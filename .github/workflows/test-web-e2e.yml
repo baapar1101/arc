@@ -1,0 +1,215 @@
+name: Flutter Web E2E Smoke
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'hesabixUI/hesabix_ui/lib/**'
+      - 'hesabixUI/hesabix_ui/pubspec.yaml'
+      - 'hesabixUI/hesabix_ui/pubspec.lock'
+      - 'build_web.sh'
+      - '.github/workflows/test-web-e2e.yml'
+  workflow_dispatch:
+
+jobs:
+  web-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PUB_HOSTED_URL: https://pub.dev
+      FLUTTER_STORAGE_BASE_URL: https://storage.googleapis.com
+      E2E_API_KEY: ${{ secrets.E2E_API_KEY }}
+      E2E_BUSINESS_ID: ${{ secrets.E2E_BUSINESS_ID }}
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build production web
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter config --enable-web
+          chmod +x build_web.sh
+          ./build_web.sh \
+            --project hesabixUI/hesabix_ui \
+            --mode release \
+            --clean \
+            --install-deps \
+            --api-base-url https://tamastore.ir
+
+      - name: Run browser smoke coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          DIST_DIR="$GITHUB_WORKSPACE/hesabixUI/hesabix_ui/build/web"
+          python3 -m http.server 8080 --bind 127.0.0.1 --directory "$DIST_DIR" \
+            >/tmp/hesabix-e2e-server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8080/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          cd "$RUNNER_TEMP"
+          npm init -y >/dev/null 2>&1
+          npm install --no-audit --no-fund playwright@1.55.0
+          npx playwright install chromium
+
+          cat > web-e2e.mjs <<'NODE'
+          import { chromium } from 'playwright';
+          import assert from 'node:assert/strict';
+
+          const baseUrl = 'http://127.0.0.1:8080';
+          const browser = await chromium.launch({
+            headless: true,
+            args: [
+              '--no-sandbox',
+              '--disable-dev-shm-usage',
+              '--enable-webgl',
+              '--ignore-gpu-blocklist',
+              '--use-angle=swiftshader',
+              '--enable-unsafe-swiftshader',
+            ],
+          });
+
+          async function createContext(extraInit = null) {
+            const context = await browser.newContext({
+              viewport: { width: 1440, height: 1000 },
+              deviceScaleFactor: 1,
+              locale: 'en-US',
+              timezoneId: 'UTC',
+              serviceWorkers: 'block',
+            });
+            await context.addInitScript(({ extra }) => {
+              localStorage.setItem('flutter.app_locale_code', 'en-US');
+              if (extra?.apiKey) {
+                localStorage.setItem('flutter.auth_api_key', extra.apiKey);
+              }
+            }, { extra: extraInit });
+            return context;
+          }
+
+          async function waitForFlutter(page) {
+            await page.waitForFunction(
+              () => Boolean(
+                document.querySelector('flt-glass-pane') ||
+                document.querySelector('canvas'),
+              ),
+              null,
+              { timeout: 60000 },
+            );
+            await page.waitForTimeout(4000);
+          }
+
+          // Always-run public E2E: compiled app boots and reaches the real login flow.
+          {
+            const context = await createContext();
+            const page = await context.newPage();
+            const pageErrors = [];
+            page.on('pageerror', (error) => pageErrors.push(error.message));
+
+            await page.goto(baseUrl, {
+              waitUntil: 'domcontentloaded',
+              timeout: 60000,
+            });
+            await waitForFlutter(page);
+
+            assert.match(
+              page.url(),
+              /\/login(?:[/?#]|$)/,
+              'Unauthenticated root navigation must resolve to the login route.',
+            );
+            assert.equal(
+              pageErrors.length,
+              0,
+              'Public login smoke must not raise browser page errors.',
+            );
+
+            await page.screenshot({
+              path: process.env.GITHUB_WORKSPACE + '/e2e-public-login.png',
+              fullPage: true,
+            });
+            await context.close();
+          }
+
+          // Optional read-only authenticated E2E. A dedicated API key avoids
+          // bypassing or automating CAPTCHA and never mutates task data.
+          const apiKey = (process.env.E2E_API_KEY || '').trim();
+          const businessId = (process.env.E2E_BUSINESS_ID || '').trim();
+          if (apiKey && /^\d+$/.test(businessId)) {
+            const context = await createContext({ apiKey });
+            const page = await context.newPage();
+            const pageErrors = [];
+            page.on('pageerror', (error) => pageErrors.push(error.message));
+
+            const listResponse = page.waitForResponse(
+              (response) => {
+                const url = new URL(response.url());
+                return response.request().method() === 'GET' &&
+                  url.pathname === `/api/v1/businesses/${businessId}/tasks`;
+              },
+              { timeout: 60000 },
+            );
+
+            await page.goto(`${baseUrl}/business/${businessId}/tasks`, {
+              waitUntil: 'domcontentloaded',
+              timeout: 60000,
+            });
+            await waitForFlutter(page);
+
+            const response = await listResponse;
+            assert.equal(
+              response.status(),
+              200,
+              `Authenticated task list request returned HTTP ${response.status()}.`,
+            );
+            assert.doesNotMatch(
+              page.url(),
+              /\/login(?:[/?#]|$)/,
+              'Authenticated task route must not redirect back to login.',
+            );
+            assert.equal(
+              pageErrors.length,
+              0,
+              'Authenticated task smoke must not raise browser page errors.',
+            );
+
+            await page.screenshot({
+              path: process.env.GITHUB_WORKSPACE + '/e2e-authenticated-tasks.png',
+              fullPage: true,
+            });
+            await context.close();
+            console.log('[e2e] authenticated task smoke passed');
+          } else {
+            console.log(
+              '[e2e] E2E_API_KEY/E2E_BUSINESS_ID not configured; authenticated read-only smoke skipped.',
+            );
+          }
+
+          await browser.close();
+          NODE
+
+          node web-e2e.mjs
+
+      - name: Upload E2E screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-web-e2e
+          path: |
+            e2e-public-login.png
+            e2e-authenticated-tasks.png
+          if-no-files-found: warn
+          retention-days: 7
