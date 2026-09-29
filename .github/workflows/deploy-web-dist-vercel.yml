@@ -1,0 +1,103 @@
+name: Deploy Web Distribution to Vercel
+
+on:
+  workflow_run:
+    workflows:
+      - Build Web Distribution
+    types:
+      - completed
+    branches:
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: vercel-production
+  cancel-in-progress: true
+
+jobs:
+  deploy-production:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VERCEL_ORG_ID: team_mCiroE8XpriX8TKvXVP3C9HA
+      VERCEL_PROJECT_ID: prj_E7v4wBSOacOAbugsPRqaJGZeAcnZ
+      PRODUCTION_URL: https://hesabix-arc.vercel.app
+      VERCEL_CLI_VERSION: 59.20.0
+
+    steps:
+      - name: Require deployment credential
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${VERCEL_TOKEN:-}" ]; then
+            echo "::error::Repository secret VERCEL_TOKEN is not configured."
+            exit 1
+          fi
+
+      - name: Checkout published web distribution
+        uses: actions/checkout@v4
+        with:
+          ref: web-dist
+          fetch-depth: 1
+
+      - name: Link existing Vercel project
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .vercel
+          cat > .vercel/project.json <<JSON
+          {"orgId":"$VERCEL_ORG_ID","projectId":"$VERCEL_PROJECT_ID"}
+          JSON
+
+      - name: Read expected build version
+        id: expected
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD="$(python3 -c 'import json; print(json.load(open("version.json"))["build"])')"
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
+          echo "Deploying web-dist build: $BUILD"
+
+      - name: Deploy existing web-dist to production
+        id: deploy
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          DEPLOY_URL="$(npx --yes vercel@$VERCEL_CLI_VERSION deploy             --prod             --yes             --token="$VERCEL_TOKEN")"
+          echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
+          echo "Deployment URL: $DEPLOY_URL"
+
+      - name: Verify deployment is READY
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          DEPLOY_URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          set -euo pipefail
+          npx --yes vercel@$VERCEL_CLI_VERSION inspect             "$DEPLOY_URL"             --wait             --token="$VERCEL_TOKEN"
+
+      - name: Verify production alias version
+        shell: bash
+        env:
+          EXPECTED_BUILD: ${{ steps.expected.outputs.build }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 24); do
+            ACTUAL_BUILD="$(curl -fsS               "$PRODUCTION_URL/version.json?deploy_check=$GITHUB_RUN_ID-$attempt"               | python3 -c 'import json,sys; print(json.load(sys.stdin).get("build",""))'               || true)"
+            if [ "$ACTUAL_BUILD" = "$EXPECTED_BUILD" ]; then
+              echo "Production verified: $ACTUAL_BUILD"
+              exit 0
+            fi
+            echo "Waiting for production alias: expected=$EXPECTED_BUILD actual=$ACTUAL_BUILD"
+            sleep 5
+          done
+
+          echo "::error::Production alias did not serve the expected web-dist build."
+          exit 1
