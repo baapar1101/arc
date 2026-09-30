@@ -41,6 +41,25 @@ void main() {
       );
     });
 
+    test('uses tamastore backend on Vercel when no API URL is configured', () {
+      expect(
+        AppConfig.resolveApiBaseUrl(
+          configuredValue: '',
+          isWebBuild: true,
+          currentUri: Uri.parse('https://hesabix-arc.vercel.app/login'),
+        ),
+        'https://tamastore.ir',
+      );
+      expect(
+        AppConfig.resolveApiBaseUrl(
+          configuredValue: '',
+          isWebBuild: true,
+          currentUri: Uri.parse('https://hesabix-preview-abc.vercel.app/'),
+        ),
+        'https://tamastore.ir',
+      );
+    });
+
     test('keeps the current origin behind a production reverse proxy', () {
       expect(
         AppConfig.resolveApiBaseUrl(
