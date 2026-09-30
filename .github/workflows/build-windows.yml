@@ -1,0 +1,89 @@
+name: Build Windows App
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'hesabixUI/hesabix_ui/**'
+      - '.github/workflows/build-windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows:
+    name: Build Windows Release
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    defaults:
+      run:
+        working-directory: hesabixUI/hesabix_ui
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Windows release
+        run: flutter build windows --release --dart-define API_BASE_URL=https://tamastore.ir
+
+      - name: Read app version
+        id: app
+        shell: pwsh
+        run: |
+          $line = Select-String -Path pubspec.yaml -Pattern '^version:\s*(.+)$' | Select-Object -First 1
+          if (-not $line) { throw 'version not found in pubspec.yaml' }
+          $version = $line.Matches[0].Groups[1].Value.Trim()
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Package Windows app
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = "${{ steps.app.outputs.version }}"
+          $releaseDir = "build/windows/x64/runner/Release"
+          if (-not (Test-Path "$releaseDir/hesabix_ui.exe")) {
+            throw "Windows executable not found at $releaseDir/hesabix_ui.exe"
+          }
+
+          $outDir = "release-windows"
+          New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+          $zip = "$outDir/MarkStreet-$version-windows-x64.zip"
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path "$releaseDir/*" -DestinationPath $zip -CompressionLevel Optimal
+
+          $hash = Get-FileHash -Path $zip -Algorithm SHA256
+          "$($hash.Hash.ToLower())  $([System.IO.Path]::GetFileName($zip))" |
+            Out-File -FilePath "$outDir/SHA256SUMS-Windows.txt" -Encoding ascii
+
+          Get-ChildItem $outDir | Format-Table Name,Length
+          Get-Content "$outDir/SHA256SUMS-Windows.txt"
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: markstreet-windows-${{ steps.app.outputs.version }}
+          path: hesabixUI/hesabix_ui/release-windows/*
+          if-no-files-found: error
+          retention-days: 30
