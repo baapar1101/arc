@@ -45,6 +45,9 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Regenerate Windows app icon
+        run: dart run flutter_launcher_icons
+
       - name: Build Windows release
         run: flutter build windows --release --dart-define API_BASE_URL=https://tamastore.ir
 
