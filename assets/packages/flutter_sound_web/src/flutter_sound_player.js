@@ -18,7 +18,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-const PLAYER_VERSION = '9.26.0'
+const PLAYER_VERSION = '9.28.0'
 
 function newPlayerInstance(aCallback, callbackTable) { return new FlutterSoundPlayer(aCallback, callbackTable); }
 
@@ -248,13 +248,13 @@ class FlutterSoundPlayer {
 
                 if (this.howl != null) {
                         this.howl.stop();
-                        this.callbackTable[CB_player_log](this.callback, DBG, 'JS: <--- stop : true');
+                        this.callbackTable[CB_player_log](this.callback, DBG, 'JS: <--- stop');
                         return true;
                 }
                 else {
                         this.status = IS_PLAYER_STOPPED; // Maybe too early ?
                         //this.callbackTable[CB_stopPlayerCompleted](this.callback,  IS_PLAYER_STOPPED, true);
-                        this.callbackTable[CB_player_log](this.callback, DBG, 'JS: <--- stop : false');
+                        this.callbackTable[CB_player_log](this.callback, DBG, 'JS: <--- stop');
                         return false;
                 }
 
@@ -265,7 +265,6 @@ class FlutterSoundPlayer {
                 //if (this.howl == null)
                 if (!this.stop()) {}
                         //this.callbackTable[CB_stopPlayerCompleted](this.callback, this.getPlayerState(), true);
-                this.status = IS_PLAYER_STOPPED; // Added in 10.2.5 because of [fs #1179]
                 this.callbackTable[CB_stopPlayerCompleted](this.callback,  IS_PLAYER_STOPPED, true);
                 this.callbackTable[CB_player_log](this.callback, DBG, 'JS: <--- stopPlayer');
                 return this.getPlayerState();

@@ -18,7 +18,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-const FLUTTER_SOUND_VERSION = '9.26.0'
+const VERSION = '9.27.0'
 
 
 const VERBOSE = 0;

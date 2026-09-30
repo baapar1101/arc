@@ -120,11 +120,6 @@ class FlutterSoundStreamProcessor extends AudioWorkletProcessor {
     {
         let chunk = this.dataList[0]; // the oldest chunk
         this.isPlaying = true;
-        if (chunk.length == 0)//***!!!
-        {
-            this.dataList.shift();
-            continue;
-        }
 
         //assert (chunk.length != this.nbrChannels);
         //assert (this.nbrChannels != data.length);
@@ -140,6 +135,9 @@ class FlutterSoundStreamProcessor extends AudioWorkletProcessor {
             for (let i = 0; i < lnx; ++i)
             {
                 data[channel][i + pd] = access(chunk, channel, i); // chunk[channel][i];
+
+
+
             }
         }
         let remain = chunk[0].length - lnx; // The number of elements not copied
@@ -170,12 +168,6 @@ class FlutterSoundStreamProcessor extends AudioWorkletProcessor {
     while (pd < frameSize && this.dataList.length > 0)
     {
         let chunk = this.dataList[0]; // the oldest chunk
-        if (chunk.length == 0)//***!!!
-        {
-            this.dataList.shift();
-            continue;
-        }
-
         let view = new DataView(chunk.buffer);
         //assert (chunk.length != this.nbrChannels);
         //assert (this.nbrChannels != data.length);
