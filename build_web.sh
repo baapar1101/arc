@@ -3,14 +3,14 @@
 set -euo pipefail
 
 # Build script for Flutter Web in this repo.
-# Creates a web build that uses https://hsxn.hesabix.ir/ as the API base URL by default.
+# Creates a web build that uses https://tamastore.ir/ as the API base URL by default.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR"
 
 DEFAULT_MODE="release" # debug|profile|release
 DEFAULT_BUILD_DIR="build/web"
-DEFAULT_API_BASE_URL="https://hsxn.hesabix.ir"
+DEFAULT_API_BASE_URL="https://tamastore.ir"
 
 USER_PROJECT=""
 MODE="$DEFAULT_MODE"
@@ -47,7 +47,7 @@ Usage examples:
   ./build_web.sh
   ./build_web.sh --mode debug --clean
   ./build_web.sh --project hesabixUI/hesabix_ui
-  ./build_web.sh --api-base-url https://hsxn.hesabix.ir
+  ./build_web.sh --api-base-url https://tamastore.ir
   ./build_web.sh --offline
   ./build_web.sh --branding custom --branding-dir /opt/hesabix/branding
 EOF
