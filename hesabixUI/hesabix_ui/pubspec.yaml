@@ -61,7 +61,8 @@ dependencies:
   printing: ^5.14.2
   pdf: ^3.11.3
   barcode: ^2.2.9
-  flutter_sound: ^9.2.13
+  # 9.29+ has an upstream Windows/Linux CMake target regression; keep 9.28.0 for desktop builds.
+  flutter_sound: 9.28.0
   ffi: ^2.1.4
   permission_handler: ^12.0.3
   geolocator: 14.0.2
