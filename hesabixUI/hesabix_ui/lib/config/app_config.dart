@@ -73,8 +73,15 @@ class AppConfig {
           port: 8000,
         ).origin;
       }
-      // مثال: http://localhost:8080 یا https://arc.hesabix.ir
-      // در این حالت انتظار داریم reverse proxy مسیرهای api/ws را route کند.
+      // Vercel فقط فرانت‌اند است و reverse proxy بک‌اند روی همان origin ندارد.
+      // اگر build-time API_BASE_URL تزریق نشده باشد، Vercel باید صریحاً به
+      // بک‌اند production اشاره کند.
+      if (host == 'hesabix-arc.vercel.app' || host.endsWith('.vercel.app')) {
+        return 'https://tamastore.ir';
+      }
+
+      // مثال: https://arc.hesabix.ir
+      // در سایر deploymentها انتظار داریم reverse proxy مسیرهای api/ws را route کند.
       return currentUri.origin;
     }
 
