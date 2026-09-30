@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: windows-build-${{ github.ref }}
@@ -90,3 +90,20 @@ jobs:
           path: hesabixUI/hesabix_ui/release-windows/*
           if-no-files-found: error
           retention-days: 30
+
+      - name: Attach Windows build to GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = "${{ steps.app.outputs.version }}"
+          $tag = "v$version"
+          Set-Location $env:GITHUB_WORKSPACE
+
+          gh release view $tag --repo $env:GITHUB_REPOSITORY | Out-Null
+          if ($LASTEXITCODE -ne 0) {
+            throw "GitHub Release $tag does not exist."
+          }
+
+          gh release upload $tag hesabixUI/hesabix_ui/release-windows/MarkStreet-$version-windows-x64.zip hesabixUI/hesabix_ui/release-windows/SHA256SUMS-Windows.txt --repo $env:GITHUB_REPOSITORY --clobber
