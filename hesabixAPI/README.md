@@ -19,3 +19,4 @@ Health endpoint: `GET /api/v1/health`.
 ## Configuration
 - See `app/core/settings.py` and `.env.example`.
 - چت CRM و WebSocket: اگر Redis برای API خاموش است، برای رویدادهای زندهٔ چت باید **تک worker** یا **sticky وب‌سوکت** باشد؛ جزییات: [`docs/CRM_CHAT_WEBSOCKET_DEPLOYMENT.md`](docs/CRM_CHAT_WEBSOCKET_DEPLOYMENT.md).
+- معماری، رفتار تراکنشی و راهنمای پایش ایمپورت Excel کالا/خدمت: [`docs/PRODUCT_EXCEL_IMPORT_PERFORMANCE.md`](docs/PRODUCT_EXCEL_IMPORT_PERFORMANCE.md).

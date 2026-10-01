@@ -144,7 +144,10 @@ class _ProductImportDialogState extends State<ProductImportDialog> {
       final res = await api.post<Map<String, dynamic>>(
         '/products/business/${widget.businessId}/import/excel',
         data: form,
-        options: Options(contentType: 'multipart/form-data'),
+        options: Options(
+          contentType: 'multipart/form-data',
+          receiveTimeout: const Duration(minutes: 5),
+        ),
       );
       setState(() {
         _result = res.data;

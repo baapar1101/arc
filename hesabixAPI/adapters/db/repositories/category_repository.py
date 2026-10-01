@@ -70,7 +70,15 @@ class CategoryRepository(BaseRepository[BusinessCategory]):
         
         return roots
 
-    def create_category(self, *, business_id: int, parent_id: int | None, translations: dict[str, str], description: str | None = None) -> BusinessCategory:
+    def create_category(
+        self,
+        *,
+        business_id: int,
+        parent_id: int | None,
+        translations: dict[str, str],
+        description: str | None = None,
+        auto_commit: bool = True,
+    ) -> BusinessCategory:
         obj = BusinessCategory(
             business_id=business_id,
             parent_id=parent_id,
@@ -78,8 +86,11 @@ class CategoryRepository(BaseRepository[BusinessCategory]):
             description=description,
         )
         self.db.add(obj)
-        self.db.commit()
-        self.db.refresh(obj)
+        if auto_commit:
+            self.db.commit()
+            self.db.refresh(obj)
+        else:
+            self.db.flush()
         return obj
 
     def update_category(self, *, category_id: int, translations: dict[str, str] | None = None, description: str | None = None, sort_order: int | None = None, parent_id: int | None = None) -> BusinessCategory | None:
@@ -188,4 +199,3 @@ class CategoryRepository(BaseRepository[BusinessCategory]):
                 "path": build_path(r),
             })
         return result
-

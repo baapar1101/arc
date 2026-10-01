@@ -10,6 +10,9 @@ from app.services.product_excel_import_normalize import (
     map_headers,
     parse_bool_strict,
     parse_inventory_mode,
+    find_existing_product_in_index,
+    load_existing_product_match_index,
+    product_match_key,
     provided_keys_from_raw,
     select_products_import_worksheet,
 )
@@ -185,3 +188,56 @@ def test_category_full_path_walks_parents():
     child = type("C", (), {"id": 2, "parent_id": 1, "title_translations": {"fa": "پلاستیک"}})()
     by_id = {1: parent, 2: child}
     assert category_full_path(child, by_id, "fa") == "مواد اولیه > پلاستیک"
+
+
+def test_import_match_index_resolves_without_database_lookup():
+    product = type("P", (), {"id": 7, "code": " P-1 ", "name": "  ماگ  بزرگ "})()
+    code_index = {"P-1": [product]}
+    found, error = find_existing_product_in_index(code_index, "code", {"code": "P-1"})
+    assert error is None
+    assert found is product
+
+    name_key = product_match_key("name", {"name": "ماگ   بزرگ"})
+    found, error = find_existing_product_in_index({name_key: [product]}, "name", {"name": "ماگ بزرگ"})
+    assert error is None
+    assert found is product
+
+
+def test_import_match_index_rejects_ambiguous_name():
+    p1 = type("P", (), {"id": 1})()
+    p2 = type("P", (), {"id": 2})()
+    found, error = find_existing_product_in_index(
+        {"ماگ": [p1, p2]},
+        "name",
+        {"name": "ماگ"},
+    )
+    assert found is None
+    assert error is not None
+
+
+def test_existing_product_lookup_is_chunked_not_per_row():
+    class _Query:
+        def filter(self, *_args):
+            return self
+
+        def all(self):
+            return []
+
+    class _Session:
+        def __init__(self):
+            self.query_count = 0
+
+        def query(self, *_args):
+            self.query_count += 1
+            return _Query()
+
+    session = _Session()
+    index = load_existing_product_match_index(  # type: ignore[arg-type]
+        session,
+        1,
+        "code",
+        [f"P-{i}" for i in range(1201)],
+        chunk_size=500,
+    )
+    assert index == {}
+    assert session.query_count == 3

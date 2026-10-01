@@ -381,7 +381,14 @@ def _validate_unit_string(unit: Optional[str]) -> Optional[str]:
 
 
 
-def _upsert_attributes(db: Session, product_id: int, business_id: int, attribute_ids: Optional[List[int]], auto_commit: bool = True) -> None:
+def _upsert_attributes(
+    db: Session,
+    product_id: int,
+    business_id: int,
+    attribute_ids: Optional[List[int]],
+    auto_commit: bool = True,
+    validate_ids: bool = True,
+) -> None:
     """
     ایجاد یا به‌روزرسانی ویژگی‌های کالا
     
@@ -399,11 +406,13 @@ def _upsert_attributes(db: Session, product_id: int, business_id: int, attribute
         if auto_commit:
             db.commit()
         return
-    valid_ids = [
-        a.id for a in db.query(ProductAttribute.id, ProductAttribute.business_id)
-        .filter(ProductAttribute.id.in_(attribute_ids), ProductAttribute.business_id == business_id)
-        .all()
-    ]
+    valid_ids = list(attribute_ids)
+    if validate_ids:
+        valid_ids = [
+            a.id for a in db.query(ProductAttribute.id, ProductAttribute.business_id)
+            .filter(ProductAttribute.id.in_(attribute_ids), ProductAttribute.business_id == business_id)
+            .all()
+        ]
     for aid in valid_ids:
         db.add(ProductAttributeLink(product_id=product_id, attribute_id=aid))
     if auto_commit:
@@ -416,6 +425,10 @@ def create_product(
     payload: ProductCreateRequest,
     *,
     defer_cache_invalidation: bool = False,
+    auto_commit: bool = True,
+    serialize_result: bool = True,
+    prevalidated_code_uniqueness: bool = False,
+    prevalidated_attribute_ids: bool = False,
 ) -> Dict[str, Any]:
     """
     ایجاد کالا/خدمت جدید (با Retry Logic برای مدیریت Race Condition)
@@ -450,9 +463,10 @@ def create_product(
                 if code_str and code_str != payload.name.strip():
                     code = code_str
                     manual_code = True
-                    dup = db.query(Product).filter(and_(Product.business_id == business_id, Product.code == code)).first()
-                    if dup:
-                        raise ApiError("DUPLICATE_PRODUCT_CODE", "کد کالا/خدمت تکراری است", http_status=400)
+                    if not prevalidated_code_uniqueness:
+                        dup = db.query(Product).filter(and_(Product.business_id == business_id, Product.code == code)).first()
+                        if dup:
+                            raise ApiError("DUPLICATE_PRODUCT_CODE", "کد کالا/خدمت تکراری است", http_status=400)
             
             # اگر کد خالی است یا برابر نام کالا است، کد خودکار تولید کن
             if not code:
@@ -525,17 +539,31 @@ def create_product(
 
             # _upsert_attributes را بدون commit صدا می‌زنیم تا همه چیز در یک transaction باشد
             logger.debug(f"[CREATE_PRODUCT] Upserting attributes - attribute_ids={payload.attribute_ids}")
-            _upsert_attributes(db, obj.id, business_id, payload.attribute_ids, auto_commit=False)
+            _upsert_attributes(
+                db,
+                obj.id,
+                business_id,
+                payload.attribute_ids,
+                auto_commit=False,
+                validate_ids=not prevalidated_attribute_ids,
+            )
             upsert_product_suppliers(db, obj.id, business_id, payload.suppliers, auto_commit=False)
             
-            # Commit همه چیز (product و attributes)
-            logger.info(f"[CREATE_PRODUCT] Committing transaction for product ID={obj.id}...")
-            db.commit()
-            logger.info(f"[CREATE_PRODUCT] ✅ Transaction COMMITTED successfully for product ID={obj.id}")
-            db.refresh(obj)  # Refresh برای دریافت اطلاعات کامل
-            logger.debug(f"[CREATE_PRODUCT] Product refreshed - final code='{obj.code}', name='{obj.name}'")
+            # مسیرهای تک‌کالا مثل گذشته commit می‌کنند؛ ایمپورت گروهی commit را
+            # تا پایان Unit of Work عقب می‌اندازد.
+            if auto_commit:
+                logger.info(f"[CREATE_PRODUCT] Committing transaction for product ID={obj.id}...")
+                db.commit()
+                logger.info(f"[CREATE_PRODUCT] ✅ Transaction COMMITTED successfully for product ID={obj.id}")
+                db.refresh(obj)
+                logger.debug(f"[CREATE_PRODUCT] Product refreshed - final code='{obj.code}', name='{obj.name}'")
 
-            data = _to_dict(obj, db)
+            data = _to_dict(obj, db) if serialize_result else {
+                "id": obj.id,
+                "name": obj.name,
+                "code": obj.code,
+                "default_warehouse_id": obj.default_warehouse_id,
+            }
             # enrich titles from payload if provided
             if getattr(payload, 'main_unit_title', None):
                 data["main_unit_title"] = str(getattr(payload, 'main_unit_title'))
@@ -557,7 +585,14 @@ def create_product(
             # خطای تکراری بودن کد (UniqueConstraint violation)
             logger.warning(f"[CREATE_PRODUCT] IntegrityError caught (attempt {retry_count + 1}): {e}")
             logger.debug(f"[CREATE_PRODUCT] Rolling back transaction...")
-            db.rollback()
+            if auto_commit:
+                db.rollback()
+            else:
+                raise ApiError(
+                    "PRODUCT_IMPORT_WRITE_CONFLICT",
+                    "تداخل هم‌زمان هنگام ثبت کالا رخ داد؛ ایمپورت دوباره بررسی شود",
+                    http_status=409,
+                ) from e
             err_txt = str(getattr(e, "orig", e)).lower()
             if "uq_product_general_barcode_business_token" in err_txt or "product_general_barcode_aliases" in err_txt:
                 raise ApiError(
@@ -735,6 +770,10 @@ def update_product(
     *,
     defer_cache_invalidation: bool = False,
     user_id: Optional[int] = None,
+    auto_commit: bool = True,
+    serialize_result: bool = True,
+    prevalidated_code_uniqueness: bool = False,
+    prevalidated_attribute_ids: bool = False,
 ) -> Optional[Dict[str, Any]]:
     repo = ProductRepository(db)
     obj = db.get(Product, product_id)
@@ -748,7 +787,7 @@ def update_product(
         code_str = payload.code.strip() if isinstance(payload.code, str) else str(payload.code).strip()
         if code_str:  # فقط اگر کد خالی نباشد
             code_value = code_str
-            if code_value != obj.code:  # اگر کد تغییر کرده
+            if code_value != obj.code and not prevalidated_code_uniqueness:  # اگر کد تغییر کرده
                 dup = db.query(Product).filter(and_(Product.business_id == business_id, Product.code == code_value, Product.id != product_id)).first()
                 if dup:
                     raise ApiError("DUPLICATE_PRODUCT_CODE", "کد کالا/خدمت تکراری است", http_status=400)
@@ -937,7 +976,14 @@ def update_product(
     if gb_handled:
         replace_general_barcode_aliases(db, business_id, product_id, general_tokens)
 
-    _upsert_attributes(db, product_id, business_id, payload.attribute_ids, auto_commit=False)
+    _upsert_attributes(
+        db,
+        product_id,
+        business_id,
+        payload.attribute_ids,
+        auto_commit=False,
+        validate_ids=not prevalidated_attribute_ids,
+    )
     if "suppliers" in fields_set:
         upsert_product_suppliers(db, product_id, business_id, payload.suppliers, auto_commit=False)
 
@@ -959,16 +1005,17 @@ def update_product(
             user_id=user_id,
         )
 
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise ApiError(
-            "GENERAL_BARCODE_CONFLICT",
-            "بارکد عمومی تکراری است یا با دادهٔ دیگر در تداخل است",
-            http_status=409,
-        )
-    db.refresh(updated)
+    if auto_commit:
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            raise ApiError(
+                "GENERAL_BARCODE_CONFLICT",
+                "بارکد عمومی تکراری است یا با دادهٔ دیگر در تداخل است",
+                http_status=409,
+            )
+        db.refresh(updated)
     
     if not defer_cache_invalidation:
         old_category_id = obj.category_id if obj else None
@@ -987,7 +1034,12 @@ def update_product(
             )
         invalidate_public_catalog_caches()
 
-    data = _to_dict(updated, db)
+    data = _to_dict(updated, db) if serialize_result else {
+        "id": updated.id,
+        "name": updated.name,
+        "code": updated.code,
+        "default_warehouse_id": updated.default_warehouse_id,
+    }
     return {"message": "PRODUCT_UPDATED", "data": data}
 
 
@@ -2676,5 +2728,3 @@ def get_inventory_stock_report(
             "has_prev": current_page > 1,
         }
     }
-
-
