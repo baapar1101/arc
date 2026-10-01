@@ -1760,6 +1760,7 @@ def import_products_excel(
         can_edit_opening_balance = has_business_permission_for_business(
             ctx, db, business_id, "opening_balance", "edit"
         )
+        can_write_inventory = ctx.has_business_permission("inventory", "write")
         warehouse_rows = db.query(Warehouse).filter(Warehouse.business_id == business_id).all()
         warehouse_index = WarehouseImportIndex(warehouse_rows)
         if "name" not in mapped_keys:
@@ -2379,6 +2380,8 @@ def import_products_excel(
                     if "item_type" not in item:
                         existing_type = existing_for_ob.item_type
                         ob_item["item_type"] = existing_type.value if hasattr(existing_type, "value") else str(existing_type)
+                    if "inventory_mode" not in item:
+                        ob_item["inventory_mode"] = existing_for_ob.inventory_mode
                     if item.get("default_warehouse_id") is None:
                         ob_item["default_warehouse_id"] = existing_for_ob.default_warehouse_id
                 ob_input, ob_errors, ob_warnings, ob_preview = prepare_opening_balance_for_import_row(
@@ -2388,6 +2391,7 @@ def import_products_excel(
                     db=db,
                     can_edit_opening_balance=can_edit_opening_balance,
                     is_update=existing_for_ob is not None,
+                    can_write_inventory=can_write_inventory,
                     existing_product=existing_for_ob,
                     warehouse_index=warehouse_index,
                     validate_document_context=False,
@@ -2455,8 +2459,6 @@ def import_products_excel(
                 row_preview["warnings"] = row_warnings
                 preview_rows.append(row_preview)
 
-        validation_finished_at = time.perf_counter()
-
         inserted = 0
         updated = 0
         skipped = 0
@@ -2464,6 +2466,14 @@ def import_products_excel(
         would_insert = 0
         would_update = 0
         would_skip_conflict = 0
+        warehouse_sync: dict[str, Any] = {
+            "receipts_created": 0,
+            "issues_created": 0,
+            "lines_created": 0,
+            "unchanged_lines": 0,
+            "posted": not is_dry_run,
+            "document_ids": [],
+        }
 
         items_with_opening_balance = [
             item for item in valid_items if item.get("opening_balance") is not None
@@ -2486,6 +2496,59 @@ def import_products_excel(
                     for item in valid_items
                     if int(item.get("_row")) not in invalid_rows
                 ]
+
+        existing_ob_candidates: dict[int, int] = {}
+        for item in valid_items:
+            if item.get("opening_balance") is None:
+                continue
+            existing_candidate, _ = find_existing_product_in_index(
+                existing_product_index, match_by, item
+            )
+            if existing_candidate is not None:
+                existing_ob_candidates[int(item["_row"])] = int(existing_candidate.id)
+        if existing_ob_candidates:
+            from app.services.opening_balance_warehouse_sync_service import (
+                find_products_with_unrelated_posted_warehouse_history,
+            )
+
+            conflicting_product_ids = find_products_with_unrelated_posted_warehouse_history(
+                db,
+                business_id,
+                sorted(set(existing_ob_candidates.values())),
+            )
+            if conflicting_product_ids:
+                conflict_rows = {
+                    row_id
+                    for row_id, product_id in existing_ob_candidates.items()
+                    if product_id in conflicting_product_ids
+                }
+                for row_id in sorted(conflict_rows):
+                    errors.append({
+                        "row": row_id,
+                        "errors": [
+                            "برای این کالا قبلاً گردش انبار ثبت شده است؛ اختلاف را با رسید/حواله یا تعدیل انبار ثبت کنید"
+                        ],
+                    })
+                valid_items = [
+                    item for item in valid_items if int(item.get("_row")) not in conflict_rows
+                ]
+
+        if is_dry_run:
+            candidate_items = [
+                item for item in valid_items if item.get("opening_balance") is not None
+            ]
+            candidate_warehouses = {
+                int(item["opening_balance"]["warehouse_id"])
+                for item in candidate_items
+                if item.get("opening_balance") and item["opening_balance"].get("warehouse_id")
+            }
+            warehouse_sync.update({
+                "candidate_warehouses": len(candidate_warehouses),
+                "candidate_lines": len(candidate_items),
+                "posted": False,
+            })
+
+        validation_finished_at = time.perf_counter()
 
         logger.info(f"[IMPORT] Processing summary - total_rows={len(data_rows)}, valid_items={len(valid_items)}, errors={len(errors)}, is_dry_run={is_dry_run}")
 
@@ -2593,12 +2656,23 @@ def import_products_excel(
                         updated += 1
 
                 if opening_balance_changes:
-                    apply_product_opening_balance_changes(
+                    opening_balance_result = apply_product_opening_balance_changes(
                         db,
                         business_id,
                         user_id,
                         opening_balance_changes,
                         auto_commit=False,
+                    )
+                    from app.services.opening_balance_warehouse_sync_service import (
+                        sync_opening_balance_warehouse_documents,
+                    )
+
+                    warehouse_sync = sync_opening_balance_warehouse_documents(
+                        db,
+                        business_id,
+                        user_id,
+                        int(opening_balance_result["id"]),
+                        [int(change["product_id"]) for change in opening_balance_changes],
                     )
 
                 db.commit()
@@ -2651,6 +2725,7 @@ def import_products_excel(
                 "summary": summary,
                 "errors": errors,
                 "reference_summary": reference_summary,
+                "warehouse_sync": warehouse_sync,
                 "preview": preview_rows if is_dry_run else None,
                 "performance": performance,
             },

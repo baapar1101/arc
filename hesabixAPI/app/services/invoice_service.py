@@ -1242,8 +1242,8 @@ def _compute_available_stock(
             WarehouseDocumentLine.warehouse_id == warehouse_id
         )
 
-    # حواله‌های ناشی از فاکتور قبلاً در invoice_item_lines (بخش _iter_product_movements) لحاظ شده‌اند؛
-    # شمردن دوبارهٔ خطوط این حواله‌ها موجودی را دو برابر نشان می‌دهد.
+    # حواله‌های آینه‌ای فاکتور و تراز افتتاحیه قبلاً در خطوط سند مالی لحاظ
+    # شده‌اند؛ شمردن دوبارهٔ خطوط این حواله‌ها موجودی را دو برابر می‌کند.
     _wh_src_doc = aliased(Document)
     wh_movements_query = wh_movements_query.outerjoin(
         _wh_src_doc,
@@ -1253,11 +1253,11 @@ def _compute_available_stock(
         ),
     ).filter(
         ~or_(
-            func.lower(func.coalesce(WarehouseDocument.source_type, "")) == "invoice",
+            func.lower(func.coalesce(WarehouseDocument.source_type, "")).in_(("invoice", "opening_balance")),
             and_(
                 WarehouseDocument.source_document_id.isnot(None),
                 _wh_src_doc.id.isnot(None),
-                _wh_src_doc.document_type.in_(SUPPORTED_INVOICE_TYPES),
+                _wh_src_doc.document_type.in_((*SUPPORTED_INVOICE_TYPES, "opening_balance")),
             ),
         )
     )

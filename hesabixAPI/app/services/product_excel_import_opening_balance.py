@@ -162,6 +162,7 @@ def prepare_opening_balance_for_import_row(
     db: Session,
     can_edit_opening_balance: bool,
     is_update: bool,
+    can_write_inventory: bool = True,
     existing_product: Optional[Product] = None,
     warehouse_index: WarehouseImportIndex,
     validate_document_context: bool = True,
@@ -205,8 +206,16 @@ def prepare_opening_balance_for_import_row(
         errors.append("برای ثبت تعداد اولیه باید کنترل موجودی فعال باشد")
         return None, errors, warnings, preview
 
+    if str(item.get("inventory_mode") or "bulk").strip().lower() == "unique":
+        errors.append("ثبت تعداد اولیه کالای یونیک از Excel بدون اطلاعات سریال/نمونه مجاز نیست")
+        return None, errors, warnings, preview
+
     if not can_edit_opening_balance:
         errors.append("برای ثبت تعداد اولیه به دسترسی ویرایش تراز افتتاحیه نیاز است")
+        return None, errors, warnings, preview
+
+    if not can_write_inventory:
+        errors.append("برای ثبت تعداد اولیه و رسید خودکار انبار به دسترسی ویرایش موجودی نیاز است")
         return None, errors, warnings, preview
 
     qty_dec = qty_raw if isinstance(qty_raw, Decimal) else Decimal(str(qty_raw or 0))

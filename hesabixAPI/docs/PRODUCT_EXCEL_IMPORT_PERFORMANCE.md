@@ -38,6 +38,8 @@ flush کالاهای معتبر در یک Unit of Work
       ↓
 یک بازنویسی سند افتتاحیه
       ↓
+همگام‌سازی اختلافی رسید/حواله انبار به تفکیک انبار
+      ↓
 یک commit و سپس یک cache invalidation
 ```
 
@@ -95,6 +97,7 @@ dry-run، تصمیم insert/update و اجرای واقعی همگی از همی
 - `errors`
 - `reference_summary`
 - `preview` در dry-run
+- `warehouse_sync` برای خلاصه اسناد فیزیکی افتتاحیه
 
 فیلد افزوده‌شدهٔ `performance` شامل مقادیر زیر برحسب میلی‌ثانیه است:
 
@@ -125,6 +128,7 @@ repositoryهای دسته، ویژگی و سند نیز `auto_commit=True` دا�
 - `app/services/product_excel_import_normalize.py`: index تطبیق و ارز
 - `app/services/product_excel_import_opening_balance.py`: validation ردیف
 - `app/services/product_opening_balance_service.py`: ادغام و apply گروهی
+- `app/services/opening_balance_warehouse_sync_service.py`: sync اختلافی موجودی فیزیکی
 - `app/services/product_service.py`: write بدون commit/serialization اجباری
 - `app/services/opening_balance_service.py`: upsert قابل استفاده در transaction بیرونی
 - `adapters/db/repositories/document_repository.py`: write با commit اختیاری
@@ -204,6 +208,9 @@ microbenchmark تابع ادغام گروهی روی همان محیط، با ه
 - lookup کالا متناسب با تعداد chunkها رشد کند، نه تعداد ردیف‌ها.
 - اجرای واقعی یک commit نهایی داشته باشد.
 - سند افتتاحیه برای کل فایل یک بار apply شود.
+- برای هر انبار و جهت حرکت حداکثر یک سند گروهی ساخته شود.
+- تکرار فایل یکسان هیچ حرکت انبار تازه‌ای نسازد.
+- موجودی افتتاحیه در محاسبات ترکیبی دو بار شمرده نشود.
 - cache invalidation برای کل import یک بار انجام شود.
 - نتیجهٔ dry-run و real import برای insert/update/skip یکسان باشد.
 - زمان ۱۰۰۰ ردیف روی یک محیط ثابت حداقل پنج برابر بهتر از baseline قدیمی باشد.

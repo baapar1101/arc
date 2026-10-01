@@ -22,7 +22,7 @@ class WarehouseDocument(Base):
 	doc_type = Column(String(32), nullable=False)  # receipt|issue|transfer|production_in|production_out|adjustment
 	warehouse_id_from = Column(Integer, nullable=True, index=True)
 	warehouse_id_to = Column(Integer, nullable=True, index=True)
-	source_type = Column(String(32), nullable=True)  # invoice|manual|api
+	source_type = Column(String(32), nullable=True)  # invoice|opening_balance|manual|api
 	source_document_id = Column(Integer, nullable=True, index=True)
 	extra_info = Column(JSON, nullable=True)
 	created_by_user_id = Column(Integer, nullable=True)
@@ -33,5 +33,4 @@ class WarehouseDocument(Base):
 
 	def touch(self):
 		self.updated_at = datetime.utcnow()
-
 
