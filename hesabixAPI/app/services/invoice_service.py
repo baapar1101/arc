@@ -1530,7 +1530,10 @@ def _validate_outgoing_stock_before_invoice_commit(
         business_id,
         document.document_date,
         lines_to_check,
-        exclude_document_id=None,
+        # InvoiceItemLineهای سند جاری پیش از این کنترل flush شده‌اند. اگر خود سند
+        # حذف نشود، مقدار فروش یک‌بار در موجودی قابل‌استفاده کسر و بار دوم به‌عنوان
+        # مقدار موردنیاز مقایسه می‌شود (مثلاً موجودی ۱ برای فروش ۱ رد می‌شود).
+        exclude_document_id=int(document.id),
         exclude_invoice_source_document_id=None,
         exclude_warehouse_document_ids=None,
     )
