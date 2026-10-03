@@ -772,10 +772,21 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
       await _loadProductInfo(pid, force: true);
     }
     _hydrateProductMetadataWithoutChangingUnitPrice();
+    for (var i = 0; i < _rows.length; i++) {
+      final row = _rows[i];
+      if (row.extraInfo?['_local_resolve_unit_price'] != true) continue;
+      final resolved = await _resolveUnitPrice(row, preferManual: false);
+      final cleanedExtraInfo = Map<String, dynamic>.from(
+        resolved.extraInfo ?? const <String, dynamic>{},
+      )..remove('_local_resolve_unit_price');
+      _rows[i] = resolved.copyWith(extraInfo: cleanedExtraInfo);
+    }
+    if (!mounted) return;
     if (mounted) {
       setState(() {});
       _syncAllDescriptionControllersFromRows();
     }
+    _notify();
     _invoiceLineAttrsLog('loadProductInfosForInitialRows done');
   }
 
@@ -838,7 +849,12 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
         }
         _loadProductInfosForInitialRows();
         _notify();
-      } else if (widget.initialRows!.length > _rows.length) {
+      } else if (widget.initialRows!.length > _rows.length ||
+          widget.initialRows!.any(
+            (incoming) =>
+                incoming.extraInfo?['_local_resolve_unit_price'] == true &&
+                !_rows.any((current) => current.lineKey == incoming.lineKey),
+          )) {
         _invoiceLineAttrsLog(
           'didUpdateWidget: replace rows initial=${widget.initialRows!.length} current=${_rows.length}',
         );
@@ -3012,6 +3028,5 @@ class _QuantityWithUnitFieldState extends State<_QuantityWithUnitField> {
     );
   }
 }
-
 
 
