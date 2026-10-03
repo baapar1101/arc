@@ -8,6 +8,7 @@ import '../../widgets/invoice/invoice_info_form.dart';
 import '../../widgets/invoice/line_items_table.dart';
 import '../../widgets/invoice/invoice_transactions_widget.dart';
 import '../../widgets/invoice/invoice_fx_dual_totals_banner.dart';
+import '../../widgets/invoice/product_bundle_picker_dialog.dart';
 import '../../utils/number_formatters.dart';
 import '../../models/invoice_type_model.dart';
 import '../../models/customer_model.dart';
@@ -1015,6 +1016,17 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (_selectedInvoiceType?.value == 'sales') ...[
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: OutlinedButton.icon(
+                    onPressed: _addProductBundleRows,
+                    icon: const Icon(Icons.inventory_2_outlined),
+                    label: const Text('وارد کردن باندل'),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               AnimatedBuilder(
                 animation: _tabController,
                 builder: (context, _) {
@@ -1145,6 +1157,21 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
         ),
       ),
     );
+  }
+
+  Future<void> _addProductBundleRows() async {
+    final rows = await showProductBundlePickerDialog(
+      context: context,
+      businessId: widget.businessId,
+    );
+    if (!mounted || rows == null || rows.isEmpty) return;
+    setState(() {
+      _lineItems = [
+        ..._lineItems.where((item) => item.productId != null),
+        ...rows,
+      ];
+      _recalculateTotals();
+    });
   }
 
   Widget _buildAdjustmentsTab() {
@@ -1581,5 +1608,4 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     };
   }
 }
-
 

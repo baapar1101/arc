@@ -325,6 +325,7 @@ class ProductComboboxWidget extends StatefulWidget {
   final String hintText;
   final AuthStore? authStore;
   final ValueChanged<List<Map<String, dynamic>>>? onProductsLoaded;
+  final bool productsOnly;
 
   const ProductComboboxWidget({
     super.key,
@@ -335,6 +336,7 @@ class ProductComboboxWidget extends StatefulWidget {
     this.hintText = 'جست‌وجو و انتخاب کالا/خدمت',
     this.authStore,
     this.onProductsLoaded,
+    this.productsOnly = false,
   });
 
   @override
@@ -342,8 +344,16 @@ class ProductComboboxWidget extends StatefulWidget {
 }
 
 class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
+  List<Map<String, dynamic>>? get _typeFilters => widget.productsOnly
+      ? const [
+          {'property': 'item_type', 'operator': '=', 'value': 'کالا'},
+          {'property': 'is_active', 'operator': '=', 'value': true},
+        ]
+      : null;
+
   /// افزودن کالای جدید در API نیازمند `products.add` است؛ صرفاً وجود [AuthStore] کافی نیست.
   bool get _canCreateProducts =>
+      !widget.productsOnly &&
       widget.authStore != null &&
       widget.authStore!.hasBusinessPermission('products', 'add');
 
@@ -922,6 +932,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
         limit: _pageSize,
         skip: 0,
         searchFields: const ['code', 'name', 'barcode'],
+        filters: _typeFilters,
         categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
         includeInventory: true,
       );
@@ -1008,6 +1019,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
         limit: _pageSize,
         skip: 0,
         searchFields: const ['code', 'name', 'barcode'],
+        filters: _typeFilters,
         categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
         includeInventory: true,
       );
@@ -1053,6 +1065,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
         limit: _pageSize,
         skip: _currentSkip,
         searchFields: const ['code', 'name', 'barcode'],
+        filters: _typeFilters,
         categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
         includeInventory: true,
       );

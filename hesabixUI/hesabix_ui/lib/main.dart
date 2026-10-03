@@ -138,6 +138,7 @@ import 'pages/business/pnl_cumulative_report_page.dart';
 import 'pages/business/account_review_report_page.dart';
 import 'pages/business/persons_page.dart';
 import 'pages/business/product_attributes_page.dart';
+import 'pages/business/product_bundles_page.dart';
 import 'pages/business/catalog_spec_fields_page.dart';
 import 'pages/business/products_page.dart';
 import 'pages/business/product_bulk_prices_sheet_page.dart';
@@ -5065,6 +5066,21 @@ class _MyAppState extends State<MyApp> {
                               return hesabixNoTransitionPage(
                                 state,
                                 ProductAttributesPage(
+                                  businessId: businessId,
+                                  authStore: _authStore!,
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'product-bundles',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                ProductBundlesPage(
                                   businessId: businessId,
                                   authStore: _authStore!,
                                 ),

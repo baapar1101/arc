@@ -18,6 +18,7 @@ import '../../models/person_model.dart';
 import '../../widgets/invoice/line_items_table.dart';
 import '../../widgets/invoice/invoice_transactions_widget.dart';
 import '../../widgets/invoice/bom_explosion_widget.dart';
+import '../../widgets/invoice/product_bundle_picker_dialog.dart';
 import '../../services/bom_service.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
 import '../../widgets/invoice/invoice_fx_dual_totals_banner.dart';
@@ -3214,6 +3215,17 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (_selectedInvoiceType?.value == 'sales') ...[
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: OutlinedButton.icon(
+                    onPressed: _addProductBundleRows,
+                    icon: const Icon(Icons.inventory_2_outlined),
+                    label: const Text('وارد کردن باندل'),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               // ویجت انفجار فرمول (فقط برای فاکتور تولید)
               if (_selectedInvoiceType == InvoiceType.production) ...[
                 BomExplosionWidget(
@@ -3406,6 +3418,21 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         ),
       ),
     );
+  }
+
+  Future<void> _addProductBundleRows() async {
+    final rows = await showProductBundlePickerDialog(
+      context: context,
+      businessId: widget.businessId,
+    );
+    if (!mounted || rows == null || rows.isEmpty) return;
+    setState(() {
+      _lineItems = [
+        ..._lineItems.where((item) => item.productId != null),
+        ...rows,
+      ];
+      _recalculateTotalsFromLines();
+    });
   }
 
   Widget _buildAdjustmentsTab() {
