@@ -87,3 +87,79 @@ def test_prepare_opening_balance_requires_permission():
     )
     assert ob is None
     assert any("دسترسی" in e for e in errors)
+
+
+def test_prepare_opening_balance_requires_inventory_write_permission():
+    idx = WarehouseImportIndex([_warehouse(1, "W", "W", True)])
+    item = {
+        "item_type": "کالا",
+        "track_inventory": True,
+        OPENING_BALANCE_QUANTITY_KEY: 5,
+        "default_warehouse_id": 1,
+    }
+    ob, errors, warnings, preview = prepare_opening_balance_for_import_row(
+        item=item,
+        mapped_keys={OPENING_BALANCE_QUANTITY_KEY},
+        business_id=1,
+        db=None,  # type: ignore[arg-type]
+        can_edit_opening_balance=True,
+        can_write_inventory=False,
+        is_update=False,
+        existing_product=None,
+        warehouse_index=idx,
+    )
+    assert ob is None
+    assert any("ویرایش موجودی" in e for e in errors)
+
+
+def test_prepare_opening_balance_rejects_unique_without_instances():
+    idx = WarehouseImportIndex([_warehouse(1, "W", "W", True)])
+    item = {
+        "item_type": "کالا",
+        "track_inventory": True,
+        "inventory_mode": "unique",
+        OPENING_BALANCE_QUANTITY_KEY: 1,
+        "default_warehouse_id": 1,
+    }
+    ob, errors, warnings, preview = prepare_opening_balance_for_import_row(
+        item=item,
+        mapped_keys={OPENING_BALANCE_QUANTITY_KEY},
+        business_id=1,
+        db=None,  # type: ignore[arg-type]
+        can_edit_opening_balance=True,
+        can_write_inventory=True,
+        is_update=False,
+        existing_product=None,
+        warehouse_index=idx,
+    )
+    assert ob is None
+    assert any("یونیک" in e for e in errors)
+
+
+def test_prepare_opening_balance_can_defer_document_queries():
+    idx = WarehouseImportIndex([_warehouse(1, "W", "W", True)])
+    item = {
+        "item_type": "کالا",
+        "track_inventory": True,
+        OPENING_BALANCE_QUANTITY_KEY: 5,
+        OPENING_BALANCE_COST_KEY: 120,
+        "default_warehouse_id": 1,
+    }
+    ob, errors, warnings, preview = prepare_opening_balance_for_import_row(
+        item=item,
+        mapped_keys={OPENING_BALANCE_QUANTITY_KEY, OPENING_BALANCE_COST_KEY},
+        business_id=1,
+        db=None,  # type: ignore[arg-type]
+        can_edit_opening_balance=True,
+        is_update=False,
+        existing_product=None,
+        warehouse_index=idx,
+        validate_document_context=False,
+    )
+    assert errors == []
+    assert warnings == []
+    assert ob is not None
+    assert ob.quantity == 5
+    assert ob.cost_price == 120
+    assert ob.warehouse_id == 1
+    assert preview["action"] == "upsert"

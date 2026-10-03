@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
 from sqlalchemy.orm import Session
 
@@ -13,6 +13,9 @@ from app.services.product_opening_balance_service import (
     get_product_opening_balance_eligibility,
     validate_product_opening_balance_allowed,
 )
+
+if TYPE_CHECKING:
+    from adapters.api.v1.schema_models.product import ProductOpeningBalanceInput
 
 OPENING_BALANCE_QUANTITY_KEY = "opening_balance_quantity"
 OPENING_BALANCE_COST_KEY = "opening_balance_cost_price"
@@ -159,8 +162,10 @@ def prepare_opening_balance_for_import_row(
     db: Session,
     can_edit_opening_balance: bool,
     is_update: bool,
+    can_write_inventory: bool = True,
     existing_product: Optional[Product] = None,
     warehouse_index: WarehouseImportIndex,
+    validate_document_context: bool = True,
 ) -> Tuple[Optional[ProductOpeningBalanceInput], List[str], List[str], Dict[str, Any]]:
     """
     ساخت opening_balance برای یک ردیف ایمپورت.
@@ -201,8 +206,16 @@ def prepare_opening_balance_for_import_row(
         errors.append("برای ثبت تعداد اولیه باید کنترل موجودی فعال باشد")
         return None, errors, warnings, preview
 
+    if str(item.get("inventory_mode") or "bulk").strip().lower() == "unique":
+        errors.append("ثبت تعداد اولیه کالای یونیک از Excel بدون اطلاعات سریال/نمونه مجاز نیست")
+        return None, errors, warnings, preview
+
     if not can_edit_opening_balance:
         errors.append("برای ثبت تعداد اولیه به دسترسی ویرایش تراز افتتاحیه نیاز است")
+        return None, errors, warnings, preview
+
+    if not can_write_inventory:
+        errors.append("برای ثبت تعداد اولیه و رسید خودکار انبار به دسترسی ویرایش موجودی نیاز است")
         return None, errors, warnings, preview
 
     qty_dec = qty_raw if isinstance(qty_raw, Decimal) else Decimal(str(qty_raw or 0))
@@ -235,43 +248,45 @@ def prepare_opening_balance_for_import_row(
     item["default_warehouse_id"] = int(warehouse_id)
 
     product_id = int(existing_product.id) if existing_product is not None else None
-    try:
-        if is_update and product_id is not None:
-            validate_product_opening_balance_allowed(
-                db,
-                business_id,
-                None,
-                product_id=product_id,
-                warehouse_id=int(warehouse_id),
-                for_update=True,
-            )
-        else:
-            validate_product_opening_balance_allowed(
-                db,
-                business_id,
-                None,
-                product_id=None,
-                warehouse_id=int(warehouse_id),
-                for_update=False,
-            )
-    except ApiError as exc:
-        err = exc.detail.get("error") if isinstance(exc.detail, dict) else {}
-        errors.append(str((err or {}).get("message") or exc))
-        return None, errors, warnings, preview
+    eligibility: Dict[str, Any] = {}
+    if validate_document_context:
+        try:
+            if is_update and product_id is not None:
+                validate_product_opening_balance_allowed(
+                    db,
+                    business_id,
+                    None,
+                    product_id=product_id,
+                    warehouse_id=int(warehouse_id),
+                    for_update=True,
+                )
+            else:
+                validate_product_opening_balance_allowed(
+                    db,
+                    business_id,
+                    None,
+                    product_id=None,
+                    warehouse_id=int(warehouse_id),
+                    for_update=False,
+                )
+        except ApiError as exc:
+            err = exc.detail.get("error") if isinstance(exc.detail, dict) else {}
+            errors.append(str((err or {}).get("message") or exc))
+            return None, errors, warnings, preview
 
-    eligibility = get_product_opening_balance_eligibility(
-        db,
-        business_id,
-        None,
-        can_edit_opening_balance=can_edit_opening_balance,
-        product_id=product_id,
-        warehouse_id=int(warehouse_id),
-    )
-    if not eligibility.get("editable"):
-        errors.append(
-            eligibility.get("message") or "تعداد اولیه در این شرایط قابل ثبت نیست"
+        eligibility = get_product_opening_balance_eligibility(
+            db,
+            business_id,
+            None,
+            can_edit_opening_balance=can_edit_opening_balance,
+            product_id=product_id,
+            warehouse_id=int(warehouse_id),
         )
-        return None, errors, warnings, preview
+        if not eligibility.get("editable"):
+            errors.append(
+                eligibility.get("message") or "تعداد اولیه در این شرایط قابل ثبت نیست"
+            )
+            return None, errors, warnings, preview
 
     fiscal_year_id = eligibility.get("fiscal_year_id")
     preview.update({

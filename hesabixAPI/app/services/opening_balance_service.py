@@ -139,9 +139,15 @@ def _validate_ob_document_date_in_fiscal_year(document_date: date, fy_start: dat
         )
 
 
-def _find_existing_ob_document(db: Session, business_id: int, fiscal_year_id: int) -> Optional[Document]:
+def _find_existing_ob_document(
+    db: Session,
+    business_id: int,
+    fiscal_year_id: int,
+    *,
+    for_update: bool = False,
+) -> Optional[Document]:
     from sqlalchemy import and_
-    return (
+    query = (
         db.query(Document)
         .filter(
             and_(
@@ -151,8 +157,10 @@ def _find_existing_ob_document(db: Session, business_id: int, fiscal_year_id: in
             )
         )
         .order_by(Document.id.desc())
-        .first()
     )
+    if for_update:
+        query = query.with_for_update()
+    return query.first()
 
 
 def get_opening_balance(
@@ -199,6 +207,9 @@ def upsert_opening_balance(
     business_id: int,
     user_id: int,
     data: Dict[str, Any],
+    *,
+    auto_commit: bool = True,
+    return_details: bool = True,
 ) -> Dict[str, Any]:
     repo = DocumentRepository(db)
     fy_id, fy_start_date, fy_end_date = _ensure_fiscal_year(db, business_id, data.get("fiscal_year_id"))
@@ -361,13 +372,17 @@ def upsert_opening_balance(
     }
 
     if existing:
-        updated = repo.update_document(existing.id, document_payload)
+        updated = repo.update_document(existing.id, document_payload, auto_commit=auto_commit)
         if not updated:
             raise ApiError("UPDATE_FAILED", "ویرایش سند تراز افتتاحیه ناموفق بود", http_status=500)
-        return repo.get_document_details(updated.id) or {}
+        if return_details:
+            return repo.get_document_details(updated.id) or {}
+        return {"id": int(updated.id)}
     else:
-        created = repo.create_document(document_payload)
-        return repo.get_document_details(created.id) or {}
+        created = repo.create_document(document_payload, auto_commit=auto_commit)
+        if return_details:
+            return repo.get_document_details(created.id) or {}
+        return {"id": int(created.id)}
 
 
 def preview_opening_balance(
@@ -616,5 +631,3 @@ def unpost_opening_balance(
         pass
 
     return repo.get_document_details(updated.id) or {}
-
-

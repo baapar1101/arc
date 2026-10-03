@@ -3822,6 +3822,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     // استفاده از Scrollbar با controller برای اطمینان از اسکرول دوطرفه
     // Scrollbar می‌تواند controller را حتی قبل از attach شدن handle کند
     final hasScrollPosition = _horizontalScrollController.hasClients;
+    const tableHorizontalMargin = 10.0;
 
     return Scrollbar(
       controller: _horizontalScrollController,
@@ -3842,11 +3843,11 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         ),
         child: DataTable2(
           columnSpacing: 0,
-          horizontalMargin: 10,
-          // محاسبه minWidth بر اساس عرض کل ستون‌ها برای جلوگیری از warning
-          // اگر عرض ستون‌ها بیش از availableWidth باشد، از همان استفاده می‌کنیم
-          // در غیر این صورت از config استفاده می‌کنیم
-          minWidth: _calculateMinTableWidth(columns, availableWidth),
+          horizontalMargin: tableHorizontalMargin,
+          minWidth: DataTableUtils.getFixedColumnsMinTableWidth(
+            columns,
+            horizontalMargin: tableHorizontalMargin,
+          ),
           horizontalScrollController: _horizontalScrollController,
           headingRowHeight: widget.config.showColumnHeaders
               ? (widget.config.headingRowHeight ?? (_dense ? 34 : 36))
@@ -4271,37 +4272,6 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       math.max(headerWidth, maxCellWidth + cellPadding),
     );
     return computed;
-  }
-
-  /// محاسبه minWidth برای DataTable2 بر اساس عرض ستون‌ها
-  /// این جلوی warning "combined width of columns ... is greater than available parent width" را می‌گیرد
-  double _calculateMinTableWidth(
-    List<DataColumn2> columns,
-    double availableWidth,
-  ) {
-    // محاسبه مجموع fixedWidth ستون‌ها
-    double totalFixedWidth = 0.0;
-    for (final col in columns) {
-      if (col.fixedWidth != null) {
-        totalFixedWidth += col.fixedWidth!;
-      }
-    }
-
-    // DataTable2 assertion چک می‌کند که minWidth >= totalFixedWidth + (horizontalMargin * 2)
-    // horizontalMargin در DataTable2 برابر با 10 است، پس باید 20 اضافه کنیم
-    const horizontalMarginTotal = 20.0; // horizontalMargin * 2 = 10 * 2
-
-    // minWidth باید حداقل برابر با totalFixedWidth + horizontalMarginTotal باشد تا assertion نخورد
-    final minRequiredWidth = totalFixedWidth + horizontalMarginTotal;
-
-    // اگر availableWidth infinity است یا نامعتبر است، فقط minRequiredWidth را برگردانیم
-    if (!availableWidth.isFinite || availableWidth <= 0) {
-      return minRequiredWidth;
-    }
-
-    // همیشه minRequiredWidth را برگردانیم تا از assertion error جلوگیری شود
-    // DataTable2 به صورت خودکار scroll می‌شود اگر فضا کافی نباشد
-    return minRequiredWidth;
   }
 
   /// محاسبه عرض کل ستون‌ها و تنظیم عرض‌ها برای پر کردن فضای موجود

@@ -46,6 +46,7 @@ _INVOICE_TYPE_LABELS_FA = {
 _SOURCE_TYPE_LABELS_FA = {
 	"manual": "دستی",
 	"invoice": "فاکتور",
+	"opening_balance": "تراز افتتاحیه",
 	"api": "API",
 	"goods_expense_income": "کالای هزینه/درآمد شده",
 }
@@ -1772,6 +1773,129 @@ def create_manual_warehouse_document(
 	return wh
 
 
+def create_linked_warehouse_document_bulk(
+	db: Session,
+	business_id: int,
+	user_id: int,
+	*,
+	doc_type: str,
+	document_date: date,
+	warehouse_id: int,
+	lines: List[Dict[str, Any]],
+	source_type: str,
+	source_document_id: int,
+	extra_info: Optional[Dict[str, Any]] = None,
+) -> WarehouseDocument:
+	"""ساخت bulk سند انبار متصل به یک سند مبدا، بدون commit.
+
+	این مسیر برای عملیات سیستمی مانند همگام‌سازی موجودی افتتاحیه است؛ برخلاف
+	``create_manual_warehouse_document`` محصولات و انبار را به‌صورت گروهی
+	اعتبارسنجی می‌کند تا ایمپورت بزرگ به N+1 query تبدیل نشود.
+	"""
+	if doc_type not in ("receipt", "issue"):
+		raise ApiError("INVALID_DOC_TYPE", "نوع سند لینک‌شده باید receipt یا issue باشد", http_status=400)
+	if not lines:
+		raise ApiError("LINES_REQUIRED", "سند انبار باید حداقل یک خط داشته باشد", http_status=400)
+
+	warehouse = db.query(Warehouse).filter(
+		and_(Warehouse.id == int(warehouse_id), Warehouse.business_id == int(business_id))
+	).first()
+	if not warehouse:
+		raise ApiError("WAREHOUSE_NOT_FOUND", "انبار انتخاب‌شده یافت نشد", http_status=404)
+
+	fy = _get_current_fiscal_year(db, int(business_id))
+	if document_date < fy.start_date or (fy.end_date and document_date > fy.end_date):
+		raise ApiError(
+			"DATE_OUT_OF_RANGE",
+			f"تاریخ باید در بازه سال مالی ({fy.start_date} تا {fy.end_date or 'نامحدود'}) باشد",
+			http_status=400,
+		)
+
+	product_ids = sorted({int(line.get("product_id")) for line in lines if line.get("product_id")})
+	products = db.query(Product.id).filter(
+		Product.business_id == int(business_id),
+		Product.id.in_(product_ids),
+	).all()
+	found_product_ids = {int(row.id) for row in products}
+	missing_product_ids = [pid for pid in product_ids if pid not in found_product_ids]
+	if missing_product_ids:
+		raise ApiError(
+			"PRODUCT_NOT_FOUND",
+			f"کالای سند انبار یافت نشد: {missing_product_ids[0]}",
+			http_status=404,
+		)
+
+	normalized_lines: List[tuple[int, Decimal, Dict[str, Any]]] = []
+	for index, line in enumerate(lines, start=1):
+		pid = line.get("product_id")
+		if pid is None:
+			raise ApiError("PRODUCT_REQUIRED", f"خط {index}: شناسه کالا الزامی است", http_status=400)
+		try:
+			quantity = Decimal(str(line.get("quantity") or 0))
+		except Exception as exc:
+			raise ApiError("INVALID_QUANTITY", f"خط {index}: تعداد نامعتبر است", http_status=400) from exc
+		if quantity <= 0 or quantity > _MAX_WAREHOUSE_LINE_QUANTITY:
+			raise ApiError("INVALID_QUANTITY", f"خط {index}: تعداد معتبر نیست", http_status=400)
+		line_extra = line.get("extra_info")
+		normalized_lines.append(
+			(int(pid), quantity, dict(line_extra) if isinstance(line_extra, dict) else {})
+		)
+
+	wh: Optional[WarehouseDocument] = None
+	for attempt in range(10):
+		code = _generate_warehouse_document_code(db, int(business_id), document_date)
+		try:
+			with db.begin_nested():
+				wh = WarehouseDocument(
+					business_id=int(business_id),
+					fiscal_year_id=int(fy.id),
+					code=code,
+					document_date=document_date,
+					status="draft",
+					doc_type=doc_type,
+					warehouse_id_from=int(warehouse_id) if doc_type == "issue" else None,
+					warehouse_id_to=int(warehouse_id) if doc_type == "receipt" else None,
+					source_type=str(source_type),
+					source_document_id=int(source_document_id),
+					created_by_user_id=int(user_id),
+					extra_info=dict(extra_info or {}),
+				)
+				db.add(wh)
+				db.flush()
+			break
+		except IntegrityError as exc:
+			if _is_duplicate_warehouse_document_code_error(exc) and attempt < 9:
+				continue
+			raise
+
+	if wh is None:
+		raise ApiError("WAREHOUSE_CODE_CONFLICT", "Failed to generate unique warehouse document code", http_status=500)
+
+	movement = "in" if doc_type == "receipt" else "out"
+	db.add_all([
+		WarehouseDocumentLine(
+			warehouse_document_id=int(wh.id),
+			product_id=pid,
+			warehouse_id=int(warehouse_id),
+			movement=movement,
+			quantity=quantity,
+			extra_info=line_extra or None,
+		)
+		for pid, quantity, line_extra in normalized_lines
+	])
+	db.flush()
+
+	invalidate_warehouse_docs_cache(
+		business_id=int(business_id),
+		fiscal_year_id=int(fy.id),
+		doc_type=doc_type,
+		warehouse_id=int(warehouse_id),
+		status="draft",
+		document_id=int(wh.id),
+	)
+	return wh
+
+
 def update_warehouse_document(
 	db: Session,
 	business_id: int,
@@ -2672,6 +2796,14 @@ def post_warehouse_document(
 	lines = db.query(WarehouseDocumentLine).filter(WarehouseDocumentLine.warehouse_document_id == wh.id).all()
 	if not lines:
 		raise ApiError("NO_LINES", "حواله باید حداقل یک خط داشته باشد", http_status=400)
+	tracked_product_ids = {
+		int(row.id)
+		for row in db.query(Product.id).filter(
+			Product.business_id == int(wh.business_id),
+			Product.id.in_({int(line.product_id) for line in lines if line.product_id is not None}),
+			Product.track_inventory == True,
+		).all()
+	}
 	
 	# کنترل کسری برای خروج‌ها
 	outgoing_lines = []
@@ -2683,9 +2815,8 @@ def post_warehouse_document(
 			if not ln.warehouse_id:
 				raise ApiError("WAREHOUSE_REQUIRED", "برای خطوط خروج، انبار باید مشخص باشد", http_status=400)
 			
-			# بررسی اینکه محصول کنترل موجودی دارد یا نه
-			product = db.query(Product).filter(Product.id == ln.product_id).first()
-			if product and product.track_inventory:
+			# وضعیت کنترل موجودی همه کالاهای سند بالاتر به‌صورت bulk خوانده شده است.
+			if int(ln.product_id) in tracked_product_ids:
 				outgoing_lines.append({
 					"product_id": ln.product_id,
 					"quantity": float(ln.quantity),
@@ -2698,61 +2829,92 @@ def post_warehouse_document(
 	
 	# کنترل کسری موجودی (با رعایت سیاست کسب‌وکار: فله / یونیک / انتقال)
 	if outgoing_lines:
-		biz = db.query(Business).filter(Business.id == int(wh.business_id)).first()
-		allow_bulk = bool(getattr(biz, "allow_negative_inventory_for_bulk", False)) if biz else False
-		allow_unique = bool(getattr(biz, "allow_negative_inventory_for_unique", False)) if biz else False
-		transfer_strict = bool(getattr(biz, "warehouse_transfer_require_positive_stock", True)) if biz else True
-		lines_to_check = filter_outgoing_lines_for_stock_enforcement(
-			db,
-			int(wh.business_id),
-			outgoing_lines,
-			allow_negative_for_bulk=allow_bulk,
-			allow_negative_for_unique=allow_unique,
-			warehouse_doc_type=getattr(wh, "doc_type", None),
-			transfer_require_positive_stock=transfer_strict,
-		)
-		if lines_to_check:
-			exclude_fin_doc: Optional[int] = None
-			exclude_inv_src: Optional[int] = None
-			if wh.source_document_id is not None:
-				src_id = int(wh.source_document_id)
-				st = (wh.source_type or "").strip().lower()
-				if st == "invoice":
-					exclude_fin_doc = src_id
-					exclude_inv_src = src_id
-				else:
-					# حواله‌های قدیمی: source_type خالی یا نادرست ولی سند مبدا فاکتور است
-					_src_row = (
-						db.query(Document.document_type)
-						.filter(
-							Document.id == src_id,
-							Document.business_id == int(wh.business_id),
-						)
-						.first()
+		# اصلاح کاهشی موجودی افتتاحیه یک عملیات کاملاً فیزیکی است. سند مالی
+		# افتتاحیه پیش از این مرحله به مقدار جدید رسیده و نباید برای کنترل خروج
+		# استفاده شود؛ در غیر این صورت جابه‌جایی انبار یا کاهش تعداد به‌اشتباه
+		# با کسری موجودی رد می‌شود.
+		if str(wh.source_type or "").strip().lower() == "opening_balance":
+			required_by_key: Dict[tuple[int, int], Decimal] = defaultdict(Decimal)
+			for line in outgoing_lines:
+				info = line.get("extra_info") or {}
+				warehouse_id = info.get("warehouse_id")
+				if warehouse_id is None:
+					continue
+				required_by_key[(int(line["product_id"]), int(warehouse_id))] += Decimal(
+					str(line.get("quantity") or 0)
+				)
+			for (product_id, warehouse_id), required_qty in required_by_key.items():
+				available_qty = get_physical_stock(
+					db,
+					int(wh.business_id),
+					product_id,
+					warehouse_id,
+					wh.document_date,
+				)
+				if available_qty < required_qty:
+					raise ApiError(
+						"INSUFFICIENT_PHYSICAL_STOCK",
+						"موجودی فیزیکی برای اصلاح موجودی افتتاحیه کافی نیست. "
+						f"موجودی: {available_qty}، موردنیاز: {required_qty}",
+						http_status=409,
+						details={"product_id": product_id, "warehouse_id": warehouse_id},
 					)
-					_sdt = _src_row[0] if _src_row is not None else None
-					if _sdt is not None and str(_sdt).startswith("invoice_"):
+		else:
+			biz = db.query(Business).filter(Business.id == int(wh.business_id)).first()
+			allow_bulk = bool(getattr(biz, "allow_negative_inventory_for_bulk", False)) if biz else False
+			allow_unique = bool(getattr(biz, "allow_negative_inventory_for_unique", False)) if biz else False
+			transfer_strict = bool(getattr(biz, "warehouse_transfer_require_positive_stock", True)) if biz else True
+			lines_to_check = filter_outgoing_lines_for_stock_enforcement(
+				db,
+				int(wh.business_id),
+				outgoing_lines,
+				allow_negative_for_bulk=allow_bulk,
+				allow_negative_for_unique=allow_unique,
+				warehouse_doc_type=getattr(wh, "doc_type", None),
+				transfer_require_positive_stock=transfer_strict,
+			)
+			if lines_to_check:
+				exclude_fin_doc: Optional[int] = None
+				exclude_inv_src: Optional[int] = None
+				if wh.source_document_id is not None:
+					src_id = int(wh.source_document_id)
+					st = (wh.source_type or "").strip().lower()
+					if st == "invoice":
 						exclude_fin_doc = src_id
 						exclude_inv_src = src_id
-			_ex_wh: Optional[List[int]] = None
-			if stock_exclude_warehouse_document_ids:
-				_ex_wh = sorted(
-					{int(x) for x in stock_exclude_warehouse_document_ids if x is not None}
-				)
-				if not _ex_wh:
-					_ex_wh = None
-			try:
-				_ensure_stock_sufficient(
-					db,
-					wh.business_id,
-					wh.document_date,
-					lines_to_check,
-					exclude_document_id=exclude_fin_doc,
-					exclude_invoice_source_document_id=exclude_inv_src,
-					exclude_warehouse_document_ids=_ex_wh,
-				)
-			except ApiError:
-				raise
+					else:
+						# حواله‌های قدیمی: source_type خالی یا نادرست ولی سند مبدا فاکتور است
+						_src_row = (
+							db.query(Document.document_type)
+							.filter(
+								Document.id == src_id,
+								Document.business_id == int(wh.business_id),
+							)
+							.first()
+						)
+						_sdt = _src_row[0] if _src_row is not None else None
+						if _sdt is not None and str(_sdt).startswith("invoice_"):
+							exclude_fin_doc = src_id
+							exclude_inv_src = src_id
+				_ex_wh: Optional[List[int]] = None
+				if stock_exclude_warehouse_document_ids:
+					_ex_wh = sorted(
+						{int(x) for x in stock_exclude_warehouse_document_ids if x is not None}
+					)
+					if not _ex_wh:
+						_ex_wh = None
+				try:
+					_ensure_stock_sufficient(
+						db,
+						wh.business_id,
+						wh.document_date,
+						lines_to_check,
+						exclude_document_id=exclude_fin_doc,
+						exclude_invoice_source_document_id=exclude_inv_src,
+						exclude_warehouse_document_ids=_ex_wh,
+					)
+				except ApiError:
+					raise
 
 	# برای حواله‌های transfer، به‌روزرسانی instance های کالاهای یونیک
 	if wh.doc_type == "transfer":
@@ -2947,36 +3109,38 @@ def post_warehouse_document(
 	
 	# شناسایی بهای تمام‌شده قطعی روی خطوط فاکتور و ثبت COGS در دفتر کل
 
-	# ورک‌فلو: موجودی کم (reorder_point)
-	try:
-		from app.services.workflow.workflow_trigger_service import maybe_fire_inventory_low_triggers
+	# افتتاحیه یک بارگذاری اولیه و بالقوه هزاران‌خطی است؛ تریگر موجودی کم
+	# برای هر خط آن معنا ندارد و مسیر ایمپورت را دوباره N+1 می‌کند.
+	if str(wh.source_type or "").strip().lower() != "opening_balance":
+		try:
+			from app.services.workflow.workflow_trigger_service import maybe_fire_inventory_low_triggers
 
-		seen_pairs: set[tuple[int, Optional[int]]] = set()
-		for ln in lines:
-			if not ln.product_id:
-				continue
-			prod = db.query(Product).filter(Product.id == int(ln.product_id)).first()
-			if not prod or not getattr(prod, "track_inventory", False):
-				continue
-			wid = int(ln.warehouse_id) if ln.warehouse_id else None
-			key = (int(ln.product_id), wid)
-			if key in seen_pairs:
-				continue
-			seen_pairs.add(key)
-			maybe_fire_inventory_low_triggers(
-				db,
-				int(business_id),
-				int(ln.product_id),
-				wid,
-				user_id=getattr(wh, "created_by_user_id", None),
+			seen_pairs: set[tuple[int, Optional[int]]] = set()
+			for ln in lines:
+				if not ln.product_id:
+					continue
+				prod = db.query(Product).filter(Product.id == int(ln.product_id)).first()
+				if not prod or not getattr(prod, "track_inventory", False):
+					continue
+				wid = int(ln.warehouse_id) if ln.warehouse_id else None
+				key = (int(ln.product_id), wid)
+				if key in seen_pairs:
+					continue
+				seen_pairs.add(key)
+				maybe_fire_inventory_low_triggers(
+					db,
+					int(business_id),
+					int(ln.product_id),
+					wid,
+					user_id=getattr(wh, "created_by_user_id", None),
+				)
+		except Exception as inv_wf_err:
+			logger.warning(
+				"warehouse_workflow_inventory_low_failed wh_id=%s err=%s",
+				wh.id,
+				inv_wf_err,
+				exc_info=True,
 			)
-	except Exception as inv_wf_err:
-		logger.warning(
-			"warehouse_workflow_inventory_low_failed wh_id=%s err=%s",
-			wh.id,
-			inv_wf_err,
-			exc_info=True,
-		)
 
 	# شناسایی بهای تمام‌شده قطعی روی خطوط فاکتور مبدأ (در صورت تنظیم کسب‌وکار)
 	try:
@@ -4270,4 +4434,3 @@ def _include_inventory_stock_row(
 	if include_zero or stock != 0:
 		return True
 	return has_warehouse_history
-

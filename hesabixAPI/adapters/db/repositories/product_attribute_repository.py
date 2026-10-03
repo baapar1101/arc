@@ -83,8 +83,16 @@ class ProductAttributeRepository(BaseRepository[ProductAttribute]):
             },
         }
 
-    def create(self, *, business_id: int, title: str, description: str | None, 
-               data_type: str = 'text', options: dict | None = None) -> ProductAttribute:
+    def create(
+        self,
+        *,
+        business_id: int,
+        title: str,
+        description: str | None,
+        data_type: str = 'text',
+        options: dict | None = None,
+        auto_commit: bool = True,
+    ) -> ProductAttribute:
         obj = ProductAttribute(
             business_id=business_id, 
             title=title, 
@@ -93,8 +101,11 @@ class ProductAttributeRepository(BaseRepository[ProductAttribute]):
             options=options
         )
         self.db.add(obj)
-        self.db.commit()
-        self.db.refresh(obj)
+        if auto_commit:
+            self.db.commit()
+            self.db.refresh(obj)
+        else:
+            self.db.flush()
         return obj
 
     def update(self, *, attribute_id: int, title: str | None, description: str | None,
@@ -121,5 +132,4 @@ class ProductAttributeRepository(BaseRepository[ProductAttribute]):
         self.db.delete(obj)
         self.db.commit()
         return True
-
 

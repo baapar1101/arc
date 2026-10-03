@@ -47,10 +47,13 @@ from app.services.product_service import (
     get_sales_by_product_report,
     get_inventory_kardex_report,
     get_inventory_stock_report,
+    invalidate_products_cache,
 )
 from app.services.product_opening_balance_service import (
+    apply_product_opening_balance_changes,
     create_product_with_opening_balance,
     update_product_with_opening_balance,
+    validate_product_opening_balance_allowed,
 )
 from app.services.product_excel_import_opening_balance import (
     WAREHOUSE_CODE_KEY,
@@ -73,16 +76,20 @@ from app.services.product_excel_import_normalize import (
     api_error_message,
     build_create_payload,
     build_update_payload,
-    find_existing_product,
+    find_existing_product_in_index,
     format_pydantic_errors,
     is_sample_import_row,
+    load_business_currency_index,
+    load_existing_product_match_index,
     map_headers,
     parse_bool_strict,
     parse_inventory_mode,
+    product_match_key,
     provided_keys_from_raw,
     resolve_fx_currency,
     select_products_import_worksheet,
 )
+from app.services.public_catalog_service import invalidate_public_catalog_caches
 from app.services.product_excel_import_template_service import (
     build_products_import_template,
     category_full_path,
@@ -1636,8 +1643,8 @@ async def download_products_import_template(
         }
     }
 )
-@require_business_access("business_id")
-async def import_products_excel(
+@require_business_access("business_id", offload_sync=True)
+def import_products_excel(
     request: Request,
     business_id: int,
     file: UploadFile = File(...),
@@ -1653,11 +1660,12 @@ async def import_products_excel(
     import io
     import logging
     import re
+    import time
     import zipfile
     from decimal import Decimal
     from typing import Optional
     from openpyxl import load_workbook
-    from sqlalchemy import and_ as _and
+    from sqlalchemy.exc import IntegrityError
     from adapters.db.models.category import BusinessCategory
     from adapters.db.models.product_attribute import ProductAttribute
     from adapters.db.models.tax_type import TaxType
@@ -1676,6 +1684,10 @@ async def import_products_excel(
             return False
 
     try:
+        import_started_at = time.perf_counter()
+        parse_finished_at = import_started_at
+        validation_finished_at = import_started_at
+        apply_elapsed_ms = 0.0
         is_dry_run = str(dry_run).lower() in ("true","1","yes","on")
         logger.info(f"[IMPORT] Starting Excel import - business_id={business_id}, dry_run={is_dry_run}, match_by={match_by}, conflict_policy={conflict_policy}")
         on_missing_category = str(on_missing_category or "error").strip().lower()
@@ -1716,7 +1728,7 @@ async def import_products_excel(
         if not file.filename or not file.filename.lower().endswith('.xlsx'):
             raise ApiError("INVALID_FILE", "فرمت فایل معتبر نیست. تنها xlsx پشتیبانی می‌شود", http_status=400)
 
-        content = await file.read()
+        content = file.file.read()
         logger.info(f"[IMPORT] File received - filename={file.filename}, size={len(content)} bytes")
         if len(content) > MAX_PRODUCT_IMPORT_FILE_BYTES:
             raise ApiError("FILE_TOO_LARGE", "حجم فایل بیش از حد مجاز است (حداکثر ۱۵ مگابایت)", http_status=413)
@@ -1730,6 +1742,7 @@ async def import_products_excel(
 
         ws = select_products_import_worksheet(wb)
         rows = list(ws.iter_rows(values_only=True))
+        parse_finished_at = time.perf_counter()
         logger.info(f"[IMPORT] Excel file loaded - sheet={ws.title}, total rows={len(rows)}")
         if not rows:
             return success_response(data={"summary": {"total": 0}}, request=request, message="EMPTY_FILE")
@@ -1747,6 +1760,7 @@ async def import_products_excel(
         can_edit_opening_balance = has_business_permission_for_business(
             ctx, db, business_id, "opening_balance", "edit"
         )
+        can_write_inventory = ctx.has_business_permission("inventory", "write")
         warehouse_rows = db.query(Warehouse).filter(Warehouse.business_id == business_id).all()
         warehouse_index = WarehouseImportIndex(warehouse_rows)
         if "name" not in mapped_keys:
@@ -1765,6 +1779,31 @@ async def import_products_excel(
         conflict_policy = str(conflict_policy or "upsert").strip().lower()
         if conflict_policy not in ("insert", "update", "upsert"):
             conflict_policy = "upsert"
+
+        match_column_index = headers.index(match_by) if match_by in headers else None
+        match_keys: list[str] = []
+        if match_column_index is not None:
+            for raw_row in data_rows:
+                raw_value = (
+                    raw_row[match_column_index]
+                    if match_column_index < len(raw_row)
+                    else None
+                )
+                match_keys.append(
+                    product_match_key(match_by, {match_by: raw_value})
+                )
+        existing_product_index = load_existing_product_match_index(
+            db,
+            business_id,
+            match_by,
+            match_keys,
+        )
+        currency_index = (
+            load_business_currency_index(db, business_id)
+            if "price_fx_currency_code" in mapped_keys
+            or "price_fx_currency_id" in mapped_keys
+            else None
+        )
 
         def _normalize_number_text(v: object) -> str:
             if v is None:
@@ -1850,22 +1889,35 @@ async def import_products_excel(
 
         # Preload reference data for faster resolve (only when needed).
         categories_rows: list[BusinessCategory] | None = None
+        categories_by_parent: dict[int | None, list[BusinessCategory]] | None = None
+        categories_by_id: dict[int, BusinessCategory] | None = None
         attrs_rows: list[ProductAttribute] | None = None
+        attrs_by_title: dict[str, ProductAttribute] | None = None
+        attr_ids: set[int] | None = None
         tax_type_by_code: dict[str, int] | None = None
         tax_type_by_title: dict[str, int] | None = None
         tax_unit_by_code: dict[str, int] | None = None
         tax_unit_by_name: dict[str, int] | None = None
 
         def _ensure_categories_loaded() -> list[BusinessCategory]:
-            nonlocal categories_rows
+            nonlocal categories_rows, categories_by_parent, categories_by_id
             if categories_rows is None:
                 categories_rows = db.query(BusinessCategory).filter(BusinessCategory.business_id == business_id).all()
+                categories_by_parent = {}
+                categories_by_id = {}
+                for category in categories_rows:
+                    categories_by_parent.setdefault(category.parent_id, []).append(category)
+                    categories_by_id[int(category.id)] = category
             return categories_rows
 
         def _ensure_attributes_loaded() -> list[ProductAttribute]:
-            nonlocal attrs_rows
+            nonlocal attrs_rows, attrs_by_title, attr_ids
             if attrs_rows is None:
                 attrs_rows = db.query(ProductAttribute).filter(ProductAttribute.business_id == business_id).all()
+                attrs_by_title = {
+                    a.title.strip().lower(): a for a in attrs_rows if a.title
+                }
+                attr_ids = {int(a.id) for a in attrs_rows}
             return attrs_rows
 
         def _ensure_tax_types_loaded() -> None:
@@ -1901,8 +1953,8 @@ async def import_products_excel(
         def _resolve_category_by_id(category_id: Optional[int]) -> tuple[Optional[int], Optional[str]]:
             if category_id is None:
                 return None, None
-            exists = db.query(BusinessCategory.id).filter(_and(BusinessCategory.business_id == business_id, BusinessCategory.id == category_id)).first()
-            if not exists:
+            _ensure_categories_loaded()
+            if categories_by_id is None or int(category_id) not in categories_by_id:
                 return None, f"دسته‌بندی با شناسه {category_id} یافت نشد"
             return category_id, None
 
@@ -1928,10 +1980,7 @@ async def import_products_excel(
                 return None, None, created_paths
 
             cats = _ensure_categories_loaded()
-            # Build index by parent_id and normalized title
-            by_parent: dict[int | None, list[BusinessCategory]] = {}
-            for c in cats:
-                by_parent.setdefault(c.parent_id, []).append(c)
+            by_parent = categories_by_parent if categories_by_parent is not None else {}
 
             parent_id: int | None = None
             current_id: int | None = None
@@ -1947,7 +1996,7 @@ async def import_products_excel(
                     parent_id = current_id
                     continue
                 if len(candidates) > 1:
-                    by_id = {c.id: c for c in cats}
+                    by_id = categories_by_id or {c.id: c for c in cats}
                     opts = [category_full_path(c, by_id, "fa") or _get_category_titles(c)[0] for c in candidates[:5]]
                     return None, (
                         f"دسته‌بندی «{seg}» مبهم است. مسیر کامل را بنویسید، مثلاً: {opts[0]}"
@@ -1965,12 +2014,19 @@ async def import_products_excel(
                     # Create the category under current parent
                     from adapters.db.repositories.category_repository import CategoryRepository
                     repo = CategoryRepository(db)
-                    obj = repo.create_category(business_id=business_id, parent_id=parent_id, translations={"fa": seg, "en": seg})
+                    obj = repo.create_category(
+                        business_id=business_id,
+                        parent_id=parent_id,
+                        translations={"fa": seg, "en": seg},
+                        auto_commit=False,
+                    )
                     reference_summary["created"]["categories"] += 1
                     created_paths.append(seg if not created_paths else f"{created_paths[-1]} > {seg}")
                     # update local caches
                     cats.append(obj)
                     by_parent.setdefault(parent_id, []).append(obj)
+                    if categories_by_id is not None:
+                        categories_by_id[int(obj.id)] = obj
                     current_id = obj.id
                     parent_id = current_id
                     continue
@@ -2046,7 +2102,8 @@ async def import_products_excel(
                     item["attribute_ids"] = []
                     return
                 # validate against business attributes
-                existing_ids = set([a.id for a in _ensure_attributes_loaded()])
+                _ensure_attributes_loaded()
+                existing_ids = attr_ids or set()
                 missing = [str(i) for i in ids if i not in existing_ids]
                 item["attribute_ids"] = [i for i in ids if i in existing_ids]
                 if missing:
@@ -2056,7 +2113,7 @@ async def import_products_excel(
             if not titles:
                 return
             attrs = _ensure_attributes_loaded()
-            by_title = {a.title.strip().lower(): a for a in attrs if a.title}
+            by_title = attrs_by_title if attrs_by_title is not None else {}
             resolved_ids: list[int] = []
             missing_titles: list[str] = []
             created: list[str] = []
@@ -2070,10 +2127,19 @@ async def import_products_excel(
                     from adapters.db.repositories.product_attribute_repository import ProductAttributeRepository
                     repo = ProductAttributeRepository(db)
                     try:
-                        obj = repo.create(business_id=business_id, title=t, description=None, data_type="text", options=None)
+                        obj = repo.create(
+                            business_id=business_id,
+                            title=t,
+                            description=None,
+                            data_type="text",
+                            options=None,
+                            auto_commit=False,
+                        )
                         reference_summary["created"]["attributes"] += 1
                         attrs.append(obj)
                         by_title[obj.title.strip().lower()] = obj
+                        if attr_ids is not None:
+                            attr_ids.add(int(obj.id))
                         resolved_ids.append(obj.id)
                         created.append(t)
                     except Exception:
@@ -2104,12 +2170,17 @@ async def import_products_excel(
             return out
 
         def _find_existing_product_row(data: dict) -> Optional[Product]:
-            found, _err = find_existing_product(db, business_id, match_by, data)
+            found, _err = find_existing_product_in_index(
+                existing_product_index,
+                match_by,
+                data,
+            )
             return found
 
         errors: list[dict] = []
         valid_items: list[dict] = []
 
+        seen_import_match_keys: dict[str, int] = {}
         for idx, row in enumerate(data_rows, start=2):
             item: dict[str, Any] = {}
             row_errors: list[str] = []
@@ -2265,7 +2336,13 @@ async def import_products_excel(
                     reference_summary["would_create"]["attributes"] += len(would_titles)
                     row_warnings.append("برخی ویژگی‌ها وجود ندارند و در حالت create ساخته خواهند شد")
 
-            resolve_fx_currency(item, db, business_id, row_errors)
+            resolve_fx_currency(
+                item,
+                db,
+                business_id,
+                row_errors,
+                currency_index=currency_index,
+            )
             if item.get("price_fx_currency_id") is not None and "price_fx_currency_code" in (item.get("_provided_keys") or set()):
                 row_preview["resolved"]["currency"] = {"price_fx_currency_id": item.get("price_fx_currency_id")}
                 reference_summary["resolved"]["currency"] += 1
@@ -2303,6 +2380,8 @@ async def import_products_excel(
                     if "item_type" not in item:
                         existing_type = existing_for_ob.item_type
                         ob_item["item_type"] = existing_type.value if hasattr(existing_type, "value") else str(existing_type)
+                    if "inventory_mode" not in item:
+                        ob_item["inventory_mode"] = existing_for_ob.inventory_mode
                     if item.get("default_warehouse_id") is None:
                         ob_item["default_warehouse_id"] = existing_for_ob.default_warehouse_id
                 ob_input, ob_errors, ob_warnings, ob_preview = prepare_opening_balance_for_import_row(
@@ -2312,8 +2391,10 @@ async def import_products_excel(
                     db=db,
                     can_edit_opening_balance=can_edit_opening_balance,
                     is_update=existing_for_ob is not None,
+                    can_write_inventory=can_write_inventory,
                     existing_product=existing_for_ob,
                     warehouse_index=warehouse_index,
+                    validate_document_context=False,
                 )
                 if ob_item.get("default_warehouse_id") is not None:
                     item["default_warehouse_id"] = ob_item.get("default_warehouse_id")
@@ -2343,7 +2424,21 @@ async def import_products_excel(
                 else:
                     item["code"] = code_str
 
-            _, match_err = find_existing_product(db, business_id, match_by, item)
+            import_match_key = product_match_key(match_by, item)
+            if import_match_key and not row_errors:
+                previous_row = seen_import_match_keys.get(import_match_key)
+                if previous_row is not None:
+                    row_errors.append(
+                        f"کلید تطبیق در فایل تکراری است (ردیف قبلی: {previous_row})"
+                    )
+                else:
+                    seen_import_match_keys[import_match_key] = idx
+
+            _, match_err = find_existing_product_in_index(
+                existing_product_index,
+                match_by,
+                item,
+            )
             if match_err:
                 row_errors.append(match_err)
 
@@ -2371,6 +2466,89 @@ async def import_products_excel(
         would_insert = 0
         would_update = 0
         would_skip_conflict = 0
+        warehouse_sync: dict[str, Any] = {
+            "receipts_created": 0,
+            "issues_created": 0,
+            "lines_created": 0,
+            "unchanged_lines": 0,
+            "posted": not is_dry_run,
+            "document_ids": [],
+        }
+
+        items_with_opening_balance = [
+            item for item in valid_items if item.get("opening_balance") is not None
+        ]
+        if items_with_opening_balance:
+            try:
+                validate_product_opening_balance_allowed(
+                    db,
+                    business_id,
+                    None,
+                    for_update=True,
+                )
+            except ApiError as exc:
+                message = api_error_message(exc)
+                invalid_rows = {int(item.get("_row")) for item in items_with_opening_balance}
+                for item in items_with_opening_balance:
+                    errors.append({"row": item.get("_row"), "errors": [message]})
+                valid_items = [
+                    item
+                    for item in valid_items
+                    if int(item.get("_row")) not in invalid_rows
+                ]
+
+        existing_ob_candidates: dict[int, int] = {}
+        for item in valid_items:
+            if item.get("opening_balance") is None:
+                continue
+            existing_candidate, _ = find_existing_product_in_index(
+                existing_product_index, match_by, item
+            )
+            if existing_candidate is not None:
+                existing_ob_candidates[int(item["_row"])] = int(existing_candidate.id)
+        if existing_ob_candidates:
+            from app.services.opening_balance_warehouse_sync_service import (
+                find_products_with_unrelated_posted_warehouse_history,
+            )
+
+            conflicting_product_ids = find_products_with_unrelated_posted_warehouse_history(
+                db,
+                business_id,
+                sorted(set(existing_ob_candidates.values())),
+            )
+            if conflicting_product_ids:
+                conflict_rows = {
+                    row_id
+                    for row_id, product_id in existing_ob_candidates.items()
+                    if product_id in conflicting_product_ids
+                }
+                for row_id in sorted(conflict_rows):
+                    errors.append({
+                        "row": row_id,
+                        "errors": [
+                            "برای این کالا قبلاً گردش انبار ثبت شده است؛ اختلاف را با رسید/حواله یا تعدیل انبار ثبت کنید"
+                        ],
+                    })
+                valid_items = [
+                    item for item in valid_items if int(item.get("_row")) not in conflict_rows
+                ]
+
+        if is_dry_run:
+            candidate_items = [
+                item for item in valid_items if item.get("opening_balance") is not None
+            ]
+            candidate_warehouses = {
+                int(item["opening_balance"]["warehouse_id"])
+                for item in candidate_items
+                if item.get("opening_balance") and item["opening_balance"].get("warehouse_id")
+            }
+            warehouse_sync.update({
+                "candidate_warehouses": len(candidate_warehouses),
+                "candidate_lines": len(candidate_items),
+                "posted": False,
+            })
+
+        validation_finished_at = time.perf_counter()
 
         logger.info(f"[IMPORT] Processing summary - total_rows={len(data_rows)}, valid_items={len(valid_items)}, errors={len(errors)}, is_dry_run={is_dry_run}")
 
@@ -2381,7 +2559,11 @@ async def import_products_excel(
         user_id = ctx.get_user_id()
 
         for data in valid_items:
-            existing, _match_err = find_existing_product(db, business_id, match_by, data)
+            existing, _match_err = find_existing_product_in_index(
+                existing_product_index,
+                match_by,
+                data,
+            )
             if existing is None:
                 if conflict_policy == "update":
                     would_skip_conflict += 1
@@ -2393,19 +2575,24 @@ async def import_products_excel(
                 would_update += 1
 
         if not is_dry_run and valid_items:
+            apply_started_at = time.perf_counter()
             logger.info(f"[IMPORT] Starting REAL import (not dry-run) for {len(valid_items)} items")
-            for data in valid_items:
-                row_idx = data.get("_row")
-                item_name = data.get("name", "N/A")
-                provided = data.get("_provided_keys") if isinstance(data.get("_provided_keys"), set) else provided_keys_from_raw(data)
-                existing, _match_err = find_existing_product(db, business_id, match_by, data)
+            opening_balance_changes: list[dict[str, Any]] = []
+            try:
+                for data in valid_items:
+                    row_idx = data.get("_row")
+                    provided = data.get("_provided_keys") if isinstance(data.get("_provided_keys"), set) else provided_keys_from_raw(data)
+                    existing, _match_err = find_existing_product_in_index(
+                        existing_product_index,
+                        match_by,
+                        data,
+                    )
 
-                if existing is None:
-                    if conflict_policy == "update":
-                        skipped += 1
-                        errors.append({"row": row_idx, "errors": ["کالای منطبق یافت نشد؛ سیاست فقط به‌روزرسانی است"]})
-                        continue
-                    try:
+                    if existing is None:
+                        if conflict_policy == "update":
+                            skipped += 1
+                            errors.append({"row": row_idx, "errors": ["کالای منطبق یافت نشد؛ سیاست فقط به‌روزرسانی است"]})
+                            continue
                         create_payload = build_create_payload(data)
                         try:
                             product_request = ProductCreateRequest(**create_payload)
@@ -2413,30 +2600,29 @@ async def import_products_excel(
                             errors.append({"row": row_idx, "errors": format_pydantic_errors(validation_error)})
                             skipped_apply += 1
                             continue
-                        if product_request.opening_balance is not None:
-                            create_product_with_opening_balance(
-                                db,
-                                business_id,
-                                user_id,
-                                product_request,
-                                create_product_fn=create_product,
-                                delete_product_fn=delete_product,
-                            )
-                        else:
-                            create_product(db, business_id, product_request)
+                        result = create_product(
+                            db,
+                            business_id,
+                            product_request,
+                            defer_cache_invalidation=True,
+                            auto_commit=False,
+                            serialize_result=False,
+                            prevalidated_code_uniqueness=match_by == "code",
+                            prevalidated_attribute_ids=True,
+                        )
+                        ob = product_request.opening_balance
+                        if ob is not None:
+                            opening_balance_changes.append({
+                                "product_id": int(result["data"]["id"]),
+                                "product_name": result["data"].get("name") or data.get("name"),
+                                "warehouse_id": int(ob.warehouse_id or result["data"].get("default_warehouse_id")),
+                                "quantity": float(ob.quantity),
+                                "cost_price": float(ob.cost_price or 0),
+                            })
                         inserted += 1
-                    except ApiError as e:
-                        logger.warning("product import create failed business_id=%s row=%s: %s", business_id, row_idx, api_error_message(e))
-                        errors.append({"row": row_idx, "errors": [api_error_message(e)]})
-                        skipped_apply += 1
-                    except Exception as e:
-                        logger.error("product import create failed for '%s': %s", item_name, e, exc_info=True)
-                        errors.append({"row": row_idx, "errors": ["خطای غیرمنتظره در ایجاد کالا"]})
-                        skipped_apply += 1
-                elif conflict_policy == "insert":
-                    skipped += 1
-                else:
-                    try:
+                    elif conflict_policy == "insert":
+                        skipped += 1
+                    else:
                         update_payload = build_update_payload(data, provided)
                         try:
                             update_request = ProductUpdateRequest(**update_payload)
@@ -2445,29 +2631,66 @@ async def import_products_excel(
                             skipped_apply += 1
                             continue
                         previous_warehouse_id = existing.default_warehouse_id
-                        if update_request.opening_balance is not None:
-                            update_product_with_opening_balance(
-                                db,
-                                business_id,
-                                user_id,
-                                existing.id,
-                                update_request,
-                                update_product_fn=update_product,
-                                previous_warehouse_id=previous_warehouse_id,
-                            )
-                        else:
-                            update_product(
-                                db, existing.id, business_id, update_request, user_id=user_id
-                            )
+                        result = update_product(
+                            db,
+                            existing.id,
+                            business_id,
+                            update_request,
+                            user_id=user_id,
+                            defer_cache_invalidation=True,
+                            auto_commit=False,
+                            serialize_result=False,
+                            prevalidated_code_uniqueness=match_by == "code",
+                            prevalidated_attribute_ids=True,
+                        )
+                        ob = update_request.opening_balance
+                        if ob is not None and result:
+                            opening_balance_changes.append({
+                                "product_id": int(existing.id),
+                                "product_name": result["data"].get("name") or data.get("name"),
+                                "warehouse_id": int(ob.warehouse_id or result["data"].get("default_warehouse_id") or previous_warehouse_id),
+                                "previous_warehouse_id": previous_warehouse_id,
+                                "quantity": float(ob.quantity),
+                                "cost_price": float(ob.cost_price or 0),
+                            })
                         updated += 1
-                    except ApiError as e:
-                        logger.warning("product import update failed business_id=%s row=%s: %s", business_id, row_idx, api_error_message(e))
-                        errors.append({"row": row_idx, "errors": [api_error_message(e)]})
-                        skipped_apply += 1
-                    except Exception as e:
-                        logger.error("product import update failed for '%s': %s", item_name, e, exc_info=True)
-                        errors.append({"row": row_idx, "errors": ["خطای غیرمنتظره در به‌روزرسانی کالا"]})
-                        skipped_apply += 1
+
+                if opening_balance_changes:
+                    opening_balance_result = apply_product_opening_balance_changes(
+                        db,
+                        business_id,
+                        user_id,
+                        opening_balance_changes,
+                        auto_commit=False,
+                    )
+                    from app.services.opening_balance_warehouse_sync_service import (
+                        sync_opening_balance_warehouse_documents,
+                    )
+
+                    warehouse_sync = sync_opening_balance_warehouse_documents(
+                        db,
+                        business_id,
+                        user_id,
+                        int(opening_balance_result["id"]),
+                        [int(change["product_id"]) for change in opening_balance_changes],
+                    )
+
+                db.commit()
+            except IntegrityError as exc:
+                db.rollback()
+                raise ApiError(
+                    "IMPORT_WRITE_CONFLICT",
+                    "داده‌های کالا هم‌زمان تغییر کرده‌اند یا مقدار یکتای تکراری ثبت شده است؛ فایل را دوباره بررسی کنید",
+                    http_status=409,
+                ) from exc
+            except Exception:
+                db.rollback()
+                raise
+
+            if inserted or updated:
+                invalidate_products_cache(business_id=business_id)
+                invalidate_public_catalog_caches()
+            apply_elapsed_ms = (time.perf_counter() - apply_started_at) * 1000
         else:
             if is_dry_run:
                 logger.info("[IMPORT] DRY-RUN mode - skipping actual database operations")
@@ -2487,8 +2710,14 @@ async def import_products_excel(
             "would_update": would_update,
             "would_skip_conflict": would_skip_conflict,
         }
+        performance = {
+            "parse_ms": round((parse_finished_at - import_started_at) * 1000, 2),
+            "validation_ms": round((validation_finished_at - parse_finished_at) * 1000, 2),
+            "apply_ms": round(apply_elapsed_ms, 2),
+            "total_ms": round((time.perf_counter() - import_started_at) * 1000, 2),
+        }
 
-        logger.info(f"[IMPORT] Final summary: {summary}")
+        logger.info("[IMPORT] Final summary=%s performance=%s", summary, performance)
         logger.info(f"[IMPORT] Import completed - inserted={inserted}, updated={updated}, skipped={skipped}")
 
         return success_response(
@@ -2496,7 +2725,9 @@ async def import_products_excel(
                 "summary": summary,
                 "errors": errors,
                 "reference_summary": reference_summary,
+                "warehouse_sync": warehouse_sync,
                 "preview": preview_rows if is_dry_run else None,
+                "performance": performance,
             },
             request=request,
             message="PRODUCTS_IMPORT_RESULT",
@@ -6255,4 +6486,3 @@ async def export_sales_by_product_report_pdf(
             "include_zero_sales": bool(body.get("include_zero_sales", False)),
         },
     )
-
