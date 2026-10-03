@@ -1341,6 +1341,15 @@ def check_product_has_related_documents(db: Session, product_id: int) -> tuple[b
         if "فرمول تولید (BOM)" not in related_types:
             related_types.append("فرمول تولید (BOM)")
 
+    # عضویت در باندل کالا (FK: RESTRICT)
+    from adapters.db.models.product_bundle import ProductBundleItem
+    bundle_item_count = db.query(func.count(ProductBundleItem.id)).filter(
+        ProductBundleItem.product_id == product_id
+    ).scalar()
+    if bundle_item_count and bundle_item_count > 0:
+        if "باندل کالا" not in related_types:
+            related_types.append("باندل کالا")
+
     # اسناد هزینه/درآمد کالا (FK: RESTRICT) — باید قبل از حذف چک شود
     try:
         from adapters.db.models.goods_expense_income import GoodsExpenseIncomeLine

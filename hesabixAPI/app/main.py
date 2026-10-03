@@ -1015,6 +1015,8 @@ def create_app() -> FastAPI:
     application.include_router(product_attributes_router, prefix=settings.api_v1_prefix)
     application.include_router(catalog_spec_fields_router, prefix=settings.api_v1_prefix)
     application.include_router(products_router, prefix=settings.api_v1_prefix)
+    from adapters.api.v1.product_bundles import router as product_bundles_router
+    application.include_router(product_bundles_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.product_instances import router as product_instances_router
     application.include_router(product_instances_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.warehouse_docs import router as warehouse_docs_router
@@ -1587,5 +1589,4 @@ Authorization: ApiKey <کلید>
 
 
 app = create_app()
-
 

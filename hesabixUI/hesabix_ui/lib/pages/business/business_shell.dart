@@ -1499,6 +1499,15 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: true,
           ),
           _MenuItem(
+            key: 'product-bundles',
+            label: 'باندل‌های کالا',
+            icon: Icons.inventory_2_outlined,
+            selectedIcon: Icons.inventory_2,
+            path: _bu('product-bundles'),
+            type: _MenuItemType.simple,
+            hasAddButton: false,
+          ),
+          _MenuItem(
             key: 'categories',
             label: t.categories,
             icon: Icons.category,
@@ -3916,6 +3925,7 @@ class _BusinessShellState extends State<BusinessShell> {
       return 'crm';
     }
     if (label == t.products) return 'products';
+    if (label == 'باندل‌های کالا' || label == 'Product bundles') return 'products';
     if (label == t.categories) return 'categories';
     if (label == t.productAttributes) return 'product_attributes';
     if (label == t.accounts) return 'bank_accounts';
