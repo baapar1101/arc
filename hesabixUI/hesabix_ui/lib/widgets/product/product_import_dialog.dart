@@ -144,12 +144,31 @@ class _ProductImportDialogState extends State<ProductImportDialog> {
       final res = await api.post<Map<String, dynamic>>(
         '/products/business/${widget.businessId}/import/excel',
         data: form,
-        options: Options(contentType: 'multipart/form-data'),
+        options: Options(
+          contentType: 'multipart/form-data',
+          receiveTimeout: const Duration(minutes: 5),
+        ),
       );
       setState(() {
         _result = res.data;
       });
       if (!dryRun) {
+        final responseData = res.data?['data'];
+        final warehouseSync = responseData is Map
+            ? responseData['warehouse_sync'] as Map?
+            : null;
+        final receipts = warehouseSync?['receipts_created'] ?? 0;
+        final issues = warehouseSync?['issues_created'] ?? 0;
+        final lines = warehouseSync?['lines_created'] ?? 0;
+        if (mounted && (receipts != 0 || issues != 0 || lines != 0)) {
+          final isFa = Localizations.localeOf(context).languageCode == 'fa';
+          SnackBarHelper.show(
+            context,
+            message: isFa
+                ? 'ایمپورت انجام شد؛ $receipts رسید و $issues حواله خروج با $lines خط انبار قطعی شد.'
+                : 'Import completed; $receipts receipt(s) and $issues issue(s) with $lines warehouse line(s) were posted.',
+          );
+        }
         if (mounted) Navigator.of(context).pop(true);
       }
     } catch (e) {
@@ -385,6 +404,7 @@ class _ResultSummaryBodyState extends State<_ResultSummaryBody> {
     final summary = (data?['summary'] as Map<String, dynamic>?) ?? {};
     final errors = (data?['errors'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
     final refSummary = data?['reference_summary'] as Map<String, dynamic>?;
+    final warehouseSync = data?['warehouse_sync'] as Map<String, dynamic>?;
     final previewRaw = (data?['preview'] as List?)?.cast<dynamic>() ?? const [];
     final preview = previewRaw
         .whereType<Map>()
@@ -432,6 +452,24 @@ class _ResultSummaryBodyState extends State<_ResultSummaryBody> {
               _chip(isFa ? 'ایجادشدنی دسته‌بندی' : 'Would create categories', (refSummary['would_create'] as Map?)?['categories']),
               _chip(isFa ? 'ایجادشدنی ویژگی' : 'Would create attributes', (refSummary['would_create'] as Map?)?['attributes']),
               _chip(isFa ? 'ردیف با تعداد اولیه' : 'Rows with opening balance', (refSummary['opening_balance'] as Map?)?['rows_with_opening_balance']),
+            ],
+          ),
+        ],
+        if (warehouseSync != null) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              if (summary['dry_run'] == true) ...[
+                _chip(isFa ? 'انبار کاندید' : 'Candidate warehouses', warehouseSync['candidate_warehouses']),
+                _chip(isFa ? 'خط انبار کاندید' : 'Candidate warehouse lines', warehouseSync['candidate_lines']),
+              ] else ...[
+                _chip(isFa ? 'رسید انبار' : 'Warehouse receipts', warehouseSync['receipts_created']),
+                _chip(isFa ? 'حواله خروج' : 'Warehouse issues', warehouseSync['issues_created']),
+                _chip(isFa ? 'خط انبار ایجادشده' : 'Warehouse lines created', warehouseSync['lines_created']),
+                _chip(isFa ? 'خط بدون تغییر' : 'Unchanged warehouse lines', warehouseSync['unchanged_lines']),
+              ],
             ],
           ),
         ],

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 from decimal import Decimal
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 from openpyxl.workbook.workbook import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
@@ -223,21 +223,74 @@ def find_existing_product(
     return None, None
 
 
+def product_match_key(match_by: str, data: Dict[str, Any]) -> str:
+    if match_by == "name":
+        return name_match_key(data.get("name"))
+    return collapse_spaces(data.get("code"))
+
+
+def load_existing_product_match_index(
+    session: Session,
+    business_id: int,
+    match_by: str,
+    keys: Iterable[str],
+    *,
+    chunk_size: int = 500,
+) -> Dict[str, List[Product]]:
+    """Load only products referenced by an import, in bounded IN queries."""
+    normalized_keys = list(dict.fromkeys(k for k in keys if k))
+    result: Dict[str, List[Product]] = {}
+    for start in range(0, len(normalized_keys), max(1, chunk_size)):
+        chunk = normalized_keys[start:start + max(1, chunk_size)]
+        query = session.query(Product).filter(Product.business_id == business_id)
+        if match_by == "name":
+            query = query.filter(func.lower(func.trim(Product.name)).in_(chunk))
+        else:
+            query = query.filter(Product.code.in_(chunk))
+        for product in query.all():
+            key = (
+                name_match_key(product.name)
+                if match_by == "name"
+                else collapse_spaces(product.code)
+            )
+            result.setdefault(key, []).append(product)
+    return result
+
+
+def find_existing_product_in_index(
+    index: Dict[str, List[Product]],
+    match_by: str,
+    data: Dict[str, Any],
+) -> Tuple[Optional[Product], Optional[str]]:
+    key = product_match_key(match_by, data)
+    if not key:
+        return None, None
+    rows = index.get(key) or []
+    if match_by == "name" and len(rows) > 1:
+        return None, "چند کالا با این نام وجود دارد؛ برای به‌روزرسانی از تطبیق بر اساس کد استفاده کنید"
+    return (rows[0] if rows else None), None
+
+
 def resolve_fx_currency(
     item: Dict[str, Any],
     db: Session,
     business_id: int,
     row_errors: List[str],
+    currency_index: Optional[Dict[str, Any]] = None,
 ) -> None:
     currency_id = item.get("price_fx_currency_id")
     if isinstance(currency_id, int):
         exists = (
-            db.query(BusinessCurrency.id)
-            .filter(
-                BusinessCurrency.business_id == business_id,
-                BusinessCurrency.currency_id == currency_id,
+            currency_id in currency_index.get("ids", set())
+            if currency_index is not None
+            else (
+                db.query(BusinessCurrency.id)
+                .filter(
+                    BusinessCurrency.business_id == business_id,
+                    BusinessCurrency.currency_id == currency_id,
+                )
+                .first()
             )
-            .first()
         )
         if not exists:
             row_errors.append(f"ارز با شناسه {currency_id} برای این کسب‌وکار تعریف نشده است")
@@ -246,18 +299,42 @@ def resolve_fx_currency(
     if not code:
         return
     row = (
-        db.query(Currency)
-        .join(BusinessCurrency, BusinessCurrency.currency_id == Currency.id)
-        .filter(
-            BusinessCurrency.business_id == business_id,
-            func.lower(Currency.code) == code.lower(),
+        currency_index.get("by_code", {}).get(code.lower())
+        if currency_index is not None
+        else (
+            db.query(Currency)
+            .join(BusinessCurrency, BusinessCurrency.currency_id == Currency.id)
+            .filter(
+                BusinessCurrency.business_id == business_id,
+                func.lower(Currency.code) == code.lower(),
+            )
+            .first()
         )
-        .first()
     )
     if not row:
         row_errors.append(f"ارز با کد «{code}» برای این کسب‌وکار یافت نشد")
         return
     item["price_fx_currency_id"] = row.id
+
+
+def load_business_currency_index(
+    db: Session,
+    business_id: int,
+) -> Dict[str, Any]:
+    rows = (
+        db.query(Currency)
+        .join(BusinessCurrency, BusinessCurrency.currency_id == Currency.id)
+        .filter(BusinessCurrency.business_id == business_id)
+        .all()
+    )
+    return {
+        "ids": {int(row.id) for row in rows},
+        "by_code": {
+            str(row.code).strip().lower(): row
+            for row in rows
+            if row.code
+        },
+    }
 
 
 def map_headers(raw_headers: Sequence[object]) -> List[str]:

@@ -486,7 +486,12 @@ class DocumentRepository:
 
         return parse_user_date(date_value, calendar_type="jalali")
 
-    def create_document(self, document_data: Dict[str, Any]) -> Document:
+    def create_document(
+        self,
+        document_data: Dict[str, Any],
+        *,
+        auto_commit: bool = True,
+    ) -> Document:
         """
         ایجاد سند جدید
         
@@ -512,15 +517,20 @@ class DocumentRepository:
             )
             self.db.add(line)
         
-        self.db.commit()
-        self.db.refresh(document)
+        if auto_commit:
+            self.db.commit()
+            self.db.refresh(document)
+        else:
+            self.db.flush()
         
         return document
 
     def update_document(
         self, 
         document_id: int, 
-        document_data: Dict[str, Any]
+        document_data: Dict[str, Any],
+        *,
+        auto_commit: bool = True,
     ) -> Optional[Document]:
         """
         ویرایش سند موجود
@@ -560,8 +570,11 @@ class DocumentRepository:
                 )
                 self.db.add(line)
         
-        self.db.commit()
-        self.db.refresh(document)
+        if auto_commit:
+            self.db.commit()
+            self.db.refresh(document)
+        else:
+            self.db.flush()
         
         return document
 
@@ -658,4 +671,3 @@ class DocumentRepository:
                 return False, f"سطر {i} نمی‌تواند همزمان بدهکار و بستانکار داشته باشد"
         
         return True, ""
-

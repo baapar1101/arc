@@ -512,6 +512,151 @@ def append_product_line_to_opening_balance(
     )
 
 
+def _merge_product_opening_balance_changes(
+    inventory_lines: List[Dict[str, Any]],
+    changes: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Merge imported balances in O(existing lines + changes)."""
+    by_key: Dict[tuple[int, int], Dict[str, Any]] = {}
+    for line in inventory_lines:
+        pid = line.get("product_id")
+        wid = _warehouse_id_from_line(line)
+        if pid is None or wid is None:
+            continue
+        by_key[(int(pid), int(wid))] = line
+
+    for change in changes:
+        product_id = int(change["product_id"])
+        warehouse_id = int(change["warehouse_id"])
+        quantity = Decimal(str(change.get("quantity") or 0))
+        cost_price = Decimal(str(change.get("cost_price") or 0))
+        if quantity <= 0:
+            raise ApiError(
+                "INVALID_OPENING_BALANCE_QUANTITY",
+                "تعداد اولیه باید بزرگتر از صفر باشد",
+                http_status=400,
+            )
+        if cost_price < 0:
+            raise ApiError(
+                "INVALID_OPENING_BALANCE_COST",
+                "بهای تمام‌شده نمی‌تواند منفی باشد",
+                http_status=400,
+            )
+
+        previous_warehouse_id = change.get("previous_warehouse_id")
+        if previous_warehouse_id is not None:
+            by_key.pop((product_id, int(previous_warehouse_id)), None)
+
+        info: Dict[str, Any] = {
+            "movement": "in",
+            "warehouse_id": warehouse_id,
+        }
+        if cost_price > 0:
+            info["cost_price"] = float(cost_price)
+        by_key[(product_id, warehouse_id)] = {
+            "product_id": product_id,
+            "quantity": float(quantity),
+            "extra_info": info,
+            "description": f"موجودی اولیه - {change.get('product_name') or product_id}",
+        }
+    return list(by_key.values())
+
+
+def apply_product_opening_balance_changes(
+    db: Session,
+    business_id: int,
+    user_id: int,
+    changes: List[Dict[str, Any]],
+    *,
+    fiscal_year_id: Optional[int] = None,
+    auto_commit: bool = True,
+) -> Dict[str, Any]:
+    """Apply all imported product opening balances with one document rewrite.
+
+    ``changes`` must contain product_id, product_name, warehouse_id, quantity and
+    cost_price.  previous_warehouse_id is optional and removes the old product
+    line when an update moves the default warehouse.
+    """
+    if not changes:
+        return {}
+
+    ctx = _validate_ob_editable(db, business_id, fiscal_year_id)
+    fy_id = int(ctx["fiscal_year_id"])
+    _, fy_start, _ = _ensure_fiscal_year(db, business_id, fy_id)
+
+    from adapters.db.repositories.document_repository import DocumentRepository
+
+    repo = DocumentRepository(db)
+    existing_obj = _find_existing_ob_document(
+        db,
+        business_id,
+        fy_id,
+        for_update=True,
+    )
+    existing_doc = repo.to_dict_with_lines(existing_obj) if existing_obj is not None else None
+
+    if existing_doc:
+        account_lines, inventory_lines, settings = _document_lines_to_upsert_inputs(existing_doc)
+        currency_id = existing_doc.get("currency_id")
+        document_date = existing_doc.get("document_date")
+    else:
+        account_lines = []
+        inventory_lines = []
+        settings = {
+            "auto_balance_to_equity": True,
+            "equity_account_id": None,
+            "inventory_account_id": None,
+        }
+        business = db.query(Business).filter(Business.id == int(business_id)).first()
+        currency_id = getattr(business, "default_currency_id", None) if business else None
+        if not currency_id:
+            raise ApiError(
+                "CURRENCY_REQUIRED",
+                "ارز پیش‌فرض کسب‌وکار تنظیم نشده است",
+                http_status=400,
+            )
+        document_date = fy_start
+
+    inventory_lines = _ensure_inventory_lines_have_warehouse(
+        db,
+        business_id,
+        inventory_lines,
+    )
+    inventory_lines = _merge_product_opening_balance_changes(
+        inventory_lines,
+        changes,
+    )
+    inventory_account_id = settings.get("inventory_account_id")
+    equity_account_id = settings.get("equity_account_id")
+    auto_balance = bool(settings.get("auto_balance_to_equity", True))
+    if inventory_lines and not inventory_account_id:
+        inventory_account_id = _resolve_default_inventory_account_id(db)
+    if auto_balance and not equity_account_id and (account_lines or inventory_lines):
+        equity_account_id = _resolve_default_equity_account_id(db)
+
+    payload: Dict[str, Any] = {
+        "fiscal_year_id": fy_id,
+        "currency_id": int(currency_id),
+        "document_date": document_date,
+        "account_lines": account_lines,
+        "inventory_lines": inventory_lines,
+        "auto_balance_to_equity": auto_balance,
+    }
+    if inventory_account_id:
+        payload["inventory_account_id"] = int(inventory_account_id)
+    if equity_account_id:
+        payload["equity_account_id"] = int(equity_account_id)
+
+    return upsert_opening_balance(
+        db,
+        business_id,
+        int(user_id),
+        payload,
+        auto_commit=auto_commit,
+        return_details=False,
+    )
+
+
 def _merged_track_inventory(payload: Any, existing: Optional[Product]) -> bool:
     if hasattr(payload, "track_inventory") and payload.track_inventory is not None:
         return bool(payload.track_inventory)

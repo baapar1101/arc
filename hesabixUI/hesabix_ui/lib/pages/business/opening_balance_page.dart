@@ -24,6 +24,7 @@ import 'package:hesabix_ui/services/person_service.dart';
 import 'package:hesabix_ui/services/product_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
+import 'package:hesabix_ui/utils/opening_balance_totals.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
@@ -1476,7 +1477,17 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
       invValue += (q * c);
     }
     debit += invValue;
-    return {'debit': debit, 'credit': credit, 'diff': debit - credit};
+    final effectiveTotals = applyOpeningBalanceAutoBalance(
+      debit: debit,
+      credit: credit,
+      autoBalanceEnabled: _autoBalance,
+      hasEquityAccount: _equityAccountId != null,
+    );
+    return {
+      'debit': effectiveTotals.debit,
+      'credit': effectiveTotals.credit,
+      'diff': effectiveTotals.difference,
+    };
   }
   
   Map<String, bool> _computeValidation() {

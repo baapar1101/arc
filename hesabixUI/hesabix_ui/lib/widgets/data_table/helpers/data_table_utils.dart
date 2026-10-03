@@ -5,6 +5,26 @@ import '../data_table_config.dart';
 
 /// Utility functions for data table
 class DataTableUtils {
+  /// Calculates a safe [DataTable2.minWidth] when every rendered column uses
+  /// [DataColumn2.fixedWidth].
+  ///
+  /// DataTable2 removes the horizontal margins before asserting that the
+  /// available width is *strictly* greater than the sum of fixed widths. The
+  /// extra logical pixel keeps the calculation on the valid side of that
+  /// strict inequality.
+  static double getFixedColumnsMinTableWidth(
+    Iterable<DataColumn2> columns, {
+    required double horizontalMargin,
+  }) {
+    var totalFixedWidth = 0.0;
+    for (final column in columns) {
+      totalFixedWidth += column.fixedWidth ?? 0.0;
+    }
+
+    const strictInequalitySlack = 1.0;
+    return totalFixedWidth + (horizontalMargin * 2) + strictInequalitySlack;
+  }
+
   /// Format text with ellipsis if needed
   static String formatText(String text, {int? maxLength}) {
     if (maxLength != null && text.length > maxLength) {

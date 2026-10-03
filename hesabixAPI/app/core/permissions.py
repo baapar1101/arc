@@ -91,7 +91,11 @@ def require_superadmin():
     return decorator
 
 
-def require_business_access(business_id_param: str = "business_id"):
+def require_business_access(
+    business_id_param: str = "business_id",
+    *,
+    offload_sync: bool = False,
+):
     """Decorator برای بررسی دسترسی به کسب و کار خاص.
     امضای اصلی endpoint حفظ می‌شود و Request از آرگومان‌ها استخراج می‌گردد.
     """
@@ -137,7 +141,12 @@ def require_business_access(business_id_param: str = "business_id"):
                         raise ApiError("FORBIDDEN", f"No access to business {business_id}", http_status=403)
 
             # فراخوانی تابع اصلی و await در صورت نیاز (خارج از context manager)
-            result = func(*args, **kwargs)
+            if offload_sync and not inspect.iscoroutinefunction(func):
+                from starlette.concurrency import run_in_threadpool
+
+                result = await run_in_threadpool(func, *args, **kwargs)
+            else:
+                result = func(*args, **kwargs)
             if inspect.isawaitable(result):
                 result = await result
             return result
