@@ -1,0 +1,2241 @@
+﻿{
+    "success":  true,
+    "message":  null,
+    "data":  {
+                 "items":  [
+                               {
+                                   "id":  6822,
+                                   "name":  "holotest",
+                                   "business_type":  "Ø´Ø±Ú©Øª",
+                                   "business_field":  "Ø¨Ø§Ø²Ø±Ú¯Ø§ÙÛ",
+                                   "owner_id":  1,
+                                   "address":  null,
+                                   "phone":  null,
+                                   "mobile":  null,
+                                   "national_id":  null,
+                                   "registration_number":  null,
+                                   "economic_id":  null,
+                                   "country":  null,
+                                   "province":  null,
+                                   "city":  null,
+                                   "postal_code":  null,
+                                   "logo_file_id":  null,
+                                   "stamp_file_id":  null,
+                                   "default_credit_limit":  null,
+                                   "check_credit_enabled_by_default":  false,
+                                   "public_catalog_show_contact":  false,
+                                   "public_catalog_show_base_sales_price":  true,
+                                   "display_timezone":  null,
+                                   "invoice_profit_calculation_method":  "automatic",
+                                   "invoice_profit_calculation_basis":  "purchase_price",
+                                   "invoice_profit_include_overhead":  false,
+                                   "invoice_profit_overhead_type":  "none",
+                                   "invoice_profit_overhead_percent":  0.0,
+                                   "invoice_profit_calculation_type":  "gross",
+                                   "invoice_profit_ledger_recognition_basis":  "warehouse_document_posting",
+                                   "invoice_profit_fifo_shortage_mode":  "perpetual_mixed",
+                                   "invoice_sync_update_sales_price_enabled":  false,
+                                   "invoice_sync_update_purchase_price_enabled":  false,
+                                   "invoice_sync_sales_price_basis":  "net_after_line_discount",
+                                   "invoice_sync_purchase_price_basis":  "net_after_line_discount",
+                                   "invoice_warehouse_release_mode":  "draft",
+                                   "invoice_purchase_accounting_mode":  "direct_inventory",
+                                   "invoice_missing_line_warehouse_policy":  "reject",
+                                   "invoice_default_warehouse_id":  null,
+                                   "invoice_default_warehouse_fill_document_header":  true,
+                                   "allow_negative_inventory_for_bulk":  false,
+                                   "allow_negative_inventory_for_unique":  false,
+                                   "warehouse_transfer_require_positive_stock":  true,
+                                   "goods_expense_income_workflow_mode":  "simple",
+                                   "goods_expense_income_auto_post_in_simple_mode":  true,
+                                   "goods_expense_income_default_expense_account_code":  "70407",
+                                   "goods_expense_income_default_income_account_code":  "60103",
+                                   "goods_expense_income_stock_count_mode":  "goods_docs",
+                                   "goods_expense_income_allow_manual_unit_cost":  false,
+                                   "goods_expense_income_require_person":  false,
+                                   "invoice_global_discount_percent_basis":  "subtotal_after_line_discount",
+                                   "invoice_global_discount_tax_mode":  "recalculate_tax_proportional",
+                                   "invoice_global_discount_max_percent":  null,
+                                   "invoice_global_discount_max_amount":  null,
+                                   "fx_revaluation_policy":  null,
+                                   "created_at":  "1405/07/02 12:33:21",
+                                   "created_at_formatted":  {
+                                                                "year":  1405,
+                                                                "month":  7,
+                                                                "day":  2,
+                                                                "hour":  12,
+                                                                "minute":  33,
+                                                                "second":  21,
+                                                                "weekday":  5,
+                                                                "month_name":  "Ù\u0085ÙØ±",
+                                                                "weekday_name":  "Ù¾ÙØ¬âØ´ÙØ¨Ù",
+                                                                "formatted":  "1405/07/02 12:33:21",
+                                                                "date_only":  "1405/07/02",
+                                                                "time_only":  "12:33:21",
+                                                                "is_leap_year":  false,
+                                                                "month_days":  30
+                                                            },
+                                   "created_at_raw":  "2026-09-24T09:03:21.185993Z",
+                                   "updated_at":  "1405/07/02 12:33:21",
+                                   "updated_at_formatted":  {
+                                                                "year":  1405,
+                                                                "month":  7,
+                                                                "day":  2,
+                                                                "hour":  12,
+                                                                "minute":  33,
+                                                                "second":  21,
+                                                                "weekday":  5,
+                                                                "month_name":  "Ù\u0085ÙØ±",
+                                                                "weekday_name":  "Ù¾ÙØ¬âØ´ÙØ¨Ù",
+                                                                "formatted":  "1405/07/02 12:33:21",
+                                                                "date_only":  "1405/07/02",
+                                                                "time_only":  "12:33:21",
+                                                                "is_leap_year":  false,
+                                                                "month_days":  30
+                                                            },
+                                   "updated_at_raw":  "2026-09-24T09:03:21.185997Z",
+                                   "deleted_at":  null,
+                                   "deletion_requested_at":  null,
+                                   "auto_delete_at":  null,
+                                   "is_deleted":  false,
+                                   "is_deletion_pending":  false,
+                                   "default_currency":  {
+                                                            "id":  1,
+                                                            "code":  "IRR",
+                                                            "title":  "Ø±ÛØ§Ù Ø§ÛØ±Ø§Ù",
+                                                            "symbol":  "ï·¼",
+                                                            "decimal_places":  0
+                                                        },
+                                   "currencies":  [
+                                                      {
+                                                          "id":  1,
+                                                          "code":  "IRR",
+                                                          "title":  "Ø±ÛØ§Ù Ø§ÛØ±Ø§Ù",
+                                                          "symbol":  "ï·¼",
+                                                          "decimal_places":  0
+                                                      }
+                                                  ],
+                                   "is_multi_currency":  false,
+                                   "is_owner":  true,
+                                   "role":  "Ù\u0085Ø§ÙÚ©",
+                                   "permissions":  {
+
+                                                   }
+                               },
+                               {
+                                   "id":  6734,
+                                   "name":  "ØªØ¬ÙÛØ² Ù\u0085Ø§Ø´ÛÙ Ø²Ø§Ú¯Ø±Ø³",
+                                   "business_type":  "Ø´Ø±Ú©Øª",
+                                   "business_field":  "Ø®Ø¯Ù\u0085Ø§ØªÛ",
+                                   "owner_id":  1,
+                                   "address":  "Ø´ÙØ±Ú© ØµÙØ¹ØªÛ Ø®ÛØ§Ø¨Ø§Ù Ú©Ø§Ø±Ú¯Ø± Ù¾ÙØ§Ú© 12",
+                                   "phone":  "02191550290",
+                                   "mobile":  null,
+                                   "national_id":  null,
+                                   "registration_number":  "140111762447",
+                                   "economic_id":  null,
+                                   "country":  "Ø§ÛØ±Ø§Ù",
+                                   "province":  "Ú©Ø±Ù\u0085Ø§ÙØ´Ø§Ù",
+                                   "city":  "Ø§Ø³ÙØ§Ù\u0085 Ø¢Ø¨Ø§Ø¯ ØºØ±Ø¨",
+                                   "postal_code":  "6761656590",
+                                   "logo_file_id":  "c553b174-16d2-444e-9dba-b83b3d385f9d",
+                                   "stamp_file_id":  "b238cb19-b19d-4a03-a8c9-bd452f443c67",
+                                   "default_credit_limit":  null,
+                                   "check_credit_enabled_by_default":  false,
+                                   "public_catalog_show_contact":  false,
+                                   "public_catalog_show_base_sales_price":  true,
+                                   "display_timezone":  null,
+                                   "invoice_profit_calculation_method":  "automatic",
+                                   "invoice_profit_calculation_basis":  "purchase_price",
+                                   "invoice_profit_include_overhead":  false,
+                                   "invoice_profit_overhead_type":  "none",
+                                   "invoice_profit_overhead_percent":  0.0,
+                                   "invoice_profit_calculation_type":  "gross",
+                                   "invoice_profit_ledger_recognition_basis":  "warehouse_document_posting",
+                                   "invoice_profit_fifo_shortage_mode":  "perpetual_mixed",
+                                   "invoice_sync_update_sales_price_enabled":  false,
+                                   "invoice_sync_update_purchase_price_enabled":  false,
+                                   "invoice_sync_sales_price_basis":  "net_after_line_discount",
+                                   "invoice_sync_purchase_price_basis":  "net_after_line_discount",
+                                   "invoice_warehouse_release_mode":  "draft",
+                                   "invoice_purchase_accounting_mode":  "direct_inventory",
+                                   "invoice_missing_line_warehouse_policy":  "reject",
+                                   "invoice_default_warehouse_id":  null,
+                                   "invoice_default_warehouse_fill_document_header":  true,
+                                   "allow_negative_inventory_for_bulk":  false,
+                                   "allow_negative_inventory_for_unique":  false,
+                                   "warehouse_transfer_require_positive_stock":  true,
+                                   "goods_expense_income_workflow_mode":  "simple",
+                                   "goods_expense_income_auto_post_in_simple_mode":  true,
+                                   "goods_expense_income_default_expense_account_code":  "70407",
+                                   "goods_expense_income_default_income_account_code":  "60103",
+                                   "goods_expense_income_stock_count_mode":  "goods_docs",
+                                   "goods_expense_income_allow_manual_unit_cost":  false,
+                                   "goods_expense_income_require_person":  false,
+                                   "invoice_global_discount_percent_basis":  "subtotal_after_line_discount",
+                                   "invoice_global_discount_tax_mode":  "recalculate_tax_proportional",
+                                   "invoice_global_discount_max_percent":  null,
+                                   "invoice_global_discount_max_amount":  null,
+                                   "fx_revaluation_policy":  null,
+                                   "created_at":  "1405/06/21 11:18:46",
+                                   "created_at_formatted":  {
+                                                                "year":  1405,
+                                                                "month":  6,
+                                                                "day":  21,
+                                                                "hour":  11,
+                                                                "minute":  18,
+                                                                "second":  46,
+                                                                "weekday":  0,
+                                                                "month_name":  "Ø´ÙØ±ÛÙØ±",
+                                                                "weekday_name":  "Ø´ÙØ¨Ù",
+                                                                "formatted":  "1405/06/21 11:18:46",
+                                                                "date_only":  "1405/06/21",
+                                                                "time_only":  "11:18:46",
+                                                                "is_leap_year":  false,
+                                                                "month_days":  31
+                                                            },
+                                   "created_at_raw":  "2026-09-12T07:48:46.443005Z",
+                                   "updated_at":  "1405/06/21 14:15:47",
+                                   "updated_at_formatted":  {
+                                                                "year":  1405,
+                                                                "month":  6,
+                                                                "day":  21,
+                                                                "hour":  14,
+                                                                "minute":  15,
+                                                                "second":  47,
+                                                                "weekday":  0,
+                                                                "month_name":  "Ø´ÙØ±ÛÙØ±",
+                                                                "weekday_name":  "Ø´ÙØ¨Ù",
+                                                                "formatted":  "1405/06/21 14:15:47",
+                                                                "date_only":  "1405/06/21",
+                                                                "time_only":  "14:15:47",
+                                                                "is_leap_year":  false,
+                                                                "month_days":  31
+                                                            },
+                                   "updated_at_raw":  "2026-09-12T10:45:47.154047Z",
+                                   "deleted_at":  null,
+                                   "deletion_requested_at":  null,
+                                   "auto_delete_at":  null,
+                                   "is_deleted":  false,
+                                   "is_deletion_pending":  false,
+                                   "default_currency":  {
+                                                            "id":  1,
+                                                            "code":  "IRR",
+                                                            "title":  "Ø±ÛØ§Ù Ø§ÛØ±Ø§Ù",
+                                                            "symbol":  "ï·¼",
+                                                            "decimal_places":  0
+                                                        },
+                                   "currencies":  [
+                                                      {
+                                                          "id":  1,
+                                                          "code":  "IRR",
+                                                          "title":  "Ø±ÛØ§Ù Ø§ÛØ±Ø§Ù",
+                                                          "symbol":  "ï·¼",
+                                                          "decimal_places":  0
+                                                      }
+                                                  ],
+                                   "is_multi_currency":  false,
+                                   "is_owner":  true,
+                                   "role":  "Ù\u0085Ø§ÙÚ©",
+                                   "permissions":  {
+
+                                                   }
+                               },
+                               {
+                                   "id":  6585,
+                                   "name":  "ØªØ³Øª Ù\u0085Ø¯Ø³Ø§",
+                                   "business_type":  "ÙØ±ÙØ´Ú¯Ø§Ù",
+                                   "business_field":  "Ø¨Ø§Ø²Ø±Ú¯Ø§ÙÛ",
+                                   "owner_id":  5,
+                                   "address":  "Ø®ÛØ§Ø¨Ø§Ù Ø­Ø¶Ø±ØªÛØ Ù\u0085Ø¬ØªÙ\u0085Ø¹ Ø¨ÛÙ Ø§ÙØ­Ø±Ù\u0085ÛÙØ Ø·Ø¨ÙÙ ÙÙ\u0085Ú©ÙØ Ù¾ÙØ§Ú© 51",
+                                   "phone":  null,
+                                   "mobile":  "09981818199",
+                                   "national_id":  null,
+                                   "registration_number":  null,
+                                   "economic_id":  null,
+                                   "country":  null,
+                                   "province":  null,
+                                   "city":  null,
+                                   "postal_code":  null,
+                                   "logo_file_id":  null,
+                                   "stamp_file_id":  null,
+                                   "default_credit_limit":  null,
+                                   "check_credit_enabled_by_default":  false,
+                                   "public_catalog_show_contact":  false,
+                                   "public_catalog_show_base_sales_price":  true,
+                                   "display_timezone":  null,
+                                   "invoice_profit_calculation_method":  "automatic",
+                                   "invoice_profit_calculation_basis":  "moving_weighted_average",
+                                   "invoice_profit_include_overhead":  false,
+                                   "invoice_profit_overhead_type":  "none",
+                                   "invoice_profit_overhead_percent":  0.0,
+                                   "invoice_profit_calculation_type":  "gross",
+                                   "invoice_profit_ledger_recognition_basis":  "warehouse_document_posting",
+                                   "invoice_profit_fifo_shortage_mode":  "perpetual_mixed",
+                                   "invoice_sync_update_sales_price_enabled":  false,
+                                   "invoice_sync_update_purchase_price_enabled":  true,
+                                   "invoice_sync_sales_price_basis":  "net_after_line_discount",
+                                   "invoice_sync_purchase_price_basis":  "unit_price",
+                                   "invoice_warehouse_release_mode":  "posted",
+                                   "invoice_purchase_accounting_mode":  "direct_inventory",
+                                   "invoice_missing_line_warehouse_policy":  "use_default_warehouse",
+                                   "invoice_default_warehouse_id":  9670,
+                                   "invoice_default_warehouse_fill_document_header":  true,
+                                   "allow_negative_inventory_for_bulk":  true,
+                                   "allow_negative_inventory_for_unique":  false,
+                                   "warehouse_transfer_require_positive_stock":  true,
+                                   "goods_expense_income_workflow_mode":  "simple",
+                                   "goods_expense_income_auto_post_in_simple_mode":  true,
+                                   "goods_expense_income_default_expense_account_code":  "70407",
+                                   "goods_expense_income_default_income_account_code":  "60103",
+                                   "goods_expense_income_stock_count_mode":  "goods_docs",
+                                   "goods_expense_income_allow_manual_unit_cost":  false,
+                                   "goods_expense_income_require_person":  false,
+                                   "invoice_global_discount_percent_basis":  "subtotal_after_line_discount",
+                                   "invoice_global_discount_tax_mode":  "recalculate_tax_proportional",
+                                   "invoice_global_discount_max_percent":  null,
+                                   "invoice_global_discount_max_amount":  null,
+                                   "fx_revaluation_policy":  null,
+                                   "created_at":  "1405/05/28 21:27:00",
+                                   "created_at_formatted":  {
+                                                                "year":  1405,
+                                                                "month":  5,
+                                                                "day":  28,
+                                                                "hour":  21,
+                                                                "minute":  27,
+                                                                "second":  0,
+                                                                "weekday":  4,
+                                                                "month_name":  "Ù\u0085Ø±Ø¯Ø§Ø¯",
+                                                                "weekday_name":  "ÚÙØ§Ø±Ø´ÙØ¨Ù",
+                                                                "formatted":  "1405/05/28 21:27:00",
+                                                                "date_only":  "1405/05/28",
+                                                                "time_only":  "21:27:00",
+                                                                "is_leap_year":  false,
+                                                                "month_days":  31
+                                                            },
+                                   "created_at_raw":  "2026-08-19T17:57:00.762434Z",
+                                   "updated_at":  "1405/05/28 21:43:03",
+                                   "updated_at_formatted":  {
+                                                                "year":  1405,
+                                                                "month":  5,
+                                                                "day":  28,
+                                                                "hour":  21,
+                                                                "minute":  43,
+                                                                "second":  3,
+                                                                "weekday":  4,
+                                                                "month_name":  "Ù\u0085Ø±Ø¯Ø§Ø¯",
+                                                                "weekday_name":  "ÚÙØ§Ø±Ø´ÙØ¨Ù",
+                                                                "formatted":  "1405/05/28 21:43:03",
+                                                                "date_only":  "1405/05/28",
+                                                                "time_only":  "21:43:03",
+                                                                "is_leap_year":  false,
+                                                                "month_days":  31
+                                                            },
+                                   "updated_at_raw":  "2026-08-19T18:13:03.159648Z",
+                                   "deleted_at":  null,
+                                   "deletion_requested_at":  null,
+                                   "auto_delete_at":  null,
+                                   "is_deleted":  false,
+                                   "is_deletion_pending":  false,
+                                   "default_currency":  {
+                                                            "id":  1,
+                                                            "code":  "IRR",
+                                                            "title":  "Ø±ÛØ§Ù Ø§ÛØ±Ø§Ù",
+                                                            "symbol":  "ï·¼",
+                                                            "decimal_places":  0
+                                                        },
+                                   "currencies":  [
+                                                      {
+                                                          "id":  13,
+                                                          "code":  "AED",
+                                                          "title":  "Dirham",
+                                                          "symbol":  "Ø¯.Ø¥",
+                                                          "decimal_places":  2
+                                                      },
+                                                      {
+                                                          "id":  1,
+                                                          "code":  "IRR",
+                                                          "title":  "Ø±ÛØ§Ù Ø§ÛØ±Ø§Ù",
+                                                          "symbol":  "ï·¼",
+                                                          "decimal_places":  0
+                                                      }
+                                                  ],
+                                   "is_multi_currency":  true,
+                                   "is_owner":  false,
+                                   "role":  "Ø¹Ø¶Ù",
+                                   "permissions":  {
+                                                       "join":  true
+                                                   }
+                               },
+                               {
+                                   "id":  6570,
+                                   "name":  "ØªØ³Øª Ù\u0085Ø§ÙØ±ÙØ´Ø§Ù¾",
+                                   "business_type":  "Ù\u0085ØºØ§Ø²Ù",
+                                   "business_field":  "Ø¨Ø§Ø²Ø±Ú¯Ø§ÙÛ",
+                                   "owner_id":  6046,
+                                   "address":  null,
+                                   "phone":  null,
+                                   "mobile":  null,
+                                   "national_id":  null,
+                                   "registration_number":  null,
+                                   "economic_id":  null,
+                                   "country":  null,
+                                   "province":  null,
+                                   "city":  null,
+                                   "postal_code":  null,
+                                   "logo_file_id":  null,
+                                   "stamp_file_id":  null,
+                                   "default_credit_limit":  null,
+                                   "check_credit_enabled_by_default":  false,
+                                   "public_catalog_show_contact":  false,
+                                   "public_catalog_show_base_sales_price":  true,
+                                   "display_timezone":  null,
+                                   "invoice_profit_calculation_method":  "automatic",
+                                   "invoice_profit_calculation_basis":  "purchase_price",
+                                   "invoice_profit_include_overhead":  false,
+                                   "invoice_profit_overhead_type":  "none",
+                                   "invoice_profit_overhead_percent":  0.0,
+                                   "invoice_profit_calculation_type":  "gross",
+                                   "invoice_profit_ledger_recognition_basis":  "warehouse_document_posting",
+                                   "invoice_profit_fifo_shortage_mode":  "perpetual_mixed",
+                                   "invoice_sync_update_sales_price_enabled":  true,
+                                   "invoice_sync_update_purchase_price_enabled":  true,
+                                   "invoice_sync_sales_price_basis":  "net_after_line_discount",
+                                   "invoice_sync_purchase_price_basis":  "net_after_line_discount",
+                                   "invoice_warehouse_release_mode":  "posted",
+                                   "invoice_purchase_accounting_mode":  "direct_inventory",
+                                   "invoice_missing_line_warehouse_policy":  "reject",
+                                   "invoice_default_warehouse_id":  null,
+                                   "invoice_default_warehouse_fill_document_header":  true,
+                                   "allow_negative_inventory_for_bulk":  false,
+                                   "allow_negative_inventory_for_unique":  false,
+                                   "warehouse_transfer_require_positive_stock":  true,
+                                   "goods_expense_income_workflow_mode":  "simple",
+                                   "goods_expense_income_auto_post_in_simple_mode":  true,
+                                   "goods_expense_income_default_expense_account_code":  "70407",
+                                   "goods_expense_income_default_income_account_code":  "60103",
+                                   "goods_expense_income_stock_count_mode":  "goods_docs",
+                                   "goods_expense_income_allow_manual_unit_cost":  false,
+                                   "goods_expense_income_require_person":  false,
+                                   "invoice_global_discount_percent_basis":  "subtotal_after_line_discount",
+                                   "invoice_global_discount_tax_mode":  "recalculate_tax_proportional",
+                                   "invoice_global_discount_max_percent":  null,
+                                   "invoice_global_discount_max_amount":  null,
+                                   "fx_revaluation_policy":  null,
+                                   "created_at":  "1405/05/27 12:19:07",
+                                   "created_at_formatted":  {
+                                                                "year":  1405,
+                                                                "month":  5,
+                                                                "day":  27,
+                                                                "hour":  12,
+                                                                "minute":  19,
+                                                                "second":  7,
+                                                                "weekday":  3,
+                                                                "month_name":  "Ù\u0085Ø±Ø¯Ø§Ø¯",
+                                                                "weekday_name":  "Ø³ÙâØ´ÙØ¨Ù",
+                                                                "formatted":  "1405/05/27 12:19:07",
+                                                                "date_only":  "1405/05/27",
+                                                                "time_only":  "12:19:07",
+                                                                "is_leap_year":  false,
+                                                                "month_days":  31
+                                                            },
+                                   "created_at_raw":  "2026-08-18T08:49:07.341248Z",
+                                   "updated_at":  "1405/07/01 11:20:28",
+                                   "updated_at_formatted":  {
+                                                                "year":  1405,
+                                                                "month":  7,
+                                                                "day":  1,
+                                                                "hour":  11,
+                                                                "minute":  20,
+                                                                "second":  28,
+                                                                "weekday":  4,
+                                                                "month_name":  "Ù\u0085ÙØ±",
+                                                                "weekday_name":  "ÚÙØ§Ø±Ø´ÙØ¨Ù",
+                                                                "formatted":  "1405/07/01 11:20:28",
+                                                                "date_only":  "1405/07/01",
+                                                                "time_only":  "11:20:28",
+                                                                "is_leap_year":  false,
+                                                                "month_days":  30
+                                                            },
+                                   "updated_at_raw":  "2026-09-23T07:50:28.415766Z",
+                                   "deleted_at":  null,
+                                   "deletion_requested_at":  null,
+                                   "auto_delete_at":  null,
+                                   "is_deleted":  false,
+                                   "is_deletion_pending":  false,
+                                   "default_currency":  {
+                                                            "id":  1,
+                                                            "code":  "IRR",
+                                                            "title":  "Ø±ÛØ§Ù Ø§ÛØ±Ø§Ù",
+                                                            "symbol":  "ï·¼",
+                                                            "decimal_places":  0
+                                                        },
+                                   "currencies":  [
+                                                      {
+                                                          "id":  1,
+                                                          "code":  "IRR",
+                                                          "title":  "Ø±ÛØ§Ù Ø§ÛØ±Ø§Ù",
+                                                          "symbol":  "ï·¼",
+                                                          "decimal_places":  0
+                                                      }
+                                                  ],
+                                   "is_multi_currency":  false,
+                                   "is_owner":  false,
+                                   "role":  "Ø¹Ø¶Ù",
+                                   "permissions":  {
+                                                       "join":  true
+                                                   }
+                               },
+                               {
+                                   "id":  6564,
+                                   "name":  "ØªØ³Øª",
+                                   "business_type":  "Ø´Ø®ØµÛ",
+                                   "business_field":  "Ø®Ø¯Ù\u0085Ø§ØªÛ",
+                                   "owner_id":  6290,
+                                   "address":  null,
+                                   "phone":  null,
+                                   "mobile":  null,
+                                   "national_id":  null,
+                                   "registration_number":  null,
+                                   "economic_id":  null,
+                                   "country":  null,
+                                   "province":  null,
+                                   "city":  null,
+                                   "postal_code":  null,
+                                   "logo_file_id":  null,
+                                   "stamp_file_id":  null,
+                                   "default_credit_limit":  null,
+                                   "check_credit_enabled_by_default":  false,
+                                   "public_catalog_show_contact":  false,
+                                   "public_catalog_show_base_sales_price":  true,
+                                   "display_timezone":  null,
+                                   "invoice_profit_calculation_method":  "automatic",
+                                   "invoice_profit_calculation_basis":  "purchase_price",
+                                   "invoice_profit_include_overhead":  false,
+                                   "invoice_profit_overhead_type":  "none",
+                                   "invoice_profit_overhead_percent":  0.0,
+                                   "invoice_profit_calculation_type":  "gross",
+                                   "invoice_profit_ledger_recognition_basis":  "warehouse_document_posting",
+                                   "invoice_profit_fifo_shortage_mode":  "perpetual_mixed",
+                                   "invoice_sync_update_sales_price_enabled":  false,
+                                   "invoice_sync_update_purchase_price_enabled":  false,
+                                   "invoice_sync_sales_price_basis":  "net_after_line_discount",
+                                   "invoice_sync_purchase_price_basis":  "net_after_line_discount",
+                                   "invoice_warehouse_release_mode":  "draft",
+                                   "invoice_purchase_accounting_mode":  "direct_inventory",
+                                   "invoice_missing_line_warehouse_policy":  "reject",
+                                   "invoice_default_warehouse_id":  null,
+                                   "invoice_default_warehouse_fill_document_header":  true,
+                                   "allow_negative_inventory_for_bulk":  false,
+                                   "allow_negative_inventory_for_unique":  false,
+                                   "warehouse_transfer_require_positive_stock":  true,
+                                   "goods_expense_income_workflow_mode":  "simple",
+                                   "goods_expense_income_auto_post_in_simple_mode":  true,
+                                   "goods_expense_income_default_expense_account_code":  "70407",
+                                   "goods_expense_income_default_income_account_code":  "60103",
+                                   "goods_expense_income_stock_count_mode":  "goods_docs",
+                                   "goods_expense_income_allow_manual_unit_cost":  false,
+                                   "goods_expense_income_require_person":  false,
+                                   "invoice_global_discount_percent_basis":  "subtotal_after_line_discount",
+                                   "invoice_global_discount_tax_mode":  "recalculate_tax_proportional",
+                                   "invoice_global_discount_max_percent":  null,
+                                   "invoice_global_discount_max_amount":  null,
+                                   "fx_revaluation_policy":  null,
+                                   "created_at":  "1405/05/26 13:05:06",
+                                   "created_at_formatted":  {
+                                                                "year":  1405,
+                                                                "month":  5,
+                                                                "day":  26,
+                                                                "hour":  13,
+                                                                "minute":  5,
+                                                                "second":  6,
+                                                                "weekday":  2,
+                                                                "month_name":  "Ù\u0085Ø±Ø¯Ø§Ø¯",
+                                                                "weekday_name":  "Ø¯ÙØ´ÙØ¨Ù",
+                                                                "formatted":  "1405/05/26 13:05:06",
+                                                                "date_only":  "1405/05/26",
+                                                                "time_only":  "13:05:06",
+                                                                "is_leap_year":  false,
+                                                                "month_days":  31
+                                                            },
+                                   "created_at_raw":  "2026-08-17T09:35:06.264430Z",
+                                   "updated_at":  "1405/05/26 15:58:37",
+                                   "updated_at_formatted":  {
+                                                                "year":  1405,
+                                                                "month":  5,
+                                                                "day":  26,
+                                                                "hour":  15,
+                                                                "minute":  58,
+                                                                "second":  37,
+                                                                "weekday":  2,
+                                                                "month_name":  "Ù\u0085Ø±Ø¯Ø§Ø¯",
+                                                                "weekday_name":  "Ø¯ÙØ´ÙØ¨Ù",
+                                                                "formatted":  "1405/05/26 15:58:37",
+                                                                "date_only":  "1405/05/26",
+                                                                "time_only":  "15:58:37",
+                                                                "is_leap_year":  false,
+                                                                "month_days":  31
+                                                            },
+                                   "updated_at_raw":  "2026-08-17T12:28:37.017433Z",
+                                   "deleted_at":  null,
+                                   "deletion_requested_at":  null,
+                                   "auto_delete_at":  null,
+                                   "is_deleted":  false,
+                                   "is_deletion_pending":  false,
+                                   "default_currency":  {
+                                                            "id":  1,
+                                                            "code":  "IRR",
+                                                            "title":  "Ø±ÛØ§Ù Ø§ÛØ±Ø§Ù",
+                                                            "symbol":  "ï·¼",
+                                                            "decimal_places":  0
+                                                        },
+                                   "currencies":  [
+                                                      {
+                                                          "id":  1,
+                                                          "code":  "IRR",
+                                                          "title":  "Ø±ÛØ§Ù Ø§ÛØ±Ø§Ù",
+                                                          "symbol":  "ï·¼",
+                                                          "decimal_places":  0
+                                                      }
+                                                  ],
+                                   "is_multi_currency":  false,
+                                   "is_owner":  false,
+                                   "role":  "Ø¹Ø¶Ù",
+                                   "permissions":  {
+                                                       "join":  true,
+                                                       "people":  {
+                                                                      "add":  true,
+                                                                      "view":  true,
+                                                                      "edit":  true,
+                                                                      "delete":  true
+                                                                  },
+                                                       "people_transactions":  {
+                                                                                   "add":  true,
+                                                                                   "view":  true,
+                                                                                   "edit":  true,
+                                                                                   "delete":  true,
+                                                                                   "draft":  true
+                                                                               },
+                                                       "products":  {
+                                                                        "add":  true,
+                                                                        "view":  true,
+                                                                        "edit":  true,
+                                                                        "delete":  true,
+                                                                        "export":  true
+                                                                    },
+                                                       "price_lists":  {
+                                                                           "add":  true,
+                                                                           "view":  true,
+                                                                           "edit":  true,
+                                                                           "delete":  true
+                                                                       },
+                                                       "categories":  {
+                                                                          "add":  true,
+                                                                          "view":  true,
+                                                                          "edit":  true,
+                                                                          "delete":  true
+                                                                      },
+                                                       "product_attributes":  {
+                                                                                  "add":  true,
+                                                                                  "view":  true,
+                                                                                  "edit":  true,
+                                                                                  "delete":  true
+                                                                              },
+                                                       "bank_accounts":  {
+                                                                             "add":  true,
+                                                                             "view":  true,
+                                                                             "edit":  true,
+                                                                             "delete":  true
+                                                                         },
+                                                       "cash":  {
+                                                                    "add":  true,
+                                                                    "view":  true,
+                                                                    "edit":  true,
+                                                                    "delete":  true
+                                                                },
+                                                       "petty_cash":  {
+                                                                          "add":  true,
+                                                                          "view":  true,
+                                                                          "edit":  true,
+                                                                          "delete":  true
+                                                                      },
+                                                       "checks":  {
+                                                                      "add":  true,
+                                                                      "view":  true,
+                                                                      "edit":  true,
+                                                                      "delete":  true,
+                                                                      "collect":  true,
+                                                                      "transfer":  true,
+                                                                      "return":  true
+                                                                  },
+                                                       "wallet":  {
+                                                                      "view":  true,
+                                                                      "charge":  true
+                                                                  },
+                                                       "transfers":  {
+                                                                         "add":  true,
+                                                                         "view":  true,
+                                                                         "edit":  true,
+                                                                         "delete":  true,
+                                                                         "draft":  true
+                                                                     },
+                                                       "invoices":  {
+                                                                        "add":  true,
+                                                                        "view":  true,
+                                                                        "edit":  true,
+                                                                        "delete":  true,
+                                                                        "draft":  true,
+                                                                        "export":  true,
+                                                                        "change_unit_price":  true
+                                                                    },
+                                                       "invoice_types":  {
+                                                                             "sales":  true,
+                                                                             "sales_return":  true,
+                                                                             "purchase":  true,
+                                                                             "purchase_return":  true,
+                                                                             "waste":  true,
+                                                                             "direct_consumption":  true,
+                                                                             "production":  true,
+                                                                             "view":  true
+                                                                         },
+                                                       "pricing":  {
+                                                                       "sales_price_view":  true,
+                                                                       "purchase_price_view":  true,
+                                                                       "view":  true
+                                                                   },
+                                                       "expenses_income":  {
+                                                                               "add":  true,
+                                                                               "view":  true,
+                                                                               "edit":  true,
+                                                                               "delete":  true,
+                                                                               "draft":  true
+                                                                           },
+                                                       "goods_expense_income":  {
+                                                                                    "view":  true,
+                                                                                    "add":  true,
+                                                                                    "edit":  true,
+                                                                                    "delete":  true,
+                                                                                    "submit":  true,
+                                                                                    "allocate":  true,
+                                                                                    "post":  true,
+                                                                                    "cancel":  true,
+                                                                                    "change_unit_cost":  true
+                                                                                },
+                                                       "accounting_documents":  {
+                                                                                    "add":  true,
+                                                                                    "view":  true,
+                                                                                    "edit":  true,
+                                                                                    "delete":  true,
+                                                                                    "draft":  true
+                                                                                },
+                                                       "chart_of_accounts":  {
+                                                                                 "add":  true,
+                                                                                 "view":  true,
+                                                                                 "edit":  true,
+                                                                                 "delete":  true
+                                                                             },
+                                                       "currency_revaluation":  {
+                                                                                    "add":  true,
+                                                                                    "view":  true,
+                                                                                    "edit":  true,
+                                                                                    "delete":  true
+                                                                                },
+                                                       "opening_balance":  {
+                                                                               "view":  true,
+                                                                               "edit":  true
+                                                                           },
+                                                       "warehouses":  {
+                                                                          "add":  true,
+                                                                          "view":  true,
+                                                                          "edit":  true,
+                                                                          "delete":  true
+                                                                      },
+                                                       "warehouse_transfers":  {
+                                                                                   "add":  true,
+                                                                                   "view":  true,
+                                                                                   "edit":  true,
+                                                                                   "delete":  true,
+                                                                                   "draft":  true
+                                                                               },
+                                                       "settings":  {
+                                                                        "business":  true,
+                                                                        "print":  true,
+                                                                        "history":  true,
+                                                                        "users":  true,
+                                                                        "manage_ftp":  true,
+                                                                        "manage_ai_provider":  true,
+                                                                        "view":  true
+                                                                    },
+                                                       "storage":  {
+                                                                       "view":  true,
+                                                                       "delete":  true
+                                                                   },
+                                                       "sms":  {
+                                                                   "history":  true,
+                                                                   "templates":  true,
+                                                                   "view":  true
+                                                               },
+                                                       "marketplace":  {
+                                                                           "view":  true,
+                                                                           "buy":  true,
+                                                                           "invoices":  true
+                                                                       },
+                                                       "reports":  {
+                                                                       "view":  true,
+                                                                       "export":  true
+                                                                   },
+                                                       "hscript":  {
+                                                                       "view":  true,
+                                                                       "write":  true,
+                                                                       "publish":  true,
+                                                                       "export":  true,
+                                                                       "schedule":  true
+                                                                   },
+                                                       "fiscal_years":  {
+                                                                            "view":  true,
+                                                                            "edit":  true,
+                                                                            "close":  true,
+                                                                            "rollback":  true
+                                                                        },
+                                                       "warranty":  {
+                                                                        "read":  true,
+                                                                        "write":  true,
+                                                                        "delete":  true,
+                                                                        "manage":  true,
+                                                                        "view":  true
+                                                                    },
+                                                       "barcode_labels":  {
+                                                                              "view":  true,
+                                                                              "design":  true,
+                                                                              "print":  true
+                                                                          },
+                                                       "customer_club":  {
+                                                                             "view":  true,
+                                                                             "manage":  true,
+                                                                             "adjust":  true,
+                                                                             "redeem":  true
+                                                                         },
+                                                       "crm":  {
+                                                                   "view":  true,
+                                                                   "write":  true,
+                                                                   "reports":  true,
+                                                                   "reports_team":  true
+                                                               },
+                                                       "crm_web_chat":  {
+                                                                            "view":  true,
+                                                                            "reply":  true,
+                                                                            "manage_widgets":  true,
+                                                                            "edit_conversations":  true,
+                                                                            "delete_messages":  true
+                                                                        },
+                                                       "distribution":  {
+                                                                            "view":  true,
+                                                                            "manage":  true,
+                                                                            "operate":  true,
+                                                                            "reports_team":  true
+                                                                        },
+                                                       "payroll":  {
+                                                                       "view":  true,
+                                                                       "manage":  true,
+                                                                       "operate":  true,
+                                                                       "post":  true,
+                                                                       "approve":  true
+                                                                   },
+                                                       "telephony":  {
+                                                                         "view":  true,
+                                                                         "manage":  true,
+                                                                         "click_to_call":  true,
+                                                                         "softphone":  true,
+                                                                         "softphone_manage":  true,
+                                                                         "softphone_quality":  true,
+                                                                         "listen_recordings":  true,
+                                                                         "live_monitor":  true,
+                                                                         "reports":  true,
+                                                                         "control_calls":  true
+                                                                     },
+                                                       "basalam":  {
+                                                                       "view":  true,
+                                                                       "manage":  true,
+                                                                       "sync":  true
+                                                                   },
+                                                       "woocommerce":  {
+                                                                           "view":  true,
+                                                                           "manage":  true
+                                                                       },
+                                                       "moadian":  {
+                                                                       "view":  true,
+                                                                       "operate":  true,
+                                                                       "manage_settings":  true,
+                                                                       "export_reports":  true
+                                                                   }
+                                                   }
+                               },
+                               {
+                                   "id":  6528,
+                                   "name":  "Ø´Ø±Ú©Øª ØªØ³Øª Ø§ÙØªÙØ§Ù Ø§Ø² ÙÙÙ Ø¨Ù Ø¢Ø±Ú©",
+                                   "business_type":  "Ø´Ø±Ú©Øª",
+                                   "business_field":  "Ø¨Ø§Ø²Ø±Ú¯Ø§ÙÛ",
+                                   "owner_id":  1,
+                                   "address":  null,
+                                   "phone":  null,
+                                   "mobile":  null,
+                                   "national_id":  null,
+                                   "registration_number":  null,
+                                   "economic_id":  null,
+                                   "country":  null,
+                                   "province":  null,
+                                   "city":  null,
+                                   "postal_code":  null,
+                                   "logo_file_id":  null,
+                                   "stamp_file_id":  null,
+                                   "default_credit_limit":  null,
+                                   "check_credit_enabled_by_default":  false,
+                                   "public_catalog_show_contact":  false,
+                                   "public_catalog_show_base_sales_price":  true,
+                                   "display_timezone":  null,
+                                   "invoice_profit_calculation_method":  "automatic",
+                                   "invoice_profit_calculation_basis":  "purchase_price",
+                                   "invoice_profit_include_overhead":  false,
+                                   "invoice_profit_overhead_type":  "none",
+                                   "invoice_profit_overhead_percent":  0.0,
+                                   "invoice_profit_calculation_type":  "gross",
+                                   "invoice_profit_ledger_recognition_basis":  "warehouse_document_posting",
+                                   "invoice_profit_fifo_shortage_mode":  "perpetual_mixed",
+                                   "invoice_sync_update_sales_price_enabled":  false,
+                                   "invoice_sync_update_purchase_price_enabled":  false,
+                                   "invoice_sync_sales_price_basis":  "net_after_line_discount",
+                                   "invoice_sync_purchase_price_basis":  "net_after_line_discount",
+                                   "invoice_warehouse_release_mode":  "draft",
+                                   "invoice_purchase_accounting_mode":  "direct_inventory",
+                                   "invoice_missing_line_warehouse_policy":  "reject",
+                                   "invoice_default_warehouse_id":  null,
+                                   "invoice_default_warehouse_fill_document_header":  true,
+                                   "allow_negative_inventory_for_bulk":  false,
+                                   "allow_negative_inventory_for_unique":  false,
+                                   "warehouse_transfer_require_positive_stock":  true,
+                                   "goods_expense_income_workflow_mode":  "simple",
+                                   "goods_expense_income_auto_post_in_simple_mode":  true,
+                                   "goods_expense_income_default_expense_account_code":  "70407",
+                                   "goods_expense_income_default_income_account_code":  "60103",
+                                   "goods_expense_income_stock_count_mode":  "goods_docs",
+                                   "goods_expense_income_allow_manual_unit_cost":  false,
+                                   "goods_expense_income_require_person":  false,
+                                   "invoice_global_discount_percent_basis":  "subtotal_after_line_discount",
+                                   "invoice_global_discount_tax_mode":  "recalculate_tax_proportional",
+                                   "invoice_global_discount_max_percent":  null,
+                                   "invoice_global_discount_max_amount":  null,
+                                   "fx_revaluation_policy":  null,
+                                   "created_at":  "1405/05/20 13:03:51",
+                                   "created_at_formatted":  {
+                                                                "year":  1405,
+                                                                "month":  5,
+                                                                "day":  20,
+                                                                "hour":  13,
+                                                                "minute":  3,
+                                                                "second":  51,
+                                                                "weekday":  3,
+                                                                "month_name":  "Ù\u0085Ø±Ø¯Ø§Ø¯",
+                                                                "weekday_name":  "Ø³ÙâØ´ÙØ¨Ù",
+                                                                "formatted":  "1405/05/20 13:03:51",
+                                                                "date_only":  "1405/05/20",
+                                                                "time_only":  "13:03:51",
+                                                                "is_leap_year":  false,
+                                                                "month_days":  31
+                                                            },
+                                   "created_at_raw":  "2026-08-11T09:33:51.581349Z",
+                                   "updated_at":  "1405/05/20 13:03:51",
+                                   "updated_at_formatted":  {
+                                                                "year":  1405,
+                                                                "month":  5,
+                                                                "day":  20,
+                                                                "hour":  13,
+                                                                "minute":  3,
+                                                                "second":  51,
+                                                                "weekday":  3,
+                                                                "month_name":  "Ù\u0085Ø±Ø¯Ø§Ø¯",
+                                                                "weekday_name":  "Ø³ÙâØ´ÙØ¨Ù",
+                                                                "formatted":  "1405/05/20 13:03:51",
+                                                                "date_only":  "1405/05/20",
+                                                                "time_only":  "13:03:51",
+                                                                "is_leap_year":  false,
+                                                                "month_days":  31
+                                                            },
+                                   "updated_at_raw":  "2026-08-11T09:33:51.581353Z",
+                                   "deleted_at":  null,
+                                   "deletion_requested_at":  null,
+                                   "auto_delete_at":  null,
+                                   "is_deleted":  false,
+                                   "is_deletion_pending":  false,
+                                   "default_currency":  {
+                                                            "id":  1,
+                                                            "code":  "IRR",
+                                                            "title":  "Ø±ÛØ§Ù Ø§ÛØ±Ø§Ù",
+                                                            "symbol":  "ï·¼",
+                                                            "decimal_places":  0
+                                                        },
+                                   "currencies":  [
+                                                      {
+                                                          "id":  1,
+                                                          "code":  "IRR",
+                                                          "title":  "Ø±ÛØ§Ù Ø§ÛØ±Ø§Ù",
+                                                          "symbol":  "ï·¼",
+                                                          "decimal_places":  0
+                                                      }
+                                                  ],
+                                   "is_multi_currency":  false,
+                                   "is_owner":  true,
+                                   "role":  "Ù\u0085Ø§ÙÚ©",
+                                   "permissions":  {
+
+                                                   }
+                               },
+                               {
+                                   "id":  6514,
+                                   "name":  "ØªØ³Øª Ø§ÙØªÙØ§Ù Ø§Ø² ÙÙÙ",
+                                   "business_type":  "Ù\u0085ØºØ§Ø²Ù",
+                                   "business_field":  "Ø¨Ø§Ø²Ø±Ú¯Ø§ÙÛ",
+                                   "owner_id":  1,
+                                   "address":  null,
+                                   "phone":  null,
+                                   "mobile":  null,
+                                   "national_id":  null,
+                                   "registration_number":  null,
+                                   "economic_id":  null,
+                                   "country":  null,
+                                   "province":  null,
+                                   "city":  null,
+                                   "postal_code":  null,
+                                   "logo_file_id":  null,
+                                   "stamp_file_id":  null,
+                                   "default_credit_limit":  null,
+                                   "check_credit_enabled_by_default":  false,
+                                   "public_catalog_show_contact":  false,
+                                   "public_catalog_show_base_sales_price":  true,
+                                   "display_timezone":  null,
+                                   "invoice_profit_calculation_method":  "automatic",
+                                   "invoice_profit_calculation_basis":  "purchase_price",
+                                   "invoice_profit_include_overhead":  false,
+                                   "invoice_profit_overhead_type":  "none",
+                                   "invoice_profit_overhead_percent":  0.0,
+                                   "invoice_profit_calculation_type":  "gross",
+                                   "invoice_profit_ledger_recognition_basis":  "warehouse_document_posting",
+                                   "invoice_profit_fifo_shortage_mode":  "perpetual_mixed",
+                                   "invoice_sync_update_sales_price_enabled":  false,
+                                   "invoice_sync_update_purchase_price_enabled":  false,
+                                   "invoice_sync_sales_price_basis":  "net_after_line_discount",
+                                   "invoice_sync_purchase_price_basis":  "net_after_line_discount",
+                                   "invoice_warehouse_release_mode":  "draft",
+                                   "invoice_purchase_accounting_mode":  "direct_inventory",
+                                   "invoice_missing_line_warehouse_policy":  "reject",
+                                   "invoice_default_warehouse_id":  null,
+                                   "invoice_default_warehouse_fill_document_header":  true,
+                                   "allow_negative_inventory_for_bulk":  false,
+                                   "allow_negative_inventory_for_unique":  false,
+                                   "warehouse_transfer_require_positive_stock":  true,
+                                   "goods_expense_income_workflow_mode":  "simple",
+                                   "goods_expense_income_auto_post_in_simple_mode":  true,
+                                   "goods_expense_income_default_expense_account_code":  "70407",
+                                   "goods_expense_income_default_income_account_code":  "60103",
+                                   "goods_expense_income_stock_count_mode":  "goods_docs",
+                                   "goods_expense_income_allow_manual_unit_cost":  false,
+                                   "goods_expense_income_require_person":  false,
+                                   "invoice_global_discount_percent_basis":  "subtotal_after_line_discount",
+                                   "invoice_global_discount_tax_mode":  "recalculate_tax_proportional",
+                                   "invoice_global_discount_max_percent":  null,
+                                   "invoice_global_discount_max_amount":  null,
+                                   "fx_revaluation_policy":  null,
+                                   "created_at":  "1405/05/19 10:31:35",
+                                   "created_at_formatted":  {
+                                                                "year":  1405,
+                                                                "month":  5,
+                                                                "day":  19,
+                                                                "hour":  10,
+                                                                "minute":  31,
+                                                                "second":  35,
+                                                                "weekday":  2,
+                                                                "month_name":  "Ù\u0085Ø±Ø¯Ø§Ø¯",
+                                                                "weekday_name":  "Ø¯ÙØ´ÙØ¨Ù",
+                                                                "formatted":  "1405/05/19 10:31:35",
+                                                                "date_only":  "1405/05/19",
+                                                                "time_only":  "10:31:35",
+                                                                "is_leap_year":  false,
+                                                                "month_days":  31
+                                                            },
+                                   "created_at_raw":  "2026-08-10T07:01:35.795810Z",
+                                   "updated_at":  "1405/05/19 10:31:35",
+                                   "updated_at_formatted":  {
+                                                                "year":  1405,
+                                                                "month":  5,
+                                                                "day":  19,
+                                                                "hour":  10,
+                                                                "minute":  31,
+                                                                "second":  35,
+                                                                "weekday":  2,
+                                                                "month_name":  "Ù\u0085Ø±Ø¯Ø§Ø¯",
+                                                                "weekday_name":  "Ø¯ÙØ´ÙØ¨Ù",
+                                                                "formatted":  "1405/05/19 10:31:35",
+                                                                "date_only":  "1405/05/19",
+                                                                "time_only":  "10:31:35",
+                                                                "is_leap_year":  false,
+                                                                "month_days":  31
+                                                            },
+                                   "updated_at_raw":  "2026-08-10T07:01:35.795815Z",
+                                   "deleted_at":  null,
+                                   "deletion_requested_at":  null,
+                                   "auto_delete_at":  null,
+                                   "is_deleted":  false,
+                                   "is_deletion_pending":  false,
+                                   "default_currency":  {
+                                                            "id":  1,
+                                                            "code":  "IRR",
+                                                            "title":  "Ø±ÛØ§Ù Ø§ÛØ±Ø§Ù",
+                                                            "symbol":  "ï·¼",
+                                                            "decimal_places":  0
+                                                        },
+                                   "currencies":  [
+                                                      {
+                                                          "id":  1,
+                                                          "code":  "IRR",
+                                                          "title":  "Ø±ÛØ§Ù Ø§ÛØ±Ø§Ù",
+                                                          "symbol":  "ï·¼",
+                                                          "decimal_places":  0
+                                                      }
+                                                  ],
+                                   "is_multi_currency":  false,
+                                   "is_owner":  true,
+                                   "role":  "Ù\u0085Ø§ÙÚ©",
+                                   "permissions":  {
+
+                                                   }
+                               },
+                               {
+                                   "id":  6453,
+                                   "name":  "Ù¾ÙØ§Ø³Ú©Ù ØªØ³Øª",
+                                   "business_type":  "ÙØ±ÙØ´Ú¯Ø§Ù",
+                                   "business_field":  "Ø¨Ø§Ø²Ø±Ú¯Ø§ÙÛ",
+                                   "owner_id":  5861,
+                                   "address":  "ØªØ³Øª",
+                                   "phone":  "06133333357",
+                                   "mobile":  "09394904386",
+                                   "national_id":  "1900435357",
+                                   "registration_number":  null,
+                                   "economic_id":  null,
+                                   "country":  "Ø§ÛØ±Ø§Ù",
+                                   "province":  "Ø®ÙØ²Ø³ØªØ§Ù",
+                                   "city":  "Ø§ÙÙØ§Ø²",
+                                   "postal_code":  "6155643744",
+                                   "logo_file_id":  null,
+                                   "stamp_file_id":  null,
+                                   "default_credit_limit":  null,
+                                   "check_credit_enabled_by_default":  false,
+                                   "public_catalog_show_contact":  false,
+                                   "public_catalog_show_base_sales_price":  true,
+                                   "display_timezone":  null,
+                                   "invoice_profit_calculation_method":  "automatic",
+                                   "invoice_profit_calculation_basis":  "purchase_price",
+                                   "invoice_profit_include_overhead":  false,
+                                   "invoice_profit_overhead_type":  "none",
+                                   "invoice_profit_overhead_percent":  0.0,
+                                   "invoice_profit_calculation_type":  "gross",
+                                   "invoice_profit_ledger_recognition_basis":  "warehouse_document_posting",
+                                   "invoice_profit_fifo_shortage_mode":  "perpetual_mixed",
+                                   "invoice_sync_update_sales_price_enabled":  false,
+                                   "invoice_sync_update_purchase_price_enabled":  false,
+                                   "invoice_sync_sales_price_basis":  "net_after_line_discount",
+                                   "invoice_sync_purchase_price_basis":  "net_after_line_discount",
+                                   "invoice_warehouse_release_mode":  "draft",
+                                   "invoice_purchase_accounting_mode":  "direct_inventory",
+                                   "invoice_missing_line_warehouse_policy":  "reject",
+                                   "invoice_default_warehouse_id":  null,
+                                   "invoice_default_warehouse_fill_document_header":  true,
+                                   "allow_negative_inventory_for_bulk":  false,
+                                   "allow_negative_inventory_for_unique":  false,
+                                   "warehouse_transfer_require_positive_stock":  true,
+                                   "goods_expense_income_workflow_mode":  "simple",
+                                   "goods_expense_income_auto_post_in_simple_mode":  true,
+                                   "goods_expense_income_default_expense_account_code":  "70407",
+                                   "goods_expense_income_default_income_account_code":  "60103",
+                                   "goods_expense_income_stock_count_mode":  "goods_docs",
+                                   "goods_expense_income_allow_manual_unit_cost":  false,
+                                   "goods_expense_income_require_person":  false,
+                                   "invoice_global_discount_percent_basis":  "subtotal_after_line_discount",
+                                   "invoice_global_discount_tax_mode":  "recalculate_tax_proportional",
+                                   "invoice_global_discount_max_percent":  null,
+                                   "invoice_global_discount_max_amount":  null,
+                                   "fx_revaluation_policy":  null,
+                                   "created_at":  "1405/05/11 20:06:31",
+                                   "created_at_formatted":  {
+                                                                "year":  1405,
+                                                                "month":  5,
+                                                                "day":  11,
+                                                                "hour":  20,
+                                                                "minute":  6,
+                                                                "second":  31,
+                                                                "weekday":  1,
+                                                                "month_name":  "Ù\u0085Ø±Ø¯Ø§Ø¯",
+                                                                "weekday_name":  "ÛÚ©Ø´ÙØ¨Ù",
+                                                                "formatted":  "1405/05/11 20:06:31",
+                                                                "date_only":  "1405/05/11",
+                                                                "time_only":  "20:06:31",
+                                                                "is_leap_year":  false,
+                                                                "month_days":  31
+                                                            },
+                                   "created_at_raw":  "2026-08-02T16:36:31.838275Z",
+                                   "updated_at":  "1405/05/11 20:06:31",
+                                   "updated_at_formatted":  {
+                                                                "year":  1405,
+                                                                "month":  5,
+                                                                "day":  11,
+                                                                "hour":  20,
+                                                                "minute":  6,
+                                                                "second":  31,
+                                                                "weekday":  1,
+                                                                "month_name":  "Ù\u0085Ø±Ø¯Ø§Ø¯",
+                                                                "weekday_name":  "ÛÚ©Ø´ÙØ¨Ù",
+                                                                "formatted":  "1405/05/11 20:06:31",
+                                                                "date_only":  "1405/05/11",
+                                                                "time_only":  "20:06:31",
+                                                                "is_leap_year":  false,
+                                                                "month_days":  31
+                                                            },
+                                   "updated_at_raw":  "2026-08-02T16:36:31.838280Z",
+                                   "deleted_at":  null,
+                                   "deletion_requested_at":  null,
+                                   "auto_delete_at":  null,
+                                   "is_deleted":  false,
+                                   "is_deletion_pending":  false,
+                                   "default_currency":  {
+                                                            "id":  1,
+                                                            "code":  "IRR",
+                                                            "title":  "Ø±ÛØ§Ù Ø§ÛØ±Ø§Ù",
+                                                            "symbol":  "ï·¼",
+                                                            "decimal_places":  0
+                                                        },
+                                   "currencies":  [
+                                                      {
+                                                          "id":  1,
+                                                          "code":  "IRR",
+                                                          "title":  "Ø±ÛØ§Ù Ø§ÛØ±Ø§Ù",
+                                                          "symbol":  "ï·¼",
+                                                          "decimal_places":  0
+                                                      }
+                                                  ],
+                                   "is_multi_currency":  false,
+                                   "is_owner":  false,
+                                   "role":  "Ø¹Ø¶Ù",
+                                   "permissions":  {
+                                                       "join":  true,
+                                                       "people":  {
+                                                                      "add":  true,
+                                                                      "view":  true,
+                                                                      "edit":  true,
+                                                                      "delete":  true
+                                                                  },
+                                                       "people_transactions":  {
+                                                                                   "add":  true,
+                                                                                   "view":  true,
+                                                                                   "edit":  true,
+                                                                                   "delete":  true,
+                                                                                   "draft":  true
+                                                                               },
+                                                       "products":  {
+                                                                        "add":  true,
+                                                                        "view":  true,
+                                                                        "edit":  true,
+                                                                        "delete":  true,
+                                                                        "export":  true
+                                                                    },
+                                                       "price_lists":  {
+                                                                           "add":  true,
+                                                                           "view":  true,
+                                                                           "edit":  true,
+                                                                           "delete":  true
+                                                                       },
+                                                       "categories":  {
+                                                                          "add":  true,
+                                                                          "view":  true,
+                                                                          "edit":  true,
+                                                                          "delete":  true
+                                                                      },
+                                                       "product_attributes":  {
+                                                                                  "add":  true,
+                                                                                  "view":  true,
+                                                                                  "edit":  true,
+                                                                                  "delete":  true
+                                                                              },
+                                                       "bank_accounts":  {
+                                                                             "add":  true,
+                                                                             "view":  true,
+                                                                             "edit":  true,
+                                                                             "delete":  true
+                                                                         },
+                                                       "cash":  {
+                                                                    "add":  true,
+                                                                    "view":  true,
+                                                                    "edit":  true,
+                                                                    "delete":  true
+                                                                },
+                                                       "petty_cash":  {
+                                                                          "add":  true,
+                                                                          "view":  true,
+                                                                          "edit":  true,
+                                                                          "delete":  true
+                                                                      },
+                                                       "checks":  {
+                                                                      "add":  true,
+                                                                      "view":  true,
+                                                                      "edit":  true,
+                                                                      "delete":  true,
+                                                                      "collect":  true,
+                                                                      "transfer":  true,
+                                                                      "return":  true
+                                                                  },
+                                                       "wallet":  {
+                                                                      "view":  true,
+                                                                      "charge":  true
+                                                                  },
+                                                       "transfers":  {
+                                                                         "add":  true,
+                                                                         "view":  true,
+                                                                         "edit":  true,
+                                                                         "delete":  true,
+                                                                         "draft":  true
+                                                                     },
+                                                       "invoices":  {
+                                                                        "add":  true,
+                                                                        "view":  true,
+                                                                        "edit":  true,
+                                                                        "delete":  true,
+                                                                        "draft":  true,
+                                                                        "export":  true,
+                                                                        "change_unit_price":  true
+                                                                    },
+                                                       "invoice_types":  {
+                                                                             "sales":  true,
+                                                                             "sales_return":  true,
+                                                                             "purchase":  true,
+                                                                             "purchase_return":  true,
+                                                                             "waste":  true,
+                                                                             "direct_consumption":  true,
+                                                                             "production":  true,
+                                                                             "view":  true
+                                                                         },
+                                                       "pricing":  {
+                                                                       "sales_price_view":  true,
+                                                                       "purchase_price_view":  true,
+                                                                       "view":  true
+                                                                   },
+                                                       "expenses_income":  {
+                                                                               "add":  true,
+                                                                               "view":  true,
+                                                                               "edit":  true,
+                                                                               "delete":  true,
+                                                                               "draft":  true
+                                                                           },
+                                                       "goods_expense_income":  {
+                                                                                    "view":  true,
+                                                                                    "add":  true,
+                                                                                    "edit":  true,
+                                                                                    "delete":  true,
+                                                                                    "submit":  true,
+                                                                                    "allocate":  true,
+                                                                                    "post":  true,
+                                                                                    "cancel":  true,
+                                                                                    "change_unit_cost":  true
+                                                                                },
+                                                       "accounting_documents":  {
+                                                                                    "add":  true,
+                                                                                    "view":  true,
+                                                                                    "edit":  true,
+                                                                                    "delete":  true,
+                                                                                    "draft":  true
+                                                                                },
+                                                       "chart_of_accounts":  {
+                                                                                 "add":  true,
+                                                                                 "view":  true,
+                                                                                 "edit":  true,
+                                                                                 "delete":  true
+                                                                             },
+                                                       "currency_revaluation":  {
+                                                                                    "add":  true,
+                                                                                    "view":  true,
+                                                                                    "edit":  true,
+                                                                                    "delete":  true
+                                                                                },
+                                                       "opening_balance":  {
+                                                                               "view":  true,
+                                                                               "edit":  true
+                                                                           },
+                                                       "warehouses":  {
+                                                                          "add":  true,
+                                                                          "view":  true,
+                                                                          "edit":  true,
+                                                                          "delete":  true
+                                                                      },
+                                                       "warehouse_transfers":  {
+                                                                                   "add":  true,
+                                                                                   "view":  true,
+                                                                                   "edit":  true,
+                                                                                   "delete":  true,
+                                                                                   "draft":  true
+                                                                               },
+                                                       "settings":  {
+                                                                        "business":  true,
+                                                                        "print":  true,
+                                                                        "history":  true,
+                                                                        "users":  true,
+                                                                        "manage_ftp":  true,
+                                                                        "manage_ai_provider":  true,
+                                                                        "view":  true
+                                                                    },
+                                                       "storage":  {
+                                                                       "view":  true,
+                                                                       "delete":  true
+                                                                   },
+                                                       "sms":  {
+                                                                   "history":  true,
+                                                                   "templates":  true,
+                                                                   "view":  true
+                                                               },
+                                                       "marketplace":  {
+                                                                           "view":  true,
+                                                                           "buy":  true,
+                                                                           "invoices":  true
+                                                                       },
+                                                       "reports":  {
+                                                                       "view":  true,
+                                                                       "export":  true
+                                                                   },
+                                                       "hscript":  {
+                                                                       "view":  true,
+                                                                       "write":  true,
+                                                                       "publish":  true,
+                                                                       "export":  true,
+                                                                       "schedule":  true
+                                                                   },
+                                                       "fiscal_years":  {
+                                                                            "view":  true,
+                                                                            "edit":  true,
+                                                                            "close":  true,
+                                                                            "rollback":  true
+                                                                        },
+                                                       "warranty":  {
+                                                                        "read":  true,
+                                                                        "write":  true,
+                                                                        "delete":  true,
+                                                                        "manage":  true,
+                                                                        "view":  true
+                                                                    },
+                                                       "customer_club":  {
+                                                                             "view":  true,
+                                                                             "manage":  true,
+                                                                             "adjust":  true,
+                                                                             "redeem":  true
+                                                                         },
+                                                       "crm":  {
+                                                                   "view":  true,
+                                                                   "write":  true,
+                                                                   "reports":  true,
+                                                                   "reports_team":  true
+                                                               },
+                                                       "crm_web_chat":  {
+                                                                            "view":  true,
+                                                                            "reply":  true,
+                                                                            "manage_widgets":  true,
+                                                                            "edit_conversations":  true,
+                                                                            "delete_messages":  true
+                                                                        },
+                                                       "distribution":  {
+                                                                            "view":  true,
+                                                                            "manage":  true,
+                                                                            "operate":  true,
+                                                                            "reports_team":  true
+                                                                        },
+                                                       "payroll":  {
+                                                                       "view":  true,
+                                                                       "manage":  true,
+                                                                       "operate":  true,
+                                                                       "post":  true,
+                                                                       "approve":  true
+                                                                   },
+                                                       "basalam":  {
+                                                                       "view":  true,
+                                                                       "manage":  true,
+                                                                       "sync":  true
+                                                                   },
+                                                       "woocommerce":  {
+                                                                           "view":  true,
+                                                                           "manage":  true
+                                                                       },
+                                                       "moadian":  {
+                                                                       "view":  true,
+                                                                       "operate":  true,
+                                                                       "manage_settings":  true,
+                                                                       "export_reports":  true
+                                                                   }
+                                                   }
+                               },
+                               {
+                                   "id":  6353,
+                                   "name":  "ÙØ±Ù\u0085 Ø§ÙØ²Ø§Ø± Ú¯ÙØ¯Ø¢Ø¨",
+                                   "business_type":  "Ø´Ø®ØµÛ",
+                                   "business_field":  "ØªÙÙÛØ¯Û",
+                                   "owner_id":  789,
+                                   "address":  "ØªØ¨Ø±ÛØ² Ø´ÙÙØ§Ø²",
+                                   "phone":  "",
+                                   "mobile":  "09904502019",
+                                   "national_id":  "1361816716",
+                                   "registration_number":  null,
+                                   "economic_id":  "13618167160002",
+                                   "country":  "",
+                                   "province":  "",
+                                   "city":  "",
+                                   "postal_code":  "",
+                                   "logo_file_id":  "e8c137a6-6c48-472f-98b8-5fb122cde9d1",
+                                   "stamp_file_id":  "88a84ff3-fa55-4003-bb0b-6cf4a7988600",
+                                   "default_credit_limit":  null,
+                                   "check_credit_enabled_by_default":  false,
+                                   "public_catalog_show_contact":  false,
+                                   "public_catalog_show_base_sales_price":  true,
+                                   "display_timezone":  null,
+                                   "invoice_profit_calculation_method":  "automatic",
+                                   "invoice_profit_calculation_basis":  "purchase_price",
+                                   "invoice_profit_include_overhead":  false,
+                                   "invoice_profit_overhead_type":  "none",
+                                   "invoice_profit_overhead_percent":  0.0,
+                                   "invoice_profit_calculation_type":  "gross",
+                                   "invoice_profit_ledger_recognition_basis":  "warehouse_document_posting",
+                                   "invoice_profit_fifo_shortage_mode":  "perpetual_mixed",
+                                   "invoice_sync_update_sales_price_enabled":  false,
+                                   "invoice_sync_update_purchase_price_enabled":  false,
+                                   "invoice_sync_sales_price_basis":  "net_after_line_discount",
+                                   "invoice_sync_purchase_price_basis":  "net_after_line_discount",
+                                   "invoice_warehouse_release_mode":  "draft",
+                                   "invoice_purchase_accounting_mode":  "direct_inventory",
+                                   "invoice_missing_line_warehouse_policy":  "reject",
+                                   "invoice_default_warehouse_id":  null,
+                                   "invoice_default_warehouse_fill_document_header":  true,
+                                   "allow_negative_inventory_for_bulk":  false,
+                                   "allow_negative_inventory_for_unique":  false,
+                                   "warehouse_transfer_require_positive_stock":  true,
+                                   "goods_expense_income_workflow_mode":  "simple",
+                                   "goods_expense_income_auto_post_in_simple_mode":  true,
+                                   "goods_expense_income_default_expense_account_code":  "70407",
+                                   "goods_expense_income_default_income_account_code":  "60103",
+                                   "goods_expense_income_stock_count_mode":  "goods_docs",
+                                   "goods_expense_income_allow_manual_unit_cost":  false,
+                                   "goods_expense_income_require_person":  false,
+                                   "invoice_global_discount_percent_basis":  "subtotal_after_line_discount",
+                                   "invoice_global_discount_tax_mode":  "recalculate_tax_proportional",
+                                   "invoice_global_discount_max_percent":  null,
+                                   "invoice_global_discount_max_amount":  null,
+                                   "fx_revaluation_policy":  null,
+                                   "created_at":  "1405/04/27 16:57:43",
+                                   "created_at_formatted":  {
+                                                                "year":  1405,
+                                                                "month":  4,
+                                                                "day":  27,
+                                                                "hour":  16,
+                                                                "minute":  57,
+                                                                "second":  43,
+                                                                "weekday":  0,
+                                                                "month_name":  "ØªÛØ±",
+                                                                "weekday_name":  "Ø´ÙØ¨Ù",
+                                                                "formatted":  "1405/04/27 16:57:43",
+                                                                "date_only":  "1405/04/27",
+                                                                "time_only":  "16:57:43",
+                                                                "is_leap_year":  false,
+                                                                "month_days":  31
+                                                            },
+                                   "created_at_raw":  "2026-07-18T13:27:43.642471Z",
+                                   "updated_at":  "1405/04/27 16:58:02",
+                                   "updated_at_formatted":  {
+                                                                "year":  1405,
+                                                                "month":  4,
+                                                                "day":  27,
+                                                                "hour":  16,
+                                                                "minute":  58,
+                                                                "second":  2,
+                                                                "weekday":  0,
+                                                                "month_name":  "ØªÛØ±",
+                                                                "weekday_name":  "Ø´ÙØ¨Ù",
+                                                                "formatted":  "1405/04/27 16:58:02",
+                                                                "date_only":  "1405/04/27",
+                                                                "time_only":  "16:58:02",
+                                                                "is_leap_year":  false,
+                                                                "month_days":  31
+                                                            },
+                                   "updated_at_raw":  "2026-07-18T13:28:02.154312Z",
+                                   "deleted_at":  null,
+                                   "deletion_requested_at":  null,
+                                   "auto_delete_at":  null,
+                                   "is_deleted":  false,
+                                   "is_deletion_pending":  false,
+                                   "default_currency":  {
+                                                            "id":  1,
+                                                            "code":  "IRR",
+                                                            "title":  "Ø±ÛØ§Ù Ø§ÛØ±Ø§Ù",
+                                                            "symbol":  "ï·¼",
+                                                            "decimal_places":  0
+                                                        },
+                                   "currencies":  [
+                                                      {
+                                                          "id":  1,
+                                                          "code":  "IRR",
+                                                          "title":  "Ø±ÛØ§Ù Ø§ÛØ±Ø§Ù",
+                                                          "symbol":  "ï·¼",
+                                                          "decimal_places":  0
+                                                      }
+                                                  ],
+                                   "is_multi_currency":  false,
+                                   "is_owner":  false,
+                                   "role":  "Ø¹Ø¶Ù",
+                                   "permissions":  {
+                                                       "join":  true,
+                                                       "people":  {
+                                                                      "add":  true,
+                                                                      "view":  true,
+                                                                      "edit":  true,
+                                                                      "delete":  true
+                                                                  },
+                                                       "people_transactions":  {
+                                                                                   "add":  true,
+                                                                                   "view":  true,
+                                                                                   "edit":  true,
+                                                                                   "delete":  true,
+                                                                                   "draft":  true
+                                                                               },
+                                                       "products":  {
+                                                                        "add":  true,
+                                                                        "view":  true,
+                                                                        "edit":  true,
+                                                                        "delete":  true,
+                                                                        "export":  true
+                                                                    },
+                                                       "price_lists":  {
+                                                                           "add":  true,
+                                                                           "view":  true,
+                                                                           "edit":  true,
+                                                                           "delete":  true
+                                                                       },
+                                                       "categories":  {
+                                                                          "add":  true,
+                                                                          "view":  true,
+                                                                          "edit":  true,
+                                                                          "delete":  true
+                                                                      },
+                                                       "product_attributes":  {
+                                                                                  "add":  true,
+                                                                                  "view":  true,
+                                                                                  "edit":  true,
+                                                                                  "delete":  true
+                                                                              },
+                                                       "bank_accounts":  {
+                                                                             "add":  true,
+                                                                             "view":  true,
+                                                                             "edit":  true,
+                                                                             "delete":  true
+                                                                         },
+                                                       "cash":  {
+                                                                    "add":  true,
+                                                                    "view":  true,
+                                                                    "edit":  true,
+                                                                    "delete":  true
+                                                                },
+                                                       "petty_cash":  {
+                                                                          "add":  true,
+                                                                          "view":  true,
+                                                                          "edit":  true,
+                                                                          "delete":  true
+                                                                      },
+                                                       "checks":  {
+                                                                      "add":  true,
+                                                                      "view":  true,
+                                                                      "edit":  true,
+                                                                      "delete":  true,
+                                                                      "collect":  true,
+                                                                      "transfer":  true,
+                                                                      "return":  true
+                                                                  },
+                                                       "wallet":  {
+                                                                      "view":  true,
+                                                                      "charge":  true
+                                                                  },
+                                                       "transfers":  {
+                                                                         "add":  true,
+                                                                         "view":  true,
+                                                                         "edit":  true,
+                                                                         "delete":  true,
+                                                                         "draft":  true
+                                                                     },
+                                                       "invoices":  {
+                                                                        "add":  true,
+                                                                        "view":  true,
+                                                                        "edit":  true,
+                                                                        "delete":  true,
+                                                                        "draft":  true,
+                                                                        "export":  true,
+                                                                        "change_unit_price":  true
+                                                                    },
+                                                       "invoice_types":  {
+                                                                             "sales":  true,
+                                                                             "sales_return":  true,
+                                                                             "purchase":  true,
+                                                                             "purchase_return":  true,
+                                                                             "waste":  true,
+                                                                             "direct_consumption":  true,
+                                                                             "production":  true
+                                                                         },
+                                                       "pricing":  {
+                                                                       "sales_price_view":  true,
+                                                                       "purchase_price_view":  true
+                                                                   },
+                                                       "expenses_income":  {
+                                                                               "add":  true,
+                                                                               "view":  true,
+                                                                               "edit":  true,
+                                                                               "delete":  true,
+                                                                               "draft":  true
+                                                                           },
+                                                       "goods_expense_income":  {
+                                                                                    "view":  true,
+                                                                                    "add":  true,
+                                                                                    "edit":  true,
+                                                                                    "delete":  true,
+                                                                                    "submit":  true,
+                                                                                    "allocate":  true,
+                                                                                    "post":  true,
+                                                                                    "cancel":  true,
+                                                                                    "change_unit_cost":  true
+                                                                                },
+                                                       "accounting_documents":  {
+                                                                                    "add":  true,
+                                                                                    "view":  true,
+                                                                                    "edit":  true,
+                                                                                    "delete":  true,
+                                                                                    "draft":  true
+                                                                                },
+                                                       "chart_of_accounts":  {
+                                                                                 "add":  true,
+                                                                                 "view":  true,
+                                                                                 "edit":  true,
+                                                                                 "delete":  true
+                                                                             },
+                                                       "currency_revaluation":  {
+                                                                                    "add":  true,
+                                                                                    "view":  true,
+                                                                                    "edit":  true,
+                                                                                    "delete":  true
+                                                                                },
+                                                       "opening_balance":  {
+                                                                               "view":  true,
+                                                                               "edit":  true
+                                                                           },
+                                                       "warehouses":  {
+                                                                          "add":  true,
+                                                                          "view":  true,
+                                                                          "edit":  true,
+                                                                          "delete":  true
+                                                                      },
+                                                       "warehouse_transfers":  {
+                                                                                   "add":  true,
+                                                                                   "view":  true,
+                                                                                   "edit":  true,
+                                                                                   "delete":  true,
+                                                                                   "draft":  true
+                                                                               },
+                                                       "settings":  {
+                                                                        "business":  true,
+                                                                        "print":  true,
+                                                                        "history":  true,
+                                                                        "users":  true,
+                                                                        "manage_ftp":  true,
+                                                                        "manage_ai_provider":  true
+                                                                    },
+                                                       "storage":  {
+                                                                       "view":  true,
+                                                                       "delete":  true
+                                                                   },
+                                                       "sms":  {
+                                                                   "history":  true,
+                                                                   "templates":  true
+                                                               },
+                                                       "marketplace":  {
+                                                                           "view":  true,
+                                                                           "buy":  true,
+                                                                           "invoices":  true
+                                                                       },
+                                                       "reports":  {
+                                                                       "view":  true,
+                                                                       "export":  true
+                                                                   },
+                                                       "hscript":  {
+                                                                       "view":  true,
+                                                                       "write":  true,
+                                                                       "publish":  true,
+                                                                       "export":  true,
+                                                                       "schedule":  true
+                                                                   },
+                                                       "fiscal_years":  {
+                                                                            "view":  true,
+                                                                            "edit":  true,
+                                                                            "close":  true,
+                                                                            "rollback":  true
+                                                                        },
+                                                       "warranty":  {
+                                                                        "read":  true,
+                                                                        "write":  true,
+                                                                        "delete":  true,
+                                                                        "manage":  true
+                                                                    },
+                                                       "barcode_labels":  {
+                                                                              "view":  true,
+                                                                              "design":  true,
+                                                                              "print":  true
+                                                                          },
+                                                       "customer_club":  {
+                                                                             "view":  true,
+                                                                             "manage":  true,
+                                                                             "adjust":  true,
+                                                                             "redeem":  true
+                                                                         },
+                                                       "crm":  {
+                                                                   "view":  true,
+                                                                   "write":  true,
+                                                                   "reports":  true,
+                                                                   "reports_team":  true
+                                                               },
+                                                       "crm_web_chat":  {
+                                                                            "view":  true,
+                                                                            "reply":  true,
+                                                                            "manage_widgets":  true,
+                                                                            "edit_conversations":  true,
+                                                                            "delete_messages":  true
+                                                                        },
+                                                       "distribution":  {
+                                                                            "view":  true,
+                                                                            "manage":  true,
+                                                                            "operate":  true,
+                                                                            "reports_team":  true
+                                                                        },
+                                                       "payroll":  {
+                                                                       "view":  true,
+                                                                       "manage":  true,
+                                                                       "operate":  true,
+                                                                       "post":  true,
+                                                                       "approve":  true
+                                                                   },
+                                                       "telephony":  {
+                                                                         "view":  true,
+                                                                         "manage":  true,
+                                                                         "click_to_call":  true,
+                                                                         "softphone":  true,
+                                                                         "softphone_manage":  true,
+                                                                         "softphone_quality":  true,
+                                                                         "listen_recordings":  true,
+                                                                         "live_monitor":  true,
+                                                                         "reports":  true,
+                                                                         "control_calls":  true
+                                                                     },
+                                                       "basalam":  {
+                                                                       "view":  true,
+                                                                       "manage":  true,
+                                                                       "sync":  true
+                                                                   },
+                                                       "woocommerce":  {
+                                                                           "view":  true,
+                                                                           "manage":  true
+                                                                       },
+                                                       "moadian":  {
+                                                                       "view":  true,
+                                                                       "operate":  true,
+                                                                       "manage_settings":  true,
+                                                                       "export_reports":  true
+                                                                   }
+                                                   }
+                               },
+                               {
+                                   "id":  6342,
+                                   "name":  "ÙØ±ÙØ´Ú¯Ø§Ù Ù\u0085Ø§ÙØ±ÙØ´Ø§Ù¾",
+                                   "business_type":  "Ù\u0085ØºØ§Ø²Ù",
+                                   "business_field":  "Ø¨Ø§Ø²Ø±Ú¯Ø§ÙÛ",
+                                   "owner_id":  6046,
+                                   "address":  null,
+                                   "phone":  null,
+                                   "mobile":  null,
+                                   "national_id":  null,
+                                   "registration_number":  null,
+                                   "economic_id":  null,
+                                   "country":  null,
+                                   "province":  null,
+                                   "city":  null,
+                                   "postal_code":  null,
+                                   "logo_file_id":  null,
+                                   "stamp_file_id":  null,
+                                   "default_credit_limit":  null,
+                                   "check_credit_enabled_by_default":  false,
+                                   "public_catalog_show_contact":  false,
+                                   "public_catalog_show_base_sales_price":  true,
+                                   "display_timezone":  null,
+                                   "invoice_profit_calculation_method":  "automatic",
+                                   "invoice_profit_calculation_basis":  "fifo_jbfn",
+                                   "invoice_profit_include_overhead":  false,
+                                   "invoice_profit_overhead_type":  "none",
+                                   "invoice_profit_overhead_percent":  0.0,
+                                   "invoice_profit_calculation_type":  "gross",
+                                   "invoice_profit_ledger_recognition_basis":  "warehouse_document_posting",
+                                   "invoice_profit_fifo_shortage_mode":  "perpetual_mixed",
+                                   "invoice_sync_update_sales_price_enabled":  true,
+                                   "invoice_sync_update_purchase_price_enabled":  true,
+                                   "invoice_sync_sales_price_basis":  "unit_price",
+                                   "invoice_sync_purchase_price_basis":  "unit_price",
+                                   "invoice_warehouse_release_mode":  "posted",
+                                   "invoice_purchase_accounting_mode":  "direct_inventory",
+                                   "invoice_missing_line_warehouse_policy":  "use_default_warehouse",
+                                   "invoice_default_warehouse_id":  9495,
+                                   "invoice_default_warehouse_fill_document_header":  true,
+                                   "allow_negative_inventory_for_bulk":  true,
+                                   "allow_negative_inventory_for_unique":  true,
+                                   "warehouse_transfer_require_positive_stock":  true,
+                                   "goods_expense_income_workflow_mode":  "simple",
+                                   "goods_expense_income_auto_post_in_simple_mode":  true,
+                                   "goods_expense_income_default_expense_account_code":  "70407",
+                                   "goods_expense_income_default_income_account_code":  "60103",
+                                   "goods_expense_income_stock_count_mode":  "goods_docs",
+                                   "goods_expense_income_allow_manual_unit_cost":  false,
+                                   "goods_expense_income_require_person":  false,
+                                   "invoice_global_discount_percent_basis":  "subtotal_after_line_discount",
+                                   "invoice_global_discount_tax_mode":  "recalculate_tax_proportional",
+                                   "invoice_global_discount_max_percent":  null,
+                                   "invoice_global_discount_max_amount":  null,
+                                   "fx_revaluation_policy":  null,
+                                   "created_at":  "1405/04/27 09:25:31",
+                                   "created_at_formatted":  {
+                                                                "year":  1405,
+                                                                "month":  4,
+                                                                "day":  27,
+                                                                "hour":  9,
+                                                                "minute":  25,
+                                                                "second":  31,
+                                                                "weekday":  0,
+                                                                "month_name":  "ØªÛØ±",
+                                                                "weekday_name":  "Ø´ÙØ¨Ù",
+                                                                "formatted":  "1405/04/27 09:25:31",
+                                                                "date_only":  "1405/04/27",
+                                                                "time_only":  "09:25:31",
+                                                                "is_leap_year":  false,
+                                                                "month_days":  31
+                                                            },
+                                   "created_at_raw":  "2026-07-18T05:55:31.119775Z",
+                                   "updated_at":  "1405/04/27 09:57:53",
+                                   "updated_at_formatted":  {
+                                                                "year":  1405,
+                                                                "month":  4,
+                                                                "day":  27,
+                                                                "hour":  9,
+                                                                "minute":  57,
+                                                                "second":  53,
+                                                                "weekday":  0,
+                                                                "month_name":  "ØªÛØ±",
+                                                                "weekday_name":  "Ø´ÙØ¨Ù",
+                                                                "formatted":  "1405/04/27 09:57:53",
+                                                                "date_only":  "1405/04/27",
+                                                                "time_only":  "09:57:53",
+                                                                "is_leap_year":  false,
+                                                                "month_days":  31
+                                                            },
+                                   "updated_at_raw":  "2026-07-18T06:27:53.773610Z",
+                                   "deleted_at":  null,
+                                   "deletion_requested_at":  null,
+                                   "auto_delete_at":  null,
+                                   "is_deleted":  false,
+                                   "is_deletion_pending":  false,
+                                   "default_currency":  {
+                                                            "id":  1,
+                                                            "code":  "IRR",
+                                                            "title":  "Ø±ÛØ§Ù Ø§ÛØ±Ø§Ù",
+                                                            "symbol":  "ï·¼",
+                                                            "decimal_places":  0
+                                                        },
+                                   "currencies":  [
+                                                      {
+                                                          "id":  1,
+                                                          "code":  "IRR",
+                                                          "title":  "Ø±ÛØ§Ù Ø§ÛØ±Ø§Ù",
+                                                          "symbol":  "ï·¼",
+                                                          "decimal_places":  0
+                                                      }
+                                                  ],
+                                   "is_multi_currency":  false,
+                                   "is_owner":  false,
+                                   "role":  "Ø¹Ø¶Ù",
+                                   "permissions":  {
+                                                       "join":  true,
+                                                       "people":  {
+                                                                      "add":  true,
+                                                                      "view":  true,
+                                                                      "edit":  true,
+                                                                      "delete":  true
+                                                                  },
+                                                       "people_transactions":  {
+                                                                                   "add":  true,
+                                                                                   "view":  true,
+                                                                                   "edit":  true,
+                                                                                   "delete":  true,
+                                                                                   "draft":  true
+                                                                               },
+                                                       "products":  {
+                                                                        "add":  true,
+                                                                        "view":  true,
+                                                                        "edit":  true,
+                                                                        "delete":  true,
+                                                                        "export":  true
+                                                                    },
+                                                       "price_lists":  {
+                                                                           "add":  true,
+                                                                           "view":  true,
+                                                                           "edit":  true,
+                                                                           "delete":  true
+                                                                       },
+                                                       "categories":  {
+                                                                          "add":  true,
+                                                                          "view":  true,
+                                                                          "edit":  true,
+                                                                          "delete":  true
+                                                                      },
+                                                       "product_attributes":  {
+                                                                                  "add":  true,
+                                                                                  "view":  true,
+                                                                                  "edit":  true,
+                                                                                  "delete":  true
+                                                                              },
+                                                       "bank_accounts":  {
+                                                                             "add":  true,
+                                                                             "view":  true,
+                                                                             "edit":  true,
+                                                                             "delete":  true
+                                                                         },
+                                                       "cash":  {
+                                                                    "add":  true,
+                                                                    "view":  true,
+                                                                    "edit":  true,
+                                                                    "delete":  true
+                                                                },
+                                                       "petty_cash":  {
+                                                                          "add":  true,
+                                                                          "view":  true,
+                                                                          "edit":  true,
+                                                                          "delete":  true
+                                                                      },
+                                                       "checks":  {
+                                                                      "add":  true,
+                                                                      "view":  true,
+                                                                      "edit":  true,
+                                                                      "delete":  true,
+                                                                      "collect":  true,
+                                                                      "transfer":  true,
+                                                                      "return":  true
+                                                                  },
+                                                       "wallet":  {
+                                                                      "view":  true,
+                                                                      "charge":  true
+                                                                  },
+                                                       "transfers":  {
+                                                                         "add":  true,
+                                                                         "view":  true,
+                                                                         "edit":  true,
+                                                                         "delete":  true,
+                                                                         "draft":  true
+                                                                     },
+                                                       "invoices":  {
+                                                                        "add":  true,
+                                                                        "view":  true,
+                                                                        "edit":  true,
+                                                                        "delete":  true,
+                                                                        "draft":  true,
+                                                                        "export":  true,
+                                                                        "change_unit_price":  true
+                                                                    },
+                                                       "invoice_types":  {
+                                                                             "sales":  true,
+                                                                             "sales_return":  true,
+                                                                             "purchase":  true,
+                                                                             "purchase_return":  true,
+                                                                             "waste":  true,
+                                                                             "direct_consumption":  true,
+                                                                             "production":  true,
+                                                                             "view":  true
+                                                                         },
+                                                       "pricing":  {
+                                                                       "sales_price_view":  true,
+                                                                       "purchase_price_view":  true,
+                                                                       "view":  true
+                                                                   },
+                                                       "expenses_income":  {
+                                                                               "add":  true,
+                                                                               "view":  true,
+                                                                               "edit":  true,
+                                                                               "delete":  true,
+                                                                               "draft":  true
+                                                                           },
+                                                       "goods_expense_income":  {
+                                                                                    "view":  true,
+                                                                                    "add":  true,
+                                                                                    "edit":  true,
+                                                                                    "delete":  true,
+                                                                                    "submit":  true,
+                                                                                    "allocate":  true,
+                                                                                    "post":  true,
+                                                                                    "cancel":  true,
+                                                                                    "change_unit_cost":  true
+                                                                                },
+                                                       "accounting_documents":  {
+                                                                                    "add":  true,
+                                                                                    "view":  true,
+                                                                                    "edit":  true,
+                                                                                    "delete":  true,
+                                                                                    "draft":  true
+                                                                                },
+                                                       "chart_of_accounts":  {
+                                                                                 "add":  true,
+                                                                                 "view":  true,
+                                                                                 "edit":  true,
+                                                                                 "delete":  true
+                                                                             },
+                                                       "currency_revaluation":  {
+                                                                                    "add":  true,
+                                                                                    "view":  true,
+                                                                                    "edit":  true,
+                                                                                    "delete":  true
+                                                                                },
+                                                       "opening_balance":  {
+                                                                               "view":  true,
+                                                                               "edit":  true
+                                                                           },
+                                                       "warehouses":  {
+                                                                          "add":  true,
+                                                                          "view":  true,
+                                                                          "edit":  true,
+                                                                          "delete":  true
+                                                                      },
+                                                       "warehouse_transfers":  {
+                                                                                   "add":  true,
+                                                                                   "view":  true,
+                                                                                   "edit":  true,
+                                                                                   "delete":  true,
+                                                                                   "draft":  true
+                                                                               },
+                                                       "settings":  {
+                                                                        "business":  true,
+                                                                        "print":  true,
+                                                                        "history":  true,
+                                                                        "users":  true,
+                                                                        "manage_ftp":  true,
+                                                                        "manage_ai_provider":  true,
+                                                                        "view":  true
+                                                                    },
+                                                       "storage":  {
+                                                                       "view":  true,
+                                                                       "delete":  true
+                                                                   },
+                                                       "sms":  {
+                                                                   "history":  true,
+                                                                   "templates":  true,
+                                                                   "view":  true
+                                                               },
+                                                       "marketplace":  {
+                                                                           "view":  true,
+                                                                           "buy":  true,
+                                                                           "invoices":  true
+                                                                       },
+                                                       "reports":  {
+                                                                       "view":  true,
+                                                                       "export":  true
+                                                                   },
+                                                       "hscript":  {
+                                                                       "view":  true,
+                                                                       "write":  true,
+                                                                       "publish":  true,
+                                                                       "export":  true,
+                                                                       "schedule":  true
+                                                                   },
+                                                       "fiscal_years":  {
+                                                                            "view":  true,
+                                                                            "edit":  true,
+                                                                            "close":  true,
+                                                                            "rollback":  true
+                                                                        },
+                                                       "warranty":  {
+                                                                        "read":  true,
+                                                                        "write":  true,
+                                                                        "delete":  true,
+                                                                        "manage":  true,
+                                                                        "view":  true
+                                                                    },
+                                                       "customer_club":  {
+                                                                             "view":  true,
+                                                                             "manage":  true,
+                                                                             "adjust":  true,
+                                                                             "redeem":  true
+                                                                         },
+                                                       "crm":  {
+                                                                   "view":  true,
+                                                                   "write":  true,
+                                                                   "reports":  true,
+                                                                   "reports_team":  true
+                                                               },
+                                                       "crm_web_chat":  {
+                                                                            "view":  true,
+                                                                            "reply":  true,
+                                                                            "manage_widgets":  true,
+                                                                            "edit_conversations":  true,
+                                                                            "delete_messages":  true
+                                                                        },
+                                                       "distribution":  {
+                                                                            "view":  true,
+                                                                            "manage":  true,
+                                                                            "operate":  true,
+                                                                            "reports_team":  true
+                                                                        },
+                                                       "payroll":  {
+                                                                       "view":  true,
+                                                                       "manage":  true,
+                                                                       "operate":  true,
+                                                                       "post":  true,
+                                                                       "approve":  true
+                                                                   },
+                                                       "basalam":  {
+                                                                       "view":  true,
+                                                                       "manage":  true,
+                                                                       "sync":  true
+                                                                   },
+                                                       "woocommerce":  {
+                                                                           "view":  true,
+                                                                           "manage":  true
+                                                                       },
+                                                       "moadian":  {
+                                                                       "view":  true,
+                                                                       "operate":  true,
+                                                                       "manage_settings":  true,
+                                                                       "export_reports":  true
+                                                                   }
+                                                   }
+                               }
+                           ],
+                 "pagination":  {
+                                    "total":  17,
+                                    "page":  1,
+                                    "per_page":  10,
+                                    "total_pages":  2,
+                                    "has_next":  true,
+                                    "has_prev":  false
+                                },
+                 "query_info":  {
+                                    "take":  10,
+                                    "skip":  0,
+                                    "sort_by":  "created_at",
+                                    "sort_desc":  true,
+                                    "search":  null
+                                }
+             }
+}

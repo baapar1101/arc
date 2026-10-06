@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Fallback MSI authoring when Advanced Installer license is unavailable. -->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+      Name="Hesabix"
+      Manufacturer="Hesabix"
+      Version="$(var.ProductVersion)"
+      UpgradeCode="F32C0E80-DA4F-433A-8E19-1BD6B5D858EE"
+      Scope="perMachine"
+      Language="1033">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="AppIcon" SourceFile="!(bindpath.Release)\hesabix_ui.exe" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="ManufacturerFolder" Name="Hesabix">
+        <Directory Id="INSTALLFOLDER" Name="Hesabix" />
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder" />
+    <StandardDirectory Id="DesktopFolder" />
+
+    <ComponentGroup Id="AppPayload" Directory="INSTALLFOLDER">
+      <Files Include="!(bindpath.Release)\**" />
+
+      <Component Id="StartMenuShortcut" Guid="*">
+        <Shortcut
+            Id="ApplicationStartMenuShortcut"
+            Name="Hesabix"
+            Directory="ProgramMenuFolder"
+            Target="[INSTALLFOLDER]hesabix_ui.exe"
+            WorkingDirectory="INSTALLFOLDER"
+            Icon="AppIcon" />
+        <RegistryValue
+            Root="HKCU"
+            Key="Software\Hesabix\HesabixUI"
+            Name="StartMenuShortcut"
+            Type="integer"
+            Value="1"
+            KeyPath="yes" />
+      </Component>
+
+      <Component Id="DesktopShortcut" Guid="*">
+        <Shortcut
+            Id="ApplicationDesktopShortcut"
+            Name="Hesabix"
+            Directory="DesktopFolder"
+            Target="[INSTALLFOLDER]hesabix_ui.exe"
+            WorkingDirectory="INSTALLFOLDER"
+            Icon="AppIcon" />
+        <RegistryValue
+            Root="HKCU"
+            Key="Software\Hesabix\HesabixUI"
+            Name="DesktopShortcut"
+            Type="integer"
+            Value="1"
+            KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <Feature Id="Main" Title="Hesabix" Level="1">
+      <ComponentGroupRef Id="AppPayload" />
+    </Feature>
+  </Package>
+</Wix>

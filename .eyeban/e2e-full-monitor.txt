@@ -1,0 +1,27 @@
+﻿15:05:43 monitor full-pid=5472
+15:07:44 alive=True inv=1374/0 rcp=24 chk=16 exp=19 man=26 cp=15:06:15 | 5:07:43 DOC [?????? ??? ???? 1402] ????? ???? 1 ?????? (?? ~3400)...
+
+15:10:23 monitor-restart
+15:12:23 alive=True pid=13828 inv=1374/0 rcp=24 chk=16 exp=19 man=26 cp=15:10:10
+15:14:24 alive=True pid=13828 inv=1399/0 rcp=24 chk=16 exp=19 man=26 cp=15:13:12
+15:16:24 alive=True pid=13828 inv=1444/0 rcp=24 chk=16 exp=19 man=26 cp=15:15:54
+15:18:24 alive=True pid=1120 inv=1449/0 rcp=24 chk=16 exp=19 man=26 cp=15:17:12
+15:20:24 alive=True pid=1120 inv=1454/0 rcp=24 chk=16 exp=19 man=26 cp=15:19:41
+15:22:24 alive=True pid=1120 inv=1474/0 rcp=24 chk=16 exp=19 man=26 cp=15:22:23
+15:24:24 alive=True pid=1120 inv=1509/0 rcp=24 chk=16 exp=19 man=26 cp=15:23:34
+15:26:24 alive=True pid=1120 inv=1529/0 rcp=24 chk=16 exp=19 man=26 cp=15:26:03
+15:28:24 alive=True pid=9652 inv=1529/0 rcp=24 chk=16 exp=19 man=26 cp=15:26:39
+15:30:24 alive=False pid=9652 inv=1529/0 rcp=24 chk=16 exp=19 man=26 cp=15:26:39
+
+15:30:57 monitor-v3
+15:32:57 alive=True pid=8244 inv=1529/0 cp=15:31:03
+15:34:57 alive=True pid=8244 inv=1559/0 cp=15:34:39
+15:36:57 alive=True pid=15972 inv=1564/0 cp=15:36:39
+15:38:57 alive=True pid=15972 inv=1579/0 cp=15:38:10
+15:40:57 alive=True pid=15972 inv=1639/0 cp=15:40:45
+15:41:58 snap alive=True inv=1669/0
+15:42:57 alive=True pid=15972 inv=1709/0 cp=15:42:57
+15:44:57 alive=True pid=15972 inv=1729/0 cp=15:44:25
+15:46:58 alive=True pid=15972 inv=1739/0 cp=15:46:48
+15:48:58 alive=True pid=15972 inv=1744/0 cp=15:47:05
+15:50:58 alive=False pid=15972 inv=1744/0 cp=15:47:05

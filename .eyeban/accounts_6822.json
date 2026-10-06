@@ -1,0 +1,1698 @@
+﻿{
+    "success":  true,
+    "data":  {
+                 "items":  [
+                               {
+                                   "id":  1,
+                                   "code":  "1",
+                                   "name":  "Ø¯Ø§Ø±Ø§ÛÛ ÙØ§",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  null,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  2,
+                                   "code":  "101",
+                                   "name":  "Ø¯Ø§Ø±Ø§ÛÛ ÙØ§Û Ø¬Ø§Ø±Û",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  1,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  20,
+                                   "code":  "10101",
+                                   "name":  "Ù¾ÛØ´ Ù¾Ø±Ø¯Ø§Ø®Øª ÙØ§",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  2,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  21,
+                                   "code":  "10102",
+                                   "name":  "Ù\u0085ÙØ¬ÙØ¯Û Ú©Ø§ÙØ§",
+                                   "account_type":  "product",
+                                   "parent_id":  2,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  22,
+                                   "code":  "10103",
+                                   "name":  "Ù\u0085ÙØ²ÙÙ\u0085Ø§Øª",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  2,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  23,
+                                   "code":  "10104",
+                                   "name":  "Ù\u0085Ø§ÙÛØ§Øª Ø¨Ø± Ø§Ø±Ø²Ø´ Ø§ÙØ²ÙØ¯Ù Ø®Ø±ÛØ¯",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  2,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  153,
+                                   "code":  "10105",
+                                   "name":  "Ù\u0085Ø³Ø§Ø¹Ø¯Ù",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  2,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  159,
+                                   "code":  "10106",
+                                   "name":  "Ù\u0085ÙØ¬ÙØ¯Û Ú©Ø§ÙØ§Û Ø¯Ø± Ø¬Ø±ÛØ§Ù Ø³Ø§Ø®Øª",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  2,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  472,
+                                   "code":  "10107",
+                                   "name":  "Ú©Ø§ÙØ§Û Ø®Ø±ÛØ¯Ø§Ø±ÛâØ´Ø¯Ù Ø¯Ø± Ø§ÙØªØ¸Ø§Ø± Ø±Ø³ÛØ¯ Ø§ÙØ¨Ø§Ø±",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  2,
+                                   "business_id":  null,
+                                   "created_at":  "2026-05-26T12:43:50.402002",
+                                   "updated_at":  "2026-05-26T12:43:50.402002"
+                               },
+                               {
+                                   "id":  3,
+                                   "code":  "102",
+                                   "name":  "Ù\u0085ÙØ¬ÙØ¯Û ÙÙØ¯ Ù Ø¨Ø§ÙÚ©",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  2,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  4,
+                                   "code":  "10201",
+                                   "name":  "ØªÙØ®ÙØ§Ù Ú¯Ø±Ø¯Ø§Ù",
+                                   "account_type":  "petty_cash",
+                                   "parent_id":  3,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  5,
+                                   "code":  "10202",
+                                   "name":  "ØµÙØ¯ÙÙ",
+                                   "account_type":  "cash_register",
+                                   "parent_id":  3,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  6,
+                                   "code":  "10203",
+                                   "name":  "Ø¨Ø§ÙÚ©",
+                                   "account_type":  "bank",
+                                   "parent_id":  3,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  7,
+                                   "code":  "10204",
+                                   "name":  "ÙØ¬ÙÙ Ø¯Ø± Ø±Ø§Ù",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  3,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  162,
+                                   "code":  "10205",
+                                   "name":  "Ú©ÛÙ Ù¾ÙÙ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  3,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:10:06",
+                                   "updated_at":  "2025-11-21T20:10:06"
+                               },
+                               {
+                                   "id":  8,
+                                   "code":  "103",
+                                   "name":  "Ø³Ù¾Ø±Ø¯Ù ÙØ§Û Ú©ÙØªØ§Ù Ù\u0085Ø¯Øª",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  2,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  9,
+                                   "code":  "10301",
+                                   "name":  "Ø³Ù¾Ø±Ø¯Ù Ø´Ø±Ú©Øª Ø¯Ø± Ù\u0085ÙØ§ÙØµÙ Ù Ù\u0085Ø²Ø§ÛØ¯Ù",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  8,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  10,
+                                   "code":  "10302",
+                                   "name":  "Ø¶Ù\u0085Ø§ÙØª ÙØ§Ù\u0085Ù Ø¨Ø§ÙÚ©Û",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  8,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  11,
+                                   "code":  "10303",
+                                   "name":  "Ø³Ø§ÛØ± Ø³Ù¾Ø±Ø¯Ù ÙØ§",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  8,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  12,
+                                   "code":  "104",
+                                   "name":  "Ø­Ø³Ø§Ø¨ ÙØ§Û Ø¯Ø±ÛØ§ÙØªÙÛ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  2,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  13,
+                                   "code":  "10401",
+                                   "name":  "Ø­Ø³Ø§Ø¨ ÙØ§Û Ø¯Ø±ÛØ§ÙØªÙÛ",
+                                   "account_type":  "person",
+                                   "parent_id":  12,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  14,
+                                   "code":  "10402",
+                                   "name":  "Ø°Ø®ÛØ±Ù Ù\u0085Ø·Ø§ÙØ¨Ø§Øª Ù\u0085Ø´Ú©ÙÚ© Ø§ÙÙØµÙÙ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  12,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  15,
+                                   "code":  "10403",
+                                   "name":  "Ø§Ø³ÙØ§Ø¯ Ø¯Ø±ÛØ§ÙØªÙÛ",
+                                   "account_type":  "check",
+                                   "parent_id":  12,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  16,
+                                   "code":  "10404",
+                                   "name":  "Ø§Ø³ÙØ§Ø¯ Ø¯Ø± Ø¬Ø±ÛØ§Ù ÙØµÙÙ",
+                                   "account_type":  "check",
+                                   "parent_id":  12,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  149,
+                                   "code":  "10405",
+                                   "name":  "Ø³ÙØ¯ ØªØ­ÙÙ ÙÛØ§ÙØªÙ ÙØ±ÙØ´ Ø§ÙØ³Ø§Ø·Û",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  12,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  17,
+                                   "code":  "105",
+                                   "name":  "Ø³Ø§ÛØ± Ø­Ø³Ø§Ø¨ ÙØ§Û Ø¯Ø±ÛØ§ÙØªÙÛ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  2,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  18,
+                                   "code":  "10501",
+                                   "name":  "ÙØ§Ù\u0085 Ú©Ø§Ø±Ú©ÙØ§Ù",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  17,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  19,
+                                   "code":  "10502",
+                                   "name":  "Ø³Ø§ÛØ± Ø­Ø³Ø§Ø¨ ÙØ§Û Ø¯Ø±ÛØ§ÙØªÙÛ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  17,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  24,
+                                   "code":  "106",
+                                   "name":  "Ø¯Ø§Ø±Ø§ÛÛ ÙØ§Û ØºÛØ± Ø¬Ø§Ø±Û",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  1,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  25,
+                                   "code":  "107",
+                                   "name":  "Ø¯Ø§Ø±Ø§ÛÛ ÙØ§Û Ø«Ø§Ø¨Øª",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  24,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  26,
+                                   "code":  "10701",
+                                   "name":  "Ø²Ù\u0085ÛÙ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  25,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  27,
+                                   "code":  "10702",
+                                   "name":  "Ø³Ø§Ø®ØªÙ\u0085Ø§Ù",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  25,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  28,
+                                   "code":  "10703",
+                                   "name":  "ÙØ³Ø§Ø¦Ø· ÙÙÙÛÙ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  25,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  29,
+                                   "code":  "10704",
+                                   "name":  "Ø§Ø«Ø§Ø«ÛÙ Ø§Ø¯Ø§Ø±Û",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  25,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  30,
+                                   "code":  "108",
+                                   "name":  "Ø§Ø³ØªÙÙØ§Ú© Ø§ÙØ¨Ø§Ø´ØªÙ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  24,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  31,
+                                   "code":  "10801",
+                                   "name":  "Ø§Ø³ØªÙÙØ§Ú© Ø§ÙØ¨Ø§Ø´ØªÙ Ø³Ø§Ø®ØªÙ\u0085Ø§Ù",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  30,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  32,
+                                   "code":  "10802",
+                                   "name":  "Ø§Ø³ØªÙÙØ§Ú© Ø§ÙØ¨Ø§Ø´ØªÙ ÙØ³Ø§Ø¦Ø· ÙÙÙÛÙ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  30,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  33,
+                                   "code":  "10803",
+                                   "name":  "Ø§Ø³ØªÙÙØ§Ú© Ø§ÙØ¨Ø§Ø´ØªÙ Ø§Ø«Ø§Ø«ÛÙ Ø§Ø¯Ø§Ø±Û",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  30,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  34,
+                                   "code":  "109",
+                                   "name":  "Ø³Ù¾Ø±Ø¯Ù ÙØ§Û Ø¨ÙÙØ¯Ù\u0085Ø¯Øª",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  24,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  35,
+                                   "code":  "110",
+                                   "name":  "Ø³Ø§ÛØ± Ø¯Ø§Ø±Ø§Ø¦Û ÙØ§",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  24,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  36,
+                                   "code":  "11001",
+                                   "name":  "Ø­Ù Ø§ÙØ§Ù\u0085ØªÛØ§Ø²ÙØ§",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  35,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  37,
+                                   "code":  "11002",
+                                   "name":  "ÙØ±Ù\u0085 Ø§ÙØ²Ø§Ø±ÙØ§",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  35,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  38,
+                                   "code":  "11003",
+                                   "name":  "Ø³Ø§ÛØ± Ø¯Ø§Ø±Ø§ÛÛ ÙØ§Û ÙØ§Ù\u0085Ø´ÙÙØ¯",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  35,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  291,
+                                   "code":  "12101",
+                                   "name":  "Ù\u0085ÙØ¬ÙØ¯Û Ú©Ø§ÙØ§",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  2,
+                                   "business_id":  null,
+                                   "created_at":  "2026-04-19T14:49:43.883368",
+                                   "updated_at":  "2026-04-19T14:49:43.883368"
+                               },
+                               {
+                                   "id":  289,
+                                   "code":  "13101",
+                                   "name":  "Ø¨Ø¯ÙÚ©Ø§Ø±Ø§Ù ØªØ¬Ø§Ø±Û",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  12,
+                                   "business_id":  null,
+                                   "created_at":  "2026-04-19T14:49:43.883368",
+                                   "updated_at":  "2026-04-19T14:49:43.883368"
+                               },
+                               {
+                                   "id":  39,
+                                   "code":  "2",
+                                   "name":  "Ø¨Ø¯ÙÛ ÙØ§",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  null,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  40,
+                                   "code":  "201",
+                                   "name":  "Ø¨Ø¯ÙÛÙØ§Û Ø¬Ø§Ø±Û",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  39,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  55,
+                                   "code":  "20101",
+                                   "name":  "Ù\u0085Ø§ÙÛØ§Øª Ø¨Ø± Ø§Ø±Ø²Ø´ Ø§ÙØ²ÙØ¯Ù ÙØ±ÙØ´",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  40,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  160,
+                                   "code":  "20102",
+                                   "name":  "Ø³Ø±Ø¨Ø§Ø± ØªÙÙÛØ¯ Ù¾Ø±Ø¯Ø§Ø®ØªÙÛ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  40,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  41,
+                                   "code":  "202",
+                                   "name":  "Ø­Ø³Ø§Ø¨ ÙØ§ Ù Ø§Ø³ÙØ§Ø¯ Ù¾Ø±Ø¯Ø§Ø®ØªÙÛ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  40,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  42,
+                                   "code":  "20201",
+                                   "name":  "Ø­Ø³Ø§Ø¨ ÙØ§Û Ù¾Ø±Ø¯Ø§Ø®ØªÙÛ",
+                                   "account_type":  "person",
+                                   "parent_id":  41,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  43,
+                                   "code":  "20202",
+                                   "name":  "Ø§Ø³ÙØ§Ø¯ Ù¾Ø±Ø¯Ø§Ø®ØªÙÛ",
+                                   "account_type":  "check",
+                                   "parent_id":  41,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  44,
+                                   "code":  "203",
+                                   "name":  "Ø³Ø§ÛØ± Ø­Ø³Ø§Ø¨ ÙØ§Û Ù¾Ø±Ø¯Ø§Ø®ØªÙÛ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  40,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  45,
+                                   "code":  "20301",
+                                   "name":  "Ø°Ø®ÛØ±Ù Ù\u0085Ø§ÙÛØ§Øª Ø¨Ø± Ø¯Ø±Ø¢Ù\u0085Ø¯ Ù¾Ø±Ø¯Ø§Ø®ØªÙÛ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  44,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  46,
+                                   "code":  "20302",
+                                   "name":  "Ù\u0085Ø§ÙÛØ§Øª Ø¨Ø± Ø¯Ø±Ø¢Ù\u0085Ø¯ Ù¾Ø±Ø¯Ø§Ø®ØªÙÛ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  44,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  47,
+                                   "code":  "20303",
+                                   "name":  "Ù\u0085Ø§ÙÛØ§Øª Ø­ÙÙÙ Ù Ø¯Ø³ØªÙ\u0085Ø²Ø¯ Ù¾Ø±Ø¯Ø§Ø®ØªÙÛ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  44,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  48,
+                                   "code":  "20304",
+                                   "name":  "Ø­Ù Ø¨ÛÙ\u0085Ù Ù¾Ø±Ø¯Ø§Ø®ØªÙÛ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  44,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  49,
+                                   "code":  "20305",
+                                   "name":  "Ø­ÙÙÙ Ù Ø¯Ø³ØªÙ\u0085Ø²Ø¯ Ù¾Ø±Ø¯Ø§Ø®ØªÙÛ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  44,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  50,
+                                   "code":  "20306",
+                                   "name":  "Ø¹ÛØ¯Û Ù Ù¾Ø§Ø¯Ø§Ø´ Ù¾Ø±Ø¯Ø§Ø®ØªÙÛ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  44,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  51,
+                                   "code":  "20307",
+                                   "name":  "Ø³Ø§ÛØ± ÙØ²ÛÙÙ ÙØ§Û Ù¾Ø±Ø¯Ø§Ø®ØªÙÛ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  44,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  52,
+                                   "code":  "204",
+                                   "name":  "Ù¾ÛØ´ Ø¯Ø±ÛØ§ÙØª ÙØ§",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  40,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  53,
+                                   "code":  "20401",
+                                   "name":  "Ù¾ÛØ´ Ø¯Ø±ÛØ§ÙØª ÙØ±ÙØ´",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  52,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  54,
+                                   "code":  "20402",
+                                   "name":  "Ø³Ø§ÛØ± Ù¾ÛØ´ Ø¯Ø±ÛØ§ÙØª ÙØ§",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  52,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  56,
+                                   "code":  "205",
+                                   "name":  "Ø¨Ø¯ÙÛÙØ§Û ØºÛØ± Ø¬Ø§Ø±Û",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  39,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  60,
+                                   "code":  "20501",
+                                   "name":  "ÙØ§Ù\u0085 Ù¾Ø±Ø¯Ø§Ø®ØªÙÛ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  56,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  61,
+                                   "code":  "20502",
+                                   "name":  "Ø°Ø®ÛØ±Ù Ù\u0085Ø²Ø§ÛØ§Û Ù¾Ø§ÛØ§Ù Ø®Ø¯Ù\u0085Øª Ú©Ø§Ø±Ú©ÙØ§Ù",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  56,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  337,
+                                   "code":  "20505",
+                                   "name":  "ØªØ³ÙÛÙØ§Øª Ø¯Ø±ÛØ§ÙØªÛ Ù Ø§ØµÙ",
+                                   "account_type":  "0",
+                                   "parent_id":  60,
+                                   "business_id":  null,
+                                   "created_at":  "2026-05-09T02:35:40.811261",
+                                   "updated_at":  "2026-05-09T02:35:40.811261"
+                               },
+                               {
+                                   "id":  338,
+                                   "code":  "20506",
+                                   "name":  "Ø°Ø®ÛØ±Ù Ø¨ÙØ±Ù ØªØ³ÙÛÙØ§Øª Ø¯Ø±ÛØ§ÙØªÛ Ù¾Ø±Ø¯Ø§Ø®ØªÙÛ",
+                                   "account_type":  "0",
+                                   "parent_id":  60,
+                                   "business_id":  null,
+                                   "created_at":  "2026-05-09T02:35:40.811261",
+                                   "updated_at":  "2026-05-09T02:35:40.811261"
+                               },
+                               {
+                                   "id":  339,
+                                   "code":  "20507",
+                                   "name":  "ÙØ¬Ù Ø§ÙØªØ²Ø§Ù\u0085 (Ø¬Ø±Ø§ÛÙ\u0085) ØªØ³ÙÛÙØ§Øª Ø¯Ø±ÛØ§ÙØªÛ Ù¾Ø±Ø¯Ø§Ø®ØªÙÛ",
+                                   "account_type":  "0",
+                                   "parent_id":  60,
+                                   "business_id":  null,
+                                   "created_at":  "2026-05-09T02:35:40.811261",
+                                   "updated_at":  "2026-05-09T02:35:40.811261"
+                               },
+                               {
+                                   "id":  57,
+                                   "code":  "206",
+                                   "name":  "Ø­Ø³Ø§Ø¨ ÙØ§ Ù Ø§Ø³ÙØ§Ø¯ Ù¾Ø±Ø¯Ø§Ø®ØªÙÛ Ø¨ÙÙØ¯Ù\u0085Ø¯Øª",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  56,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  58,
+                                   "code":  "20601",
+                                   "name":  "Ø­Ø³Ø§Ø¨ ÙØ§Û Ù¾Ø±Ø¯Ø§Ø®ØªÙÛ Ø¨ÙÙØ¯Ù\u0085Ø¯Øª",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  57,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  59,
+                                   "code":  "20602",
+                                   "name":  "Ø§Ø³ÙØ§Ø¯ Ù¾Ø±Ø¯Ø§Ø®ØªÙÛ Ø¨ÙÙØ¯Ù\u0085Ø¯Øª",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  57,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  290,
+                                   "code":  "21101",
+                                   "name":  "Ø¨Ø³ØªØ§ÙÚ©Ø§Ø±Ø§Ù ØªØ¬Ø§Ø±Û",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  41,
+                                   "business_id":  null,
+                                   "created_at":  "2026-04-19T14:49:43.883368",
+                                   "updated_at":  "2026-04-19T14:49:43.883368"
+                               },
+                               {
+                                   "id":  62,
+                                   "code":  "3",
+                                   "name":  "Ø­ÙÙÙ ØµØ§Ø­Ø¨Ø§Ù Ø³ÙØ§Ù\u0085",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  null,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  63,
+                                   "code":  "301",
+                                   "name":  "Ø³Ø±Ù\u0085Ø§ÛÙ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  62,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  64,
+                                   "code":  "30101",
+                                   "name":  "Ø³Ø±Ù\u0085Ø§ÛÙ Ø§ÙÙÛÙ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  63,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  65,
+                                   "code":  "30102",
+                                   "name":  "Ø§ÙØ²Ø§ÛØ´ ÛØ§ Ú©Ø§ÙØ´ Ø³Ø±Ù\u0085Ø§ÛÙ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  63,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  66,
+                                   "code":  "30103",
+                                   "name":  "Ø§ÙØ¯ÙØ®ØªÙ ÙØ§ÙÙÙÛ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  63,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  67,
+                                   "code":  "30104",
+                                   "name":  "Ø¨Ø±Ø¯Ø§Ø´Øª ÙØ§",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  63,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  68,
+                                   "code":  "30105",
+                                   "name":  "Ø³ÙÙ\u0085 Ø³ÙØ¯ Ù Ø²ÛØ§Ù",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  63,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  69,
+                                   "code":  "30106",
+                                   "name":  "Ø³ÙØ¯ ÛØ§ Ø²ÛØ§Ù Ø§ÙØ¨Ø§Ø´ØªÙ (Ø³ÙÙØ§ØªÛ)",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  63,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  70,
+                                   "code":  "4",
+                                   "name":  "Ø¨ÙØ§Û ØªÙ\u0085Ø§Ù\u0085 Ø´Ø¯Ù Ú©Ø§ÙØ§Û ÙØ±ÙØ®ØªÙ Ø´Ø¯Ù",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  null,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  71,
+                                   "code":  "40001",
+                                   "name":  "Ø¨ÙØ§Û ØªÙ\u0085Ø§Ù\u0085 Ø´Ø¯Ù Ú©Ø§ÙØ§Û ÙØ±ÙØ®ØªÙ Ø´Ø¯Ù",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  70,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  72,
+                                   "code":  "40002",
+                                   "name":  "Ø¨Ø±Ú¯Ø´Øª Ø§Ø² Ø®Ø±ÛØ¯",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  70,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  73,
+                                   "code":  "40003",
+                                   "name":  "ØªØ®ÙÛÙØ§Øª ÙÙØ¯Û Ø®Ø±ÛØ¯",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  70,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  74,
+                                   "code":  "5",
+                                   "name":  "ÙØ±ÙØ´",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  null,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  75,
+                                   "code":  "50001",
+                                   "name":  "ÙØ±ÙØ´ Ú©Ø§ÙØ§",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  74,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  76,
+                                   "code":  "50002",
+                                   "name":  "Ø¨Ø±Ú¯Ø´Øª Ø§Ø² ÙØ±ÙØ´",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  74,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  77,
+                                   "code":  "50003",
+                                   "name":  "ØªØ®ÙÛÙØ§Øª ÙÙØ¯Û ÙØ±ÙØ´",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  74,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  292,
+                                   "code":  "50101",
+                                   "name":  "Ù\u0085Ø§ÙÛØ§Øª Ø¨Ø± Ø¯Ø±Ø¢Ù\u0085Ø¯",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  129,
+                                   "business_id":  null,
+                                   "created_at":  "2026-04-19T14:49:43.883368",
+                                   "updated_at":  "2026-04-19T14:49:43.883368"
+                               },
+                               {
+                                   "id":  78,
+                                   "code":  "6",
+                                   "name":  "Ø¯Ø±Ø¢Ù\u0085Ø¯",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  null,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  79,
+                                   "code":  "601",
+                                   "name":  "Ø¯Ø±Ø¢Ù\u0085Ø¯ ÙØ§Û Ø¹Ù\u0085ÙÛØ§ØªÛ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  78,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  80,
+                                   "code":  "60101",
+                                   "name":  "Ø¯Ø±Ø¢Ù\u0085Ø¯ Ø­Ø§ØµÙ Ø§Ø² ÙØ±ÙØ´ Ø®Ø¯Ù\u0085Ø§Øª",
+                                   "account_type":  "service",
+                                   "parent_id":  79,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  81,
+                                   "code":  "60102",
+                                   "name":  "Ø¨Ø±Ú¯Ø´Øª Ø§Ø² Ø®Ø±ÛØ¯ Ø®Ø¯Ù\u0085Ø§Øª",
+                                   "account_type":  "service",
+                                   "parent_id":  79,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  82,
+                                   "code":  "60103",
+                                   "name":  "Ø¯Ø±Ø¢Ù\u0085Ø¯ Ø§Ø¶Ø§ÙÙ Ú©Ø§ÙØ§",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  79,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  83,
+                                   "code":  "60104",
+                                   "name":  "Ø¯Ø±Ø¢Ù\u0085Ø¯ Ø­Ù\u0085Ù Ú©Ø§ÙØ§",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  79,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  84,
+                                   "code":  "602",
+                                   "name":  "Ø¯Ø±Ø¢Ù\u0085Ø¯ ÙØ§Û ØºÛØ± Ø¹Ù\u0085ÙÛØ§ØªÛ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  78,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  85,
+                                   "code":  "60201",
+                                   "name":  "Ø¯Ø±Ø¢Ù\u0085Ø¯ Ø­Ø§ØµÙ Ø§Ø² Ø³Ø±Ù\u0085Ø§ÛÙ Ú¯Ø°Ø§Ø±Û",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  84,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  86,
+                                   "code":  "60202",
+                                   "name":  "Ø¯Ø±Ø¢Ù\u0085Ø¯ Ø³ÙØ¯ Ø³Ù¾Ø±Ø¯Ù ÙØ§",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  84,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  87,
+                                   "code":  "60203",
+                                   "name":  "Ø³Ø§ÛØ± Ø¯Ø±Ø¢Ù\u0085Ø¯ ÙØ§",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  84,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  88,
+                                   "code":  "60204",
+                                   "name":  "Ø¯Ø±Ø¢Ù\u0085Ø¯ ØªØ³Ø¹ÛØ± Ø§Ø±Ø²",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  84,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  150,
+                                   "code":  "60205",
+                                   "name":  "Ø³ÙØ¯ ÙØ±ÙØ´ Ø§ÙØ³Ø§Ø·Û",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  84,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  156,
+                                   "code":  "60206",
+                                   "name":  "Ø¯Ø±Ø§Ù\u0085Ø¯ Ø­Ø§ØµÙ Ø§Ø² ÙØ±ÙØ´ Ø¶Ø§ÛØ¹Ø§Øª",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  84,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  157,
+                                   "code":  "60207",
+                                   "name":  "Ø³ÙØ¯ ÙØ±ÙØ´ Ø¯Ø§Ø±Ø§ÛÛ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  84,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  89,
+                                   "code":  "7",
+                                   "name":  "ÙØ²ÛÙÙ ÙØ§",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  null,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  90,
+                                   "code":  "701",
+                                   "name":  "ÙØ²ÛÙÙ ÙØ§Û Ù¾Ø±Ø³ÙÙÛ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  89,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  91,
+                                   "code":  "702",
+                                   "name":  "ÙØ²ÛÙÙ Ø­ÙÙÙ Ù Ø¯Ø³ØªÙ\u0085Ø²Ø¯",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  90,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  92,
+                                   "code":  "70201",
+                                   "name":  "Ø­ÙÙÙ Ù¾Ø§ÛÙ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  91,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  93,
+                                   "code":  "70202",
+                                   "name":  "Ø§Ø¶Ø§ÙÙ Ú©Ø§Ø±",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  91,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  94,
+                                   "code":  "70203",
+                                   "name":  "Ø­Ù Ø´ÛÙØª Ù Ø´Ø¨ Ú©Ø§Ø±Û",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  91,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  95,
+                                   "code":  "70204",
+                                   "name":  "Ø­Ù ÙÙØ¨Øª Ú©Ø§Ø±Û",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  91,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  96,
+                                   "code":  "70205",
+                                   "name":  "Ø­Ù Ù\u0085Ø§Ù\u0085ÙØ±ÛØª",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  91,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  97,
+                                   "code":  "70206",
+                                   "name":  "ÙÙÙ Ø§ÙØ¹Ø§Ø¯Ù Ù\u0085Ø³Ú©Ù Ù Ø®Ø§Ø±ÙØ¨Ø§Ø±",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  91,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  98,
+                                   "code":  "70207",
+                                   "name":  "Ø­Ù Ø§ÙÙØ§Ø¯",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  91,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  99,
+                                   "code":  "70208",
+                                   "name":  "Ø¹ÛØ¯Û Ù Ù¾Ø§Ø¯Ø§Ø´",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  91,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  100,
+                                   "code":  "70209",
+                                   "name":  "Ø¨Ø§Ø²Ø®Ø±ÛØ¯ Ø³ÙÙØ§Øª Ø®Ø¯Ù\u0085Øª Ú©Ø§Ø±Ú©ÙØ§Ù",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  91,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  101,
+                                   "code":  "70210",
+                                   "name":  "Ø¨Ø§Ø²Ø®Ø±ÛØ¯ Ù\u0085Ø±Ø®ØµÛ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  91,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  102,
+                                   "code":  "70211",
+                                   "name":  "Ø¨ÛÙ\u0085Ù Ø³ÙÙ\u0085 Ú©Ø§Ø±ÙØ±Ù\u0085Ø§",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  91,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  103,
+                                   "code":  "70212",
+                                   "name":  "Ø¨ÛÙ\u0085Ù Ø¨ÛÚ©Ø§Ø±Û",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  91,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  104,
+                                   "code":  "70213",
+                                   "name":  "Ø­ÙÙÙ Ù\u0085Ø²Ø§ÛØ§Û Ù\u0085ØªÙØ±ÙÙ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  91,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  151,
+                                   "code":  "70214",
+                                   "name":  "Ø­Ù ØªØ§ÙÙ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  91,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  105,
+                                   "code":  "703",
+                                   "name":  "Ø³Ø§ÛØ± ÙØ²ÛÙÙ ÙØ§Û Ú©Ø§Ø±Ú©ÙØ§Ù",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  90,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  106,
+                                   "code":  "70301",
+                                   "name":  "Ø³ÙØ± Ù Ù\u0085Ø§Ù\u0085ÙØ±ÛØª",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  105,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  107,
+                                   "code":  "70302",
+                                   "name":  "Ø§ÛØ§Ø¨ Ù Ø°ÙØ§Ø¨",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  105,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  108,
+                                   "code":  "70303",
+                                   "name":  "Ø³Ø§ÛØ± ÙØ²ÛÙÙ ÙØ§Û Ú©Ø§Ø±Ú©ÙØ§Ù",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  105,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  109,
+                                   "code":  "704",
+                                   "name":  "ÙØ²ÛÙÙ ÙØ§Û Ø¹Ù\u0085ÙÛØ§ØªÛ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  89,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  110,
+                                   "code":  "70401",
+                                   "name":  "Ø®Ø±ÛØ¯ Ø®Ø¯Ù\u0085Ø§Øª",
+                                   "account_type":  "service",
+                                   "parent_id":  109,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  111,
+                                   "code":  "70402",
+                                   "name":  "Ø¨Ø±Ú¯Ø´Øª Ø§Ø² ÙØ±ÙØ´ Ø®Ø¯Ù\u0085Ø§Øª",
+                                   "account_type":  "service",
+                                   "parent_id":  109,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  112,
+                                   "code":  "70403",
+                                   "name":  "ÙØ²ÛÙÙ Ø­Ù\u0085Ù Ú©Ø§ÙØ§",
+                                   "account_type":  "service",
+                                   "parent_id":  109,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  113,
+                                   "code":  "70404",
+                                   "name":  "ØªØ¹Ù\u0085ÛØ± Ù ÙÚ¯ÙØ¯Ø§Ø±Û Ø§Ù\u0085ÙØ§Ù Ù Ø§Ø«Ø§Ø«ÛÙ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  109,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  114,
+                                   "code":  "70405",
+                                   "name":  "ÙØ²ÛÙÙ Ø§Ø¬Ø§Ø±Ù Ù\u0085Ø­Ù",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  109,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  118,
+                                   "code":  "70406",
+                                   "name":  "ÙØ²ÛÙÙ Ù\u0085ÙØ²ÙÙ\u0085Ø§Øª Ù\u0085ØµØ±ÙÛ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  109,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  119,
+                                   "code":  "70407",
+                                   "name":  "ÙØ²ÛÙÙ Ú©Ø³Ø±Û Ù Ø¶Ø§ÛØ¹Ø§Øª Ú©Ø§ÙØ§",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  109,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  120,
+                                   "code":  "70408",
+                                   "name":  "Ø¨ÛÙ\u0085Ù Ø¯Ø§Ø±Ø§ÛÛ ÙØ§Û Ø«Ø§Ø¨Øª",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  109,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  115,
+                                   "code":  "705",
+                                   "name":  "ÙØ²ÛÙÙ ÙØ§Û Ø¹Ù\u0085ÙÙ\u0085Û",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  109,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  116,
+                                   "code":  "70501",
+                                   "name":  "ÙØ²ÛÙÙ Ø¢Ø¨ Ù Ø¨Ø±Ù Ù Ú¯Ø§Ø² Ù ØªÙÙÙ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  115,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  117,
+                                   "code":  "70502",
+                                   "name":  "ÙØ²ÛÙÙ Ù¾Ø°ÛØ±Ø§ÛÛ Ù Ø¢Ø¨Ø¯Ø§Ø±Ø®Ø§ÙÙ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  115,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  144,
+                                   "code":  "70503",
+                                   "name":  "ÙØ²ÛÙÙ Ø¢Ø¨",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  116,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  145,
+                                   "code":  "70504",
+                                   "name":  "ÙØ²ÛÙÙ Ø¨Ø±Ù",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  116,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  146,
+                                   "code":  "70505",
+                                   "name":  "ÙØ²ÛÙÙ Ú¯Ø§Ø²",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  116,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  147,
+                                   "code":  "70506",
+                                   "name":  "ÙØ²ÛÙÙ ØªÙÙÙ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  116,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  161,
+                                   "code":  "70507",
+                                   "name":  "ÙØ²ÛÙÙ Ø§Ø´ØªØ±Ø§Ú© Ù Ø®Ø¯Ù\u0085Ø§Øª Ø³ÛØ³ØªÙ\u0085",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  115,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:54",
+                                   "updated_at":  "2025-12-03T17:55:28"
+                               },
+                               {
+                                   "id":  164,
+                                   "code":  "70508",
+                                   "name":  "ÙØ²ÛÙÙ ÙÙØ´ Ù\u0085ØµÙÙØ¹Û",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  115,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-22T09:58:59",
+                                   "updated_at":  "2025-11-22T09:58:59"
+                               },
+                               {
+                                   "id":  165,
+                                   "code":  "70509",
+                                   "name":  "ÙØ²ÛÙÙ Ø³Ø±ÙÛØ³âÙØ§Û Ø§Ø³ØªØ¹ÙØ§Ù\u0085Ø§Øª",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  115,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-29T18:59:37",
+                                   "updated_at":  "2025-11-29T18:59:37"
+                               },
+                               {
+                                   "id":  335,
+                                   "code":  "70510",
+                                   "name":  "ÙØ²ÛÙÙ Ø§Ø±Ø³Ø§Ù Ù¾ÛØ§Ù\u0085Ú© ÙØ§ØªÛÙÛÚ©ÛØ´Ù",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  115,
+                                   "business_id":  null,
+                                   "created_at":  "2026-05-06T07:39:41.286438",
+                                   "updated_at":  "2026-05-06T07:39:41.286441"
+                               },
+                               {
+                                   "id":  121,
+                                   "code":  "706",
+                                   "name":  "ÙØ²ÛÙÙ ÙØ§Û Ø§Ø³ØªÙÙØ§Ú©",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  89,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  122,
+                                   "code":  "70601",
+                                   "name":  "ÙØ²ÛÙÙ Ø§Ø³ØªÙÙØ§Ú© Ø³Ø§Ø®ØªÙ\u0085Ø§Ù",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  121,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  123,
+                                   "code":  "70602",
+                                   "name":  "ÙØ²ÛÙÙ Ø§Ø³ØªÙÙØ§Ú© ÙØ³Ø§Ø¦Ø· ÙÙÙÛÙ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  121,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  124,
+                                   "code":  "70603",
+                                   "name":  "ÙØ²ÛÙÙ Ø§Ø³ØªÙÙØ§Ú© Ø§Ø«Ø§Ø«ÛÙ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  121,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  125,
+                                   "code":  "707",
+                                   "name":  "ÙØ²ÛÙÙ ÙØ§Û Ø¨Ø§Ø²Ø§Ø±ÛØ§Ø¨Û Ù ØªÙØ²ÛØ¹ Ù ÙØ±ÙØ´",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  89,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  126,
+                                   "code":  "70701",
+                                   "name":  "ÙØ²ÛÙÙ Ø¢Ú¯ÙÛ Ù ØªØ¨ÙÛØºØ§Øª",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  125,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  127,
+                                   "code":  "70702",
+                                   "name":  "ÙØ²ÛÙÙ Ø¨Ø§Ø²Ø§Ø±ÛØ§Ø¨Û Ù Ù¾ÙØ±Ø³Ø§ÙØª",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  125,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  128,
+                                   "code":  "70703",
+                                   "name":  "Ø³Ø§ÛØ± ÙØ²ÛÙÙ ÙØ§Û ØªÙØ²ÛØ¹ Ù ÙØ±ÙØ´",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  125,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  129,
+                                   "code":  "708",
+                                   "name":  "ÙØ²ÛÙÙ ÙØ§Û ØºÛØ±Ø¹Ù\u0085ÙÛØ§ØªÛ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  89,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  134,
+                                   "code":  "70801",
+                                   "name":  "ÙØ²ÛÙÙ ØªØ³Ø¹ÛØ± Ø§Ø±Ø²",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  129,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  135,
+                                   "code":  "70802",
+                                   "name":  "ÙØ²ÛÙÙ Ù\u0085Ø·Ø§ÙØ¨Ø§Øª Ø³ÙØ®Øª Ø´Ø¯Ù",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  129,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  158,
+                                   "code":  "70803",
+                                   "name":  "Ø²ÛØ§Ù ÙØ±ÙØ´ Ø¯Ø§Ø±Ø§ÛÛ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  129,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  130,
+                                   "code":  "709",
+                                   "name":  "ÙØ²ÛÙÙ ÙØ§Û Ø¨Ø§ÙÚ©Û",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  129,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  131,
+                                   "code":  "70901",
+                                   "name":  "Ø³ÙØ¯ Ù Ú©Ø§Ø±Ù\u0085Ø²Ø¯ ÙØ§Ù\u0085ÙØ§",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  130,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  132,
+                                   "code":  "70902",
+                                   "name":  "Ú©Ø§Ø±Ù\u0085Ø²Ø¯ Ø®Ø¯Ù\u0085Ø§Øª Ø¨Ø§ÙÚ©Û",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  130,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  133,
+                                   "code":  "70903",
+                                   "name":  "Ø¬Ø±Ø§Ø¦Ù\u0085 Ø¯ÛØ±Ú©Ø±Ø¯ Ø¨Ø§ÙÚ©Û",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  130,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  136,
+                                   "code":  "8",
+                                   "name":  "Ø³Ø§ÛØ± Ø­Ø³Ø§Ø¨ ÙØ§",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  null,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  137,
+                                   "code":  "801",
+                                   "name":  "Ø­Ø³Ø§Ø¨ ÙØ§Û Ø§ÙØªØ¸Ø§Ù\u0085Û",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  136,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  138,
+                                   "code":  "80101",
+                                   "name":  "Ø­Ø³Ø§Ø¨ ÙØ§Û Ø§ÙØªØ¸Ø§Ù\u0085Û",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  137,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  139,
+                                   "code":  "80102",
+                                   "name":  "Ø·Ø±Ù Ø­Ø³Ø§Ø¨ ÙØ§Û Ø§ÙØªØ¸Ø§Ù\u0085Û",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  137,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  140,
+                                   "code":  "802",
+                                   "name":  "Ø­Ø³Ø§Ø¨ ÙØ§Û Ú©ÙØªØ±ÙÛ",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  136,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  141,
+                                   "code":  "80201",
+                                   "name":  "Ú©ÙØªØ±Ù Ú©Ø³Ø±Û Ù Ø§Ø¶Ø§ÙÙ Ú©Ø§ÙØ§",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  140,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  142,
+                                   "code":  "803",
+                                   "name":  "Ø­Ø³Ø§Ø¨ Ø®ÙØ§ØµÙ Ø³ÙØ¯ Ù Ø²ÛØ§Ù",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  136,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               },
+                               {
+                                   "id":  143,
+                                   "code":  "80301",
+                                   "name":  "Ø®ÙØ§ØµÙ Ø³ÙØ¯ Ù Ø²ÛØ§Ù",
+                                   "account_type":  "accounting_document",
+                                   "parent_id":  142,
+                                   "business_id":  null,
+                                   "created_at":  "2025-11-21T20:08:50",
+                                   "updated_at":  "2025-11-21T20:08:54"
+                               }
+                           ]
+             },
+    "calendar_type":  "jalali"
+}

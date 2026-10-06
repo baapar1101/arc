@@ -120,6 +120,16 @@ List<InvoiceTransaction> invoiceTransactionsFromReceiptPaymentDoc(
         personName: accountLine.extraInfo?['person_name'] as String?,
         accountId: accountLine.accountId.toString(),
         accountName: accountLine.accountName,
+        detailType: accountLine.extraInfo?['detail_type'] as String? ??
+            _detailTypeFromAccountLine(accountLine),
+        detailId: _detailIdFromAccountLine(accountLine)?.toString(),
+        detailName: accountLine.extraInfo?['detail_name'] as String? ??
+            accountLine.extraInfo?['person_name'] as String? ??
+            accountLine.extraInfo?['product_name'] as String? ??
+            accountLine.extraInfo?['bank_account_name'] as String? ??
+            accountLine.extraInfo?['cash_register_name'] as String? ??
+            accountLine.extraInfo?['petty_cash_name'] as String? ??
+            accountLine.extraInfo?['check_number'] as String?,
         settlesAmount: settlesForLine,
         fxRate: settlesForLine != null ? fxRate : null,
         paymentCurrencyId: settlesForLine != null ? linePayCur : (fx != null ? linePayCur : null),
@@ -145,4 +155,19 @@ List<InvoiceTransaction> invoiceTransactionsFromReceiptPaymentDoc(
   }
 
   return out;
+}
+
+String? _detailTypeFromAccountLine(AccountLine line) {
+  final extra = line.extraInfo;
+  if (extra == null) return null;
+  for (final type in ['person', 'product', 'bank_account', 'cash_register', 'petty_cash', 'check']) {
+    if (extra['${type}_id'] != null) return type;
+  }
+  return null;
+}
+
+dynamic _detailIdFromAccountLine(AccountLine line) {
+  final type = line.extraInfo?['detail_type'] as String? ?? _detailTypeFromAccountLine(line);
+  if (type == null) return null;
+  return line.extraInfo?['${type}_id'];
 }

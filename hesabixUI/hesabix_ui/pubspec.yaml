@@ -1,4 +1,4 @@
-name: hesabix_ui
+﻿name: hesabix_ui
 description: "cloud and open source accounting software with love."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 70.15.300+70015300
+version: 70.15.301+70015301
 
 environment:
   sdk: ^3.9.2
@@ -118,8 +118,8 @@ flutter:
   uses-material-design: true
   generate: true
   fonts:
-    # TTF برای اندروید/iOS/دسکتاپ؛ وب هم TTF را پشتیبانی می‌کند.
-    # WOFF2 فقط در CSS لودر وب (hesabix_web_loader.css) برای preload قبل از Flutter.
+    # TTF Ø¨Ø±Ø§ÛŒ Ø§Ù†Ø¯Ø±ÙˆÛŒØ¯/iOS/Ø¯Ø³Ú©ØªØ§Ù¾Ø› ÙˆØ¨ Ù‡Ù… TTF Ø±Ø§ Ù¾Ø´ØªÛŒØ¨Ø§Ù†ÛŒ Ù…ÛŒâ€ŒÚ©Ù†Ø¯.
+    # WOFF2 ÙÙ‚Ø· Ø¯Ø± CSS Ù„ÙˆØ¯Ø± ÙˆØ¨ (hesabix_web_loader.css) Ø¨Ø±Ø§ÛŒ preload Ù‚Ø¨Ù„ Ø§Ø² Flutter.
     - family: Roboto
       fonts:
         - asset: assets/fonts/Roboto-Regular.ttf
@@ -150,8 +150,8 @@ flutter:
           weight: 800
         - asset: assets/fonts/YekanBakhFaNum-Black.ttf
           weight: 900
-    # پوشش لاتین/عمومی وقتی Roboto کافی نباشد. ایموجی از shardهای محلی
-    # fonts/gstatic/s/notocoloremoji (fontFallbackBaseUrl) — نه TTF مونolith.
+    # Ù¾ÙˆØ´Ø´ Ù„Ø§ØªÛŒÙ†/Ø¹Ù…ÙˆÙ…ÛŒ ÙˆÙ‚ØªÛŒ Roboto Ú©Ø§ÙÛŒ Ù†Ø¨Ø§Ø´Ø¯. Ø§ÛŒÙ…ÙˆØ¬ÛŒ Ø§Ø² shardÙ‡Ø§ÛŒ Ù…Ø­Ù„ÛŒ
+    # fonts/gstatic/s/notocoloremoji (fontFallbackBaseUrl) â€” Ù†Ù‡ TTF Ù…ÙˆÙ†olith.
     - family: Noto Sans
       fonts:
         - asset: assets/fonts/Roboto-Regular.ttf
