@@ -1,0 +1,20 @@
+﻿14:09:52 monitor start pid=12412
+14:11:52 alive=False done=970 fail=0 cp=14:11:04
+14:18:41 monitor restart pid=2528
+14:20:41 alive=True done=1000 fail=0 cp=14:20:25
+14:22:41 alive=True done=1025 fail=0 cp=14:22:01
+14:24:42 alive=True done=1050 fail=0 cp=14:23:30
+14:26:42 alive=True done=1125 fail=0 cp=14:26:29
+14:28:42 alive=False done=1125 fail=0 cp=14:26:29
+14:29:46 monitor pid=10320
+14:31:46 alive=True done=1125 fail=0 cp=14:28:45
+14:33:46 alive=True done=1173 fail=2 cp=14:33:19
+14:35:21 monitor pid=6416
+14:35:46 alive=False done=1182 fail=0 cp=14:35:45
+14:36:41 monitor pid=12048
+14:38:41 alive=True done=1182 fail=0 cp=14:35:45
+14:40:41 alive=True done=1182 fail=0 cp=14:35:45
+14:42:41 alive=True done=1200 fail=0 cp=14:41:46
+14:44:41 alive=True done=1250 fail=0 cp=14:44:31
+14:46:41 alive=True done=1250 fail=0 cp=14:44:31
+14:48:41 alive=False done=1275 fail=0 cp=14:46:49

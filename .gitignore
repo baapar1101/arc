@@ -1,1 +1,7 @@
 backup/
+
+# Eyeban (local caches — keep rules/skills/agents tracked)
+.eyeban/index/
+.eyeban/debug/
+.eyeban/tool-output/
+.eyeban/generated/

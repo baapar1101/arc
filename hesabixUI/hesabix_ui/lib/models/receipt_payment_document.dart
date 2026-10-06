@@ -125,6 +125,14 @@ class AccountLine {
     mergeRoot('check_id');
     mergeRoot('person_name');
     mergeRoot('person_id');
+    mergeRoot('product_id');
+    mergeRoot('bank_account_id');
+    mergeRoot('product_name');
+    mergeRoot('bank_account_name');
+    mergeRoot('cash_register_name');
+    mergeRoot('petty_cash_name');
+    mergeRoot('detail_name');
+    mergeRoot('detail_type');
     mergeRoot('transaction_type');
     mergeRoot('transaction_date');
     mergeRoot('commission');

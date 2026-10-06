@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../models/invoice_transaction.dart';
 import '../../models/person_model.dart';
 import '../../models/account_tree_node.dart';
+import '../../models/account_model.dart';
 import '../../core/date_utils.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/auth_store.dart';
@@ -22,6 +23,7 @@ import 'bank_account_combobox_widget.dart';
 import 'cash_register_combobox_widget.dart';
 import 'petty_cash_combobox_widget.dart';
 import 'account_tree_combobox_widget.dart';
+import '../document/detail_selector_widget.dart';
 import 'check_combobox_widget.dart';
 import '../../models/invoice_type_model.dart';
 import '../../utils/number_normalizer.dart';
@@ -1223,6 +1225,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
   String? _selectedCheckNumber;
   String? _selectedPersonId;
   AccountTreeNode? _selectedAccount;
+  Map<String, dynamic>? _selectedDetail;
   int? _selectedPaymentCurrencyId;
   String? _paymentCurrencyUnit;
   
@@ -1292,6 +1295,15 @@ class _TransactionDialogState extends State<TransactionDialog> {
     _selectedCheckNumber = widget.transaction?.checkNumber;
     _selectedPersonId = widget.transaction?.personId;
     _selectedPaymentCurrencyId = widget.transaction?.paymentCurrencyId;
+    if (widget.transaction?.detailId != null && widget.transaction?.detailType != null) {
+      final key = _detailIdKey(widget.transaction!.detailType!);
+      if (key != null) {
+        _selectedDetail = {
+          key: int.tryParse(widget.transaction!.detailId!) ?? widget.transaction!.detailId,
+          if (widget.transaction!.detailName != null) 'detail_name': widget.transaction!.detailName,
+        };
+      }
+    }
     
     // اگر حساب انتخاب شده است، باید آن را از API دریافت کنیم
     if (widget.transaction?.accountId != null) {
@@ -2272,7 +2284,12 @@ class _TransactionDialogState extends State<TransactionDialog> {
   }
 
   Widget _buildAccountFields() {
-    return AccountTreeComboboxWidget(
+    final detailType = _accountDetailType(_selectedAccount?.toAccount());
+    final detailIdKey = detailType == null ? null : _detailIdKey(detailType);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AccountTreeComboboxWidget(
       businessId: widget.businessId,
       selectedAccount: _selectedAccount?.toAccount(),
       onChanged: (account) {
@@ -2290,12 +2307,55 @@ class _TransactionDialogState extends State<TransactionDialog> {
           } else {
             _selectedAccount = null;
           }
+          _selectedDetail = null;
         });
       },
       label: 'حساب *',
       hintText: 'انتخاب حساب',
       isRequired: true,
+        ),
+        if (detailType != null && detailIdKey != null) ...[
+          const SizedBox(height: 12),
+          DetailSelectorWidget(
+            key: ValueKey('invoice-account-detail-${_selectedAccount?.id}-$detailType'),
+            businessId: widget.businessId,
+            selectedAccount: _selectedAccount?.toAccount(),
+            detailType: detailType,
+            selectedDetailId: _selectedDetail?[detailIdKey] is num
+                ? (_selectedDetail![detailIdKey] as num).toInt()
+                : int.tryParse(_selectedDetail?[detailIdKey]?.toString() ?? ''),
+            onChanged: (detail) => setState(() => _selectedDetail = detail),
+            label: 'تفصیل',
+            isRequired: true,
+          ),
+        ],
+      ],
     );
+  }
+
+  String? _detailIdKey(String type) => switch (type) {
+        'person' => 'person_id',
+        'product' => 'product_id',
+        'bank_account' => 'bank_account_id',
+        'cash_register' => 'cash_register_id',
+        'petty_cash' => 'petty_cash_id',
+        'check' => 'check_id',
+        _ => null,
+      };
+
+  String? _accountDetailType(Account? account) {
+    if (account == null) return null;
+    if (account.accountType == 'product') return 'product';
+    final name = account.name.toLowerCase();
+    if (name.contains('دریافتنی') || name.contains('پرداختنی') ||
+        name.contains('مشتری') || name.contains('تامین')) return 'person';
+    if (name.contains('موجودی') || name.contains('کالا') || name.contains('انبار')) return 'product';
+    if (account.accountType == 'bank' || name.contains('بانک')) return 'bank_account';
+    if (account.accountType == 'cash_register' || name.contains('صندوق')) return 'cash_register';
+    if (account.accountType == 'petty_cash' || name.contains('تنخواه')) return 'petty_cash';
+    if (account.accountType == 'check' || name.contains('چک')) return 'check';
+    if (account.accountType == 'person') return 'person';
+    return null;
   }
 
 
@@ -2342,6 +2402,12 @@ class _TransactionDialogState extends State<TransactionDialog> {
       case TransactionType.account:
         if (_selectedAccount == null) {
           SnackBarHelper.showError(context, message: 'انتخاب حساب الزامی است');
+          return;
+        }
+        final detailType = _accountDetailType(_selectedAccount!.toAccount());
+        final detailKey = detailType == null ? null : _detailIdKey(detailType);
+        if (detailKey != null && _selectedDetail?[detailKey] == null) {
+          SnackBarHelper.showError(context, message: 'انتخاب تفصیل حساب الزامی است');
           return;
         }
         break;
@@ -2530,6 +2596,19 @@ class _TransactionDialogState extends State<TransactionDialog> {
       personName: _getPersonName(_selectedPersonId),
       accountId: _selectedAccount?.id.toString(),
       accountName: _selectedAccount?.name,
+      detailType: _accountDetailType(_selectedAccount?.toAccount()),
+      detailId: (() {
+        final type = _accountDetailType(_selectedAccount?.toAccount());
+        final key = type == null ? null : _detailIdKey(type);
+        return key == null ? null : _selectedDetail?[key]?.toString();
+      })(),
+      detailName: _selectedDetail?['detail_name']?.toString() ??
+          _selectedDetail?['person_name']?.toString() ??
+          _selectedDetail?['product_name']?.toString() ??
+          _selectedDetail?['bank_account_name']?.toString() ??
+          _selectedDetail?['cash_register_name']?.toString() ??
+          _selectedDetail?['petty_cash_name']?.toString() ??
+          _selectedDetail?['check_number']?.toString(),
       transactionDate: _transactionDate,
       amount: amount,
       commission: commission,

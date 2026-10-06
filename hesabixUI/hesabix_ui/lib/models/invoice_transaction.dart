@@ -39,17 +39,27 @@ class InvoiceTransaction {
   final String? personName;
   final String? accountId;
   final String? accountName;
+
+  /// شناسه و نوع تفصیل حساب انتخاب‌شده (مثل person_id یا product_id).
+  final String? detailType;
+  final String? detailId;
+  final String? detailName;
   final DateTime transactionDate;
+
   /// مبلغ واقعی پرداخت به ارز حساب پرداخت.
   final num amount;
   final num? commission;
   final String? description;
+
   /// مبلغ تسویه به ارز فاکتور (پرداخت بین‌ارزی).
   final num? settlesAmount;
+
   /// نرخ تبدیل تراکنش (۱ واحد ارز غیرپایه = rate × پایه / یا طبق قرارداد API).
   final num? fxRate;
+
   /// ارز حساب پرداخت (برای نمایش و تشخیص بین‌ارزی در UI).
   final int? paymentCurrencyId;
+
   /// تأیید صریح اختلاف تسعیر بزرگ (>۲۵٪) برای عبور از گارد بک‌اند.
   final bool allowLargeFxDiff;
 
@@ -68,6 +78,9 @@ class InvoiceTransaction {
     this.personName,
     this.accountId,
     this.accountName,
+    this.detailType,
+    this.detailId,
+    this.detailName,
     required this.transactionDate,
     required this.amount,
     this.commission,
@@ -99,6 +112,9 @@ class InvoiceTransaction {
     String? personName,
     String? accountId,
     String? accountName,
+    String? detailType,
+    String? detailId,
+    String? detailName,
     DateTime? transactionDate,
     num? amount,
     num? commission,
@@ -123,6 +139,9 @@ class InvoiceTransaction {
       personName: personName ?? this.personName,
       accountId: accountId ?? this.accountId,
       accountName: accountName ?? this.accountName,
+      detailType: detailType ?? this.detailType,
+      detailId: detailId ?? this.detailId,
+      detailName: detailName ?? this.detailName,
       transactionDate: transactionDate ?? this.transactionDate,
       amount: amount ?? this.amount,
       commission: commission ?? this.commission,
@@ -159,6 +178,11 @@ class InvoiceTransaction {
       'commission': commission,
       'description': description,
     };
+    final detailKey = _detailKeyForType(detailType);
+    if (detailKey != null && detailId != null) {
+      map[detailKey] = int.tryParse(detailId!) ?? detailId;
+    }
+    if (detailName != null) map['detail_name'] = detailName;
     if (settlesAmount != null) {
       map['settles_amount'] = settlesAmount;
     }
@@ -182,7 +206,8 @@ class InvoiceTransaction {
     num? invoiceFxRate,
   }) {
     final map = toJson();
-    final foreignInvoice = invoiceCurrencyId != null &&
+    final foreignInvoice =
+        invoiceCurrencyId != null &&
         baseCurrencyId != null &&
         invoiceCurrencyId != baseCurrencyId;
     if (foreignInvoice) {
@@ -199,7 +224,9 @@ class InvoiceTransaction {
   factory InvoiceTransaction.fromJson(Map<String, dynamic> json) {
     return InvoiceTransaction(
       id: json['id'] as String,
-      type: TransactionType.fromValue(json['type'] as String) ?? TransactionType.person,
+      type:
+          TransactionType.fromValue(json['type'] as String) ??
+          TransactionType.person,
       bankId: json['bank_id'] as String?,
       bankName: json['bank_name'] as String?,
       cashRegisterId: json['cash_register_id'] as String?,
@@ -212,6 +239,16 @@ class InvoiceTransaction {
       personName: json['person_name'] as String?,
       accountId: json['account_id'] as String?,
       accountName: json['account_name'] as String?,
+      detailType: json['detail_type'] as String? ?? _detailTypeFromJson(json),
+      detailId: _detailIdFromJson(json)?.toString(),
+      detailName:
+          json['detail_name'] as String? ??
+          json['person_name'] as String? ??
+          json['product_name'] as String? ??
+          json['bank_account_name'] as String? ??
+          json['cash_register_name'] as String? ??
+          json['petty_cash_name'] as String? ??
+          json['check_number'] as String?,
       transactionDate: DateTime.parse(json['transaction_date'] as String),
       amount: json['amount'] as num,
       commission: json['commission'] as num?,
@@ -225,3 +262,35 @@ class InvoiceTransaction {
 }
 
 const Object _unset = Object();
+
+String? _detailKeyForType(String? type) => switch (type) {
+  'person' => 'person_id',
+  'product' => 'product_id',
+  'bank_account' => 'bank_account_id',
+  'cash_register' => 'cash_register_id',
+  'petty_cash' => 'petty_cash_id',
+  'check' => 'check_id',
+  _ => null,
+};
+
+String? _detailTypeFromJson(Map<String, dynamic> json) {
+  if (json['type'] != 'account') return null;
+  for (final type in [
+    'person',
+    'product',
+    'bank_account',
+    'cash_register',
+    'petty_cash',
+    'check',
+  ]) {
+    if (json['${type}_id'] != null) return type;
+  }
+  return null;
+}
+
+dynamic _detailIdFromJson(Map<String, dynamic> json) {
+  final key = _detailKeyForType(
+    json['detail_type'] as String? ?? _detailTypeFromJson(json),
+  );
+  return key == null ? null : json[key];
+}

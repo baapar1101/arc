@@ -35,6 +35,40 @@ import jdatetime
 logger = logging.getLogger(__name__)
 
 
+def _invoice_account_detail_ids(db: Session, business_id: int, account_line: Dict[str, Any]) -> Dict[str, Optional[int]]:
+    """Resolve and tenant-check optional details attached to an invoice account payment."""
+    from adapters.db.models.product import Product
+    from adapters.db.models.bank_account import BankAccount
+    from adapters.db.models.cash_register import CashRegister
+    from adapters.db.models.petty_cash import PettyCash
+
+    models = {
+        "person_id": Person,
+        "product_id": Product,
+        "bank_account_id": BankAccount,
+        "cash_register_id": CashRegister,
+        "petty_cash_id": PettyCash,
+        "check_id": Check,
+    }
+    resolved: Dict[str, Optional[int]] = {key: None for key in models}
+    supplied = [(key, account_line.get(key)) for key in models if account_line.get(key) is not None]
+    if len(supplied) > 1:
+        raise ApiError("INVALID_ACCOUNT_DETAIL", "Only one account detail may be selected", http_status=400)
+    for key, raw_id in supplied:
+        try:
+            detail_id = int(raw_id)
+        except (TypeError, ValueError):
+            raise ApiError("INVALID_ACCOUNT_DETAIL", "Invalid account detail ID", http_status=400)
+        detail = db.query(models[key]).filter(
+            models[key].id == detail_id,
+            models[key].business_id == business_id,
+        ).first()
+        if detail is None:
+            raise ApiError("INVALID_ACCOUNT_DETAIL", "Account detail was not found for this business", http_status=400)
+        resolved[key] = detail_id
+    return resolved
+
+
 # نوع‌های سند
 DOCUMENT_TYPE_RECEIPT = "receipt"  # دریافت
 DOCUMENT_TYPE_PAYMENT = "payment"  # پرداخت
@@ -927,14 +961,21 @@ def create_receipt_payment(
             except Exception:
                 resolved_check_id = None
 
+        detail_ids = _invoice_account_detail_ids(db, business_id, account_line) if transaction_type == "account" else {}
+        if transaction_type == "account" and account_line.get("detail_name"):
+            extra_info["detail_name"] = str(account_line["detail_name"])
+        if transaction_type == "account" and account_line.get("detail_type"):
+            extra_info["detail_type"] = str(account_line["detail_type"])
+
         line = DocumentLine(
             document_id=document.id,
             account_id=account.id,
-            person_id=person_id_for_line,
-            bank_account_id=bank_account_id,
-            cash_register_id=account_line.get("cash_register_id"),
-            petty_cash_id=account_line.get("petty_cash_id"),
-            check_id=resolved_check_id,
+            person_id=person_id_for_line or detail_ids.get("person_id"),
+            product_id=detail_ids.get("product_id"),
+            bank_account_id=bank_account_id or detail_ids.get("bank_account_id"),
+            cash_register_id=account_line.get("cash_register_id") or detail_ids.get("cash_register_id"),
+            petty_cash_id=account_line.get("petty_cash_id") or detail_ids.get("petty_cash_id"),
+            check_id=resolved_check_id or detail_ids.get("check_id"),
             quantity=account_line.get("quantity"),
             debit=debit_amount,
             credit=credit_amount,
@@ -2196,14 +2237,21 @@ def update_receipt_payment(
             except Exception:
                 resolved_check_id = None
 
+        detail_ids = _invoice_account_detail_ids(db, business_id, account_line) if transaction_type == "account" else {}
+        if transaction_type == "account" and account_line.get("detail_name"):
+            extra_info["detail_name"] = str(account_line["detail_name"])
+        if transaction_type == "account" and account_line.get("detail_type"):
+            extra_info["detail_type"] = str(account_line["detail_type"])
+
         line = DocumentLine(
             document_id=document.id,
             account_id=account.id,
-            person_id=person_id_for_line,
-            bank_account_id=bank_account_id,
-            cash_register_id=account_line.get("cash_register_id"),
-            petty_cash_id=account_line.get("petty_cash_id"),
-            check_id=resolved_check_id,
+            person_id=person_id_for_line or detail_ids.get("person_id"),
+            product_id=detail_ids.get("product_id"),
+            bank_account_id=bank_account_id or detail_ids.get("bank_account_id"),
+            cash_register_id=account_line.get("cash_register_id") or detail_ids.get("cash_register_id"),
+            petty_cash_id=account_line.get("petty_cash_id") or detail_ids.get("petty_cash_id"),
+            check_id=resolved_check_id or detail_ids.get("check_id"),
             quantity=account_line.get("quantity"),
             debit=debit_amount,
             credit=credit_amount,
@@ -2709,8 +2757,16 @@ def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
         if is_commission_line:
             # خط کارمزد - در account_lines قرار می‌گیرد
             account_lines.append(line_dict)
-        elif (line.extra_info and line.extra_info.get("person_id")) or (
-            line.person_id and account.account_type == "person"
+        elif (
+            not (
+                line.extra_info
+                and line.extra_info.get("transaction_type") == "account"
+                and line.extra_info.get("detail_type")
+            )
+            and (
+                (line.extra_info and line.extra_info.get("person_id"))
+                or (line.person_id and account.account_type == "person")
+            )
         ):
             # خط شخص: یا extra_info دارای person_id است، یا ستون person_id پر است و حساب از نوع شخص (دریافتنی/پرداختنی)
             # برای داده‌های قدیمی که فقط person_id در ستون دارند، بدون نیاز به extra_info هم درست نمایش داده می‌شود

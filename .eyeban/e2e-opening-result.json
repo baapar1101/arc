@@ -1,0 +1,52 @@
+﻿{
+  "success": true,
+  "businessId": 6823,
+  "businessName": "holoo-e2e-opening-20260924-132053",
+  "currencyId": 1,
+  "openingDoneKeys": [
+    "OB:6894"
+  ],
+  "openingFailed": {},
+  "manualDone": 26,
+  "manualFailed": 0,
+  "manualFailedSample": {},
+  "invoiceDone": 1373,
+  "invoiceFailed": 0,
+  "invoiceFailedSample": {},
+  "receiptsDone": 24,
+  "receiptsFailed": 0,
+  "checksDone": 16,
+  "checksFailed": 0,
+  "expenseDone": 19,
+  "expenseFailed": 0,
+  "checkpointPath": "C:\\Users\\babak\\AppData\\Local\\Holoo2Hesabix\\checkpoints\\biz6823_Holoo1.json",
+  "profilePath": "C:\\Users\\babak\\AppData\\Local\\Holoo2Hesabix\\profiles\\sarfasl_biz6823_Holoo1.json",
+  "proofPath": "C:\\Users\\babak\\AppData\\Local\\Holoo2Hesabix\\proofs\\proof_biz6823_Holoo1_20260924_150057.json",
+  "unmappedCount": 0,
+  "fiscalYears": [
+    {
+      "title": "سال مالی 1402",
+      "hesabixId": 6894,
+      "start": "2023-03-21",
+      "end": "2024-03-20"
+    },
+    {
+      "title": "سال مالی 1403",
+      "hesabixId": 6895,
+      "start": "2024-03-21",
+      "end": "2025-03-20"
+    },
+    {
+      "title": "سال مالی 1404",
+      "hesabixId": 6896,
+      "start": "2025-03-21",
+      "end": "2026-03-20"
+    },
+    {
+      "title": "سال مالی 1405",
+      "hesabixId": 6897,
+      "start": "2026-03-21",
+      "end": "2027-03-20"
+    }
+  ]
+}

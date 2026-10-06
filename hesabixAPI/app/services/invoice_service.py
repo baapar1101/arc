@@ -2325,6 +2325,10 @@ def _build_invoice_payment_account_line(p: Dict[str, Any]) -> Optional[Dict[str,
         "check_number",
         "person_id",
         "account_id",
+        "product_id",
+        "bank_account_id",
+        "detail_type",
+        "detail_name",
     ):
         if p.get(key) is not None:
             account_line[key] = p.get(key)
