@@ -5,10 +5,8 @@ on:
   schedule:
     - cron: "17 */6 * * *"
   push:
-    branches:
-      - master
-    paths:
-      - .github/workflows/sync-hesabix.yml
+    branches: [master]
+    paths: [.github/workflows/sync-hesabix.yml]
 
 permissions:
   contents: write
@@ -20,199 +18,138 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GIT_TERMINAL_PROMPT: '0'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: master
           fetch-depth: 0
 
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-      - name: Fetch Hesabix upstream
-        run: |
-          git remote remove upstream 2>/dev/null || true
-          git remote add upstream https://source.hesabix.ir/hesabix/arc.git
-          git fetch upstream master --tags --prune
-
-      - name: Merge upstream while preserving custom UI
+      # Never merge upstream into master here. Conflict-free Git merges still
+      # require source review and regression validation before integration.
+      - name: Fetch and fast-forward upstream mirror
+        id: mirror
         shell: bash
         run: |
           set -euo pipefail
-          git checkout master
-
-          apply_glass_modals() {
-            python3 - <<'PY'
-          from pathlib import Path
-          import re
-          
-          root = Path("hesabixUI/hesabix_ui/lib")
-          glass_file = root / "theme" / "glass.dart"
-          dialog_re = re.compile(r"\bshowDialog(?=\s*(?:<|\())")
-          sheet_re = re.compile(r"\bshowModalBottomSheet(?=\s*(?:<|\())")
-          glass_import_re = re.compile(
-              r"^import\s+['\"][^'\"]*theme/glass\.dart['\"];\s*$",
-              re.MULTILINE,
-          )
-          first_import_re = re.compile(r"^import\s+['\"][^'\"]+['\"];\s*$", re.MULTILINE)
-          package_import = "import 'package:hesabix_ui/theme/glass.dart';\n"
-          
-          changed = []
-          for path in root.rglob("*.dart"):
-              if path == glass_file or path.name.endswith(".dart.backup"):
-                  continue
-          
-              original = path.read_text(encoding="utf-8")
-              updated = dialog_re.sub("showGlassDialog", original)
-              updated = sheet_re.sub("showGlassModalBottomSheet", updated)
-          
-              if updated == original:
-                  continue
-          
-              if not glass_import_re.search(updated):
-                  match = first_import_re.search(updated)
-                  if match:
-                      updated = updated[:match.start()] + package_import + updated[match.start():]
-                  else:
-                      updated = package_import + updated
-          
-              path.write_text(updated, encoding="utf-8")
-              changed.append(str(path))
-          
-          print(f"Glass-normalized {len(changed)} Dart files")
-          for item in changed:
-              print(item)
-          PY
-          }
-
-          if git merge-base --is-ancestor upstream/master HEAD; then
-            echo "Already contains current upstream master."
-            apply_glass_modals
-            if ! git diff --quiet; then
-              git add hesabixUI/hesabix_ui/lib
-              git commit -m "Reapply glass modals across updated UI"
-              git push origin master
+          git config core.hooksPath /dev/null
+          git remote add hesabix https://source.hesabix.ir/hesabix/arc.git
+          fetched=false
+          for attempt in 1 2 3; do
+            if timeout 180 git fetch --no-tags hesabix refs/heads/master:refs/remotes/hesabix/master; then
+              fetched=true
+              break
             fi
-            exit 0
-          fi
-
-          LOCAL_HEAD="$(git rev-parse HEAD)"
-          UPSTREAM_HEAD="$(git rev-parse upstream/master)"
-
-          echo "Merging upstream ${UPSTREAM_HEAD} into ${LOCAL_HEAD}"
-          set +e
-          git merge --no-ff --no-commit upstream/master
-          MERGE_RC=$?
-          set -e
-
-          mapfile -t CONFLICTS < <(git diff --name-only --diff-filter=U)
-          echo "Conflict count: ${#CONFLICTS[@]}"
-
-          for file in "${CONFLICTS[@]}"; do
-            case "$file" in
-              hesabixUI/hesabix_ui/lib/main.dart)
-                echo "::error::main.dart has an upstream conflict and needs explicit integration."
-                exit 1
-                ;;
-              .github/*|\
-              hesabixUI/hesabix_ui/lib/theme/*|\
-              hesabixUI/hesabix_ui/lib/pages/login_page.dart|\
-              hesabixUI/hesabix_ui/web/index.html|\
-              hesabixUI/hesabix_ui/web/favicon.ico|\
-              hesabixUI/hesabix_ui/web/favicon.png|\
-              hesabixUI/hesabix_ui/web/icons/*|\
-              hesabixUI/hesabix_ui/web/images/*|\
-              hesabixUI/hesabix_ui/web/assets/images/*|\
-              hesabixUI/hesabix_ui/lib/widgets/auth_footer.dart|\
-              hesabixUI/hesabix_ui/lib/config/brand_config.dart|\
-              hesabixUI/hesabix_ui/pubspec.yaml|\
-              hesabixUI/hesabix_ui/lib/utils/error_extractor.dart|\
-              hesabixUI/hesabix_ui/assets/images/*|\
-              hesabixUI/hesabix_ui/android/app/src/main/res/drawable*/ic_*|\
-              hesabixUI/hesabix_ui/android/app/src/main/res/mipmap*/ic_*|\
-              hesabixUI/hesabix_ui/android/app/src/main/res/values*/strings.xml|\
-              hesabixUI/hesabix_ui/ios/Runner/Assets.xcassets/AppIcon.appiconset/*|\
-              hesabixUI/hesabix_ui/ios/Runner/Info.plist|\
-              hesabixUI/hesabix_ui/macos/Runner/Assets.xcassets/AppIcon.appiconset/*|\
-              hesabixUI/hesabix_ui/windows/runner/resources/app_icon.ico|\
-              build_web.sh)
-                echo "KEEP PRESENTATION: $file"
-                git checkout --ours -- "$file"
-                ;;
-              *)
-                echo "TAKE UPSTREAM FUNCTIONAL SOURCE: $file"
-                git checkout --theirs -- "$file"
-                ;;
-            esac
-            git add -- "$file"
+            sleep 10
           done
-
-          # Even when Git merged these cleanly, the fork owns these presentation
-          # files. Restore them exactly from the pre-merge local head.
-          git checkout "$LOCAL_HEAD" -- \
-            .github \
-            hesabixUI/hesabix_ui/lib/theme \
-            hesabixUI/hesabix_ui/lib/pages/login_page.dart \
-            hesabixUI/hesabix_ui/web/index.html \
-            hesabixUI/hesabix_ui/web/favicon.ico \
-            hesabixUI/hesabix_ui/web/favicon.png \
-            hesabixUI/hesabix_ui/web/icons \
-            hesabixUI/hesabix_ui/web/images \
-            hesabixUI/hesabix_ui/web/assets/images \
-            hesabixUI/hesabix_ui/lib/widgets/auth_footer.dart \
-            hesabixUI/hesabix_ui/lib/config/brand_config.dart \
-            hesabixUI/hesabix_ui/pubspec.yaml \
-            hesabixUI/hesabix_ui/lib/utils/error_extractor.dart \
-            hesabixUI/hesabix_ui/assets/images \
-            hesabixUI/hesabix_ui/android/app/src/main/res \
-            hesabixUI/hesabix_ui/ios/Runner/Assets.xcassets/AppIcon.appiconset \
-            hesabixUI/hesabix_ui/ios/Runner/Info.plist \
-            hesabixUI/hesabix_ui/macos/Runner/Assets.xcassets/AppIcon.appiconset \
-            hesabixUI/hesabix_ui/windows/runner/resources/app_icon.ico \
-            build_web.sh
-          git add \
-            .github \
-            hesabixUI/hesabix_ui/lib/theme \
-            hesabixUI/hesabix_ui/lib/pages/login_page.dart \
-            hesabixUI/hesabix_ui/web/index.html \
-            hesabixUI/hesabix_ui/web/favicon.ico \
-            hesabixUI/hesabix_ui/web/favicon.png \
-            hesabixUI/hesabix_ui/web/icons \
-            hesabixUI/hesabix_ui/web/images \
-            hesabixUI/hesabix_ui/web/assets/images \
-            hesabixUI/hesabix_ui/lib/widgets/auth_footer.dart \
-            hesabixUI/hesabix_ui/lib/config/brand_config.dart \
-            hesabixUI/hesabix_ui/pubspec.yaml \
-            hesabixUI/hesabix_ui/lib/utils/error_extractor.dart \
-            hesabixUI/hesabix_ui/assets/images \
-            hesabixUI/hesabix_ui/android/app/src/main/res \
-            hesabixUI/hesabix_ui/ios/Runner/Assets.xcassets/AppIcon.appiconset \
-            hesabixUI/hesabix_ui/ios/Runner/Info.plist \
-            hesabixUI/hesabix_ui/macos/Runner/Assets.xcassets/AppIcon.appiconset \
-            hesabixUI/hesabix_ui/windows/runner/resources/app_icon.ico \
-            build_web.sh
-
-          if git diff --name-only --diff-filter=U | grep -q .; then
-            echo "::error::Unresolved merge conflicts remain."
-            git diff --name-only --diff-filter=U
+          if [ "$fetched" != true ]; then
+            echo '::error::Cannot fetch current Hesabix master; neither mirror nor master was updated.'
             exit 1
           fi
-
-          apply_glass_modals
-          git add hesabixUI/hesabix_ui/lib
-
-          if git diff --cached --quiet; then
-            echo "Merge produced no tree changes."
-            git merge --abort 2>/dev/null || true
-            exit 0
+          git fetch --no-tags origin refs/heads/master:refs/remotes/origin/master refs/heads/hesabix-upstream:refs/remotes/origin/hesabix-upstream
+          BASE="$(git rev-parse refs/remotes/origin/master)"
+          OLD="$(git rev-parse refs/remotes/origin/hesabix-upstream)"
+          NEW="$(git rev-parse refs/remotes/hesabix/master)"
+          if ! git merge-base --is-ancestor "$OLD" "$NEW"; then
+            echo '::error::Upstream history diverged; refusing to overwrite the existing mirror.'
+            exit 1
           fi
+          if [ "$OLD" != "$NEW" ]; then
+            git push --atomic origin "$OLD:refs/heads/backup/hesabix-upstream-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" "$NEW:refs/heads/hesabix-upstream"
+          fi
+          REMOTE="$(git ls-remote origin refs/heads/hesabix-upstream | cut -f1)"
+          test "$REMOTE" = "$NEW"
+          printf 'base=%s\nold=%s\nupstream=%s\n' "$BASE" "$OLD" "$NEW" >> "$GITHUB_OUTPUT"
+          echo "Verified mirror: $OLD -> $NEW; comparison base: $BASE"
 
-          git commit -m "Merge Hesabix upstream ${UPSTREAM_HEAD:0:12} preserving custom UI"
-          git push origin master
-
-      - name: Push upstream tags
-        if: success()
+      - name: Audit incoming changes and merge conflicts
+        env:
+          BASE_SHA: ${{ steps.mirror.outputs.base }}
+          OLD_SHA: ${{ steps.mirror.outputs.old }}
+          UPSTREAM_SHA: ${{ steps.mirror.outputs.upstream }}
+        shell: bash
         run: |
-          git push origin --tags
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+
+          def git(*args, check=True):
+              return subprocess.run(['git', *args], check=check, capture_output=True, text=True)
+
+          base, old, upstream = (os.environ[k] for k in ('BASE_SHA', 'OLD_SHA', 'UPSTREAM_SHA'))
+          out = Path(os.environ['RUNNER_TEMP']) / 'hesabix-upstream-audit'
+          out.mkdir(parents=True, exist_ok=True)
+          common = git('merge-base', base, upstream).stdout.strip()
+          fork_only, incoming = map(int, git('rev-list', '--left-right', '--count', f'{base}...{upstream}').stdout.split())
+          names = git('diff', '--no-ext-diff', '--no-textconv', '--name-status', common, upstream).stdout
+          incoming_paths = git('diff', '--no-ext-diff', '--name-only', '-z', common, upstream).stdout.rstrip('\0').split('\0') if incoming else []
+          mirror_commits = int(git('rev-list', '--count', f'{old}..{upstream}').stdout)
+          protected = (
+              '.github/', 'hesabixUI/hesabix_ui/lib/theme/',
+              'hesabixUI/hesabix_ui/lib/pages/login_page.dart',
+              'hesabixUI/hesabix_ui/lib/main.dart',
+              'hesabixUI/hesabix_ui/lib/pages/business/business_shell.dart',
+              'hesabixUI/hesabix_ui/lib/config/',
+              'hesabixUI/hesabix_ui/pubspec.', 'hesabixUI/hesabix_ui/web/',
+              'hesabixUI/hesabix_ui/assets/images/', 'build_web.sh',
+          )
+          report = dict(base_sha=base, old_mirror_sha=old, upstream_sha=upstream,
+                        merge_base=common, mirrored_commits=mirror_commits,
+                        fork_only_commits=fork_only, incoming_commits=incoming,
+                        incoming_files=incoming_paths,
+                        protected_paths_changed=[p for p in incoming_paths if p.startswith(protected)],
+                        conflicts=[], master_updated=False, validation='not_run')
+          # Detached preview only: no commit, no conflict auto-resolution, no
+          # upstream scripts, no push to master, and no imported upstream tags.
+          original = git('rev-parse', 'HEAD').stdout.strip()
+          try:
+              git('checkout', '--detach', base)
+              preview = git('-c', 'user.name=Upstream Audit', '-c', 'user.email=audit@localhost',
+                            'merge', '--no-ff', '--no-commit', upstream, check=False)
+              conflict_text = git('diff', '--name-only', '--diff-filter=U', '-z').stdout
+              report['conflicts'] = [p for p in conflict_text.split('\0') if p]
+              if preview.returncode not in (0, 1) or (preview.returncode == 1 and not report['conflicts']):
+                  report['decision'] = 'merge_preview_failed'
+                  raise RuntimeError('Git merge preview failed unexpectedly; master was not changed')
+              report['merge_clean'] = preview.returncode == 0 and not report['conflicts']
+              report['decision'] = ('already_integrated' if incoming == 0 else
+                                    'blocked_conflicts' if report['conflicts'] else
+                                    'requires_source_review_and_tests')
+              report['effective_files'] = git('diff', '--cached', '--name-only', '-z').stdout.rstrip('\0').split('\0') if incoming else []
+              (out / 'incoming-files.tsv').write_text(names, encoding='utf-8')
+              (out / 'merge-preview-files.tsv').write_text(git('diff', '--cached', '--name-status').stdout, encoding='utf-8')
+          finally:
+              git('merge', '--abort', check=False)
+              git('checkout', '--detach', original)
+              (out / 'report.json').write_text(json.dumps(report, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+          summary = '\n'.join([
+              '# Hesabix upstream sync and review',
+              f'- Source: `{upstream}`', f'- Previous mirror: `{old}`',
+              f'- Master inspected: `{base}`', f'- New mirrored commits: {mirror_commits}',
+              f'- Incoming commits not in master: {incoming}',
+              f'- Fork-only commits retained: {fork_only}',
+              f'- Incoming changed files: {len(incoming_paths)}',
+              f'- Conflicted files: {len(report["conflicts"])}',
+              f'- Decision: **{report["decision"]}**',
+              '- Application master and release tags were not modified.',
+          ]) + '\n'
+          (out / 'SUMMARY.md').write_text(summary, encoding='utf-8')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as stream:
+              stream.write(summary)
+          print(json.dumps(report, indent=2, ensure_ascii=False))
+          PY
+
+      - name: Upload upstream review report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hesabix-upstream-audit-${{ github.run_id }}
+          path: ${{ runner.temp }}/hesabix-upstream-audit/
+          if-no-files-found: warn
+          retention-days: 30
