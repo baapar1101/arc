@@ -60,6 +60,7 @@ adapters/api/v1/petty_cash.py
 adapters/api/v1/ping_pong.py
 adapters/api/v1/price_lists.py
 adapters/api/v1/product_attributes.py
+adapters/api/v1/product_bundles.py
 adapters/api/v1/product_instances.py
 adapters/api/v1/products.py
 adapters/api/v1/profile_dashboard.py
@@ -171,6 +172,7 @@ adapters/api/v1/schema_models/price_list.py
 adapters/api/v1/schema_models/product.py
 adapters/api/v1/schema_models/product_attribute.py
 adapters/api/v1/schema_models/product_bom.py
+adapters/api/v1/schema_models/product_bundle.py
 adapters/api/v1/schema_models/project.py
 adapters/api/v1/schema_models/receipt_payment.py
 adapters/api/v1/schema_models/repair_shop.py
@@ -297,6 +299,7 @@ adapters/db/models/product.py
 adapters/db/models/product_attribute.py
 adapters/db/models/product_attribute_link.py
 adapters/db/models/product_bom.py
+adapters/db/models/product_bundle.py
 adapters/db/models/product_general_barcode_alias.py
 adapters/db/models/product_instance.py
 adapters/db/models/product_supplier.py
@@ -608,6 +611,7 @@ app/services/notification_outbox_monitoring_service.py
 app/services/notification_processor.py
 app/services/notification_service.py
 app/services/opening_balance_service.py
+app/services/opening_balance_warehouse_sync_service.py
 app/services/otp_login_service.py
 app/services/parsian_gateway.py
 app/services/password_reset_otp_service.py
@@ -635,6 +639,7 @@ app/services/print_stamp_scale.py
 app/services/print_tax_discount_display.py
 app/services/product_attribute_service.py
 app/services/product_bulk_upsert_service.py
+app/services/product_bundle_service.py
 app/services/product_catalog_profile_service.py
 app/services/product_commercial_insights_service.py
 app/services/product_excel_export_service.py
@@ -1227,6 +1232,7 @@ migrations/versions/20260902_000002_distribution_target_product_key.py
 migrations/versions/20260906_000001_distribution_map_tile_source.py
 migrations/versions/20260907_000001_distribution_live_location.py
 migrations/versions/20260907_000002_distribution_field_ops_upgrade.py
+migrations/versions/20261003_000001_product_bundles.py
 tests/__init__.py
 tests/test_account_balance_core.py
 tests/test_account_tree_roots.py
@@ -1365,6 +1371,7 @@ tests/test_invoice_payment_remaining.py
 tests/test_invoice_person_id_header.py
 tests/test_invoice_profit_costing.py
 tests/test_invoice_receipt_pdf_template.py
+tests/test_invoice_stock_prevalidation.py
 tests/test_invoice_tag_service.py
 tests/test_invoice_tax_snapshot_refresh.py
 tests/test_invoice_tax_type_change_guard.py
@@ -1379,6 +1386,7 @@ tests/test_moadian_api_version_selection.py
 tests/test_moadian_plugin_license_gate.py
 tests/test_moadian_v2_client.py
 tests/test_notification_event_type_defaults.py
+tests/test_opening_balance_warehouse_sync.py
 tests/test_parsian_gateway.py
 tests/test_payroll_accounting_lines.py
 tests/test_payroll_plugin_license_gate.py
