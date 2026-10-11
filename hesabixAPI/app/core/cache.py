@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+import threading
 from datetime import date, datetime
 from decimal import Decimal
 from functools import wraps
@@ -18,6 +19,27 @@ logger = logging.getLogger(__name__)
 
 # Global Redis client instance
 _redis_client: Optional[redis.Redis] = None
+_redis_lock = threading.RLock()
+_redis_config: Optional[dict[str, Any]] = None
+_redis_config_expires_at = 0.0
+_redis_retry_at = 0.0
+_REDIS_CONFIG_TTL = 30.0
+_REDIS_RETRY_DELAY = 10.0
+
+
+def invalidate_redis_configuration_cache() -> None:
+	"""Expire process-local Redis settings after an administrator changes them."""
+	global _redis_config, _redis_config_expires_at, _redis_retry_at, _redis_client
+	with _redis_lock:
+		_redis_config = None
+		_redis_config_expires_at = 0.0
+		_redis_retry_at = 0.0
+		if _redis_client is not None:
+			try:
+				_redis_client.close()
+			except Exception:
+				pass
+			_redis_client = None
 
 
 def _json_serializer(obj: Any) -> Any:
@@ -40,77 +62,66 @@ def _json_serializer(obj: Any) -> Any:
 
 def get_redis_client(force_reconnect: bool = False) -> Optional[redis.Redis]:
 	"""Get or create Redis client instance"""
-	global _redis_client
-	
-	if _redis_client is not None and not force_reconnect:
-		return _redis_client
-	
-	settings = get_settings()
-	
-	# تلاش برای خواندن تنظیمات از DB (اگر در دسترس باشد)
-	redis_enabled = getattr(settings, 'redis_enabled', False)
-	redis_host = getattr(settings, 'redis_host', 'localhost')
-	redis_port = getattr(settings, 'redis_port', 6379)
-	redis_db = getattr(settings, 'redis_db', 0)
-	redis_password = getattr(settings, 'redis_password', None)
-	
-	# خواندن از DB اگر در دسترس باشد - استفاده از context manager برای جلوگیری از connection leak
-	try:
-		from adapters.db.session import get_db_session
-		from app.services.system_settings_service import get_redis_configuration
-		with get_db_session() as db:
-			redis_config = get_redis_configuration(db)
-			redis_enabled = redis_config.get('enabled', False)
-			redis_host = redis_config.get('host', 'localhost')
-			redis_port = redis_config.get('port', 6379)
-			redis_db = redis_config.get('db', 0)
-			redis_password = redis_config.get('password')
-	except Exception:
-		# اگر DB در دسترس نبود، از env استفاده می‌کنیم
-		pass
-	
-	# اگر Redis غیرفعال باشد، None برمی‌گردانیم
-	if not redis_enabled:
-		if _redis_client is not None:
+	global _redis_client, _redis_config, _redis_config_expires_at, _redis_retry_at
+	with _redis_lock:
+		now = time.monotonic()
+		if _redis_client is not None and not force_reconnect:
+			return _redis_client
+		if _redis_client is not None and force_reconnect:
 			try:
 				_redis_client.close()
 			except Exception:
 				pass
 			_redis_client = None
-		return None
-	
-	try:
-		# بستن اتصال قبلی اگر وجود داشت
-		if _redis_client is not None:
+		if not force_reconnect and now < _redis_retry_at:
+			return None
+
+		if _redis_config is None or now >= _redis_config_expires_at:
+			settings = get_settings()
+			_redis_config = {
+				"enabled": getattr(settings, "redis_enabled", False),
+				"host": getattr(settings, "redis_host", "localhost"),
+				"port": getattr(settings, "redis_port", 6379),
+				"db": getattr(settings, "redis_db", 0),
+				"password": getattr(settings, "redis_password", None),
+			}
 			try:
-				_redis_client.close()
+				from adapters.db.session import get_db_session
+				from app.services.system_settings_service import get_redis_configuration
+				with get_db_session() as db:
+					_redis_config = get_redis_configuration(db)
 			except Exception:
-				pass
-		
-		_redis_client = redis.Redis(
-			host=redis_host,
-			port=redis_port,
-			db=redis_db,
-			password=redis_password,
-			decode_responses=True,  # برای کار با string ها
-			socket_connect_timeout=2,
-			socket_timeout=2,
-			retry_on_timeout=True,
-			health_check_interval=30
-		)
-		
-		# تست اتصال
-		_redis_client.ping()
-		logger.info(f"Redis connected successfully to {redis_host}:{redis_port}")
-		return _redis_client
-	except (RedisConnectionError, RedisError) as e:
-		logger.warning(f"Redis connection failed: {e}. Cache will be disabled.")
-		_redis_client = None
-		return None
-	except Exception as e:
-		logger.error(f"Unexpected error connecting to Redis: {e}", exc_info=True)
-		_redis_client = None
-		return None
+				pass  # fall back to environment settings
+			_redis_config_expires_at = now + _REDIS_CONFIG_TTL
+
+		redis_enabled = _redis_config.get("enabled", False)
+		if not redis_enabled:
+			_redis_retry_at = _redis_config_expires_at
+			return None
+
+		try:
+			config = _redis_config
+			client = redis.Redis(
+				host=config.get("host", "localhost"), port=config.get("port", 6379),
+				db=config.get("db", 0), password=config.get("password"),
+				decode_responses=True, socket_connect_timeout=2, socket_timeout=2,
+				retry_on_timeout=True, health_check_interval=30,
+			)
+			client.ping()
+			_redis_client = client
+			_redis_retry_at = 0.0
+			logger.info("Redis connected successfully to %s:%s", config.get("host"), config.get("port"))
+			return _redis_client
+		except (RedisConnectionError, RedisError) as e:
+			logger.warning("Redis connection failed: %s. Cache will be disabled.", e)
+			_redis_client = None
+			_redis_retry_at = now + _REDIS_RETRY_DELAY
+			return None
+		except Exception as e:
+			logger.error("Unexpected error connecting to Redis: %s", e, exc_info=True)
+			_redis_client = None
+			_redis_retry_at = now + _REDIS_RETRY_DELAY
+			return None
 
 
 class CacheService:

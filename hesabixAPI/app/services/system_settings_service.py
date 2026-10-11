@@ -1370,11 +1370,31 @@ def get_redis_configuration(db: Session) -> Dict[str, Any]:
 	"""
 	env = get_settings()
 	
-	redis_enabled = _get_setting_bool(db, REDIS_CONFIG_ENABLED)
-	redis_host = _get_setting(db, REDIS_CONFIG_HOST)
-	redis_port = _get_setting_int(db, REDIS_CONFIG_PORT)
-	redis_db = _get_setting_int(db, REDIS_CONFIG_DB)
-	redis_password = _get_setting(db, REDIS_CONFIG_PASSWORD)
+	keys = (REDIS_CONFIG_ENABLED, REDIS_CONFIG_HOST, REDIS_CONFIG_PORT, REDIS_CONFIG_DB, REDIS_CONFIG_PASSWORD)
+	settings = {
+		setting.key: setting
+		for setting in db.execute(select(SystemSetting).where(SystemSetting.key.in_(keys))).scalars()
+	}
+	enabled_setting = settings.get(REDIS_CONFIG_ENABLED)
+	redis_enabled = None
+	if enabled_setting and enabled_setting.value_string is not None:
+		redis_enabled = enabled_setting.value_string.strip().lower() in {"1", "true", "yes", "on"}
+
+	def setting_int(key: str) -> Optional[int]:
+		setting = settings.get(key)
+		if setting and setting.value_int is not None:
+			return setting.value_int
+		if setting and setting.value_string is not None:
+			try:
+				return int(setting.value_string.strip())
+			except (ValueError, TypeError):
+				return None
+		return None
+
+	redis_host = settings.get(REDIS_CONFIG_HOST)
+	redis_password = settings.get(REDIS_CONFIG_PASSWORD)
+	redis_port = setting_int(REDIS_CONFIG_PORT)
+	redis_db = setting_int(REDIS_CONFIG_DB)
 	
 	return {
 		"enabled": (redis_enabled if redis_enabled is not None else getattr(env, 'redis_enabled', False)),
@@ -1430,14 +1450,9 @@ def set_redis_configuration(
 	
 	db.commit()
 	
-	# Invalidate cache و reconnect Redis client
-	from app.core.cache import get_cache
+	# Invalidate process-local settings and reconnect Redis client.
 	import app.core.cache as cache_module
-	
-	# Force reconnect Redis client
-	cache_module._redis_client = None
-	
-	# Refresh cache service
+	cache_module.invalidate_redis_configuration_cache()
 	cache = get_cache()
 	# حذف تمام cache برای reconnect
 	if cache.enabled:

@@ -4,7 +4,7 @@ from typing import Callable, Any, Optional
 import time
 import logging
 import traceback
-import inspect
+import os
 from contextvars import ContextVar
 
 from sqlalchemy import create_engine, text, event
@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 # Context variable برای ذخیره اطلاعات request
 _request_context: ContextVar[Optional[dict]] = ContextVar('request_context', default=None)
+_capture_checkout_stacks = os.getenv("HESABIX_CAPTURE_DB_CHECKOUT_STACKS", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 
 class Base(DeclarativeBase):
@@ -98,25 +99,21 @@ def receive_checkout(dbapi_conn, connection_record, connection_proxy):
 	connection_id = id(dbapi_conn)
 	current_time = time.time()
 	
-	# گرفتن stack trace برای تشخیص محل checkout
-	stack_frames = []
-	try:
-		stack = inspect.stack()
-		# گرفتن 15 فریم اول برای پیدا کردن فریم‌های مربوط به کد ما
-		for frame_info in stack[1:16]:
-			filename = frame_info.filename
-			lineno = frame_info.lineno
-			function = frame_info.function
-			# فقط فریم‌های مربوط به کد ما را نگه دار (بدون site-packages و __pycache__)
-			if 'hesabixAPI' in filename and 'site-packages' not in filename and '__pycache__' not in filename:
-				# تبدیل مسیر کامل به مسیر نسبی
-				relative_path = filename
-				if '/var/www/ark/hesabixAPI/' in filename:
-					relative_path = filename.split('/var/www/ark/hesabixAPI/')[-1]
-				stack_frames.append(f"{relative_path}:{lineno} in {function}")
-		stack_trace = "\n".join(stack_frames[:5]) if stack_frames else "No stack frames found"
-	except Exception as e:
-		stack_trace = f"Error getting stack trace: {e}"
+	# Stack inspection is useful for diagnosing leaks, but expensive on every checkout.
+	stack_trace = "Disabled (set HESABIX_CAPTURE_DB_CHECKOUT_STACKS=true to enable)"
+	if _capture_checkout_stacks:
+		try:
+			stack_frames = []
+			for frame in traceback.extract_stack(limit=16)[:-1]:
+				filename = frame.filename
+				if 'hesabixAPI' in filename and 'site-packages' not in filename and '__pycache__' not in filename:
+					relative_path = filename
+					if '/var/www/ark/hesabixAPI/' in filename:
+						relative_path = filename.split('/var/www/ark/hesabixAPI/')[-1]
+					stack_frames.append(f"{relative_path}:{frame.lineno} in {frame.name}")
+			stack_trace = "\n".join(stack_frames[-5:]) if stack_frames else "No stack frames found"
+		except Exception as e:
+			stack_trace = f"Error getting stack trace: {e}"
 	
 	# گرفتن اطلاعات request از context (اگر در دسترس باشد)
 	request_info = {}
