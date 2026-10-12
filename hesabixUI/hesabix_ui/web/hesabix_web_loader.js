@@ -363,6 +363,7 @@
     setStatus: setStatus,
     setStatusKey: setStatusKey,
     markSlowLoad: markSlowLoad,
+    showRetry: showRetry,
     hide: hideLoadingScreen,
     t: t,
     detectLocale: detectLocale,
@@ -400,7 +401,10 @@
     var screen = document.getElementById('flutter-loading-screen');
     if (screen && !screen.classList.contains('hidden') && !appReadySignaled) {
       console.warn('[Hesabix] Loader fallback timeout');
-      hideLoadingScreen();
+      // Flutter may still be compiling or initializing. Keep the loader visible
+      // instead of exposing the intentionally empty web loading widget.
+      markSlowLoad();
+      showRetry();
     }
   }, 120000);
 })();
