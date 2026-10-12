@@ -53,6 +53,7 @@ class InventoryDiscrepancyCase(Base):
         cascade="all, delete-orphan",
         order_by="InventoryDiscrepancyLine.id",
     )
+    invoice_document = relationship("Document", foreign_keys=[invoice_document_id])
 
 
 class InventoryDiscrepancyLine(Base):
@@ -84,3 +85,5 @@ class InventoryDiscrepancyLine(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
     case = relationship("InventoryDiscrepancyCase", back_populates="lines")
+    product = relationship("Product", foreign_keys=[product_id])
+    warehouse = relationship("Warehouse", foreign_keys=[warehouse_id])

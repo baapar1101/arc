@@ -20,11 +20,27 @@ def _decimal(value: Any) -> Decimal:
     return Decimal(str(value or 0))
 
 
+def _correction_lines_by_case_line(lines: list[dict[str, Any]]) -> dict[int, dict[str, Any]]:
+    indexed: dict[int, dict[str, Any]] = {}
+    for line in lines:
+        extra = line.get("extra_info")
+        if not isinstance(extra, dict) or extra.get("inventory_discrepancy_line_id") is None:
+            continue
+        indexed[int(extra["inventory_discrepancy_line_id"])] = line
+    return indexed
+
+
 def _serialize(case: InventoryDiscrepancyCase) -> dict[str, Any]:
     return {
         "id": case.id,
         "business_id": case.business_id,
         "invoice_document_id": case.invoice_document_id,
+        "invoice_code": case.invoice_document.code if case.invoice_document else None,
+        "invoice_date": (
+            case.invoice_document.document_date.isoformat()
+            if case.invoice_document and case.invoice_document.document_date
+            else None
+        ),
         "warehouse_document_id": case.warehouse_document_id,
         "resolution_document_id": case.resolution_document_id,
         "status": case.status,
@@ -40,7 +56,10 @@ def _serialize(case: InventoryDiscrepancyCase) -> dict[str, Any]:
             {
                 "id": line.id,
                 "product_id": line.product_id,
+                "product_name": line.product.name if line.product else None,
+                "product_code": line.product.code if line.product else None,
                 "warehouse_id": line.warehouse_id,
+                "warehouse_name": line.warehouse.name if line.warehouse else None,
                 "invoice_item_line_id": line.invoice_item_line_id,
                 "available_quantity": float(line.available_quantity or 0),
                 "requested_quantity": float(line.requested_quantity or 0),
@@ -48,6 +67,9 @@ def _serialize(case: InventoryDiscrepancyCase) -> dict[str, Any]:
                 "resolved_quantity": float(line.resolved_quantity or 0),
                 "resolution_unit_cost": (
                     float(line.resolution_unit_cost) if line.resolution_unit_cost is not None else None
+                ),
+                "suggested_unit_cost": (
+                    float(line.product.base_purchase_price or 0) if line.product else 0
                 ),
             }
             for line in case.lines
@@ -126,7 +148,9 @@ def create_case_for_invoice(
 
 def list_cases(db: Session, business_id: int, status: str | None = None) -> dict[str, Any]:
     q = db.query(InventoryDiscrepancyCase).options(
-        selectinload(InventoryDiscrepancyCase.lines)
+        selectinload(InventoryDiscrepancyCase.invoice_document),
+        selectinload(InventoryDiscrepancyCase.lines).selectinload(InventoryDiscrepancyLine.product),
+        selectinload(InventoryDiscrepancyCase.lines).selectinload(InventoryDiscrepancyLine.warehouse),
     ).filter(InventoryDiscrepancyCase.business_id == int(business_id))
     if status:
         q = q.filter(InventoryDiscrepancyCase.status == str(status))
@@ -136,7 +160,9 @@ def list_cases(db: Session, business_id: int, status: str | None = None) -> dict
 
 def get_case(db: Session, business_id: int, case_id: int) -> InventoryDiscrepancyCase:
     row = db.query(InventoryDiscrepancyCase).options(
-        selectinload(InventoryDiscrepancyCase.lines)
+        selectinload(InventoryDiscrepancyCase.invoice_document),
+        selectinload(InventoryDiscrepancyCase.lines).selectinload(InventoryDiscrepancyLine.product),
+        selectinload(InventoryDiscrepancyCase.lines).selectinload(InventoryDiscrepancyLine.warehouse),
     ).filter(
         InventoryDiscrepancyCase.id == int(case_id),
         InventoryDiscrepancyCase.business_id == int(business_id),
@@ -244,10 +270,16 @@ def resolve_case_with_goods_income(
         case_id=case.id,
     )
     actual_lines = correction.get("lines") or []
-    actual_by_product = {int(x["product_id"]): x for x in actual_lines}
+    actual_by_case_line = _correction_lines_by_case_line(actual_lines)
     for case_line in case.lines:
-        actual = actual_by_product.get(int(case_line.product_id), {})
-        qty = _decimal(actual.get("quantity", case_line.shortage_quantity))
+        actual = actual_by_case_line.get(int(case_line.id))
+        if not actual:
+            raise ApiError(
+                "INVENTORY_RESOLUTION_LINE_MISMATCH",
+                "ردیف سند اصلاح با پرونده مغایرت تطبیق ندارد",
+                http_status=500,
+            )
+        qty = _decimal(actual.get("quantity"))
         unit_cost = _decimal(actual.get("unit_cost"))
         case_line.resolved_quantity = _decimal(case_line.resolved_quantity) + qty
         case_line.resolution_unit_cost = unit_cost
