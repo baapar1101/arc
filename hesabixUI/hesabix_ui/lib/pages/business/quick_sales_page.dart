@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:dio/dio.dart' as dio;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
@@ -82,6 +83,8 @@ String? _quickSalesDisplayProductBusinessCode(Map<String, dynamic> p) {
 
 /// نوع عملیات ثبت در حال اجرا (برای لودینگ دقیق روی دکمه‌ها).
 enum _QuickSalesSaveAction { none, save, saveAndPrint }
+
+enum _StockShortageAction { cancel, park, correct, override }
 
 class QuickSalesPage extends StatefulWidget {
   final int businessId;
@@ -179,6 +182,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   bool _enableWarehouseDocument = true;
   String _warehouseDocumentType = 'posted'; // 'draft' or 'posted'
   bool _showInventory = true;
+  bool _enableStockShortageOverride = false;
   bool _showPurchasePrice = false;
   int? _printTemplateId;
   String? _printPaperSize = '80mm';
@@ -492,6 +496,8 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         _warehouseDocumentType =
             settings['warehouse_document_type'] ?? 'posted';
         _showInventory = settings['show_inventory'] ?? true;
+        _enableStockShortageOverride =
+            settings['enable_stock_shortage_override'] ?? false;
         _showPurchasePrice =
             (settings['show_purchase_price'] ?? false) &&
             widget.authStore.canViewPurchasePrice();
@@ -2254,7 +2260,217 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         _cartItems.fold<num>(0, (sum, item) => sum + item.total);
   }
 
-  Future<void> _saveInvoice({bool print = false}) async {
+  List<Map<String, dynamic>> _stockShortagesFromError(Object error) {
+    if (error is! dio.DioException) return const [];
+    final raw = error.response?.data;
+    if (raw is! Map) return const [];
+    final data = Map<String, dynamic>.from(raw);
+    final errorBody = data['error'];
+    if (errorBody is! Map || errorBody['code'] != 'INSUFFICIENT_STOCK') {
+      return const [];
+    }
+    final details = errorBody['details'];
+    if (details is! Map || details['shortages'] is! List) return const [];
+    return (details['shortages'] as List)
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
+
+  Future<_StockShortageAction?> _showStockShortageDialog(
+    List<Map<String, dynamic>> shortages,
+  ) {
+    final canOverride =
+        _enableStockShortageOverride &&
+        widget.authStore.hasBusinessPermission(
+          'inventory',
+          'negative_stock_override',
+        );
+    final canCorrect =
+        _enableStockShortageOverride &&
+        widget.authStore.hasBusinessPermission('goods_expense_income', 'add') &&
+        widget.authStore.hasBusinessPermission('goods_expense_income', 'post');
+    return showDialog<_StockShortageAction>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('کسری موجودی'),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'موجودی سیستمی کالاهای زیر برای ثبت فاکتور کافی نیست:',
+              ),
+              const SizedBox(height: 12),
+              ...shortages.map((item) {
+                final name = item['product_name'] ?? 'کالا';
+                final warehouse = item['warehouse_name'];
+                final available = item['available_quantity'] ?? 0;
+                final requested = item['requested_quantity'] ?? 0;
+                return ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(name.toString()),
+                  subtitle: Text(
+                    '${warehouse == null ? '' : '$warehouse — '}موجودی: $available، موردنیاز: $requested',
+                  ),
+                );
+              }),
+              if (!_enableStockShortageOverride)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Text(
+                    'گردش‌کار کسری موجودی در تنظیمات فروش سریع فعال نیست.',
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, _StockShortageAction.cancel),
+            child: const Text('انصراف'),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, _StockShortageAction.park),
+            child: const Text('پارک فروش'),
+          ),
+          if (canCorrect)
+            OutlinedButton(
+              onPressed: () =>
+                  Navigator.pop(dialogContext, _StockShortageAction.correct),
+              child: const Text('اصلاح موجودی'),
+            ),
+          if (canOverride)
+            FilledButton(
+              onPressed: () =>
+                  Navigator.pop(dialogContext, _StockShortageAction.override),
+              child: const Text('ثبت با موجودی منفی'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<Map<String, dynamic>?> _askStockOverrideReason() async {
+    var reason = 'physical_stock_exists';
+    final note = TextEditingController();
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('ثبت یک‌باره با موجودی منفی'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                value: reason,
+                decoration: const InputDecoration(labelText: 'علت'),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'physical_stock_exists',
+                    child: Text('کالا به‌صورت فیزیکی موجود است'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'urgent_sale',
+                    child: Text('فروش فوری؛ اصلاح بعداً انجام می‌شود'),
+                  ),
+                  DropdownMenuItem(value: 'other', child: Text('سایر')),
+                ],
+                onChanged: (value) => setDialogState(
+                  () => reason = value ?? 'physical_stock_exists',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: note,
+                decoration: InputDecoration(
+                  labelText: reason == 'other'
+                      ? 'توضیح (الزامی)'
+                      : 'توضیح (اختیاری)',
+                ),
+                maxLines: 2,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('انصراف'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (reason == 'other' && note.text.trim().isEmpty) return;
+                Navigator.pop(dialogContext, {
+                  'reason_code': reason,
+                  'reason_note': note.text.trim(),
+                  'request_token':
+                      'qs-${widget.businessId}-${DateTime.now().microsecondsSinceEpoch}',
+                });
+              },
+              child: const Text('تأیید و ثبت'),
+            ),
+          ],
+        ),
+      ),
+    );
+    note.dispose();
+    return result;
+  }
+
+  Future<bool> _correctShortagesBeforeSale(
+    List<Map<String, dynamic>> shortages,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('اصلاح موجودی'),
+        content: const Text(
+          'این گزینه «کالای درآمدشده» را با تاریخ امروز ثبت می‌کند. فقط وقتی ادامه دهید که کالا واقعاً در انبار موجود است و خرید، انتقال یا موجودی اول دوره‌ای از قلم نیفتاده باشد.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('انصراف'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('تأیید موجودی فیزیکی'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return false;
+    final today = DateTime.now().toIso8601String().split('T').first;
+    await _quickSalesService.createStockCorrection(
+      businessId: widget.businessId,
+      payload: {
+        'document_date': today,
+        'confirm_unexplained_physical_surplus': true,
+        'description': 'اصلاح کسری کشف‌شده هنگام فروش سریع',
+        'lines': shortages
+            .map(
+              (s) => {
+                'product_id': s['product_id'],
+                'warehouse_id': s['warehouse_id'],
+                'quantity': s['shortage_quantity'],
+              },
+            )
+            .toList(),
+      },
+    );
+    return true;
+  }
+
+  Future<void> _saveInvoice({
+    bool print = false,
+    Map<String, dynamic>? stockOverride,
+  }) async {
     // اعتبارسنجی سبد خرید
     if (_cartItems.isEmpty) {
       SnackBarHelper.show(context, message: 'سبد خرید خالی است', isError: true);
@@ -2343,6 +2559,9 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     final savedShareAmount = _remainingAmount > 0
         ? _remainingAmount
         : _totalAmount;
+    Map<String, dynamic>? retryOverride;
+    var retryAfterCorrection = false;
+    var parkAfterFailure = false;
 
     try {
       // ساخت payload
@@ -2448,6 +2667,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         'lines': lines,
         if (payments.isNotEmpty) 'payments': payments,
         if (desc.isNotEmpty) 'description': desc,
+        if (stockOverride != null) 'stock_override': stockOverride,
       };
 
       final result = await _invoiceService.createInvoice(
@@ -2500,16 +2720,47 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       }
     } catch (e) {
       if (mounted) {
-        String errorMessage = 'خطا در ثبت فاکتور';
-        if (e.toString().contains('INSUFFICIENT_STOCK')) {
-          errorMessage = 'موجودی کافی برای برخی محصولات وجود ندارد';
-        } else if (e.toString().contains('CURRENCY')) {
-          errorMessage = 'خطا در تنظیمات ارز';
+        final shortages = _stockShortagesFromError(e);
+        if (shortages.isNotEmpty && stockOverride == null) {
+          final action = await _showStockShortageDialog(shortages);
+          if (!mounted) return;
+          if (action == _StockShortageAction.override) {
+            retryOverride = await _askStockOverrideReason();
+            if (!mounted) return;
+          } else if (action == _StockShortageAction.correct) {
+            try {
+              retryAfterCorrection = await _correctShortagesBeforeSale(
+                shortages,
+              );
+            } catch (correctionError) {
+              if (!mounted) return;
+              SnackBarHelper.show(
+                context,
+                message:
+                    'اصلاح موجودی انجام نشد: ${ErrorExtractor.forContext(correctionError, context)}',
+                isError: true,
+              );
+            }
+          } else if (action == _StockShortageAction.park) {
+            parkAfterFailure = true;
+          }
+          if (action != null && action != _StockShortageAction.cancel) {
+            // عملیات انتخاب‌شده پس از آزاد شدن وضعیت ذخیره اجرا می‌شود.
+          } else {
+            return;
+          }
         } else {
-          errorMessage =
-              'خطا در ثبت فاکتور: ${ErrorExtractor.forContext(e, context)}';
+          String errorMessage = 'خطا در ثبت فاکتور';
+          if (e.toString().contains('INSUFFICIENT_STOCK')) {
+            errorMessage = 'موجودی کافی برای برخی محصولات وجود ندارد';
+          } else if (e.toString().contains('CURRENCY')) {
+            errorMessage = 'خطا در تنظیمات ارز';
+          } else {
+            errorMessage =
+                'خطا در ثبت فاکتور: ${ErrorExtractor.forContext(e, context)}';
+          }
+          SnackBarHelper.show(context, message: errorMessage, isError: true);
         }
-        SnackBarHelper.show(context, message: errorMessage, isError: true);
       }
     } finally {
       if (mounted && _isSaving) {
@@ -2517,6 +2768,12 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           _saveAction = _QuickSalesSaveAction.none;
         });
       }
+    }
+    if (!mounted) return;
+    if (parkAfterFailure) {
+      _startNewSale();
+    } else if (retryAfterCorrection || retryOverride != null) {
+      await _saveInvoice(print: print, stockOverride: retryOverride);
     }
   }
 
@@ -2635,10 +2892,12 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         if (stock != null && stock <= item.quantity) {
           SnackBarHelper.show(
             context,
-            message: 'موجودی کافی نیست. موجودی: ${_formatNumber(stock)}',
+            message: _enableStockShortageOverride
+                ? 'هشدار کسری موجودی؛ هنگام ثبت درباره نحوه ادامه تصمیم می‌گیرید. موجودی: ${_formatNumber(stock)}'
+                : 'موجودی کافی نیست. موجودی: ${_formatNumber(stock)}',
             isError: true,
           );
-          return;
+          if (!_enableStockShortageOverride) return;
         }
       }
 

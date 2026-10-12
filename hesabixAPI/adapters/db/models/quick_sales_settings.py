@@ -118,6 +118,13 @@ class QuickSalesSetting(Base):
         server_default="1",
         comment="نمایش موجودی در صفحه فروش سریع"
     )
+    enable_stock_shortage_override: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="0",
+        comment="اجازه نمایش گردش‌کار ثبت یک‌باره فروش سریع با موجودی منفی",
+    )
 
     # تنظیمات حسابداری
     auto_create_payment_document: Mapped[bool] = mapped_column(
@@ -183,4 +190,3 @@ class QuickSalesSetting(Base):
     default_cash_register = relationship("CashRegister", foreign_keys=[default_cash_register_id])
     default_currency = relationship("Currency", foreign_keys=[default_currency_id])
     default_price_list = relationship("PriceList", foreign_keys=[default_price_list_id])
-

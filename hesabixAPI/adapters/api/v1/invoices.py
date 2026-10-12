@@ -25,6 +25,7 @@ from app.core.permissions import (
     has_invoice_type_permission_for_business,
     allowed_invoice_types_for_business,
     user_can_change_invoice_unit_price,
+    has_business_permission_for_business,
 )
 from app.core.responses import success_response, format_datetime_fields
 from app.core.cache import get_cache
@@ -217,6 +218,79 @@ def create_invoice_endpoint(
     _: None = Depends(require_business_permission_dep("invoices", "add")),
     __: None = Depends(require_invoice_type_permission_from_payload_dep("add")),
 ) -> Dict[str, Any]:
+    # کلاینت اجازه ساختن علامت داخلی عبور از کنترل موجودی را ندارد. این مقدار فقط
+    # پس از کنترل ویژگی فروش سریع، تنظیمات کسب‌وکار و مجوز کاربر در سرور ساخته می‌شود.
+    extra = dict(payload.get("extra_info") or {})
+    extra.pop("_stock_override", None)
+    requested_override = payload.pop("stock_override", None)
+    if requested_override is not None:
+        from adapters.db.models.quick_sales_settings import QuickSalesSetting
+
+        if extra.get("quick_sale") is not True:
+            raise ApiError(
+                "STOCK_OVERRIDE_QUICK_SALE_ONLY",
+                "مجوز یک‌باره موجودی منفی فقط در فروش سریع قابل استفاده است",
+                http_status=400,
+            )
+        settings_row = (
+            db.query(QuickSalesSetting)
+            .filter(QuickSalesSetting.business_id == int(business_id))
+            .first()
+        )
+        enabled = bool(
+            settings_row
+            and getattr(settings_row, "enable_stock_shortage_override", False)
+        )
+        if not enabled:
+            raise ApiError(
+                "STOCK_OVERRIDE_DISABLED",
+                "ثبت فروش با موجودی منفی در تنظیمات فروش سریع فعال نیست",
+                http_status=403,
+            )
+        if not has_business_permission_for_business(
+            ctx, db, business_id, "inventory", "negative_stock_override"
+        ):
+            raise ApiError(
+                "STOCK_OVERRIDE_FORBIDDEN",
+                "مجوز ثبت یک‌باره فروش با موجودی منفی را ندارید",
+                http_status=403,
+            )
+        override = requested_override if isinstance(requested_override, dict) else {}
+        reason_code = str(override.get("reason_code") or "").strip()
+        reason_note = str(override.get("reason_note") or "").strip()
+        request_token = str(override.get("request_token") or "").strip()
+        if reason_code not in {"physical_stock_exists", "urgent_sale", "other"}:
+            raise ApiError("STOCK_OVERRIDE_REASON_REQUIRED", "علت ثبت موجودی منفی را انتخاب کنید", http_status=400)
+        if reason_code == "other" and not reason_note:
+            raise ApiError("STOCK_OVERRIDE_NOTE_REQUIRED", "برای علت «سایر» توضیح وارد کنید", http_status=400)
+        if not request_token or len(request_token) > 80:
+            raise ApiError("STOCK_OVERRIDE_TOKEN_REQUIRED", "شناسه درخواست نامعتبر است", http_status=400)
+        from adapters.db.models.inventory_discrepancy import InventoryDiscrepancyCase
+
+        existing_case = db.query(InventoryDiscrepancyCase).filter(
+            InventoryDiscrepancyCase.business_id == int(business_id),
+            InventoryDiscrepancyCase.request_token == request_token,
+        ).first()
+        if existing_case:
+            existing_invoice = db.query(Document).filter(
+                Document.id == int(existing_case.invoice_document_id),
+                Document.business_id == int(business_id),
+            ).first()
+            if existing_invoice:
+                return success_response(
+                    data=invoice_document_to_dict(db, existing_invoice),
+                    request=request,
+                    message="INVOICE_ALREADY_CREATED",
+                )
+        extra["_stock_override"] = {
+            "authorized": True,
+            "authorized_by_user_id": ctx.get_user_id(),
+            "reason_code": reason_code,
+            "reason_note": reason_note or None,
+            "request_token": request_token,
+            "authorized_at": datetime.datetime.utcnow().isoformat(),
+        }
+    payload["extra_info"] = extra
     can_pick = _user_can_select_fx_rate_for_business(db, ctx, business_id)
     can_change_unit = user_can_change_invoice_unit_price(ctx, db, business_id)
     result = create_invoice(
@@ -5681,4 +5755,3 @@ async def calculate_invoices_remaining_endpoint(
         request=request,
         message="INVOICE_REMAINING_CALCULATED",
     )
-

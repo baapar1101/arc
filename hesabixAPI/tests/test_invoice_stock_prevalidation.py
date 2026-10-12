@@ -12,6 +12,7 @@ from app.services.invoice_service import (
     INVOICE_SALES,
     _ensure_stock_sufficient,
     _validate_outgoing_stock_before_invoice_commit,
+    collect_stock_shortages,
 )
 
 
@@ -59,7 +60,7 @@ def test_precommit_validation_excludes_current_invoice_from_available_stock() ->
             "filter_outgoing_lines_for_stock_enforcement",
             side_effect=lambda _db, _business_id, outgoing_lines, **_kwargs: outgoing_lines,
         ),
-        patch.object(invoice_service, "_ensure_stock_sufficient") as ensure_stock,
+        patch.object(invoice_service, "collect_stock_shortages", return_value=[]) as collect,
     ):
         _validate_outgoing_stock_before_invoice_commit(
             db,
@@ -70,8 +71,8 @@ def test_precommit_validation_excludes_current_invoice_from_available_stock() ->
             data=data,
         )
 
-    ensure_stock.assert_called_once()
-    assert ensure_stock.call_args.kwargs["exclude_document_id"] == document.id
+    collect.assert_called_once()
+    assert collect.call_args.kwargs["exclude_document_id"] == document.id
 
 
 def test_stock_validation_accepts_quantity_equal_to_available_stock() -> None:
@@ -81,6 +82,7 @@ def test_stock_validation_accepts_quantity_equal_to_available_stock() -> None:
     query.filter.return_value.all.side_effect = [
         [SimpleNamespace(id=520098, name="کالای نمونه", code="520098")],
         [SimpleNamespace(id=9, name="انبار اصلی")],
+        [SimpleNamespace(id=520098, inventory_mode="bulk")],
     ]
     outgoing_lines = [
         {
@@ -102,3 +104,33 @@ def test_stock_validation_accepts_quantity_equal_to_available_stock() -> None:
             outgoing_lines=outgoing_lines,
             exclude_document_id=731,
         )
+
+
+def test_collect_stock_shortages_returns_all_short_products() -> None:
+    db = MagicMock()
+    query = db.query.return_value
+    query.filter.return_value.all.side_effect = [
+        [
+            SimpleNamespace(id=1, name="کالای اول", code="A"),
+            SimpleNamespace(id=2, name="کالای دوم", code="B"),
+        ],
+        [SimpleNamespace(id=9, name="انبار اصلی")],
+        [
+            SimpleNamespace(id=1, inventory_mode="bulk"),
+            SimpleNamespace(id=2, inventory_mode="unique"),
+        ],
+    ]
+    lines = [
+        {"product_id": 1, "quantity": 3, "extra_info": {"warehouse_id": 9}},
+        {"product_id": 2, "quantity": 2, "extra_info": {"warehouse_id": 9}},
+    ]
+    with patch.object(
+        invoice_service,
+        "_compute_available_stock",
+        side_effect=[Decimal("1"), Decimal("0")],
+    ):
+        shortages = collect_stock_shortages(db, 17, date(2026, 10, 3), lines)
+
+    assert [row["product_id"] for row in shortages] == [1, 2]
+    assert [row["shortage_quantity"] for row in shortages] == [2.0, 2.0]
+    assert shortages[1]["inventory_mode"] == "unique"

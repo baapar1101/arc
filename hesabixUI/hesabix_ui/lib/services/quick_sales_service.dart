@@ -6,9 +6,7 @@ class QuickSalesService {
   QuickSalesService({ApiClient? apiClient}) : _api = apiClient ?? ApiClient();
 
   /// دریافت تنظیمات فروش سریع
-  Future<Map<String, dynamic>> getSettings({
-    required int businessId,
-  }) async {
+  Future<Map<String, dynamic>> getSettings({required int businessId}) async {
     final res = await _api.get<Map<String, dynamic>>(
       '/api/v1/businesses/$businessId/quick-sales/settings',
     );
@@ -36,5 +34,15 @@ class QuickSalesService {
     );
     return Map<String, dynamic>.from(res.data?['data'] ?? const {});
   }
-}
 
+  Future<Map<String, dynamic>> createStockCorrection({
+    required int businessId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/quick-sales/stock-corrections',
+      data: payload,
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+}
