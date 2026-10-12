@@ -196,6 +196,7 @@ import 'pages/business/warehouse_locations_page.dart';
 import 'pages/warehouse/warehouse_docs_page.dart';
 import 'pages/warehouse/warehouse_document_details_page.dart';
 import 'pages/warehouse/stock_count_page.dart';
+import 'pages/warehouse/quick_sales_stock_discrepancies_page.dart';
 import 'pages/warehouse/goods_expense_income_list_page.dart';
 import 'pages/business/installments_report_page.dart';
 import 'pages/business/credit_settings_page.dart';
@@ -5444,6 +5445,21 @@ class _MyAppState extends State<MyApp> {
                                 StockCountPage(
                                   businessId: businessId,
                                   calendarController: calendarController,
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'quick-sales-stock-discrepancies',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                QuickSalesStockDiscrepanciesPage(
+                                  businessId: businessId,
+                                  calendarController: _calendarController!,
                                 ),
                               );
                             },

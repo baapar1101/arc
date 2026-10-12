@@ -57,6 +57,7 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
   String _warehouseDocumentType = 'posted'; // 'draft' or 'posted'
   bool _autoPostWarehouse = true; // برای سازگاری با گذشته
   bool _showInventory = true;
+  bool _enableStockShortageOverride = false;
   bool _autoCreatePaymentDocument = true;
   bool _showPurchasePrice = false;
 
@@ -106,6 +107,7 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
         _warehouseDocumentType = settings['warehouse_document_type'] ?? 'posted';
         _autoPostWarehouse = settings['auto_post_warehouse'] ?? true;
         _showInventory = settings['show_inventory'] ?? true;
+        _enableStockShortageOverride = settings['enable_stock_shortage_override'] ?? false;
         _autoCreatePaymentDocument = settings['auto_create_payment_document'] ?? true;
         _showPurchasePrice = settings['show_purchase_price'] ?? false;
         _defaultShareOnlinePayment = settings['default_share_online_payment'] ?? true;
@@ -249,6 +251,7 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
         'warehouse_document_type': _warehouseDocumentType,
         'auto_post_warehouse': _autoPostWarehouse,
         'show_inventory': _showInventory,
+        'enable_stock_shortage_override': _enableStockShortageOverride,
         'auto_create_payment_document': _autoCreatePaymentDocument,
         'show_purchase_price': _showPurchasePrice,
         'default_share_online_payment': _defaultShareOnlinePayment,
@@ -551,6 +554,15 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
                                   });
                                 },
                               ),
+                              const SizedBox(height: 8),
+                              SwitchListTile(
+                                title: const Text('گردش‌کار کسری موجودی در فروش سریع'),
+                                subtitle: const Text('هنگام کسری، امکان اصلاح موجودی یا ثبت یک‌باره فروش با موجودی منفی را به کاربران مجاز نشان می‌دهد'),
+                                value: _enableStockShortageOverride,
+                                onChanged: _enableWarehouseDocument && _warehouseDocumentType == 'posted'
+                                    ? (v) => setState(() => _enableStockShortageOverride = v)
+                                    : null,
+                              ),
                             ],
                           ),
                           const SizedBox(height: 24),
@@ -791,4 +803,3 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
     );
   }
 }
-

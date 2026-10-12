@@ -1350,7 +1350,7 @@ def get_financial_stock_bulk(
     return stock_dict
 
 
-def _ensure_stock_sufficient(
+def collect_stock_shortages(
     db: Session,
     business_id: int,
     document_date: date,
@@ -1359,7 +1359,7 @@ def _ensure_stock_sufficient(
     *,
     exclude_invoice_source_document_id: Optional[int] = None,
     exclude_warehouse_document_ids: Optional[List[int]] = None,
-) -> None:
+) -> List[Dict[str, Any]]:
     # تجمیع نیاز خروجی به تفکیک کالا/انبار
     required: Dict[Tuple[int, Optional[int]], Decimal] = {}
     for ln in outgoing_lines:
@@ -1391,7 +1391,17 @@ def _ensure_stock_sufficient(
         ):
             warehouse_labels[int(row.id)] = str(row.name or "")
 
-    # بررسی موجودی
+    shortages: List[Dict[str, Any]] = []
+    mode_map: Dict[int, str] = {}
+    if pids:
+        mode_map = {
+            int(row.id): str(row.inventory_mode or "bulk")
+            for row in db.query(Product.id, Product.inventory_mode)
+            .filter(Product.business_id == business_id, Product.id.in_(pids))
+            .all()
+        }
+
+    # همهٔ کسری‌ها یک‌جا برگردانده می‌شوند تا کاربر مجبور به چند بار ذخیره نباشد.
     for (pid, wh_id), req in required.items():
         avail = _compute_available_stock(
             db,
@@ -1405,22 +1415,57 @@ def _ensure_stock_sufficient(
         )
         if avail < req:
             pname, pcode = product_labels.get(pid, ("", ""))
-            if not pname:
-                pname = "کالا"
-            p_disp = f"«{pname}»" + (f" (کد {pcode})" if pcode else f" (شناسه {pid})")
-            if wh_id is not None:
-                wn = warehouse_labels.get(int(wh_id), "")
-                wh_disp = f"«{wn}»" if wn else f"انبار (شناسه {wh_id})"
-            else:
-                wh_disp = "—"
-            raise ApiError(
-                "INSUFFICIENT_STOCK",
-                f"موجودی کافی برای کالا {p_disp} در انبار {wh_disp} موجود نیست. "
-                f"موجودی قابل استفاده: {_format_quantity_for_user_message(avail)}، "
-                f"موردنیاز: {_format_quantity_for_user_message(req)}",
-                http_status=409,
-                details={"product_id": pid, "warehouse_id": wh_id},
+            shortages.append(
+                {
+                    "product_id": pid,
+                    "product_name": pname or "کالا",
+                    "product_code": pcode or None,
+                    "warehouse_id": wh_id,
+                    "warehouse_name": warehouse_labels.get(int(wh_id), "") if wh_id else None,
+                    "inventory_mode": mode_map.get(pid, "bulk"),
+                    "available_quantity": float(avail),
+                    "requested_quantity": float(req),
+                    "shortage_quantity": float(req - avail),
+                }
             )
+    return shortages
+
+
+def _ensure_stock_sufficient(
+    db: Session,
+    business_id: int,
+    document_date: date,
+    outgoing_lines: List[Dict[str, Any]],
+    exclude_document_id: Optional[int] = None,
+    *,
+    exclude_invoice_source_document_id: Optional[int] = None,
+    exclude_warehouse_document_ids: Optional[List[int]] = None,
+) -> None:
+    shortages = collect_stock_shortages(
+        db,
+        business_id,
+        document_date,
+        outgoing_lines,
+        exclude_document_id,
+        exclude_invoice_source_document_id=exclude_invoice_source_document_id,
+        exclude_warehouse_document_ids=exclude_warehouse_document_ids,
+    )
+    if not shortages:
+        return
+    first = shortages[0]
+    pname = first.get("product_name") or "کالا"
+    pcode = first.get("product_code")
+    p_disp = f"«{pname}»" + (f" (کد {pcode})" if pcode else f" (شناسه {first['product_id']})")
+    wh_name = first.get("warehouse_name")
+    wh_id = first.get("warehouse_id")
+    wh_disp = f"«{wh_name}»" if wh_name else (f"انبار (شناسه {wh_id})" if wh_id else "—")
+    suffix = f" و {len(shortages) - 1} کالای دیگر" if len(shortages) > 1 else ""
+    raise ApiError(
+        "INSUFFICIENT_STOCK",
+        f"موجودی کافی برای کالا {p_disp}{suffix} در انبار {wh_disp} موجود نیست.",
+        http_status=409,
+        details={"shortages": shortages},
+    )
 
 
 def _validate_outgoing_stock_before_invoice_commit(
@@ -1525,17 +1570,42 @@ def _validate_outgoing_stock_before_invoice_commit(
     )
     if not lines_to_check:
         return
-    _ensure_stock_sufficient(
-        db,
-        business_id,
-        document.document_date,
-        lines_to_check,
+    shortages = collect_stock_shortages(
+        db, business_id, document.document_date, lines_to_check,
         # InvoiceItemLineهای سند جاری پیش از این کنترل flush شده‌اند. اگر خود سند
         # حذف نشود، مقدار فروش یک‌بار در موجودی قابل‌استفاده کسر و بار دوم به‌عنوان
         # مقدار موردنیاز مقایسه می‌شود (مثلاً موجودی ۱ برای فروش ۱ رد می‌شود).
         exclude_document_id=int(document.id),
         exclude_invoice_source_document_id=None,
         exclude_warehouse_document_ids=None,
+    )
+    if not shortages:
+        return
+
+    override = (document.extra_info or {}).get("_stock_override")
+    if isinstance(override, dict) and override.get("authorized") is True:
+        unique = [s for s in shortages if _product_inventory_mode_is_unique(s.get("inventory_mode"))]
+        if unique:
+            raise ApiError(
+                "UNIQUE_STOCK_OVERRIDE_FORBIDDEN",
+                "ثبت موجودی منفی برای کالای یونیک/سریالی مجاز نیست",
+                http_status=409,
+                details={"shortages": unique},
+            )
+        extra = dict(document.extra_info or {})
+        override = dict(override)
+        override["shortages"] = shortages
+        extra["_stock_override"] = override
+        document.extra_info = _normalize_document_extra_info_for_storage(extra)
+        flag_modified(document, "extra_info")
+        db.flush()
+        return
+
+    raise ApiError(
+        "INSUFFICIENT_STOCK",
+        "موجودی کافی برای یک یا چند کالای فاکتور وجود ندارد",
+        http_status=409,
+        details={"shortages": shortages},
     )
 
 
@@ -3272,6 +3342,54 @@ def _iter_profit_movements_from_invoice_lines(
                 "invoice_item_line_id": int(line.id),
             }
         )
+    # کالای درآمدشده یک ورود واقعی و قیمت‌دار به انبار است و باید در لایه‌های
+    # FIFO/LIFO دیده شود. حواله‌های فاکتور و افتتاحیه عمداً اینجا اضافه نمی‌شوند
+    # چون حرکت متناظرشان از invoice_item_lines محاسبه شده است.
+    from adapters.db.models.warehouse_document import WarehouseDocument
+    from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
+
+    warehouse_rows = (
+        db.query(WarehouseDocumentLine, WarehouseDocument)
+        .join(
+            WarehouseDocument,
+            WarehouseDocument.id == WarehouseDocumentLine.warehouse_document_id,
+        )
+        .filter(
+            WarehouseDocument.business_id == int(business_id),
+            WarehouseDocument.status == "posted",
+            WarehouseDocument.source_type == "goods_expense_income",
+            WarehouseDocument.document_date <= as_of_date,
+            WarehouseDocumentLine.product_id == int(product_id),
+            WarehouseDocumentLine.movement == "in",
+        )
+        .all()
+    )
+    for line, doc in warehouse_rows:
+        if warehouse_id is not None and int(line.warehouse_id or 0) != int(warehouse_id):
+            continue
+        info = line.extra_info or {}
+        movements.append(
+            {
+                "document_id": -int(doc.id),
+                "document_date": doc.document_date,
+                "registered_at": doc.created_at,
+                "document_type": "goods_income",
+                "product_id": int(product_id),
+                "warehouse_id": int(line.warehouse_id) if line.warehouse_id else None,
+                "movement": "in",
+                "quantity": Decimal(str(line.quantity or 0)),
+                "cost_price": Decimal(str(info.get("unit_cost") or 0)),
+                "invoice_item_line_id": -int(line.id),
+            }
+        )
+    movements.sort(
+        key=lambda mv: (
+            mv.get("document_date"),
+            str(mv.get("registered_at") or ""),
+            int(mv.get("document_id") or 0),
+            int(mv.get("invoice_item_line_id") or 0),
+        )
+    )
     return movements
 
 
@@ -5510,6 +5628,16 @@ def create_invoice(
         )
         if created_wh_ids:
             db.flush()
+        if invoice_type == INVOICE_SALES:
+            from app.services.inventory_discrepancy_service import create_case_for_invoice
+
+            create_case_for_invoice(
+                db,
+                business_id=business_id,
+                document=document,
+                user_id=user_id,
+                warehouse_document_ids=created_wh_ids,
+            )
     except ApiError:
         raise
     except Exception as ex:

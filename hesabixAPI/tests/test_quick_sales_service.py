@@ -79,6 +79,7 @@ def test_get_quick_sales_settings_includes_share_defaults_when_missing_row() -> 
     assert result["default_share_channels"] == DEFAULT_SHARE_CHANNELS
     assert result["default_share_expiry_hours"] == 168
     assert result["default_currency_id"] == 42
+    assert result["enable_stock_shortage_override"] is False
 
 
 def test_invoice_share_link_event_type_in_seed_catalog() -> None:

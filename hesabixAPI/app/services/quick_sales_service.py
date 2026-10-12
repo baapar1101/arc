@@ -125,6 +125,7 @@ def get_quick_sales_settings(db: Session, business_id: int) -> Dict[str, Any]:
             "warehouse_document_type": "posted",
             "auto_post_warehouse": True,
             "show_inventory": True,
+            "enable_stock_shortage_override": False,
             "auto_create_payment_document": True,
             "show_purchase_price": False,
             **_share_settings_from_obj(None),
@@ -149,6 +150,9 @@ def get_quick_sales_settings(db: Session, business_id: int) -> Dict[str, Any]:
         "warehouse_document_type": str(getattr(obj, 'warehouse_document_type', 'posted')),
         "auto_post_warehouse": bool(obj.auto_post_warehouse),
         "show_inventory": bool(obj.show_inventory),
+        "enable_stock_shortage_override": bool(
+            getattr(obj, "enable_stock_shortage_override", False)
+        ),
         "auto_create_payment_document": bool(obj.auto_create_payment_document),
         "show_purchase_price": bool(obj.show_purchase_price),
         **_share_settings_from_obj(obj),
@@ -274,6 +278,11 @@ def update_quick_sales_settings(db: Session, business_id: int, payload: Dict[str
     
     if "show_inventory" in payload:
         obj.show_inventory = bool(payload.get("show_inventory"))
+
+    if "enable_stock_shortage_override" in payload:
+        obj.enable_stock_shortage_override = bool(
+            payload.get("enable_stock_shortage_override")
+        )
     
     if "auto_create_payment_document" in payload:
         obj.auto_create_payment_document = bool(payload.get("auto_create_payment_document"))
@@ -418,4 +427,3 @@ def get_or_create_anonymous_customer(
         "مشتری ناشناس تعریف نشده است. لطفاً در تنظیمات فروش سریع یک مشتری پیش‌فرض انتخاب کنید.",
         http_status=400
     )
-

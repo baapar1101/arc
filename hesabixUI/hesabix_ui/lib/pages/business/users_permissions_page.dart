@@ -1209,6 +1209,10 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'edit': '${t.edit} ${t.warehouses}',
         'delete': '${t.delete} ${t.warehouses}',
       },
+      'inventory': {
+        'view': 'مشاهده موجودی و مغایرت‌ها',
+        'negative_stock_override': 'ثبت یک‌باره فروش سریع با موجودی منفی',
+      },
       'warehouse_transfers': {
         'add': '${t.add} ${t.warehouseTransfers}',
         'view': '${t.view} ${t.warehouseTransfers}',
@@ -1846,7 +1850,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       {
         'title': t.warehouseManagement,
         'icon': Icons.warehouse,
-        'sections': ['warehouses', 'warehouse_transfers', 'goods_expense_income'],
+        'sections': ['warehouses', 'inventory', 'warehouse_transfers', 'goods_expense_income'],
         'permissionHintKey': 'warehouse_inventory_bridge',
       },
       {
@@ -2028,6 +2032,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.openingBalance;
       case 'warehouses':
         return t.warehouses;
+      case 'inventory':
+        return 'موجودی و مغایرت‌ها';
       case 'warehouse_transfers':
         return t.warehouseTransfers;
       case 'goods_expense_income':

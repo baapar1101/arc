@@ -2863,6 +2863,17 @@ def post_warehouse_document(
 			biz = db.query(Business).filter(Business.id == int(wh.business_id)).first()
 			allow_bulk = bool(getattr(biz, "allow_negative_inventory_for_bulk", False)) if biz else False
 			allow_unique = bool(getattr(biz, "allow_negative_inventory_for_unique", False)) if biz else False
+			# مجوز یک‌باره فقط از فاکتور مبدأِ تأییدشده توسط endpoint خوانده می‌شود.
+			# کالاهای یونیک همچنان سخت‌گیرانه کنترل می‌شوند.
+			if str(wh.source_type or "").strip().lower() == "invoice" and wh.source_document_id:
+				source_invoice = db.query(Document).filter(
+					Document.id == int(wh.source_document_id),
+					Document.business_id == int(wh.business_id),
+				).first()
+				override = (source_invoice.extra_info or {}).get("_stock_override") if source_invoice else None
+				if isinstance(override, dict) and override.get("authorized") is True:
+					allow_bulk = True
+					allow_unique = False
 			transfer_strict = bool(getattr(biz, "warehouse_transfer_require_positive_stock", True)) if biz else True
 			lines_to_check = filter_outgoing_lines_for_stock_enforcement(
 				db,
