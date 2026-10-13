@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_ROOT="${HESABIX_BACKEND_ROOT:-/opt/hesabix-backend}"
+SOURCE_DIR="${APP_ROOT}/source"
+ENV_FILE="${APP_ROOT}/.env"
+CLI_COPY="${APP_ROOT}/hesabix-backend"
+PROJECT_NAME="hesabix-backend"
+
+fail() { echo "hesabix-backend: $*" >&2; exit 1; }
+
+require_install() {
+  [[ -d "${SOURCE_DIR}/.git" ]] || fail "Backend checkout not found at ${SOURCE_DIR}; run the installer first."
+  [[ -f "${ENV_FILE}" ]] || fail "Configuration file not found at ${ENV_FILE}."
+  command -v docker >/dev/null 2>&1 || fail "Docker is required."
+  docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 is required (docker compose)."
+}
+
+compose() {
+  (cd "${SOURCE_DIR}" && docker compose \
+    --project-name "${PROJECT_NAME}" \
+    --env-file "${ENV_FILE}" \
+    -f docker-compose.backend.yml "$@")
+}
+
+env_value() {
+  local key="$1"
+  sed -n "s/^${key}=//p" "${ENV_FILE}" | tail -n 1
+}
+
+require_root() {
+  [[ "${EUID:-$(id -u)}" -eq 0 ]] || fail "Run as root, for example: sudo hesabix-backend $1"
+}
+
+update_source() {
+  local branch="${1:-$(env_value BRANCH)}"
+  local repo_url
+  repo_url="$(env_value REPO_URL)"
+  [[ -n "${branch}" ]] || fail "No branch is configured in ${ENV_FILE}."
+  [[ -n "${repo_url}" ]] || fail "No REPO_URL is configured in ${ENV_FILE}."
+
+  echo "Updating backend source from ${repo_url} (${branch})..."
+  git -C "${SOURCE_DIR}" remote set-url origin "${repo_url}"
+  git -C "${SOURCE_DIR}" fetch origin --prune
+  git -C "${SOURCE_DIR}" show-ref --verify --quiet "refs/remotes/origin/${branch}" \
+    || fail "Remote branch origin/${branch} was not found."
+  git -C "${SOURCE_DIR}" checkout -B "${branch}" "origin/${branch}"
+  git -C "${SOURCE_DIR}" reset --hard "origin/${branch}"
+  sed -i "s/^BRANCH=.*/BRANCH=${branch}/" "${ENV_FILE}"
+  chmod 600 "${ENV_FILE}"
+}
+
+prepare_database() {
+  compose up -d db redis
+  # This check is safe to repeat. It imports the seed only into an empty database.
+  compose run --rm bootstrap
+}
+
+start_stack() {
+  prepare_database
+  compose build --pull api
+  compose up -d --remove-orphans
+  echo
+  echo "Hesabix backend is starting. Check status with: sudo hesabix-backend status"
+  echo "Health endpoint: http://<server-ip>:$(env_value API_PORT)/api/v1/health"
+}
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  hesabix-backend install
+  hesabix-backend update [branch]
+  hesabix-backend status
+  hesabix-backend logs [service]
+  hesabix-backend restart
+  hesabix-backend stop
+  hesabix-backend start
+  hesabix-backend backup
+
+Commands:
+  install       Build the backend image and start the backend stack
+  update        Pull the configured repository branch, rebuild, migrate and restart
+  status        Show the API, database and worker status
+  logs          Follow logs (optionally for api, db, redis, rq-worker or notification-moderation)
+  restart       Restart the backend stack
+  stop          Stop services without deleting persistent data
+  start         Start services without deleting persistent data
+  backup        Write a PostgreSQL custom-format backup under the install directory
+
+The PostgreSQL and file-storage volumes are kept outside the source checkout.
+Do not use `docker compose down -v` unless you intend to delete application data.
+USAGE
+}
+
+command_name="${1:-help}"
+if [[ $# -gt 0 ]]; then shift; fi
+
+case "${command_name}" in
+  install)
+    require_root install
+    require_install
+    start_stack
+    ;;
+  update)
+    require_root update
+    require_install
+    update_source "${1:-}"
+    # Keep the management command current while preserving its location outside Git.
+    if [[ -f "${SOURCE_DIR}/scripts/hesabix-backend" ]]; then
+      install -m 0755 "${SOURCE_DIR}/scripts/hesabix-backend" "${CLI_COPY}"
+    fi
+    start_stack
+    ;;
+  status)
+    require_install
+    compose ps
+    ;;
+  logs)
+    require_install
+    if [[ -n "${1:-}" ]]; then
+      compose logs --follow --tail=200 "$1"
+    else
+      compose logs --follow --tail=200
+    fi
+    ;;
+  restart)
+    require_root restart
+    require_install
+    compose restart
+    ;;
+  stop)
+    require_root stop
+    require_install
+    compose stop
+    ;;
+  start)
+    require_root start
+    require_install
+    prepare_database
+    compose up -d
+    ;;
+  backup)
+    require_root backup
+    require_install
+    backup_dir="${APP_ROOT}/backups"
+    mkdir -p "${backup_dir}"
+    chmod 700 "${backup_dir}"
+    backup_file="${backup_dir}/hesabix-$(date -u +%Y%m%dT%H%M%SZ).dump"
+    db_user="$(env_value DB_USER)"
+    db_name="$(env_value DB_NAME)"
+    compose exec -T db pg_dump --username="${db_user}" --format=custom --no-owner "${db_name}" >"${backup_file}"
+    chmod 600 "${backup_file}"
+    echo "Database backup saved to ${backup_file}"
+    ;;
+  help|-h|--help)
+    usage
+    ;;
+  *)
+    usage >&2
+    fail "Unknown command: ${command_name}"
+    ;;
+esac

@@ -77,6 +77,8 @@ The installation script automatically installs all required software:
 
 ## Installation
 
+For a backend-only Docker installation (API, database, background services, and repository-based updates), see the [Backend-only Docker deployment guide](docs/BACKEND_DOCKER.md).
+
 ### Quick Installation
 
 The easiest way to install Hesabix is using the automated installation script from the project repository:
