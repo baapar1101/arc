@@ -1,0 +1,97 @@
+name: hesabix-backend
+
+# ParsPack PaaS deploys prebuilt images: do not add build: or bind mounts here.
+# Set API_IMAGE and DATABASE_IMAGE in the .env uploaded with this file.
+services:
+  db:
+    image: ${DATABASE_IMAGE:?Set DATABASE_IMAGE to the published seeded PostgreSQL image}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-hesabix}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-hesabix}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    expose:
+      - "5432"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    expose:
+      - "6379"
+
+  api:
+    image: ${API_IMAGE:?Set API_IMAGE to the published Hesabix API image}
+    restart: unless-stopped
+    environment:
+      APP_NAME: Hesabix API
+      APP_VERSION: ${APP_VERSION:-0.1.0}
+      API_V1_PREFIX: /api/v1
+      ENVIRONMENT: production
+      DEBUG: "false"
+      LOG_LEVEL: ${LOG_LEVEL:-WARNING}
+      DB_USER: ${DB_USER:-hesabix}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-hesabix}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-4}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-2}
+      UVICORN_WORKERS: ${UVICORN_WORKERS:-2}
+      CAPTCHA_SECRET: ${CAPTCHA_SECRET:?Set CAPTCHA_SECRET}
+      SHARE_LINK_SECRET: ${SHARE_LINK_SECRET:?Set SHARE_LINK_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY}
+      WALLET_WEBHOOK_SECRET: ${WALLET_WEBHOOK_SECRET:?Set WALLET_WEBHOOK_SECRET}
+      REDIS_ENABLED: ${REDIS_ENABLED:-false}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      VOICE_DATA_COLLECTION_DIR: /var/lib/hesabix/voice-data
+      VOICE_TTS_PIPER_MODELS_DIR: /var/lib/hesabix/voice-data/piper
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - file_data:/tmp/hesabix_files
+      - voice_data:/var/lib/hesabix/voice-data
+    depends_on:
+      - db
+      - redis
+
+  rq-worker:
+    image: ${API_IMAGE:?Set API_IMAGE to the published Hesabix API image}
+    restart: unless-stopped
+    command: ["python", "/app/rq_worker.py"]
+    environment:
+      DB_USER: ${DB_USER:-hesabix}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-hesabix}
+      REDIS_ENABLED: ${REDIS_ENABLED:-false}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      - api
+      - redis
+
+  notification-moderation:
+    image: ${API_IMAGE:?Set API_IMAGE to the published Hesabix API image}
+    restart: unless-stopped
+    command: ["python", "-m", "app.workers.notification_moderation_worker"]
+    environment:
+      DB_USER: ${DB_USER:-hesabix}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-hesabix}
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  redis_data:
+  file_data:
+  voice_data:

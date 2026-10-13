@@ -152,7 +152,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
         businessId: widget.businessId,
         settings: payload,
       );
-      if (!mounted) return;
+      if (!mounted) return false;
       setState(() {
         _settings = saved;
       });

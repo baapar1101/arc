@@ -4,7 +4,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
-RUN apt-get update \
+ARG DEBIAN_MIRROR=https://deb.debian.org
+ARG PIP_INDEX_URL=https://pypi.org/simple
+
+WORKDIR /app
+
+# Include templates, locales, Swagger assets and worker entry points alongside the API.
+COPY hesabixAPI/ ./
+
+RUN sed -i "s|http://deb.debian.org|${DEBIAN_MIRROR}|g" /etc/apt/sources.list.d/debian.sources \
+    && apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
         libcairo2 \
@@ -13,15 +22,9 @@ RUN apt-get update \
         libpango-1.0-0 \
         libpangocairo-1.0-0 \
         shared-mime-info \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-
-# Include templates, locales, Swagger assets and worker entry points alongside the API.
-COPY hesabixAPI/ ./
-
-RUN pip install --upgrade pip setuptools wheel \
-    && pip install -e .
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --index-url "${PIP_INDEX_URL}" --upgrade pip setuptools wheel \
+    && pip install --index-url "${PIP_INDEX_URL}" -e .
 
 RUN mkdir -p /var/lib/hesabix/files \
     && useradd --system --uid 10001 --create-home --home-dir /home/hesabix hesabix \
