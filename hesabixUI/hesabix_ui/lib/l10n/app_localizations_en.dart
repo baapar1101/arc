@@ -20257,16 +20257,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get taxSubmissionFanava => "Submit through Hamrah Fanava";
 
   @override
-  String get taxSubmissionDirectDescription => "Use this business's current direct connection to the Taxpayer System";
+  String get taxSubmissionDirectDescription => "Use the direct Taxpayer System connection configured for this business";
 
   @override
-  String get taxSubmissionFanavaDescription => "Automatically register and submit through the Fanava broker using this business's existing tax keys";
+  String get taxSubmissionFanavaDescription => "Automatically register and submit invoices through the Fanava broker using the tax configuration already saved in Hesabix";
 
   @override
   String get fanavaUnavailable => "Fanava has not been configured by a system administrator yet.";
 
   @override
-  String get fanavaConnected => "This business's Fanava account is connected.";
+  String get fanavaConnected => "The Fanava account for this business is connected.";
 
   @override
   String get fanavaNotConnected => "After your approval, the business account will be registered automatically with Fanava.";
@@ -20278,10 +20278,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fanavaConsentTitle => "Enable submission through Fanava";
 
   @override
-  String get fanavaConsentDescription => "If you continue, a tax account for this business will be created with the owner and tax profile details in the Fanava broker. Hesabix stores the generated login securely and uses this business's existing tax keys to submit invoices.";
+  String get fanavaConsentDescription => "If you continue, Hesabix will create a tax account in the Fanava broker using the owner details and tax profile saved for this business. Hesabix stores the generated login securely and uses the existing tax configuration to submit invoices.";
 
   @override
-  String get fanavaConsentCheckbox => "I authorize creating this business's Fanava account and using it to submit invoices.";
+  String get fanavaConsentCheckbox => "I authorize Hesabix to create a Fanava account for this business and use it to submit invoices.";
 
   @override
   String get fanavaRegistrationDataTitle => "Owner details for automatic registration";
@@ -20296,7 +20296,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fanavaLastName => "Owner last name";
 
   @override
-  String get fanavaFatherName => "Father's name";
+  String get fanavaFatherName => "Father name";
 
   @override
   String get fanavaNationalCode => "Owner/representative national code";

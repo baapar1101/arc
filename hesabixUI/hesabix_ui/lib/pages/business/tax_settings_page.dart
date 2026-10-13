@@ -219,7 +219,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
                           _fanavaEnrollmentField(fields['last_name']!, t.fanavaLastName),
                           _fanavaEnrollmentField(fields['father_name']!, t.fanavaFatherName),
                           _fanavaEnrollmentField(fields['national_code']!, t.fanavaNationalCode, numeric: true),
-                          _fanavaEnrollmentField(fields['identification_number']!, t.fanavaIdentificationNumber, numeric: true),
+                          _fanavaEnrollmentField(fields['identification_number']!, t.fanavaIdentificationNumber),
                           _fanavaEnrollmentField(fields['birth_date']!, t.fanavaBirthDate, hint: '۱۳۷۰/۰۱/۰۱'),
                           _fanavaEnrollmentField(fields['phone_number']!, t.fanavaPhoneNumber, numeric: true),
                         ],

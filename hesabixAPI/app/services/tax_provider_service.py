@@ -441,8 +441,6 @@ def select_business_provider(
         raise ApiError("FANAVA_INVALID_NATIONAL_CODE", "کد ملی مالک باید ۱۰ رقم باشد.", http_status=400)
     if not re.fullmatch(r"09\d{9}", phone_number):
         raise ApiError("FANAVA_INVALID_PHONE", "شمارهٔ تماس فن‌آوا معتبر نیست.", http_status=400)
-    if not identification_number.isdigit():
-        raise ApiError("FANAVA_INVALID_IDENTIFICATION_NUMBER", "شمارهٔ شناسنامه باید عددی باشد.", http_status=400)
     try:
         import jdatetime
         parts = [int(part) for part in birth_date.split("/")]
