@@ -53,10 +53,10 @@ class QuickSalesPaymentDock extends StatefulWidget {
 
 class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
   static const _uuid = Uuid();
-  static const double _defaultButtonWidth = 510;
-  static const double _minButtonWidth = 330;
-  static const double _minListWidth = 300;
-  static const double _summaryWidth = 280;
+  static const double _defaultButtonWidth = 384;
+  static const double _minButtonWidth = 300;
+  static const double _minListWidth = 360;
+  static const double _summaryWidth = 384;
   static const int _maxPaymentLines = 50;
 
   final QuickSalesService _service = QuickSalesService();
@@ -87,7 +87,7 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
       : 0;
 
   String get _preferenceKey =>
-      'quick_sales_payment_dock_buttons_width_${widget.businessId}_${widget.authStore.currentUserId ?? 0}';
+      'quick_sales_payment_dock_buttons_width_v2_${widget.businessId}_${widget.authStore.currentUserId ?? 0}';
 
   @override
   void initState() {
@@ -306,45 +306,62 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
               .toDouble();
           return SizedBox(
             height: 220,
-            child: Row(
-              textDirection: TextDirection.rtl,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(width: buttonWidth, child: _buildAmountAndButtons(cs)),
-                _ResizeHandle(
-                  onReset: () {
-                    setState(
-                      () => _buttonWidth = _defaultButtonWidth
-                          .clamp(_minButtonWidth, maxButtons)
-                          .toDouble(),
-                    );
-                    unawaited(_saveWidth());
-                  },
-                  onDrag: (dx) {
-                    setState(() {
-                      _buttonWidth = (_buttonWidth - dx)
-                          .clamp(_minButtonWidth, maxButtons)
-                          .toDouble();
-                    });
-                  },
-                  onDragEnd: () => unawaited(_saveWidth()),
-                  onNudge: (dx) {
-                    setState(() {
-                      _buttonWidth = (_buttonWidth + dx)
-                          .clamp(_minButtonWidth, maxButtons)
-                          .toDouble();
-                    });
-                    unawaited(_saveWidth());
-                  },
-                ),
-                Expanded(child: _buildPaymentList(cs)),
-                VerticalDivider(
-                  width: 1,
-                  thickness: 1,
-                  color: cs.outlineVariant,
-                ),
-                SizedBox(width: _summaryWidth, child: _buildSummary(cs)),
-              ],
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: cs.outlineVariant)),
+              ),
+              child: Row(
+                textDirection: TextDirection.rtl,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    width: buttonWidth,
+                    child: ColoredBox(
+                      color: cs.surfaceContainerLow,
+                      child: _buildAmountAndButtons(cs),
+                    ),
+                  ),
+                  _ResizeHandle(
+                    onReset: () {
+                      setState(
+                        () => _buttonWidth = _defaultButtonWidth
+                            .clamp(_minButtonWidth, maxButtons)
+                            .toDouble(),
+                      );
+                      unawaited(_saveWidth());
+                    },
+                    onDrag: (dx) {
+                      setState(() {
+                        _buttonWidth = (_buttonWidth - dx)
+                            .clamp(_minButtonWidth, maxButtons)
+                            .toDouble();
+                      });
+                    },
+                    onDragEnd: () => unawaited(_saveWidth()),
+                    onNudge: (dx) {
+                      setState(() {
+                        _buttonWidth = (_buttonWidth + dx)
+                            .clamp(_minButtonWidth, maxButtons)
+                            .toDouble();
+                      });
+                      unawaited(_saveWidth());
+                    },
+                  ),
+                  Expanded(child: _buildPaymentList(cs)),
+                  VerticalDivider(
+                    width: 1,
+                    thickness: 1,
+                    color: cs.outlineVariant,
+                  ),
+                  SizedBox(
+                    width: _summaryWidth,
+                    child: ColoredBox(
+                      color: cs.surfaceContainerLow,
+                      child: _buildSummary(cs),
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         },
@@ -463,6 +480,7 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
                       decimalPlaces: widget.decimalPlaces,
                     ),
                     enabled: widget.enabled,
+                    textDirection: TextDirection.ltr,
                     textAlign: TextAlign.end,
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
@@ -513,6 +531,7 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
             controller: _amountController,
             focusNode: _amountFocus,
             enabled: widget.enabled,
+            textDirection: TextDirection.ltr,
             textAlign: TextAlign.end,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [
@@ -561,8 +580,8 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
                       controller: _buttonScroll,
                       gridDelegate:
                           const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 155,
-                            mainAxisExtent: 72,
+                            maxCrossAxisExtent: 122,
+                            mainAxisExtent: 66,
                             crossAxisSpacing: 8,
                             mainAxisSpacing: 8,
                           ),

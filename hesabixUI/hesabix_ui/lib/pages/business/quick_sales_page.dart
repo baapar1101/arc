@@ -4366,6 +4366,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
               children: [
                 Expanded(
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       // ستون اصلی: سبد خرید
                       Expanded(flex: 7, child: cartColumn),
@@ -5209,6 +5210,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             includeCustomer: true,
             includeDocumentMeta: true,
             includePayment: false,
+            includeTotal: false,
           ),
         ),
       ),
@@ -5220,6 +5222,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     required bool includeCustomer,
     required bool includeDocumentMeta,
     bool includePayment = true,
+    bool includeTotal = true,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -5243,8 +5246,10 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           ),
           const SizedBox(height: 10),
         ],
-        _buildCheckoutTotalHero(cs),
-        const SizedBox(height: 4),
+        if (includeTotal) ...[
+          _buildCheckoutTotalHero(cs),
+          const SizedBox(height: 4),
+        ],
         _buildCheckoutDiscountBlock(cs),
         const SizedBox(height: 10),
         if (includePayment) ...[
