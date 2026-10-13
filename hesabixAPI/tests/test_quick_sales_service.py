@@ -14,10 +14,11 @@ from app.core.responses import ApiError
 from app.services.quick_sales_service import (
     DEFAULT_SHARE_CHANNELS,
     DEFAULT_SHARE_EXPIRY_HOURS,
+    _normalize_payment_button_shortcut,
+    _share_settings_from_obj,
+    get_quick_sales_settings,
     normalize_default_share_channels,
     normalize_share_expiry_hours,
-    get_quick_sales_settings,
-    _share_settings_from_obj,
 )
 
 
@@ -101,3 +102,17 @@ def test_validate_share_gateway_id_rejects_unknown_gateway() -> None:
     with pytest.raises(ApiError) as exc:
         _validate_share_gateway_id(db, 1, 99)
     assert exc.value.detail["error"]["code"] == "GATEWAY_NOT_FOUND"
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [("alt + 1", "ALT+1"), ("F3", "F3"), ("ctrl+shift+k", "CTRL+SHIFT+K")],
+)
+def test_normalize_payment_button_shortcut(raw: str, expected: str) -> None:
+    assert _normalize_payment_button_shortcut(raw) == expected
+
+
+@pytest.mark.parametrize("raw", ["F5", "Enter", "plain text", "Ctrl+"])
+def test_normalize_payment_button_shortcut_rejects_invalid_or_reserved(raw: str) -> None:
+    with pytest.raises(ApiError):
+        _normalize_payment_button_shortcut(raw)

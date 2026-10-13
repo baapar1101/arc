@@ -27,7 +27,7 @@ bool canAddQuickSalesPaymentLine({
   required List<InvoiceTransaction> payments,
   required bool enabled,
   required num epsilon,
-  int maxLines = 6,
+  int maxLines = 50,
 }) {
   if (!enabled) return false;
   if (payments.length >= maxLines) return false;
@@ -37,11 +37,10 @@ bool canAddQuickSalesPaymentLine({
   return true;
 }
 
-/// اعمال مبلغ روی یک ردیف و حفظ تراز با فاکتور.
+/// اعمال مبلغ روی یک ردیف پرداخت.
 ///
-/// اگر جمع از مبلغ فاکتور بیشتر شود، از ردیف‌های دیگر (از آخر)
-/// کم می‌شود تا دفاتر از حد فاکتور رد نشوند. ردیف‌های دیگر که صفر
-/// شدند حذف می‌شوند. ردیف در حال ویرایش حتی با مبلغ صفر می‌ماند.
+/// پرداخت‌ها مستقل از یکدیگر نگه داشته می‌شوند. جمع بیشتر از مبلغ
+/// فاکتور مجاز است و در فروش سریع به صورت وجه برگشتی ثبت می‌شود.
 List<InvoiceTransaction> applyQuickSalesPaymentAmount({
   required List<InvoiceTransaction> payments,
   required int index,
@@ -53,35 +52,8 @@ List<InvoiceTransaction> applyQuickSalesPaymentAmount({
     return List<InvoiceTransaction>.from(payments);
   }
 
-  final epsilon = quickSalesPaymentEpsilon(decimalPlaces);
   final next = List<InvoiceTransaction>.from(payments);
   final safe = amount < 0 ? 0 : roundQuickSalesMoney(amount, decimalPlaces);
   next[index] = next[index].copyWith(amount: safe);
-
-  var paid = next.fold<num>(0, (sum, p) => sum + p.amount);
-  if (paid > invoiceTotal + epsilon) {
-    var excess = roundQuickSalesMoney(paid - invoiceTotal, decimalPlaces);
-    for (var i = next.length - 1; i >= 0; i--) {
-      if (i == index) continue;
-      if (excess <= epsilon) break;
-      final reducible = next[i].amount;
-      if (reducible <= epsilon) continue;
-      final take = reducible < excess ? reducible : excess;
-      next[i] = next[i].copyWith(
-        amount: roundQuickSalesMoney(next[i].amount - take, decimalPlaces),
-      );
-      excess = roundQuickSalesMoney(excess - take, decimalPlaces);
-    }
-    if (excess > epsilon) {
-      final capped = roundQuickSalesMoney(
-        next[index].amount - excess,
-        decimalPlaces,
-      );
-      next[index] = next[index].copyWith(amount: capped < 0 ? 0 : capped);
-    }
-  }
-
-  final editedId = next[index].id;
-  next.removeWhere((p) => p.id != editedId && p.amount <= epsilon);
   return next;
 }

@@ -828,8 +828,9 @@ def create_receipt_payment(
             logger.info(f"انتخاب حساب چک با کد: {account_code}")
             account = _get_fixed_account_by_code(db, account_code)
         elif normalized_transaction_type == "person":
-            # برای شخص، از حساب شخص عمومی استفاده کن
-            account_code = "20201"  # حساب‌های پرداختنی
+            # دریافت نزد شخص یعنی شخص وجه کسب‌وکار را نگه می‌دارد و به کسب‌وکار بدهکار است.
+            # در پرداخت به شخص، حساب پرداختنی شخص استفاده می‌شود.
+            account_code = "10401" if is_receipt else "20201"
             logger.info(f"انتخاب حساب شخص با کد: {account_code}")
             account = _get_fixed_account_by_code(db, account_code)
         elif normalized_transaction_type == "wallet":
@@ -2152,7 +2153,10 @@ def update_receipt_payment(
         elif normalized_transaction_type == "check":
             account = _get_fixed_account_by_code(db, "10403" if is_receipt else "20202")
         elif normalized_transaction_type == "person":
-            account = _get_fixed_account_by_code(db, "20201")
+            account = _get_fixed_account_by_code(
+                db,
+                "10401" if is_receipt else "20201",
+            )
         elif account_line.get("account_id"):
             account = db.query(Account).filter(
                 and_(
@@ -2832,4 +2836,3 @@ def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
         "created_at": document.created_at.isoformat(),
         "updated_at": document.updated_at.isoformat(),
     }
-
