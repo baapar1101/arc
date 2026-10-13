@@ -20144,4 +20144,169 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get distributionUnitVolumeM3 => 'حجم واحد (متر مکعب)';
+  @override
+  String get taxSubmissionMethodLabel => "روش ارسال صورت‌حساب";
+
+  @override
+  String get taxSubmissionDirect => "ارسال مستقیم";
+
+  @override
+  String get taxSubmissionFanava => "ارسال از طریق همراه فن‌آوا";
+
+  @override
+  String get taxSubmissionDirectDescription => "ارسال با اتصال مستقیم فعلی کسب‌وکار به سامانه مودیان";
+
+  @override
+  String get taxSubmissionFanavaDescription => "ثبت و ارسال خودکار از طریق بروکر فن‌آوا با همان کلیدهای مالیاتی کسب‌وکار";
+
+  @override
+  String get fanavaUnavailable => "اتصال فن‌آوا هنوز توسط مدیر سیستم راه‌اندازی نشده است.";
+
+  @override
+  String get fanavaConnected => "حساب این کسب‌وکار در فن‌آوا متصل است.";
+
+  @override
+  String get fanavaNotConnected => "برای استفاده از فن‌آوا، حساب کسب‌وکار پس از تأیید شما به‌صورت خودکار ثبت می‌شود.";
+
+  @override
+  String get fanavaSyncAccount => "بررسی دوباره اتصال";
+
+  @override
+  String get fanavaConsentTitle => "فعال‌سازی ارسال از طریق فن‌آوا";
+
+  @override
+  String get fanavaConsentDescription => "با ادامه، حساب مالیاتی این کسب‌وکار با اطلاعات مالک و پرونده مالیاتی در بروکر فن‌آوا ساخته می‌شود. حسابیکس اطلاعات ورود را امن نگه می‌دارد و از کلیدهای مالیاتی فعلی همین کسب‌وکار برای ارسال صورت‌حساب‌ها استفاده می‌کند.";
+
+  @override
+  String get fanavaConsentCheckbox => "اجازه می‌دهم حساب این کسب‌وکار در فن‌آوا ساخته و برای ارسال صورت‌حساب استفاده شود.";
+
+  @override
+  String get fanavaRegistrationDataTitle => "اطلاعات مالک برای ثبت خودکار";
+
+  @override
+  String get fanavaRegistrationDataHint => "اطلاعات موجود از حسابیکس پر شده است. موارد خالی را تکمیل کنید؛ نام و شماره همراه را پیش از ثبت بررسی کنید.";
+
+  @override
+  String get fanavaFirstName => "نام مالک";
+
+  @override
+  String get fanavaLastName => "نام خانوادگی مالک";
+
+  @override
+  String get fanavaFatherName => "نام پدر";
+
+  @override
+  String get fanavaNationalCode => "کد ملی مالک/نماینده";
+
+  @override
+  String get fanavaIdentificationNumber => "شماره شناسنامه";
+
+  @override
+  String get fanavaBirthDate => "تاریخ تولد شمسی (سال/ماه/روز)";
+
+  @override
+  String get fanavaPhoneNumber => "شماره همراه";
+
+  @override
+  String get fanavaEnableButton => "تأیید و اتصال فن‌آوا";
+
+  @override
+  String get fanavaConnectedSuccess => "حساب کسب‌وکار در فن‌آوا ثبت و متصل شد.";
+
+  @override
+  String get fanavaSyncSuccess => "اطلاعات اتصال فن‌آوا به‌روز شد.";
+
+  @override
+  String get fanavaAccountPending => "وضعیت ثبت در فن‌آوا در حال بررسی است. برای جلوگیری از ثبت تکراری، کمی بعد اتصال را بررسی کنید.";
+
+  @override
+  String get fanavaAccountFailed => "ثبت حساب فن‌آوا انجام نشد. اطلاعات را بررسی و دوباره تلاش کنید.";
+
+  @override
+  String get taxProviderAdminTitle => "اتصال بروکر همراه فن‌آوا";
+
+  @override
+  String get taxProviderAdminDescription => "اعتبارنامه بروکر را یک‌بار در سطح سیستم ثبت کنید تا کسب‌وکارها پس از رضایت، خودکار در فن‌آوا ساخته شوند.";
+
+  @override
+  String get taxProviderBaseUrl => "نشانی API فن‌آوا";
+
+  @override
+  String get taxProviderBrokerUsername => "نام کاربری بروکر";
+
+  @override
+  String get taxProviderBrokerPassword => "رمز عبور بروکر";
+
+  @override
+  String get taxProviderBrokerUsernameHint => "برای نگه‌داشتن نام کاربری ذخیره‌شده، این کادر را خالی بگذارید.";
+
+  @override
+  String get taxProviderBrokerPasswordHint => "برای نگه‌داشتن رمز ذخیره‌شده، این کادر را خالی بگذارید.";
+
+  @override
+  String get taxProviderBrokerCode => "کد بروکر";
+
+  @override
+  String get taxProviderContractDuration => "مدت قرارداد پیش‌فرض (روز)";
+
+  @override
+  String get taxProviderActivate => "فعال بودن ثبت و ارسال از طریق فن‌آوا";
+
+  @override
+  String get taxProviderSave => "ذخیره تنظیمات فن‌آوا";
+
+  @override
+  String get taxProviderTest => "بررسی اتصال بروکر";
+
+  @override
+  String get taxProviderSaved => "تنظیمات بروکر فن‌آوا ذخیره شد.";
+
+  @override
+  String get taxProviderTestSuccess => "ورود به فن‌آوا و دریافت فهرست بروکرها موفق بود. هیچ حساب یا صورت‌حسابی ساخته نشد.";
+
+  @override
+  String get taxProviderNotConfigured => "اعتبارنامه بروکر هنوز ذخیره نشده است.";
+
+  @override
+  String get taxProviderActiveState => "وضعیت اتصال بروکر";
+
+  @override
+  String get settingsTaxProviders => "ارائه‌دهندگان ارسال مالیاتی";
+
+  @override
+  String get settingsTaxProvidersDescription => "تنظیم اتصال بروکرهای مالیاتی مانند همراه فن‌آوا";
+
+  @override
+  String get taxProviderInvalidUrl => "نشانی باید یک URL معتبر با HTTPS باشد.";
+
+  @override
+  String get taxProviderNumericBrokerCode => "کد بروکر باید عددی باشد.";
+
+  @override
+  String get taxProviderContractRange => "مدت قرارداد باید بین ۱ تا ۳۶۵۰ روز باشد.";
+
+  @override
+  String get taxProviderActive => "فعال";
+
+  @override
+  String get taxProviderInactive => "غیرفعال";
+
+  @override
+  String get fanavaSandboxUnavailable => "فن‌آوا محیط آزمایشی ندارد. برای انتخاب فن‌آوا، حالت آزمایشی را خاموش کنید.";
+
+  @override
+  String get taxProviderBrokerCount => "تعداد بروکرها";
+
+  @override
+  String get taxProviderActiveBrokerCount => "بروکرهای فعال";
+
+  @override
+  String get taxProviderEnabledHint => "اتصال فعال است و کسب‌وکارها می‌توانند پس از تأیید، در فن‌آوا ثبت شوند.";
+
+  @override
+  String get taxProviderDisabledHint => "اتصال غیرفعال است و کسب‌وکارها نمی‌توانند فن‌آوا را انتخاب کنند.";
+
+  @override
+  String get taxProviderSaveBeforeTest => "ابتدا اعتبارنامه‌های جدید را ذخیره کنید؛ سپس اتصال را بررسی کنید.";
+
 }

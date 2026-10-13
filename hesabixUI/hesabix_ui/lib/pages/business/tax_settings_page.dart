@@ -37,6 +37,8 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
   bool _sandboxMode = false;
   bool _loading = true;
   bool _saving = false;
+  bool _providerSaving = false;
+  bool _fanavaSyncing = false;
   String? _error;
   TaxSettingsModel? _settings;
   TaxDataQualityReport? _dataQuality;
@@ -113,10 +115,10 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
     }
   }
 
-  Future<void> _save() async {
+  Future<bool> _saveCurrentTaxSettings() async {
     final t = AppLocalizations.of(context);
     if (!(_connectionFormKey.currentState?.validate() ?? false)) {
-      return;
+      return false;
     }
     final memoryId = _normalizeTaxMemoryId(_taxMemoryIdController.text);
     final economicCode = _convertDigitsToEnglish(
@@ -154,20 +156,209 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
       setState(() {
         _settings = saved;
       });
-      SnackBarHelper.show(context, message: t.taxSettingsSaved);
+      return true;
     } catch (e) {
-      setState(() {
-        _error = ErrorExtractor.forContext(e, context);
-      });
       if (mounted) {
         SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
       }
+      return false;
     } finally {
       if (mounted) {
         setState(() {
           _saving = false;
         });
       }
+    }
+  }
+
+  Future<void> _save() async {
+    if (await _saveCurrentTaxSettings() && mounted) {
+      SnackBarHelper.show(context, message: AppLocalizations.of(context).taxSettingsSaved);
+    }
+  }
+
+  Future<Map<String, dynamic>?> _requestFanavaEnrollment() async {
+    final t = AppLocalizations.of(context);
+    final prefill = _settings?.enrollmentPrefill ?? const <String, dynamic>{};
+    final formKey = GlobalKey<FormState>();
+    final fields = <String, TextEditingController>{
+      'first_name': TextEditingController(text: prefill['first_name']?.toString() ?? ''),
+      'last_name': TextEditingController(text: prefill['last_name']?.toString() ?? ''),
+      'father_name': TextEditingController(),
+      'national_code': TextEditingController(text: prefill['national_code']?.toString() ?? ''),
+      'identification_number': TextEditingController(),
+      'birth_date': TextEditingController(),
+      'phone_number': TextEditingController(text: prefill['phone_number']?.toString() ?? ''),
+    };
+    bool consent = false;
+    try {
+      return await showDialog<Map<String, dynamic>>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, setDialogState) => AlertDialog(
+            title: Text(t.fanavaConsentTitle),
+            content: SizedBox(
+              width: 520,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(t.fanavaConsentDescription),
+                    const SizedBox(height: 16),
+                    Text(t.fanavaRegistrationDataTitle, style: Theme.of(context).textTheme.titleSmall),
+                    const SizedBox(height: 4),
+                    Text(t.fanavaRegistrationDataHint, style: Theme.of(context).textTheme.bodySmall),
+                    const SizedBox(height: 12),
+                    Form(
+                      key: formKey,
+                      child: Column(
+                        children: [
+                          _fanavaEnrollmentField(fields['first_name']!, t.fanavaFirstName),
+                          _fanavaEnrollmentField(fields['last_name']!, t.fanavaLastName),
+                          _fanavaEnrollmentField(fields['father_name']!, t.fanavaFatherName),
+                          _fanavaEnrollmentField(fields['national_code']!, t.fanavaNationalCode, numeric: true),
+                          _fanavaEnrollmentField(fields['identification_number']!, t.fanavaIdentificationNumber, numeric: true),
+                          _fanavaEnrollmentField(fields['birth_date']!, t.fanavaBirthDate, hint: '۱۳۷۰/۰۱/۰۱'),
+                          _fanavaEnrollmentField(fields['phone_number']!, t.fanavaPhoneNumber, numeric: true),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: consent,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      onChanged: (value) => setDialogState(() => consent = value == true),
+                      title: Text(t.fanavaConsentCheckbox),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: Text(t.cancel),
+              ),
+              FilledButton.icon(
+                onPressed: consent
+                    ? () {
+                        if (!(formKey.currentState?.validate() ?? false)) return;
+                        Navigator.pop(
+                          dialogContext,
+                          fields.map((key, value) => MapEntry(key, value.text.trim())),
+                        );
+                      }
+                    : null,
+                icon: const Icon(Icons.verified_user_outlined),
+                label: Text(t.fanavaEnableButton),
+              ),
+            ],
+          ),
+        ),
+      );
+    } finally {
+      for (final controller in fields.values) {
+        controller.dispose();
+      }
+    }
+  }
+
+  Widget _fanavaEnrollmentField(
+    TextEditingController controller,
+    String label, {
+    bool numeric = false,
+    String? hint,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: TextFormField(
+        controller: controller,
+        keyboardType: numeric ? TextInputType.number : TextInputType.text,
+        decoration: InputDecoration(labelText: label, hintText: hint, border: const OutlineInputBorder()),
+        validator: (value) => value == null || value.trim().isEmpty
+            ? AppLocalizations.of(context).required
+            : null,
+      ),
+    );
+  }
+
+  Future<void> _selectSubmissionProvider(String providerCode) async {
+    final t = AppLocalizations.of(context);
+    if (_providerSaving || _saving) return;
+    if (providerCode == _settings?.submissionProvider &&
+        (providerCode == 'moadian_direct' || _settings?.fanavaAccount?['connected'] == true)) {
+      return;
+    }
+    if (providerCode == 'fanava' && _settings?.fanavaAvailable != true) return;
+    if (providerCode == 'fanava') {
+      if (!(_connectionFormKey.currentState?.validate() ?? false)) return;
+      if (_privateKeyController.text.trim().isEmpty) {
+        SnackBarHelper.showError(context, message: t.taxPrivateKeyRequired);
+        return;
+      }
+    }
+
+    Map<String, dynamic>? enrollment;
+    final accountStatus = _settings?.fanavaAccount?['status']?.toString();
+    final canReconcilePreviousRegistration =
+        accountStatus == 'registering' || accountStatus == 'registration_unknown';
+    if (providerCode == 'fanava' &&
+        _settings?.fanavaAccount?['connected'] != true &&
+        !canReconcilePreviousRegistration) {
+      enrollment = await _requestFanavaEnrollment();
+      if (enrollment == null || !mounted) return;
+    }
+
+    // A direct-route change only updates the saved provider choice. Skipping
+    // the form save lets a Fanava user switch away before enabling sandbox.
+    if (providerCode == 'fanava' &&
+        (!await _saveCurrentTaxSettings() || !mounted)) {
+      return;
+    }
+    setState(() {
+      _providerSaving = true;
+    });
+    try {
+      await _service.selectProvider(
+        businessId: widget.businessId,
+        providerCode: providerCode,
+        consent: providerCode == 'fanava',
+        enrollment: enrollment,
+      );
+      final refreshed = await _service.fetchSettings(widget.businessId);
+      if (!mounted) return;
+      setState(() => _settings = refreshed);
+      SnackBarHelper.show(
+        context,
+        message: providerCode == 'fanava' ? t.fanavaConnectedSuccess : t.taxSubmissionDirect,
+      );
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+        await _load();
+      }
+    } finally {
+      if (mounted) setState(() => _providerSaving = false);
+    }
+  }
+
+  Future<void> _syncFanavaAccount() async {
+    final t = AppLocalizations.of(context);
+    if (_fanavaSyncing) return;
+    setState(() => _fanavaSyncing = true);
+    try {
+      await _service.syncFanavaAccount(widget.businessId);
+      final refreshed = await _service.fetchSettings(widget.businessId);
+      if (!mounted) return;
+      setState(() => _settings = refreshed);
+      SnackBarHelper.show(context, message: t.fanavaSyncSuccess);
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    } finally {
+      if (mounted) setState(() => _fanavaSyncing = false);
     }
   }
 
@@ -706,6 +897,8 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
                   return null;
                 },
               ),
+              const SizedBox(height: 16),
+              _buildSubmissionProviderControls(t, cs),
               const Divider(height: 32),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
@@ -719,6 +912,110 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
         ),
       ),
     );
+  }
+
+  Widget _buildSubmissionProviderControls(AppLocalizations t, ColorScheme cs) {
+    final provider = _settings?.submissionProvider ?? 'moadian_direct';
+    final account = _settings?.fanavaAccount;
+    final connected = account?['connected'] == true;
+    final status = account?['status']?.toString() ?? 'not_connected';
+    final lastError = account?['last_error']?.toString();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(t.taxSubmissionMethodLabel, style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 4),
+        RadioListTile<String>(
+          contentPadding: EdgeInsets.zero,
+          value: 'moadian_direct',
+          groupValue: provider,
+          onChanged: (_saving || _providerSaving) ? null : (_) => _selectSubmissionProvider('moadian_direct'),
+          title: Text(t.taxSubmissionDirect),
+          subtitle: Text(t.taxSubmissionDirectDescription),
+        ),
+        RadioListTile<String>(
+          contentPadding: EdgeInsets.zero,
+          value: 'fanava',
+          groupValue: provider,
+          onChanged: (_saving || _providerSaving || _sandboxMode || _settings?.fanavaAvailable != true)
+              ? null
+              : (_) => _selectSubmissionProvider('fanava'),
+          title: Text(t.taxSubmissionFanava),
+          subtitle: Text(
+            _sandboxMode
+                ? t.fanavaSandboxUnavailable
+                : _settings?.fanavaAvailable == true
+                    ? t.taxSubmissionFanavaDescription
+                    : t.fanavaUnavailable,
+          ),
+        ),
+        if (_providerSaving)
+          const LinearProgressIndicator(minHeight: 2)
+        else if (status != 'not_connected' || connected)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: connected
+                  ? SemanticColorResolver.positive(context).withValues(alpha: 0.10)
+                  : SemanticColorResolver.warning(context).withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      connected ? Icons.check_circle_outline : Icons.sync_problem_outlined,
+                      color: connected
+                          ? SemanticColorResolver.positive(context)
+                          : SemanticColorResolver.warning(context),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(connected ? t.fanavaConnected : _fanavaStatusLabel(t, status))),
+                    if (connected)
+                      TextButton.icon(
+                        onPressed: _fanavaSyncing ? null : _syncFanavaAccount,
+                        icon: _fanavaSyncing
+                            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.refresh, size: 18),
+                        label: Text(t.fanavaSyncAccount),
+                      )
+                    else if (status == 'registering' || status == 'registration_unknown')
+                      TextButton.icon(
+                        onPressed: (_providerSaving || _saving)
+                            ? null
+                            : () => _selectSubmissionProvider('fanava'),
+                        icon: const Icon(Icons.refresh, size: 18),
+                        label: Text(t.fanavaSyncAccount),
+                      ),
+                  ],
+                ),
+                if (lastError != null && lastError.trim().isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(lastError, style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  String _fanavaStatusLabel(AppLocalizations t, String status) {
+    switch (status) {
+      case 'registering':
+      case 'registration_unknown':
+        return t.fanavaAccountPending;
+      case 'failed':
+      case 'needs_attention':
+        return t.fanavaAccountFailed;
+      default:
+        return t.fanavaNotConnected;
+    }
   }
 
   Widget _buildKeysCard(AppLocalizations t, ColorScheme cs) {

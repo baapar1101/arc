@@ -250,6 +250,33 @@ def send_document_to_tax_system(
             details=rate_info,
         )
 
+    # Keep each invoice bound to its original provider. Older direct invoices
+    # predate this field, so infer their provider from a prior send attempt.
+    extra = dict(document.extra_info or {})
+    stored_provider = str(extra.get("tax_submission_provider") or "").strip().lower()
+    has_legacy_send = bool(
+        extra.get("tax_last_send_at")
+        or extra.get("tax_tracking_code")
+        or extra.get("tax_provider_last_response")
+    )
+    provider_code = stored_provider or (
+        "moadian_direct"
+        if has_legacy_send
+        else str(getattr(tax_setting, "submission_provider", "moadian_direct") or "moadian_direct").strip().lower()
+    )
+    if provider_code not in {"moadian_direct", "fanava"}:
+        raise ApiError("TAX_PROVIDER_UNSUPPORTED", "روش ارسال مالیاتی این کسب‌وکار پشتیبانی نمی‌شود.", http_status=400)
+    if provider_code == "fanava" and bool(getattr(tax_setting, "sandbox_mode", False)):
+        raise ApiError(
+            "FANAVA_SANDBOX_UNAVAILABLE",
+            "فن‌آوا محیط آزمایشی ندارد؛ حالت آزمایشی را خاموش کنید یا روش ارسال مستقیم را انتخاب کنید.",
+            http_status=400,
+        )
+    extra["tax_submission_provider"] = provider_code
+    document.extra_info = extra
+    db.add(document)
+    db.flush()
+
     # 3.6. ثبت لاگ شروع
     from app.services.tax_logging import log_tax_operation
     log_tax_operation(
@@ -267,20 +294,31 @@ def send_document_to_tax_system(
     settings = get_settings()
     max_retries = settings.tax_system_retry_max_attempts
     initial_retry_delay = settings.tax_system_retry_initial_delay_seconds
+    # Provider save/send operations can have committed remotely even when the response timed out.
+    # Fanava reconciles by taxId/status and must never be blindly retried here.
+    retry_count = 1 if provider_code == "fanava" else max_retries
     
     try:
-        client = MoadianClient(settings=settings, tax_setting=tax_setting)
+        if provider_code == "moadian_direct":
+            client = MoadianClient(settings=settings, tax_setting=tax_setting)
         
-        for attempt in range(max_retries):
+        for attempt in range(retry_count):
             retry_delay = initial_retry_delay * (2 ** attempt)  # exponential backoff
             try:
-                submission = client.send_invoice(invoice_dto)
+                if provider_code == "fanava":
+                    from app.services.fanava_tax_submission_service import send_document_via_fanava
+                    submission = send_document_via_fanava(
+                        db, document, tax_setting, invoice_dto, submission_mode=mode
+                    )
+                else:
+                    submission = client.send_invoice(invoice_dto)
+                submission.setdefault("provider", provider_code)
                 # 6. ذخیره نتیجه اولیه (صف async)
                 _apply_submission_result(document, submission, db, submission_mode=mode)
 
                 # 6.5 استعلام فوری: «sent» یعنی پذیرش در صف، نه ثبت نهایی در کارپوشه مودیان
                 tracking_code = submission.get("tracking_code")
-                if tracking_code and submission.get("mode") == "live":
+                if tracking_code and submission.get("mode") == "live" and provider_code == "moadian_direct":
                     try:
                         inquiry = client.inquire_status([str(tracking_code)])
                         for item in inquiry.get("results") or []:
@@ -314,7 +352,7 @@ def send_document_to_tax_system(
                     invoice_id=document.id,
                     tracking_code=tracking_code,
                     status=log_status,
-                    details={"status": final_status, "mode": submission.get("mode")},
+                    details={"status": final_status, "mode": submission.get("mode"), "provider": provider_code},
                     error=submission.get("error_message") if log_status == "failed" else None,
                 )
 
@@ -328,6 +366,21 @@ def send_document_to_tax_system(
                 return submission
                 
             except ApiError as e:
+                if provider_code == "fanava" and getattr(e, "code", None) == "FANAVA_RESULT_UNKNOWN":
+                    extra = dict(document.extra_info or {})
+                    submission = {
+                        "mode": "fanava",
+                        "provider": "fanava",
+                        "status": "pending",
+                        "tracking_code": extra.get("fanava_latest_invoice_id") or extra.get("tax_tracking_code"),
+                        "fanava_invoice_id": extra.get("fanava_latest_invoice_id"),
+                        "tax_id": extra.get("tax_moadian_taxid"),
+                        "error_message": e.message,
+                        "raw_response": {"provider": "fanava", "state": "result_unknown"},
+                        "sent_at": datetime.datetime.utcnow().isoformat(),
+                    }
+                    _apply_submission_result(document, submission, db, submission_mode=mode)
+                    return submission
                 # خطاهای validation یا business logic را retry نمی‌کنیم
                 status_code = getattr(e, "status_code", None)
                 if status_code in (400, 401, 403, 404):
@@ -362,9 +415,9 @@ def send_document_to_tax_system(
                     raise
                 
                 # خطاهای شبکه یا سرور را retry می‌کنیم
-                if attempt < max_retries - 1:
+                if attempt < retry_count - 1:
                     logger.warning(
-                        f"Attempt {attempt + 1}/{max_retries} failed for document {document.id}: {e}. "
+                        f"Attempt {attempt + 1}/{retry_count} failed for document {document.id}: {e}. "
                         f"Retrying in {retry_delay}s..."
                     )
                     time.sleep(retry_delay)
@@ -392,7 +445,7 @@ def send_document_to_tax_system(
                             invoice_id=document.id,
                             error_code=error_code or "RETRY_EXHAUSTED",
                             error_message=str(e),
-                            error_details={"http_status": getattr(e, "status_code", None), "attempts": max_retries} if hasattr(e, "status_code") else {"attempts": max_retries},
+                            error_details={"http_status": getattr(e, "status_code", None), "attempts": retry_count} if hasattr(e, "status_code") else {"attempts": retry_count},
                         )
                     except Exception as dlq_error:
                         logger.warning(f"Failed to add to dead letter queue: {dlq_error}")
@@ -400,9 +453,9 @@ def send_document_to_tax_system(
                     raise
                     
             except Exception as e:
-                if attempt < max_retries - 1:
+                if attempt < retry_count - 1:
                     logger.warning(
-                        f"Attempt {attempt + 1}/{max_retries} failed for document {document.id}: {e}. "
+                        f"Attempt {attempt + 1}/{retry_count} failed for document {document.id}: {e}. "
                         f"Retrying in {retry_delay}s..."
                     )
                     time.sleep(retry_delay)
@@ -429,7 +482,7 @@ def send_document_to_tax_system(
                             invoice_id=document.id,
                             error_code="RETRY_EXHAUSTED",
                             error_message=str(e),
-                            error_details={"attempts": max_retries},
+                            error_details={"attempts": retry_count},
                         )
                     except Exception as dlq_error:
                         logger.warning(f"Failed to add to dead letter queue: {dlq_error}")
@@ -462,6 +515,7 @@ def inquire_tax_status(
         raise ApiError("INVALID_REQUEST", "لیست فاکتورها یا کد رهگیری لازم است.", http_status=400)
 
     doc_by_tracking: Dict[str, Document] = {}
+    documents_by_id: Dict[int, Document] = {}
     if invoice_ids:
         docs = (
             db.query(Document)
@@ -469,9 +523,13 @@ def inquire_tax_status(
             .all()
         )
         for doc in docs:
+            documents_by_id[int(doc.id)] = doc
             code = (doc.extra_info or {}).get("tax_tracking_code")
             if code:
                 doc_by_tracking[str(code)] = doc
+            extra = doc.extra_info or {}
+            if extra.get("tax_submission_provider") == "fanava" and extra.get("fanava_latest_invoice_id"):
+                doc_by_tracking[str(extra["fanava_latest_invoice_id"])] = doc
 
     merged_codes = {str(code).strip() for code in tracking_codes if code and str(code).strip()}
     merged_codes.update(doc_by_tracking.keys())
@@ -493,26 +551,105 @@ def inquire_tax_status(
             http_status=400,
         )
 
-    client = MoadianClient(settings=get_settings(), tax_setting=tax_setting)
-    try:
-        response = client.inquire_status(sorted(merged_codes))
-    finally:
-        client.close()
-
-    results = [_enrich_inquiry_result_item(item) for item in (response.get("results") or [])]
     now = datetime.datetime.utcnow().isoformat()
-    for item in results:
-        reference = item.get("reference_number") or item.get("tracking_code")
-        if not reference:
-            continue
-        doc = doc_by_tracking.get(str(reference))
-        if not doc:
-            continue
-        _apply_inquiry_result_to_document(doc, item, now=now)
-        db.add(doc)
+    fanava_results: List[Dict[str, Any]] = []
+    direct_codes = set(merged_codes)
+    fanava_documents: Dict[int, Document] = dict(documents_by_id)
+    for code, doc in doc_by_tracking.items():
+        extra = doc.extra_info or {}
+        if extra.get("tax_submission_provider") == "fanava":
+            direct_codes.discard(code)
+            fanava_documents[int(doc.id)] = doc
+
+    if fanava_documents:
+        from app.services.fanava_tax_submission_service import fanava_status_for_document, map_fanava_inquiry
+
+        for doc in fanava_documents.values():
+            extra = dict(doc.extra_info or {})
+            if extra.get("tax_submission_provider") != "fanava":
+                continue
+            try:
+                provider_status = fanava_status_for_document(db, business_id, doc)
+                inquiry = provider_status.get("inquiry")
+                mapped_inquiry = map_fanava_inquiry(inquiry) if isinstance(inquiry, dict) else None
+                cancellation_completed = (
+                    mapped_inquiry == "cancelled"
+                    or (
+                        extra.get("tax_last_submission_mode") == "cancel"
+                        and mapped_inquiry == "accepted"
+                    )
+                )
+                if cancellation_completed:
+                    extra["tax_cancelled_in_modian"] = True
+                    extra["tax_cancelled_at"] = now
+                    normalized = "accepted"
+                elif mapped_inquiry:
+                    normalized = mapped_inquiry
+                else:
+                    normalized = provider_status.get("mapped_status") or "unknown"
+                latest = provider_status.get("latest") or {}
+                raw_data = {
+                    "provider": "fanava",
+                    "status": latest.get("status"),
+                    "messages": latest.get("messages"),
+                    "serverMessages": latest.get("serverMessages"),
+                    "messageErrorCodes": latest.get("messageErrorCodes"),
+                    "inquiry": inquiry,
+                }
+                error_message = None
+                if isinstance(inquiry, dict) and inquiry.get("error"):
+                    error_message = str(inquiry.get("error"))
+                elif mapped_inquiry == "rejected":
+                    error_message = str(latest.get("serverMessages") or latest.get("messages") or "صورتحساب توسط سامانه مودیان رد شده است.")
+                item = {
+                    "reference_number": str(extra.get("tax_tracking_code") or extra.get("fanava_latest_invoice_id") or ""),
+                    "tracking_code": str(extra.get("tax_tracking_code") or extra.get("fanava_latest_invoice_id") or ""),
+                    "status": normalized,
+                    "error_message": error_message,
+                    "raw_data": raw_data,
+                    "inquiry_at": now,
+                }
+                _apply_inquiry_result_to_document(doc, item, now=now)
+                updated_extra = dict(doc.extra_info or {})
+                updated_extra["tax_provider_last_status"] = latest.get("status")
+                updated_extra["tax_provider_invoice_status"] = (inquiry or {}).get("invoiceStatus") if isinstance(inquiry, dict) else None
+                if cancellation_completed:
+                    updated_extra["tax_cancelled_in_modian"] = True
+                    updated_extra["tax_cancelled_at"] = now
+                doc.extra_info = updated_extra
+                db.add(doc)
+                fanava_results.append(item)
+            except ApiError as exc:
+                fanava_results.append({
+                    "reference_number": str(extra.get("tax_tracking_code") or extra.get("fanava_latest_invoice_id") or ""),
+                    "status": "unknown",
+                    "error_message": str(exc),
+                    "provider": "fanava",
+                })
+
+    direct_response: Dict[str, Any] = {"mode": "fanava", "results": []}
+    if direct_codes:
+        client = MoadianClient(settings=get_settings(), tax_setting=tax_setting)
+        try:
+            direct_response = client.inquire_status(sorted(direct_codes))
+        finally:
+            client.close()
+        direct_results = [_enrich_inquiry_result_item(item) for item in (direct_response.get("results") or [])]
+        for item in direct_results:
+            reference = item.get("reference_number") or item.get("tracking_code")
+            if not reference:
+                continue
+            doc = doc_by_tracking.get(str(reference))
+            if doc:
+                _apply_inquiry_result_to_document(doc, item, now=now)
+                db.add(doc)
+    else:
+        direct_results = []
+
+    results = direct_results + fanava_results
 
     return {
-        "mode": response.get("mode"),
+        "mode": "mixed" if direct_codes and fanava_results else direct_response.get("mode", "fanava"),
         "results": results,
     }
 
@@ -566,7 +703,16 @@ def _apply_submission_result(
     extra["tax_tracking_code"] = submission.get("tracking_code") or extra.get("tax_tracking_code")
     extra["tax_last_send_at"] = submission.get("sent_at") or datetime.datetime.utcnow().isoformat()
     extra["tax_last_submission_mode"] = submission_mode
-    if submission_mode == "cancel":
+    provider_code = submission.get("provider") or submission.get("mode")
+    if provider_code in ("moadian_direct", "fanava"):
+        extra["tax_submission_provider"] = provider_code
+    if submission.get("fanava_invoice_id"):
+        extra["fanava_latest_invoice_id"] = int(submission["fanava_invoice_id"])
+    if submission.get("tax_id"):
+        extra["tax_moadian_taxid"] = submission["tax_id"]
+    if submission.get("raw_response"):
+        extra["tax_provider_last_response"] = submission["raw_response"]
+    if submission_mode == "cancel" and provider_code != "fanava":
         extra["tax_cancelled_in_modian"] = True
         extra["tax_cancelled_at"] = extra["tax_last_send_at"]
     if submission_mode == "corrective":

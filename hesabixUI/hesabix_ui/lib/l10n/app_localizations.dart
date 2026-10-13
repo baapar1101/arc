@@ -37144,6 +37144,171 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unit volume (m³)'**
   String get distributionUnitVolumeM3;
+  /// Localized text for @taxSubmissionMethodLabel.
+  String get taxSubmissionMethodLabel;
+
+  /// Localized text for @taxSubmissionDirect.
+  String get taxSubmissionDirect;
+
+  /// Localized text for @taxSubmissionFanava.
+  String get taxSubmissionFanava;
+
+  /// Localized text for @taxSubmissionDirectDescription.
+  String get taxSubmissionDirectDescription;
+
+  /// Localized text for @taxSubmissionFanavaDescription.
+  String get taxSubmissionFanavaDescription;
+
+  /// Localized text for @fanavaUnavailable.
+  String get fanavaUnavailable;
+
+  /// Localized text for @fanavaConnected.
+  String get fanavaConnected;
+
+  /// Localized text for @fanavaNotConnected.
+  String get fanavaNotConnected;
+
+  /// Localized text for @fanavaSyncAccount.
+  String get fanavaSyncAccount;
+
+  /// Localized text for @fanavaConsentTitle.
+  String get fanavaConsentTitle;
+
+  /// Localized text for @fanavaConsentDescription.
+  String get fanavaConsentDescription;
+
+  /// Localized text for @fanavaConsentCheckbox.
+  String get fanavaConsentCheckbox;
+
+  /// Localized text for @fanavaRegistrationDataTitle.
+  String get fanavaRegistrationDataTitle;
+
+  /// Localized text for @fanavaRegistrationDataHint.
+  String get fanavaRegistrationDataHint;
+
+  /// Localized text for @fanavaFirstName.
+  String get fanavaFirstName;
+
+  /// Localized text for @fanavaLastName.
+  String get fanavaLastName;
+
+  /// Localized text for @fanavaFatherName.
+  String get fanavaFatherName;
+
+  /// Localized text for @fanavaNationalCode.
+  String get fanavaNationalCode;
+
+  /// Localized text for @fanavaIdentificationNumber.
+  String get fanavaIdentificationNumber;
+
+  /// Localized text for @fanavaBirthDate.
+  String get fanavaBirthDate;
+
+  /// Localized text for @fanavaPhoneNumber.
+  String get fanavaPhoneNumber;
+
+  /// Localized text for @fanavaEnableButton.
+  String get fanavaEnableButton;
+
+  /// Localized text for @fanavaConnectedSuccess.
+  String get fanavaConnectedSuccess;
+
+  /// Localized text for @fanavaSyncSuccess.
+  String get fanavaSyncSuccess;
+
+  /// Localized text for @fanavaAccountPending.
+  String get fanavaAccountPending;
+
+  /// Localized text for @fanavaAccountFailed.
+  String get fanavaAccountFailed;
+
+  /// Localized text for @taxProviderAdminTitle.
+  String get taxProviderAdminTitle;
+
+  /// Localized text for @taxProviderAdminDescription.
+  String get taxProviderAdminDescription;
+
+  /// Localized text for @taxProviderBaseUrl.
+  String get taxProviderBaseUrl;
+
+  /// Localized text for @taxProviderBrokerUsername.
+  String get taxProviderBrokerUsername;
+
+  /// Localized text for @taxProviderBrokerPassword.
+  String get taxProviderBrokerPassword;
+
+  /// Localized text for @taxProviderBrokerUsernameHint.
+  String get taxProviderBrokerUsernameHint;
+
+  /// Localized text for @taxProviderBrokerPasswordHint.
+  String get taxProviderBrokerPasswordHint;
+
+  /// Localized text for @taxProviderBrokerCode.
+  String get taxProviderBrokerCode;
+
+  /// Localized text for @taxProviderContractDuration.
+  String get taxProviderContractDuration;
+
+  /// Localized text for @taxProviderActivate.
+  String get taxProviderActivate;
+
+  /// Localized text for @taxProviderSave.
+  String get taxProviderSave;
+
+  /// Localized text for @taxProviderTest.
+  String get taxProviderTest;
+
+  /// Localized text for @taxProviderSaved.
+  String get taxProviderSaved;
+
+  /// Localized text for @taxProviderTestSuccess.
+  String get taxProviderTestSuccess;
+
+  /// Localized text for @taxProviderNotConfigured.
+  String get taxProviderNotConfigured;
+
+  /// Localized text for @taxProviderActiveState.
+  String get taxProviderActiveState;
+
+  /// Localized text for @settingsTaxProviders.
+  String get settingsTaxProviders;
+
+  /// Localized text for @settingsTaxProvidersDescription.
+  String get settingsTaxProvidersDescription;
+
+  /// Localized text for @taxProviderInvalidUrl.
+  String get taxProviderInvalidUrl;
+
+  /// Localized text for @taxProviderNumericBrokerCode.
+  String get taxProviderNumericBrokerCode;
+
+  /// Localized text for @taxProviderContractRange.
+  String get taxProviderContractRange;
+
+  /// Localized text for @taxProviderActive.
+  String get taxProviderActive;
+
+  /// Localized text for @taxProviderInactive.
+  String get taxProviderInactive;
+
+  /// Localized text for @fanavaSandboxUnavailable.
+  String get fanavaSandboxUnavailable;
+
+  /// Localized text for @taxProviderBrokerCount.
+  String get taxProviderBrokerCount;
+
+  /// Localized text for @taxProviderActiveBrokerCount.
+  String get taxProviderActiveBrokerCount;
+
+  /// Localized text for @taxProviderEnabledHint.
+  String get taxProviderEnabledHint;
+
+  /// Localized text for @taxProviderDisabledHint.
+  String get taxProviderDisabledHint;
+
+  /// Localized text for @taxProviderSaveBeforeTest.
+  String get taxProviderSaveBeforeTest;
+
 }
 
 class _AppLocalizationsDelegate

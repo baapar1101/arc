@@ -37,6 +37,9 @@ class TaxSetting(Base):
     certificate: Mapped[str | None] = mapped_column(Text, nullable=True)
     certificate_request: Mapped[str | None] = mapped_column(Text, nullable=True)
     sandbox_mode: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    submission_provider: Mapped[str] = mapped_column(
+        String(40), nullable=False, default="moadian_direct", server_default="moadian_direct"
+    )
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(

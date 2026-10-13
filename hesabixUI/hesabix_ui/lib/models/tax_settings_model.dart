@@ -12,6 +12,10 @@ class TaxSettingsModel {
   final List<TaxConfigurationWarning> configurationWarnings;
   final TaxIdentityCheck? identityCheck;
   final String? suggestedPersonType;
+  final String submissionProvider;
+  final bool fanavaAvailable;
+  final Map<String, dynamic>? fanavaAccount;
+  final Map<String, dynamic> enrollmentPrefill;
 
   const TaxSettingsModel({
     required this.businessId,
@@ -27,6 +31,10 @@ class TaxSettingsModel {
     this.configurationWarnings = const [],
     this.identityCheck,
     this.suggestedPersonType,
+    this.submissionProvider = 'moadian_direct',
+    this.fanavaAvailable = false,
+    this.fanavaAccount,
+    this.enrollmentPrefill = const {},
   });
 
   factory TaxSettingsModel.fromJson(Map<String, dynamic> json) {
@@ -50,6 +58,14 @@ class TaxSettingsModel {
           ? TaxIdentityCheck.fromJson(json['identity_check'] as Map<String, dynamic>)
           : null,
       suggestedPersonType: json['suggested_person_type']?.toString(),
+      submissionProvider: json['submission_provider']?.toString() ?? 'moadian_direct',
+      fanavaAvailable: json['fanava_available'] == true,
+      fanavaAccount: json['fanava_account'] is Map
+          ? Map<String, dynamic>.from(json['fanava_account'] as Map)
+          : null,
+      enrollmentPrefill: json['enrollment_prefill'] is Map
+          ? Map<String, dynamic>.from(json['enrollment_prefill'] as Map)
+          : const {},
     );
   }
 
@@ -86,6 +102,10 @@ class TaxSettingsModel {
     List<TaxConfigurationWarning>? configurationWarnings,
     TaxIdentityCheck? identityCheck,
     String? suggestedPersonType,
+    String? submissionProvider,
+    bool? fanavaAvailable,
+    Map<String, dynamic>? fanavaAccount,
+    Map<String, dynamic>? enrollmentPrefill,
   }) {
     return TaxSettingsModel(
       businessId: businessId,
@@ -101,6 +121,10 @@ class TaxSettingsModel {
       configurationWarnings: configurationWarnings ?? this.configurationWarnings,
       identityCheck: identityCheck ?? this.identityCheck,
       suggestedPersonType: suggestedPersonType ?? this.suggestedPersonType,
+      submissionProvider: submissionProvider ?? this.submissionProvider,
+      fanavaAvailable: fanavaAvailable ?? this.fanavaAvailable,
+      fanavaAccount: fanavaAccount ?? this.fanavaAccount,
+      enrollmentPrefill: enrollmentPrefill ?? this.enrollmentPrefill,
     );
   }
 }

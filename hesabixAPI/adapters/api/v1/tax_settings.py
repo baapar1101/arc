@@ -30,6 +30,12 @@ from app.services.tax_key_material_service import (
     validate_generate_keys_request,
     validate_tax_setting_key_material,
 )
+from app.services.tax_provider_service import (
+    get_business_provider_state,
+    select_business_provider,
+    fanava_business_call,
+    sync_business_fanava_account,
+)
 
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
@@ -52,6 +58,192 @@ def get_tax_settings_endpoint(
     return success_response(data=data, request=request, message="TAX_SETTINGS_FETCHED")
 
 
+@router.get("/business/{business_id}/provider")
+@require_business_access("business_id")
+def get_tax_provider_endpoint(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("moadian", "manage_settings")),
+):
+    ensure_moadian_plugin_active(db, business_id)
+    return success_response(get_business_provider_state(db, business_id), request, "TAX_PROVIDER_STATE")
+
+
+@router.post("/business/{business_id}/provider")
+@require_business_access("business_id")
+def select_tax_provider_endpoint(
+    request: Request,
+    business_id: int,
+    payload: Dict[str, Any] = Body(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("moadian", "manage_settings")),
+):
+    ensure_moadian_plugin_active(db, business_id)
+    provider_code = str(payload.get("provider_code") or "").strip().lower()
+    consented_by_user_id = ctx.get_user_id()
+    if provider_code == "fanava" and not consented_by_user_id:
+        raise ApiError("UNAUTHORIZED", "برای ثبت رضایت باید کاربر وارد شده باشد.", http_status=401)
+    select_business_provider(
+        db,
+        business_id=business_id,
+        provider_code=provider_code,
+        consent=bool(payload.get("consent")),
+        consented_by_user_id=consented_by_user_id,
+        enrollment=payload.get("enrollment") if isinstance(payload.get("enrollment"), dict) else {},
+    )
+    # Keep the response shape identical to GET /tax-settings/business/{id};
+    # the client model also owns the existing key material and memory settings.
+    setting = get_tax_setting(db, business_id)
+    data = serialize_tax_setting(setting, business_id=business_id, db=db)
+    return success_response(data, request, "TAX_PROVIDER_UPDATED")
+
+
+@router.post("/business/{business_id}/fanava/sync")
+@require_business_access("business_id")
+def sync_fanava_account_endpoint(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("moadian", "manage_settings")),
+):
+    ensure_moadian_plugin_active(db, business_id)
+    return success_response(sync_business_fanava_account(db, business_id), request, "FANAVA_ACCOUNT_SYNCED")
+
+
+@router.get("/business/{business_id}/fanava/invoices")
+@require_business_access("business_id")
+def list_fanava_invoices_endpoint(
+    request: Request,
+    business_id: int,
+    page: int = 0,
+    size: int = 50,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("moadian", "operate")),
+):
+    ensure_moadian_plugin_active(db, business_id)
+    if page < 0 or not 1 <= size <= 50:
+        raise ApiError("INVALID_PAGINATION", "محدودهٔ صفحه‌بندی نامعتبر است.", http_status=400)
+    result = fanava_business_call(
+        db, business_id,
+        lambda client, token, account: client.list_invoices(token, int(account.cartable_id), page=page, size=size),
+    )
+    return success_response(result, request, "FANAVA_INVOICES_LISTED")
+
+
+@router.get("/business/{business_id}/fanava/invoices/{fanava_invoice_id}")
+@require_business_access("business_id")
+def get_fanava_invoice_endpoint(
+    request: Request,
+    business_id: int,
+    fanava_invoice_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("moadian", "operate")),
+):
+    ensure_moadian_plugin_active(db, business_id)
+    result = fanava_business_call(
+        db, business_id,
+        lambda client, token, account: client.get_invoice(token, int(account.cartable_id), fanava_invoice_id),
+    )
+    return success_response(result, request, "FANAVA_INVOICE_FETCHED")
+
+
+@router.post("/business/{business_id}/fanava/invoices/{fanava_invoice_id}/check-status")
+@require_business_access("business_id")
+def check_fanava_invoice_endpoint(
+    request: Request,
+    business_id: int,
+    fanava_invoice_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("moadian", "operate")),
+):
+    ensure_moadian_plugin_active(db, business_id)
+    result = fanava_business_call(
+        db, business_id,
+        lambda client, token, account: client.check_status(token, int(account.cartable_id), fanava_invoice_id),
+    )
+    return success_response({"history": result}, request, "FANAVA_INVOICE_STATUS_CHECKED")
+
+
+@router.post("/business/{business_id}/fanava/invoices/{fanava_invoice_id}/inquiry-status")
+@require_business_access("business_id")
+def inquire_fanava_invoice_endpoint(
+    request: Request,
+    business_id: int,
+    fanava_invoice_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("moadian", "operate")),
+):
+    ensure_moadian_plugin_active(db, business_id)
+    history = fanava_business_call(
+        db, business_id,
+        lambda client, token, account: client.check_status(token, int(account.cartable_id), fanava_invoice_id),
+    )
+    latest = history[-1] if history else {}
+    if str(latest.get("status") or "").upper() != "SUCCESS":
+        raise ApiError(
+            "FANAVA_INVOICE_NOT_READY_FOR_INQUIRY",
+            "استعلام نهایی فقط پس از موفقیت پردازش صورتحساب در فن‌آوا امکان‌پذیر است.",
+            http_status=409,
+        )
+    result = fanava_business_call(
+        db, business_id,
+        lambda client, token, account: client.inquiry_status(token, int(account.cartable_id), fanava_invoice_id),
+    )
+    return success_response(result, request, "FANAVA_INVOICE_INQUIRED")
+
+
+@router.delete("/business/{business_id}/fanava/invoices/{fanava_invoice_id}")
+@require_business_access("business_id")
+def delete_fanava_invoice_endpoint(
+    request: Request,
+    business_id: int,
+    fanava_invoice_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("moadian", "manage_settings")),
+):
+    ensure_moadian_plugin_active(db, business_id)
+    history = fanava_business_call(
+        db, business_id,
+        lambda client, token, account: client.check_status(token, int(account.cartable_id), fanava_invoice_id),
+    )
+    latest = history[-1] if history else {}
+    if str(latest.get("status") or "").upper() != "SAVE":
+        raise ApiError("FANAVA_INVOICE_DELETE_NOT_ALLOWED", "فقط صورتحساب ذخیره‌شده و ارسال‌نشده از فن‌آوا قابل حذف است.", http_status=409)
+    result = fanava_business_call(
+        db, business_id,
+        lambda client, token, account: client.delete_invoice(token, int(account.cartable_id), fanava_invoice_id),
+    )
+    return success_response({"deleted": True, "result": result}, request, "FANAVA_INVOICE_DELETED")
+
+
+@router.get("/business/{business_id}/fanava/invoice-fields/{code}/subject/{subject}")
+@require_business_access("business_id")
+def get_fanava_invoice_fields_endpoint(
+    request: Request,
+    business_id: int,
+    code: str,
+    subject: str,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("moadian", "operate")),
+):
+    ensure_moadian_plugin_active(db, business_id)
+    result = fanava_business_call(
+        db, business_id,
+        lambda client, token, account: client.invoice_fields_format(token, code, subject),
+    )
+    return success_response(result, request, "FANAVA_INVOICE_FIELDS_FETCHED")
+
+
 @router.post("/business/{business_id}")
 @require_business_access("business_id")
 def save_tax_settings_endpoint(
@@ -68,6 +260,14 @@ def save_tax_settings_endpoint(
         raise ApiError("UNAUTHORIZED", "Authentication required", http_status=401)
 
     validate_tax_setting_key_material(payload.dict())
+
+    current_setting = get_tax_setting(db, business_id)
+    if current_setting and current_setting.submission_provider == "fanava" and payload.sandbox_mode:
+        raise ApiError(
+            "FANAVA_SANDBOX_UNAVAILABLE",
+            "فن‌آوا محیط آزمایشی ندارد؛ ابتدا روش ارسال مستقیم را انتخاب کنید.",
+            http_status=400,
+        )
 
     setting = upsert_tax_setting(
         db,
