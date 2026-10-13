@@ -126,6 +126,7 @@ adapters/api/v1/admin/storage_plans.py
 adapters/api/v1/admin/support_billing.py
 adapters/api/v1/admin/system_services.py
 adapters/api/v1/admin/system_settings.py
+adapters/api/v1/admin/tax_providers.py
 adapters/api/v1/admin/users_permissions.py
 adapters/api/v1/admin/wallet_admin.py
 adapters/api/v1/admin/zohal.py
@@ -277,6 +278,7 @@ adapters/db/models/fiscal_year.py
 adapters/db/models/fx_rate_provider.py
 adapters/db/models/goods_expense_income.py
 adapters/db/models/hscript_report.py
+adapters/db/models/inventory_discrepancy.py
 adapters/db/models/invoice_item_line.py
 adapters/db/models/label_template.py
 adapters/db/models/marketplace.py
@@ -316,6 +318,7 @@ adapters/db/models/sms_destination_send_log.py
 adapters/db/models/storage_plan.py
 adapters/db/models/system_setting.py
 adapters/db/models/tax_failed_invoice.py
+adapters/db/models/tax_provider.py
 adapters/db/models/tax_setting.py
 adapters/db/models/tax_type.py
 adapters/db/models/tax_unit.py
@@ -454,6 +457,8 @@ app/core/woocommerce_bridge_rate_limit.py
 app/core/woocommerce_bridge_security.py
 app/core/woocommerce_dev_flags.py
 app/core/woocommerce_plugin_dependency.py
+app/integrations/fanava/__init__.py
+app/integrations/fanava/client.py
 app/integrations/moadian/__init__.py
 app/integrations/moadian/certificate.py
 app/integrations/moadian/client.py
@@ -567,6 +572,7 @@ app/services/email_verification_service.py
 app/services/encryption_service.py
 app/services/expense_income_bulk_upsert_service.py
 app/services/expense_income_service.py
+app/services/fanava_tax_submission_service.py
 app/services/file_dependency_service.py
 app/services/file_storage_service.py
 app/services/file_storage_share_service.py
@@ -585,6 +591,7 @@ app/services/goods_expense_income_service.py
 app/services/hscript_report_service.py
 app/services/hscript_schedule_background_jobs.py
 app/services/hscript_schedule_service.py
+app/services/inventory_discrepancy_service.py
 app/services/invoice_adjustments_service.py
 app/services/invoice_bulk_upsert_service.py
 app/services/invoice_cogs_gl_service.py
@@ -697,6 +704,7 @@ app/services/tax_key_material_service.py
 app/services/tax_logging.py
 app/services/tax_payload_builder.py
 app/services/tax_product_code_service.py
+app/services/tax_provider_service.py
 app/services/tax_rate_limiter.py
 app/services/tax_reference_service.py
 app/services/tax_setting_health_service.py
@@ -1233,6 +1241,8 @@ migrations/versions/20260906_000001_distribution_map_tile_source.py
 migrations/versions/20260907_000001_distribution_live_location.py
 migrations/versions/20260907_000002_distribution_field_ops_upgrade.py
 migrations/versions/20261003_000001_product_bundles.py
+migrations/versions/20261012_000001_quick_sales_stock_shortage.py
+migrations/versions/20261012_000002_tax_provider_accounts.py
 tests/__init__.py
 tests/test_account_balance_core.py
 tests/test_account_tree_roots.py
@@ -1364,6 +1374,7 @@ tests/test_hscript_phase7.py
 tests/test_hscript_phase8.py
 tests/test_hscript_phase9.py
 tests/test_hscript_runtime.py
+tests/test_inventory_discrepancy_service.py
 tests/test_invoice_cogs_gl_service.py
 tests/test_invoice_payable_total.py
 tests/test_invoice_payment_documents.py

@@ -20247,169 +20247,192 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get distributionUnitVolumeM3 => 'Unit volume (m³)';
-  @override
-  String get taxSubmissionMethodLabel => "Invoice submission method";
 
   @override
-  String get taxSubmissionDirect => "Direct submission";
+  String get taxSubmissionMethodLabel => 'Invoice submission method';
 
   @override
-  String get taxSubmissionFanava => "Submit through Hamrah Fanava";
+  String get taxSubmissionDirect => 'Direct submission';
 
   @override
-  String get taxSubmissionDirectDescription => "Use the direct Taxpayer System connection configured for this business";
+  String get taxSubmissionFanava => 'Submit through Hamrah Fanava';
 
   @override
-  String get taxSubmissionFanavaDescription => "Automatically register and submit invoices through the Fanava broker using the tax configuration already saved in Hesabix";
+  String get taxSubmissionDirectDescription =>
+      'Use the direct Taxpayer System connection configured for this business';
 
   @override
-  String get fanavaUnavailable => "Fanava has not been configured by a system administrator yet.";
+  String get taxSubmissionFanavaDescription =>
+      'Automatically register and submit invoices through the Fanava broker using the tax configuration already saved in Hesabix';
 
   @override
-  String get fanavaConnected => "The Fanava account for this business is connected.";
+  String get fanavaUnavailable =>
+      'Fanava has not been configured by a system administrator yet.';
 
   @override
-  String get fanavaNotConnected => "After your approval, the business account will be registered automatically with Fanava.";
+  String get fanavaConnected =>
+      'The Fanava account for this business is connected.';
 
   @override
-  String get fanavaSyncAccount => "Refresh connection";
+  String get fanavaNotConnected =>
+      'After your approval, the business account will be registered automatically with Fanava.';
 
   @override
-  String get fanavaConsentTitle => "Enable submission through Fanava";
+  String get fanavaSyncAccount => 'Refresh connection';
 
   @override
-  String get fanavaConsentDescription => "If you continue, Hesabix will create a tax account in the Fanava broker using the owner details and tax profile saved for this business. Hesabix stores the generated login securely and uses the existing tax configuration to submit invoices.";
+  String get fanavaConsentTitle => 'Enable submission through Fanava';
 
   @override
-  String get fanavaConsentCheckbox => "I authorize Hesabix to create a Fanava account for this business and use it to submit invoices.";
+  String get fanavaConsentDescription =>
+      'If you continue, Hesabix will create a tax account in the Fanava broker using the owner details and tax profile saved for this business. Hesabix stores the generated login securely and uses the existing tax configuration to submit invoices.';
 
   @override
-  String get fanavaRegistrationDataTitle => "Owner details for automatic registration";
+  String get fanavaConsentCheckbox =>
+      'I authorize Hesabix to create a Fanava account for this business and use it to submit invoices.';
 
   @override
-  String get fanavaRegistrationDataHint => "Existing Hesabix details are prefilled. Complete missing fields and verify the name and phone number before registration.";
+  String get fanavaRegistrationDataTitle =>
+      'Owner details for automatic registration';
 
   @override
-  String get fanavaFirstName => "Owner first name";
+  String get fanavaRegistrationDataHint =>
+      'Existing Hesabix details are prefilled. Complete missing fields and verify the name and phone number before registration.';
 
   @override
-  String get fanavaLastName => "Owner last name";
+  String get fanavaFirstName => 'Owner first name';
 
   @override
-  String get fanavaFatherName => "Father name";
+  String get fanavaLastName => 'Owner last name';
 
   @override
-  String get fanavaNationalCode => "Owner/representative national code";
+  String get fanavaFatherName => 'Father name';
 
   @override
-  String get fanavaIdentificationNumber => "Identity document number";
+  String get fanavaNationalCode => 'Owner/representative national code';
 
   @override
-  String get fanavaBirthDate => "Solar Hijri birth date (year/month/day)";
+  String get fanavaIdentificationNumber => 'Identity document number';
 
   @override
-  String get fanavaPhoneNumber => "Mobile number";
+  String get fanavaBirthDate => 'Solar Hijri birth date (year/month/day)';
 
   @override
-  String get fanavaEnableButton => "Approve and connect Fanava";
+  String get fanavaPhoneNumber => 'Mobile number';
 
   @override
-  String get fanavaConnectedSuccess => "The business account was registered and connected with Fanava.";
+  String get fanavaEnableButton => 'Approve and connect Fanava';
 
   @override
-  String get fanavaSyncSuccess => "Fanava connection details were refreshed.";
+  String get fanavaConnectedSuccess =>
+      'The business account was registered and connected with Fanava.';
 
   @override
-  String get fanavaAccountPending => "Fanava registration is being checked. Refresh the connection later to avoid creating a duplicate account.";
+  String get fanavaSyncSuccess => 'Fanava connection details were refreshed.';
 
   @override
-  String get fanavaAccountFailed => "Fanava account registration failed. Review the details and try again.";
+  String get fanavaAccountPending =>
+      'Fanava registration is being checked. Refresh the connection later to avoid creating a duplicate account.';
 
   @override
-  String get taxProviderAdminTitle => "Hamrah Fanava broker connection";
+  String get fanavaAccountFailed =>
+      'Fanava account registration failed. Review the details and try again.';
 
   @override
-  String get taxProviderAdminDescription => "Configure broker credentials once for the system. Businesses are registered automatically after they approve Fanava.";
+  String get taxProviderAdminTitle => 'Hamrah Fanava broker connection';
 
   @override
-  String get taxProviderBaseUrl => "Fanava API URL";
+  String get taxProviderAdminDescription =>
+      'Configure broker credentials once for the system. Businesses are registered automatically after they approve Fanava.';
 
   @override
-  String get taxProviderBrokerUsername => "Broker username";
+  String get taxProviderBaseUrl => 'Fanava API URL';
 
   @override
-  String get taxProviderBrokerPassword => "Broker password";
+  String get taxProviderBrokerUsername => 'Broker username';
 
   @override
-  String get taxProviderBrokerUsernameHint => "Leave blank to keep the saved username.";
+  String get taxProviderBrokerPassword => 'Broker password';
 
   @override
-  String get taxProviderBrokerPasswordHint => "Leave blank to keep the saved password.";
+  String get taxProviderBrokerUsernameHint =>
+      'Leave blank to keep the saved username.';
 
   @override
-  String get taxProviderBrokerCode => "Broker code";
+  String get taxProviderBrokerPasswordHint =>
+      'Leave blank to keep the saved password.';
 
   @override
-  String get taxProviderContractDuration => "Default contract duration (days)";
+  String get taxProviderBrokerCode => 'Broker code';
 
   @override
-  String get taxProviderActivate => "Enable Fanava registration and submission";
+  String get taxProviderContractDuration => 'Default contract duration (days)';
 
   @override
-  String get taxProviderSave => "Save Fanava settings";
+  String get taxProviderActivate => 'Enable Fanava registration and submission';
 
   @override
-  String get taxProviderTest => "Test broker connection";
+  String get taxProviderSave => 'Save Fanava settings';
 
   @override
-  String get taxProviderSaved => "Fanava broker settings were saved.";
+  String get taxProviderTest => 'Test broker connection';
 
   @override
-  String get taxProviderTestSuccess => "Login and broker list succeeded. No account or invoice was created.";
+  String get taxProviderSaved => 'Fanava broker settings were saved.';
 
   @override
-  String get taxProviderNotConfigured => "Broker credentials have not been saved yet.";
+  String get taxProviderTestSuccess =>
+      'Login and broker list succeeded. No account or invoice was created.';
 
   @override
-  String get taxProviderActiveState => "Broker connection status";
+  String get taxProviderNotConfigured =>
+      'Broker credentials have not been saved yet.';
 
   @override
-  String get settingsTaxProviders => "Tax submission providers";
+  String get taxProviderActiveState => 'Broker connection status';
 
   @override
-  String get settingsTaxProvidersDescription => "Configure tax brokers such as Hamrah Fanava";
+  String get settingsTaxProviders => 'Tax submission providers';
 
   @override
-  String get taxProviderInvalidUrl => "Enter a valid HTTPS URL.";
+  String get settingsTaxProvidersDescription =>
+      'Configure tax brokers such as Hamrah Fanava';
 
   @override
-  String get taxProviderNumericBrokerCode => "Broker code must be numeric.";
+  String get taxProviderInvalidUrl => 'Enter a valid HTTPS URL.';
 
   @override
-  String get taxProviderContractRange => "Contract duration must be between 1 and 3650 days.";
+  String get taxProviderNumericBrokerCode => 'Broker code must be numeric.';
 
   @override
-  String get taxProviderActive => "Active";
+  String get taxProviderContractRange =>
+      'Contract duration must be between 1 and 3650 days.';
 
   @override
-  String get taxProviderInactive => "Inactive";
+  String get taxProviderActive => 'Active';
 
   @override
-  String get fanavaSandboxUnavailable => "Fanava has no sandbox. Turn off sandbox mode to select Fanava.";
+  String get taxProviderInactive => 'Inactive';
 
   @override
-  String get taxProviderBrokerCount => "Brokers";
+  String get fanavaSandboxUnavailable =>
+      'Fanava has no sandbox. Turn off sandbox mode to select Fanava.';
 
   @override
-  String get taxProviderActiveBrokerCount => "Active brokers";
+  String get taxProviderBrokerCount => 'Brokers';
 
   @override
-  String get taxProviderEnabledHint => "The connection is active. Businesses may register with Fanava after approval.";
+  String get taxProviderActiveBrokerCount => 'Active brokers';
 
   @override
-  String get taxProviderDisabledHint => "The connection is disabled. Businesses cannot select Fanava.";
+  String get taxProviderEnabledHint =>
+      'The connection is active. Businesses may register with Fanava after approval.';
 
   @override
-  String get taxProviderSaveBeforeTest => "Save the new broker credentials before testing the connection.";
+  String get taxProviderDisabledHint =>
+      'The connection is disabled. Businesses cannot select Fanava.';
 
+  @override
+  String get taxProviderSaveBeforeTest =>
+      'Save the new broker credentials before testing the connection.';
 }
