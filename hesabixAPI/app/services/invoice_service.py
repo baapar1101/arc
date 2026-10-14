@@ -2775,6 +2775,18 @@ def _quick_sale_change_amount(document: Document, payments: List[Dict[str, Any]]
     return max(Decimal(0), paid - total)
 
 
+def _quick_sale_change_document_amount(document: Document) -> Decimal:
+    """مبلغی که واقعاً از سند برگشت فروش سریع به مشتری پرداخت شده است."""
+    extra = document.extra_info if isinstance(document.extra_info, dict) else {}
+    raw = extra.get("returned_amount", extra.get("change_amount"))
+    if raw is not None:
+        try:
+            return max(Decimal(0), Decimal(str(raw)))
+        except Exception:
+            pass
+    return _sum_receipt_doc_account_payments(document)
+
+
 def _create_quick_sale_change_payment(
     db: Session,
     *,
@@ -2785,15 +2797,24 @@ def _create_quick_sale_change_payment(
     payments: List[Dict[str, Any]],
     change_request: Dict[str, Any] | None,
 ) -> int | None:
-    """ثبت وجه برگشتی فروش سریع از صندوق، در همان تراکنش ساخت فاکتور."""
+    """ثبت تعیین تکلیف اضافه‌دریافت فروش سریع در همان تراکنش فاکتور."""
     change_amount = _quick_sale_change_amount(document, payments)
     if change_amount <= Decimal("0.01"):
         return None
     request = dict(change_request) if isinstance(change_request, dict) else {}
-    if request.get("confirmed_returned") is not True:
+    # ثبت بدون تعیین منبع برگشت برای مشتری مشخص، کل اضافه‌دریافت را
+    # بستانکاری مشتری نگه می‌دارد. مشتری ناشناس پایین‌تر رد می‌شود.
+    if not request:
+        request = {
+            "confirmed": True,
+            "amount": change_amount,
+            "credit_amount": change_amount,
+            "allocations": [],
+        }
+    if request.get("confirmed") is not True and request.get("confirmed_returned") is not True:
         raise ApiError(
             "QUICK_SALE_CHANGE_CONFIRMATION_REQUIRED",
-            "باید پرداخت مبلغ قابل برگشت به مشتری تأیید شود",
+            "باید تعیین تکلیف مبلغ اضافه‌دریافت تأیید شود",
             http_status=400,
         )
     requested_amount = Decimal(str(request.get("amount", 0) or 0))
@@ -2803,35 +2824,235 @@ def _create_quick_sale_change_payment(
             "مبلغ قابل برگشت با اضافه‌پرداخت فاکتور هم‌خوانی ندارد",
             http_status=400,
         )
-    try:
-        cash_register_id = int(request.get("cash_register_id"))
-    except (TypeError, ValueError) as exc:
+
+    allocations = request.get("allocations")
+    # سازگاری با کلاینت قبلی: تمام مبلغ از یک صندوق برگردانده می‌شد.
+    if not isinstance(allocations, list):
+        allocations = []
+        if request.get("cash_register_id") is not None:
+            allocations.append({
+                "source_type": "cash_register",
+                "source_id": request.get("cash_register_id"),
+                "amount": requested_amount,
+            })
+    if len(allocations) > 50:
         raise ApiError(
-            "QUICK_SALE_CHANGE_CASH_REGISTER_REQUIRED",
-            "برای برگشت وجه انتخاب صندوق نقدی الزامی است",
+            "QUICK_SALE_CHANGE_TOO_MANY_ALLOCATIONS",
+            "حداکثر ۵۰ ردیف برای برگشت وجه مجاز است",
+            http_status=400,
+        )
+
+    try:
+        credited_amount = Decimal(str(request.get("credit_amount", 0) or 0))
+    except Exception as exc:
+        raise ApiError(
+            "QUICK_SALE_CHANGE_CREDIT_INVALID",
+            "مبلغ بستانکاری مشتری نامعتبر است",
             http_status=400,
         ) from exc
-    register = (
-        db.query(CashRegister)
-        .filter(
-            CashRegister.id == cash_register_id,
-            CashRegister.business_id == int(business_id),
-            CashRegister.is_active == True,  # noqa: E712
-        )
-        .first()
-    )
-    if not register:
+    if credited_amount < 0:
         raise ApiError(
-            "QUICK_SALE_CHANGE_CASH_REGISTER_NOT_FOUND",
-            "صندوق برگشت وجه یافت نشد یا غیرفعال است",
-            http_status=404,
-        )
-    if int(register.currency_id) != int(document.currency_id):
-        raise ApiError(
-            "QUICK_SALE_CHANGE_CURRENCY_MISMATCH",
-            "ارز صندوق برگشت وجه با ارز فاکتور یکسان نیست",
+            "QUICK_SALE_CHANGE_CREDIT_INVALID",
+            "مبلغ بستانکاری مشتری نمی‌تواند منفی باشد",
             http_status=400,
         )
+
+    normalized_allocations: List[Dict[str, Any]] = []
+    returned_amount = Decimal(0)
+    total_bank_commission = Decimal(0)
+    for index, raw in enumerate(allocations):
+        if not isinstance(raw, dict):
+            raise ApiError(
+                "QUICK_SALE_CHANGE_ALLOCATION_INVALID",
+                f"ردیف برگشت {index + 1} نامعتبر است",
+                http_status=400,
+            )
+        source_type = str(raw.get("source_type") or "").strip().lower()
+        if source_type not in {"cash_register", "bank", "person"}:
+            raise ApiError(
+                "QUICK_SALE_CHANGE_SOURCE_INVALID",
+                "منبع برگشت وجه باید صندوق، بانک یا شخص باشد",
+                http_status=400,
+            )
+        try:
+            source_id = int(raw.get("source_id"))
+            amount = Decimal(str(raw.get("amount", 0) or 0))
+            commission = Decimal(str(raw.get("commission", 0) or 0))
+        except Exception as exc:
+            raise ApiError(
+                "QUICK_SALE_CHANGE_ALLOCATION_INVALID",
+                f"مبلغ یا منبع ردیف برگشت {index + 1} نامعتبر است",
+                http_status=400,
+            ) from exc
+        if source_id <= 0 or amount <= 0 or commission < 0:
+            raise ApiError(
+                "QUICK_SALE_CHANGE_ALLOCATION_INVALID",
+                f"اطلاعات ردیف برگشت {index + 1} کامل نیست",
+                http_status=400,
+            )
+        if source_type != "bank" and commission > 0:
+            raise ApiError(
+                "QUICK_SALE_CHANGE_COMMISSION_NOT_ALLOWED",
+                "کارمزد فقط برای برگشت وجه بانکی مجاز است",
+                http_status=400,
+            )
+        normalized_allocations.append({
+            "source_type": source_type,
+            "source_id": source_id,
+            "amount": amount,
+            "commission": commission,
+        })
+        returned_amount += amount
+        total_bank_commission += commission
+
+    if abs((returned_amount + credited_amount) - change_amount) > Decimal("0.01"):
+        raise ApiError(
+            "QUICK_SALE_CHANGE_RESOLUTION_MISMATCH",
+            "جمع وجه برگشتی و بستانکاری مشتری با اضافه‌دریافت فاکتور هم‌خوانی ندارد",
+            http_status=400,
+        )
+
+    if credited_amount > Decimal("0.01"):
+        from adapters.db.models.quick_sales_settings import QuickSalesSetting
+
+        settings = (
+            db.query(QuickSalesSetting)
+            .filter(QuickSalesSetting.business_id == int(business_id))
+            .first()
+        )
+        anonymous_id = getattr(settings, "default_anonymous_customer_id", None)
+        if anonymous_id is not None and int(anonymous_id) == int(person_id):
+            raise ApiError(
+                "QUICK_SALE_CHANGE_ANONYMOUS_CREDIT_NOT_ALLOWED",
+                "بستانکار کردن مشتری ناشناس مجاز نیست؛ وجه باید کامل برگردانده شود",
+                http_status=400,
+            )
+
+    account_lines: List[Dict[str, Any]] = []
+    resolution_rows: List[Dict[str, Any]] = []
+    receivable_account: Account | None = None
+    for allocation in normalized_allocations:
+        source_type = allocation["source_type"]
+        source_id = int(allocation["source_id"])
+        amount = Decimal(allocation["amount"])
+        commission = Decimal(allocation["commission"])
+        if source_type == "cash_register":
+            register = (
+                db.query(CashRegister)
+                .filter(
+                    CashRegister.id == source_id,
+                    CashRegister.business_id == int(business_id),
+                    CashRegister.is_active == True,  # noqa: E712
+                )
+                .first()
+            )
+            if not register:
+                raise ApiError(
+                    "QUICK_SALE_CHANGE_CASH_REGISTER_NOT_FOUND",
+                    "صندوق برگشت وجه یافت نشد یا غیرفعال است",
+                    http_status=404,
+                )
+            if int(register.currency_id) != int(document.currency_id):
+                raise ApiError(
+                    "QUICK_SALE_CHANGE_CURRENCY_MISMATCH",
+                    "ارز صندوق برگشت وجه با ارز فاکتور یکسان نیست",
+                    http_status=400,
+                )
+            account_lines.append({
+                "transaction_type": "cash_register",
+                "cash_register_id": source_id,
+                "cash_register_name": register.name,
+                "amount": float(amount),
+                "transaction_date": document.document_date.isoformat(),
+                "description": f"برگشت اضافه‌دریافت فاکتور {document.code}",
+            })
+            source_name = register.name
+        elif source_type == "bank":
+            bank = (
+                db.query(BankAccount)
+                .filter(
+                    BankAccount.id == source_id,
+                    BankAccount.business_id == int(business_id),
+                    BankAccount.is_active == True,  # noqa: E712
+                )
+                .first()
+            )
+            if not bank:
+                raise ApiError(
+                    "QUICK_SALE_CHANGE_BANK_NOT_FOUND",
+                    "حساب بانکی برگشت وجه یافت نشد یا غیرفعال است",
+                    http_status=404,
+                )
+            if int(bank.currency_id) != int(document.currency_id):
+                raise ApiError(
+                    "QUICK_SALE_CHANGE_CURRENCY_MISMATCH",
+                    "ارز حساب بانکی برگشت وجه با ارز فاکتور یکسان نیست",
+                    http_status=400,
+                )
+            account_lines.append({
+                "transaction_type": "bank",
+                "bank_id": source_id,
+                "bank_name": bank.name,
+                "amount": float(amount + commission),
+                "transaction_date": document.document_date.isoformat(),
+                "description": f"برگشت اضافه‌دریافت فاکتور {document.code}",
+            })
+            source_name = bank.name
+        else:
+            source_person = (
+                db.query(Person)
+                .filter(
+                    Person.id == source_id,
+                    Person.business_id == int(business_id),
+                )
+                .first()
+            )
+            if not source_person:
+                raise ApiError(
+                    "QUICK_SALE_CHANGE_PERSON_NOT_FOUND",
+                    "شخص پرداخت‌کننده برگشت وجه یافت نشد یا غیرفعال است",
+                    http_status=404,
+                )
+            if source_id == int(person_id):
+                raise ApiError(
+                    "QUICK_SALE_CHANGE_SOURCE_IS_CUSTOMER",
+                    "مشتری فاکتور نمی‌تواند منبع برگشت وجه همان فاکتور باشد",
+                    http_status=400,
+                )
+            if receivable_account is None:
+                receivable_account = (
+                    db.query(Account)
+                    .filter(Account.business_id.is_(None), Account.code == "10401")
+                    .first()
+                )
+                if not receivable_account:
+                    raise ApiError(
+                        "ACCOUNT_NOT_FOUND",
+                        "حساب دریافتنی اشخاص (10401) یافت نشد",
+                        http_status=500,
+                    )
+            account_lines.append({
+                "transaction_type": "account",
+                "account_id": int(receivable_account.id),
+                "person_id": source_id,
+                "detail_type": "person",
+                "detail_name": source_person.alias_name,
+                "amount": float(amount),
+                "transaction_date": document.document_date.isoformat(),
+                "description": f"برگشت وجه فاکتور {document.code} توسط شخص",
+            })
+            source_name = source_person.alias_name
+        resolution_rows.append({
+            "source_type": source_type,
+            "source_id": source_id,
+            "source_name": source_name,
+            "amount": float(amount),
+            "commission": float(commission),
+        })
+
+    if returned_amount <= Decimal("0.01"):
+        return None
+
     from app.services.receipt_payment_service import create_receipt_payment
 
     rp = create_receipt_payment(
@@ -2846,17 +3067,17 @@ def _create_quick_sale_change_payment(
             "description": f"برگشت اضافه‌دریافت فروش سریع فاکتور {document.code}",
             "person_lines": [{
                 "person_id": int(person_id),
-                "amount": float(change_amount),
+                "amount": float(returned_amount),
                 "description": f"وجه برگشتی فاکتور {document.code}",
+                "extra_info": {"invoice_id": int(document.id)},
             }],
-            "account_lines": [{
-                "transaction_type": "cash_register",
-                "cash_register_id": cash_register_id,
-                "cash_register_name": register.name,
-                "amount": float(change_amount),
-                "transaction_date": document.document_date.isoformat(),
-                "description": f"برگشت اضافه‌دریافت فاکتور {document.code}",
-            }],
+            "account_lines": account_lines,
+            "fx_adjustment_lines": ([{
+                "account_code": "70902",
+                "side": "debit",
+                "amount": float(total_bank_commission),
+                "description": "کارمزد خدمات بانکی برگشت وجه فروش سریع",
+            }] if total_bank_commission > 0 else []),
             "extra_info": {
                 "source": "quick_sale_change",
                 "invoice_id": int(document.id),
@@ -2872,7 +3093,12 @@ def _create_quick_sale_change_payment(
                         )
                     )
                 ),
-                "change_amount": float(change_amount),
+                "overpayment_amount": float(change_amount),
+                "change_amount": float(returned_amount),
+                "returned_amount": float(returned_amount),
+                "credited_amount": float(credited_amount),
+                "bank_commission": float(total_bank_commission),
+                "allocations": resolution_rows,
             },
         },
     )
@@ -10656,7 +10882,7 @@ def batch_calculate_invoices_remaining(
                 continue
             processed_doc_ids.add(doc_id_int)
             if (rp_doc.extra_info or {}).get("source") == "quick_sale_change":
-                total_paid -= _sum_receipt_doc_account_payments(rp_doc)
+                total_paid -= _quick_sale_change_document_amount(rp_doc)
             else:
                 total_paid += _sum_receipt_doc_payments_for_invoice(
                     rp_doc, inv_id, via_person_line=True
@@ -10671,7 +10897,7 @@ def batch_calculate_invoices_remaining(
             change_doc = rp_docs_by_id.get(parsed_change_doc_id)
             if change_doc:
                 processed_doc_ids.add(parsed_change_doc_id)
-                total_paid -= _sum_receipt_doc_account_payments(change_doc)
+                total_paid -= _quick_sale_change_document_amount(change_doc)
 
         remaining = total_amount - total_paid
         results[inv_id] = {
@@ -10801,7 +11027,7 @@ def calculate_invoice_remaining(
                     continue
                 processed_doc_ids.add(doc.id)
                 if (doc.extra_info or {}).get("source") == "quick_sale_change":
-                    total_paid -= _sum_receipt_doc_account_payments(doc)
+                    total_paid -= _quick_sale_change_document_amount(doc)
                 else:
                     total_paid += _sum_receipt_doc_payments_for_invoice(
                         doc, invoice_id, via_person_line=True
@@ -10825,7 +11051,7 @@ def calculate_invoice_remaining(
             )
             if change_doc:
                 processed_doc_ids.add(parsed_change_doc_id)
-                total_paid -= _sum_receipt_doc_account_payments(change_doc)
+                total_paid -= _quick_sale_change_document_amount(change_doc)
         
         remaining = total_amount - total_paid
         

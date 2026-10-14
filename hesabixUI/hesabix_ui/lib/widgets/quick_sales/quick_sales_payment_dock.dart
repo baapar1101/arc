@@ -9,6 +9,7 @@ import '../../core/auth_store.dart';
 import '../../models/invoice_transaction.dart';
 import '../../models/person_model.dart';
 import '../../models/quick_sales_payment_button.dart';
+import '../../models/quick_sales_change_resolution.dart';
 import '../../services/person_service.dart';
 import '../../services/quick_sales_service.dart';
 import '../../utils/error_extractor.dart';
@@ -25,6 +26,8 @@ class QuickSalesPaymentDock extends StatefulWidget {
   final List<InvoiceTransaction> payments;
   final ValueChanged<List<InvoiceTransaction>> onChanged;
   final num invoiceTotal;
+  final QuickSalesChangeResolution? changeResolution;
+  final Future<QuickSalesChangeResolution?> Function() onConfigureChange;
   final String? defaultCashRegisterId;
   final String currencyUnit;
   final int decimalPlaces;
@@ -39,6 +42,8 @@ class QuickSalesPaymentDock extends StatefulWidget {
     required this.payments,
     required this.onChanged,
     required this.invoiceTotal,
+    required this.changeResolution,
+    required this.onConfigureChange,
     required this.defaultCashRegisterId,
     required this.currencyUnit,
     required this.decimalPlaces,
@@ -550,21 +555,44 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
           if (_change > 0)
             Padding(
               padding: const EdgeInsets.only(top: 6),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: cs.errorContainer,
-                  borderRadius: BorderRadius.circular(7),
-                ),
-                child: Text(
-                  'مبلغ قابل برگشت: ${_format(_change)} ${widget.currencyUnit}',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: cs.onErrorContainer,
-                    fontWeight: FontWeight.w700,
+              child: InkWell(
+                onTap: widget.enabled
+                    ? () => unawaited(widget.onConfigureChange())
+                    : null,
+                borderRadius: BorderRadius.circular(7),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: cs.errorContainer,
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.changeResolution == null
+                              ? 'تعیین تکلیف ${_format(_change)} ${widget.currencyUnit}'
+                              : 'برگشت ${_format(widget.changeResolution!.returnedAmount)} • بستانکاری ${_format(widget.changeResolution!.creditAmount)}',
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: cs.onErrorContainer,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        widget.changeResolution == null
+                            ? Icons.rule_folder_outlined
+                            : Icons.edit_outlined,
+                        size: 18,
+                        color: cs.onErrorContainer,
+                      ),
+                    ],
                   ),
                 ),
               ),
