@@ -3583,7 +3583,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
-                initiallyExpanded: false,
+                initiallyExpanded: true,
                 children: [descWidget],
               ),
             ),
@@ -4365,45 +4365,52 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             ],
           );
 
+          final desktopBody = Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ستون اصلی: سبد خرید
+              Expanded(flex: 7, child: cartColumn),
+              // ستون کناری: مشتری، جمع و جزئیات سند
+              _buildDesktopCheckoutPanel(cs),
+            ],
+          );
+
           return _withParkedSalesBar(
-            Column(
-              children: [
-                Expanded(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+            _autoCreatePaymentDocument
+                ? Stack(
                     children: [
-                      // ستون اصلی: سبد خرید
-                      Expanded(flex: 7, child: cartColumn),
-                      // ستون کناری: مشتری، جمع و جزئیات سند
-                      _buildDesktopCheckoutPanel(cs),
+                      Positioned.fill(child: desktopBody),
+                      Align(
+                        alignment: Alignment.bottomCenter,
+                        child: QuickSalesPaymentDock(
+                          key: ValueKey('payment-dock-$_activeSaleId'),
+                          businessId: widget.businessId,
+                          authStore: widget.authStore,
+                          payments: _payments,
+                          onChanged: _onPaymentsChanged,
+                          invoiceTotal: _totalAmount,
+                          changeResolution: _validChangeResolution,
+                          onConfigureChange: _openChangeResolutionDialog,
+                          defaultCashRegisterId: _selectedCashRegisterId,
+                          currencyUnit: _paymentCurrencyUnit,
+                          decimalPlaces: _invoiceCurrencyDecimalPlaces,
+                          enabled: !_isSaving,
+                          onSave: () => _saveInvoice(print: false),
+                          onSaveAndPrint: () => _saveInvoice(print: true),
+                        ),
+                      ),
+                    ],
+                  )
+                : Column(
+                    children: [
+                      Expanded(child: desktopBody),
+                      Material(
+                        elevation: 3,
+                        color: cs.surface,
+                        child: _buildCheckoutButtons(cs),
+                      ),
                     ],
                   ),
-                ),
-                if (_autoCreatePaymentDocument)
-                  QuickSalesPaymentDock(
-                    key: ValueKey('payment-dock-$_activeSaleId'),
-                    businessId: widget.businessId,
-                    authStore: widget.authStore,
-                    payments: _payments,
-                    onChanged: _onPaymentsChanged,
-                    invoiceTotal: _totalAmount,
-                    changeResolution: _validChangeResolution,
-                    onConfigureChange: _openChangeResolutionDialog,
-                    defaultCashRegisterId: _selectedCashRegisterId,
-                    currencyUnit: _paymentCurrencyUnit,
-                    decimalPlaces: _invoiceCurrencyDecimalPlaces,
-                    enabled: !_isSaving,
-                    onSave: () => _saveInvoice(print: false),
-                    onSaveAndPrint: () => _saveInvoice(print: true),
-                  )
-                else
-                  Material(
-                    elevation: 3,
-                    color: cs.surface,
-                    child: _buildCheckoutButtons(cs),
-                  ),
-              ],
-            ),
             compact: isCompact,
           );
         },
@@ -5211,7 +5218,12 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       child: Scrollbar(
         thumbVisibility: true,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+          padding: EdgeInsets.fromLTRB(
+            12,
+            12,
+            12,
+            _autoCreatePaymentDocument ? 232 : 8,
+          ),
           child: _buildCheckoutScrollBody(
             cs,
             includeCustomer: true,
@@ -5381,7 +5393,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
         key: ValueKey('qs-details-$_forceCheckoutDetails'),
-        initiallyExpanded: _forceCheckoutDetails,
+        initiallyExpanded: true,
         tilePadding: EdgeInsets.zero,
         childrenPadding: const EdgeInsets.only(bottom: 8),
         visualDensity: VisualDensity.compact,

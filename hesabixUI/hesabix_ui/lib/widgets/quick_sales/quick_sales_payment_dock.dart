@@ -12,6 +12,7 @@ import '../../models/quick_sales_payment_button.dart';
 import '../../models/quick_sales_change_resolution.dart';
 import '../../services/person_service.dart';
 import '../../services/quick_sales_service.dart';
+import '../../utils/date_formatters.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/number_formatters.dart';
 import '../../utils/number_normalizer.dart';
@@ -34,6 +35,7 @@ class QuickSalesPaymentDock extends StatefulWidget {
   final bool enabled;
   final VoidCallback onSave;
   final VoidCallback onSaveAndPrint;
+  final QuickSalesService? service;
 
   const QuickSalesPaymentDock({
     super.key,
@@ -50,6 +52,7 @@ class QuickSalesPaymentDock extends StatefulWidget {
     required this.enabled,
     required this.onSave,
     required this.onSaveAndPrint,
+    this.service,
   });
 
   @override
@@ -62,9 +65,13 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
   static const double _minButtonWidth = 300;
   static const double _minListWidth = 360;
   static const double _summaryWidth = 384;
+  static const double _expandedHeight = 220;
+  static const double _collapsedHeight = 52;
+  static const double _handleOverlap = 12;
+  static const double _dockHeight = _expandedHeight + _handleOverlap;
   static const int _maxPaymentLines = 50;
 
-  final QuickSalesService _service = QuickSalesService();
+  late final QuickSalesService _service;
   final TextEditingController _amountController = TextEditingController();
   final FocusNode _amountFocus = FocusNode();
   final ScrollController _paymentScroll = ScrollController();
@@ -72,6 +79,7 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
   List<QuickSalesPaymentButtonModel> _buttons = const [];
   bool _loadingButtons = true;
   double _buttonWidth = _defaultButtonWidth;
+  bool _expanded = false;
 
   num get _epsilon {
     if (widget.decimalPlaces <= 0) return 0.5;
@@ -93,10 +101,13 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
 
   String get _preferenceKey =>
       'quick_sales_payment_dock_buttons_width_v2_${widget.businessId}_${widget.authStore.currentUserId ?? 0}';
+  String get _expandedPreferenceKey =>
+      'quick_sales_payment_dock_expanded_v1_${widget.businessId}_${widget.authStore.currentUserId ?? 0}';
 
   @override
   void initState() {
     super.initState();
+    _service = widget.service ?? QuickSalesService();
     HardwareKeyboard.instance.addHandler(_handleShortcutKeyEvent);
     _amountFocus.addListener(() {
       if (_amountFocus.hasFocus) {
@@ -109,6 +120,7 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
     _syncAmount();
     unawaited(_loadButtons());
     unawaited(_loadWidth());
+    unawaited(_loadExpanded());
   }
 
   @override
@@ -200,8 +212,24 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
     await prefs.setDouble(_preferenceKey, _buttonWidth);
   }
 
+  Future<void> _loadExpanded() async {
+    final prefs = await SharedPreferences.getInstance();
+    final value = prefs.getBool(_expandedPreferenceKey);
+    if (mounted && value != null) setState(() => _expanded = value);
+  }
+
+  Future<void> _setExpanded(bool value) async {
+    if (_expanded == value) return;
+    setState(() => _expanded = value);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_expandedPreferenceKey, value);
+  }
+
   String _format(num value) =>
       formatWithThousands(value, decimalPlaces: widget.decimalPlaces);
+
+  String _formatPaymentDate(DateTime value) =>
+      DateFormatters.formatServerDateTime(value.toIso8601String());
 
   void _addPayment(QuickSalesPaymentButtonModel button) {
     if (!widget.enabled) return;
@@ -285,6 +313,15 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
     _ => Icons.account_balance_wallet_outlined,
   };
 
+  Color _paymentColor(TransactionType type, ColorScheme cs) => switch (type) {
+    TransactionType.cashRegister => Colors.teal,
+    TransactionType.bank => cs.primary,
+    TransactionType.person => cs.secondary,
+    TransactionType.check || TransactionType.checkExpense => Colors.orange,
+    TransactionType.pettyCash => Colors.indigo,
+    TransactionType.account => cs.tertiary,
+  };
+
   IconData _buttonIcon(QuickSalesPaymentTargetType type) => switch (type) {
     QuickSalesPaymentTargetType.cashRegister => Icons.payments_outlined,
     QuickSalesPaymentTargetType.bank => Icons.account_balance,
@@ -294,82 +331,171 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Material(
-      elevation: 6,
-      color: cs.surface,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          if (constraints.maxWidth < 1050) {
-            return SizedBox(height: 260, child: _buildCompact(cs));
-          }
-          final maxButtons =
-              (constraints.maxWidth - _summaryWidth - _minListWidth - 12)
-                  .clamp(_minButtonWidth, constraints.maxWidth * .62)
-                  .toDouble();
-          final buttonWidth = _buttonWidth
-              .clamp(_minButtonWidth, maxButtons)
-              .toDouble();
-          return SizedBox(
-            height: 220,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: cs.outlineVariant)),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 1050) {
+          return Material(
+            elevation: 6,
+            color: cs.surface,
+            child: SizedBox(height: 260, child: _buildCompact(cs)),
+          );
+        }
+        final maxButtons =
+            (constraints.maxWidth - _summaryWidth - _minListWidth - 12)
+                .clamp(_minButtonWidth, constraints.maxWidth * .62)
+                .toDouble();
+        final buttonWidth = _buttonWidth
+            .clamp(_minButtonWidth, maxButtons)
+            .toDouble();
+        return SizedBox(
+          height: _dockHeight,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: 0,
+                bottom: 0,
+                width: _summaryWidth,
+                height: _expandedHeight,
+                child: Material(
+                  elevation: 6,
+                  color: cs.surfaceContainerLow,
+                  shape: Border(
+                    top: BorderSide(color: cs.outlineVariant),
+                    right: BorderSide(color: cs.outlineVariant),
+                  ),
+                  child: _buildSummary(cs),
+                ),
               ),
-              child: Row(
-                textDirection: TextDirection.rtl,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SizedBox(
-                    width: buttonWidth,
-                    child: ColoredBox(
-                      color: cs.surfaceContainerLow,
-                      child: _buildAmountAndButtons(cs),
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                left: _summaryWidth,
+                right: 0,
+                bottom: _expanded ? 0 : -(_expandedHeight - _collapsedHeight),
+                height: _dockHeight,
+                child: Stack(
+                  children: [
+                    Positioned(
+                      top: _handleOverlap,
+                      left: 0,
+                      right: 0,
+                      height: _expandedHeight,
+                      child: Material(
+                        elevation: 6,
+                        color: cs.surface,
+                        shape: Border(
+                          top: BorderSide(color: cs.outlineVariant),
+                        ),
+                        child: Stack(
+                          children: [
+                            if (_expanded)
+                              Positioned.fill(
+                                child: Row(
+                                  textDirection: TextDirection.rtl,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    SizedBox(
+                                      width: buttonWidth,
+                                      child: ColoredBox(
+                                        color: cs.surfaceContainerLow,
+                                        child: _buildAmountAndButtons(cs),
+                                      ),
+                                    ),
+                                    _ResizeHandle(
+                                      onReset: () {
+                                        setState(
+                                          () =>
+                                              _buttonWidth = _defaultButtonWidth
+                                                  .clamp(
+                                                    _minButtonWidth,
+                                                    maxButtons,
+                                                  )
+                                                  .toDouble(),
+                                        );
+                                        unawaited(_saveWidth());
+                                      },
+                                      onDrag: (dx) {
+                                        setState(() {
+                                          _buttonWidth = (_buttonWidth - dx)
+                                              .clamp(
+                                                _minButtonWidth,
+                                                maxButtons,
+                                              )
+                                              .toDouble();
+                                        });
+                                      },
+                                      onDragEnd: () => unawaited(_saveWidth()),
+                                      onNudge: (dx) {
+                                        setState(() {
+                                          _buttonWidth = (_buttonWidth + dx)
+                                              .clamp(
+                                                _minButtonWidth,
+                                                maxButtons,
+                                              )
+                                              .toDouble();
+                                        });
+                                        unawaited(_saveWidth());
+                                      },
+                                    ),
+                                    Expanded(child: _buildPaymentList(cs)),
+                                  ],
+                                ),
+                              )
+                            else
+                              Positioned(
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                height: _collapsedHeight,
+                                child: _buildCollapsedBar(cs),
+                              ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                  _ResizeHandle(
-                    onReset: () {
-                      setState(
-                        () => _buttonWidth = _defaultButtonWidth
-                            .clamp(_minButtonWidth, maxButtons)
-                            .toDouble(),
-                      );
-                      unawaited(_saveWidth());
-                    },
-                    onDrag: (dx) {
-                      setState(() {
-                        _buttonWidth = (_buttonWidth - dx)
-                            .clamp(_minButtonWidth, maxButtons)
-                            .toDouble();
-                      });
-                    },
-                    onDragEnd: () => unawaited(_saveWidth()),
-                    onNudge: (dx) {
-                      setState(() {
-                        _buttonWidth = (_buttonWidth + dx)
-                            .clamp(_minButtonWidth, maxButtons)
-                            .toDouble();
-                      });
-                      unawaited(_saveWidth());
-                    },
-                  ),
-                  Expanded(child: _buildPaymentList(cs)),
-                  VerticalDivider(
-                    width: 1,
-                    thickness: 1,
-                    color: cs.outlineVariant,
-                  ),
-                  SizedBox(
-                    width: _summaryWidth,
-                    child: ColoredBox(
-                      color: cs.surfaceContainerLow,
-                      child: _buildSummary(cs),
+                    Align(
+                      alignment: Alignment.topCenter,
+                      child: _DockExpansionHandle(
+                        expanded: _expanded,
+                        onPressed: () => unawaited(_setExpanded(!_expanded)),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCollapsedBar(ColorScheme cs) {
+    return InkWell(
+      onTap: () => unawaited(_setExpanded(true)),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(18, 8, 18, 4),
+        child: Row(
+          textDirection: TextDirection.rtl,
+          children: [
+            Icon(Icons.account_balance_wallet_outlined, color: cs.primary),
+            const SizedBox(width: 8),
+            Text(
+              'پرداخت‌ها (${widget.payments.length})',
+              style: TextStyle(color: cs.primary, fontWeight: FontWeight.w700),
+            ),
+            const Spacer(),
+            Text(
+              'مجموع: ${_format(_paid)} ${widget.currencyUnit}',
+              style: TextStyle(
+                color: cs.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
               ),
             ),
-          );
-        },
+          ],
+        ),
       ),
     );
   }
@@ -463,17 +589,58 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
             Divider(height: 1, color: cs.outlineVariant),
         itemBuilder: (context, index) {
           final payment = widget.payments[index];
+          final paymentColor = _paymentColor(payment.type, cs);
           return SizedBox(
             height: 58,
             child: Row(
               children: [
-                Icon(_paymentIcon(payment.type), color: cs.primary),
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: paymentColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    _paymentIcon(payment.type),
+                    color: paymentColor,
+                    size: 21,
+                  ),
+                ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    _paymentTitle(payment),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _paymentTitle(payment),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.schedule_outlined,
+                            size: 14,
+                            color: cs.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              _formatPaymentDate(payment.transactionDate),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
                 SizedBox(
@@ -511,12 +678,19 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
                         _updatePaymentAmount(payment, value),
                   ),
                 ),
+                const SizedBox(width: 8),
                 IconButton(
                   tooltip: 'حذف پرداخت',
                   onPressed: widget.enabled
                       ? () => _removePayment(payment.id)
                       : null,
-                  icon: const Icon(Icons.close),
+                  style: IconButton.styleFrom(
+                    foregroundColor: cs.error,
+                    backgroundColor: cs.errorContainer,
+                    disabledForegroundColor: cs.onSurface.withValues(alpha: .3),
+                    disabledBackgroundColor: cs.surfaceContainerHighest,
+                  ),
+                  icon: const Icon(Icons.delete_outline),
                 ),
               ],
             ),
@@ -769,6 +943,43 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
       ),
     );
     if (changed == true) await _loadButtons();
+  }
+}
+
+class _DockExpansionHandle extends StatelessWidget {
+  final bool expanded;
+  final VoidCallback onPressed;
+
+  const _DockExpansionHandle({required this.expanded, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Semantics(
+      button: true,
+      label: expanded ? 'جمع کردن بخش پرداخت' : 'باز کردن بخش پرداخت',
+      child: Material(
+        color: cs.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(color: cs.outlineVariant),
+        ),
+        child: InkWell(
+          key: const ValueKey('quick-sales-payment-dock-toggle'),
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(10),
+          child: SizedBox(
+            width: 54,
+            height: 24,
+            child: Icon(
+              expanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up,
+              size: 22,
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
