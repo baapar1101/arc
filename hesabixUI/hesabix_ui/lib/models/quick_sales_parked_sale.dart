@@ -7,6 +7,7 @@ import '../core/date_utils.dart';
 import 'customer_model.dart';
 import 'invoice_line_item.dart';
 import 'invoice_transaction.dart';
+import 'quick_sales_change_resolution.dart';
 
 /// یک فروش باز در صندوق فروش سریع (Park / Hold).
 ///
@@ -34,6 +35,7 @@ class QuickSalesParkedSale {
   final int shareExpiryHours;
   final int itemCount;
   final num totalAmount;
+  final QuickSalesChangeResolution? changeResolution;
 
   const QuickSalesParkedSale({
     required this.id,
@@ -58,6 +60,7 @@ class QuickSalesParkedSale {
     this.shareExpiryHours = 168,
     this.itemCount = 0,
     this.totalAmount = 0,
+    this.changeResolution,
   });
 
   static String newId() => const Uuid().v4();
@@ -104,6 +107,8 @@ class QuickSalesParkedSale {
     int? shareExpiryHours,
     int? itemCount,
     num? totalAmount,
+    QuickSalesChangeResolution? changeResolution,
+    bool clearChangeResolution = false,
   }) {
     return QuickSalesParkedSale(
       id: id,
@@ -130,6 +135,9 @@ class QuickSalesParkedSale {
       shareExpiryHours: shareExpiryHours ?? this.shareExpiryHours,
       itemCount: itemCount ?? this.itemCount,
       totalAmount: totalAmount ?? this.totalAmount,
+      changeResolution: clearChangeResolution
+          ? null
+          : changeResolution ?? this.changeResolution,
     );
   }
 
@@ -157,6 +165,8 @@ class QuickSalesParkedSale {
       'share_expiry_hours': shareExpiryHours,
       'item_count': itemCount,
       'total_amount': totalAmount,
+      if (changeResolution != null)
+        'change_resolution': changeResolution!.toJson(),
     };
   }
 
@@ -209,7 +219,8 @@ class QuickSalesParkedSale {
           json['cash_follows_total'] != false && (payments.length <= 1),
       cashRegisterId: json['cash_register_id']?.toString(),
       warehouseId: _asInt(json['warehouse_id']),
-      documentDate: HesabixDateUtils.parseApiDate(
+      documentDate:
+          HesabixDateUtils.parseApiDate(
             json['document_date'],
             rawValue: json['document_date_raw'],
           ) ??
@@ -226,6 +237,11 @@ class QuickSalesParkedSale {
       shareExpiryHours: _asInt(json['share_expiry_hours']) ?? 168,
       itemCount: _asInt(json['item_count']) ?? items.length,
       totalAmount: _asNum(json['total_amount']) ?? 0,
+      changeResolution: json['change_resolution'] is Map
+          ? QuickSalesChangeResolution.fromJson(
+              Map<String, dynamic>.from(json['change_resolution'] as Map),
+            )
+          : null,
     );
   }
 

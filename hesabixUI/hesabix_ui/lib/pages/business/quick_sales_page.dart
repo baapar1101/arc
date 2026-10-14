@@ -30,10 +30,12 @@ import '../../services/currency_service.dart';
 import '../../models/invoice_line_item.dart';
 import '../../models/invoice_transaction.dart';
 import '../../models/quick_sales_parked_sale.dart';
+import '../../models/quick_sales_change_resolution.dart';
 import '../../widgets/invoice/customer_combobox_widget.dart';
 import '../../widgets/quick_sales/quick_sales_parked_sales_bar.dart';
 import '../../widgets/quick_sales/quick_sales_payment_composer.dart';
 import '../../widgets/quick_sales/quick_sales_payment_dock.dart';
+import '../../widgets/quick_sales/quick_sales_change_resolution_dialog.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
 import '../../utils/currency_display_utils.dart';
 import '../../widgets/permission/access_denied_page.dart';
@@ -157,6 +159,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
 
   // پرداخت
   List<InvoiceTransaction> _payments = [];
+  QuickSalesChangeResolution? _changeResolution;
   String? _selectedCashRegisterId;
   bool _autoCreatePaymentDocument = true;
   bool _cashFollowsTotal = false;
@@ -658,6 +661,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       shareExpiryHours: _shareExpiryHours,
       itemCount: _cartItems.length,
       totalAmount: _totalAmount,
+      changeResolution: _validChangeResolution,
     );
   }
 
@@ -672,6 +676,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     _selectedCustomer = customer;
     _cartItems = sale.cartItems.map(QuickSalesParkedSale.cloneLine).toList();
     _payments = List<InvoiceTransaction>.from(sale.payments);
+    _changeResolution = sale.changeResolution;
     _cashFollowsTotal = sale.cashFollowsTotal;
     _shareRemainingEnabled = false;
     _checkoutDiscountExpanded = false;
@@ -699,6 +704,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     _selectedCustomer = _anonymousCustomer;
     _cartItems = [];
     _payments = [];
+    _changeResolution = null;
     _cashFollowsTotal = false;
     _shareRemainingEnabled = false;
     _checkoutDiscountExpanded = false;
@@ -1043,6 +1049,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       _autoCreatePaymentDocument = value;
       _shareRemainingEnabled = false;
       _payments = [];
+      _changeResolution = null;
       _cashFollowsTotal = false;
       if (!value) {
         _syncShareChannelDefaults();
@@ -1075,6 +1082,34 @@ class _QuickSalesPageState extends State<QuickSalesPage>
 
   num get _changeAmount => _isOverpaid ? _paidAmount - _totalAmount : 0;
 
+  QuickSalesChangeResolution? get _validChangeResolution {
+    final value = _changeResolution;
+    if (!_isOverpaid || value == null) return null;
+    return value.isValidFor(_changeAmount, _paymentEpsilon) ? value : null;
+  }
+
+  Future<QuickSalesChangeResolution?> _openChangeResolutionDialog() async {
+    if (!_isOverpaid) return null;
+    final result = await showDialog<QuickSalesChangeResolution>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => QuickSalesChangeResolutionDialog(
+        businessId: widget.businessId,
+        currencyId: _defaultCurrencyId,
+        overpaymentAmount: _changeAmount,
+        currencyUnit: _paymentCurrencyUnit,
+        decimalPlaces: _invoiceCurrencyDecimalPlaces,
+        customerName: _selectedCustomer?.name ?? 'مشتری ناشناس',
+        customerId: _selectedCustomer?.id,
+        isAnonymousCustomer: _isAnonymousSelected,
+        initialValue: _validChangeResolution,
+      ),
+    );
+    if (!mounted || result == null) return null;
+    setState(() => _changeResolution = result);
+    return result;
+  }
+
   bool get _isAnonymousSelected {
     if (_selectedCustomer == null || _anonymousCustomer == null) {
       return _selectedCustomer == null;
@@ -1098,6 +1133,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   void _onPaymentsChanged(List<InvoiceTransaction> payments) {
     setState(() {
       _payments = payments;
+      _changeResolution = null;
       InvoiceTransaction? cash;
       for (final p in payments) {
         if (p.type == TransactionType.cashRegister) {
@@ -2483,7 +2519,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   Future<void> _saveInvoice({
     bool print = false,
     Map<String, dynamic>? stockOverride,
-    bool changeConfirmed = false,
     bool debtConfirmed = false,
   }) async {
     // اعتبارسنجی سبد خرید
@@ -2548,37 +2583,10 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       if (!mounted || confirmed != true) return;
       debtConfirmed = true;
     }
-    if (_isOverpaid && !changeConfirmed) {
-      if (int.tryParse(_selectedCashRegisterId ?? '') == null) {
-        SnackBarHelper.show(
-          context,
-          message:
-              'برای ثبت مبلغ قابل برگشت، صندوق نقدی پیش‌فرض را انتخاب کنید.',
-          isError: true,
-        );
-        return;
-      }
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('تأیید برگشت وجه'),
-          content: Text(
-            '${_formatNumber(_changeAmount)} $_paymentCurrencyUnit از صندوق نقدی به مشتری برگردانده شده است؟',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('انصراف'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('تأیید برگشت وجه'),
-            ),
-          ],
-        ),
-      );
-      if (!mounted || confirmed != true) return;
-      changeConfirmed = true;
+    QuickSalesChangeResolution? changeResolution = _validChangeResolution;
+    if (_isOverpaid && changeResolution == null) {
+      changeResolution = await _openChangeResolutionDialog();
+      if (!mounted || changeResolution == null) return;
     }
     if (_shouldShareAfterSave) {
       if (_shareOnlinePaymentEnabled) {
@@ -2716,12 +2724,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           'tax': _totalTax,
           'net': _totalAmount,
         },
-        if (_isOverpaid)
-          'quick_sale_change': {
-            'amount': _changeAmount,
-            'cash_register_id': int.tryParse(_selectedCashRegisterId ?? ''),
-            'confirmed_returned': changeConfirmed,
-          },
+        if (_isOverpaid) 'quick_sale_change': changeResolution!.toJson(),
       };
 
       final gvSave = _parsedGlobalDiscountValue;
@@ -2762,6 +2765,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       setState(() {
         _cartItems.clear();
         _payments = [];
+        _changeResolution = null;
         _cashFollowsTotal = false;
         _shareRemainingEnabled = false;
         _checkoutDiscountExpanded = false;
@@ -2855,7 +2859,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       await _saveInvoice(
         print: print,
         stockOverride: retryOverride,
-        changeConfirmed: changeConfirmed,
         debtConfirmed: debtConfirmed,
       );
     }
@@ -3580,7 +3583,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
-                initiallyExpanded: false,
+                initiallyExpanded: true,
                 children: [descWidget],
               ),
             ),
@@ -3925,6 +3928,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
                               setState(() {
                                 _selectedCustomer =
                                     customer ?? _anonymousCustomer;
+                                _changeResolution = null;
                                 _syncShareChannelDefaults();
                               });
                             },
@@ -4361,43 +4365,52 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             ],
           );
 
+          final desktopBody = Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ستون اصلی: سبد خرید
+              Expanded(flex: 7, child: cartColumn),
+              // ستون کناری: مشتری، جمع و جزئیات سند
+              _buildDesktopCheckoutPanel(cs),
+            ],
+          );
+
           return _withParkedSalesBar(
-            Column(
-              children: [
-                Expanded(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+            _autoCreatePaymentDocument
+                ? Stack(
                     children: [
-                      // ستون اصلی: سبد خرید
-                      Expanded(flex: 7, child: cartColumn),
-                      // ستون کناری: مشتری، جمع و جزئیات سند
-                      _buildDesktopCheckoutPanel(cs),
+                      Positioned.fill(child: desktopBody),
+                      Align(
+                        alignment: Alignment.bottomCenter,
+                        child: QuickSalesPaymentDock(
+                          key: ValueKey('payment-dock-$_activeSaleId'),
+                          businessId: widget.businessId,
+                          authStore: widget.authStore,
+                          payments: _payments,
+                          onChanged: _onPaymentsChanged,
+                          invoiceTotal: _totalAmount,
+                          changeResolution: _validChangeResolution,
+                          onConfigureChange: _openChangeResolutionDialog,
+                          defaultCashRegisterId: _selectedCashRegisterId,
+                          currencyUnit: _paymentCurrencyUnit,
+                          decimalPlaces: _invoiceCurrencyDecimalPlaces,
+                          enabled: !_isSaving,
+                          onSave: () => _saveInvoice(print: false),
+                          onSaveAndPrint: () => _saveInvoice(print: true),
+                        ),
+                      ),
+                    ],
+                  )
+                : Column(
+                    children: [
+                      Expanded(child: desktopBody),
+                      Material(
+                        elevation: 3,
+                        color: cs.surface,
+                        child: _buildCheckoutButtons(cs),
+                      ),
                     ],
                   ),
-                ),
-                if (_autoCreatePaymentDocument)
-                  QuickSalesPaymentDock(
-                    key: ValueKey('payment-dock-$_activeSaleId'),
-                    businessId: widget.businessId,
-                    authStore: widget.authStore,
-                    payments: _payments,
-                    onChanged: _onPaymentsChanged,
-                    invoiceTotal: _totalAmount,
-                    defaultCashRegisterId: _selectedCashRegisterId,
-                    currencyUnit: _paymentCurrencyUnit,
-                    decimalPlaces: _invoiceCurrencyDecimalPlaces,
-                    enabled: !_isSaving,
-                    onSave: () => _saveInvoice(print: false),
-                    onSaveAndPrint: () => _saveInvoice(print: true),
-                  )
-                else
-                  Material(
-                    elevation: 3,
-                    color: cs.surface,
-                    child: _buildCheckoutButtons(cs),
-                  ),
-              ],
-            ),
             compact: isCompact,
           );
         },
@@ -4837,6 +4850,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             onCustomerChanged: (customer) {
               setState(() {
                 _selectedCustomer = customer ?? _anonymousCustomer;
+                _changeResolution = null;
                 _syncShareChannelDefaults();
               });
             },
@@ -5204,7 +5218,12 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       child: Scrollbar(
         thumbVisibility: true,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+          padding: EdgeInsets.fromLTRB(
+            12,
+            12,
+            12,
+            _autoCreatePaymentDocument ? 232 : 8,
+          ),
           child: _buildCheckoutScrollBody(
             cs,
             includeCustomer: true,
@@ -5233,6 +5252,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             onCustomerChanged: (customer) {
               setState(() {
                 _selectedCustomer = customer ?? _anonymousCustomer;
+                _changeResolution = null;
                 _syncShareChannelDefaults();
               });
             },
@@ -5373,7 +5393,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
         key: ValueKey('qs-details-$_forceCheckoutDetails'),
-        initiallyExpanded: _forceCheckoutDetails,
+        initiallyExpanded: true,
         tilePadding: EdgeInsets.zero,
         childrenPadding: const EdgeInsets.only(bottom: 8),
         visualDensity: VisualDensity.compact,
@@ -5578,6 +5598,38 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             calendarController: widget.calendarController,
             isAnonymousCustomer: _isAnonymousSelected,
           ),
+          if (_isOverpaid) ...[
+            const SizedBox(height: 8),
+            Card(
+              color: cs.errorContainer,
+              margin: EdgeInsets.zero,
+              child: ListTile(
+                dense: true,
+                leading: Icon(
+                  _validChangeResolution == null
+                      ? Icons.rule_folder_outlined
+                      : Icons.edit_outlined,
+                  color: cs.onErrorContainer,
+                ),
+                title: Text(
+                  _validChangeResolution == null
+                      ? 'تعیین تکلیف مبلغ اضافه‌دریافت'
+                      : 'برگشت ${_formatNumber(_validChangeResolution!.returnedAmount)} • بستانکاری ${_formatNumber(_validChangeResolution!.creditAmount)}',
+                  style: TextStyle(
+                    color: cs.onErrorContainer,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                subtitle: Text(
+                  '${_formatNumber(_changeAmount)} $_paymentCurrencyUnit',
+                  style: TextStyle(color: cs.onErrorContainer),
+                ),
+                onTap: _isSaving
+                    ? null
+                    : () => unawaited(_openChangeResolutionDialog()),
+              ),
+            ),
+          ],
           if (_remainingAmount > 0 && !_isOverpaid) ...[
             SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,

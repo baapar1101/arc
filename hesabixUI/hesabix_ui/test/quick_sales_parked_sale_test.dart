@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hesabix_ui/models/customer_model.dart';
 import 'package:hesabix_ui/models/invoice_line_item.dart';
 import 'package:hesabix_ui/models/quick_sales_parked_sale.dart';
+import 'package:hesabix_ui/models/quick_sales_change_resolution.dart';
 
 void main() {
   test('parked sale round-trips cart, customer and totals', () {
@@ -60,7 +61,10 @@ void main() {
   });
 
   test('bundle parse rejects wrong version and keeps active id', () {
-    expect(QuickSalesParkedSalesBundle.tryParse({'version': 2, 'sales': []}), isNull);
+    expect(
+      QuickSalesParkedSalesBundle.tryParse({'version': 2, 'sales': []}),
+      isNull,
+    );
     final sale = QuickSalesParkedSale(
       id: 'a',
       createdAt: DateTime.now(),
@@ -71,5 +75,43 @@ void main() {
     final parsed = QuickSalesParkedSalesBundle.tryParse(bundle.toJson());
     expect(parsed?.activeId, 'a');
     expect(parsed?.sales, hasLength(1));
+  });
+
+  test('parked sale preserves split change resolution', () {
+    final sale = QuickSalesParkedSale(
+      id: 'change-sale',
+      createdAt: DateTime.utc(2026, 10, 14, 8),
+      updatedAt: DateTime.utc(2026, 10, 14, 9),
+      documentDate: DateTime.utc(2026, 10, 14),
+      changeResolution: const QuickSalesChangeResolution(
+        overpaymentAmount: 1000000,
+        creditAmount: 300000,
+        allocations: [
+          QuickSalesChangeAllocation(
+            id: 'cash-1',
+            sourceType: QuickSalesChangeSourceType.cashRegister,
+            sourceId: 3,
+            sourceName: 'صندوق اصلی',
+            amount: 400000,
+          ),
+          QuickSalesChangeAllocation(
+            id: 'bank-1',
+            sourceType: QuickSalesChangeSourceType.bank,
+            sourceId: 7,
+            sourceName: 'بانک سامان',
+            amount: 300000,
+            commission: 20000,
+          ),
+        ],
+      ),
+    );
+
+    final parsed = QuickSalesParkedSale.fromJson(sale.toJson());
+    final resolution = parsed.changeResolution;
+    expect(resolution, isNotNull);
+    expect(resolution!.returnedAmount, 700000);
+    expect(resolution.creditAmount, 300000);
+    expect(resolution.bankCommission, 20000);
+    expect(resolution.isValidFor(1000000, 0.5), isTrue);
   });
 }
