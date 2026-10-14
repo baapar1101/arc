@@ -81,6 +81,68 @@ def test_get_quick_sales_settings_includes_share_defaults_when_missing_row() -> 
     assert result["default_share_expiry_hours"] == 168
     assert result["default_currency_id"] == 42
     assert result["enable_stock_shortage_override"] is False
+    assert result["quick_customer_group_id"] is None
+
+
+def test_update_quick_sales_settings_validates_and_saves_customer_group(monkeypatch) -> None:
+    from app.services import quick_sales_service as service
+
+    db = MagicMock()
+    settings = MagicMock()
+    settings.quick_customer_group_id = None
+    settings_query = MagicMock()
+    settings_query.filter.return_value.first.return_value = settings
+    db.query.return_value = settings_query
+    validate_group = MagicMock()
+    monkeypatch.setattr(service, "assert_assignable_person_group", validate_group)
+    monkeypatch.setattr(
+        service,
+        "get_quick_sales_settings",
+        lambda _db, _business_id: {
+            "quick_customer_group_id": settings.quick_customer_group_id,
+        },
+    )
+
+    result = service.update_quick_sales_settings(
+        db,
+        business_id=5,
+        payload={"quick_customer_group_id": 19},
+    )
+
+    validate_group.assert_called_once_with(db, 5, 19)
+    assert settings.quick_customer_group_id == 19
+    assert result["quick_customer_group_id"] == 19
+    db.commit.assert_called_once()
+
+
+def test_update_quick_sales_settings_can_clear_customer_group(monkeypatch) -> None:
+    from app.services import quick_sales_service as service
+
+    db = MagicMock()
+    settings = MagicMock()
+    settings.quick_customer_group_id = 19
+    settings_query = MagicMock()
+    settings_query.filter.return_value.first.return_value = settings
+    db.query.return_value = settings_query
+    validate_group = MagicMock()
+    monkeypatch.setattr(service, "assert_assignable_person_group", validate_group)
+    monkeypatch.setattr(
+        service,
+        "get_quick_sales_settings",
+        lambda _db, _business_id: {
+            "quick_customer_group_id": settings.quick_customer_group_id,
+        },
+    )
+
+    result = service.update_quick_sales_settings(
+        db,
+        business_id=5,
+        payload={"quick_customer_group_id": None},
+    )
+
+    validate_group.assert_not_called()
+    assert settings.quick_customer_group_id is None
+    assert result["quick_customer_group_id"] is None
 
 
 def test_invoice_share_link_event_type_in_seed_catalog() -> None:

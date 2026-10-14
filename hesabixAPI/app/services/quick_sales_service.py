@@ -16,6 +16,7 @@ from adapters.db.models.person import Person, PersonType
 from adapters.db.models.quick_sales_payment_button import QuickSalesPaymentButton
 from adapters.db.models.quick_sales_settings import QuickSalesSetting
 from app.core.responses import ApiError
+from app.services.person_group_service import assert_assignable_person_group
 from app.services.person_service import create_person
 
 logger = logging.getLogger(__name__)
@@ -530,6 +531,7 @@ def get_quick_sales_settings(db: Session, business_id: int) -> Dict[str, Any]:
             "default_anonymous_customer_id": None,
             "auto_create_anonymous_customer": True,
             "anonymous_customer_name": "مشتری ناشناس",
+            "quick_customer_group_id": None,
             "default_warehouse_id": None,
             "default_cash_register_id": None,
             "default_currency_id": business_default_currency_id,
@@ -555,6 +557,7 @@ def get_quick_sales_settings(db: Session, business_id: int) -> Dict[str, Any]:
         "default_anonymous_customer_id": int(obj.default_anonymous_customer_id) if obj.default_anonymous_customer_id else None,
         "auto_create_anonymous_customer": bool(obj.auto_create_anonymous_customer),
         "anonymous_customer_name": obj.anonymous_customer_name if obj.anonymous_customer_name else "مشتری ناشناس",
+        "quick_customer_group_id": int(obj.quick_customer_group_id) if obj.quick_customer_group_id else None,
         "default_warehouse_id": int(obj.default_warehouse_id) if obj.default_warehouse_id else None,
         "default_cash_register_id": int(obj.default_cash_register_id) if obj.default_cash_register_id else None,
         "default_currency_id": currency_id,
@@ -612,6 +615,12 @@ def update_quick_sales_settings(db: Session, business_id: int, payload: Dict[str
             obj.anonymous_customer_name = str(name_data).strip()
         else:
             obj.anonymous_customer_name = None
+
+    if "quick_customer_group_id" in payload:
+        group_id = payload.get("quick_customer_group_id")
+        if group_id is not None:
+            assert_assignable_person_group(db, int(business_id), int(group_id))
+        obj.quick_customer_group_id = int(group_id) if group_id is not None else None
     
     if "default_warehouse_id" in payload:
         warehouse_id = payload.get("default_warehouse_id")
