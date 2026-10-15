@@ -13,6 +13,7 @@ from adapters.api.v1.schema_models.person import (
     PersonType as PersonRequestType,
 )
 from adapters.db.models.person import Person
+from adapters.db.models.quick_sales_settings import QuickSalesSetting
 from app.core.responses import ApiError
 from app.services.person_service import create_person
 from app.services.telephony.phone_normalizer import normalize_iran_phone, numbers_match
@@ -291,6 +292,16 @@ def resolve_or_create_quick_customer(
 
     stored_alias = cleaned_alias or normalized_mobile
     assert stored_alias is not None
+    settings = (
+        db.query(QuickSalesSetting)
+        .filter(QuickSalesSetting.business_id == int(business_id))
+        .first()
+    )
+    quick_customer_group_id = (
+        int(settings.quick_customer_group_id)
+        if settings is not None and settings.quick_customer_group_id is not None
+        else None
+    )
     result = create_person(
         db,
         int(business_id),
@@ -298,6 +309,7 @@ def resolve_or_create_quick_customer(
             alias_name=stored_alias,
             mobile=normalized_mobile,
             person_types=[PersonRequestType.CUSTOMER],
+            person_group_id=quick_customer_group_id,
         ),
     )
     person_id = int(result["data"]["id"])

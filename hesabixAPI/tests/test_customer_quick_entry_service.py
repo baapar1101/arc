@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 import pytest
 
@@ -12,6 +12,7 @@ from app.services.customer_quick_entry_service import (
     mobile_search_needles,
     normalize_customer_alias,
     normalize_customer_mobile,
+    resolve_or_create_quick_customer,
 )
 
 
@@ -161,6 +162,85 @@ def test_returns_all_similar_names_when_there_is_no_exact_match():
         mobile=None,
     )
     assert [person.id for person in matches] == [1, 2]
+
+
+@pytest.mark.parametrize("configured_group_id", [None, 27])
+def test_new_quick_customer_uses_group_from_quick_sales_settings(
+    monkeypatch,
+    configured_group_id,
+):
+    from adapters.db.models.person import Person
+    from adapters.db.models.quick_sales_settings import QuickSalesSetting
+    from app.services import customer_quick_entry_service as service
+
+    db = MagicMock()
+    db.get_bind.return_value = SimpleNamespace(dialect=SimpleNamespace(name="sqlite"))
+    settings_query = MagicMock()
+    settings_query.filter.return_value.first.return_value = (
+        SimpleNamespace(quick_customer_group_id=configured_group_id)
+        if configured_group_id is not None
+        else None
+    )
+    created_person = _person(41, "مشتری جدید", mobile="09121234567")
+    person_query = MagicMock()
+    person_query.filter.return_value.one.return_value = created_person
+
+    def query_for(model):
+        if model is QuickSalesSetting:
+            return settings_query
+        if model is Person:
+            return person_query
+        return MagicMock()
+
+    db.query.side_effect = query_for
+    monkeypatch.setattr(service, "load_quick_customer_candidates", lambda *args, **kwargs: [])
+    captured_request = {}
+
+    def fake_create_person(_db, _business_id, request):
+        captured_request["value"] = request
+        return {"data": {"id": 41}}
+
+    monkeypatch.setattr(service, "create_person", fake_create_person)
+
+    result = resolve_or_create_quick_customer(
+        db,
+        business_id=8,
+        alias_name="مشتری جدید",
+        mobile="09121234567",
+    )
+
+    assert result.created is True
+    assert result.persons == [created_person]
+    assert captured_request["value"].person_group_id == configured_group_id
+
+
+def test_existing_quick_customer_keeps_its_current_group(monkeypatch):
+    from app.services import customer_quick_entry_service as service
+
+    db = MagicMock()
+    db.get_bind.return_value = SimpleNamespace(dialect=SimpleNamespace(name="sqlite"))
+    existing = _person(9, "مشتری موجود", mobile="09121234567")
+    existing.person_group_id = 4
+    monkeypatch.setattr(
+        service,
+        "load_quick_customer_candidates",
+        lambda *args, **kwargs: [existing],
+    )
+    create_person = MagicMock()
+    monkeypatch.setattr(service, "create_person", create_person)
+
+    result = resolve_or_create_quick_customer(
+        db,
+        business_id=8,
+        alias_name="مشتری موجود",
+        mobile="09121234567",
+    )
+
+    assert result.created is False
+    assert result.persons == [existing]
+    assert existing.person_group_id == 4
+    create_person.assert_not_called()
+    db.query.assert_not_called()
 
 
 @pytest.mark.asyncio
