@@ -10097,6 +10097,8 @@ def _get_receipt_payment_ids_linked_to_invoice(
         cast(DocumentLine.extra_info, JSONB)["invoice_id"].astext,
         Integer,
     )
+    # Keep JSON columns out of DISTINCT: PostgreSQL's JSON type has no equality
+    # operator. Select unique document IDs first, then inspect extra_info apart.
     rows = (
         db.query(DocumentLine.document_id)
         .join(Document, DocumentLine.document_id == Document.id)
@@ -10109,8 +10111,23 @@ def _get_receipt_payment_ids_linked_to_invoice(
         .distinct()
         .all()
     )
-    for row in rows:
-        ids.add(int(row[0]))
+    linked_document_ids = {int(row[0]) for row in rows}
+    if linked_document_ids:
+        linked_documents = (
+            db.query(Document.id, Document.extra_info)
+            .filter(
+                Document.business_id == business_id,
+                Document.id.in_(linked_document_ids),
+            )
+            .all()
+        )
+        for document_id, document_extra_info in linked_documents:
+            document_extra_info = (
+                document_extra_info if isinstance(document_extra_info, dict) else {}
+            )
+            if document_extra_info.get("source") == "quick_sale_change":
+                continue
+            ids.add(int(document_id))
     return list(ids)
 
 
