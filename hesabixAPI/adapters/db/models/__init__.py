@@ -90,6 +90,7 @@ from .warehouse_document import WarehouseDocument  # noqa: F401
 from .warehouse_document_line import WarehouseDocumentLine  # noqa: F401
 from .goods_expense_income import GoodsExpenseIncomeDocument, GoodsExpenseIncomeLine  # noqa: F401
 from .inventory_discrepancy import InventoryDiscrepancyCase, InventoryDiscrepancyLine  # noqa: F401
+from .quick_sales_payment_button import QuickSalesPaymentButton  # noqa: F401
 from .hscript_report import HScriptReport, HScriptReportVersion, HScriptReportRun, HScriptReportSchedule  # noqa: F401
 from .product_bom import ProductBOM, ProductBOMItem, ProductBOMOutput, ProductBOMOperation  # noqa: F401
 from .ping_pong_score import PingPongScore  # noqa: F401

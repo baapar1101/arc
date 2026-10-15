@@ -23,12 +23,7 @@ void main() {
   group('canAddQuickSalesPaymentLine', () {
     test('allows a second bank when remaining is already settled', () {
       final payments = [
-        _tx(
-          id: 'b1',
-          type: TransactionType.bank,
-          amount: 800000,
-          bankId: '10',
-        ),
+        _tx(id: 'b1', type: TransactionType.bank, amount: 800000, bankId: '10'),
       ];
       expect(
         canAddQuickSalesPaymentLine(
@@ -57,7 +52,7 @@ void main() {
   });
 
   group('applyQuickSalesPaymentAmount', () {
-    test('splits a full bank receipt into two same-type receipts', () {
+    test('keeps payment rows independent when adding a second card', () {
       final payments = [
         _tx(id: 'b1', type: TransactionType.bank, amount: 800000, bankId: '10'),
         _tx(id: 'b2', type: TransactionType.bank, amount: 0, bankId: '11'),
@@ -74,17 +69,14 @@ void main() {
       expect(next, hasLength(2));
       expect(next[0].id, 'b1');
       expect(next[0].type, TransactionType.bank);
-      expect(next[0].amount, 500000);
+      expect(next[0].amount, 800000);
       expect(next[1].id, 'b2');
       expect(next[1].type, TransactionType.bank);
       expect(next[1].amount, 300000);
-      expect(
-        next.fold<num>(0, (sum, p) => sum + p.amount),
-        800000,
-      );
+      expect(next.fold<num>(0, (sum, p) => sum + p.amount), 1100000);
     });
 
-    test('reduces cash when a bank line is typed against a settled sale', () {
+    test('does not reduce cash when a bank line is entered', () {
       final payments = [
         _tx(
           id: 'c1',
@@ -104,12 +96,12 @@ void main() {
       );
 
       expect(next[0].type, TransactionType.cashRegister);
-      expect(next[0].amount, 500000);
+      expect(next[0].amount, 800000);
       expect(next[1].type, TransactionType.bank);
       expect(next[1].amount, 300000);
     });
 
-    test('drops other lines that fall to zero so bank can replace cash', () {
+    test('keeps every row when the total reaches overpayment', () {
       final payments = [
         _tx(
           id: 'c1',
@@ -128,12 +120,13 @@ void main() {
         decimalPlaces: 0,
       );
 
-      expect(next, hasLength(1));
-      expect(next.single.id, 'b1');
-      expect(next.single.amount, 800000);
+      expect(next, hasLength(2));
+      expect(next[0].amount, 800000);
+      expect(next[1].id, 'b1');
+      expect(next[1].amount, 800000);
     });
 
-    test('caps a single line so payments cannot exceed the invoice', () {
+    test('allows a single payment to exceed the invoice', () {
       final payments = [
         _tx(
           id: 'c1',
@@ -151,7 +144,7 @@ void main() {
         decimalPlaces: 0,
       );
 
-      expect(next.single.amount, 800000);
+      expect(next.single.amount, 900000);
     });
   });
 }

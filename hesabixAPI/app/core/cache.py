@@ -1189,14 +1189,25 @@ class CacheService:
 			return total_deleted
 
 
-# Global cache service instance
-_cache_service = CacheService()
+# Create the global cache service on first use. Constructing it during module
+# import can enter get_redis_client() before system_settings_service has finished
+# importing; that circular import is swallowed there and caches the environment
+# defaults (often Redis disabled) for the full configuration TTL.
+_cache_service: Optional[CacheService] = None
+_cache_service_lock = threading.Lock()
 
 
 def get_cache() -> CacheService:
 	"""Get global cache service instance"""
-	# Refresh client در صورت نیاز
-	_cache_service._refresh_client()
+	global _cache_service
+	if _cache_service is None:
+		with _cache_service_lock:
+			if _cache_service is None:
+				_cache_service = CacheService()
+	else:
+		# Refresh client در صورت نیاز
+		_cache_service._refresh_client()
+	assert _cache_service is not None
 	return _cache_service
 
 

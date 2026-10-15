@@ -184,6 +184,7 @@ ALLOWED_INVOICE_PROFIT_OVERHEAD_TYPES = {"none", "production_overhead", "all_ove
 # کلیدهای لینک اسناد جانبی روی extra_info.links فاکتور
 INVOICE_LINK_RECEIPT_PAYMENT_IDS = "receipt_payment_document_ids"
 INVOICE_LINK_EXPENSE_INCOME_IDS = "expense_income_document_ids"
+INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID = "quick_sale_change_payment_document_id"
 
 
 def _strip_invoice_side_document_links_from_document(document: Document) -> None:
@@ -192,6 +193,7 @@ def _strip_invoice_side_document_links_from_document(document: Document) -> None
     links = dict(extra.get("links") or {})
     links.pop(INVOICE_LINK_RECEIPT_PAYMENT_IDS, None)
     links.pop(INVOICE_LINK_EXPENSE_INCOME_IDS, None)
+    links.pop(INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID, None)
     extra["links"] = links
     document.extra_info = _normalize_document_extra_info_for_storage(extra)
     flag_modified(document, "extra_info")
@@ -202,6 +204,7 @@ def _delete_invoice_linked_side_documents(
     *,
     receipt_payment_ids: List[Any],
     expense_income_ids: List[Any],
+    change_payment_id: Any = None,
 ) -> None:
     """
     حذف اسناد دریافت/پرداخت و هزینه/درآمد پیوندخورده به فاکتور (بدون commit؛ در همان تراکنش caller).
@@ -213,6 +216,10 @@ def _delete_invoice_linked_side_documents(
             if rid is None:
                 continue
             delete_receipt_payment(db, int(rid), commit=False)
+    if change_payment_id is not None:
+        from app.services.receipt_payment_service import delete_receipt_payment
+
+        delete_receipt_payment(db, int(change_payment_id), commit=False)
     if expense_income_ids:
         from app.services.expense_income_service import delete_expense_income
 
@@ -2425,6 +2432,38 @@ def _validate_invoice_payment_item_currency(
     )
 
     ttype = (payment_item.get("transaction_type") or payment_item.get("type") or "").strip().lower()
+    if ttype == "person":
+        ref_id = payment_item.get("person_id")
+        if not ref_id:
+            raise ApiError(
+                "PAYMENT_PERSON_REQUIRED",
+                "Payment person is required",
+                http_status=400,
+            )
+        target_person = db.query(Person).filter(Person.id == int(ref_id)).first()
+        if not target_person:
+            raise ApiError(
+                "PAYMENT_ACCOUNT_NOT_FOUND",
+                "Payment person not found",
+                http_status=404,
+            )
+        if business_id is not None and int(target_person.business_id) != int(business_id):
+            raise ApiError(
+                "PAYMENT_ACCOUNT_BUSINESS_MISMATCH",
+                "Payment person does not belong to this business",
+                http_status=400,
+            )
+        invoice_person_id = _person_id_from_header(
+            {"extra_info": invoice.extra_info or {}}
+        ) if invoice is not None else None
+        if invoice_person_id and int(invoice_person_id) == int(ref_id):
+            raise ApiError(
+                "PAYMENT_PERSON_SAME_AS_CUSTOMER",
+                "شخص مقصد پرداخت نمی‌تواند همان مشتری فاکتور باشد",
+                http_status=400,
+            )
+        return None
+
     if ttype not in ("bank", "cash_register", "petty_cash", "check"):
         return None
 
@@ -2722,6 +2761,356 @@ def _create_receipt_payment_documents_for_invoice_payments(
     return payment_docs
 
 
+def _quick_sale_change_amount(document: Document, payments: List[Dict[str, Any]]) -> Decimal:
+    """مبلغ اضافه‌دریافت نسبت به خالص فاکتور، به ارز خود فاکتور."""
+    total = Decimal(str(((document.extra_info or {}).get("totals") or {}).get("net", 0) or 0))
+    paid = Decimal(0)
+    for item in payments:
+        raw = item.get("settles_amount")
+        if raw is None:
+            raw = item.get("amount", 0)
+        amount = Decimal(str(raw or 0))
+        if amount > 0:
+            paid += amount
+    return max(Decimal(0), paid - total)
+
+
+def _quick_sale_change_document_amount(document: Document) -> Decimal:
+    """مبلغی که واقعاً از سند برگشت فروش سریع به مشتری پرداخت شده است."""
+    extra = document.extra_info if isinstance(document.extra_info, dict) else {}
+    raw = extra.get("returned_amount", extra.get("change_amount"))
+    if raw is not None:
+        try:
+            return max(Decimal(0), Decimal(str(raw)))
+        except Exception:
+            pass
+    return _sum_receipt_doc_account_payments(document)
+
+
+def _create_quick_sale_change_payment(
+    db: Session,
+    *,
+    business_id: int,
+    user_id: int,
+    document: Document,
+    person_id: int,
+    payments: List[Dict[str, Any]],
+    change_request: Dict[str, Any] | None,
+) -> int | None:
+    """ثبت تعیین تکلیف اضافه‌دریافت فروش سریع در همان تراکنش فاکتور."""
+    change_amount = _quick_sale_change_amount(document, payments)
+    if change_amount <= Decimal("0.01"):
+        return None
+    request = dict(change_request) if isinstance(change_request, dict) else {}
+    # ثبت بدون تعیین منبع برگشت برای مشتری مشخص، کل اضافه‌دریافت را
+    # بستانکاری مشتری نگه می‌دارد. مشتری ناشناس پایین‌تر رد می‌شود.
+    if not request:
+        request = {
+            "confirmed": True,
+            "amount": change_amount,
+            "credit_amount": change_amount,
+            "allocations": [],
+        }
+    if request.get("confirmed") is not True and request.get("confirmed_returned") is not True:
+        raise ApiError(
+            "QUICK_SALE_CHANGE_CONFIRMATION_REQUIRED",
+            "باید تعیین تکلیف مبلغ اضافه‌دریافت تأیید شود",
+            http_status=400,
+        )
+    requested_amount = Decimal(str(request.get("amount", 0) or 0))
+    if abs(requested_amount - change_amount) > Decimal("0.01"):
+        raise ApiError(
+            "QUICK_SALE_CHANGE_AMOUNT_MISMATCH",
+            "مبلغ قابل برگشت با اضافه‌پرداخت فاکتور هم‌خوانی ندارد",
+            http_status=400,
+        )
+
+    allocations = request.get("allocations")
+    # سازگاری با کلاینت قبلی: تمام مبلغ از یک صندوق برگردانده می‌شد.
+    if not isinstance(allocations, list):
+        allocations = []
+        if request.get("cash_register_id") is not None:
+            allocations.append({
+                "source_type": "cash_register",
+                "source_id": request.get("cash_register_id"),
+                "amount": requested_amount,
+            })
+    if len(allocations) > 50:
+        raise ApiError(
+            "QUICK_SALE_CHANGE_TOO_MANY_ALLOCATIONS",
+            "حداکثر ۵۰ ردیف برای برگشت وجه مجاز است",
+            http_status=400,
+        )
+
+    try:
+        credited_amount = Decimal(str(request.get("credit_amount", 0) or 0))
+    except Exception as exc:
+        raise ApiError(
+            "QUICK_SALE_CHANGE_CREDIT_INVALID",
+            "مبلغ بستانکاری مشتری نامعتبر است",
+            http_status=400,
+        ) from exc
+    if credited_amount < 0:
+        raise ApiError(
+            "QUICK_SALE_CHANGE_CREDIT_INVALID",
+            "مبلغ بستانکاری مشتری نمی‌تواند منفی باشد",
+            http_status=400,
+        )
+
+    normalized_allocations: List[Dict[str, Any]] = []
+    returned_amount = Decimal(0)
+    total_bank_commission = Decimal(0)
+    for index, raw in enumerate(allocations):
+        if not isinstance(raw, dict):
+            raise ApiError(
+                "QUICK_SALE_CHANGE_ALLOCATION_INVALID",
+                f"ردیف برگشت {index + 1} نامعتبر است",
+                http_status=400,
+            )
+        source_type = str(raw.get("source_type") or "").strip().lower()
+        if source_type not in {"cash_register", "bank", "person"}:
+            raise ApiError(
+                "QUICK_SALE_CHANGE_SOURCE_INVALID",
+                "منبع برگشت وجه باید صندوق، بانک یا شخص باشد",
+                http_status=400,
+            )
+        try:
+            source_id = int(raw.get("source_id"))
+            amount = Decimal(str(raw.get("amount", 0) or 0))
+            commission = Decimal(str(raw.get("commission", 0) or 0))
+        except Exception as exc:
+            raise ApiError(
+                "QUICK_SALE_CHANGE_ALLOCATION_INVALID",
+                f"مبلغ یا منبع ردیف برگشت {index + 1} نامعتبر است",
+                http_status=400,
+            ) from exc
+        if source_id <= 0 or amount <= 0 or commission < 0:
+            raise ApiError(
+                "QUICK_SALE_CHANGE_ALLOCATION_INVALID",
+                f"اطلاعات ردیف برگشت {index + 1} کامل نیست",
+                http_status=400,
+            )
+        if source_type != "bank" and commission > 0:
+            raise ApiError(
+                "QUICK_SALE_CHANGE_COMMISSION_NOT_ALLOWED",
+                "کارمزد فقط برای برگشت وجه بانکی مجاز است",
+                http_status=400,
+            )
+        normalized_allocations.append({
+            "source_type": source_type,
+            "source_id": source_id,
+            "amount": amount,
+            "commission": commission,
+        })
+        returned_amount += amount
+        total_bank_commission += commission
+
+    if abs((returned_amount + credited_amount) - change_amount) > Decimal("0.01"):
+        raise ApiError(
+            "QUICK_SALE_CHANGE_RESOLUTION_MISMATCH",
+            "جمع وجه برگشتی و بستانکاری مشتری با اضافه‌دریافت فاکتور هم‌خوانی ندارد",
+            http_status=400,
+        )
+
+    if credited_amount > Decimal("0.01"):
+        from adapters.db.models.quick_sales_settings import QuickSalesSetting
+
+        settings = (
+            db.query(QuickSalesSetting)
+            .filter(QuickSalesSetting.business_id == int(business_id))
+            .first()
+        )
+        anonymous_id = getattr(settings, "default_anonymous_customer_id", None)
+        if anonymous_id is not None and int(anonymous_id) == int(person_id):
+            raise ApiError(
+                "QUICK_SALE_CHANGE_ANONYMOUS_CREDIT_NOT_ALLOWED",
+                "بستانکار کردن مشتری ناشناس مجاز نیست؛ وجه باید کامل برگردانده شود",
+                http_status=400,
+            )
+
+    account_lines: List[Dict[str, Any]] = []
+    resolution_rows: List[Dict[str, Any]] = []
+    receivable_account: Account | None = None
+    for allocation in normalized_allocations:
+        source_type = allocation["source_type"]
+        source_id = int(allocation["source_id"])
+        amount = Decimal(allocation["amount"])
+        commission = Decimal(allocation["commission"])
+        if source_type == "cash_register":
+            register = (
+                db.query(CashRegister)
+                .filter(
+                    CashRegister.id == source_id,
+                    CashRegister.business_id == int(business_id),
+                    CashRegister.is_active == True,  # noqa: E712
+                )
+                .first()
+            )
+            if not register:
+                raise ApiError(
+                    "QUICK_SALE_CHANGE_CASH_REGISTER_NOT_FOUND",
+                    "صندوق برگشت وجه یافت نشد یا غیرفعال است",
+                    http_status=404,
+                )
+            if int(register.currency_id) != int(document.currency_id):
+                raise ApiError(
+                    "QUICK_SALE_CHANGE_CURRENCY_MISMATCH",
+                    "ارز صندوق برگشت وجه با ارز فاکتور یکسان نیست",
+                    http_status=400,
+                )
+            account_lines.append({
+                "transaction_type": "cash_register",
+                "cash_register_id": source_id,
+                "cash_register_name": register.name,
+                "amount": float(amount),
+                "transaction_date": document.document_date.isoformat(),
+                "description": f"برگشت اضافه‌دریافت فاکتور {document.code}",
+            })
+            source_name = register.name
+        elif source_type == "bank":
+            bank = (
+                db.query(BankAccount)
+                .filter(
+                    BankAccount.id == source_id,
+                    BankAccount.business_id == int(business_id),
+                    BankAccount.is_active == True,  # noqa: E712
+                )
+                .first()
+            )
+            if not bank:
+                raise ApiError(
+                    "QUICK_SALE_CHANGE_BANK_NOT_FOUND",
+                    "حساب بانکی برگشت وجه یافت نشد یا غیرفعال است",
+                    http_status=404,
+                )
+            if int(bank.currency_id) != int(document.currency_id):
+                raise ApiError(
+                    "QUICK_SALE_CHANGE_CURRENCY_MISMATCH",
+                    "ارز حساب بانکی برگشت وجه با ارز فاکتور یکسان نیست",
+                    http_status=400,
+                )
+            account_lines.append({
+                "transaction_type": "bank",
+                "bank_id": source_id,
+                "bank_name": bank.name,
+                "amount": float(amount + commission),
+                "transaction_date": document.document_date.isoformat(),
+                "description": f"برگشت اضافه‌دریافت فاکتور {document.code}",
+            })
+            source_name = bank.name
+        else:
+            source_person = (
+                db.query(Person)
+                .filter(
+                    Person.id == source_id,
+                    Person.business_id == int(business_id),
+                )
+                .first()
+            )
+            if not source_person:
+                raise ApiError(
+                    "QUICK_SALE_CHANGE_PERSON_NOT_FOUND",
+                    "شخص پرداخت‌کننده برگشت وجه یافت نشد یا غیرفعال است",
+                    http_status=404,
+                )
+            if source_id == int(person_id):
+                raise ApiError(
+                    "QUICK_SALE_CHANGE_SOURCE_IS_CUSTOMER",
+                    "مشتری فاکتور نمی‌تواند منبع برگشت وجه همان فاکتور باشد",
+                    http_status=400,
+                )
+            if receivable_account is None:
+                receivable_account = (
+                    db.query(Account)
+                    .filter(Account.business_id.is_(None), Account.code == "10401")
+                    .first()
+                )
+                if not receivable_account:
+                    raise ApiError(
+                        "ACCOUNT_NOT_FOUND",
+                        "حساب دریافتنی اشخاص (10401) یافت نشد",
+                        http_status=500,
+                    )
+            account_lines.append({
+                "transaction_type": "account",
+                "account_id": int(receivable_account.id),
+                "person_id": source_id,
+                "detail_type": "person",
+                "detail_name": source_person.alias_name,
+                "amount": float(amount),
+                "transaction_date": document.document_date.isoformat(),
+                "description": f"برگشت وجه فاکتور {document.code} توسط شخص",
+            })
+            source_name = source_person.alias_name
+        resolution_rows.append({
+            "source_type": source_type,
+            "source_id": source_id,
+            "source_name": source_name,
+            "amount": float(amount),
+            "commission": float(commission),
+        })
+
+    if returned_amount <= Decimal("0.01"):
+        return None
+
+    from app.services.receipt_payment_service import create_receipt_payment
+
+    rp = create_receipt_payment(
+        db=db,
+        business_id=int(business_id),
+        user_id=int(user_id),
+        commit=False,
+        data={
+            "document_type": "payment",
+            "document_date": document.document_date.isoformat(),
+            "currency_id": int(document.currency_id),
+            "description": f"برگشت اضافه‌دریافت فروش سریع فاکتور {document.code}",
+            "person_lines": [{
+                "person_id": int(person_id),
+                "amount": float(returned_amount),
+                "description": f"وجه برگشتی فاکتور {document.code}",
+                "extra_info": {"invoice_id": int(document.id)},
+            }],
+            "account_lines": account_lines,
+            "fx_adjustment_lines": ([{
+                "account_code": "70902",
+                "side": "debit",
+                "amount": float(total_bank_commission),
+                "description": "کارمزد خدمات بانکی برگشت وجه فروش سریع",
+            }] if total_bank_commission > 0 else []),
+            "extra_info": {
+                "source": "quick_sale_change",
+                "invoice_id": int(document.id),
+                "person_is_receivable": True,
+                "gross_received": float(
+                    change_amount
+                    + Decimal(
+                        str(
+                            ((document.extra_info or {}).get("totals") or {}).get(
+                                "net", 0
+                            )
+                            or 0
+                        )
+                    )
+                ),
+                "overpayment_amount": float(change_amount),
+                "change_amount": float(returned_amount),
+                "returned_amount": float(returned_amount),
+                "credited_amount": float(credited_amount),
+                "bank_commission": float(total_bank_commission),
+                "allocations": resolution_rows,
+            },
+        },
+    )
+    if not isinstance(rp, dict) or not rp.get("id"):
+        raise ApiError(
+            "QUICK_SALE_CHANGE_CREATE_FAILED",
+            "ثبت سند برگشت وجه ناموفق بود",
+            http_status=500,
+        )
+    return int(rp["id"])
+
+
 def _sum_receipt_payment_amounts_for_invoice(
     db: Session,
     business_id: int,
@@ -2920,7 +3309,11 @@ def _clear_invoice_linked_receipt_payments(
         delete_receipt_payment(db, int(rp_id), commit=False)
     extra = dict(document.extra_info) if document.extra_info else {}
     links = dict(extra.get("links") or {})
+    change_payment_id = links.get(INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID)
+    if change_payment_id is not None:
+        delete_receipt_payment(db, int(change_payment_id), commit=False)
     links.pop(INVOICE_LINK_RECEIPT_PAYMENT_IDS, None)
+    links.pop(INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID, None)
     extra["links"] = links
     document.extra_info = _normalize_document_extra_info_for_storage(extra)
     flag_modified(document, "extra_info")
@@ -5608,12 +6001,39 @@ def create_invoice(
                     invoice_type=invoice_type,
                 )
 
-    if payment_docs:
-        logger.info(f"Linking payment_docs to invoice {document.id}: {payment_docs}")
+    change_payment_id: int | None = None
+    if (
+        not document.is_proforma
+        and is_quick_sale
+        and invoice_type == INVOICE_SALES
+        and payments
+        and isinstance(payments, list)
+        and person_id
+    ):
+        change_payment_id = _create_quick_sale_change_payment(
+            db,
+            business_id=business_id,
+            user_id=user_id,
+            document=document,
+            person_id=int(person_id),
+            payments=payments,
+            change_request=extra_info_all.get("quick_sale_change"),
+        )
+
+    if payment_docs or change_payment_id:
+        logger.info(
+            "Linking payment docs to invoice %s: receipts=%s change=%s",
+            document.id,
+            payment_docs,
+            change_payment_id,
+        )
         db.add(document)
         extra = dict(document.extra_info) if document.extra_info else {}
         links = dict(extra.get("links", {}))
-        links[INVOICE_LINK_RECEIPT_PAYMENT_IDS] = payment_docs
+        if payment_docs:
+            links[INVOICE_LINK_RECEIPT_PAYMENT_IDS] = payment_docs
+        if change_payment_id:
+            links[INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID] = change_payment_id
         extra["links"] = links
         document.extra_info = _normalize_document_extra_info_for_storage(extra)
         flag_modified(document, "extra_info")
@@ -5786,6 +6206,7 @@ def update_invoice(
     _old_is_proforma = bool(document.is_proforma)
     _old_receipt_payment_ids = list(_pre_links_wh.get(INVOICE_LINK_RECEIPT_PAYMENT_IDS) or [])
     _old_expense_income_ids = list(_pre_links_wh.get(INVOICE_LINK_EXPENSE_INCOME_IDS) or [])
+    _old_change_payment_id = _pre_links_wh.get(INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID)
 
     # Only editable in current fiscal year
     fiscal_year = (
@@ -5870,6 +6291,7 @@ def update_invoice(
             db,
             receipt_payment_ids=_old_receipt_payment_ids,
             expense_income_ids=_old_expense_income_ids,
+            change_payment_id=_old_change_payment_id,
         )
     if document.is_proforma:
         _strip_invoice_side_document_links_from_document(document)
@@ -6649,6 +7071,15 @@ def update_invoice(
         # هرگاه payments در payload باشد، اسناد دریافت/پرداخت قبلی حذف می‌شوند؛ خطای حذف باید به کاربر برگردد
         for old_rp_id in old_receipt_payment_ids:
             delete_receipt_payment(db, int(old_rp_id), commit=False)
+        if _old_change_payment_id is not None:
+            delete_receipt_payment(db, int(_old_change_payment_id), commit=False)
+
+        extra = dict(document.extra_info) if document.extra_info else {}
+        links = dict(extra.get("links", {}))
+        links.pop(INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID, None)
+        extra["links"] = links
+        document.extra_info = _normalize_document_extra_info_for_storage(extra)
+        flag_modified(document, "extra_info")
 
         if not payments:
             extra = dict(document.extra_info) if document.extra_info else {}
@@ -6678,6 +7109,31 @@ def update_invoice(
                 extra = dict(document.extra_info) if document.extra_info else {}
                 links = dict(extra.get("links", {}))
                 links.pop(INVOICE_LINK_RECEIPT_PAYMENT_IDS, None)
+                extra["links"] = links
+                document.extra_info = _normalize_document_extra_info_for_storage(extra)
+                flag_modified(document, "extra_info")
+
+        is_quick_sale_pm = bool((document.extra_info or {}).get("quick_sale", False))
+        if payments and inv_type == INVOICE_SALES and is_quick_sale_pm and person_id_pm:
+            change_amount = _quick_sale_change_amount(document, payments)
+            if change_amount <= Decimal("0.01"):
+                extra = dict(document.extra_info) if document.extra_info else {}
+                extra.pop("quick_sale_change", None)
+                document.extra_info = _normalize_document_extra_info_for_storage(extra)
+                flag_modified(document, "extra_info")
+            change_payment_id = _create_quick_sale_change_payment(
+                db,
+                business_id=int(document.business_id),
+                user_id=user_id,
+                document=document,
+                person_id=int(person_id_pm),
+                payments=payments,
+                change_request=(document.extra_info or {}).get("quick_sale_change"),
+            )
+            if change_payment_id:
+                extra = dict(document.extra_info) if document.extra_info else {}
+                links = dict(extra.get("links", {}))
+                links[INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID] = change_payment_id
                 extra["links"] = links
                 document.extra_info = _normalize_document_extra_info_for_storage(extra)
                 flag_modified(document, "extra_info")
@@ -7029,7 +7485,10 @@ def delete_invoice(db: Session, document_id: int, *, commit: bool = True) -> boo
                 raise  # خطا را propagate کن تا rollback شود
         
         # 5) حذف خودکار همه اسناد دریافت/پرداخت مرتبط (بدون توجه به مبلغ) - بدون commit
-        receipt_payment_document_ids = links.get("receipt_payment_document_ids") or []
+        receipt_payment_document_ids = list(links.get("receipt_payment_document_ids") or [])
+        change_payment_id = links.get(INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID)
+        if change_payment_id is not None:
+            receipt_payment_document_ids.append(change_payment_id)
         logger.info(f"[DELETE_INVOICE] Invoice {document_id}: Found {len(receipt_payment_document_ids)} receipt/payment document IDs in links: {receipt_payment_document_ids}")
         
         if receipt_payment_document_ids:
@@ -7270,10 +7729,11 @@ def _cleanup_dead_receipt_payment_links(db: Session, document: Document) -> bool
     """
     try:
         extra_info = document.extra_info or {}
-        links = extra_info.get('links', {})
-        receipt_payment_ids = links.get('receipt_payment_document_ids', [])
-        
-        if not receipt_payment_ids:
+        links = extra_info.get("links", {})
+        receipt_payment_ids = links.get(INVOICE_LINK_RECEIPT_PAYMENT_IDS, [])
+        change_payment_id = links.get(INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID)
+
+        if not receipt_payment_ids and change_payment_id is None:
             return False
         
         # بررسی وجود واقعی هر سند
@@ -7284,7 +7744,8 @@ def _cleanup_dead_receipt_payment_links(db: Session, document: Document) -> bool
                 # بررسی وجود سند در دیتابیس
                 doc = db.query(Document).filter(
                     Document.id == doc_id_int,
-                    Document.document_type.in_(['receipt', 'payment']),
+                    Document.business_id == document.business_id,
+                    Document.document_type.in_(["receipt", "payment"]),
                 ).first()
                 if doc:
                     valid_ids.append(doc_id_int)
@@ -7292,15 +7753,43 @@ def _cleanup_dead_receipt_payment_links(db: Session, document: Document) -> bool
                 # شناسه نامعتبر، رد می‌شود
                 continue
         
+        valid_change_payment_id = None
+        parsed_change_id = None
+        if change_payment_id is not None:
+            try:
+                parsed_change_id = int(change_payment_id)
+                change_doc = db.query(Document).filter(
+                    Document.id == parsed_change_id,
+                    Document.business_id == document.business_id,
+                    Document.document_type == "payment",
+                ).first()
+                if change_doc:
+                    valid_change_payment_id = parsed_change_id
+            except (ValueError, TypeError):
+                pass
+
         # اگر همه لینک‌ها معتبر هستند، نیازی به به‌روزرسانی نیست
-        if len(valid_ids) == len(receipt_payment_ids):
+        if (
+            len(valid_ids) == len(receipt_payment_ids)
+            and (
+                change_payment_id is None
+                or (
+                    parsed_change_id is not None
+                    and valid_change_payment_id == parsed_change_id
+                )
+            )
+        ):
             return False
         
         # به‌روزرسانی extra_info با لینک‌های معتبر
         extra_info = dict(extra_info)
         links = dict(links)
-        links['receipt_payment_document_ids'] = valid_ids
-        extra_info['links'] = links
+        links[INVOICE_LINK_RECEIPT_PAYMENT_IDS] = valid_ids
+        if valid_change_payment_id is None:
+            links.pop(INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID, None)
+        else:
+            links[INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID] = valid_change_payment_id
+        extra_info["links"] = links
 
         document.extra_info = _normalize_document_extra_info_for_storage(extra_info)
         flag_modified(document, "extra_info")
@@ -10314,6 +10803,12 @@ def batch_calculate_invoices_remaining(
                 link_doc_ids.add(int(doc_id))
             except (ValueError, TypeError):
                 pass
+        change_doc_id = links.get(INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID)
+        if change_doc_id is not None:
+            try:
+                link_doc_ids.add(int(change_doc_id))
+            except (ValueError, TypeError):
+                pass
 
     item_lines_by_doc: Dict[int, List[InvoiceItemLine]] = defaultdict(list)
     if need_item_lines:
@@ -10400,7 +10895,23 @@ def batch_calculate_invoices_remaining(
             if not rp_doc:
                 continue
             processed_doc_ids.add(doc_id_int)
-            total_paid += _sum_receipt_doc_payments_for_invoice(rp_doc, inv_id, via_person_line=True)
+            if (rp_doc.extra_info or {}).get("source") == "quick_sale_change":
+                total_paid -= _quick_sale_change_document_amount(rp_doc)
+            else:
+                total_paid += _sum_receipt_doc_payments_for_invoice(
+                    rp_doc, inv_id, via_person_line=True
+                )
+
+        change_doc_id = links.get(INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID)
+        try:
+            parsed_change_doc_id = int(change_doc_id) if change_doc_id is not None else None
+        except (ValueError, TypeError):
+            parsed_change_doc_id = None
+        if parsed_change_doc_id is not None and parsed_change_doc_id not in processed_doc_ids:
+            change_doc = rp_docs_by_id.get(parsed_change_doc_id)
+            if change_doc:
+                processed_doc_ids.add(parsed_change_doc_id)
+                total_paid -= _quick_sale_change_document_amount(change_doc)
 
         remaining = total_amount - total_paid
         results[inv_id] = {
@@ -10529,7 +11040,32 @@ def calculate_invoice_remaining(
                 if doc.id in processed_doc_ids:
                     continue
                 processed_doc_ids.add(doc.id)
-                total_paid += _sum_receipt_doc_payments_for_invoice(doc, invoice_id, via_person_line=True)
+                if (doc.extra_info or {}).get("source") == "quick_sale_change":
+                    total_paid -= _quick_sale_change_document_amount(doc)
+                else:
+                    total_paid += _sum_receipt_doc_payments_for_invoice(
+                        doc, invoice_id, via_person_line=True
+                    )
+
+        change_doc_id = links.get(INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID)
+        try:
+            parsed_change_doc_id = int(change_doc_id) if change_doc_id is not None else None
+        except (ValueError, TypeError):
+            parsed_change_doc_id = None
+        if parsed_change_doc_id is not None and parsed_change_doc_id not in processed_doc_ids:
+            change_doc = (
+                db.query(Document)
+                .options(selectinload(Document.lines))
+                .filter(
+                    Document.id == parsed_change_doc_id,
+                    Document.business_id == business_id,
+                    Document.document_type == "payment",
+                )
+                .first()
+            )
+            if change_doc:
+                processed_doc_ids.add(parsed_change_doc_id)
+                total_paid -= _quick_sale_change_document_amount(change_doc)
         
         remaining = total_amount - total_paid
         

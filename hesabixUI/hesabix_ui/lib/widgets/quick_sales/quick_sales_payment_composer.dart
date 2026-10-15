@@ -61,7 +61,7 @@ class QuickSalesPaymentComposer extends StatefulWidget {
 
 class _QuickSalesPaymentComposerState extends State<QuickSalesPaymentComposer> {
   static const _uuid = Uuid();
-  static const _maxLines = 6;
+  static const _maxLines = 50;
 
   String? _lastBankId;
   String? _focusAmountId;
@@ -240,8 +240,7 @@ class _QuickSalesPaymentComposerState extends State<QuickSalesPaymentComposer> {
     _emit([...widget.payments, tx]);
   }
 
-  int _indexOfId(String id) =>
-      widget.payments.indexWhere((p) => p.id == id);
+  int _indexOfId(String id) => widget.payments.indexWhere((p) => p.id == id);
 
   void _replaceAt(int index, InvoiceTransaction tx) {
     if (index < 0 || index >= widget.payments.length) return;
@@ -382,8 +381,7 @@ class _QuickSalesPaymentComposerState extends State<QuickSalesPaymentComposer> {
       currencyUnit: widget.currencyUnit,
       enabled: widget.enabled,
       autofocus: false,
-      onAmountChanged: (v) =>
-          _onAmountEditedById(widget.payments.first.id, v),
+      onAmountChanged: (v) => _onAmountEditedById(widget.payments.first.id, v),
     );
 
     return LayoutBuilder(

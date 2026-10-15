@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime
 import logging
-from typing import Dict, Any
+from datetime import date, datetime
+from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, Request, Body
+from fastapi import APIRouter, Body, Depends, Request
 from sqlalchemy.orm import Session
 
-from adapters.db.session import get_db
 from adapters.db.models.person import PersonType
-from app.core.auth_dependency import get_current_user, AuthContext
+from adapters.db.session import get_db
+from app.core.auth_dependency import AuthContext, get_current_user
 from app.core.permissions import (
     has_business_permission_for_business,
     require_business_access_dep,
@@ -18,9 +18,14 @@ from app.core.permissions import (
 )
 from app.core.responses import ApiError, success_response
 from app.services.quick_sales_service import (
-    get_quick_sales_settings,
-    update_quick_sales_settings,
+    create_quick_sales_payment_button,
+    delete_quick_sales_payment_button,
     get_or_create_anonymous_customer,
+    get_quick_sales_settings,
+    list_quick_sales_payment_buttons,
+    reorder_quick_sales_payment_buttons,
+    update_quick_sales_payment_button,
+    update_quick_sales_settings,
 )
 
 logger = logging.getLogger(__name__)
@@ -108,6 +113,96 @@ def get_anonymous_customer_endpoint(
     except Exception as e:
         logger.error(f"Error in get_anonymous_customer_endpoint for business {business_id}: {type(e).__name__}: {str(e)}", exc_info=True)
         raise
+
+
+@router.get("/payment-buttons", summary="دکمه‌های پرداخت فروش سریع")
+def list_payment_buttons_endpoint(
+    request: Request,
+    business_id: int,
+    _: None = Depends(require_business_access_dep),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+    data = list_quick_sales_payment_buttons(db, business_id, ctx.get_user_id())
+    return success_response(data, request)
+
+
+@router.post("/payment-buttons", summary="ایجاد دکمه پرداخت فروش سریع")
+def create_payment_button_endpoint(
+    request: Request,
+    business_id: int,
+    payload: Dict[str, Any] = Body(...),
+    _: None = Depends(require_business_access_dep),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+    data = create_quick_sales_payment_button(
+        db,
+        business_id=business_id,
+        user_id=ctx.get_user_id(),
+        payload=payload,
+        can_manage_business=_can(ctx, db, business_id, "settings", "business"),
+    )
+    return success_response(data, request, message="QUICK_SALES_PAYMENT_BUTTON_CREATED")
+
+
+@router.put("/payment-buttons/reorder", summary="تغییر ترتیب دکمه‌های پرداخت فروش سریع")
+def reorder_payment_buttons_endpoint(
+    request: Request,
+    business_id: int,
+    payload: Dict[str, Any] = Body(...),
+    _: None = Depends(require_business_access_dep),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+    data = reorder_quick_sales_payment_buttons(
+        db,
+        business_id=business_id,
+        user_id=ctx.get_user_id(),
+        button_ids=list(payload.get("button_ids") or []),
+        can_manage_business=_can(ctx, db, business_id, "settings", "business"),
+    )
+    return success_response(data, request, message="QUICK_SALES_PAYMENT_BUTTONS_REORDERED")
+
+
+@router.put("/payment-buttons/{button_id}", summary="ویرایش دکمه پرداخت فروش سریع")
+def update_payment_button_endpoint(
+    request: Request,
+    business_id: int,
+    button_id: int,
+    payload: Dict[str, Any] = Body(...),
+    _: None = Depends(require_business_access_dep),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+    data = update_quick_sales_payment_button(
+        db,
+        business_id=business_id,
+        button_id=button_id,
+        user_id=ctx.get_user_id(),
+        payload=payload,
+        can_manage_business=_can(ctx, db, business_id, "settings", "business"),
+    )
+    return success_response(data, request, message="QUICK_SALES_PAYMENT_BUTTON_UPDATED")
+
+
+@router.delete("/payment-buttons/{button_id}", summary="حذف دکمه پرداخت فروش سریع")
+def delete_payment_button_endpoint(
+    request: Request,
+    business_id: int,
+    button_id: int,
+    _: None = Depends(require_business_access_dep),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+    delete_quick_sales_payment_button(
+        db,
+        business_id=business_id,
+        button_id=button_id,
+        user_id=ctx.get_user_id(),
+        can_manage_business=_can(ctx, db, business_id, "settings", "business"),
+    )
+    return success_response({"id": button_id}, request, message="QUICK_SALES_PAYMENT_BUTTON_DELETED")
 
 
 @router.get("/stock-discrepancies", summary="فهرست مغایرت‌های موجودی فروش سریع")

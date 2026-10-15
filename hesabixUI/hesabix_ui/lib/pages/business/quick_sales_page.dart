@@ -30,9 +30,12 @@ import '../../services/currency_service.dart';
 import '../../models/invoice_line_item.dart';
 import '../../models/invoice_transaction.dart';
 import '../../models/quick_sales_parked_sale.dart';
+import '../../models/quick_sales_change_resolution.dart';
 import '../../widgets/invoice/customer_combobox_widget.dart';
 import '../../widgets/quick_sales/quick_sales_parked_sales_bar.dart';
 import '../../widgets/quick_sales/quick_sales_payment_composer.dart';
+import '../../widgets/quick_sales/quick_sales_payment_dock.dart';
+import '../../widgets/quick_sales/quick_sales_change_resolution_dialog.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
 import '../../utils/currency_display_utils.dart';
 import '../../widgets/permission/access_denied_page.dart';
@@ -156,9 +159,10 @@ class _QuickSalesPageState extends State<QuickSalesPage>
 
   // پرداخت
   List<InvoiceTransaction> _payments = [];
+  QuickSalesChangeResolution? _changeResolution;
   String? _selectedCashRegisterId;
   bool _autoCreatePaymentDocument = true;
-  bool _cashFollowsTotal = true;
+  bool _cashFollowsTotal = false;
   bool _shareRemainingEnabled = false;
 
   // اشتراک‌گذاری (وقتی سند دریافت ثبت نمی‌شود)
@@ -657,6 +661,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       shareExpiryHours: _shareExpiryHours,
       itemCount: _cartItems.length,
       totalAmount: _totalAmount,
+      changeResolution: _validChangeResolution,
     );
   }
 
@@ -671,6 +676,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     _selectedCustomer = customer;
     _cartItems = sale.cartItems.map(QuickSalesParkedSale.cloneLine).toList();
     _payments = List<InvoiceTransaction>.from(sale.payments);
+    _changeResolution = sale.changeResolution;
     _cashFollowsTotal = sale.cashFollowsTotal;
     _shareRemainingEnabled = false;
     _checkoutDiscountExpanded = false;
@@ -698,7 +704,8 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     _selectedCustomer = _anonymousCustomer;
     _cartItems = [];
     _payments = [];
-    _cashFollowsTotal = true;
+    _changeResolution = null;
+    _cashFollowsTotal = false;
     _shareRemainingEnabled = false;
     _checkoutDiscountExpanded = false;
     _selectedCashRegisterId = _settingsDefaultCashRegisterId;
@@ -1042,14 +1049,16 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       _autoCreatePaymentDocument = value;
       _shareRemainingEnabled = false;
       _payments = [];
-      _cashFollowsTotal = true;
+      _changeResolution = null;
+      _cashFollowsTotal = false;
       if (!value) {
         _syncShareChannelDefaults();
       }
     });
   }
 
-  num get _paidAmount => _payments.fold<num>(0, (sum, p) => sum + p.amount);
+  num get _paidAmount =>
+      _payments.fold<num>(0, (sum, p) => sum + p.settlesAgainstInvoice);
 
   num get _paymentEpsilon {
     if (_invoiceCurrencyDecimalPlaces <= 0) return 0.5;
@@ -1070,6 +1079,36 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   bool get _isOverpaid =>
       _autoCreatePaymentDocument &&
       _paidAmount > _totalAmount + _paymentEpsilon;
+
+  num get _changeAmount => _isOverpaid ? _paidAmount - _totalAmount : 0;
+
+  QuickSalesChangeResolution? get _validChangeResolution {
+    final value = _changeResolution;
+    if (!_isOverpaid || value == null) return null;
+    return value.isValidFor(_changeAmount, _paymentEpsilon) ? value : null;
+  }
+
+  Future<QuickSalesChangeResolution?> _openChangeResolutionDialog() async {
+    if (!_isOverpaid) return null;
+    final result = await showDialog<QuickSalesChangeResolution>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => QuickSalesChangeResolutionDialog(
+        businessId: widget.businessId,
+        currencyId: _defaultCurrencyId,
+        overpaymentAmount: _changeAmount,
+        currencyUnit: _paymentCurrencyUnit,
+        decimalPlaces: _invoiceCurrencyDecimalPlaces,
+        customerName: _selectedCustomer?.name ?? 'مشتری ناشناس',
+        customerId: _selectedCustomer?.id,
+        isAnonymousCustomer: _isAnonymousSelected,
+        initialValue: _validChangeResolution,
+      ),
+    );
+    if (!mounted || result == null) return null;
+    setState(() => _changeResolution = result);
+    return result;
+  }
 
   bool get _isAnonymousSelected {
     if (_selectedCustomer == null || _anonymousCustomer == null) {
@@ -1094,6 +1133,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   void _onPaymentsChanged(List<InvoiceTransaction> payments) {
     setState(() {
       _payments = payments;
+      _changeResolution = null;
       InvoiceTransaction? cash;
       for (final p in payments) {
         if (p.type == TransactionType.cashRegister) {
@@ -1139,6 +1179,11 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           if (id != null) map['check_id'] = id;
           if (p.checkNumber != null) map['check_number'] = p.checkNumber;
           break;
+        case TransactionType.person:
+          final id = int.tryParse(p.personId ?? '');
+          if (id != null) map['person_id'] = id;
+          if (p.personName != null) map['person_name'] = p.personName;
+          break;
         default:
           break;
       }
@@ -1149,7 +1194,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
 
   String? _validatePayments(AppLocalizations t) {
     if (!_autoCreatePaymentDocument) return null;
-    if (_isOverpaid) return t.quickSalesPayOverpaidError;
     for (final p in _payments) {
       if (p.amount <= 0) continue;
       switch (p.type) {
@@ -1166,6 +1210,11 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         case TransactionType.check:
           if (int.tryParse(p.checkId ?? '') == null) {
             return t.quickSalesPaySelectCheck;
+          }
+          break;
+        case TransactionType.person:
+          if (int.tryParse(p.personId ?? '') == null) {
+            return t.quickSalesPayNeedDestination;
           }
           break;
         default:
@@ -2470,6 +2519,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   Future<void> _saveInvoice({
     bool print = false,
     Map<String, dynamic>? stockOverride,
+    bool debtConfirmed = false,
   }) async {
     // اعتبارسنجی سبد خرید
     if (_cartItems.isEmpty) {
@@ -2506,6 +2556,37 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         SnackBarHelper.show(context, message: paymentError, isError: true);
         return;
       }
+    }
+    if (_autoCreatePaymentDocument &&
+        _payments.isEmpty &&
+        _totalAmount > 0 &&
+        !debtConfirmed) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('ثبت بدون دریافت'),
+          content: const Text(
+            'هیچ پرداختی ثبت نشده است و کل مبلغ فاکتور به حساب مشتری بدهکار می‌شود. ادامه می‌دهید؟',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('انصراف'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('ثبت نسیه'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted || confirmed != true) return;
+      debtConfirmed = true;
+    }
+    QuickSalesChangeResolution? changeResolution = _validChangeResolution;
+    if (_isOverpaid && changeResolution == null) {
+      changeResolution = await _openChangeResolutionDialog();
+      if (!mounted || changeResolution == null) return;
     }
     if (_shouldShareAfterSave) {
       if (_shareOnlinePaymentEnabled) {
@@ -2643,6 +2724,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           'tax': _totalTax,
           'net': _totalAmount,
         },
+        if (_isOverpaid) 'quick_sale_change': changeResolution!.toJson(),
       };
 
       final gvSave = _parsedGlobalDiscountValue;
@@ -2683,7 +2765,8 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       setState(() {
         _cartItems.clear();
         _payments = [];
-        _cashFollowsTotal = true;
+        _changeResolution = null;
+        _cashFollowsTotal = false;
         _shareRemainingEnabled = false;
         _checkoutDiscountExpanded = false;
         _productStocks.clear();
@@ -2773,7 +2856,11 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     if (parkAfterFailure) {
       _startNewSale();
     } else if (retryAfterCorrection || retryOverride != null) {
-      await _saveInvoice(print: print, stockOverride: retryOverride);
+      await _saveInvoice(
+        print: print,
+        stockOverride: retryOverride,
+        debtConfirmed: debtConfirmed,
+      );
     }
   }
 
@@ -3496,7 +3583,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
-                initiallyExpanded: false,
+                initiallyExpanded: true,
                 children: [descWidget],
               ),
             ),
@@ -3841,6 +3928,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
                               setState(() {
                                 _selectedCustomer =
                                     customer ?? _anonymousCustomer;
+                                _changeResolution = null;
                                 _syncShareChannelDefaults();
                               });
                             },
@@ -4277,15 +4365,52 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             ],
           );
 
+          final desktopBody = Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ستون اصلی: سبد خرید
+              Expanded(flex: 7, child: cartColumn),
+              // ستون کناری: مشتری، جمع و جزئیات سند
+              _buildDesktopCheckoutPanel(cs),
+            ],
+          );
+
           return _withParkedSalesBar(
-            Row(
-              children: [
-                // ستون چپ: سبد خرید
-                Expanded(flex: 7, child: cartColumn),
-                // ستون راست: خلاصه و پرداخت
-                _buildDesktopCheckoutPanel(cs),
-              ],
-            ),
+            _autoCreatePaymentDocument
+                ? Stack(
+                    children: [
+                      Positioned.fill(child: desktopBody),
+                      Align(
+                        alignment: Alignment.bottomCenter,
+                        child: QuickSalesPaymentDock(
+                          key: ValueKey('payment-dock-$_activeSaleId'),
+                          businessId: widget.businessId,
+                          authStore: widget.authStore,
+                          payments: _payments,
+                          onChanged: _onPaymentsChanged,
+                          invoiceTotal: _totalAmount,
+                          changeResolution: _validChangeResolution,
+                          onConfigureChange: _openChangeResolutionDialog,
+                          defaultCashRegisterId: _selectedCashRegisterId,
+                          currencyUnit: _paymentCurrencyUnit,
+                          decimalPlaces: _invoiceCurrencyDecimalPlaces,
+                          enabled: !_isSaving,
+                          onSave: () => _saveInvoice(print: false),
+                          onSaveAndPrint: () => _saveInvoice(print: true),
+                        ),
+                      ),
+                    ],
+                  )
+                : Column(
+                    children: [
+                      Expanded(child: desktopBody),
+                      Material(
+                        elevation: 3,
+                        color: cs.surface,
+                        child: _buildCheckoutButtons(cs),
+                      ),
+                    ],
+                  ),
             compact: isCompact,
           );
         },
@@ -4725,6 +4850,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             onCustomerChanged: (customer) {
               setState(() {
                 _selectedCustomer = customer ?? _anonymousCustomer;
+                _changeResolution = null;
                 _syncShareChannelDefaults();
               });
             },
@@ -5089,28 +5215,23 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     return Container(
       width: 384,
       color: cs.surfaceContainerHighest,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: Scrollbar(
-              thumbVisibility: true,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-                child: _buildCheckoutScrollBody(
-                  cs,
-                  includeCustomer: true,
-                  includeDocumentMeta: true,
-                ),
-              ),
-            ),
+      child: Scrollbar(
+        thumbVisibility: true,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            12,
+            12,
+            12,
+            _autoCreatePaymentDocument ? 232 : 8,
           ),
-          Material(
-            elevation: 2,
-            color: cs.surface,
-            child: _buildCheckoutButtons(cs),
+          child: _buildCheckoutScrollBody(
+            cs,
+            includeCustomer: true,
+            includeDocumentMeta: true,
+            includePayment: false,
+            includeTotal: false,
           ),
-        ],
+        ),
       ),
     );
   }
@@ -5119,6 +5240,8 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     ColorScheme cs, {
     required bool includeCustomer,
     required bool includeDocumentMeta,
+    bool includePayment = true,
+    bool includeTotal = true,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -5129,6 +5252,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             onCustomerChanged: (customer) {
               setState(() {
                 _selectedCustomer = customer ?? _anonymousCustomer;
+                _changeResolution = null;
                 _syncShareChannelDefaults();
               });
             },
@@ -5142,13 +5266,50 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           ),
           const SizedBox(height: 10),
         ],
-        _buildCheckoutTotalHero(cs),
-        const SizedBox(height: 4),
+        if (includeTotal) ...[
+          _buildCheckoutTotalHero(cs),
+          const SizedBox(height: 4),
+        ],
         _buildCheckoutDiscountBlock(cs),
         const SizedBox(height: 10),
-        _buildPaymentSection(cs),
-        const SizedBox(height: 4),
+        if (includePayment) ...[
+          _buildPaymentSection(cs),
+          const SizedBox(height: 4),
+        ],
         _buildCheckoutDetailsTile(cs, includeDocumentMeta: includeDocumentMeta),
+        if (!includePayment) ...[
+          const SizedBox(height: 8),
+          _buildDesktopShareControls(cs),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildDesktopShareControls(ColorScheme cs) {
+    final t = AppLocalizations.of(context);
+    if (!_autoCreatePaymentDocument) return _buildShareSection(cs, t);
+    if (_remainingAmount <= 0 || _isOverpaid) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SwitchListTile.adaptive(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          title: Tooltip(
+            message: t.quickSalesPayShareRemainingHint,
+            child: Text(t.quickSalesPayShareRemaining),
+          ),
+          value: _shareRemainingEnabled,
+          onChanged: _isSaving
+              ? null
+              : (value) {
+                  setState(() {
+                    _shareRemainingEnabled = value;
+                    if (value) _syncShareChannelDefaults();
+                  });
+                },
+        ),
+        if (_shareRemainingEnabled) _buildShareSection(cs, t),
       ],
     );
   }
@@ -5232,7 +5393,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
         key: ValueKey('qs-details-$_forceCheckoutDetails'),
-        initiallyExpanded: _forceCheckoutDetails,
+        initiallyExpanded: true,
         tilePadding: EdgeInsets.zero,
         childrenPadding: const EdgeInsets.only(bottom: 8),
         visualDensity: VisualDensity.compact,
@@ -5437,6 +5598,38 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             calendarController: widget.calendarController,
             isAnonymousCustomer: _isAnonymousSelected,
           ),
+          if (_isOverpaid) ...[
+            const SizedBox(height: 8),
+            Card(
+              color: cs.errorContainer,
+              margin: EdgeInsets.zero,
+              child: ListTile(
+                dense: true,
+                leading: Icon(
+                  _validChangeResolution == null
+                      ? Icons.rule_folder_outlined
+                      : Icons.edit_outlined,
+                  color: cs.onErrorContainer,
+                ),
+                title: Text(
+                  _validChangeResolution == null
+                      ? 'تعیین تکلیف مبلغ اضافه‌دریافت'
+                      : 'برگشت ${_formatNumber(_validChangeResolution!.returnedAmount)} • بستانکاری ${_formatNumber(_validChangeResolution!.creditAmount)}',
+                  style: TextStyle(
+                    color: cs.onErrorContainer,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                subtitle: Text(
+                  '${_formatNumber(_changeAmount)} $_paymentCurrencyUnit',
+                  style: TextStyle(color: cs.onErrorContainer),
+                ),
+                onTap: _isSaving
+                    ? null
+                    : () => unawaited(_openChangeResolutionDialog()),
+              ),
+            ),
+          ],
           if (_remainingAmount > 0 && !_isOverpaid) ...[
             SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,
@@ -5636,190 +5829,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildMobileBottomBar(ColorScheme cs) {
-    final canCheckout = _cartItems.isNotEmpty && !_isSaving;
-    final narrow = MediaQuery.sizeOf(context).width < _compactBreakpoint;
-    return SafeArea(
-      top: false,
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: narrow ? 8 : 12,
-          vertical: narrow ? 8 : 10,
-        ),
-        decoration: BoxDecoration(
-          color: cs.surface,
-          border: Border(
-            top: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
-          ),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'مبلغ نهایی',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: cs.onSurface.withOpacity(0.7),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _formatNumber(_totalAmount),
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: cs.primary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(width: narrow ? 8 : 12),
-            FilledButton(
-              onPressed: canCheckout ? () => _openCheckoutSheet(cs) : null,
-              style: narrow
-                  ? FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                    )
-                  : null,
-              child: _isSaving
-                  ? SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: cs.onPrimary,
-                      ),
-                    )
-                  : Text(
-                      _cartItems.isEmpty
-                          ? 'سبد خالی'
-                          : (narrow ? 'تسویه' : 'پرداخت / ثبت'),
-                    ),
-            ),
-            const SizedBox(width: 8),
-            PopupMenuButton<String>(
-              enabled: canCheckout,
-              tooltip: 'اقدامات سریع',
-              onSelected: (value) async {
-                switch (value) {
-                  case 'save':
-                    await _saveInvoice(print: false);
-                    break;
-                  case 'print':
-                    await _saveInvoice(print: true);
-                    break;
-                }
-              },
-              itemBuilder: (context) => const [
-                PopupMenuItem<String>(
-                  value: 'save',
-                  child: Row(
-                    children: [
-                      Icon(Icons.save),
-                      SizedBox(width: 10),
-                      Text('ثبت'),
-                    ],
-                  ),
-                ),
-                PopupMenuItem<String>(
-                  value: 'print',
-                  child: Row(
-                    children: [
-                      Icon(Icons.print),
-                      SizedBox(width: 10),
-                      Text('ثبت و چاپ'),
-                    ],
-                  ),
-                ),
-              ],
-              child: SizedBox(
-                width: 44,
-                height: 44,
-                child: Center(
-                  child: _isSaving
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Icon(
-                          Icons.more_vert,
-                          color: canCheckout
-                              ? cs.onSurface
-                              : cs.onSurface.withOpacity(0.4),
-                        ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _openCheckoutSheet(ColorScheme cs) async {
-    if (_cartItems.isEmpty) return;
-
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      useSafeArea: true,
-      backgroundColor: cs.surface,
-      builder: (context) {
-        return DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.72,
-          minChildSize: 0.45,
-          maxChildSize: 0.95,
-          builder: (context, scrollController) {
-            return Column(
-              children: [
-                Expanded(
-                  child: ListView(
-                    controller: scrollController,
-                    padding: const EdgeInsets.only(bottom: 12),
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-                        child: _buildCheckoutScrollBody(
-                          cs,
-                          includeCustomer: true,
-                          includeDocumentMeta: true,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  decoration: BoxDecoration(
-                    color: cs.surface,
-                    border: Border(
-                      top: BorderSide(
-                        color: cs.outlineVariant.withOpacity(0.4),
-                      ),
-                    ),
-                  ),
-                  child: SafeArea(top: false, child: _buildCheckoutButtons(cs)),
-                ),
-              ],
-            );
-          },
-        );
-      },
     );
   }
 
