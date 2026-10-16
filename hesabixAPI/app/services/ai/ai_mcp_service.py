@@ -312,7 +312,7 @@ async def handle_mcp_request(
                     "MCP agent task completed connection_id=%s user_id=%s business_id=%s",
                     getattr(ctx, "mcp_connection_id", None), ctx.get_user_id(), eff_business,
                 )
-            return _jsonrpc_result(req_id, {"content": [{"type": "text", "text": str(rendered)}], "isError": False, **({"resultType": "complete"} if modern else {})})
+                return _jsonrpc_result(req_id, {"content": [{"type": "text", "text": str(rendered)}], "isError": False, **({"resultType": "complete"} if modern else {})})
 
             from app.services.ai.ai_db_helpers import run_ai_registry_function
 
