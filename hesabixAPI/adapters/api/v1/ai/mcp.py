@@ -19,7 +19,7 @@ from app.core.responses import ApiError
 from app.core.security import generate_api_key, hash_api_key
 from app.core.cache import get_cache
 from app.services.ai.ai_mcp_service import handle_mcp_request
-from adapters.api.v1.ai.mcp_oauth import _base_url, _resource
+from adapters.api.v1.ai.mcp_oauth import _base_url, _has_explicit_business_access, _resource
 
 router = APIRouter(prefix="/ai/mcp", tags=["هوش مصنوعی-MCP"])
 logger = logging.getLogger(__name__)
@@ -37,9 +37,7 @@ def _scopes(row: ApiKey) -> set[str]:
 
 
 def _require_business_access(ctx: AuthContext, business_id: int) -> None:
-    if ctx.is_superadmin():
-        raise ApiError("FORBIDDEN", "اتصال MCP کسب‌وکار باید با کاربر عادی همان کسب‌وکار ساخته شود", http_status=403)
-    if not ctx.can_access_business(business_id):
+    if not ctx.db or not _has_explicit_business_access(ctx.db, ctx.get_user_id(), business_id):
         raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار مجاز نیست", http_status=403)
 
 
@@ -143,7 +141,8 @@ def revoke_mcp_connection(
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
     row = db.query(ApiKey).filter(ApiKey.id == connection_id, ApiKey.key_type == "mcp").first()
-    if not row or not row.business_id or not ctx.can_access_business(row.business_id):
+    if (not row or not row.business_id or not ctx.db or
+            not _has_explicit_business_access(ctx.db, ctx.get_user_id(), row.business_id)):
         raise ApiError("NOT_FOUND", "اتصال پیدا نشد", http_status=404)
     if not ctx.is_business_owner(row.business_id) and row.user_id != ctx.get_user_id():
         raise ApiError("FORBIDDEN", "لغو این اتصال مجاز نیست", http_status=403)
@@ -217,14 +216,12 @@ def get_mcp_context(request: Request, db: Session = Depends(get_db)) -> AuthCont
         business_id=row.business_id,
         db=db,
     )
-    if not ctx.can_access_business(row.business_id):
+    if not _has_explicit_business_access(db, user.id, row.business_id):
         raise HTTPException(
             status_code=403,
             detail="Business membership is no longer active.",
             headers={"WWW-Authenticate": f'Bearer error="invalid_token", resource_metadata="{resource_metadata}"'},
         )
-    if ctx.is_superadmin():
-        raise ApiError("FORBIDDEN", "حساب مدیریتی سامانه برای اتصال MCP کسب‌وکار مجاز نیست", http_status=403)
     ctx.mcp_scopes = scopes
     ctx.mcp_connection_id = row.id
     origin = request.headers.get("origin")

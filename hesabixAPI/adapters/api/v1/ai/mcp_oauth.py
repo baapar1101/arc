@@ -192,6 +192,23 @@ def _trusted_redirect_uri(uri: str) -> bool:
     return host in allowed or any(host.endswith("." + domain) for domain in allowed)
 
 
+def _has_explicit_business_access(db: Session, user_id: int, business_id: int) -> bool:
+    """Check tenant membership without the global superadmin access shortcut."""
+    business = db.get(Business, business_id)
+    if not business or business.deleted_at is not None:
+        return False
+    if business.owner_id == user_id:
+        return True
+    permission = db.query(BusinessPermission).filter(
+        BusinessPermission.user_id == user_id,
+        BusinessPermission.business_id == business_id,
+    ).first()
+    if not permission:
+        return False
+    permissions = AuthContext._normalize_permissions_value(permission.business_permissions or {})
+    return permissions.get("join") is True and membership_is_active(permission)
+
+
 def _append_query(uri: str, values: dict[str, str]) -> str:
     p = urlsplit(uri)
     query = parse_qsl(p.query, keep_blank_values=True)
@@ -503,7 +520,7 @@ $('approve').addEventListener('click',()=>decide(true));$('deny').addEventListen
 @rate_limit(max_requests=20, window_seconds=600, error_message="درخواست‌های ورود OAuth بیش از حد مجاز است.")
 def create_consent_session(payload: dict, db: Session = Depends(get_db), ctx: AuthContext = Depends(get_current_user)) -> dict:
     db = ctx.db
-    if db is None or ctx.is_superadmin():
+    if db is None:
         raise HTTPException(403, "A business user account is required")
     raw_request_id = payload.get("request_id")
     authorization = db.query(McpOAuthAuthorizationRequest).filter(
@@ -582,7 +599,8 @@ def consent(payload: dict, request: Request, db: Session = Depends(get_db)) -> d
     except (TypeError, ValueError):
         raise HTTPException(400, "A business must be selected")
     ctx = AuthContext(user=user, api_key_id=0, business_id=business_id, db=db)
-    if ctx.is_superadmin() or not ctx.can_access_business(business_id) or not ctx.is_user_active():
+    if (not ctx.is_user_active() or
+            not _has_explicit_business_access(db, ctx.get_user_id(), business_id)):
         raise HTTPException(403, "Business access is no longer active")
     requested = set(row.scopes or [])
     raw_scopes = payload.get("scopes")
@@ -694,7 +712,8 @@ async def token(request: Request, db: Session = Depends(get_db)) -> JSONResponse
         return _json_error("unsupported_grant_type", "Only authorization_code and refresh_token are supported")
     user = db.get(User, user_id)
     probe = AuthContext(user=user, api_key_id=0, business_id=business_id, db=db) if user else None
-    if not user or not user.is_active or not probe or not probe.can_access_business(business_id) or probe.is_superadmin():
+    if (not user or not user.is_active or not probe or
+            not _has_explicit_business_access(db, user_id, business_id)):
         now = datetime.utcnow()
         if grant_type == "refresh_token" and refresh_row is not None:
             db.query(McpOAuthRefreshToken).filter(
