@@ -7,10 +7,11 @@ import json
 import re
 import secrets
 from datetime import datetime, timedelta
+from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from sqlalchemy.orm import Session
 
 from adapters.db.models.ai_mcp_oauth import (
@@ -306,30 +307,186 @@ async def authorize(
     )
     return HTMLResponse(html_body, headers={
         "Cache-Control": "no-store", "Pragma": "no-cache",
-        "Content-Security-Policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+        "Content-Security-Policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; font-src 'self'; img-src data:; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
         "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff",
     })
 
 
+@oauth_router.get("/assets/fonts/{font_name}", include_in_schema=False)
+def oauth_font(font_name: str) -> FileResponse:
+    """Serve only the bundled UI fonts used by the standalone OAuth page."""
+    allowed_fonts = {
+        "YekanBakhFaNum-Regular.woff2",
+        "YekanBakhFaNum-SemiBold.woff2",
+        "YekanBakhFaNum-Bold.woff2",
+        "roboto.woff2",
+    }
+    if font_name not in allowed_fonts:
+        raise HTTPException(404, "Font not found")
+    repository_root = Path(__file__).resolve().parents[5]
+    font_path = repository_root / "hesabixUI" / "hesabix_ui" / "web" / "fonts" / font_name
+    if not font_path.is_file():
+        raise HTTPException(404, "Font not found")
+    return FileResponse(
+        font_path,
+        media_type="font/woff2",
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+    )
+
+
 def _authorization_html(request_id: str, client_name: str, write_requested: bool, offline_requested: bool) -> str:
-    safe_id, safe_name = html.escape(request_id), html.escape(client_name)
-    return f'''<!doctype html><html lang="fa" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>اتصال حسابیکس</title>
-<style>body{{font-family:system-ui,sans-serif;background:#f5f7fb;margin:0;color:#182230}}main{{max-width:520px;margin:6vh auto;background:white;padding:24px;border-radius:16px;box-shadow:0 8px 30px #18223018}}input,select,button{{box-sizing:border-box;width:100%;padding:11px;margin:6px 0;border:1px solid #ccd3df;border-radius:8px}}button{{background:#1455d9;color:white;border:0;cursor:pointer}}label{{display:block;margin-top:12px}}#status{{white-space:pre-wrap;color:#a22}}.row{{display:flex;gap:8px}}.row>*{{flex:1}}</style>
-<main><h2>اتصال امن به حسابیکس</h2><p><b>{safe_name}</b> درخواست دسترسی به ابزارهای کسب‌وکار حسابیکس را دارد. پس از ورود، کسب‌وکار و سطح دسترسی را انتخاب کنید.</p>
-<label>موبایل یا ایمیل<input id="identifier" autocomplete="username" maxlength="255"></label><div class="row"><select id="channel"><option value="sms">پیامک</option><option value="email">ایمیل</option></select><button id="reload" type="button">دریافت کپچا</button></div>
-<img id="captcha" alt="کپچا" style="max-height:80px"><label>متن کپچا<input id="captchaCode" maxlength="10" autocomplete="off"></label><button id="send" type="button">ارسال کد ورود</button>
-<section id="otpSection" hidden><label>کد یکبارمصرف<input id="otp" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></label><button id="verify" type="button">تایید و ورود</button></section>
-<section id="consent" hidden><label>کسب‌وکار<select id="business"></select></label><p>دسترسی پایه: مشاهده اطلاعات و گزارش‌های این کسب‌وکار.</p>{'<label><input type="checkbox" id="write" style="width:auto"> اجازه استفاده از ابزارهای تغییردهنده اطلاعات (فقط مالک کسب‌وکار)</label>' if write_requested else ''}{'<label><input type="checkbox" id="offline" style="width:auto"> اجازه تمدید اتصال تا ۳۰ روز بدون ورود مجدد</label>' if offline_requested else ''}<button id="approve" type="button">تایید اتصال</button><button id="deny" type="button">رد درخواست</button></section><p id="status" role="status"></p></main>
+    safe_name = html.escape(client_name)
+    api_json = json.dumps(get_settings().api_v1_prefix)
+    request_json = json.dumps(request_id)
+    write_option = (
+        '<label class="permission permission--optional"><input type="checkbox" id="write">'
+        '<span><strong>ابزارهای ویرایشی</strong><small>امکان ثبت یا تغییر اطلاعات کسب‌وکار (ویژهٔ مالک)</small></span></label>'
+        if write_requested else ""
+    )
+    offline_option = (
+        '<label class="permission permission--optional"><input type="checkbox" id="offline">'
+        '<span><strong>تمدید اتصال</strong><small>تمدید اتصال تا ۳۰ روز، بدون ورود دوباره</small></span></label>'
+        if offline_requested else ""
+    )
+    return f'''<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <title>اتصال امن | حسابیکس</title>
+  <style>
+    @font-face {{ font-family: YekanBakh; src: url("{get_settings().api_v1_prefix}/ai/mcp/oauth/assets/fonts/YekanBakhFaNum-Regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }}
+    @font-face {{ font-family: YekanBakh; src: url("{get_settings().api_v1_prefix}/ai/mcp/oauth/assets/fonts/YekanBakhFaNum-SemiBold.woff2") format("woff2"); font-weight: 600; font-display: swap; }}
+    @font-face {{ font-family: YekanBakh; src: url("{get_settings().api_v1_prefix}/ai/mcp/oauth/assets/fonts/YekanBakhFaNum-Bold.woff2") format("woff2"); font-weight: 700; font-display: swap; }}
+    @font-face {{ font-family: Roboto; src: url("{get_settings().api_v1_prefix}/ai/mcp/oauth/assets/fonts/roboto.woff2") format("woff2"); font-weight: 400; font-display: swap; }}
+    :root {{ color-scheme: light; --brand:#0f4c81; --brand-strong:#0a3d69; --ink:#172b3b; --muted:#657789; --line:#e4ebf1; --surface:#fff; --canvas:#f3f7fa; --danger:#a83232; --success:#176b4d; }}
+    * {{ box-sizing:border-box; }}
+    [hidden] {{ display:none !important; }}
+    body {{ margin:0; min-height:100vh; min-height:100dvh; padding:clamp(16px,4vw,48px); display:grid; place-items:center; color:var(--ink); background:radial-gradient(ellipse at 50% 0%,#e3eff7 0,transparent 48%),var(--canvas); font-family:YekanBakh,Tahoma,sans-serif; font-size:15px; line-height:1.7; }}
+    button,input,select {{ font:inherit; }}
+    .shell {{ width:min(100%,520px); }}
+    .card {{ overflow:hidden; background:var(--surface); border:1px solid rgba(15,76,129,.09); border-radius:24px; box-shadow:0 24px 72px rgba(21,52,76,.12),0 2px 8px rgba(21,52,76,.04); }}
+    .card-head {{ padding:clamp(22px,6vw,36px) clamp(20px,6vw,40px) 24px; text-align:center; }}
+    .brand-mark {{ width:56px; height:56px; margin:0 auto 15px; display:grid; place-items:center; color:#fff; background:linear-gradient(145deg,#17639d,var(--brand-strong)); border-radius:18px; box-shadow:0 8px 18px rgba(15,76,129,.22); }}
+    .brand-mark svg {{ width:29px; height:29px; }}
+    .eyebrow {{ margin:0 0 3px; color:var(--brand); font-size:12px; font-weight:600; }}
+    h1 {{ margin:0; font-size:clamp(22px,5vw,27px); line-height:1.4; font-weight:700; letter-spacing:-.02em; }}
+    .intro {{ margin:10px auto 0; max-width:390px; color:var(--muted); font-size:14px; line-height:1.9; }}
+    .client {{ color:var(--ink); font-weight:600; }}
+    .secure-note {{ margin-top:15px; display:inline-flex; align-items:center; gap:7px; color:#4e6b7e; font-size:12px; }}
+    .secure-note svg {{ width:15px; height:15px; color:#31836a; }}
+    .steps {{ display:flex; align-items:center; justify-content:center; gap:10px; margin-top:22px; color:#7890a1; font-size:12px; }}
+    .step {{ display:flex; align-items:center; gap:7px; }}
+    .step-number {{ width:22px; height:22px; display:grid; place-items:center; border:1px solid #d6e1e9; border-radius:50%; font-family:Roboto,YekanBakh,sans-serif; font-size:11px; }}
+    .step.active {{ color:var(--brand); font-weight:600; }}
+    .step.active .step-number {{ color:#fff; background:var(--brand); border-color:var(--brand); }}
+    .step-line {{ width:28px; height:1px; background:#dce5eb; }}
+    .card-body {{ padding:0 clamp(20px,6vw,40px) clamp(22px,6vw,36px); }}
+    .section-label {{ margin:0 0 12px; color:#536b7c; font-size:13px; font-weight:600; }}
+    .field {{ display:block; margin:0 0 15px; }}
+    .field-label {{ display:block; margin-bottom:6px; color:#314b5d; font-size:13px; font-weight:600; }}
+    .control {{ width:100%; min-height:48px; padding:10px 13px; color:var(--ink); background:#fff; border:1px solid #d8e2e9; border-radius:11px; outline:none; transition:border-color .16s,box-shadow .16s; }}
+    .control:focus {{ border-color:#4c8ab4; box-shadow:0 0 0 3px rgba(15,76,129,.11); }}
+    .control::placeholder {{ color:#99a8b4; }}
+    .captcha-row {{ display:grid; grid-template-columns:minmax(0,1fr) 105px; gap:10px; align-items:end; }}
+    .captcha-box {{ height:48px; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#f7fafc; border:1px solid var(--line); border-radius:11px; }}
+    .captcha-box img {{ max-width:100%; max-height:44px; object-fit:contain; }}
+    .icon-button {{ width:38px; height:38px; flex:0 0 38px; display:grid; place-items:center; color:#547187; background:transparent; border:0; border-radius:9px; cursor:pointer; }}
+    .captcha-tools {{ display:flex; align-items:center; gap:5px; }}
+    .captcha-tools .captcha-box {{ flex:1; }}
+    .icon-button:hover {{ color:var(--brand); background:#edf4f8; }}
+    .icon-button svg {{ width:18px; height:18px; }}
+    .channel-row {{ display:grid; grid-template-columns:145px minmax(0,1fr); gap:10px; align-items:center; }}
+    .primary,.secondary {{ width:100%; min-height:48px; padding:10px 16px; border-radius:11px; font-weight:600; cursor:pointer; transition:background .16s,border-color .16s,transform .16s; }}
+    .primary {{ color:#fff; background:var(--brand); border:1px solid var(--brand); box-shadow:0 5px 12px rgba(15,76,129,.14); }}
+    .primary:hover:not(:disabled) {{ background:var(--brand-strong); border-color:var(--brand-strong); transform:translateY(-1px); }}
+    .secondary {{ color:#496579; background:#fff; border:1px solid #d8e2e9; }}
+    .secondary:hover:not(:disabled) {{ background:#f6f9fb; border-color:#bdcdd9; }}
+    button:disabled {{ opacity:.58; cursor:wait; }}
+    .status {{ min-height:24px; margin:13px 0 0; color:var(--muted); font-size:13px; }}
+    .status[data-tone="error"] {{ color:var(--danger); }}
+    .status[data-tone="success"] {{ color:var(--success); }}
+    .divider {{ height:1px; margin:19px 0; background:var(--line); }}
+    .permission-list {{ display:grid; gap:9px; margin:0 0 17px; }}
+    .permission {{ display:flex; align-items:flex-start; gap:11px; padding:13px; background:#f7fafc; border:1px solid #e5edf2; border-radius:12px; cursor:pointer; }}
+    .permission input {{ width:18px; height:18px; margin:3px 0 0; accent-color:var(--brand); flex:0 0 auto; }}
+    .permission span {{ display:grid; gap:1px; }}
+    .permission strong {{ color:#29465a; font-size:13px; font-weight:600; }}
+    .permission small {{ color:var(--muted); font-size:12px; }}
+    .permission--optional {{ background:#fff; }}
+    .button-row {{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:13px; }}
+    .footnote {{ margin:17px 0 0; color:#8192a0; text-align:center; font-size:11px; }}
+    @media(max-width:420px) {{ body {{ padding:12px; }} .card {{ border-radius:19px; }} .channel-row {{ grid-template-columns:118px minmax(0,1fr); gap:8px; }} .steps {{ gap:7px; }} .step-line {{ width:17px; }} .intro {{ font-size:13px; }} }}
+    @media(prefers-reduced-motion:reduce) {{ *,*::before,*::after {{ scroll-behavior:auto !important; transition:none !important; }} }}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <article class="card" aria-labelledby="page-title">
+      <header class="card-head">
+        <div class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2.8 20 6v5.4c0 5.2-3.5 8.4-8 10.1-4.5-1.7-8-4.9-8-10.1V6l8-3.2Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m8.7 12.1 2.2 2.2 4.6-4.7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <p class="eyebrow">حسابیکس · اتصال به هوش مصنوعی</p>
+        <h1 id="page-title">اتصال امن حساب کاربری</h1>
+        <p class="intro"><span class="client">{safe_name}</span> می‌خواهد به ابزارهای حسابیکس شما متصل شود. ورود و انتخاب کسب‌وکار را فقط در صورتی ادامه دهید که این درخواست را خودتان آغاز کرده‌اید.</p>
+        <span class="secure-note"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3 19 6v5c0 4.6-3 7.5-7 9-4-1.5-7-4.4-7-9V6l7-3Z" stroke="currentColor" stroke-width="1.8"/><path d="m9 11.5 2 2 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>ورود مستقیم و رمزنگاری‌شده در حسابیکس</span>
+        <div class="steps" aria-label="مراحل اتصال"><span class="step active" id="stepLogin"><span class="step-number">۱</span> ورود</span><span class="step-line"></span><span class="step" id="stepConsent"><span class="step-number">۲</span> انتخاب دسترسی</span></div>
+      </header>
+      <div class="card-body">
+        <section id="loginSection" aria-labelledby="login-heading">
+          <h2 class="section-label" id="login-heading">با شماره موبایل یا ایمیل حسابیکس وارد شوید</h2>
+          <label class="field"><span class="field-label">شماره موبایل یا ایمیل</span><input class="control" id="identifier" autocomplete="username" maxlength="255" placeholder="مثلاً ۰۹۱۲۱۲۳۴۵۶۷" required></label>
+          <div class="captcha-row">
+            <label class="field"><span class="field-label">کد امنیتی</span><input class="control" id="captchaCode" maxlength="10" autocomplete="off" placeholder="متن تصویر را وارد کنید" required></label>
+            <div class="captcha-tools"><div class="captcha-box"><img id="captcha" alt="تصویر کد امنیتی"></div><button class="icon-button" id="reload" type="button" aria-label="دریافت کد امنیتی جدید" title="کد جدید"><svg viewBox="0 0 24 24" fill="none"><path d="M20 7v5h-5M4 17v-5h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 9a7 7 0 0 1 12-2l2 2M4 15l2 2a7 7 0 0 0 12-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div>
+          </div>
+          <div class="channel-row"><label><span class="field-label">روش دریافت کد</span><select class="control" id="channel"><option value="sms">پیامک</option><option value="email">ایمیل</option></select></label><button class="primary" id="send" type="button">ارسال کد ورود</button></div>
+          <p id="status" class="status" role="status" aria-live="polite"></p>
+        </section>
+        <section id="otpSection" hidden aria-labelledby="otp-heading">
+          <div class="divider"></div><h2 class="section-label" id="otp-heading">کد ارسال‌شده را وارد کنید</h2>
+          <label class="field"><span class="field-label">کد یک‌بارمصرف</span><input class="control" id="otp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="کد ۶ رقمی" dir="ltr" required></label>
+          <button class="primary" id="verify" type="button">تایید و ادامه</button>
+          <p class="status" id="otpStatus" role="status" aria-live="polite"></p>
+        </section>
+        <section id="consent" hidden aria-labelledby="consent-heading">
+          <div class="divider"></div><h2 class="section-label" id="consent-heading">کسب‌وکار و دسترسی را انتخاب کنید</h2>
+          <label class="field"><span class="field-label">کسب‌وکار</span><select class="control" id="business" required></select></label>
+          <div class="permission-list"><label class="permission"><input type="checkbox" checked disabled><span><strong>مشاهدهٔ اطلاعات و گزارش‌ها</strong><small>دسترسی پایه برای استفاده از ابزارهای حسابیکس</small></span></label>{write_option}{offline_option}</div>
+          <div class="button-row"><button class="primary" id="approve" type="button">تایید و اتصال</button><button class="secondary" id="deny" type="button">رد درخواست</button></div>
+          <p class="status" id="consentStatus" role="status" aria-live="polite"></p>
+        </section>
+      </div>
+    </article>
+    <p class="footnote">با تایید شما، فقط کسب‌وکار و سطح دسترسی انتخاب‌شده متصل می‌شود.</p>
+  </main>
 <script>
-const api='{get_settings().api_v1_prefix}', rid='{safe_id}';let captchaId='',loginSession='',sessionKey='';const $=id=>document.getElementById(id),status=m=>$('status').textContent=m;
-async function data(r){{let j=await r.json();if(!r.ok||j.success===false)throw Error(j.message||j.detail||'درخواست ناموفق بود');return j.data??j}}
-async function loadCaptcha(){{try{{let j=await data(await fetch(api+'/auth/captcha',{{method:'POST'}}));captchaId=j.captcha_id;$('captcha').src='data:image/png;base64,'+j.image_base64}}catch(e){{status(e.message)}}}}
-$('reload').onclick=loadCaptcha;loadCaptcha();
-$('send').onclick=async()=>{{try{{let j=await data(await fetch(api+'/auth/login/send-otp',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{identifier:$('identifier').value,channel:$('channel').value,captcha_id:captchaId,captcha_code:$('captchaCode').value}})}}));loginSession=j.session_id;$('otpSection').hidden=false;status('کد ورود ارسال شد')}}catch(e){{status(e.message);loadCaptcha()}}}};
-$('verify').onclick=async()=>{{try{{let j=await data(await fetch(api+'/auth/login/verify-otp?session_id='+encodeURIComponent(loginSession)+'&otp_code='+encodeURIComponent($('otp').value),{{method:'POST'}}));let b=await data(await fetch(api+'/ai/mcp/oauth/authorize/session',{{method:'POST',headers:{{'Content-Type':'application/json',Authorization:'ApiKey '+j.api_key}},body:JSON.stringify({{request_id:rid}})}}));sessionKey=b.consent_token;$('business').innerHTML='';for(const item of b.items){{let o=document.createElement('option');o.value=item.id;o.textContent=item.name;o.dataset.owner=item.owner?'1':'0';$('business').append(o)}}$('business').onchange=()=>{{let w=$('write');if(w){{w.disabled=$('business').selectedOptions[0].dataset.owner!=='1';if(w.disabled)w.checked=false}}}};$('business').onchange();$('consent').hidden=false;$('identifier').disabled=true;$('send').disabled=true;status('ورود موفق؛ سطح دسترسی را بررسی و تایید کنید')}}catch(e){{status(e.message)}}}};
-async function decide(approved){{try{{let scopes=['ai:tools:read'];if($('write')?.checked===true)scopes.push('ai:tools:write');if($('offline')?.checked===true)scopes.push('offline_access');let r=await fetch(api+'/ai/mcp/oauth/authorize/consent',{{method:'POST',headers:{{'Content-Type':'application/json',Authorization:'Bearer '+sessionKey}},body:JSON.stringify({{request_id:rid,business_id:$('business')?Number($('business').value):null,approved,scopes}})}});let j=await data(r);location.assign(j.redirect_to)}}catch(e){{status(e.message)}}}}
-$('approve').onclick=()=>decide(true);$('deny').onclick=()=>decide(false);
-</script></html>'''
+const api={api_json},rid={request_json};let captchaId='',loginSession='',sessionKey='';
+const $=id=>document.getElementById(id);
+function status(id,message,tone=''){{const el=$(id);el.textContent=message;el.dataset.tone=tone}}
+async function request(path,options={{}}){{
+  let response;try{{response=await fetch(api+path,options)}}catch{{throw Error('ارتباط با سرور برقرار نشد؛ اتصال اینترنت را بررسی کنید.')}}
+  let payload;try{{payload=await response.json()}}catch{{if(response.status===404)throw Error(`مسیر API «${{path}}» در سرور پیدا نشد (HTTP 404). سرور یا تنظیم Nginx نیاز به به‌روزرسانی دارد.`);throw Error(`پاسخ سرور معتبر نیست (HTTP ${{response.status}}). اگر خطا ادامه دارد، صفحه را دوباره باز کنید.`)}}
+  const error=payload?.error&&typeof payload.error==='object'?payload.error:payload;
+  if(!response.ok||payload?.success===false){{
+    if(response.status===404&&error?.code==='SESSION_NOT_FOUND')throw Error('نشست ورود منقضی شده است. کد تازه دریافت کنید و دوباره وارد کنید.');
+    if(response.status===404&&error?.code==='USER_NOT_FOUND')throw Error('برای این شماره یا ایمیل حساب فعالی پیدا نشد. شناسهٔ ورود حسابیکس را بررسی کنید.');
+    if(response.status===404&&(!error?.code||error.code==='HTTP_ERROR'))throw Error(`مسیر API «${{path}}» در نسخهٔ فعلی سرور پیدا نشد (HTTP 404). صفحه را تازه کنید؛ اگر مشکل ماند، سرور باید به‌روزرسانی شود.`);
+    throw Error(error?.message||payload?.detail||`درخواست ناموفق بود (HTTP ${{response.status}}).`)
+  }}
+  return payload?.data??payload;
+}}
+function asciiDigits(value){{return value.replace(/[۰-۹٠-٩]/g,d=>String('۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩'.indexOf(d)%10))}}
+async function loadCaptcha(){{try{{const result=await request('/auth/captcha',{{method:'POST'}});captchaId=result.captcha_id;$('captcha').src='data:image/png;base64,'+result.image_base64}}catch(error){{status('status',error.message,'error')}}}}
+function setBusy(button,busy,label){{button.disabled=busy;if(busy){{button.dataset.label=button.textContent;button.textContent=label}}else if(button.dataset.label){{button.textContent=button.dataset.label;delete button.dataset.label}}}}
+$('reload').addEventListener('click',loadCaptcha);loadCaptcha();
+$('send').addEventListener('click',async()=>{{const button=$('send');setBusy(button,true,'در حال ارسال…');status('status','');try{{if(!$('identifier').value.trim()||!$('captchaCode').value.trim())throw Error('شماره موبایل یا ایمیل و کد امنیتی را وارد کنید.');const result=await request('/auth/login/send-otp',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{identifier:$('identifier').value.trim(),channel:$('channel').value,captcha_id:captchaId,captcha_code:$('captchaCode').value.trim()}})}});loginSession=result.session_id;$('otpSection').hidden=false;$('otp').focus();status('otpStatus',result.message||'کد ورود ارسال شد. پیامک یا ایمیل خود را بررسی کنید.','success')}}catch(error){{status('status',error.message,'error');await loadCaptcha()}}finally{{setBusy(button,false)}}}});
+ $('verify').addEventListener('click',async()=>{{const button=$('verify');setBusy(button,true,'در حال بررسی…');status('otpStatus','');try{{const otp=asciiDigits($('otp').value.trim());if(!otp)throw Error('کد یک‌بارمصرف را وارد کنید.');const login=await request('/auth/login/verify-otp?session_id='+encodeURIComponent(loginSession)+'&otp_code='+encodeURIComponent(otp),{{method:'POST'}});const consent=await request('/ai/mcp/oauth/authorize/session',{{method:'POST',headers:{{'Content-Type':'application/json',Authorization:'ApiKey '+login.api_key}},body:JSON.stringify({{request_id:rid}})}});sessionKey=consent.consent_token;$('business').replaceChildren();for(const item of consent.items){{const option=document.createElement('option');option.value=item.id;option.textContent=item.name;option.dataset.owner=item.owner?'1':'0';$('business').append(option)}}$('business').addEventListener('change',()=>{{const write=$('write');if(write){{write.disabled=$('business').selectedOptions[0]?.dataset.owner!=='1';if(write.disabled)write.checked=false}}}});$('business').dispatchEvent(new Event('change'));$('loginSection').hidden=true;$('otpSection').hidden=true;$('consent').hidden=false;$('stepLogin').classList.remove('active');$('stepConsent').classList.add('active');status('consentStatus','ورود موفق بود. کسب‌وکار و دسترسی‌های درخواستی را بررسی کنید.','success')}}catch(error){{status('otpStatus',error.message,'error')}}finally{{setBusy(button,false)}}}});
+async function decide(approved){{const button=approved?$('approve'):$('deny');setBusy(button,true,approved?'در حال اتصال…':'در حال ثبت…');status('consentStatus','');try{{const scopes=['ai:tools:read'];if($('write')?.checked)scopes.push('ai:tools:write');if($('offline')?.checked)scopes.push('offline_access');const result=await request('/ai/mcp/oauth/authorize/consent',{{method:'POST',headers:{{'Content-Type':'application/json',Authorization:'Bearer '+sessionKey}},body:JSON.stringify({{request_id:rid,business_id:Number($('business').value),approved,scopes}})}});location.assign(result.redirect_to)}}catch(error){{status('consentStatus',error.message,'error');setBusy(button,false)}}}}
+$('approve').addEventListener('click',()=>decide(true));$('deny').addEventListener('click',()=>decide(false));
+</script>
+</body>
+</html>'''
 
 
 @oauth_router.post("/authorize/session")
