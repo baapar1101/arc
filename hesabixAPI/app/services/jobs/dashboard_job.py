@@ -17,6 +17,7 @@ def process_dashboard_widgets_job(
     filters: Optional[Dict[str, Any]] = None,
     calendar_type: str = "gregorian",
     cache_key: Optional[str] = None,
+    trace_id: Optional[str] = None,
     **kwargs
 ) -> Dict[str, Any]:
     """
@@ -40,7 +41,12 @@ def process_dashboard_widgets_job(
         from app.core.cache import get_cache
         from app.core.responses import format_datetime_fields
 
-        logger.info(f"Processing dashboard widgets for business {business_id}, user {user_id}")
+        logger.info(
+            "Processing dashboard widgets request_id=%s business_id=%s user_id=%s",
+            trace_id,
+            business_id,
+            user_id,
+        )
 
         filters = filters or {}
 
@@ -80,7 +86,11 @@ def process_dashboard_widgets_job(
                 except Exception as cache_err:
                     logger.warning(f"Failed to cache dashboard job result: {cache_err}")
 
-            logger.info(f"Dashboard widgets processed successfully for business {business_id}")
+            logger.info(
+                "Dashboard widgets processed successfully request_id=%s business_id=%s",
+                trace_id,
+                business_id,
+            )
             return {
                 "success": True,
                 "data": formatted,
@@ -89,5 +99,10 @@ def process_dashboard_widgets_job(
             }
 
     except Exception as e:
-        logger.error(f"Error processing dashboard widgets for business {business_id}: {e}", exc_info=True)
+        logger.exception(
+            "Error processing dashboard widgets request_id=%s business_id=%s error_type=%s",
+            trace_id,
+            business_id,
+            type(e).__name__,
+        )
         raise

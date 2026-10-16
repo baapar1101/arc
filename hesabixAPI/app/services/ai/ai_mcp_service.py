@@ -105,6 +105,7 @@ async def handle_mcp_request(
     body: Dict[str, Any],
     *,
     business_id: Optional[int] = None,
+    diagnostic_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     req_id = body.get("id")
     method = body.get("method")
@@ -283,6 +284,14 @@ async def handle_mcp_request(
         if name != AGENT_TOOL_NAME and not _mcp_readonly(name, registry) and WRITE_SCOPE not in getattr(ctx, "mcp_scopes", set()):
             return _jsonrpc_error(req_id, -32003, "This MCP connection is read-only; create a separately authorized write connection.")
 
+        logger.info(
+            "mcp_tool_call_started diagnostic_id=%s tool=%s connection_id=%s user_id=%s business_id=%s",
+            diagnostic_id,
+            name,
+            getattr(ctx, "mcp_connection_id", None),
+            ctx.get_user_id(),
+            eff_business,
+        )
         safe_arguments = prepare_mcp_tool_arguments(arguments, business_id=eff_business)
         context = {
             "user_context": ctx,
@@ -309,7 +318,8 @@ async def handle_mcp_request(
                 answer = message.get("content") if isinstance(message, dict) else None
                 rendered = answer if isinstance(answer, str) and answer.strip() else "Agent task completed without a text answer."
                 logger.info(
-                    "MCP agent task completed connection_id=%s user_id=%s business_id=%s",
+                    "MCP agent task completed diagnostic_id=%s connection_id=%s user_id=%s business_id=%s",
+                    diagnostic_id,
                     getattr(ctx, "mcp_connection_id", None), ctx.get_user_id(), eff_business,
                 )
                 return _jsonrpc_result(req_id, {"content": [{"type": "text", "text": str(rendered)}], "isError": False, **({"resultType": "complete"} if modern else {})})
@@ -319,18 +329,29 @@ async def handle_mcp_request(
             result = run_ai_registry_function(name, safe_arguments, context)
             text = result if isinstance(result, str) else json.dumps(result, ensure_ascii=False, default=str)
             logger.info(
-                "MCP tool call completed connection_id=%s user_id=%s business_id=%s tool=%s",
+                "MCP tool call completed diagnostic_id=%s connection_id=%s user_id=%s business_id=%s tool=%s result_type=%s result_chars=%s",
+                diagnostic_id,
                 getattr(ctx, "mcp_connection_id", None), ctx.get_user_id(), eff_business, name,
+                type(result).__name__, len(text),
             )
             return _jsonrpc_result(req_id, {"content": [{"type": "text", "text": text}], "isError": False, **({"resultType": "complete"} if modern else {})})
         except PermissionError:
+            logger.warning(
+                "MCP tool call denied diagnostic_id=%s connection_id=%s user_id=%s business_id=%s tool=%s reason=permission_error",
+                diagnostic_id,
+                getattr(ctx, "mcp_connection_id", None),
+                ctx.get_user_id(),
+                eff_business,
+                name,
+            )
             return _jsonrpc_result(req_id, {"content": [{"type": "text", "text": "Permission denied for this tool."}], "isError": True})
         except Exception:
             from app.services.ai.ai_db_helpers import safe_db_rollback
 
             safe_db_rollback(db)
             logger.exception(
-                "MCP tool call failed connection_id=%s user_id=%s business_id=%s tool=%s",
+                "MCP tool call failed diagnostic_id=%s connection_id=%s user_id=%s business_id=%s tool=%s",
+                diagnostic_id,
                 getattr(ctx, "mcp_connection_id", None), ctx.get_user_id(), eff_business, name,
             )
             return _jsonrpc_result(req_id, {"content": [{"type": "text", "text": "Tool execution failed."}], "isError": True})

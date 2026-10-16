@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from fastapi import APIRouter, Request, Depends, Body
 from typing import Optional, Dict, Any
 
@@ -10,6 +11,7 @@ from app.core.auth_dependency import get_current_user, AuthContext
 from app.services.jobs import generate_report_job
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
+logger = logging.getLogger(__name__)
 
 def _ensure_job_access(ctx: AuthContext, job_meta: dict | None, job_id: str) -> None:
     """
@@ -36,9 +38,6 @@ async def get_job_status(
     ctx: AuthContext = Depends(get_current_user),
 ):
     """دریافت وضعیت job"""
-    import logging
-    logger = logging.getLogger(__name__)
-    
     logger.info(f"[GET_JOB_STATUS] Request for job_id: {job_id}, user_id: {ctx.get_user_id()}")
     
     queue_service = get_queue_service()
@@ -52,6 +51,16 @@ async def get_job_status(
             logger.info(f"[GET_JOB_STATUS] Job {job_id} found in queue service, state: {queue_status.get('state')}")
             # بررسی مالکیت/دسترسی قبل از بازگرداندن status/result
             job_meta = queue_status.get("meta")
+            meta_user_id = (job_meta or {}).get("user_id")
+            caller_user_id = ctx.get_user_id()
+            logger.info(
+                "job_access_check diagnostic_id=%s job_id=%s caller_user_id=%s owner_user_id=%s state=%s",
+                getattr(request.state, "diagnostic_request_id", None),
+                job_id,
+                caller_user_id,
+                meta_user_id,
+                queue_status.get("state"),
+            )
             _ensure_job_access(ctx, job_meta, job_id)
             
             # همیشه وضعیت job را برگردان (نه مستقیماً نتیجه)

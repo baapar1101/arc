@@ -674,12 +674,27 @@ def post_dashboard_widgets_data(
                 filters=filters,
                 calendar_type=calendar_type,
                 cache_key=cache_key,
+                trace_id=getattr(request.state, "diagnostic_request_id", None),
+                job_meta={
+                    "user_id": int(ctx.get_user_id()),
+                    "business_id": int(business_id),
+                    "job_type": "dashboard_widgets",
+                    "trace_id": getattr(request.state, "diagnostic_request_id", None),
+                },
                 queue_name=QUEUE_DEFAULT,
                 timeout=300,
                 result_ttl=3600,
             )
 
             if job:
+                logger.info(
+                    "dashboard_job_queued",
+                    request_id=getattr(request.state, "diagnostic_request_id", None),
+                    job_id=job.id,
+                    business_id=business_id,
+                    user_id=ctx.get_user_id(),
+                    widget_keys=[str(k) for k in widget_keys],
+                )
                 return success_response({
                     "job_id": job.id,
                     "status": "queued",

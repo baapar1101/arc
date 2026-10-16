@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import logging
+import time
+import secrets
 from datetime import datetime, timedelta
 from typing import Any, Dict
 
@@ -169,10 +171,12 @@ def revoke_mcp_connection(
 
 def get_mcp_context(request: Request, db: Session = Depends(get_db)) -> AuthContext:
     """Authenticate a dedicated MCP bearer and pin its principal to one business."""
+    diagnostic_id = getattr(request.state, "diagnostic_request_id", None)
     authorization = request.headers.get("authorization", "")
     scheme, _, token = authorization.partition(" ")
     resource_metadata = _base_url(request) + "/.well-known/oauth-protected-resource" + request.url.path
     if scheme.lower() != "bearer" or not token.startswith(MCP_BEARER_PREFIX):
+        logger.warning("mcp_auth_rejected diagnostic_id=%s reason=missing_or_invalid_scheme", diagnostic_id)
         raise HTTPException(
             status_code=401,
             detail="A Hesabix MCP bearer credential is required.",
@@ -186,6 +190,7 @@ def get_mcp_context(request: Request, db: Session = Depends(get_db)) -> AuthCont
         or (row.expires_at and row.expires_at <= datetime.utcnow())
         or not row.business_id
     ):
+        logger.warning("mcp_auth_rejected diagnostic_id=%s reason=invalid_expired_or_unbound_credential", diagnostic_id)
         raise HTTPException(
             status_code=401,
             detail="The Hesabix MCP bearer credential is invalid or expired.",
@@ -193,15 +198,18 @@ def get_mcp_context(request: Request, db: Session = Depends(get_db)) -> AuthCont
         )
     scopes = _scopes(row)
     if row.mcp_resource and row.mcp_resource != _resource(request):
+        logger.warning("mcp_auth_rejected diagnostic_id=%s connection_id=%s reason=wrong_resource", diagnostic_id, row.id)
         raise HTTPException(
             status_code=401,
             detail="The bearer credential was issued for another MCP resource.",
             headers={"WWW-Authenticate": f'Bearer error="invalid_token", error_description="wrong audience", resource_metadata="{resource_metadata}"'},
         )
     if MCP_READ_SCOPE not in scopes:
+        logger.warning("mcp_auth_rejected diagnostic_id=%s connection_id=%s reason=missing_read_scope", diagnostic_id, row.id)
         raise ApiError("FORBIDDEN", "مجوز خواندن ابزارهای MCP وجود ندارد", http_status=403)
     user = db.get(User, row.user_id)
     if not user or not user.is_active:
+        logger.warning("mcp_auth_rejected diagnostic_id=%s connection_id=%s reason=inactive_user", diagnostic_id, row.id)
         raise HTTPException(
             status_code=401,
             detail="The Hesabix MCP bearer credential is invalid or expired.",
@@ -217,6 +225,7 @@ def get_mcp_context(request: Request, db: Session = Depends(get_db)) -> AuthCont
         db=db,
     )
     if not _has_explicit_business_access(db, user.id, row.business_id):
+        logger.warning("mcp_auth_rejected diagnostic_id=%s connection_id=%s business_id=%s reason=inactive_membership", diagnostic_id, row.id, row.business_id)
         raise HTTPException(
             status_code=403,
             detail="Business membership is no longer active.",
@@ -229,6 +238,7 @@ def get_mcp_context(request: Request, db: Session = Depends(get_db)) -> AuthCont
         from app.core.settings import get_settings
         allowed_origins = set(get_settings().mcp_allowed_origins)
         if origin not in allowed_origins:
+            logger.warning("mcp_auth_rejected diagnostic_id=%s connection_id=%s reason=origin_not_allowed", diagnostic_id, row.id)
             raise HTTPException(status_code=403, detail="Origin is not allowed for MCP")
     if row.last_used_at is None or (datetime.utcnow() - row.last_used_at).total_seconds() >= 60:
         row.last_used_at = datetime.utcnow()
@@ -244,6 +254,18 @@ async def mcp_jsonrpc_endpoint(
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_mcp_context),
 ) -> Response:
+    diagnostic_id = getattr(request.state, "diagnostic_request_id", None) or secrets.token_hex(8)
+    method = body.get("method")
+    params = body.get("params") or {}
+    tool_name = params.get("name") if isinstance(params, dict) else None
+    started_at = time.perf_counter()
+    logger.info(
+        "mcp_request_received diagnostic_id=%s method=%s tool=%s protocol=%s",
+        diagnostic_id,
+        method,
+        tool_name if isinstance(tool_name, str) else "",
+        request.headers.get("mcp-protocol-version", ""),
+    )
     content_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
     if content_type != "application/json":
         return JSONResponse({"error": "Content-Type must be application/json"}, status_code=415)
@@ -299,7 +321,13 @@ async def mcp_jsonrpc_endpoint(
             {"jsonrpc": "2.0", "id": body.get("id"), "error": {"code": -32022, "message": "Unsupported protocol version", "data": {"supported": sorted(legacy_versions | modern_versions), "requested": protocol_version}}},
             status_code=400,
         )
-    response = await handle_mcp_request(db, ctx, body, business_id=ctx.business_id)
+    response = await handle_mcp_request(
+        db,
+        ctx,
+        body,
+        business_id=ctx.business_id,
+        diagnostic_id=diagnostic_id,
+    )
     if body["method"].startswith("notifications/") or body["method"] in {"notifications/initialized", "notifications/cancelled"}:
         return Response(status_code=202)
     negotiated = protocol_version or "2025-11-25"
@@ -311,4 +339,19 @@ async def mcp_jsonrpc_endpoint(
         result = response.get("result")
         if isinstance(result, dict) and body.get("method") != "server/discover":
             result.setdefault("resultType", "complete")
-    return JSONResponse(response, headers={"MCP-Protocol-Version": negotiated})
+    rpc_error = response.get("error") if isinstance(response, dict) else None
+    tool_result = response.get("result") if isinstance(response, dict) else None
+    tool_is_error = tool_result.get("isError") if isinstance(tool_result, dict) else None
+    logger.info(
+        "mcp_request_completed diagnostic_id=%s method=%s tool=%s rpc_error_code=%s tool_is_error=%s duration_ms=%.2f",
+        diagnostic_id,
+        method,
+        tool_name if isinstance(tool_name, str) else "",
+        rpc_error.get("code") if isinstance(rpc_error, dict) else "",
+        tool_is_error,
+        (time.perf_counter() - started_at) * 1000,
+    )
+    return JSONResponse(
+        response,
+        headers={"MCP-Protocol-Version": negotiated, "X-Hesabix-Diagnostic-ID": diagnostic_id},
+    )

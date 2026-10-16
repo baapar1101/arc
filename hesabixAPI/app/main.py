@@ -1424,6 +1424,47 @@ def create_app() -> FastAPI:
             _request_context.reset(token)
 
     @application.middleware("http")
+    async def trace_ai_connector_requests(request: Request, call_next):
+        """Correlate MCP and likely connector-backed REST calls without logging payloads."""
+        import secrets
+        import time
+        import structlog
+
+        request_id = secrets.token_hex(8)
+        request.state.diagnostic_request_id = request_id
+        start = time.perf_counter()
+        response = None
+        status_code = 500
+        try:
+            response = await call_next(request)
+            status_code = response.status_code
+            return response
+        finally:
+            route = request.scope.get("route")
+            route_template = getattr(route, "path", request.url.path)
+            is_connector_route = (
+                route_template.endswith("/ai/mcp")
+                or "/ai/mcp/oauth/" in route_template
+                or "oauth-protected-resource" in route_template
+                or route_template.endswith("/persons")
+                or route_template.endswith("/dashboard/data")
+                or "/dashboard/" in route_template
+                or route_template.endswith("/jobs/{job_id}")
+                or route_template.endswith("/businesses/{business_id}")
+            )
+            if is_connector_route:
+                if response is not None:
+                    response.headers["X-Hesabix-Diagnostic-ID"] = request_id
+                structlog.get_logger().info(
+                    "ai_connector_http",
+                    diagnostic_id=request_id,
+                    method=request.method,
+                    route=route_template,
+                    status_code=status_code,
+                    duration_ms=round((time.perf_counter() - start) * 1000, 2),
+                )
+
+    @application.middleware("http")
     async def log_slow_requests(request: Request, call_next):
         import time
         import structlog
