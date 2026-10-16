@@ -5,6 +5,9 @@ from .user import User  # noqa: F401
 from .user_ui_preferences import UserUiPreferences  # noqa: F401
 from .business_user_menu_preferences import BusinessUserMenuPreference  # noqa: F401
 from .api_key import ApiKey  # noqa: F401
+from .ai_mcp_oauth import (  # noqa: F401
+	McpOAuthClient, McpOAuthAuthorizationRequest, McpOAuthAuthorizationCode, McpOAuthRefreshToken,
+)
 from .captcha import Captcha  # noqa: F401
 from .auth_security_event import AuthSecurityEvent  # noqa: F401
 from .sms_destination_send_log import SmsDestinationSendLog  # noqa: F401

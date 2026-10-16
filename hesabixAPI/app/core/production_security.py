@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from urllib.parse import urlsplit
+
 from app.core.settings import Settings
 
 _INSECURE_SECRET_VALUES = frozenset(
@@ -44,6 +46,26 @@ def validate_production_security(settings: Settings) -> None:
 
 	if not (settings.wallet_webhook_secret or "").strip():
 		errors.append("WALLET_WEBHOOK_SECRET must be set in production")
+
+	if not (settings.mcp_public_base_url or "").strip():
+		errors.append("MCP_PUBLIC_BASE_URL must be set in production")
+	else:
+		try:
+			public_mcp = urlsplit(settings.mcp_public_base_url.strip().rstrip("/"))
+			valid_public_mcp = (
+				public_mcp.scheme == "https"
+				and bool(public_mcp.hostname)
+				and public_mcp.port != 0
+				and not public_mcp.username
+				and not public_mcp.password
+				and not public_mcp.path
+				and not public_mcp.query
+				and not public_mcp.fragment
+			)
+		except ValueError:
+			valid_public_mcp = False
+		if not valid_public_mcp:
+			errors.append("MCP_PUBLIC_BASE_URL must be a valid HTTPS origin without a path")
 
 	if errors:
 		raise RuntimeError(

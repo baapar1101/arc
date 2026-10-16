@@ -14,7 +14,14 @@ class ApiKey(Base):
 	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 	user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
 	key_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True, nullable=False)
-	key_type: Mapped[str] = mapped_column(String(16), nullable=False)  # "session" | "personal"
+	key_type: Mapped[str] = mapped_column(String(16), nullable=False)  # "session" | "personal" | "mcp"
+	# MCP credentials are pinned to one business; never infer their tenant from request input.
+	business_id: Mapped[int | None] = mapped_column(
+		ForeignKey("businesses.id", ondelete="CASCADE"), nullable=True, index=True
+	)
+	mcp_resource: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+	oauth_client_id: Mapped[str | None] = mapped_column(String(512), nullable=True, index=True)
+	oauth_grant_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
 	name: Mapped[str | None] = mapped_column(String(100), nullable=True)
 	scopes: Mapped[str | None] = mapped_column(String(500), nullable=True)
 	device_id: Mapped[str | None] = mapped_column(String(100), nullable=True)

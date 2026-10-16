@@ -53,6 +53,12 @@ class Settings(BaseSettings):
 	# لینک‌های وب (مثلاً ساخت /login?reset_token=... برای ادمین و قالب اعلان)
 	# اگر خالی باشد، در endpoint بازنشانی از header Origin (درخواست مرورگر) استفاده می‌شود
 	app_public_url: str = ""
+	# Public origin of the MCP API. Required in production so OAuth issuer/audience
+	# never depend on an untrusted Host header.
+	mcp_public_base_url: str = ""
+	mcp_allowed_origins: list[str] = ["https://chatgpt.com", "https://chat.openai.com", "https://claude.ai"]
+	mcp_cimd_allowed_hosts: list[str] = ["chatgpt.com"]
+	mcp_oauth_trusted_redirect_hosts: list[str] = ["chatgpt.com", "chat.openai.com", "claude.ai"]
 
 	# CORS — پذیرش هر Origin (API باز برای کلاینت‌های وب/موبایل/ابزارها)
 	# نکته: با allow_origins=["*"] در Starlette باید allow_credentials=False بماند (در app/main.py).
