@@ -121,7 +121,17 @@ async def _resolve_client(db: Session, client_id: str) -> McpOAuthClient | None:
     methods = metadata.get("token_endpoint_auth_methods_supported")
     if methods is not None and (not isinstance(methods, list) or "none" not in methods):
         return None
-    if metadata.get("token_endpoint_auth_method", "none") != "none":
+    # The singular CIMD field is the client's preferred/default method. ChatGPT
+    # advertises `private_key_jwt` there while also explicitly supporting `none`.
+    # This server only implements public-client (`none`) authentication, so use
+    # the supported-methods list as the capability check when it is present.
+    # Older/simple metadata documents may omit that list; in that case the
+    # singular method is the only available declaration and must be `none`.
+    auth_method = metadata.get("token_endpoint_auth_method")
+    if methods is None and auth_method not in (None, "none"):
+        return None
+    if methods is not None and auth_method is not None and (
+            not isinstance(auth_method, str) or auth_method not in methods):
         return None
     grants = metadata.get("grant_types", ["authorization_code"])
     if (not isinstance(grants, list) or not all(isinstance(grant, str) for grant in grants)
