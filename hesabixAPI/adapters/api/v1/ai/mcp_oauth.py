@@ -38,11 +38,15 @@ SCOPES = {"ai:tools:read", "ai:tools:write"}
 AUTH_SCOPES = SCOPES | {"offline_access"}
 READ_SCOPE = "ai:tools:read"
 WRITE_SCOPE = "ai:tools:write"
-ACCESS_TTL = timedelta(minutes=15)
-REFRESH_TTL = timedelta(days=30)
 AUTH_REQUEST_TTL = timedelta(minutes=10)
 CODE_TTL = timedelta(minutes=2)
 _VERIFIER_RE = re.compile(r"^[A-Za-z0-9._~-]{43,128}$")
+
+
+def _session_ttl(db: Session) -> timedelta:
+    from app.services.system_settings_service import get_mcp_oauth_session_days
+
+    return timedelta(days=get_mcp_oauth_session_days(db))
 
 
 def _is_production() -> bool:
@@ -372,7 +376,7 @@ def _authorization_html(request_id: str, client_name: str, write_requested: bool
     )
     offline_option = (
         '<label class="permission permission--optional"><input type="checkbox" id="offline">'
-        '<span><strong>تمدید اتصال</strong><small>تمدید اتصال تا ۳۰ روز، بدون ورود دوباره</small></span></label>'
+        '<span><strong>تداوم اتصال بدون ورود دوباره</strong><small>تمدید اتصال در بازهٔ زمانی تعیین‌شده در تنظیمات حسابیکس</small></span></label>'
         if offline_requested else ""
     )
     return f'''<!doctype html>
@@ -390,61 +394,80 @@ def _authorization_html(request_id: str, client_name: str, write_requested: bool
     :root {{ color-scheme: light; --brand:#0f4c81; --brand-strong:#0a3d69; --ink:#172b3b; --muted:#657789; --line:#e4ebf1; --surface:#fff; --canvas:#f3f7fa; --danger:#a83232; --success:#176b4d; }}
     * {{ box-sizing:border-box; }}
     [hidden] {{ display:none !important; }}
-    body {{ margin:0; min-height:100vh; min-height:100dvh; padding:clamp(16px,4vw,48px); display:grid; place-items:center; color:var(--ink); background:radial-gradient(ellipse at 50% 0%,#e3eff7 0,transparent 48%),var(--canvas); font-family:YekanBakh,Tahoma,sans-serif; font-size:15px; line-height:1.7; }}
+    body {{ margin:0; min-height:100vh; min-height:100dvh; padding:clamp(16px,4vw,48px); display:grid; place-items:center; color:var(--ink); background:radial-gradient(ellipse at 8% 12%,rgba(116,181,213,.2),transparent 32%),radial-gradient(ellipse at 94% 84%,rgba(63,144,129,.13),transparent 31%),#f2f6f9; font-family:YekanBakh,Tahoma,sans-serif; font-size:15px; line-height:1.7; }}
     button,input,select {{ font:inherit; }}
-    .shell {{ width:min(100%,520px); }}
-    .card {{ overflow:hidden; background:var(--surface); border:1px solid rgba(15,76,129,.09); border-radius:24px; box-shadow:0 24px 72px rgba(21,52,76,.12),0 2px 8px rgba(21,52,76,.04); }}
-    .card-head {{ padding:clamp(22px,6vw,36px) clamp(20px,6vw,40px) 24px; text-align:center; }}
-    .brand-mark {{ width:56px; height:56px; margin:0 auto 15px; display:grid; place-items:center; color:#fff; background:linear-gradient(145deg,#17639d,var(--brand-strong)); border-radius:18px; box-shadow:0 8px 18px rgba(15,76,129,.22); }}
-    .brand-mark svg {{ width:29px; height:29px; }}
-    .eyebrow {{ margin:0 0 3px; color:var(--brand); font-size:12px; font-weight:600; }}
-    h1 {{ margin:0; font-size:clamp(22px,5vw,27px); line-height:1.4; font-weight:700; letter-spacing:-.02em; }}
-    .intro {{ margin:10px auto 0; max-width:390px; color:var(--muted); font-size:14px; line-height:1.9; }}
-    .client {{ color:var(--ink); font-weight:600; }}
-    .secure-note {{ margin-top:15px; display:inline-flex; align-items:center; gap:7px; color:#4e6b7e; font-size:12px; }}
-    .secure-note svg {{ width:15px; height:15px; color:#31836a; }}
-    .steps {{ display:flex; align-items:center; justify-content:center; gap:10px; margin-top:22px; color:#7890a1; font-size:12px; }}
-    .step {{ display:flex; align-items:center; gap:7px; }}
-    .step-number {{ width:22px; height:22px; display:grid; place-items:center; border:1px solid #d6e1e9; border-radius:50%; font-family:Roboto,YekanBakh,sans-serif; font-size:11px; }}
-    .step.active {{ color:var(--brand); font-weight:600; }}
+    .shell {{ width:min(100%,560px); }}
+    .card {{ overflow:hidden; background:var(--surface); border:1px solid rgba(18,63,94,.08); border-radius:26px; box-shadow:0 28px 80px rgba(21,52,76,.14),0 3px 12px rgba(21,52,76,.04); }}
+    .card-head {{ padding:clamp(22px,6vw,34px) clamp(22px,6vw,42px) 20px; }}
+    .brand-row {{ display:flex; align-items:center; gap:12px; }}
+    .brand-mark {{ width:48px; height:48px; flex:0 0 48px; display:grid; place-items:center; color:#fff; background:linear-gradient(145deg,#2181ae,#0a426f); border-radius:16px; box-shadow:0 8px 18px rgba(15,76,129,.22); }}
+    .brand-mark svg {{ width:26px; height:26px; }}
+    .brand-copy {{ min-width:0; }}
+    .eyebrow {{ margin:0; color:#526d80; font-size:12px; font-weight:600; }}
+    h1 {{ margin:2px 0 0; font-size:clamp(21px,5vw,26px); line-height:1.4; font-weight:700; letter-spacing:-.02em; }}
+    .intro {{ margin:16px 0 0; color:var(--muted); font-size:13px; line-height:1.9; }}
+    .client {{ color:var(--ink); font-weight:700; }}
+    .trust-row {{ display:flex; align-items:center; gap:8px; margin-top:12px; color:#39705f; font-size:12px; }}
+    .trust-row svg {{ width:17px; height:17px; flex:0 0 auto; }}
+    .steps {{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:23px; padding:5px; background:#f1f5f8; border:1px solid #e9eef2; border-radius:13px; color:#778b99; font-size:12px; }}
+    .step {{ display:flex; justify-content:center; align-items:center; gap:8px; min-height:36px; border-radius:9px; transition:background .18s,color .18s,box-shadow .18s; }}
+    .step-number {{ width:21px; height:21px; display:grid; place-items:center; border:1px solid #d4dfe6; border-radius:50%; font-family:Roboto,YekanBakh,sans-serif; font-size:11px; }}
+    .step.active {{ color:var(--brand); background:#fff; font-weight:700; box-shadow:0 2px 6px rgba(34,62,79,.08); }}
     .step.active .step-number {{ color:#fff; background:var(--brand); border-color:var(--brand); }}
-    .step-line {{ width:28px; height:1px; background:#dce5eb; }}
-    .card-body {{ padding:0 clamp(20px,6vw,40px) clamp(22px,6vw,36px); }}
-    .section-label {{ margin:0 0 12px; color:#536b7c; font-size:13px; font-weight:600; }}
-    .field {{ display:block; margin:0 0 15px; }}
-    .field-label {{ display:block; margin-bottom:6px; color:#314b5d; font-size:13px; font-weight:600; }}
-    .control {{ width:100%; min-height:48px; padding:10px 13px; color:var(--ink); background:#fff; border:1px solid #d8e2e9; border-radius:11px; outline:none; transition:border-color .16s,box-shadow .16s; }}
-    .control:focus {{ border-color:#4c8ab4; box-shadow:0 0 0 3px rgba(15,76,129,.11); }}
+    .card-body {{ padding:4px clamp(22px,6vw,42px) clamp(24px,6vw,38px); }}
+    .section-heading {{ margin:0 0 5px; color:#213e52; font-size:17px; font-weight:700; }}
+    .section-hint {{ margin:0 0 19px; color:var(--muted); font-size:12px; line-height:1.8; }}
+    .field {{ display:block; margin:0 0 17px; }}
+    .field-label {{ display:block; margin-bottom:7px; color:#314b5d; font-size:13px; font-weight:600; }}
+    .control {{ width:100%; min-height:50px; padding:11px 14px; color:var(--ink); background:#fff; border:1px solid #d8e2e9; border-radius:12px; outline:none; transition:border-color .16s,box-shadow .16s,background .16s; }}
+    .control:focus {{ border-color:#4c8ab4; box-shadow:0 0 0 4px rgba(15,76,129,.1); }}
     .control::placeholder {{ color:#99a8b4; }}
-    .captcha-row {{ display:grid; grid-template-columns:minmax(0,1fr) 105px; gap:10px; align-items:end; }}
-    .captcha-box {{ height:48px; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#f7fafc; border:1px solid var(--line); border-radius:11px; }}
-    .captcha-box img {{ max-width:100%; max-height:44px; object-fit:contain; }}
-    .icon-button {{ width:38px; height:38px; flex:0 0 38px; display:grid; place-items:center; color:#547187; background:transparent; border:0; border-radius:9px; cursor:pointer; }}
-    .captcha-tools {{ display:flex; align-items:center; gap:5px; }}
-    .captcha-tools .captcha-box {{ flex:1; }}
-    .icon-button:hover {{ color:var(--brand); background:#edf4f8; }}
-    .icon-button svg {{ width:18px; height:18px; }}
-    .channel-row {{ display:grid; grid-template-columns:145px minmax(0,1fr); gap:10px; align-items:center; }}
-    .primary,.secondary {{ width:100%; min-height:48px; padding:10px 16px; border-radius:11px; font-weight:600; cursor:pointer; transition:background .16s,border-color .16s,transform .16s; }}
-    .primary {{ color:#fff; background:var(--brand); border:1px solid var(--brand); box-shadow:0 5px 12px rgba(15,76,129,.14); }}
-    .primary:hover:not(:disabled) {{ background:var(--brand-strong); border-color:var(--brand-strong); transform:translateY(-1px); }}
+    .channel-label {{ margin-bottom:8px; color:#314b5d; font-size:13px; font-weight:600; }}
+    .channel-switch {{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:17px; padding:4px; background:#f3f6f8; border:1px solid #e8edf1; border-radius:12px; }}
+    .channel-option {{ display:flex; align-items:center; justify-content:center; gap:8px; min-height:41px; color:#667b89; background:transparent; border:1px solid transparent; border-radius:9px; cursor:pointer; font-size:13px; transition:all .16s; }}
+    .channel-option svg {{ width:17px; height:17px; }}
+    .channel-option[aria-pressed="true"] {{ color:var(--brand); background:#fff; border-color:#e3ebf0; box-shadow:0 2px 5px rgba(31,63,82,.07); font-weight:700; }}
+    .captcha-field {{ margin-top:2px; }}
+    .captcha-layout {{ display:grid; grid-template-columns:minmax(0,1fr) 164px; gap:10px; align-items:end; }}
+    .captcha-image {{ height:54px; display:flex; align-items:center; justify-content:center; overflow:hidden; background:linear-gradient(135deg,#f5f9fb,#edf4f7); border:1px solid #dfe8ee; border-radius:12px; }}
+    .captcha-image img {{ max-width:100%; max-height:52px; object-fit:contain; }}
+    .captcha-image span {{ color:#7b8d99; font-size:11px; }}
+    .captcha-refresh {{ width:42px; height:42px; flex:0 0 42px; display:grid; place-items:center; color:#4d6b7f; background:#fff; border:1px solid #dfe8ee; border-radius:11px; cursor:pointer; transition:all .16s; }}
+    .captcha-refresh:hover:not(:disabled) {{ color:var(--brand); background:#f4f9fc; border-color:#b9d0df; }}
+    .captcha-refresh svg {{ width:19px; height:19px; }}
+    .captcha-tools {{ display:flex; align-items:center; gap:7px; }}
+    .captcha-tools .captcha-image {{ flex:1; }}
+    .primary,.secondary {{ width:100%; min-height:50px; padding:11px 16px; border-radius:12px; font-weight:700; cursor:pointer; transition:background .16s,border-color .16s,transform .16s,box-shadow .16s; }}
+    .primary {{ color:#fff; background:linear-gradient(110deg,#14588b,#0d4777); border:1px solid #0f4c81; box-shadow:0 6px 14px rgba(15,76,129,.17); }}
+    .primary:hover:not(:disabled) {{ background:linear-gradient(110deg,#0f4b79,#093a64); border-color:#0a3d69; transform:translateY(-1px); box-shadow:0 8px 17px rgba(15,76,129,.2); }}
     .secondary {{ color:#496579; background:#fff; border:1px solid #d8e2e9; }}
     .secondary:hover:not(:disabled) {{ background:#f6f9fb; border-color:#bdcdd9; }}
-    button:disabled {{ opacity:.58; cursor:wait; }}
-    .status {{ min-height:24px; margin:13px 0 0; color:var(--muted); font-size:13px; }}
-    .status[data-tone="error"] {{ color:var(--danger); }}
-    .status[data-tone="success"] {{ color:var(--success); }}
-    .divider {{ height:1px; margin:19px 0; background:var(--line); }}
-    .permission-list {{ display:grid; gap:9px; margin:0 0 17px; }}
-    .permission {{ display:flex; align-items:flex-start; gap:11px; padding:13px; background:#f7fafc; border:1px solid #e5edf2; border-radius:12px; cursor:pointer; }}
+    button:focus-visible {{ outline:3px solid rgba(15,76,129,.28); outline-offset:2px; }}
+    button:disabled {{ opacity:.58; cursor:wait; transform:none; }}
+    .status {{ display:flex; align-items:flex-start; gap:8px; margin:13px 0 0; padding:0; color:var(--muted); font-size:12px; line-height:1.8; }}
+    .status:not(:empty) {{ padding:10px 12px; background:#f3f7f9; border:1px solid #e7eef2; border-radius:11px; }}
+    .status[data-tone="error"] {{ color:var(--danger); background:#fff5f4; border-color:#f4d7d4; }}
+    .status[data-tone="success"] {{ color:var(--success); background:#f1faf5; border-color:#d8eee2; }}
+    .divider {{ height:1px; margin:18px 0; background:var(--line); }}
+    .otp-input {{ min-height:62px; text-align:center; direction:ltr; font-family:Roboto,YekanBakh,sans-serif; font-size:26px; font-weight:700; letter-spacing:.42em; padding-left:calc(14px + .42em); }}
+    .otp-summary {{ display:flex; align-items:center; gap:9px; margin:14px 0 18px; padding:11px 13px; color:#506b7c; background:#f4f8fa; border:1px solid #e5edf2; border-radius:11px; font-size:12px; }}
+    .otp-summary svg {{ width:17px; height:17px; color:#39705f; flex:0 0 auto; }}
+    .text-button {{ display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:40px; padding:6px 8px; color:var(--brand); background:transparent; border:0; border-radius:8px; cursor:pointer; font-size:12px; font-weight:600; }}
+    .text-button:hover {{ background:#f0f6fa; }}
+    .permission-list {{ display:grid; gap:9px; margin:17px 0 19px; }}
+    .permission {{ display:flex; align-items:flex-start; gap:11px; padding:14px; background:#f4f8fa; border:1px solid #e2ebf0; border-radius:13px; cursor:pointer; transition:border-color .16s,background .16s; }}
+    .permission:has(input:checked) {{ background:#f0f7fb; border-color:#c9dce8; }}
     .permission input {{ width:18px; height:18px; margin:3px 0 0; accent-color:var(--brand); flex:0 0 auto; }}
-    .permission span {{ display:grid; gap:1px; }}
-    .permission strong {{ color:#29465a; font-size:13px; font-weight:600; }}
-    .permission small {{ color:var(--muted); font-size:12px; }}
+    .permission span {{ display:grid; gap:2px; }}
+    .permission strong {{ color:#29465a; font-size:13px; font-weight:700; }}
+    .permission small {{ color:var(--muted); font-size:12px; line-height:1.7; }}
     .permission--optional {{ background:#fff; }}
-    .button-row {{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:13px; }}
-    .footnote {{ margin:17px 0 0; color:#8192a0; text-align:center; font-size:11px; }}
-    @media(max-width:420px) {{ body {{ padding:12px; }} .card {{ border-radius:19px; }} .channel-row {{ grid-template-columns:118px minmax(0,1fr); gap:8px; }} .steps {{ gap:7px; }} .step-line {{ width:17px; }} .intro {{ font-size:13px; }} }}
+    .business-label {{ margin-bottom:7px; }}
+    .button-row {{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:17px; }}
+    .footnote {{ display:flex; justify-content:center; align-items:center; gap:6px; margin:16px 0 0; color:#778b99; text-align:center; font-size:11px; }}
+    .footnote svg {{ width:14px; height:14px; color:#438069; }}
+    @media(max-width:460px) {{ body {{ padding:12px; }} .card {{ border-radius:21px; }} .card-head {{ padding:22px 20px 17px; }} .card-body {{ padding:4px 20px 25px; }} .captcha-layout {{ grid-template-columns:minmax(0,1fr) 142px; gap:8px; }} .steps {{ gap:6px; }} .intro {{ font-size:12px; }} .otp-input {{ font-size:23px; }} }}
+    @media(max-width:360px) {{ .captcha-layout {{ grid-template-columns:minmax(0,1fr) 126px; }} .brand-mark {{ width:43px; height:43px; flex-basis:43px; }} .button-row {{ grid-template-columns:1fr; }} }}
     @media(prefers-reduced-motion:reduce) {{ *,*::before,*::after {{ scroll-behavior:auto !important; transition:none !important; }} }}
   </style>
 </head>
@@ -452,43 +475,55 @@ def _authorization_html(request_id: str, client_name: str, write_requested: bool
   <main class="shell">
     <article class="card" aria-labelledby="page-title">
       <header class="card-head">
-        <div class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2.8 20 6v5.4c0 5.2-3.5 8.4-8 10.1-4.5-1.7-8-4.9-8-10.1V6l8-3.2Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m8.7 12.1 2.2 2.2 4.6-4.7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <p class="eyebrow">حسابیکس · اتصال به هوش مصنوعی</p>
-        <h1 id="page-title">اتصال امن حساب کاربری</h1>
-        <p class="intro"><span class="client">{safe_name}</span> می‌خواهد به ابزارهای حسابیکس شما متصل شود. ورود و انتخاب کسب‌وکار را فقط در صورتی ادامه دهید که این درخواست را خودتان آغاز کرده‌اید.</p>
-        <span class="secure-note"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3 19 6v5c0 4.6-3 7.5-7 9-4-1.5-7-4.4-7-9V6l7-3Z" stroke="currentColor" stroke-width="1.8"/><path d="m9 11.5 2 2 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>ورود مستقیم و رمزنگاری‌شده در حسابیکس</span>
-        <div class="steps" aria-label="مراحل اتصال"><span class="step active" id="stepLogin"><span class="step-number">۱</span> ورود</span><span class="step-line"></span><span class="step" id="stepConsent"><span class="step-number">۲</span> انتخاب دسترسی</span></div>
+        <div class="brand-row"><div class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2.8 20 6v5.4c0 5.2-3.5 8.4-8 10.1-4.5-1.7-8-4.9-8-10.1V6l8-3.2Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m8.7 12.1 2.2 2.2 4.6-4.7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="brand-copy"><p class="eyebrow">حسابیکس · اتصال به هوش مصنوعی</p><h1 id="page-title">اتصال امن حساب کاربری</h1></div></div>
+        <p class="intro"><span class="client">{safe_name}</span> درخواست اتصال به ابزارهای حسابیکس را دارد. فقط اگر این درخواست را خودتان آغاز کرده‌اید، ادامه دهید.</p>
+        <div class="trust-row"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3 19 6v5c0 4.6-3 7.5-7 9-4-1.5-7-4.4-7-9V6l7-3Z" stroke="currentColor" stroke-width="1.8"/><path d="m9 11.5 2 2 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>ورود شما مستقیماً در حسابیکس انجام می‌شود</span></div>
+        <div class="steps" aria-label="مراحل اتصال"><span class="step active" id="stepLogin"><span class="step-number">۱</span><span>تایید هویت</span></span><span class="step" id="stepConsent"><span class="step-number">۲</span><span>انتخاب دسترسی</span></span></div>
       </header>
       <div class="card-body">
         <section id="loginSection" aria-labelledby="login-heading">
-          <h2 class="section-label" id="login-heading">با شماره موبایل یا ایمیل حسابیکس وارد شوید</h2>
-          <label class="field"><span class="field-label">شماره موبایل یا ایمیل</span><input class="control" id="identifier" autocomplete="username" maxlength="255" placeholder="مثلاً ۰۹۱۲۱۲۳۴۵۶۷" required></label>
-          <div class="captcha-row">
-            <label class="field"><span class="field-label">کد امنیتی</span><input class="control" id="captchaCode" maxlength="10" autocomplete="off" placeholder="متن تصویر را وارد کنید" required></label>
-            <div class="captcha-tools"><div class="captcha-box"><img id="captcha" alt="تصویر کد امنیتی"></div><button class="icon-button" id="reload" type="button" aria-label="دریافت کد امنیتی جدید" title="کد جدید"><svg viewBox="0 0 24 24" fill="none"><path d="M20 7v5h-5M4 17v-5h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 9a7 7 0 0 1 12-2l2 2M4 15l2 2a7 7 0 0 0 12-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div>
+          <h2 class="section-heading" id="login-heading">ورود به حسابیکس</h2>
+          <p class="section-hint">برای ادامه، کد یک‌بارمصرف برای شما ارسال می‌شود.</p>
+          <div class="channel-label">روش دریافت کد</div>
+          <div class="channel-switch" role="group" aria-label="روش دریافت کد">
+            <button class="channel-option" type="button" data-channel="sms" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="2.8" width="14" height="18.4" rx="3" stroke="currentColor" stroke-width="1.7"/><path d="M9 6h6M10 18h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span>پیامک</span></button>
+            <button class="channel-option" type="button" data-channel="email" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3" stroke="currentColor" stroke-width="1.7"/><path d="m4.5 7 7.5 5.5L19.5 7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><span>ایمیل</span></button>
           </div>
-          <div class="channel-row"><label><span class="field-label">روش دریافت کد</span><select class="control" id="channel"><option value="sms">پیامک</option><option value="email">ایمیل</option></select></label><button class="primary" id="send" type="button">ارسال کد ورود</button></div>
+          <label class="field"><span class="field-label" id="identifierLabel">شماره موبایل</span><input class="control" id="identifier" type="tel" inputmode="tel" autocomplete="tel" maxlength="255" placeholder="مثلاً ۰۹۱۲۱۲۳۴۵۶۷" required></label>
+          <div class="field captcha-field">
+            <label class="field-label" for="captchaCode">کد امنیتی تصویر</label>
+            <div class="captcha-layout">
+              <input class="control" id="captchaCode" maxlength="10" autocomplete="off" autocapitalize="characters" placeholder="متن تصویر را وارد کنید" required>
+              <div class="captcha-tools"><div class="captcha-image"><span id="captchaPlaceholder">در حال دریافت تصویر…</span><img id="captcha" alt="کد امنیتی جدید"></div><button class="captcha-refresh" id="reload" type="button" aria-label="دریافت تصویر جدید" title="تصویر جدید"><svg viewBox="0 0 24 24" fill="none"><path d="M20 7v5h-5M4 17v-5h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 9a7 7 0 0 1 12-2l2 2M4 15l2 2a7 7 0 0 0 12-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div>
+            </div>
+          </div>
+          <button class="primary" id="send" type="button">ارسال کد تایید</button>
           <p id="status" class="status" role="status" aria-live="polite"></p>
         </section>
         <section id="otpSection" hidden aria-labelledby="otp-heading">
-          <div class="divider"></div><h2 class="section-label" id="otp-heading">کد ارسال‌شده را وارد کنید</h2>
-          <label class="field"><span class="field-label">کد یک‌بارمصرف</span><input class="control" id="otp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="کد ۶ رقمی" dir="ltr" required></label>
+          <div class="divider"></div><h2 class="section-heading" id="otp-heading">کد تایید را وارد کنید</h2>
+          <p class="section-hint">کد یک‌بارمصرف را در پیامک یا ایمیل خود پیدا کنید.</p>
+          <div class="otp-summary"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5v9a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5v-9Z" stroke="currentColor" stroke-width="1.7"/><path d="m5 7 7 5.5L19 7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="deliverySummary">کد برای شما ارسال شد.</span></div>
+          <label class="field"><span class="field-label" for="otp">کد یک‌بارمصرف</span><input class="control otp-input" id="otp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="ــــــ" dir="ltr" aria-describedby="otpHint" required></label>
+          <p class="section-hint" id="otpHint">کد را بدون فاصله وارد کنید.</p>
           <button class="primary" id="verify" type="button">تایید و ادامه</button>
           <p class="status" id="otpStatus" role="status" aria-live="polite"></p>
+          <div class="divider"></div><button class="text-button" id="changeLogin" type="button"><span aria-hidden="true">←</span> اصلاح شماره یا روش دریافت کد</button>
         </section>
         <section id="consent" hidden aria-labelledby="consent-heading">
-          <div class="divider"></div><h2 class="section-label" id="consent-heading">کسب‌وکار و دسترسی را انتخاب کنید</h2>
-          <label class="field"><span class="field-label">کسب‌وکار</span><select class="control" id="business" required></select></label>
+          <div class="divider"></div><h2 class="section-heading" id="consent-heading">اتصال را بررسی و تایید کنید</h2>
+          <p class="section-hint">کسب‌وکار و سطح دسترسی را انتخاب کنید. فقط موارد انتخاب‌شده در اختیار این اتصال قرار می‌گیرد.</p>
+          <label class="field"><span class="field-label business-label" for="business">کسب‌وکار موردنظر</span><select class="control" id="business" required><option value="" selected disabled>یک کسب‌وکار را انتخاب کنید</option></select></label>
           <div class="permission-list"><label class="permission"><input type="checkbox" checked disabled><span><strong>مشاهدهٔ اطلاعات و گزارش‌ها</strong><small>دسترسی پایه برای استفاده از ابزارهای حسابیکس</small></span></label>{write_option}{offline_option}</div>
           <div class="button-row"><button class="primary" id="approve" type="button">تایید و اتصال</button><button class="secondary" id="deny" type="button">رد درخواست</button></div>
           <p class="status" id="consentStatus" role="status" aria-live="polite"></p>
         </section>
       </div>
     </article>
-    <p class="footnote">با تایید شما، فقط کسب‌وکار و سطح دسترسی انتخاب‌شده متصل می‌شود.</p>
+    <p class="footnote"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3 19 6v5c0 4.6-3 7.5-7 9-4-1.5-7-4.4-7-9V6l7-3Z" stroke="currentColor" stroke-width="1.7"/><path d="m9 11.5 2 2 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>می‌توانید دسترسی این اتصال را بعداً از تنظیمات حسابیکس لغو کنید.</p>
   </main>
 <script>
-const api={api_json},rid={request_json};let captchaId='',loginSession='',sessionKey='';
+const api={api_json},rid={request_json};let captchaId='',loginSession='',sessionKey='',selectedChannel='sms';
 const $=id=>document.getElementById(id);
 function status(id,message,tone=''){{const el=$(id);el.textContent=message;el.dataset.tone=tone}}
 async function request(path,options={{}}){{
@@ -496,21 +531,26 @@ async function request(path,options={{}}){{
   let payload;try{{payload=await response.json()}}catch{{if(response.status===404)throw Error(`مسیر API «${{path}}» در سرور پیدا نشد (HTTP 404). سرور یا تنظیم Nginx نیاز به به‌روزرسانی دارد.`);throw Error(`پاسخ سرور معتبر نیست (HTTP ${{response.status}}). اگر خطا ادامه دارد، صفحه را دوباره باز کنید.`)}}
   const error=payload?.error&&typeof payload.error==='object'?payload.error:payload;
   if(!response.ok||payload?.success===false){{
-    if(response.status===404&&error?.code==='SESSION_NOT_FOUND')throw Error('نشست ورود منقضی شده است. کد تازه دریافت کنید و دوباره وارد کنید.');
-    if(response.status===404&&error?.code==='USER_NOT_FOUND')throw Error('برای این شماره یا ایمیل حساب فعالی پیدا نشد. شناسهٔ ورود حسابیکس را بررسی کنید.');
+    const friendlyErrors={{INVALID_CAPTCHA:'کد امنیتی درست نیست. تصویر تازه بگیرید و دوباره وارد کنید.',INVALID_OTP_FORMAT:'کد تایید باید ۶ رقم باشد.',OTP_NOT_FOUND:'کد تایید منقضی شده است. دوباره کد بگیرید.',SESSION_NOT_FOUND:'نشست ورود منقضی شده است. دوباره کد بگیرید.',INVALID_OTP:'کد واردشده صحیح نیست. آن را بررسی و دوباره وارد کنید.',OTP_ATTEMPTS_EXCEEDED:'تعداد تلاش مجاز تمام شده است. دوباره کد ورود بگیرید.',RATE_LIMIT_EXCEEDED:'درخواست‌های زیادی ثبت شده است. کمی صبر کنید و دوباره تلاش کنید.',CHANNEL_NOT_SUPPORTED:'روش دریافت انتخاب‌شده در دسترس نیست.',USER_NOT_FOUND:'برای این شماره یا ایمیل حساب فعالی پیدا نشد. اطلاعات ورود را بررسی کنید.'}};
+    if(friendlyErrors[error?.code])throw Error(friendlyErrors[error.code]);
     if(response.status===404&&(!error?.code||error.code==='HTTP_ERROR'))throw Error(`مسیر API «${{path}}» در نسخهٔ فعلی سرور پیدا نشد (HTTP 404). صفحه را تازه کنید؛ اگر مشکل ماند، سرور باید به‌روزرسانی شود.`);
     throw Error(error?.message||payload?.detail||`درخواست ناموفق بود (HTTP ${{response.status}}).`)
   }}
   return payload?.data??payload;
 }}
 function asciiDigits(value){{return value.replace(/[۰-۹٠-٩]/g,d=>String('۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩'.indexOf(d)%10))}}
-async function loadCaptcha(){{try{{const result=await request('/auth/captcha',{{method:'POST'}});captchaId=result.captcha_id;$('captcha').src='data:image/png;base64,'+result.image_base64}}catch(error){{status('status',error.message,'error')}}}}
+function setChannel(channel){{selectedChannel=channel;status('status','','');document.querySelectorAll('.channel-option').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.channel===channel)));const email=channel==='email';$('identifierLabel').textContent=email?'آدرس ایمیل':'شماره موبایل';$('identifier').type=email?'email':'tel';$('identifier').inputMode=email?'email':'tel';$('identifier').autocomplete=email?'email':'tel';$('identifier').placeholder=email?'مثلاً name@example.com':'مثلاً ۰۹۱۲۱۲۳۴۵۶۷';$('identifier').focus()}}
+function maskDestination(value,channel){{const clean=value.trim();if(channel==='email'){{const parts=clean.split('@');return parts.length===2?(parts[0].slice(0,1)+'•••@'+parts[1]):clean}}const digits=asciiDigits(clean).replace(/\\D/g,'');return digits.length>4?('•••••'+digits.slice(-4)):clean}}
+async function loadCaptcha(){{const button=$('reload');button.disabled=true;$('captchaPlaceholder').hidden=false;$('captchaPlaceholder').textContent='در حال دریافت تصویر…';try{{const result=await request('/auth/captcha',{{method:'POST'}});captchaId=result.captcha_id;$('captcha').src='data:image/png;base64,'+result.image_base64;$('captchaPlaceholder').hidden=true}}catch(error){{captchaId='';$('captchaPlaceholder').textContent='تصویر دریافت نشد';status('status',error.message,'error')}}finally{{button.disabled=false}}}}
 function setBusy(button,busy,label){{button.disabled=busy;if(busy){{button.dataset.label=button.textContent;button.textContent=label}}else if(button.dataset.label){{button.textContent=button.dataset.label;delete button.dataset.label}}}}
-$('reload').addEventListener('click',loadCaptcha);loadCaptcha();
-$('send').addEventListener('click',async()=>{{const button=$('send');setBusy(button,true,'در حال ارسال…');status('status','');try{{if(!$('identifier').value.trim()||!$('captchaCode').value.trim())throw Error('شماره موبایل یا ایمیل و کد امنیتی را وارد کنید.');const result=await request('/auth/login/send-otp',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{identifier:$('identifier').value.trim(),channel:$('channel').value,captcha_id:captchaId,captcha_code:$('captchaCode').value.trim()}})}});loginSession=result.session_id;$('otpSection').hidden=false;$('otp').focus();status('otpStatus',result.message||'کد ورود ارسال شد. پیامک یا ایمیل خود را بررسی کنید.','success')}}catch(error){{status('status',error.message,'error');await loadCaptcha()}}finally{{setBusy(button,false)}}}});
- $('verify').addEventListener('click',async()=>{{const button=$('verify');setBusy(button,true,'در حال بررسی…');status('otpStatus','');try{{const otp=asciiDigits($('otp').value.trim());if(!otp)throw Error('کد یک‌بارمصرف را وارد کنید.');const login=await request('/auth/login/verify-otp?session_id='+encodeURIComponent(loginSession)+'&otp_code='+encodeURIComponent(otp),{{method:'POST'}});const consent=await request('/ai/mcp/oauth/authorize/session',{{method:'POST',headers:{{'Content-Type':'application/json',Authorization:'ApiKey '+login.api_key}},body:JSON.stringify({{request_id:rid}})}});sessionKey=consent.consent_token;$('business').replaceChildren();for(const item of consent.items){{const option=document.createElement('option');option.value=item.id;option.textContent=item.name;option.dataset.owner=item.owner?'1':'0';$('business').append(option)}}$('business').addEventListener('change',()=>{{const write=$('write');if(write){{write.disabled=$('business').selectedOptions[0]?.dataset.owner!=='1';if(write.disabled)write.checked=false}}}});$('business').dispatchEvent(new Event('change'));$('loginSection').hidden=true;$('otpSection').hidden=true;$('consent').hidden=false;$('stepLogin').classList.remove('active');$('stepConsent').classList.add('active');status('consentStatus','ورود موفق بود. کسب‌وکار و دسترسی‌های درخواستی را بررسی کنید.','success')}}catch(error){{status('otpStatus',error.message,'error')}}finally{{setBusy(button,false)}}}});
+$('reload').addEventListener('click',loadCaptcha);document.querySelectorAll('.channel-option').forEach(button=>button.addEventListener('click',()=>setChannel(button.dataset.channel)));loadCaptcha();
+$('send').addEventListener('click',async()=>{{const button=$('send');let requestStarted=false;setBusy(button,true,'در حال ارسال کد…');status('status','');try{{if(!$('identifier').value.trim())throw Error(selectedChannel==='email'?'آدرس ایمیل را وارد کنید.':'شماره موبایل را وارد کنید.');if(selectedChannel==='email'&&!$('identifier').checkValidity())throw Error('فرمت آدرس ایمیل را بررسی کنید.');if(!$('captchaCode').value.trim())throw Error('متن تصویر امنیتی را وارد کنید.');if(!captchaId)throw Error('تصویر امنیتی هنوز آماده نیست. چند لحظه دیگر دوباره تلاش کنید.');requestStarted=true;const result=await request('/auth/login/send-otp',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{identifier:$('identifier').value.trim(),channel:selectedChannel,captcha_id:captchaId,captcha_code:$('captchaCode').value.trim()}})}});loginSession=result.session_id;$('deliverySummary').textContent='کد تایید به '+maskDestination($('identifier').value,selectedChannel)+' ارسال شد.';$('otp').value='';$('loginSection').hidden=true;$('otpSection').hidden=false;$('stepLogin').classList.remove('active');$('stepConsent').classList.remove('active');$('otp').focus();status('otpStatus','کد ارسال شد. کد را وارد کنید.','success')}}catch(error){{status('status',error.message,'error');if(requestStarted)await loadCaptcha()}}finally{{setBusy(button,false)}}}});
+$('otp').addEventListener('input',()=>{{const value=asciiDigits($('otp').value).replace(/\\D/g,'').slice(0,6);if($('otp').value!==value)$('otp').value=value}});
+$('changeLogin').addEventListener('click',()=>{{status('otpStatus','','');$('otpSection').hidden=true;$('loginSection').hidden=false;$('stepLogin').classList.add('active');$('stepConsent').classList.remove('active');$('captchaCode').value='';loadCaptcha();$('identifier').focus()}});
+$('verify').addEventListener('click',async()=>{{const button=$('verify');setBusy(button,true,'در حال بررسی کد…');status('otpStatus','');try{{const otp=asciiDigits($('otp').value.trim());if(otp.length!==6)throw Error('کد تایید باید ۶ رقم باشد.');const login=await request('/auth/login/verify-otp?session_id='+encodeURIComponent(loginSession)+'&otp_code='+encodeURIComponent(otp),{{method:'POST'}});const consent=await request('/ai/mcp/oauth/authorize/session',{{method:'POST',headers:{{'Content-Type':'application/json',Authorization:'ApiKey '+login.api_key}},body:JSON.stringify({{request_id:rid}})}});sessionKey=consent.consent_token;$('business').replaceChildren();const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='یک کسب‌وکار را انتخاب کنید';placeholder.disabled=true;placeholder.selected=true;$('business').append(placeholder);for(const item of consent.items){{const option=document.createElement('option');option.value=item.id;option.textContent=item.name;option.dataset.owner=item.owner?'1':'0';$('business').append(option)}}$('business').addEventListener('change',()=>{{const write=$('write');if(write){{write.disabled=$('business').selectedOptions[0]?.dataset.owner!=='1';if(write.disabled)write.checked=false}}}});$('business').dispatchEvent(new Event('change'));$('loginSection').hidden=true;$('otpSection').hidden=true;$('consent').hidden=false;$('stepLogin').classList.remove('active');$('stepConsent').classList.add('active');status('consentStatus','ورود موفق بود. دسترسی‌های درخواستی را بررسی کنید.','success')}}catch(error){{status('otpStatus',error.message,'error')}}finally{{setBusy(button,false)}}}});
 async function decide(approved){{const button=approved?$('approve'):$('deny');setBusy(button,true,approved?'در حال اتصال…':'در حال ثبت…');status('consentStatus','');try{{const scopes=['ai:tools:read'];if($('write')?.checked)scopes.push('ai:tools:write');if($('offline')?.checked)scopes.push('offline_access');const result=await request('/ai/mcp/oauth/authorize/consent',{{method:'POST',headers:{{'Content-Type':'application/json',Authorization:'Bearer '+sessionKey}},body:JSON.stringify({{request_id:rid,business_id:Number($('business').value),approved,scopes}})}});location.assign(result.redirect_to)}}catch(error){{status('consentStatus',error.message,'error');setBusy(button,false)}}}}
-$('approve').addEventListener('click',()=>decide(true));$('deny').addEventListener('click',()=>decide(false));
+$('approve').addEventListener('click',()=>{{if(!$('business').value){{status('consentStatus','ابتدا کسب‌وکار موردنظر را انتخاب کنید.','error');return}}decide(true)}});$('deny').addEventListener('click',()=>decide(false));
+$('identifier').addEventListener('keydown',event=>{{if(event.key==='Enter'){{event.preventDefault();$('send').click()}}}});$('captchaCode').addEventListener('keydown',event=>{{if(event.key==='Enter'){{event.preventDefault();$('send').click()}}}});$('otp').addEventListener('keydown',event=>{{if(event.key==='Enter'){{event.preventDefault();$('verify').click()}}}});
 </script>
 </body>
 </html>'''
@@ -730,21 +770,22 @@ async def token(request: Request, db: Session = Depends(get_db)) -> JSONResponse
         # access changed between consent and token exchange.
         db.commit()
         return _json_error("invalid_grant", "User or business access is no longer active")
+    session_ttl = _session_ttl(db)
     access_token, access_hash = generate_api_key(prefix="mcp_live_")
     access_scopes = [scope for scope in scopes if scope != "offline_access"]
     access_row = ApiKey(
         user_id=user_id, key_hash=access_hash, key_type="mcp", business_id=business_id,
         mcp_resource=resource, oauth_client_id=client_id, oauth_grant_id=oauth_grant_id,
         name=f"OAuth: {client.client_name}"[:100],
-        scopes=json.dumps(access_scopes), expires_at=datetime.utcnow() + ACCESS_TTL,
+        scopes=json.dumps(access_scopes), expires_at=datetime.utcnow() + session_ttl,
     )
     db.add(access_row)
-    returned = {"access_token": access_token, "token_type": "Bearer", "expires_in": int(ACCESS_TTL.total_seconds()), "scope": " ".join(access_scopes)}
+    returned = {"access_token": access_token, "token_type": "Bearer", "expires_in": int(session_ttl.total_seconds()), "scope": " ".join(access_scopes)}
     if "refresh_token" in (client.grant_types or []) and "offline_access" in scopes:
         refresh_token, refresh_hash = generate_api_key(prefix="mcp_refresh_")
         refresh_row = McpOAuthRefreshToken(
             token_hash=refresh_hash, client_id=client_id, user_id=user_id, business_id=business_id,
-            grant_id=oauth_grant_id, resource=resource, scopes=scopes, expires_at=datetime.utcnow() + REFRESH_TTL,
+            grant_id=oauth_grant_id, resource=resource, scopes=scopes, expires_at=datetime.utcnow() + session_ttl,
         )
         db.add(refresh_row)
         db.flush()

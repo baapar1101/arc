@@ -70,6 +70,7 @@ SYSTEM_CONFIG_SUPPORT_TICKETS_DISABLED_MESSAGE = "system_config_support_tickets_
 SYSTEM_CONFIG_LEGACY_API_IMPORT_ENABLED = "system_config_legacy_api_import_enabled"
 SYSTEM_CONFIG_LEGACY_API_IMPORT_DISABLED_MESSAGE = "system_config_legacy_api_import_disabled_message"
 SYSTEM_CONFIG_SESSION_TIMEOUT = "system_config_session_timeout"
+SYSTEM_CONFIG_MCP_OAUTH_SESSION_DAYS = "system_config_mcp_oauth_session_days"
 SYSTEM_CONFIG_MAX_FILE_SIZE = "system_config_max_file_size"
 SYSTEM_CONFIG_MAX_USERS = "system_config_max_users"
 SYSTEM_CONFIG_BUSINESS_CREATION_VERIFICATION_REQUIREMENT = "system_config_business_creation_verification_requirement"
@@ -804,6 +805,12 @@ def get_session_timeout(db: Session) -> int:
 	return (session_timeout if session_timeout is not None else 30)
 
 
+def get_mcp_oauth_session_days(db: Session) -> int:
+	"""مدت اعتبار اتصال‌های OAuth مربوط به ابزارهای هوش مصنوعی (۱ تا ۳۶۵ روز)."""
+	days = _get_setting_int(db, SYSTEM_CONFIG_MCP_OAUTH_SESSION_DAYS)
+	return max(1, min(365, days if days is not None else 30))
+
+
 def get_max_file_size_mb(db: Session) -> int:
 	"""خواندن حداکثر حجم فایل به مگابایت"""
 	max_file_size = _get_setting_int(db, SYSTEM_CONFIG_MAX_FILE_SIZE)
@@ -1016,6 +1023,7 @@ def get_system_configuration(db: Session) -> Dict[str, Any]:
 		"enable_email_verification": (enable_email_verification if enable_email_verification is not None else True),
 		"enable_maintenance_mode": (enable_maintenance_mode if enable_maintenance_mode is not None else False),
 		"session_timeout": (session_timeout if session_timeout is not None else 30),
+		"mcp_oauth_session_days": get_mcp_oauth_session_days(db),
 		"max_file_size": (max_file_size if max_file_size is not None else 10),
 		"max_users": (max_users if max_users is not None else 0),
 		"business_creation_verification_requirement": business_creation_requirement,
@@ -1084,6 +1092,7 @@ def set_system_configuration(
 	support_expiry_notify_days: list | None = None,
 	support_paid_priority_boost: bool | None = None,
 	session_timeout: int | None = None,
+	mcp_oauth_session_days: int | None = None,
 	max_file_size: int | None = None,
 	max_users: int | None = None,
 	business_creation_verification_requirement: str | None = None,
@@ -1230,6 +1239,11 @@ def set_system_configuration(
 		if session_timeout < 0 or (session_timeout > 0 and (session_timeout < 5 or session_timeout > 1440)):
 			raise ApiError("INVALID_SESSION_TIMEOUT", "زمان انقضای نشست باید 0 (نامحدود) یا بین 5 تا 1440 دقیقه باشد", http_status=400)
 		_upsert_setting_int(db, SYSTEM_CONFIG_SESSION_TIMEOUT, session_timeout)
+
+	if mcp_oauth_session_days is not None:
+		if mcp_oauth_session_days < 1 or mcp_oauth_session_days > 365:
+			raise ApiError("INVALID_MCP_OAUTH_SESSION_DAYS", "مدت اعتبار نشست اتصال هوش مصنوعی باید بین 1 تا 365 روز باشد", http_status=400)
+		_upsert_setting_int(db, SYSTEM_CONFIG_MCP_OAUTH_SESSION_DAYS, mcp_oauth_session_days)
 	
 	if max_file_size is not None:
 		if max_file_size < 1 or max_file_size > 1000:

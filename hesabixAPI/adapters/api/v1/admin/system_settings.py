@@ -491,6 +491,7 @@ class SystemConfigurationPayload(BaseModel):
 	support_expiry_notify_days: list[int] | None = None
 	support_paid_priority_boost: bool | None = None
 	session_timeout: int | None = None
+	mcp_oauth_session_days: int | None = Field(None, ge=1, le=365)
 	max_file_size: int | None = None
 	max_users: int | None = None
 	business_creation_verification_requirement: str | None = Field(
@@ -581,6 +582,7 @@ def set_system_configuration_endpoint(
 		support_expiry_notify_days=payload.support_expiry_notify_days,
 		support_paid_priority_boost=payload.support_paid_priority_boost,
 		session_timeout=payload.session_timeout,
+		mcp_oauth_session_days=payload.mcp_oauth_session_days,
 		max_file_size=payload.max_file_size,
 		max_users=payload.max_users,
 		business_creation_verification_requirement=payload.business_creation_verification_requirement,
