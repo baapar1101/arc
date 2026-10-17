@@ -73,5 +73,12 @@ _flutter.buildConfig = {"engineRevision":"deb287481e3ce9468f3434937ced4240a70539
 
   hesabixStartFlutter().catch(function (e) {
     console.error('[Hesabix] Flutter bootstrap failed:', e);
+    var loaderUi = window.__hesabixLoaderUI;
+    if (loaderUi && typeof loaderUi.markSlowLoad === 'function') {
+      loaderUi.markSlowLoad();
+    }
+    if (loaderUi && typeof loaderUi.showRetry === 'function') {
+      loaderUi.showRetry();
+    }
   });
 })();
