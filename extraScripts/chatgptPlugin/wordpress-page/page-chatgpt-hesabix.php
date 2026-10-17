@@ -28,7 +28,7 @@ add_action('wp_head', static function () {
 $hx_chatgpt_mcp_url = 'https://arc.hesabix.ir/api/v1/ai/mcp';
 $hx_chatgpt_zip_url = 'https://source.hesabix.ir/hesabix/arc/raw/branch/master/extraScripts/chatgptPlugin/plugin-1.0.0.zip';
 $hx_chatgpt_source  = 'https://source.hesabix.ir/hesabix/arc/src/branch/master/extraScripts/chatgptPlugin';
-$hx_chatgpt_openai  = 'https://developers.openai.com/plugins/deploy/connect-chatgpt';
+$hx_chatgpt_openai  = 'https://help.openai.com/en/articles/20001256-plugins-in-chatgpt';
 
 get_header();
 ?>
@@ -114,8 +114,18 @@ get_header();
 
     <section class="hx-chatgpt-section hx-chatgpt-section--tint" id="hx-chatgpt-download">
         <div class="hx-chatgpt-wrap hx-chatgpt-download-panel">
-            <div><span class="hx-chatgpt-section-kicker">برای توسعه‌دهندگان</span><h2>سورس و بستهٔ افزونهٔ Hesabix</h2><p>ساختار و فایل‌های نسخهٔ فعلی را در مخزن حسابیکس ببینید. برای استفادهٔ روزمره، اتصال MCP بالا مسیر پیشنهادی است و ZIP فعلی بستهٔ توسعه/آزمایش محسوب می‌شود.</p><small>توسعه‌دهنده: TFS company LTD · پشتیبانی: <a href="mailto:support@hesabix.ir">support@hesabix.ir</a></small></div>
-            <div class="hx-chatgpt-download-actions"><a class="hx-chatgpt-button hx-chatgpt-button--primary" href="<?php echo esc_url($hx_chatgpt_zip_url); ?>">دریافت فایل ZIP نسخهٔ آزمایشی <span aria-hidden="true">↓</span></a><a class="hx-chatgpt-button hx-chatgpt-button--outline" href="<?php echo esc_url($hx_chatgpt_source); ?>" target="_blank" rel="noopener noreferrer">باز کردن مخزن سورس</a></div>
+            <div><span class="hx-chatgpt-section-kicker">نصب از فایل ZIP</span><h2>افزونهٔ Hesabix را به ChatGPT اضافه کنید</h2><p>ZIP را دریافت کنید و در ChatGPT وب از بخش Plugins بارگذاری کنید. بعد از نصب، حسابیکس را به افزونه وصل و مجوزهای لازم را تأیید کنید تا ابزارهای حسابداری در گفت‌وگو در دسترس باشند.</p><small>توسعه‌دهنده: TFS company LTD · پشتیبانی: <a href="mailto:support@hesabix.ir">support@hesabix.ir</a></small></div>
+            <div class="hx-chatgpt-download-actions"><a class="hx-chatgpt-button hx-chatgpt-button--primary" href="<?php echo esc_url($hx_chatgpt_zip_url); ?>">دریافت فایل ZIP افزونه <span aria-hidden="true">↓</span></a><a class="hx-chatgpt-button hx-chatgpt-button--outline" href="<?php echo esc_url($hx_chatgpt_source); ?>" target="_blank" rel="noopener noreferrer">باز کردن مخزن سورس</a></div>
+        </div>
+        <div class="hx-chatgpt-wrap hx-chatgpt-upload-guide">
+            <header class="hx-chatgpt-section-head"><span>راهنمای نصب</span><h2>آپلود ZIP و اتصال حسابیکس</h2><p>این مراحل را در ChatGPT وب انجام دهید. عنوان یا جای گزینه‌ها ممکن است با نسخهٔ برنامه و سطح دسترسی فضای کاری تفاوت داشته باشد.</p></header>
+            <ol class="hx-chatgpt-steps">
+                <li class="hx-chatgpt-step"><span class="hx-chatgpt-step__number">۱</span><h3>فایل افزونه را دریافت کنید</h3><p>روی دکمهٔ دریافت ZIP بزنید و فایل را بدون تغییر نگه دارید.</p></li>
+                <li class="hx-chatgpt-step"><span class="hx-chatgpt-step__number">۲</span><h3>صفحهٔ مدیریت افزونه‌ها را باز کنید</h3><p>در ChatGPT وب وارد <b>Admin console</b> شوید، فضای کاری موردنظر را انتخاب کنید و به <b>Plugins</b> بروید.</p></li>
+                <li class="hx-chatgpt-step"><span class="hx-chatgpt-step__number">۳</span><h3>ZIP را بارگذاری کنید</h3><p><b>Add</b> و سپس <b>Upload plugin</b> را بزنید؛ فایل ZIP دریافت‌شده را انتخاب کنید و نصب را کامل کنید.</p></li>
+                <li class="hx-chatgpt-step"><span class="hx-chatgpt-step__number">۴</span><h3>حسابیکس را متصل و مجوزدهی کنید</h3><p>افزونهٔ Hesabix را باز کنید، اتصال حسابیکس را انجام دهید، کسب‌وکار و مجوزهای درخواستی را بررسی و تأیید کنید. سپس در یک گفت‌وگوی تازه با یک گزارش ساده شروع کنید.</p></li>
+            </ol>
+            <div class="hx-chatgpt-setup-note"><strong>گزینهٔ Upload plugin را نمی‌بینید؟</strong> این قابلیت در ChatGPT وب و برای فضای کاری/حسابی که مجوز آپلود دارد در دسترس است؛ از مالک یا مدیر فضای کاری بخواهید دسترسی لازم را بررسی کند. بارگذاری ZIP به‌تنهایی اتصال حسابیکس یا مجوزهای آن را تکمیل نمی‌کند. <a href="<?php echo esc_url($hx_chatgpt_openai); ?>" target="_blank" rel="noopener noreferrer">راهنمای رسمی OpenAI دربارهٔ آپلود ZIP</a></div>
         </div>
     </section>
 
@@ -124,7 +134,8 @@ get_header();
             <div class="hx-chatgpt-faq">
                 <details><summary>آیا دستیار فقط گزارش می‌گیرد؟</summary><p>خیر. در کنار خواندن و گزارش‌گیری، ابزارهای پشتیبانی‌شده ممکن است ثبت یا ویرایش را هم انجام دهند؛ این کارها به دسترسی نوشتن جداگانه و مجوز شما نیاز دارند.</p></details>
                 <details><summary>آیا همهٔ ابزارها در هر حساب در دسترس هستند؟</summary><p>ابزارها به کسب‌وکار متصل‌شده، نقش کاربر، مجوزها و تنظیمات حساب محدود هستند. اگر عملیاتی در دسترس نبود، نقش کاربر و اتصال را در حسابیکس بررسی کنید.</p></details>
-                <details><summary>برای اتصال حتماً باید ZIP را نصب کنم؟</summary><p>برای اتصال MCP سفارشی، نشانی سرور را در ChatGPT وارد کنید؛ فایل ZIP برای توسعه و آزمایش است و جایگزین ساخت اتصال و احراز هویت حساب شما نیست.</p></details>
+                <details><summary>بعد از آپلود ZIP، افزونه آمادهٔ استفاده است؟</summary><p>پس از بارگذاری، اتصال حسابیکس و احراز هویت را هم کامل کنید. نصب افزونه به‌تنهایی دسترسی به اپ‌های متصل یا تأیید مجوزهای آن‌ها را انجام نمی‌دهد.</p></details>
+                <details><summary>چرا گزینهٔ Upload plugin را نمی‌بینم؟</summary><p>آپلود از ChatGPT وب انجام می‌شود و نیازمند دسترسی آپلود در فضای کاری است. در صورت نبودن گزینه، از مدیر فضای کاری بخواهید مجوزها و تنظیمات Plugins را بررسی کند.</p></details>
                 <details><summary>از کجا پشتیبانی بگیرم؟</summary><p>سؤال خود را به <a href="mailto:support@hesabix.ir">support@hesabix.ir</a> بفرستید.</p></details>
             </div>
         </div>
