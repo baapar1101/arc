@@ -35,6 +35,7 @@ class QuickSalesPaymentDock extends StatefulWidget {
   final Future<QuickSalesChangeResolution?> Function() onConfigureChange;
   final String? defaultCashRegisterId;
   final String currencyUnit;
+  final int currencyId;
   final int decimalPlaces;
   final bool enabled;
   final VoidCallback onSave;
@@ -53,6 +54,7 @@ class QuickSalesPaymentDock extends StatefulWidget {
     required this.onConfigureChange,
     required this.defaultCashRegisterId,
     required this.currencyUnit,
+    required this.currencyId,
     required this.decimalPlaces,
     required this.enabled,
     required this.onSave,
@@ -269,6 +271,15 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
 
   void _addPayment(QuickSalesPaymentButtonModel button) {
     if (!widget.enabled) return;
+    if (button.targetCurrencyId != null &&
+        button.targetCurrencyId != widget.currencyId) {
+      SnackBarHelper.show(
+        context,
+        message: 'ارز مقصد این دکمه با ارز فاکتور یکسان نیست.',
+        isError: true,
+      );
+      return;
+    }
     if (widget.payments.length >= _maxPaymentLines) {
       SnackBarHelper.show(
         context,

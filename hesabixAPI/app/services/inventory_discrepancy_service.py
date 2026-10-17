@@ -214,8 +214,9 @@ def list_cases(db: Session, business_id: int, status: str | None = None) -> dict
     ).filter(InventoryDiscrepancyCase.business_id == int(business_id))
     if status:
         q = q.filter(InventoryDiscrepancyCase.status == str(status))
+    total = q.order_by(None).count()
     rows = q.order_by(InventoryDiscrepancyCase.created_at.desc()).limit(200).all()
-    return {"items": [_serialize(row) for row in rows], "total": len(rows)}
+    return {"items": [_serialize(row) for row in rows], "total": total}
 
 
 def get_case(db: Session, business_id: int, case_id: int) -> InventoryDiscrepancyCase:
@@ -324,6 +325,10 @@ def resolve_case_with_goods_income(
     user_can_post: bool,
     user_can_change_unit_cost: bool,
 ) -> dict[str, Any]:
+    acquire_transaction_lock(
+        db,
+        f"inventory_discrepancy_resolution:{business_id}:{case_id}",
+    )
     case = get_case(db, business_id, case_id)
     if case.status != "open":
         raise ApiError("INVENTORY_DISCREPANCY_ALREADY_RESOLVED", "این پرونده قبلاً رسیدگی شده است", http_status=409)

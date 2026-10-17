@@ -20,6 +20,7 @@ from app.core.responses import ApiError, success_response
 from app.services.quick_sales_service import (
     create_quick_sales_payment_button,
     delete_quick_sales_payment_button,
+    get_configured_anonymous_customer,
     get_or_create_anonymous_customer,
     get_quick_sales_customer_balance,
     get_quick_sales_settings,
@@ -37,6 +38,25 @@ logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/businesses/{business_id}/quick-sales", tags=["quick-sales"])
+
+
+def _anonymous_customer_data(customer) -> dict:
+    person_types = []
+    if customer.person_types:
+        try:
+            parsed_types = json.loads(customer.person_types)
+            person_types = parsed_types if isinstance(parsed_types, list) else []
+        except (json.JSONDecodeError, TypeError) as exc:
+            logger.warning(
+                "Failed to parse person_types for customer %s: %s",
+                customer.id,
+                exc,
+            )
+    return {
+        "id": customer.id,
+        "name": customer.alias_name,
+        "is_customer": PersonType.CUSTOMER.value in person_types,
+    }
 
 
 def _can(ctx: AuthContext, db: Session, business_id: int, section: str, action: str) -> bool:
@@ -57,7 +77,9 @@ def get_customer_balance_endpoint(
     person_id: int,
     currency_id: int,
     as_of_date: date,
-    _: None = Depends(require_business_access_dep),
+    _: None = Depends(
+        require_business_permission_dep("quick_sales", "view_customer_balance")
+    ),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
@@ -108,34 +130,35 @@ def update_quick_sales_settings_endpoint(
 
 @router.get(
     "/anonymous-customer",
+    summary="دریافت مشتری ناشناس تنظیم‌شده",
+)
+def read_anonymous_customer_endpoint(
+    request: Request,
+    business_id: int,
+    _: None = Depends(require_business_permission_dep("invoices", "add")),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+    customer = get_configured_anonymous_customer(db, business_id)
+    return success_response(_anonymous_customer_data(customer), request)
+
+
+@router.post(
+    "/anonymous-customer",
     summary="دریافت یا ایجاد مشتری ناشناس",
     description="دریافت مشتری ناشناس پیش‌فرض یا ایجاد آن در صورت عدم وجود",
 )
 def get_anonymous_customer_endpoint(
     request: Request,
     business_id: int,
-    _: None = Depends(require_business_access_dep),
+    _: None = Depends(require_business_permission_dep("invoices", "add")),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
     """دریافت یا ایجاد مشتری ناشناس"""
     try:
         customer = get_or_create_anonymous_customer(db, business_id)
-        # بررسی اینکه آیا مشتری است یا نه
-        person_types = []
-        if customer.person_types:
-            try:
-                parsed_types = json.loads(customer.person_types)
-                person_types = parsed_types if isinstance(parsed_types, list) else []
-            except (json.JSONDecodeError, TypeError) as e:
-                logger.warning(f"Failed to parse person_types for customer {customer.id}: {e}")
-                person_types = []
-        is_customer = PersonType.CUSTOMER.value in person_types
-        return success_response({
-            "id": customer.id,
-            "name": customer.alias_name,
-            "is_customer": is_customer,
-        }, request)
+        return success_response(_anonymous_customer_data(customer), request)
     except Exception as e:
         logger.error(f"Error in get_anonymous_customer_endpoint for business {business_id}: {type(e).__name__}: {str(e)}", exc_info=True)
         raise
@@ -145,7 +168,7 @@ def get_anonymous_customer_endpoint(
 def list_payment_buttons_endpoint(
     request: Request,
     business_id: int,
-    _: None = Depends(require_business_access_dep),
+    _: None = Depends(require_business_permission_dep("invoices", "add")),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
@@ -158,7 +181,7 @@ def create_payment_button_endpoint(
     request: Request,
     business_id: int,
     payload: Dict[str, Any] = Body(...),
-    _: None = Depends(require_business_access_dep),
+    _: None = Depends(require_business_permission_dep("invoices", "add")),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
@@ -177,7 +200,7 @@ def reorder_payment_buttons_endpoint(
     request: Request,
     business_id: int,
     payload: Dict[str, Any] = Body(...),
-    _: None = Depends(require_business_access_dep),
+    _: None = Depends(require_business_permission_dep("invoices", "add")),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
@@ -200,7 +223,7 @@ def update_payment_button_shortcut_endpoint(
     business_id: int,
     button_key: str,
     payload: Dict[str, Any] = Body(...),
-    _: None = Depends(require_business_access_dep),
+    _: None = Depends(require_business_permission_dep("invoices", "add")),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
@@ -276,7 +299,7 @@ def update_payment_button_endpoint(
     business_id: int,
     button_id: int,
     payload: Dict[str, Any] = Body(...),
-    _: None = Depends(require_business_access_dep),
+    _: None = Depends(require_business_permission_dep("invoices", "add")),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
@@ -296,7 +319,7 @@ def delete_payment_button_endpoint(
     request: Request,
     business_id: int,
     button_id: int,
-    _: None = Depends(require_business_access_dep),
+    _: None = Depends(require_business_permission_dep("invoices", "add")),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ) -> dict:

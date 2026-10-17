@@ -1162,6 +1162,9 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'change_unit_price': t.permissionInvoiceChangeUnitPrice,
       },
       'quick_sales': {
+        'create_customer': 'ثبت سریع مشتری در فروش سریع',
+        'view_customer_contact': 'مشاهده اطلاعات تماس مشتری در فروش سریع',
+        'view_customer_balance': 'مشاهده مانده حساب مشتری در فروش سریع',
         'manage_default_payment_shortcuts':
             'مدیریت میانبرهای پیش‌فرض پرداخت در فروش سریع',
       },

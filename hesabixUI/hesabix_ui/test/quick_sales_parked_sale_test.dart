@@ -5,6 +5,20 @@ import 'package:hesabix_ui/models/quick_sales_parked_sale.dart';
 import 'package:hesabix_ui/models/quick_sales_change_resolution.dart';
 
 void main() {
+  test('parked-sale storage is isolated by user inside one business', () {
+    expect(
+      QuickSalesParkedSalesStorage.keyFor(5, 11),
+      isNot(QuickSalesParkedSalesStorage.keyFor(5, 12)),
+    );
+  });
+
+  test('parked-sale storage is isolated by browser-tab scope', () {
+    expect(
+      QuickSalesParkedSalesStorage.keyFor(12, 3, scope: 'tab-a'),
+      isNot(QuickSalesParkedSalesStorage.keyFor(12, 3, scope: 'tab-b')),
+    );
+  });
+
   test('parked sale round-trips cart, customer and totals', () {
     final sale = QuickSalesParkedSale(
       id: 'sale-1',

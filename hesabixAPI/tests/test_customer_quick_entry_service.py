@@ -271,7 +271,7 @@ async def test_quick_resolve_requires_business_access(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_quick_resolve_allows_business_member(monkeypatch):
+async def test_quick_resolve_allows_authorized_quick_sales_user(monkeypatch):
     from adapters.api.v1 import customers as customers_api
     from adapters.api.v1.customers import (
         CustomerQuickResolveRequest,
@@ -283,6 +283,11 @@ async def test_quick_resolve_allows_business_member(monkeypatch):
     user.id = 1
     ctx = AuthContext(user=user, api_key_id=1, db=Mock())
     ctx.can_access_business = Mock(return_value=True)
+    monkeypatch.setattr(
+        customers_api,
+        "has_business_permission_for_business",
+        lambda *_args, **_kwargs: True,
+    )
 
     person = _person(7, "علی رضایی", mobile="09121234567")
     monkeypatch.setattr(
@@ -309,3 +314,37 @@ async def test_quick_resolve_allows_business_member(monkeypatch):
     assert len(response.customers) == 1
     assert response.customers[0].id == 7
     ctx.can_access_business.assert_called_once_with(15)
+
+
+@pytest.mark.asyncio
+async def test_quick_resolve_rejects_member_without_customer_permission(
+    monkeypatch,
+):
+    from adapters.api.v1 import customers as customers_api
+    from adapters.api.v1.customers import (
+        CustomerQuickResolveRequest,
+        quick_resolve_customer,
+    )
+
+    user = Mock()
+    user.id = 1
+    ctx = AuthContext(user=user, api_key_id=1, db=Mock())
+    ctx.can_access_business = Mock(return_value=True)
+    monkeypatch.setattr(
+        customers_api,
+        "has_business_permission_for_business",
+        lambda *_args, **_kwargs: False,
+    )
+
+    with pytest.raises(ApiError) as exc:
+        await quick_resolve_customer(
+            request=Mock(),
+            payload=CustomerQuickResolveRequest(
+                business_id=15,
+                alias_name="علی رضایی",
+            ),
+            ctx=ctx,
+            db=Mock(),
+        )
+
+    assert exc.value.status_code == 403
