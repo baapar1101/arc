@@ -1,0 +1,48 @@
+{
+  "apps": "./.app.json",
+  "author": {
+    "name": "TFS company LTD",
+    "email": "support@hesabix.ir",
+    "url": "https://hesabix.ir/"
+  },
+  "description": "Connect ChatGPT to Hesabix accounting and business tools for reporting and authorized bookkeeping operations.",
+  "interface": {
+    "capabilities": [
+      "Read accounting and business data",
+      "Prepare reports and summaries",
+      "Create or update records when authorized"
+    ],
+    "category": "Productivity",
+    "defaultPrompt": [
+      "Summarize this month's sales, expenses, and outstanding balances.",
+      "Find overdue receivables and summarize the largest customer balances.",
+      "Create a sales invoice for [customer] with [items] and [amounts]."
+    ],
+    "developerName": "TFS company LTD",
+    "displayName": "Hesabix",
+    "longDescription": "Connect ChatGPT to your Hesabix accounting workspace. Review financial and business records, prepare reports, and carry out supported bookkeeping, sales, and other business operations with Hesabix tools. The available tools are limited to the connected business and your Hesabix role. Reading is available by default; creating or changing records requires a separately authorized write connection. Review generated reports and proposed changes before relying on them. For support, email support@hesabix.ir.",
+    "shortDescription": "Accounting, reports & actions",
+    "websiteURL": "https://hesabix.ir/",
+    "supportURL": "https://hesabix.ir/contact/",
+    "privacyPolicyURL": "https://hesabix.ir/privacy/",
+    "termsOfServiceURL": "https://hesabix.ir/terms/",
+    "brandColor": "#001870",
+    "brandColorDark": "#8CB4FF",
+    "logo": "./assets/hesabix-mark.png",
+    "composerIcon": "./assets/hesabix-mark.png"
+  },
+  "name": "dev-6ad2078c85fc8191b8db6c2c618a5d9c",
+  "version": "1.0.0",
+  "extensions": {
+    "com.openai": {
+      "publication": {
+        "translations": {
+          "fa": {
+            "subtitle": "حسابداری، گزارش و عملیات مجاز",
+            "description": "ChatGPT را به فضای حسابداری حسابیکس وصل کنید. گزارش‌های مالی تهیه کنید، سوابق کسب‌وکار را بررسی کنید و عملیات پشتیبانی‌شدهٔ حسابداری و فروش را با ابزارهای حسابیکس انجام دهید. ابزارهای در دسترس به کسب‌وکار متصل‌شده و نقش شما در حسابیکس محدود هستند. دسترسی خواندن به‌صورت پیش‌فرض فعال است؛ ایجاد یا تغییر سوابق به اتصال دارای مجوز نوشتن جداگانه نیاز دارد. برای پشتیبانی به support@hesabix.ir ایمیل بزنید."
+          }
+        }
+      }
+    }
+  }
+}
