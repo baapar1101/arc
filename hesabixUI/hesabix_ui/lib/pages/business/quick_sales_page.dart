@@ -24,6 +24,8 @@ import '../../utils/number_normalizer.dart' as number_utils;
 import '../../utils/number_formatters.dart';
 import '../../utils/product_search_overlay_policy.dart';
 import '../../utils/invoice_global_discount_calculator.dart';
+import '../../utils/quick_sales_customer_balance.dart';
+import '../../utils/quick_sales_stock_correction.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/business_api_service.dart';
 import '../../services/currency_service.dart';
@@ -156,6 +158,12 @@ class _QuickSalesPageState extends State<QuickSalesPage>
 
   // مشتری
   Customer? _selectedCustomer;
+  num? _customerBalance;
+  String? _customerBalanceStatus;
+  bool _customerBalanceLoading = false;
+  String? _customerBalanceError;
+  bool _applyCustomerBalance = false;
+  int _customerBalanceRequestGeneration = 0;
 
   // پرداخت
   List<InvoiceTransaction> _payments = [];
@@ -529,6 +537,8 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         _parkedHydrated = true;
       });
 
+      unawaited(_refreshCustomerBalance(preserveApply: _applyCustomerBalance));
+
       unawaited(_loadShareGatewaysAndDefaults());
       unawaited(_loadBusinessMetadata());
 
@@ -646,6 +656,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       cartItems: _cartItems.map(QuickSalesParkedSale.cloneLine).toList(),
       payments: List<InvoiceTransaction>.from(_payments),
       cashFollowsTotal: _cashFollowsTotal,
+      applyCustomerBalance: _applyCustomerBalance,
       cashRegisterId: _selectedCashRegisterId,
       warehouseId: _defaultWarehouseId,
       documentDate: _documentDate,
@@ -678,6 +689,11 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     _payments = List<InvoiceTransaction>.from(sale.payments);
     _changeResolution = sale.changeResolution;
     _cashFollowsTotal = sale.cashFollowsTotal;
+    _applyCustomerBalance = sale.applyCustomerBalance;
+    _customerBalance = null;
+    _customerBalanceStatus = null;
+    _customerBalanceError = null;
+    _customerBalanceLoading = false;
     _shareRemainingEnabled = false;
     _checkoutDiscountExpanded = false;
     _selectedCashRegisterId =
@@ -706,6 +722,11 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     _payments = [];
     _changeResolution = null;
     _cashFollowsTotal = false;
+    _applyCustomerBalance = false;
+    _customerBalance = null;
+    _customerBalanceStatus = null;
+    _customerBalanceError = null;
+    _customerBalanceLoading = false;
     _shareRemainingEnabled = false;
     _checkoutDiscountExpanded = false;
     _selectedCashRegisterId = _settingsDefaultCashRegisterId;
@@ -757,6 +778,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     if (_showInventory && _cartItems.isNotEmpty) {
       _refreshAllStocks();
     }
+    unawaited(_refreshCustomerBalance(preserveApply: _applyCustomerBalance));
   }
 
   void _startNewSale() {
@@ -1057,8 +1079,102 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     });
   }
 
+  void _onCustomerChanged(Customer? customer) {
+    setState(() {
+      _selectedCustomer = customer ?? _anonymousCustomer;
+      _applyCustomerBalance = false;
+      _customerBalance = null;
+      _customerBalanceStatus = null;
+      _customerBalanceError = null;
+      _changeResolution = null;
+      _syncShareChannelDefaults();
+    });
+    unawaited(_refreshCustomerBalance());
+  }
+
+  void _onDocumentDateChanged(DateTime value) {
+    setState(() {
+      _documentDate = value;
+      _applyCustomerBalance = false;
+      _changeResolution = null;
+    });
+    unawaited(_refreshCustomerBalance());
+  }
+
+  Future<void> _refreshCustomerBalance({bool preserveApply = false}) async {
+    final customer = _selectedCustomer;
+    final currencyId = _defaultCurrencyId;
+    final requestGeneration = ++_customerBalanceRequestGeneration;
+    if (customer == null || currencyId == null || _isAnonymousSelected) {
+      if (!mounted) return;
+      setState(() {
+        _customerBalance = null;
+        _customerBalanceStatus = null;
+        _customerBalanceError = null;
+        _customerBalanceLoading = false;
+        _applyCustomerBalance = false;
+      });
+      return;
+    }
+
+    final requestedPersonId = customer.id;
+    final requestedDate = _documentDate;
+    final keepApply = preserveApply && _applyCustomerBalance;
+    setState(() {
+      _customerBalanceLoading = true;
+      _customerBalanceError = null;
+      if (!preserveApply) _applyCustomerBalance = false;
+    });
+    try {
+      final result = await _quickSalesService.getCustomerBalance(
+        businessId: widget.businessId,
+        personId: requestedPersonId,
+        currencyId: currencyId,
+        asOfDate: requestedDate,
+      );
+      if (!mounted || requestGeneration != _customerBalanceRequestGeneration) {
+        return;
+      }
+      if (_selectedCustomer?.id != requestedPersonId ||
+          _defaultCurrencyId != currencyId ||
+          _documentDate.year != requestedDate.year ||
+          _documentDate.month != requestedDate.month ||
+          _documentDate.day != requestedDate.day) {
+        return;
+      }
+      final balance = (result['balance'] as num?) ?? 0;
+      setState(() {
+        _customerBalance = balance;
+        _customerBalanceStatus =
+            result['status']?.toString() ??
+            quickSalesCustomerBalanceStatus(balance);
+        _customerBalanceLoading = false;
+        _customerBalanceError = null;
+        _applyCustomerBalance = keepApply && balance.abs() > _paymentEpsilon;
+        _changeResolution = null;
+      });
+    } catch (error) {
+      if (!mounted || requestGeneration != _customerBalanceRequestGeneration) {
+        return;
+      }
+      setState(() {
+        _customerBalance = null;
+        _customerBalanceStatus = null;
+        _customerBalanceLoading = false;
+        _customerBalanceError = ErrorExtractor.forContext(error, context);
+        _applyCustomerBalance = false;
+      });
+    }
+  }
+
   num get _paidAmount =>
       _payments.fold<num>(0, (sum, p) => sum + p.settlesAgainstInvoice);
+
+  num get _paymentTargetAmount => quickSalesPaymentTarget(
+    invoiceTotal: _totalAmount,
+    customerBalance: _customerBalance ?? 0,
+    applyBalance: _applyCustomerBalance,
+  );
 
   num get _paymentEpsilon {
     if (_invoiceCurrencyDecimalPlaces <= 0) return 0.5;
@@ -1070,17 +1186,17 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   }
 
   num get _remainingAmount {
-    if (!_autoCreatePaymentDocument) return _totalAmount;
-    final raw = _totalAmount - _paidAmount;
+    if (!_autoCreatePaymentDocument) return _paymentTargetAmount;
+    final raw = _paymentTargetAmount - _paidAmount;
     if (raw.abs() <= _paymentEpsilon) return 0;
     return raw;
   }
 
   bool get _isOverpaid =>
       _autoCreatePaymentDocument &&
-      _paidAmount > _totalAmount + _paymentEpsilon;
+      _paidAmount > _paymentTargetAmount + _paymentEpsilon;
 
-  num get _changeAmount => _isOverpaid ? _paidAmount - _totalAmount : 0;
+  num get _changeAmount => _isOverpaid ? _paidAmount - _paymentTargetAmount : 0;
 
   QuickSalesChangeResolution? get _validChangeResolution {
     final value = _changeResolution;
@@ -1409,12 +1525,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       );
       await _addToCart(fullProduct, skipHydrate: true);
       await _saveRecentProduct(fullProduct);
-      if (mounted) {
-        SnackBarHelper.show(
-          context,
-          message: '${product['name'] ?? 'محصول'} به سبد اضافه شد',
-        );
-      }
     } catch (e) {
       if (mounted) {
         SnackBarHelper.show(
@@ -1515,12 +1625,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
                   _lastFailedSearchQuery = null;
                 });
               }
-              if (mounted) {
-                SnackBarHelper.show(
-                  context,
-                  message: '${product['name'] ?? 'محصول'} به سبد اضافه شد',
-                );
-              }
               return;
             }
           }
@@ -1563,13 +1667,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             setState(() {
               _lastFailedSearchQuery = null;
             });
-          }
-          // فیدبک بصری
-          if (mounted) {
-            SnackBarHelper.show(
-              context,
-              message: '${product['name'] ?? 'محصول'} به سبد اضافه شد',
-            );
           }
           return;
         }
@@ -1624,13 +1721,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
               _lastFailedSearchQuery = null;
             });
           }
-          // فیدبک بصری
-          if (mounted) {
-            SnackBarHelper.show(
-              context,
-              message: '${selected['name'] ?? 'محصول'} به سبد اضافه شد',
-            );
-          }
         } else {
           // اگر دیالوگ انتخاب بسته شد بدون انتخاب، جستجوی ناموفق را ثبت کن
           if (mounted) {
@@ -1652,13 +1742,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         setState(() {
           _lastFailedSearchQuery = null;
         });
-      }
-      // فیدبک بصری
-      if (mounted) {
-        SnackBarHelper.show(
-          context,
-          message: '${product['name'] ?? 'محصول'} به سبد اضافه شد',
-        );
       }
     } catch (e) {
       if (mounted) {
@@ -1733,12 +1816,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             });
             _barcodeController.clear();
             _barcodeFocus.requestFocus();
-
-            SnackBarHelper.show(
-              context,
-              message:
-                  '${product['name'] ?? 'محصول'} با موفقیت اضافه شد و به سبد خرید اضافه گردید',
-            );
           } catch (e) {
             SnackBarHelper.show(
               context,
@@ -2472,7 +2549,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     return result;
   }
 
-  Future<bool> _correctShortagesBeforeSale(
+  Future<String?> _correctShortagesBeforeSale(
     List<Map<String, dynamic>> shortages,
   ) async {
     final confirmed = await showDialog<bool>(
@@ -2480,7 +2557,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       builder: (dialogContext) => AlertDialog(
         title: const Text('اصلاح موجودی'),
         content: const Text(
-          'این گزینه «کالای درآمدشده» را با تاریخ امروز ثبت می‌کند. فقط وقتی ادامه دهید که کالا واقعاً در انبار موجود است و خرید، انتقال یا موجودی اول دوره‌ای از قلم نیفتاده باشد.',
+          'این گزینه «کالای درآمدشده» را با همان تاریخ فاکتور ثبت می‌کند. فقط وقتی ادامه دهید که کالا واقعاً در انبار موجود است و خرید، انتقال یا موجودی اول دوره‌ای از قلم نیفتاده باشد.',
         ),
         actions: [
           TextButton(
@@ -2494,12 +2571,19 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         ],
       ),
     );
-    if (confirmed != true) return false;
-    final today = DateTime.now().toIso8601String().split('T').first;
+    if (confirmed != true) return null;
+    final documentDate = _documentDate.toIso8601String().split('T').first;
+    final requestToken = quickSalesStockCorrectionToken(
+      businessId: widget.businessId,
+      saleId: _activeSaleId,
+      documentDate: _documentDate,
+      shortages: shortages,
+    );
     await _quickSalesService.createStockCorrection(
       businessId: widget.businessId,
       payload: {
-        'document_date': today,
+        'document_date': documentDate,
+        'request_token': requestToken,
         'confirm_unexplained_physical_surplus': true,
         'description': 'اصلاح کسری کشف‌شده هنگام فروش سریع',
         'lines': shortages
@@ -2513,13 +2597,14 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             .toList(),
       },
     );
-    return true;
+    return requestToken;
   }
 
   Future<void> _saveInvoice({
     bool print = false,
     Map<String, dynamic>? stockOverride,
     bool debtConfirmed = false,
+    String? appliedStockCorrectionToken,
   }) async {
     // اعتبارسنجی سبد خرید
     if (_cartItems.isEmpty) {
@@ -2559,14 +2644,14 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     }
     if (_autoCreatePaymentDocument &&
         _payments.isEmpty &&
-        _totalAmount > 0 &&
+        _paymentTargetAmount > 0 &&
         !debtConfirmed) {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
           title: const Text('ثبت بدون دریافت'),
-          content: const Text(
-            'هیچ پرداختی ثبت نشده است و کل مبلغ فاکتور به حساب مشتری بدهکار می‌شود. ادامه می‌دهید؟',
+          content: Text(
+            'هیچ پرداختی ثبت نشده است و مبلغ ${_formatNumber(_paymentTargetAmount)} $_paymentCurrencyUnit در حساب مشتری تسویه‌نشده می‌ماند. ادامه می‌دهید؟',
           ),
           actions: [
             TextButton(
@@ -2639,9 +2724,9 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     final shouldShare = _shouldShareAfterSave;
     final savedShareAmount = _remainingAmount > 0
         ? _remainingAmount
-        : _totalAmount;
+        : _paymentTargetAmount;
     Map<String, dynamic>? retryOverride;
-    var retryAfterCorrection = false;
+    String? retryCorrectionToken;
     var parkAfterFailure = false;
 
     try {
@@ -2724,6 +2809,14 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           'tax': _totalTax,
           'net': _totalAmount,
         },
+        if (_applyCustomerBalance && _customerBalance != null)
+          'quick_sale_customer_balance': {
+            'apply': true,
+            'person_id': personId,
+            'currency_id': _defaultCurrencyId,
+            'as_of_date': _documentDate.toIso8601String().split('T')[0],
+            'balance_before': _customerBalance,
+          },
         if (_isOverpaid) 'quick_sale_change': changeResolution!.toJson(),
       };
 
@@ -2767,6 +2860,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         _payments = [];
         _changeResolution = null;
         _cashFollowsTotal = false;
+        _applyCustomerBalance = false;
         _shareRemainingEnabled = false;
         _checkoutDiscountExpanded = false;
         _productStocks.clear();
@@ -2778,6 +2872,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       });
 
       _barcodeFocus.requestFocus();
+      unawaited(_refreshCustomerBalance());
 
       final successMsg = StringBuffer('فاکتور با موفقیت ثبت شد');
       if (invoiceCode != null) successMsg.write(' ($invoiceCode)');
@@ -2804,7 +2899,14 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     } catch (e) {
       if (mounted) {
         final shortages = _stockShortagesFromError(e);
-        if (shortages.isNotEmpty && stockOverride == null) {
+        if (shortages.isNotEmpty && appliedStockCorrectionToken != null) {
+          SnackBarHelper.show(
+            context,
+            message:
+                'اصلاح موجودی ثبت شد، اما فاکتور هنوز به علت کسری موجودی ثبت نشد. تاریخ فاکتور و گردش انبار را بررسی کنید؛ با تکرار ثبت، سند اصلاح جدید ساخته نمی‌شود.',
+            isError: true,
+          );
+        } else if (shortages.isNotEmpty && stockOverride == null) {
           final action = await _showStockShortageDialog(shortages);
           if (!mounted) return;
           if (action == _StockShortageAction.override) {
@@ -2812,7 +2914,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             if (!mounted) return;
           } else if (action == _StockShortageAction.correct) {
             try {
-              retryAfterCorrection = await _correctShortagesBeforeSale(
+              retryCorrectionToken = await _correctShortagesBeforeSale(
                 shortages,
               );
             } catch (correctionError) {
@@ -2836,6 +2938,12 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           String errorMessage = 'خطا در ثبت فاکتور';
           if (e.toString().contains('INSUFFICIENT_STOCK')) {
             errorMessage = 'موجودی کافی برای برخی محصولات وجود ندارد';
+          } else if (e.toString().contains(
+            'QUICK_SALE_CUSTOMER_BALANCE_CHANGED',
+          )) {
+            errorMessage =
+                'مانده حساب مشتری تغییر کرده است؛ مانده جدید را بررسی کنید';
+            unawaited(_refreshCustomerBalance());
           } else if (e.toString().contains('CURRENCY')) {
             errorMessage = 'خطا در تنظیمات ارز';
           } else {
@@ -2855,11 +2963,12 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     if (!mounted) return;
     if (parkAfterFailure) {
       _startNewSale();
-    } else if (retryAfterCorrection || retryOverride != null) {
+    } else if (retryCorrectionToken != null || retryOverride != null) {
       await _saveInvoice(
         print: print,
         stockOverride: retryOverride,
         debtConfirmed: debtConfirmed,
+        appliedStockCorrectionToken: retryCorrectionToken,
       );
     }
   }
@@ -3406,10 +3515,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     setState(() {
       _lastFailedSearchQuery = null;
     });
-    SnackBarHelper.show(
-      context,
-      message: '${product['name'] ?? 'محصول'} به سبد اضافه شد',
-    );
   }
 
   bool _handleKeyEvent(KeyEvent event) {
@@ -3518,6 +3623,138 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     return false;
   }
 
+  Widget _buildCustomerSelector({bool dense = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        CustomerComboboxWidget(
+          selectedCustomer: _selectedCustomer,
+          onCustomerChanged: _onCustomerChanged,
+          businessId: widget.businessId,
+          authStore: widget.authStore,
+          isRequired: false,
+          enableQuickCreateOnSubmit: true,
+          dense: dense,
+          label: 'مشتری',
+          hintText: 'مشتری ناشناس',
+        ),
+        if (!_isAnonymousSelected) ...[
+          const SizedBox(height: 6),
+          _buildCustomerBalancePanel(),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildCustomerBalancePanel() {
+    final cs = Theme.of(context).colorScheme;
+    if (_customerBalanceLoading) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 8),
+            Expanded(child: Text('در حال دریافت مانده حساب…')),
+          ],
+        ),
+      );
+    }
+    if (_customerBalanceError != null) {
+      return Container(
+        padding: const EdgeInsetsDirectional.only(start: 10),
+        decoration: BoxDecoration(
+          color: cs.errorContainer,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                'مانده حساب دریافت نشد',
+                style: TextStyle(color: cs.onErrorContainer),
+              ),
+            ),
+            IconButton(
+              tooltip: 'تلاش دوباره',
+              onPressed: () => unawaited(_refreshCustomerBalance()),
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
+        ),
+      );
+    }
+    final balance = _customerBalance;
+    if (balance == null) return const SizedBox.shrink();
+    final isSettled = balance.abs() <= _paymentEpsilon;
+    final status =
+        _customerBalanceStatus ?? quickSalesCustomerBalanceStatus(balance);
+    final statusColor = isSettled
+        ? cs.onSurfaceVariant
+        : balance < 0
+        ? cs.error
+        : Colors.green.shade700;
+    final remainingCredit = balance > _totalAmount ? balance - _totalAmount : 0;
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: SwitchListTile.adaptive(
+        dense: true,
+        contentPadding: const EdgeInsetsDirectional.only(start: 10, end: 4),
+        secondary: Icon(
+          balance < 0
+              ? Icons.account_balance_wallet_outlined
+              : Icons.savings_outlined,
+          color: statusColor,
+        ),
+        title: Text.rich(
+          TextSpan(
+            text: 'مانده حساب: ',
+            children: [
+              TextSpan(
+                text: isSettled
+                    ? 'تسویه'
+                    : '${_formatNumber(balance.abs())} $_paymentCurrencyUnit — $status',
+                style: TextStyle(
+                  color: statusColor,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+        subtitle: Text(
+          _applyCustomerBalance
+              ? remainingCredit > _paymentEpsilon
+                    ? 'قابل تسویه: ${_formatNumber(_paymentTargetAmount)} $_paymentCurrencyUnit • اعتبار باقی‌مانده: ${_formatNumber(remainingCredit)}'
+                    : 'مبلغ قابل تسویه: ${_formatNumber(_paymentTargetAmount)} $_paymentCurrencyUnit'
+              : 'اعمال مانده در مبلغ قابل تسویه این فروش',
+        ),
+        value: _applyCustomerBalance,
+        onChanged: isSettled || _isSaving
+            ? null
+            : (value) {
+                setState(() {
+                  _applyCustomerBalance = value;
+                  _changeResolution = null;
+                  _shareRemainingEnabled = false;
+                });
+              },
+      ),
+    );
+  }
+
   /// تاریخ فاکتور (شمسی/میلادی طبق تنظیم کاربر) و شرح سند — چیدمان فشرده
   Widget _buildDocumentDateAndDescription({
     required bool isMobile,
@@ -3529,9 +3766,15 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       hintText: 'انتخاب تاریخ',
       calendarController: widget.calendarController,
       isDense: true,
+      contentPadding: const EdgeInsetsDirectional.only(
+        start: 12,
+        top: 14,
+        bottom: 12,
+        end: 12,
+      ),
       onChanged: (d) {
         if (d != null) {
-          setState(() => _documentDate = d);
+          _onDocumentDateChanged(d);
         }
       },
     );
@@ -3569,7 +3812,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            dateWidget,
+            Padding(padding: const EdgeInsets.only(top: 4), child: dateWidget),
             Theme(
               data: Theme.of(
                 context,
@@ -3922,23 +4165,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
                             ],
                           ),
                           SizedBox(height: isCompact ? 6 : 8),
-                          CustomerComboboxWidget(
-                            selectedCustomer: _selectedCustomer,
-                            onCustomerChanged: (customer) {
-                              setState(() {
-                                _selectedCustomer =
-                                    customer ?? _anonymousCustomer;
-                                _changeResolution = null;
-                                _syncShareChannelDefaults();
-                              });
-                            },
-                            businessId: widget.businessId,
-                            authStore: widget.authStore,
-                            isRequired: false,
-                            enableQuickCreateOnSubmit: true,
-                            label: 'مشتری',
-                            hintText: 'مشتری ناشناس',
-                          ),
+                          _buildCustomerSelector(),
                           SizedBox(height: isCompact ? 6 : 8),
                           _buildDocumentDateAndDescription(
                             isMobile: true,
@@ -4389,6 +4616,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
                           payments: _payments,
                           onChanged: _onPaymentsChanged,
                           invoiceTotal: _totalAmount,
+                          paymentTarget: _paymentTargetAmount,
                           changeResolution: _validChangeResolution,
                           onConfigureChange: _openChangeResolutionDialog,
                           defaultCashRegisterId: _selectedCashRegisterId,
@@ -4845,22 +5073,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CustomerComboboxWidget(
-            selectedCustomer: _selectedCustomer,
-            onCustomerChanged: (customer) {
-              setState(() {
-                _selectedCustomer = customer ?? _anonymousCustomer;
-                _changeResolution = null;
-                _syncShareChannelDefaults();
-              });
-            },
-            businessId: widget.businessId,
-            authStore: widget.authStore,
-            isRequired: false,
-            enableQuickCreateOnSubmit: true,
-            label: 'مشتری',
-            hintText: 'مشتری ناشناس',
-          ),
+          _buildCustomerSelector(),
           const SizedBox(height: 12),
           _buildDocumentDateAndDescription(isMobile: true, compact: isCompact),
         ],
@@ -5222,7 +5435,9 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             12,
             12,
             12,
-            _autoCreatePaymentDocument ? 232 : 8,
+            _autoCreatePaymentDocument
+                ? QuickSalesPaymentDock.desktopSummaryHeight + 8
+                : 8,
           ),
           child: _buildCheckoutScrollBody(
             cs,
@@ -5247,23 +5462,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (includeCustomer) ...[
-          CustomerComboboxWidget(
-            selectedCustomer: _selectedCustomer,
-            onCustomerChanged: (customer) {
-              setState(() {
-                _selectedCustomer = customer ?? _anonymousCustomer;
-                _changeResolution = null;
-                _syncShareChannelDefaults();
-              });
-            },
-            businessId: widget.businessId,
-            authStore: widget.authStore,
-            isRequired: false,
-            enableQuickCreateOnSubmit: true,
-            dense: true,
-            label: 'مشتری',
-            hintText: 'مشتری ناشناس',
-          ),
+          _buildCustomerSelector(dense: true),
           const SizedBox(height: 10),
         ],
         if (includeTotal) ...[
@@ -5588,7 +5787,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
               if (v == _cashFollowsTotal) return;
               setState(() => _cashFollowsTotal = v);
             },
-            invoiceTotal: _totalAmount,
+            invoiceTotal: _paymentTargetAmount,
             defaultCashRegisterId: _selectedCashRegisterId,
             enabled: !_isSaving,
             currencyId: _defaultCurrencyId,

@@ -20,6 +20,7 @@ class QuickSalesParkedSale {
   final List<InvoiceLineItem> cartItems;
   final List<InvoiceTransaction> payments;
   final bool cashFollowsTotal;
+  final bool applyCustomerBalance;
   final String? cashRegisterId;
   final int? warehouseId;
   final DateTime documentDate;
@@ -45,6 +46,7 @@ class QuickSalesParkedSale {
     this.cartItems = const [],
     this.payments = const [],
     this.cashFollowsTotal = true,
+    this.applyCustomerBalance = false,
     this.cashRegisterId,
     this.warehouseId,
     required this.documentDate,
@@ -92,6 +94,7 @@ class QuickSalesParkedSale {
     List<InvoiceLineItem>? cartItems,
     List<InvoiceTransaction>? payments,
     bool? cashFollowsTotal,
+    bool? applyCustomerBalance,
     String? cashRegisterId,
     int? warehouseId,
     DateTime? documentDate,
@@ -118,6 +121,7 @@ class QuickSalesParkedSale {
       cartItems: cartItems ?? this.cartItems,
       payments: payments ?? this.payments,
       cashFollowsTotal: cashFollowsTotal ?? this.cashFollowsTotal,
+      applyCustomerBalance: applyCustomerBalance ?? this.applyCustomerBalance,
       cashRegisterId: cashRegisterId ?? this.cashRegisterId,
       warehouseId: warehouseId ?? this.warehouseId,
       documentDate: documentDate ?? this.documentDate,
@@ -150,6 +154,7 @@ class QuickSalesParkedSale {
       'cart_items': cartItems.map(encodeLine).toList(),
       'payments': payments.map((p) => p.toJson()).toList(),
       'cash_follows_total': cashFollowsTotal,
+      'apply_customer_balance': applyCustomerBalance,
       'cash_register_id': cashRegisterId,
       'warehouse_id': warehouseId,
       'document_date': documentDate.toIso8601String(),
@@ -217,6 +222,7 @@ class QuickSalesParkedSale {
       payments: payments,
       cashFollowsTotal:
           json['cash_follows_total'] != false && (payments.length <= 1),
+      applyCustomerBalance: json['apply_customer_balance'] == true,
       cashRegisterId: json['cash_register_id']?.toString(),
       warehouseId: _asInt(json['warehouse_id']),
       documentDate:

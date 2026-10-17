@@ -205,7 +205,7 @@ class BusinessSettingsCategorizationService {
 
   static SettingsCategory _salesDocuments(BusinessSettingsContext ctx) {
     final items = <SettingsItem>[
-      if (ctx.canManageBusiness)
+      if (ctx.canManageBusiness || ctx.canManageDefaultPaymentShortcuts)
         _item(
           id: 'quick_sales',
           title: 'businessSettingsQuickSales',

@@ -1,17 +1,13 @@
+"""قفل‌های تراکنشی نام‌دار برای سری‌کردن عملیات همزمان حساس."""
+
 from __future__ import annotations
 
-"""
-قفل‌های سطح دیتابیس برای جلوگیری از نشت سهمیهٔ ارسال OTP/SMS ناشی از race همزمان.
-"""
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 
-def acquire_sms_rate_lock(db: Session, key: str) -> None:
-	"""
-	قفل تراکنشی (PostgreSQL: pg_advisory_xact_lock) تا پایان تراکنش جاری.
-	مقدار key باید برای هر شناسهٔ ارسال (موبایل، ایمیل، user_id) یکتا باشد.
-	"""
+def acquire_transaction_lock(db: Session, key: str) -> None:
+	"""قفل تراکنشی نام‌دار را تا پایان تراکنش جاری نگه می‌دارد."""
 	bind = db.get_bind()
 	if bind.dialect.name != "postgresql":
 		return
@@ -20,3 +16,8 @@ def acquire_sms_rate_lock(db: Session, key: str) -> None:
 		text("SELECT pg_advisory_xact_lock((hashtext(CAST(:k AS text)))::bigint)"),
 		{"k": key[:4000]},
 	)
+
+
+def acquire_sms_rate_lock(db: Session, key: str) -> None:
+	"""سازگاری با فراخوان‌های قدیمی محدودکنندهٔ پیامک."""
+	acquire_transaction_lock(db, key)

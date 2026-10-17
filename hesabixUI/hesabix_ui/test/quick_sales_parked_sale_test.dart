@@ -30,6 +30,7 @@ void main() {
       documentDescription: 'فروش صندوق',
       globalDiscountType: 'percent',
       globalDiscountValue: '5',
+      applyCustomerBalance: true,
       itemCount: 1,
       totalAmount: 33000,
     );
@@ -44,6 +45,7 @@ void main() {
     expect(parsed.cartItems.first.warehouseId, 3);
     expect(parsed.cartItems.first.extraInfo?['unit_price_source'], 'base');
     expect(parsed.globalDiscountValue, '5');
+    expect(parsed.applyCustomerBalance, isTrue);
     expect(parsed.totalAmount, 33000);
     expect(parsed.isBlank(anonymousCustomerId: 1), isFalse);
   });

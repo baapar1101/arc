@@ -36,6 +36,24 @@ class QuickSalesService {
     return Map<String, dynamic>.from(res.data?['data'] ?? const {});
   }
 
+  Future<Map<String, dynamic>> getCustomerBalance({
+    required int businessId,
+    required int personId,
+    required int currencyId,
+    required DateTime asOfDate,
+  }) async {
+    final date = asOfDate.toIso8601String().split('T').first;
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/quick-sales/customer-balance',
+      query: {
+        'person_id': personId,
+        'currency_id': currencyId,
+        'as_of_date': date,
+      },
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
   Future<List<QuickSalesPaymentButtonModel>> listPaymentButtons({
     required int businessId,
   }) async {
@@ -79,6 +97,64 @@ class QuickSalesService {
     return QuickSalesPaymentButtonModel.fromJson(
       Map<String, dynamic>.from(res.data?['data'] ?? const {}),
     );
+  }
+
+  Future<Map<String, dynamic>> updatePaymentButtonShortcut({
+    required int businessId,
+    required Object buttonId,
+    required String platform,
+    required String mode,
+    required String? shortcut,
+  }) async {
+    final buttonKey = Uri.encodeComponent(buttonId.toString());
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/quick-sales/payment-buttons/$buttonKey/shortcut',
+      data: {'platform': platform, 'mode': mode, 'shortcut': shortcut},
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
+  Future<Map<String, dynamic>> updatePaymentButtonShortcuts({
+    required int businessId,
+    required Object buttonId,
+    required Map<String, Map<String, dynamic>> platforms,
+  }) async {
+    final buttonKey = Uri.encodeComponent(buttonId.toString());
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/quick-sales/payment-buttons/$buttonKey/shortcut',
+      data: {'platforms': platforms},
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
+  Future<List<Map<String, dynamic>>> listDefaultPaymentShortcuts({
+    required int businessId,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/quick-sales/payment-buttons/default-shortcuts',
+    );
+    final raw = res.data?['data'];
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((row) => Map<String, dynamic>.from(row))
+        .toList();
+  }
+
+  Future<List<Map<String, dynamic>>> updateDefaultPaymentShortcuts({
+    required int businessId,
+    required List<Map<String, dynamic>> shortcuts,
+  }) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/quick-sales/payment-buttons/default-shortcuts',
+      data: {'shortcuts': shortcuts},
+    );
+    final raw = res.data?['data'];
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((row) => Map<String, dynamic>.from(row))
+        .toList();
   }
 
   Future<void> deletePaymentButton({
