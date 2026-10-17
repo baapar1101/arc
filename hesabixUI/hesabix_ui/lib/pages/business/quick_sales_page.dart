@@ -91,6 +91,32 @@ enum _QuickSalesSaveAction { none, save, saveAndPrint }
 
 enum _StockShortageAction { cancel, park, correct, override }
 
+class _QuickSalesShareSnapshot {
+  final bool onlinePaymentEnabled;
+  final bool hasGateways;
+  final int? gatewayId;
+  final int expiryHours;
+  final bool sendSms;
+  final bool sendEmail;
+  final bool useNativeShare;
+  final String customerName;
+  final String? customerMobile;
+  final String? customerEmail;
+
+  const _QuickSalesShareSnapshot({
+    required this.onlinePaymentEnabled,
+    required this.hasGateways,
+    required this.gatewayId,
+    required this.expiryHours,
+    required this.sendSms,
+    required this.sendEmail,
+    required this.useNativeShare,
+    required this.customerName,
+    required this.customerMobile,
+    required this.customerEmail,
+  });
+}
+
 class QuickSalesPage extends StatefulWidget {
   final int businessId;
   final AuthStore authStore;
@@ -808,6 +834,31 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     _afterSaleSwitchUi();
   }
 
+  void _openBlankSaleAfterSuccessfulSave() {
+    final completedSaleId = _activeSaleId;
+    final newSaleId = QuickSalesParkedSale.newId();
+    setState(() {
+      _activeSaleId = newSaleId;
+      _applyBlankSaleState();
+      _saveAction = _QuickSalesSaveAction.none;
+
+      final nextBundle =
+          QuickSalesParkedSalesBundle(
+            activeId: completedSaleId,
+            sales: List<QuickSalesParkedSale>.from(_sales),
+          ).afterCompletedActiveSale(
+            blankSale: _snapshotActiveSale(),
+            anonymousCustomerId: _anonymousCustomer?.id,
+          );
+      _sales
+        ..clear()
+        ..addAll(nextBundle.sales);
+      _activeSaleId = nextBundle.activeId;
+    });
+    unawaited(_persistParkedSalesNow());
+    _afterSaleSwitchUi();
+  }
+
   void _selectParkedSale(String id) {
     if (_isSaving || id == _activeSaleId) return;
     QuickSalesParkedSale? target;
@@ -1346,6 +1397,8 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     required String? invoiceCode,
     required num totalAmount,
     required String channel,
+    required String customerName,
+    required String? customerMobile,
   }) async {
     final api = ApiClient();
     final response = await api.post<Map<String, dynamic>>(
@@ -1355,15 +1408,15 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         'event_type': 'invoice_share_link',
         'context': {
           'share_link': shareLink,
-          'customer_name': _selectedCustomer?.name ?? '',
-          'customer_mobile': _selectedCustomerPhone ?? '',
+          'customer_name': customerName,
+          'customer_mobile': customerMobile ?? '',
           'invoice_number': invoiceCode ?? '',
           'invoice_code': invoiceCode ?? '',
           'final_amount': totalAmount.toDouble(),
         },
         'channel': channel,
-        if (channel == 'sms' && _selectedCustomerPhone != null)
-          'recipient_mobile': _selectedCustomerPhone,
+        if (channel == 'sms' && customerMobile != null)
+          'recipient_mobile': customerMobile,
       },
     );
     return response.data;
@@ -1374,6 +1427,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     required String? invoiceCode,
     required int personId,
     required num totalAmount,
+    required _QuickSalesShareSnapshot shareSnapshot,
   }) async {
     final t = AppLocalizations.of(context);
     final notes = <String>[];
@@ -1383,12 +1437,12 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       return notes;
     }
 
-    if (_shareOnlinePaymentEnabled) {
-      if (_shareGateways.isEmpty) {
+    if (shareSnapshot.onlinePaymentEnabled) {
+      if (!shareSnapshot.hasGateways) {
         notes.add(t.quickSalesShareNoGateway);
         return notes;
       }
-      if (_shareGatewayId == null) {
+      if (shareSnapshot.gatewayId == null) {
         notes.add(t.quickSalesShareGatewayRequired);
         return notes;
       }
@@ -1398,10 +1452,10 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       final link = await _invoiceService.createInvoiceShareLink(
         businessId: widget.businessId,
         invoiceId: invoiceId,
-        expiresInHours: _shareExpiryHours,
-        onlinePaymentEnabled: _shareOnlinePaymentEnabled,
-        onlinePaymentGatewayId: _shareOnlinePaymentEnabled
-            ? _shareGatewayId
+        expiresInHours: shareSnapshot.expiryHours,
+        onlinePaymentEnabled: shareSnapshot.onlinePaymentEnabled,
+        onlinePaymentGatewayId: shareSnapshot.onlinePaymentEnabled
+            ? shareSnapshot.gatewayId
             : null,
       );
       final shortUrl = link['short_url']?.toString();
@@ -1416,8 +1470,8 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         'send',
       );
 
-      if (_shareSendSms) {
-        if (_selectedCustomerPhone == null) {
+      if (shareSnapshot.sendSms) {
+        if (shareSnapshot.customerMobile == null) {
           notes.add(t.quickSalesShareSmsSkippedNoPhone);
         } else if (!canNotify) {
           notes.add(t.quickSalesShareNoNotificationPermission);
@@ -1429,6 +1483,8 @@ class _QuickSalesPageState extends State<QuickSalesPage>
               invoiceCode: invoiceCode,
               totalAmount: totalAmount,
               channel: 'sms',
+              customerName: shareSnapshot.customerName,
+              customerMobile: shareSnapshot.customerMobile,
             );
             if (!mounted) return notes;
             final result = response?['data'] as Map<String, dynamic>?;
@@ -1453,8 +1509,8 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         }
       }
 
-      if (_shareSendEmail) {
-        if (_selectedCustomerEmail == null) {
+      if (shareSnapshot.sendEmail) {
+        if (shareSnapshot.customerEmail == null) {
           notes.add(t.quickSalesShareEmailSkippedNoEmail);
         } else if (!canNotify) {
           notes.add(t.quickSalesShareNoNotificationPermission);
@@ -1466,6 +1522,8 @@ class _QuickSalesPageState extends State<QuickSalesPage>
               invoiceCode: invoiceCode,
               totalAmount: totalAmount,
               channel: 'email',
+              customerName: shareSnapshot.customerName,
+              customerMobile: shareSnapshot.customerMobile,
             );
             if (!mounted) return notes;
             final result = response?['data'] as Map<String, dynamic>?;
@@ -1490,7 +1548,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         }
       }
 
-      if (_shareViaNativeShare) {
+      if (shareSnapshot.useNativeShare) {
         await Share.share(shortUrl);
       }
 
@@ -2722,6 +2780,18 @@ class _QuickSalesPageState extends State<QuickSalesPage>
 
     final shouldPrint = print || _autoPrint;
     final shouldShare = _shouldShareAfterSave;
+    final shareSnapshot = _QuickSalesShareSnapshot(
+      onlinePaymentEnabled: _shareOnlinePaymentEnabled,
+      hasGateways: _shareGateways.isNotEmpty,
+      gatewayId: _shareGatewayId,
+      expiryHours: _shareExpiryHours,
+      sendSms: _shareSendSms,
+      sendEmail: _shareSendEmail,
+      useNativeShare: _shareViaNativeShare,
+      customerName: _selectedCustomer?.name ?? '',
+      customerMobile: _selectedCustomerPhone,
+      customerEmail: _selectedCustomerEmail,
+    );
     final savedShareAmount = _remainingAmount > 0
         ? _remainingAmount
         : _paymentTargetAmount;
@@ -2855,24 +2925,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       final invoiceId = (result['id'] as num?)?.toInt();
       final invoiceCode = result['code']?.toString();
 
-      setState(() {
-        _cartItems.clear();
-        _payments = [];
-        _changeResolution = null;
-        _cashFollowsTotal = false;
-        _applyCustomerBalance = false;
-        _shareRemainingEnabled = false;
-        _checkoutDiscountExpanded = false;
-        _productStocks.clear();
-        _pendingStockProductIds.clear();
-        _documentDate = DateTime.now();
-        _documentDescriptionController.clear();
-        _globalDiscountValueController.clear();
-        _saveAction = _QuickSalesSaveAction.none;
-      });
-
-      _barcodeFocus.requestFocus();
-      unawaited(_refreshCustomerBalance());
+      _openBlankSaleAfterSuccessfulSave();
 
       final successMsg = StringBuffer('فاکتور با موفقیت ثبت شد');
       if (invoiceCode != null) successMsg.write(' ($invoiceCode)');
@@ -2887,6 +2940,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             totalAmount: savedShareAmount,
             shouldPrint: shouldPrint,
             shouldShare: shouldShare,
+            shareSnapshot: shareSnapshot,
           ),
         );
       } else if (shouldPrint && invoiceId == null) {
@@ -2980,6 +3034,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     required num totalAmount,
     required bool shouldPrint,
     required bool shouldShare,
+    required _QuickSalesShareSnapshot shareSnapshot,
   }) async {
     final followUpNotes = <String>[];
 
@@ -3000,6 +3055,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           invoiceCode: invoiceCode,
           personId: personId,
           totalAmount: totalAmount,
+          shareSnapshot: shareSnapshot,
         );
         followUpNotes.addAll(shareNotes);
       } catch (e) {

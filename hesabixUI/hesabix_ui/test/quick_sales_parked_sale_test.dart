@@ -79,6 +79,61 @@ void main() {
     expect(parsed?.sales, hasLength(1));
   });
 
+  test(
+    'completed active sale is replaced by a blank default-customer sale',
+    () {
+      final now = DateTime.utc(2026, 10, 17);
+      const defaultCustomer = Customer(id: 1, name: 'مشتری عمومی');
+      final completed = QuickSalesParkedSale(
+        id: 'completed',
+        createdAt: now,
+        updatedAt: now,
+        customer: const Customer(id: 42, name: 'زارع'),
+        documentDate: now,
+        documentDescription: 'فاکتور ثبت‌شده',
+      );
+      final parked = QuickSalesParkedSale(
+        id: 'parked',
+        createdAt: now,
+        updatedAt: now,
+        customer: const Customer(id: 43, name: 'موسوی'),
+        documentDate: now,
+        documentDescription: 'فروش پارک‌شده',
+      );
+      final staleBlank = QuickSalesParkedSale(
+        id: 'old-blank',
+        createdAt: now,
+        updatedAt: now,
+        customer: defaultCustomer,
+        documentDate: now,
+      );
+      final newBlank = QuickSalesParkedSale(
+        id: 'new-blank',
+        createdAt: now,
+        updatedAt: now,
+        customer: defaultCustomer,
+        documentDate: now,
+      );
+
+      final result =
+          QuickSalesParkedSalesBundle(
+            activeId: completed.id,
+            sales: [completed, parked, staleBlank],
+          ).afterCompletedActiveSale(
+            blankSale: newBlank,
+            anonymousCustomerId: defaultCustomer.id,
+          );
+
+      expect(result.activeId, newBlank.id);
+      expect(result.sales.map((sale) => sale.id), ['parked', 'new-blank']);
+      expect(result.sales.last.customer?.id, defaultCustomer.id);
+      expect(
+        result.sales.last.isBlank(anonymousCustomerId: defaultCustomer.id),
+        isTrue,
+      );
+    },
+  );
+
   test('parked sale preserves split change resolution', () {
     final sale = QuickSalesParkedSale(
       id: 'change-sale',
