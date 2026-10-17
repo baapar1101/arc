@@ -1,0 +1,263 @@
+name: Integrate Hesabix upstream
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/integrate-hesabix-upstream.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: integrate-hesabix-upstream
+  cancel-in-progress: false
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GIT_TERMINAL_PROMPT: '0'
+
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch mirrored Hesabix upstream
+        id: refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin master hesabix-upstream
+          BASE="$(git rev-parse origin/master)"
+          UPSTREAM="$(git rev-parse origin/hesabix-upstream)"
+          echo "base=$BASE" >> "$GITHUB_OUTPUT"
+          echo "upstream=$UPSTREAM" >> "$GITHUB_OUTPUT"
+          echo "Base master: $BASE"
+          echo "Upstream:    $UPSTREAM"
+
+          if git merge-base --is-ancestor "$UPSTREAM" "$BASE"; then
+            echo "already=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "already=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Merge upstream and resolve approved conflicts
+        if: steps.refs.outputs.already != 'true'
+        shell: bash
+        env:
+          BASE: ${{ steps.refs.outputs.base }}
+          UPSTREAM: ${{ steps.refs.outputs.upstream }}
+        run: |
+          set -euo pipefail
+          git checkout -B integration-hesabix "$BASE"
+
+          set +e
+          git merge --no-ff --no-commit "$UPSTREAM"
+          MERGE_RC=$?
+          set -e
+
+          mapfile -t CONFLICTS < <(git diff --name-only --diff-filter=U)
+          printf 'Conflicts (%d):\n' "${#CONFLICTS[@]}"
+          printf ' - %s\n' "${CONFLICTS[@]:-}"
+
+          for file in "${CONFLICTS[@]}"; do
+            case "$file" in
+              hesabixUI/hesabix_ui/lib/pages/business/quick_sales_page.dart|              hesabixUI/hesabix_ui/pubspec.yaml)
+                ;;
+              *)
+                echo "::error::Unexpected upstream conflict: $file"
+                exit 1
+                ;;
+            esac
+          done
+
+          # The fork changed quick_sales_page only to apply the glass dialog wrappers.
+          # Take all upstream Quick Sales functionality, then re-apply Glass below.
+          git checkout "$UPSTREAM" --             hesabixUI/hesabix_ui/lib/pages/business/quick_sales_page.dart
+
+          # Upstream pubspec change is only its release-version bump. Keep the fork's
+          # app version and known-good cross-platform dependency pins.
+          git checkout "$BASE" --             hesabixUI/hesabix_ui/pubspec.yaml             hesabixUI/hesabix_ui/pubspec.lock
+
+          git add             hesabixUI/hesabix_ui/lib/pages/business/quick_sales_page.dart             hesabixUI/hesabix_ui/pubspec.yaml             hesabixUI/hesabix_ui/pubspec.lock
+
+          if git diff --name-only --diff-filter=U | grep -q .; then
+            echo "::error::Unresolved conflicts remain"
+            git diff --name-only --diff-filter=U
+            exit 1
+          fi
+
+          if [ "$MERGE_RC" -ne 0 ] && [ "${#CONFLICTS[@]}" -eq 0 ]; then
+            echo "::error::Merge failed without a normal content conflict"
+            exit 1
+          fi
+
+      - name: Re-apply fork glass dialogs
+        if: steps.refs.outputs.already != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path("hesabixUI/hesabix_ui/lib")
+          glass_file = root / "theme" / "glass.dart"
+          dialog_re = re.compile(r"\bshowDialog(?=\s*(?:<|\())")
+          sheet_re = re.compile(r"\bshowModalBottomSheet(?=\s*(?:<|\())")
+          glass_import_re = re.compile(
+              r"^import\s+['\"][^'\"]*theme/glass\.dart['\"];\s*$",
+              re.MULTILINE,
+          )
+          first_import_re = re.compile(
+              r"^import\s+['\"][^'\"]+['\"];\s*$",
+              re.MULTILINE,
+          )
+          package_import = "import 'package:hesabix_ui/theme/glass.dart';\n"
+
+          changed = []
+          for path in root.rglob("*.dart"):
+              if path == glass_file or path.name.endswith(".dart.backup"):
+                  continue
+              original = path.read_text(encoding="utf-8")
+              updated = dialog_re.sub("showGlassDialog", original)
+              updated = sheet_re.sub("showGlassModalBottomSheet", updated)
+              if updated == original:
+                  continue
+              if not glass_import_re.search(updated):
+                  match = first_import_re.search(updated)
+                  if match:
+                      updated = updated[:match.start()] + package_import + updated[match.start():]
+                  else:
+                      updated = package_import + updated
+              path.write_text(updated, encoding="utf-8")
+              changed.append(str(path))
+
+          print(f"Glass-normalized {len(changed)} Dart files")
+          PY
+          git add hesabixUI/hesabix_ui/lib
+
+      - name: Guard fork-specific navigation and backend target
+        if: steps.refs.outputs.already != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F "label: 'مدیریت کارها'" hesabixUI/hesabix_ui/lib/pages/business/business_shell.dart
+          grep -F "path: _bu('tasks')" hesabixUI/hesabix_ui/lib/pages/business/business_shell.dart
+          grep -F "label: 'پروژه‌ها'" hesabixUI/hesabix_ui/lib/pages/business/business_shell.dart
+          grep -F "TaskManagementPage" hesabixUI/hesabix_ui/lib/main.dart
+          grep -F 'DEFAULT_API_BASE_URL="https://tamastore.ir"' build_web.sh
+          grep -F 'flutter_sound: 9.28.0' hesabixUI/hesabix_ui/pubspec.yaml
+
+      - name: Set up Python
+        if: steps.refs.outputs.already != 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: hesabixAPI/pyproject.toml
+
+      - name: Install backend test dependencies
+        if: steps.refs.outputs.already != 'true'
+        working-directory: hesabixAPI
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Run upstream backend regression tests
+        if: steps.refs.outputs.already != 'true'
+        working-directory: hesabixAPI
+        run: |
+          pytest -q             tests/test_ai_mcp_write_guard.py             tests/test_ai_tool_security.py             tests/test_customer_quick_entry_service.py             tests/test_http_exception_headers.py             tests/test_inventory_discrepancy_service.py             tests/test_invoice_stock_prevalidation.py             tests/test_quick_sales_change.py             tests/test_quick_sales_service.py             tests/test_task_entity_adapters.py
+
+      - name: Install Flutter
+        if: steps.refs.outputs.already != 'true'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Resolve Flutter dependencies
+        if: steps.refs.outputs.already != 'true'
+        working-directory: hesabixUI/hesabix_ui
+        run: flutter pub get
+
+      - name: Analyze merged Flutter source
+        if: steps.refs.outputs.already != 'true'
+        working-directory: hesabixUI/hesabix_ui
+        run: flutter analyze --no-fatal-warnings --no-fatal-infos
+
+      - name: Run Quick Sales and Task Manager regressions
+        if: steps.refs.outputs.already != 'true'
+        working-directory: hesabixUI/hesabix_ui
+        run: |
+          flutter test             test/business_shell_task_navigation_test.dart             test/quick_sales_change_resolution_dialog_test.dart             test/quick_sales_parked_sale_test.dart             test/quick_sales_payment_balance_test.dart             test/quick_sales_payment_dock_test.dart
+
+      - name: Build production web
+        if: steps.refs.outputs.already != 'true'
+        working-directory: hesabixUI/hesabix_ui
+        run: |
+          flutter build web             --release             --dart-define API_BASE_URL=https://tamastore.ir
+
+      - name: Commit validated merge
+        if: steps.refs.outputs.already != 'true'
+        id: merge_commit
+        shell: bash
+        env:
+          BASE: ${{ steps.refs.outputs.base }}
+          UPSTREAM: ${{ steps.refs.outputs.upstream }}
+        run: |
+          set -euo pipefail
+          git add -A
+
+          # flutter pub get may regenerate the lockfile; retain it only when it
+          # actually follows the fork's pinned pubspec and passes all validation.
+          if git diff --name-only --diff-filter=U | grep -q .; then
+            echo "::error::Cannot commit with unresolved conflicts"
+            exit 1
+          fi
+
+          git commit -m "Merge Hesabix upstream ${UPSTREAM:0:12} after validation"
+          MERGE_SHA="$(git rev-parse HEAD)"
+          echo "sha=$MERGE_SHA" >> "$GITHUB_OUTPUT"
+
+          INTEGRATION_BRANCH="integration/hesabix-${UPSTREAM:0:12}-${GITHUB_RUN_ID}"
+          BACKUP_BRANCH="backup/master-before-hesabix-${UPSTREAM:0:12}-${GITHUB_RUN_ID}"
+
+          git push origin "$BASE:refs/heads/$BACKUP_BRANCH"
+          git push origin "HEAD:refs/heads/$INTEGRATION_BRANCH"
+
+          git fetch origin master
+          REMOTE_MASTER="$(git rev-parse origin/master)"
+          if [ "$REMOTE_MASTER" != "$BASE" ]; then
+            echo "::error::master changed during validation ($BASE -> $REMOTE_MASTER); refusing to overwrite it"
+            exit 1
+          fi
+
+          git push origin HEAD:master
+          echo "Validated merge pushed to master: $MERGE_SHA"
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Hesabix upstream integration"
+            echo
+            echo "- Base master: \`${{ steps.refs.outputs.base }}\`"
+            echo "- Upstream: \`${{ steps.refs.outputs.upstream }}\`"
+            echo "- Already integrated: \`${{ steps.refs.outputs.already }}\`"
+            echo "- Merge commit: \`${{ steps.merge_commit.outputs.sha }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
