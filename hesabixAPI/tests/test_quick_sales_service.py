@@ -14,10 +14,11 @@ from app.core.responses import ApiError
 from app.services.quick_sales_service import (
     DEFAULT_SHARE_CHANNELS,
     DEFAULT_SHARE_EXPIRY_HOURS,
+    _normalize_payment_button_shortcut,
+    _share_settings_from_obj,
+    get_quick_sales_settings,
     normalize_default_share_channels,
     normalize_share_expiry_hours,
-    get_quick_sales_settings,
-    _share_settings_from_obj,
 )
 
 
@@ -79,6 +80,69 @@ def test_get_quick_sales_settings_includes_share_defaults_when_missing_row() -> 
     assert result["default_share_channels"] == DEFAULT_SHARE_CHANNELS
     assert result["default_share_expiry_hours"] == 168
     assert result["default_currency_id"] == 42
+    assert result["enable_stock_shortage_override"] is False
+    assert result["quick_customer_group_id"] is None
+
+
+def test_update_quick_sales_settings_validates_and_saves_customer_group(monkeypatch) -> None:
+    from app.services import quick_sales_service as service
+
+    db = MagicMock()
+    settings = MagicMock()
+    settings.quick_customer_group_id = None
+    settings_query = MagicMock()
+    settings_query.filter.return_value.first.return_value = settings
+    db.query.return_value = settings_query
+    validate_group = MagicMock()
+    monkeypatch.setattr(service, "assert_assignable_person_group", validate_group)
+    monkeypatch.setattr(
+        service,
+        "get_quick_sales_settings",
+        lambda _db, _business_id: {
+            "quick_customer_group_id": settings.quick_customer_group_id,
+        },
+    )
+
+    result = service.update_quick_sales_settings(
+        db,
+        business_id=5,
+        payload={"quick_customer_group_id": 19},
+    )
+
+    validate_group.assert_called_once_with(db, 5, 19)
+    assert settings.quick_customer_group_id == 19
+    assert result["quick_customer_group_id"] == 19
+    db.commit.assert_called_once()
+
+
+def test_update_quick_sales_settings_can_clear_customer_group(monkeypatch) -> None:
+    from app.services import quick_sales_service as service
+
+    db = MagicMock()
+    settings = MagicMock()
+    settings.quick_customer_group_id = 19
+    settings_query = MagicMock()
+    settings_query.filter.return_value.first.return_value = settings
+    db.query.return_value = settings_query
+    validate_group = MagicMock()
+    monkeypatch.setattr(service, "assert_assignable_person_group", validate_group)
+    monkeypatch.setattr(
+        service,
+        "get_quick_sales_settings",
+        lambda _db, _business_id: {
+            "quick_customer_group_id": settings.quick_customer_group_id,
+        },
+    )
+
+    result = service.update_quick_sales_settings(
+        db,
+        business_id=5,
+        payload={"quick_customer_group_id": None},
+    )
+
+    validate_group.assert_not_called()
+    assert settings.quick_customer_group_id is None
+    assert result["quick_customer_group_id"] is None
 
 
 def test_invoice_share_link_event_type_in_seed_catalog() -> None:
@@ -100,3 +164,17 @@ def test_validate_share_gateway_id_rejects_unknown_gateway() -> None:
     with pytest.raises(ApiError) as exc:
         _validate_share_gateway_id(db, 1, 99)
     assert exc.value.detail["error"]["code"] == "GATEWAY_NOT_FOUND"
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [("alt + 1", "ALT+1"), ("F3", "F3"), ("ctrl+shift+k", "CTRL+SHIFT+K")],
+)
+def test_normalize_payment_button_shortcut(raw: str, expected: str) -> None:
+    assert _normalize_payment_button_shortcut(raw) == expected
+
+
+@pytest.mark.parametrize("raw", ["F5", "Enter", "plain text", "Ctrl+"])
+def test_normalize_payment_button_shortcut_rejects_invalid_or_reserved(raw: str) -> None:
+    with pytest.raises(ApiError):
+        _normalize_payment_button_shortcut(raw)

@@ -171,6 +171,10 @@ def serialize_tax_setting(
     suggested_person_type = _resolve_suggested_person_type(db, business_id)
 
     if setting is None:
+        from app.services.tax_provider_service import get_business_provider_state
+        provider_state = get_business_provider_state(db, int(business_id)) if db is not None else {
+            "submission_provider": "moadian_direct", "fanava_available": False, "fanava_account": None
+        }
         return {
             "business_id": int(business_id),
             "tax_memory_id": None,
@@ -185,6 +189,7 @@ def serialize_tax_setting(
             "configuration_warnings": [],
             "identity_check": None,
             "suggested_person_type": suggested_person_type,
+            **provider_state,
         }
 
     # رمزگشایی کلید خصوصی برای نمایش
@@ -205,6 +210,13 @@ def serialize_tax_setting(
     if db is not None:
         identity_check = build_identity_check(db, int(business_id))
 
+    from app.services.tax_provider_service import get_business_provider_state
+    provider_state = get_business_provider_state(db, int(business_id)) if db is not None else {
+        "submission_provider": getattr(setting, "submission_provider", "moadian_direct"),
+        "fanava_available": False,
+        "fanava_account": None,
+    }
+
     return {
         "business_id": int(setting.business_id),
         "tax_memory_id": setting.tax_memory_id,
@@ -219,6 +231,7 @@ def serialize_tax_setting(
         "configuration_warnings": warnings,
         "identity_check": identity_check,
         "suggested_person_type": suggested_person_type,
+        **provider_state,
     }
 
 

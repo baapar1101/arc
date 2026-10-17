@@ -54,6 +54,7 @@ from adapters.api.v1.support.statuses import router as support_statuses_router
 from adapters.api.v1.admin.file_storage import router as admin_file_storage_router
 from adapters.api.v1.admin.email_config import router as admin_email_config_router
 from adapters.api.v1.admin.system_settings import router as admin_system_settings_router
+from adapters.api.v1.admin.tax_providers import router as admin_tax_providers_router
 from adapters.api.v1.admin.legacy_import import router as admin_legacy_import_router
 from adapters.api.v1.admin.firewall import router as admin_firewall_router
 from adapters.api.v1.admin.currencies import router as admin_currencies_router
@@ -1150,6 +1151,7 @@ def create_app() -> FastAPI:
     application.include_router(admin_file_storage_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_email_config_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_system_settings_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_tax_providers_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_legacy_import_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_firewall_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_currencies_router, prefix=settings.api_v1_prefix)
@@ -1198,11 +1200,14 @@ def create_app() -> FastAPI:
     from adapters.api.v1.ai.voice_feedback import router as ai_voice_feedback_router
     from adapters.api.v1.ai.voice_http import router as ai_voice_http_router
     from adapters.api.v1.ai.mcp import router as ai_mcp_router
+    from adapters.api.v1.ai.mcp_oauth import oauth_router as ai_mcp_oauth_router, metadata_router as ai_mcp_metadata_router
     from adapters.api.v1.ai.models import router as ai_models_router
     from adapters.api.v1.ai.skills import router as ai_skills_router
     from adapters.api.v1.ai.business_provider import router as ai_business_provider_router
     application.include_router(ai_chat_router, prefix=settings.api_v1_prefix)
     application.include_router(ai_mcp_router, prefix=settings.api_v1_prefix)
+    application.include_router(ai_mcp_oauth_router, prefix=settings.api_v1_prefix)
+    application.include_router(ai_mcp_metadata_router)
     application.include_router(ai_models_router, prefix=settings.api_v1_prefix)
     application.include_router(ai_skills_router, prefix=settings.api_v1_prefix)
     application.include_router(ai_crm_router, prefix=settings.api_v1_prefix)
@@ -1428,6 +1433,47 @@ def create_app() -> FastAPI:
         finally:
             # پاک کردن context variable
             _request_context.reset(token)
+
+    @application.middleware("http")
+    async def trace_ai_connector_requests(request: Request, call_next):
+        """Correlate MCP and likely connector-backed REST calls without logging payloads."""
+        import secrets
+        import time
+        import structlog
+
+        request_id = secrets.token_hex(8)
+        request.state.diagnostic_request_id = request_id
+        start = time.perf_counter()
+        response = None
+        status_code = 500
+        try:
+            response = await call_next(request)
+            status_code = response.status_code
+            return response
+        finally:
+            route = request.scope.get("route")
+            route_template = getattr(route, "path", request.url.path)
+            is_connector_route = (
+                route_template.endswith("/ai/mcp")
+                or "/ai/mcp/oauth/" in route_template
+                or "oauth-protected-resource" in route_template
+                or route_template.endswith("/persons")
+                or route_template.endswith("/dashboard/data")
+                or "/dashboard/" in route_template
+                or route_template.endswith("/jobs/{job_id}")
+                or route_template.endswith("/businesses/{business_id}")
+            )
+            if is_connector_route:
+                if response is not None:
+                    response.headers["X-Hesabix-Diagnostic-ID"] = request_id
+                structlog.get_logger().info(
+                    "ai_connector_http",
+                    diagnostic_id=request_id,
+                    method=request.method,
+                    route=route_template,
+                    status_code=status_code,
+                    duration_ms=round((time.perf_counter() - start) * 1000, 2),
+                )
 
     @application.middleware("http")
     async def log_slow_requests(request: Request, call_next):

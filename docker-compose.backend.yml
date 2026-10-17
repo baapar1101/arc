@@ -1,0 +1,149 @@
+name: hesabix-backend
+
+services:
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-hesabix}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the backend .env file}
+      POSTGRES_DB: ${DB_NAME:-hesabix}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    networks:
+      - backend
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks:
+      - backend
+
+  bootstrap:
+    image: postgres:17
+    restart: "no"
+    environment:
+      POSTGRES_USER: ${DB_USER:-hesabix}
+      POSTGRES_DB: ${DB_NAME:-hesabix}
+      PGPASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the backend .env file}
+    volumes:
+      - ./backup:/seed:ro
+      - ./docker/backend/bootstrap-seed.sh:/usr/local/bin/bootstrap-seed.sh:ro
+    entrypoint: ["/bin/sh", "/usr/local/bin/bootstrap-seed.sh"]
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+    image: hesabix/backend:local
+    restart: unless-stopped
+    environment:
+      APP_NAME: Hesabix API
+      APP_VERSION: ${APP_VERSION:-0.1.0}
+      API_V1_PREFIX: /api/v1
+      ENVIRONMENT: production
+      DEBUG: "false"
+      LOG_LEVEL: ${LOG_LEVEL:-WARNING}
+      DB_USER: ${DB_USER:-hesabix}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the backend .env file}
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-hesabix}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-4}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-2}
+      UVICORN_WORKERS: ${UVICORN_WORKERS:-2}
+      CAPTCHA_SECRET: ${CAPTCHA_SECRET:?Set CAPTCHA_SECRET in the backend .env file}
+      SHARE_LINK_SECRET: ${SHARE_LINK_SECRET:?Set SHARE_LINK_SECRET in the backend .env file}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY in the backend .env file}
+      WALLET_WEBHOOK_SECRET: ${WALLET_WEBHOOK_SECRET:?Set WALLET_WEBHOOK_SECRET in the backend .env file}
+      REDIS_ENABLED: ${REDIS_ENABLED:-false}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      VOICE_DATA_COLLECTION_DIR: /var/lib/hesabix/voice-data
+      VOICE_TTS_PIPER_MODELS_DIR: /var/lib/hesabix/voice-data/piper
+    ports:
+      - "${API_BIND_IP:-0.0.0.0}:${API_PORT:-8000}:8000"
+    volumes:
+      - file_data:/tmp/hesabix_files
+      - voice_data:/var/lib/hesabix/voice-data
+    depends_on:
+      db:
+        condition: service_healthy
+      bootstrap:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=5)"]
+      interval: 20s
+      timeout: 8s
+      retries: 10
+      start_period: 120s
+    networks:
+      - backend
+
+  rq-worker:
+    image: hesabix/backend:local
+    restart: unless-stopped
+    command: ["python", "/app/rq_worker.py"]
+    environment:
+      DB_USER: ${DB_USER:-hesabix}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the backend .env file}
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-hesabix}
+      REDIS_ENABLED: ${REDIS_ENABLED:-false}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend
+
+  notification-moderation:
+    image: hesabix/backend:local
+    restart: unless-stopped
+    command: ["python", "-m", "app.workers.notification_moderation_worker"]
+    environment:
+      DB_USER: ${DB_USER:-hesabix}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the backend .env file}
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-hesabix}
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - backend
+
+volumes:
+  postgres_data:
+  redis_data:
+  file_data:
+  voice_data:
+
+networks:
+  backend:
+    driver: bridge

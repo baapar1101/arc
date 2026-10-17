@@ -7,7 +7,6 @@ list(APPEND FLUTTER_PLUGIN_LIST
   file_saver
   file_selector_linux
   flutter_secure_storage_linux
-  flutter_sound
   printing
   url_launcher_linux
 )

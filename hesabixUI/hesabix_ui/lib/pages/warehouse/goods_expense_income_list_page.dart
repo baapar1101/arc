@@ -421,6 +421,7 @@ class _GoodsExpenseIncomeListPageState extends State<GoodsExpenseIncomeListPage>
       ],
       onRowTap: (item) => _openForm(doc: item as Map<String, dynamic>),
       expandBodyHeightToFitRows: true,
+      deferVerticalScrollToParent: true,
     );
   }
 
@@ -500,7 +501,6 @@ class _GoodsExpenseIncomeListPageState extends State<GoodsExpenseIncomeListPage>
               onPressed: _loading ? null : _refresh,
               icon: const Icon(Icons.refresh),
             ),
-            const Spacer(),
             if (_canAdd) ...[
               FilledButton.tonalIcon(
                 onPressed: () => _openForm(initialDocKind: 'goods_expense'),

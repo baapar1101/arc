@@ -43,6 +43,12 @@ class QuickSalesSetting(Base):
         nullable=True,
         comment="نام مشتری ناشناس"
     )
+    quick_customer_group_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("person_groups.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="گروه پیش‌فرض مشتریانی که در فروش سریع ثبت می‌شوند",
+    )
 
     # انبار و صندوق
     default_warehouse_id: Mapped[int | None] = mapped_column(
@@ -118,6 +124,13 @@ class QuickSalesSetting(Base):
         server_default="1",
         comment="نمایش موجودی در صفحه فروش سریع"
     )
+    enable_stock_shortage_override: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="0",
+        comment="اجازه نمایش گردش‌کار ثبت یک‌باره فروش سریع با موجودی منفی",
+    )
 
     # تنظیمات حسابداری
     auto_create_payment_document: Mapped[bool] = mapped_column(
@@ -179,8 +192,8 @@ class QuickSalesSetting(Base):
     # Relationships
     business = relationship("Business", backref="quick_sales_setting", uselist=False)
     anonymous_customer = relationship("Person", foreign_keys=[default_anonymous_customer_id])
+    quick_customer_group = relationship("PersonGroup", foreign_keys=[quick_customer_group_id])
     default_warehouse = relationship("Warehouse", foreign_keys=[default_warehouse_id])
     default_cash_register = relationship("CashRegister", foreign_keys=[default_cash_register_id])
     default_currency = relationship("Currency", foreign_keys=[default_currency_id])
     default_price_list = relationship("PriceList", foreign_keys=[default_price_list_id])
-

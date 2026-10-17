@@ -1807,6 +1807,15 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: false,
           ),
           _MenuItem(
+            key: 'quick-sales-stock-discrepancies',
+            label: 'مغایرت‌های موجودی فروش سریع',
+            icon: Icons.rule_folder_outlined,
+            selectedIcon: Icons.rule_folder,
+            path: _bu('quick-sales-stock-discrepancies'),
+            type: _MenuItemType.simple,
+            hasAddButton: false,
+          ),
+          _MenuItem(
             key: 'goods-expense-income',
             label: 'کالای هزینه/درآمد شده',
             icon: Icons.inventory_2_outlined,
@@ -3949,6 +3958,7 @@ class _BusinessShellState extends State<BusinessShell> {
     // انبارگردانی (Stock Count) در نهایت به ایجاد/مدیریت حواله‌های تعدیل منجر می‌شود؛
     // بنابراین در مدل دسترسی فعلی زیر مجموعه‌ی warehouse_transfers در نظر گرفته می‌شود.
     if (label == 'انبار گردانی' || label == 'انبارگردانی' || label == 'Stock Count') return 'warehouse_transfers';
+    if (label == 'مغایرت‌های موجودی فروش سریع') return 'inventory';
     if (label == 'کالای هزینه/درآمد شده' ||
         label == 'کالای هزینه‌شده / کالای درآمدشده' ||
         label == 'Goods Expense/Income') {

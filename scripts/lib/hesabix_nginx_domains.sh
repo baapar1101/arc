@@ -246,6 +246,20 @@ ${API_SSL_BLOCK}
       proxy_send_timeout 300;
   }
 
+  # OAuth/MCP discovery metadata is public and must bypass the API-domain 404 catch-all.
+  location = /.well-known/oauth-authorization-server {
+    proxy_pass http://127.0.0.1:8000;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+  }
+  location ^~ /.well-known/oauth-protected-resource {
+    proxy_pass http://127.0.0.1:8000;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+  }
+
   location / {
     return 404;
   }
@@ -373,6 +387,20 @@ ${UI_SSL_BLOCK}
     proxy_set_header X-Forwarded-Proto \$scheme;
     proxy_read_timeout 86400;
     proxy_send_timeout 86400;
+  }
+
+  # OAuth/MCP discovery metadata is served by the backend on a shared UI+API domain.
+  location = /.well-known/oauth-authorization-server {
+    proxy_pass http://127.0.0.1:8000;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+  }
+  location ^~ /.well-known/oauth-protected-resource {
+    proxy_pass http://127.0.0.1:8000;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
   }
 
   # همان دامنهٔ UI+API: /docs و openapi و redoc و دارایی‌های swagger به بک‌اند (بدون تداخل با /assets Flutter)

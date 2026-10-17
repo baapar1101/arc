@@ -37,6 +37,7 @@ Requires-Dist: psutil>=5.9.0
 Requires-Dist: simpleeval>=0.9.14
 Requires-Dist: croniter>=2.0.0
 Requires-Dist: pytz>=2024.1
+Requires-Dist: python-dateutil>=2.9.0
 Requires-Dist: paramiko>=3.4.0
 Requires-Dist: qrcode>=7.4.2
 Requires-Dist: basalam-sdk>=0.1.0
@@ -77,3 +78,4 @@ Health endpoint: `GET /api/v1/health`.
 ## Configuration
 - See `app/core/settings.py` and `.env.example`.
 - چت CRM و WebSocket: اگر Redis برای API خاموش است، برای رویدادهای زندهٔ چت باید **تک worker** یا **sticky وب‌سوکت** باشد؛ جزییات: [`docs/CRM_CHAT_WEBSOCKET_DEPLOYMENT.md`](docs/CRM_CHAT_WEBSOCKET_DEPLOYMENT.md).
+- معماری، رفتار تراکنشی و راهنمای پایش ایمپورت Excel کالا/خدمت: [`docs/PRODUCT_EXCEL_IMPORT_PERFORMANCE.md`](docs/PRODUCT_EXCEL_IMPORT_PERFORMANCE.md).

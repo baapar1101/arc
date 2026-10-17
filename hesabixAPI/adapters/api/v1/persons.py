@@ -4,6 +4,7 @@ from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
 from typing import Dict, Any, List, Optional
+import logging
 
 from adapters.db.session import get_db
 from adapters.api.v1.schema_models.person import (
@@ -46,6 +47,8 @@ from app.services.person_service import (
     get_creditors_report,
     get_people_transactions_report,
 )
+
+logger = logging.getLogger(__name__)
 from app.services.person_opening_balance_service import (
     create_person_with_opening_balance,
     get_person_opening_balance_eligibility,
@@ -342,6 +345,14 @@ async def get_persons_endpoint(
         cache_key = f"persons_list:{key_hash}"
         cached = cache.get(cache_key)
         if cached is not None:
+            cached_pagination = cached.get("pagination") if isinstance(cached, dict) else {}
+            logger.info(
+                "ai_connector_persons_list diagnostic_id=%s business_id=%s source=cache item_count=%s total=%s",
+                getattr(request.state, "diagnostic_request_id", None),
+                business_id,
+                len(cached.get("items", [])) if isinstance(cached, dict) else None,
+                cached_pagination.get("total") if isinstance(cached_pagination, dict) else None,
+            )
             return success_response(
                 data=cached,
                 request=request,
@@ -359,6 +370,15 @@ async def get_persons_endpoint(
         # استفاده از set_with_business_tag برای مدیریت بهتر با set ردیس
         # این متد کلید را در set های مربوط به business_id و fiscal_year_id ذخیره می‌کند
         cache.set_with_business_tag(cache_key, result, business_id=business_id, fiscal_year_id=fiscal_year_id, ttl=60)
+
+    pagination = result.get("pagination") if isinstance(result, dict) else {}
+    logger.info(
+        "ai_connector_persons_list diagnostic_id=%s business_id=%s source=database item_count=%s total=%s",
+        getattr(request.state, "diagnostic_request_id", None),
+        business_id,
+        len(result.get("items", [])) if isinstance(result, dict) else None,
+        pagination.get("total") if isinstance(pagination, dict) else None,
+    )
     
     return success_response(
         data=result,

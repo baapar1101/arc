@@ -1048,6 +1048,7 @@ class _PermissionsDialog extends StatefulWidget {
 
 class _PermissionsDialogState extends State<_PermissionsDialog> {
   late Map<String, dynamic> _currentPermissions;
+  bool _permissionsInitialized = false;
   bool _isUpdating = false;
   late bool _membershipUnlimited;
   DateTime? _membershipEndDate;
@@ -1056,9 +1057,20 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
   @override
   void initState() {
     super.initState();
-    _currentPermissions = _mergePermissions(widget.user.permissions);
     _membershipEndDate = widget.user.membershipExpiresAt;
     _membershipUnlimited = widget.user.membershipUnlimited;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_permissionsInitialized) return;
+
+    _currentPermissions = _mergePermissions(
+      widget.user.permissions,
+      AppLocalizations.of(context),
+    );
+    _permissionsInitialized = true;
   }
 
   /// ساختار کامل دسترسی‌های سیستم
@@ -1210,6 +1222,10 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'edit': '${t.edit} ${t.warehouses}',
         'delete': '${t.delete} ${t.warehouses}',
       },
+      'inventory': {
+        'view': 'مشاهده موجودی و مغایرت‌ها',
+        'negative_stock_override': 'ثبت یک‌باره فروش سریع با موجودی منفی',
+      },
       'warehouse_transfers': {
         'add': '${t.add} ${t.warehouseTransfers}',
         'view': '${t.view} ${t.warehouseTransfers}',
@@ -1344,8 +1360,10 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
   }
 
   /// ادغام دسترسی‌های دیتابیس با ساختار کامل
-  Map<String, dynamic> _mergePermissions(Map<String, dynamic> dbPermissions) {
-    final t = AppLocalizations.of(context);
+  Map<String, dynamic> _mergePermissions(
+    Map<String, dynamic> dbPermissions,
+    AppLocalizations t,
+  ) {
     final allPermissions = _getAllPermissions(t);
     final mergedPermissions = <String, dynamic>{};
     
@@ -1730,8 +1748,11 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
                       ),
                     ),
                   ),
-                  Tooltip(
-                    message: t.dialogClose,
+                  // Flutter 3.41.1 may corrupt OverlayPortal element state if a
+                  // tooltip is visible while its dialog is being dismissed.
+                  Semantics(
+                    label: t.dialogClose,
+                    button: true,
                     child: IconButton(
                       visualDensity: VisualDensity.compact,
                       padding: const EdgeInsets.all(6),
@@ -1863,7 +1884,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       {
         'title': t.warehouseManagement,
         'icon': Icons.warehouse,
-        'sections': ['warehouses', 'warehouse_transfers', 'goods_expense_income'],
+        'sections': ['warehouses', 'inventory', 'warehouse_transfers', 'goods_expense_income'],
         'permissionHintKey': 'warehouse_inventory_bridge',
       },
       {
@@ -2045,6 +2066,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.openingBalance;
       case 'warehouses':
         return t.warehouses;
+      case 'inventory':
+        return 'موجودی و مغایرت‌ها';
       case 'warehouse_transfers':
         return t.warehouseTransfers;
       case 'goods_expense_income':

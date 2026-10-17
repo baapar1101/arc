@@ -185,7 +185,7 @@ def test_mcp_execution_guard_still_active_for_writes():
         "execute_workflow",
     ):
         assert is_write_function(name) is True
-    assert mcp_explicit_write_approval({"approve_writes": True}) is True
+    assert mcp_explicit_write_approval({"approve_writes": True}) is False
     assert mcp_explicit_write_approval({}) is False
-    cleaned = prepare_mcp_tool_arguments({"_approve_writes": True, "id": 1})
+    cleaned = prepare_mcp_tool_arguments({"_approve_writes": True, "id": 1}, business_id=7)
     assert "_approve_writes" not in cleaned

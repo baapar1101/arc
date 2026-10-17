@@ -1,16 +1,22 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List
 import json
 import logging
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, func
+import re
+from typing import Any, Dict, List
 
-from adapters.db.models.quick_sales_settings import QuickSalesSetting
-from adapters.db.models.person import Person, PersonType
-from adapters.db.models.business import Business
+from sqlalchemy import and_, func, or_
+from sqlalchemy.orm import Session
+
 from adapters.api.v1.schema_models.person import PersonCreateRequest
+from adapters.db.models.bank_account import BankAccount
+from adapters.db.models.business import Business
+from adapters.db.models.cash_register import CashRegister
+from adapters.db.models.person import Person, PersonType
+from adapters.db.models.quick_sales_payment_button import QuickSalesPaymentButton
+from adapters.db.models.quick_sales_settings import QuickSalesSetting
 from app.core.responses import ApiError
+from app.services.person_group_service import assert_assignable_person_group
 from app.services.person_service import create_person
 
 logger = logging.getLogger(__name__)
@@ -20,6 +26,417 @@ VALID_SHARE_CHANNEL_CODES = frozenset({"sms", "email", "native"})
 DEFAULT_SHARE_EXPIRY_HOURS = 168
 MIN_SHARE_EXPIRY_HOURS = 1
 MAX_SHARE_EXPIRY_HOURS = 720
+
+PAYMENT_BUTTON_TARGETS = frozenset({"cash_register", "bank", "person"})
+PAYMENT_BUTTON_SCOPES = frozenset({"business", "user"})
+PAYMENT_BUTTON_RESERVED_SHORTCUTS = frozenset(
+    {"ENTER", "ESCAPE", "DELETE", "BACKSPACE", "F5", "+", "-"}
+)
+MAX_PAYMENT_BUTTONS_PER_SCOPE = 30
+
+
+def _normalize_payment_button_shortcut(value: Any) -> str | None:
+    shortcut = str(value or "").strip().upper().replace(" ", "")
+    if not shortcut:
+        return None
+    if len(shortcut) > 32:
+        raise ApiError("PAYMENT_BUTTON_SHORTCUT_INVALID", "میانبر بیش از حد طولانی است", http_status=400)
+    if shortcut in PAYMENT_BUTTON_RESERVED_SHORTCUTS:
+        raise ApiError(
+            "PAYMENT_BUTTON_SHORTCUT_RESERVED",
+            "این کلید در فروش سریع یا مرورگر رزرو شده است",
+            http_status=400,
+        )
+    if not re.fullmatch(
+        r"(?:F(?:[1-9]|1[0-2])|(?:(?:CTRL|ALT|SHIFT)\+)+(?:[A-Z0-9]|F(?:[1-9]|1[0-2])))",
+        shortcut,
+    ):
+        raise ApiError(
+            "PAYMENT_BUTTON_SHORTCUT_INVALID",
+            "میانبر باید یکی از کلیدهای F یا ترکیبی مانند Alt+1 باشد",
+            http_status=400,
+        )
+    return shortcut
+
+
+def _payment_button_target(
+    db: Session,
+    business_id: int,
+    target_type: str,
+    target_id: Any,
+) -> tuple[Any, str]:
+    try:
+        parsed_id = int(target_id)
+    except (TypeError, ValueError) as exc:
+        raise ApiError("PAYMENT_BUTTON_TARGET_REQUIRED", "مقصد پرداخت الزامی است", http_status=400) from exc
+
+    if target_type == "cash_register":
+        target = (
+            db.query(CashRegister)
+            .filter(
+                CashRegister.id == parsed_id,
+                CashRegister.business_id == int(business_id),
+                CashRegister.is_active == True,  # noqa: E712
+            )
+            .first()
+        )
+        name = getattr(target, "name", None)
+    elif target_type == "bank":
+        target = (
+            db.query(BankAccount)
+            .filter(
+                BankAccount.id == parsed_id,
+                BankAccount.business_id == int(business_id),
+                BankAccount.is_active == True,  # noqa: E712
+            )
+            .first()
+        )
+        name = getattr(target, "name", None)
+    elif target_type == "person":
+        target = (
+            db.query(Person)
+            .filter(Person.id == parsed_id, Person.business_id == int(business_id))
+            .first()
+        )
+        name = getattr(target, "alias_name", None)
+    else:
+        raise ApiError("PAYMENT_BUTTON_TARGET_TYPE_INVALID", "نوع مقصد پرداخت نامعتبر است", http_status=400)
+
+    if not target:
+        raise ApiError("PAYMENT_BUTTON_TARGET_NOT_FOUND", "مقصد پرداخت یافت نشد یا غیرفعال است", http_status=404)
+    return target, str(name or "مقصد پرداخت")
+
+
+def _payment_button_target_id(row: QuickSalesPaymentButton) -> int:
+    if row.target_type == "cash_register":
+        return int(row.cash_register_id)
+    if row.target_type == "bank":
+        return int(row.bank_account_id)
+    return int(row.person_id)
+
+
+def _payment_button_to_dict(db: Session, row: QuickSalesPaymentButton) -> Dict[str, Any]:
+    _, target_name = _payment_button_target(
+        db, row.business_id, row.target_type, _payment_button_target_id(row)
+    )
+    # برای شخص، خود نام شخص روی دکمه نمایش داده می‌شود تا عنوان مبهمی مثل «کارت شخصی» نسازیم.
+    label = target_name if row.target_type == "person" else (row.label or target_name)
+    return {
+        "id": int(row.id),
+        "business_id": int(row.business_id),
+        "scope": row.scope,
+        "owner_user_id": int(row.owner_user_id) if row.owner_user_id else None,
+        "target_type": row.target_type,
+        "target_id": _payment_button_target_id(row),
+        "target_name": target_name,
+        "label": label,
+        "shortcut": row.shortcut,
+        "position": int(row.position),
+        "is_active": bool(row.is_active),
+        "is_system": False,
+    }
+
+
+def _assert_payment_button_shortcut_available(
+    db: Session,
+    *,
+    business_id: int,
+    scope: str,
+    owner_user_id: int | None,
+    shortcut: str | None,
+    exclude_id: int | None = None,
+) -> None:
+    if not shortcut:
+        return
+    query = db.query(QuickSalesPaymentButton).filter(
+        QuickSalesPaymentButton.business_id == int(business_id),
+        QuickSalesPaymentButton.is_active == True,  # noqa: E712
+        func.upper(QuickSalesPaymentButton.shortcut) == shortcut,
+    )
+    if exclude_id is not None:
+        query = query.filter(QuickSalesPaymentButton.id != int(exclude_id))
+    if scope == "business":
+        query = query.filter(
+            or_(
+                QuickSalesPaymentButton.scope == "business",
+                QuickSalesPaymentButton.scope == "user",
+            )
+        )
+    else:
+        query = query.filter(
+            or_(
+                QuickSalesPaymentButton.scope == "business",
+                and_(
+                    QuickSalesPaymentButton.scope == "user",
+                    QuickSalesPaymentButton.owner_user_id == int(owner_user_id),
+                ),
+            )
+        )
+    if query.first():
+        raise ApiError(
+            "PAYMENT_BUTTON_SHORTCUT_CONFLICT",
+            "این میانبر قبلاً برای یک دکمه پرداخت استفاده شده است",
+            http_status=409,
+        )
+
+
+def list_quick_sales_payment_buttons(
+    db: Session, business_id: int, user_id: int
+) -> List[Dict[str, Any]]:
+    rows = (
+        db.query(QuickSalesPaymentButton)
+        .filter(
+            QuickSalesPaymentButton.business_id == int(business_id),
+            QuickSalesPaymentButton.is_active == True,  # noqa: E712
+            or_(
+                QuickSalesPaymentButton.scope == "business",
+                and_(
+                    QuickSalesPaymentButton.scope == "user",
+                    QuickSalesPaymentButton.owner_user_id == int(user_id),
+                ),
+            ),
+        )
+        .order_by(QuickSalesPaymentButton.position.asc(), QuickSalesPaymentButton.id.asc())
+        .all()
+    )
+    result = [_payment_button_to_dict(db, row) for row in rows]
+    if result:
+        return result
+
+    settings = (
+        db.query(QuickSalesSetting)
+        .filter(QuickSalesSetting.business_id == int(business_id))
+        .first()
+    )
+    register_id = getattr(settings, "default_cash_register_id", None)
+    if not register_id:
+        return []
+    try:
+        _, name = _payment_button_target(db, business_id, "cash_register", register_id)
+    except ApiError:
+        return []
+    return [{
+        "id": f"system-cash-{int(register_id)}",
+        "business_id": int(business_id),
+        "scope": "system",
+        "owner_user_id": None,
+        "target_type": "cash_register",
+        "target_id": int(register_id),
+        "target_name": name,
+        "label": name,
+        "shortcut": None,
+        "position": 0,
+        "is_active": True,
+        "is_system": True,
+    }]
+
+
+def create_quick_sales_payment_button(
+    db: Session,
+    *,
+    business_id: int,
+    user_id: int,
+    payload: Dict[str, Any],
+    can_manage_business: bool,
+) -> Dict[str, Any]:
+    scope = str(payload.get("scope") or "user").strip().lower()
+    if scope not in PAYMENT_BUTTON_SCOPES:
+        raise ApiError("PAYMENT_BUTTON_SCOPE_INVALID", "دامنه دکمه نامعتبر است", http_status=400)
+    if scope == "business" and not can_manage_business:
+        raise ApiError("FORBIDDEN", "مجوز تعریف دکمه مشترک را ندارید", http_status=403)
+    target_type = str(payload.get("target_type") or "").strip().lower()
+    if target_type not in PAYMENT_BUTTON_TARGETS:
+        raise ApiError("PAYMENT_BUTTON_TARGET_TYPE_INVALID", "نوع مقصد پرداخت نامعتبر است", http_status=400)
+    target, target_name = _payment_button_target(
+        db, business_id, target_type, payload.get("target_id")
+    )
+    owner_user_id = int(user_id) if scope == "user" else None
+    count = (
+        db.query(func.count(QuickSalesPaymentButton.id))
+        .filter(
+            QuickSalesPaymentButton.business_id == int(business_id),
+            QuickSalesPaymentButton.scope == scope,
+            QuickSalesPaymentButton.owner_user_id == owner_user_id,
+            QuickSalesPaymentButton.is_active == True,  # noqa: E712
+        )
+        .scalar()
+        or 0
+    )
+    if int(count) >= MAX_PAYMENT_BUTTONS_PER_SCOPE:
+        raise ApiError("PAYMENT_BUTTON_LIMIT", "حداکثر تعداد دکمه‌های پرداخت ثبت شده است", http_status=400)
+    shortcut = _normalize_payment_button_shortcut(payload.get("shortcut"))
+    _assert_payment_button_shortcut_available(
+        db,
+        business_id=business_id,
+        scope=scope,
+        owner_user_id=owner_user_id,
+        shortcut=shortcut,
+    )
+    max_position = (
+        db.query(func.max(QuickSalesPaymentButton.position))
+        .filter(
+            QuickSalesPaymentButton.business_id == int(business_id),
+            QuickSalesPaymentButton.scope == scope,
+            QuickSalesPaymentButton.owner_user_id == owner_user_id,
+        )
+        .scalar()
+    )
+    label = str(payload.get("label") or "").strip() or target_name
+    if target_type == "person":
+        label = target_name
+    row = QuickSalesPaymentButton(
+        business_id=int(business_id),
+        scope=scope,
+        owner_user_id=owner_user_id,
+        target_type=target_type,
+        cash_register_id=int(target.id) if target_type == "cash_register" else None,
+        bank_account_id=int(target.id) if target_type == "bank" else None,
+        person_id=int(target.id) if target_type == "person" else None,
+        label=label[:120],
+        shortcut=shortcut,
+        position=(int(max_position) + 1) if max_position is not None else 0,
+        is_active=True,
+        created_by_user_id=int(user_id),
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return _payment_button_to_dict(db, row)
+
+
+def update_quick_sales_payment_button(
+    db: Session,
+    *,
+    business_id: int,
+    button_id: int,
+    user_id: int,
+    payload: Dict[str, Any],
+    can_manage_business: bool,
+) -> Dict[str, Any]:
+    row = (
+        db.query(QuickSalesPaymentButton)
+        .filter(
+            QuickSalesPaymentButton.id == int(button_id),
+            QuickSalesPaymentButton.business_id == int(business_id),
+            QuickSalesPaymentButton.is_active == True,  # noqa: E712
+        )
+        .first()
+    )
+    if not row:
+        raise ApiError("PAYMENT_BUTTON_NOT_FOUND", "دکمه پرداخت یافت نشد", http_status=404)
+    if row.scope == "business" and not can_manage_business:
+        raise ApiError("FORBIDDEN", "مجوز ویرایش دکمه مشترک را ندارید", http_status=403)
+    if row.scope == "user" and int(row.owner_user_id or 0) != int(user_id):
+        raise ApiError("FORBIDDEN", "این دکمه متعلق به کاربر دیگری است", http_status=403)
+
+    target_type = str(payload.get("target_type") or row.target_type).strip().lower()
+    target_id = payload.get("target_id", _payment_button_target_id(row))
+    target, target_name = _payment_button_target(db, business_id, target_type, target_id)
+    shortcut = _normalize_payment_button_shortcut(payload.get("shortcut", row.shortcut))
+    _assert_payment_button_shortcut_available(
+        db,
+        business_id=business_id,
+        scope=row.scope,
+        owner_user_id=row.owner_user_id,
+        shortcut=shortcut,
+        exclude_id=row.id,
+    )
+    row.target_type = target_type
+    row.cash_register_id = int(target.id) if target_type == "cash_register" else None
+    row.bank_account_id = int(target.id) if target_type == "bank" else None
+    row.person_id = int(target.id) if target_type == "person" else None
+    row.label = (
+        target_name
+        if target_type == "person"
+        else (str(payload.get("label") or row.label or target_name).strip() or target_name)[:120]
+    )
+    row.shortcut = shortcut
+    if "position" in payload:
+        row.position = max(0, int(payload.get("position") or 0))
+    db.commit()
+    db.refresh(row)
+    return _payment_button_to_dict(db, row)
+
+
+def delete_quick_sales_payment_button(
+    db: Session,
+    *,
+    business_id: int,
+    button_id: int,
+    user_id: int,
+    can_manage_business: bool,
+) -> None:
+    row = (
+        db.query(QuickSalesPaymentButton)
+        .filter(
+            QuickSalesPaymentButton.id == int(button_id),
+            QuickSalesPaymentButton.business_id == int(business_id),
+            QuickSalesPaymentButton.is_active == True,  # noqa: E712
+        )
+        .first()
+    )
+    if not row:
+        raise ApiError("PAYMENT_BUTTON_NOT_FOUND", "دکمه پرداخت یافت نشد", http_status=404)
+    if row.scope == "business" and not can_manage_business:
+        raise ApiError("FORBIDDEN", "مجوز حذف دکمه مشترک را ندارید", http_status=403)
+    if row.scope == "user" and int(row.owner_user_id or 0) != int(user_id):
+        raise ApiError("FORBIDDEN", "این دکمه متعلق به کاربر دیگری است", http_status=403)
+    row.is_active = False
+    db.commit()
+
+
+def reorder_quick_sales_payment_buttons(
+    db: Session,
+    *,
+    business_id: int,
+    user_id: int,
+    button_ids: List[Any],
+    can_manage_business: bool,
+) -> List[Dict[str, Any]]:
+    """ترتیب مؤثر دکمه‌های مشترک و شخصی کاربر را ذخیره می‌کند."""
+    try:
+        ordered_ids = [int(value) for value in button_ids]
+    except (TypeError, ValueError) as exc:
+        raise ApiError(
+            "PAYMENT_BUTTON_ORDER_INVALID",
+            "ترتیب دکمه‌های پرداخت نامعتبر است",
+            http_status=400,
+        ) from exc
+    if len(ordered_ids) != len(set(ordered_ids)):
+        raise ApiError(
+            "PAYMENT_BUTTON_ORDER_INVALID",
+            "شناسه تکراری در ترتیب دکمه‌ها وجود دارد",
+            http_status=400,
+        )
+    rows = (
+        db.query(QuickSalesPaymentButton)
+        .filter(
+            QuickSalesPaymentButton.business_id == int(business_id),
+            QuickSalesPaymentButton.id.in_(ordered_ids),
+            QuickSalesPaymentButton.is_active == True,  # noqa: E712
+        )
+        .all()
+    )
+    by_id = {int(row.id): row for row in rows}
+    if set(by_id) != set(ordered_ids):
+        raise ApiError(
+            "PAYMENT_BUTTON_NOT_FOUND",
+            "یکی از دکمه‌های پرداخت یافت نشد",
+            http_status=404,
+        )
+    for row in rows:
+        if row.scope == "business" and not can_manage_business:
+            raise ApiError(
+                "FORBIDDEN",
+                "مجوز تغییر ترتیب دکمه‌های مشترک را ندارید",
+                http_status=403,
+            )
+        if row.scope == "user" and int(row.owner_user_id or 0) != int(user_id):
+            raise ApiError("FORBIDDEN", "این دکمه متعلق به کاربر دیگری است", http_status=403)
+    for position, button_id in enumerate(ordered_ids):
+        by_id[button_id].position = position
+    db.commit()
+    return list_quick_sales_payment_buttons(db, business_id, user_id)
 
 
 def normalize_default_share_channels(value: Any) -> List[str]:
@@ -114,6 +531,7 @@ def get_quick_sales_settings(db: Session, business_id: int) -> Dict[str, Any]:
             "default_anonymous_customer_id": None,
             "auto_create_anonymous_customer": True,
             "anonymous_customer_name": "مشتری ناشناس",
+            "quick_customer_group_id": None,
             "default_warehouse_id": None,
             "default_cash_register_id": None,
             "default_currency_id": business_default_currency_id,
@@ -125,6 +543,7 @@ def get_quick_sales_settings(db: Session, business_id: int) -> Dict[str, Any]:
             "warehouse_document_type": "posted",
             "auto_post_warehouse": True,
             "show_inventory": True,
+            "enable_stock_shortage_override": False,
             "auto_create_payment_document": True,
             "show_purchase_price": False,
             **_share_settings_from_obj(None),
@@ -138,6 +557,7 @@ def get_quick_sales_settings(db: Session, business_id: int) -> Dict[str, Any]:
         "default_anonymous_customer_id": int(obj.default_anonymous_customer_id) if obj.default_anonymous_customer_id else None,
         "auto_create_anonymous_customer": bool(obj.auto_create_anonymous_customer),
         "anonymous_customer_name": obj.anonymous_customer_name if obj.anonymous_customer_name else "مشتری ناشناس",
+        "quick_customer_group_id": int(obj.quick_customer_group_id) if obj.quick_customer_group_id else None,
         "default_warehouse_id": int(obj.default_warehouse_id) if obj.default_warehouse_id else None,
         "default_cash_register_id": int(obj.default_cash_register_id) if obj.default_cash_register_id else None,
         "default_currency_id": currency_id,
@@ -149,6 +569,9 @@ def get_quick_sales_settings(db: Session, business_id: int) -> Dict[str, Any]:
         "warehouse_document_type": str(getattr(obj, 'warehouse_document_type', 'posted')),
         "auto_post_warehouse": bool(obj.auto_post_warehouse),
         "show_inventory": bool(obj.show_inventory),
+        "enable_stock_shortage_override": bool(
+            getattr(obj, "enable_stock_shortage_override", False)
+        ),
         "auto_create_payment_document": bool(obj.auto_create_payment_document),
         "show_purchase_price": bool(obj.show_purchase_price),
         **_share_settings_from_obj(obj),
@@ -192,6 +615,12 @@ def update_quick_sales_settings(db: Session, business_id: int, payload: Dict[str
             obj.anonymous_customer_name = str(name_data).strip()
         else:
             obj.anonymous_customer_name = None
+
+    if "quick_customer_group_id" in payload:
+        group_id = payload.get("quick_customer_group_id")
+        if group_id is not None:
+            assert_assignable_person_group(db, int(business_id), int(group_id))
+        obj.quick_customer_group_id = int(group_id) if group_id is not None else None
     
     if "default_warehouse_id" in payload:
         warehouse_id = payload.get("default_warehouse_id")
@@ -274,6 +703,11 @@ def update_quick_sales_settings(db: Session, business_id: int, payload: Dict[str
     
     if "show_inventory" in payload:
         obj.show_inventory = bool(payload.get("show_inventory"))
+
+    if "enable_stock_shortage_override" in payload:
+        obj.enable_stock_shortage_override = bool(
+            payload.get("enable_stock_shortage_override")
+        )
     
     if "auto_create_payment_document" in payload:
         obj.auto_create_payment_document = bool(payload.get("auto_create_payment_document"))
@@ -418,4 +852,3 @@ def get_or_create_anonymous_customer(
         "مشتری ناشناس تعریف نشده است. لطفاً در تنظیمات فروش سریع یک مشتری پیش‌فرض انتخاب کنید.",
         http_status=400
     )
-

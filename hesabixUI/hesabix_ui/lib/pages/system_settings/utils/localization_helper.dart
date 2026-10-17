@@ -80,6 +80,8 @@ class LocalizationHelper {
         return t.settingsZohalSettings;
       case 'settingsTaxProductCodes':
         return t.settingsTaxProductCodes;
+      case 'settingsTaxProviders':
+        return t.settingsTaxProviders;
       case 'settingsSystemMonitoring':
         return t.settingsSystemMonitoring;
       case 'settingsServiceLogs':
@@ -168,6 +170,8 @@ class LocalizationHelper {
         return t.settingsZohalSettingsDescription;
       case 'settingsTaxProductCodesDescription':
         return t.settingsTaxProductCodesDescription;
+      case 'settingsTaxProvidersDescription':
+        return t.settingsTaxProvidersDescription;
       case 'settingsSystemMonitoringDescription':
         return t.settingsSystemMonitoringDescription;
       case 'settingsServiceLogsDescription':

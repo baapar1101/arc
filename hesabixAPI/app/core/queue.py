@@ -121,6 +121,7 @@ class QueueService:
         timeout: int = 300,
         result_ttl: int = 3600,
         job_id: Optional[str] = None,
+        job_meta: Optional[Dict[str, Any]] = None,
         **kwargs
     ) -> Optional[Job]:
         """
@@ -133,6 +134,7 @@ class QueueService:
             timeout: حداکثر زمان اجرا (ثانیه)
             result_ttl: زمان نگهداری نتیجه (ثانیه)
             job_id: شناسه job (اختیاری)
+            job_meta: metadata ذخیره‌شده روی job، جدا از آرگومان‌های تابع
             **kwargs: آرگومان‌های keyword
         
         Returns:
@@ -147,14 +149,15 @@ class QueueService:
             if queue is None:
                 return None
             
-            job = queue.enqueue(
-                func,
-                *args,
-                job_id=job_id,
-                timeout=timeout,
-                result_ttl=result_ttl,
-                **kwargs
-            )
+            enqueue_options = {
+                "job_id": job_id,
+                "timeout": timeout,
+                "result_ttl": result_ttl,
+                **kwargs,
+            }
+            if job_meta is not None:
+                enqueue_options["meta"] = dict(job_meta)
+            job = queue.enqueue(func, *args, **enqueue_options)
             logger.info(f"Job {job.id} enqueued to {queue_name} queue")
             return job
         except Exception as e:

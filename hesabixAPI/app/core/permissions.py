@@ -94,10 +94,11 @@ def require_superadmin():
 def require_business_access(
     business_id_param: str = "business_id",
     *,
-    offload_sync: bool = False,
+    offload_sync: bool = True,
 ):
     """Decorator برای بررسی دسترسی به کسب و کار خاص.
     امضای اصلی endpoint حفظ می‌شود و Request از آرگومان‌ها استخراج می‌گردد.
+    Handlerهای همگام به‌طور پیش‌فرض در thread pool اجرا می‌شوند تا event loop مسدود نشود.
     """
     def decorator(func: Callable) -> Callable:
         @wraps(func)

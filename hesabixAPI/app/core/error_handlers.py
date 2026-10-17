@@ -75,6 +75,7 @@ def _translate_http_exception(request: Request, exc: HTTPException) -> JSONRespo
 	translator = getattr(request.state, "translator", None)
 	detail = exc.detail
 	status_code = exc.status_code or 400
+	headers = exc.headers
 	if isinstance(detail, dict) and isinstance(detail.get("error"), dict):
 		error = detail["error"]
 		code = error.get("code")
@@ -96,7 +97,7 @@ def _translate_http_exception(request: Request, exc: HTTPException) -> JSONRespo
 				code,
 				error.get("message") if isinstance(error, dict) else message,
 			)
-		return JSONResponse(status_code=status_code, content=detail)
+		return JSONResponse(status_code=status_code, content=detail, headers=headers)
 	# ساختار قدیمی: { "error": "CODE", "message": "...", ... } (مثلاً file_storage_service)
 	if isinstance(detail, dict) and isinstance(detail.get("error"), str):
 		code = detail["error"]
@@ -114,6 +115,7 @@ def _translate_http_exception(request: Request, exc: HTTPException) -> JSONRespo
 		return JSONResponse(
 			status_code=status_code,
 			content={"success": False, "error": error_obj},
+			headers=headers,
 		)
 	# fallback generic shape
 	message = ""
@@ -124,7 +126,11 @@ def _translate_http_exception(request: Request, exc: HTTPException) -> JSONRespo
 	# اگر پیام مشخص از اپلیکیشن داریم، همان را نگه می‌داریم؛ وگرنه از ترجمهٔ عمومی HTTP_ERROR استفاده می‌کنیم
 	if not (message and message.strip()) and translator is not None:
 		message = translator.t("HTTP_ERROR", default=message)
-	return JSONResponse(status_code=status_code, content={"success": False, "error": {"code": "HTTP_ERROR", "message": message}})
+	return JSONResponse(
+		status_code=status_code,
+		content={"success": False, "error": {"code": "HTTP_ERROR", "message": message}},
+		headers=headers,
+	)
 
 
 def _handle_pydantic_serialization_error(request: Request, exc: BaseException) -> JSONResponse:

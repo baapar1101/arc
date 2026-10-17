@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../services/quick_sales_service.dart';
 import '../../services/payment_gateway_service.dart';
+import '../../services/person_group_service.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import '../../utils/error_extractor.dart';
@@ -12,6 +13,7 @@ import '../../widgets/invoice/cash_register_combobox_widget.dart';
 import '../../widgets/invoice/price_list_combobox_widget.dart';
 import '../../widgets/banking/currency_picker_widget.dart';
 import '../../models/customer_model.dart';
+import '../../models/person_group_model.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 import '../../constants/invoice_print_paper.dart';
 import '../../services/report_template_service.dart';
@@ -44,6 +46,11 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
   String? _selectedCashRegisterId;
   int? _selectedCurrencyId;
   int? _selectedPriceListId;
+  int? _selectedQuickCustomerGroupId;
+  List<PersonGroup> _quickCustomerGroups = const [];
+  bool _loadingQuickCustomerGroups = false;
+  bool _quickCustomerGroupsLoadFailed = false;
+  String? _quickCustomerGroupsError;
 
   // Boolean settings
   bool _autoCreateAnonymousCustomer = true;
@@ -57,6 +64,7 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
   String _warehouseDocumentType = 'posted'; // 'draft' or 'posted'
   bool _autoPostWarehouse = true; // برای سازگاری با گذشته
   bool _showInventory = true;
+  bool _enableStockShortageOverride = false;
   bool _autoCreatePaymentDocument = true;
   bool _showPurchasePrice = false;
 
@@ -71,6 +79,7 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
   bool _loadingShareGateways = false;
 
   final _gatewayService = PaymentGatewayService(ApiClient());
+  final _personGroupService = PersonGroupService();
 
   @override
   void initState() {
@@ -99,6 +108,7 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
         _selectedCashRegisterId = settings['default_cash_register_id']?.toString();
         _selectedCurrencyId = settings['default_currency_id'];
         _selectedPriceListId = settings['default_price_list_id'];
+        _selectedQuickCustomerGroupId = (settings['quick_customer_group_id'] as num?)?.toInt();
         _autoPrint = settings['auto_print'] ?? false;
         _printPaperSize = (settings['print_paper_size'] ?? '80mm')?.toString();
         _printTemplateId = (settings['print_template_id'] as num?)?.toInt();
@@ -106,6 +116,7 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
         _warehouseDocumentType = settings['warehouse_document_type'] ?? 'posted';
         _autoPostWarehouse = settings['auto_post_warehouse'] ?? true;
         _showInventory = settings['show_inventory'] ?? true;
+        _enableStockShortageOverride = settings['enable_stock_shortage_override'] ?? false;
         _autoCreatePaymentDocument = settings['auto_create_payment_document'] ?? true;
         _showPurchasePrice = settings['show_purchase_price'] ?? false;
         _defaultShareOnlinePayment = settings['default_share_online_payment'] ?? true;
@@ -120,6 +131,7 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
         }
       });
 
+      await _loadQuickCustomerGroups();
       await _loadShareGateways();
       await _loadPrintTemplates();
       
@@ -134,6 +146,41 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
     } finally {
       setState(() {
         _loading = false;
+      });
+    }
+  }
+
+  Future<void> _loadQuickCustomerGroups() async {
+    setState(() {
+      _loadingQuickCustomerGroups = true;
+      _quickCustomerGroupsLoadFailed = false;
+      _quickCustomerGroupsError = null;
+    });
+    try {
+      final groups = await _personGroupService.listGroups(
+        businessId: widget.businessId,
+        activeOnly: true,
+        rootOnly: true,
+      );
+      if (!mounted) return;
+      final availableIds = groups.map((group) => group.id).toSet();
+      setState(() {
+        _quickCustomerGroups = groups;
+        _loadingQuickCustomerGroups = false;
+        _quickCustomerGroupsLoadFailed = false;
+        if (_selectedQuickCustomerGroupId != null &&
+            !availableIds.contains(_selectedQuickCustomerGroupId)) {
+          _selectedQuickCustomerGroupId = null;
+          _quickCustomerGroupsError = 'گروه ذخیره‌شده غیرفعال یا حذف شده است؛ گزینه «بدون گروه» انتخاب شد.';
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _quickCustomerGroups = const [];
+        _loadingQuickCustomerGroups = false;
+        _quickCustomerGroupsLoadFailed = true;
+        _quickCustomerGroupsError = 'بارگذاری گروه‌های اشخاص انجام نشد.';
       });
     }
   }
@@ -232,6 +279,7 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
             ? null 
             : _anonymousCustomerNameController.text.trim(),
         'auto_create_anonymous_customer': _autoCreateAnonymousCustomer,
+        'quick_customer_group_id': _selectedQuickCustomerGroupId,
         if (_selectedAnonymousCustomer != null)
           'default_anonymous_customer_id': _selectedAnonymousCustomer!.id,
         if (_selectedWarehouseId != null)
@@ -249,6 +297,7 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
         'warehouse_document_type': _warehouseDocumentType,
         'auto_post_warehouse': _autoPostWarehouse,
         'show_inventory': _showInventory,
+        'enable_stock_shortage_override': _enableStockShortageOverride,
         'auto_create_payment_document': _autoCreatePaymentDocument,
         'show_purchase_price': _showPurchasePrice,
         'default_share_online_payment': _defaultShareOnlinePayment,
@@ -339,6 +388,61 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
                                     _autoCreateAnonymousCustomer = v;
                                   });
                                 },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+
+                          _buildSection(
+                            title: 'ثبت سریع مشتری',
+                            icon: Icons.person_add_alt_1_outlined,
+                            children: [
+                              if (_loadingQuickCustomerGroups)
+                                const LinearProgressIndicator()
+                              else if (_quickCustomerGroupsLoadFailed)
+                                OutlinedButton.icon(
+                                  onPressed: _loadQuickCustomerGroups,
+                                  icon: const Icon(Icons.refresh),
+                                  label: const Text('تلاش مجدد برای بارگذاری گروه‌ها'),
+                                )
+                              else
+                                DropdownButtonFormField<int?>(
+                                  initialValue: _selectedQuickCustomerGroupId,
+                                  decoration: const InputDecoration(
+                                    labelText: 'گروه مشتریان ثبت‌شده سریع',
+                                    helperText: 'فقط مشتریان جدیدی که از فیلد مشتری فروش سریع ثبت می‌شوند در این گروه قرار می‌گیرند.',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  items: [
+                                    const DropdownMenuItem<int?>(
+                                      value: null,
+                                      child: Text('بدون گروه'),
+                                    ),
+                                    ..._quickCustomerGroups.map(
+                                      (group) => DropdownMenuItem<int?>(
+                                        value: group.id,
+                                        child: Text(group.name, overflow: TextOverflow.ellipsis),
+                                      ),
+                                    ),
+                                  ],
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _selectedQuickCustomerGroupId = value;
+                                      _quickCustomerGroupsError = null;
+                                    });
+                                  },
+                                ),
+                              if (_quickCustomerGroupsError != null) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  _quickCustomerGroupsError!,
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.error),
+                                ),
+                              ],
+                              const SizedBox(height: 8),
+                              Text(
+                                'مشتریان موجود و مشتری ناشناس تغییر نمی‌کنند.',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                               ),
                             ],
                           ),
@@ -550,6 +654,15 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
                                     _showInventory = v;
                                   });
                                 },
+                              ),
+                              const SizedBox(height: 8),
+                              SwitchListTile(
+                                title: const Text('گردش‌کار کسری موجودی در فروش سریع'),
+                                subtitle: const Text('هنگام کسری، امکان اصلاح موجودی یا ثبت یک‌باره فروش با موجودی منفی را به کاربران مجاز نشان می‌دهد'),
+                                value: _enableStockShortageOverride,
+                                onChanged: _enableWarehouseDocument && _warehouseDocumentType == 'posted'
+                                    ? (v) => setState(() => _enableStockShortageOverride = v)
+                                    : null,
                               ),
                             ],
                           ),
@@ -791,4 +904,3 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
     );
   }
 }
-

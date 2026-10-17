@@ -46,6 +46,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
   bool _supportPaidPriorityBoost = true;
   final TextEditingController _supportInvoicePrefixCtrl = TextEditingController(text: 'SUP');
   int _sessionTimeout = 30;
+  int _mcpOauthSessionDays = 30;
   int _maxFileSize = 10;
   int _maxUsers = 0;
   String _businessCreationRequirement = 'none';
@@ -197,6 +198,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                   ? data['support_invoice_prefix'].toString().trim()
                   : 'SUP';
           _sessionTimeout = data['session_timeout'] as int? ?? 30;
+          _mcpOauthSessionDays = _asConfigInt(data['mcp_oauth_session_days'], 30);
           _maxFileSize = data['max_file_size'] as int? ?? 10;
           _maxUsers = data['max_users'] as int? ?? 0;
           final reqValueRaw = data['business_creation_verification_requirement'];
@@ -496,6 +498,22 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                       max: 1440,
                       allowUnlimited: true,
                       unlimitedLabel: t.unlimited,
+                    ),
+                    _buildNumberField(
+                      label: 'مدت اعتبار اتصال ChatGPT و ابزارهای هوش مصنوعی (روز)',
+                      value: _mcpOauthSessionDays,
+                      onChanged: (value) => setState(() => _mcpOauthSessionDays = value),
+                      min: 1,
+                      max: 365,
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        'پس از این مدت، کاربر باید اتصال حسابیکس را دوباره تایید کند. مقدار پیش‌فرض ۳۰ روز است.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                     ),
                     _buildDropdownField(
                       label: 'محدودیت ایجاد کسب و کار',
@@ -1224,6 +1242,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
         'support_invoice_prefix': _supportInvoicePrefixCtrl.text.trim(),
         'support_paid_priority_boost': _supportPaidPriorityBoost,
         'session_timeout': _sessionTimeout,
+        'mcp_oauth_session_days': _mcpOauthSessionDays,
         'max_file_size': _maxFileSize,
         'max_users': _maxUsers,
         'business_creation_verification_requirement': _businessCreationRequirement,

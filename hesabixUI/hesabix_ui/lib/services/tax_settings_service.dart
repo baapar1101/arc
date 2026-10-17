@@ -105,6 +105,44 @@ class TaxSettingsService {
     }
   }
 
+  Future<TaxSettingsModel> selectProvider({
+    required int businessId,
+    required String providerCode,
+    bool consent = false,
+    Map<String, dynamic>? enrollment,
+  }) async {
+    try {
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        '/tax-settings/business/$businessId/provider',
+        data: {
+          'provider_code': providerCode,
+          'consent': consent,
+          if (enrollment != null) 'enrollment': enrollment,
+        },
+      );
+      final data = response.data?['data'];
+      if (data is Map<String, dynamic>) {
+        return TaxSettingsModel.fromJson(data);
+      }
+      throw Exception('پاسخ نامعتبر از سرور');
+    } on DioException catch (e) {
+      throw _extractMessage(e, defaultMessage: 'تغییر روش ارسال مالیاتی ناموفق بود');
+    }
+  }
+
+  Future<Map<String, dynamic>> syncFanavaAccount(int businessId) async {
+    try {
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        '/tax-settings/business/$businessId/fanava/sync',
+      );
+      final data = response.data?['data'];
+      if (data is Map<String, dynamic>) return data;
+      throw Exception('پاسخ نامعتبر از سرور');
+    } on DioException catch (e) {
+      throw _extractMessage(e, defaultMessage: 'بررسی اتصال فن‌آوا ناموفق بود');
+    }
+  }
+
   Exception _extractMessage(DioException exception, {required String defaultMessage}) {
     final data = exception.response?.data;
     if (data is Map<String, dynamic>) {

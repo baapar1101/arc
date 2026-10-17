@@ -33,5 +33,12 @@
 
   hesabixStartFlutter().catch(function (e) {
     console.error('[Hesabix] Flutter bootstrap failed:', e);
+    var loaderUi = window.__hesabixLoaderUI;
+    if (loaderUi && typeof loaderUi.markSlowLoad === 'function') {
+      loaderUi.markSlowLoad();
+    }
+    if (loaderUi && typeof loaderUi.showRetry === 'function') {
+      loaderUi.showRetry();
+    }
   });
 })();

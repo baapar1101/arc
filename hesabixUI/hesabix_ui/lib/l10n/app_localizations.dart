@@ -37144,6 +37144,336 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unit volume (m³)'**
   String get distributionUnitVolumeM3;
+
+  /// No description provided for @taxSubmissionMethodLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice submission method'**
+  String get taxSubmissionMethodLabel;
+
+  /// No description provided for @taxSubmissionDirect.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct submission'**
+  String get taxSubmissionDirect;
+
+  /// No description provided for @taxSubmissionFanava.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit through Hamrah Fanava'**
+  String get taxSubmissionFanava;
+
+  /// No description provided for @taxSubmissionDirectDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the direct Taxpayer System connection configured for this business'**
+  String get taxSubmissionDirectDescription;
+
+  /// No description provided for @taxSubmissionFanavaDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically register and submit invoices through the Fanava broker using the tax configuration already saved in Hesabix'**
+  String get taxSubmissionFanavaDescription;
+
+  /// No description provided for @fanavaUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Fanava has not been configured by a system administrator yet.'**
+  String get fanavaUnavailable;
+
+  /// No description provided for @fanavaConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'The Fanava account for this business is connected.'**
+  String get fanavaConnected;
+
+  /// No description provided for @fanavaNotConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'After your approval, the business account will be registered automatically with Fanava.'**
+  String get fanavaNotConnected;
+
+  /// No description provided for @fanavaSyncAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh connection'**
+  String get fanavaSyncAccount;
+
+  /// No description provided for @fanavaConsentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable submission through Fanava'**
+  String get fanavaConsentTitle;
+
+  /// No description provided for @fanavaConsentDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'If you continue, Hesabix will create a tax account in the Fanava broker using the owner details and tax profile saved for this business. Hesabix stores the generated login securely and uses the existing tax configuration to submit invoices.'**
+  String get fanavaConsentDescription;
+
+  /// No description provided for @fanavaConsentCheckbox.
+  ///
+  /// In en, this message translates to:
+  /// **'I authorize Hesabix to create a Fanava account for this business and use it to submit invoices.'**
+  String get fanavaConsentCheckbox;
+
+  /// No description provided for @fanavaRegistrationDataTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner details for automatic registration'**
+  String get fanavaRegistrationDataTitle;
+
+  /// No description provided for @fanavaRegistrationDataHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Existing Hesabix details are prefilled. Complete missing fields and verify the name and phone number before registration.'**
+  String get fanavaRegistrationDataHint;
+
+  /// No description provided for @fanavaFirstName.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner first name'**
+  String get fanavaFirstName;
+
+  /// No description provided for @fanavaLastName.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner last name'**
+  String get fanavaLastName;
+
+  /// No description provided for @fanavaFatherName.
+  ///
+  /// In en, this message translates to:
+  /// **'Father name'**
+  String get fanavaFatherName;
+
+  /// No description provided for @fanavaNationalCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner/representative national code'**
+  String get fanavaNationalCode;
+
+  /// No description provided for @fanavaIdentificationNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Identity document number'**
+  String get fanavaIdentificationNumber;
+
+  /// No description provided for @fanavaBirthDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Solar Hijri birth date (year/month/day)'**
+  String get fanavaBirthDate;
+
+  /// No description provided for @fanavaPhoneNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile number'**
+  String get fanavaPhoneNumber;
+
+  /// No description provided for @fanavaEnableButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve and connect Fanava'**
+  String get fanavaEnableButton;
+
+  /// No description provided for @fanavaConnectedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'The business account was registered and connected with Fanava.'**
+  String get fanavaConnectedSuccess;
+
+  /// No description provided for @fanavaSyncSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Fanava connection details were refreshed.'**
+  String get fanavaSyncSuccess;
+
+  /// No description provided for @fanavaAccountPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Fanava registration is being checked. Refresh the connection later to avoid creating a duplicate account.'**
+  String get fanavaAccountPending;
+
+  /// No description provided for @fanavaAccountFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Fanava account registration failed. Review the details and try again.'**
+  String get fanavaAccountFailed;
+
+  /// No description provided for @taxProviderAdminTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Hamrah Fanava broker connection'**
+  String get taxProviderAdminTitle;
+
+  /// No description provided for @taxProviderAdminDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure broker credentials once for the system. Businesses are registered automatically after they approve Fanava.'**
+  String get taxProviderAdminDescription;
+
+  /// No description provided for @taxProviderBaseUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Fanava API URL'**
+  String get taxProviderBaseUrl;
+
+  /// No description provided for @taxProviderBrokerUsername.
+  ///
+  /// In en, this message translates to:
+  /// **'Broker username'**
+  String get taxProviderBrokerUsername;
+
+  /// No description provided for @taxProviderBrokerPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Broker password'**
+  String get taxProviderBrokerPassword;
+
+  /// No description provided for @taxProviderBrokerUsernameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave blank to keep the saved username.'**
+  String get taxProviderBrokerUsernameHint;
+
+  /// No description provided for @taxProviderBrokerPasswordHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave blank to keep the saved password.'**
+  String get taxProviderBrokerPasswordHint;
+
+  /// No description provided for @taxProviderBrokerCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Broker code'**
+  String get taxProviderBrokerCode;
+
+  /// No description provided for @taxProviderContractDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Default contract duration (days)'**
+  String get taxProviderContractDuration;
+
+  /// No description provided for @taxProviderActivate.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Fanava registration and submission'**
+  String get taxProviderActivate;
+
+  /// No description provided for @taxProviderSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Fanava settings'**
+  String get taxProviderSave;
+
+  /// No description provided for @taxProviderTest.
+  ///
+  /// In en, this message translates to:
+  /// **'Test broker connection'**
+  String get taxProviderTest;
+
+  /// No description provided for @taxProviderSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Fanava broker settings were saved.'**
+  String get taxProviderSaved;
+
+  /// No description provided for @taxProviderTestSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Login and broker list succeeded. No account or invoice was created.'**
+  String get taxProviderTestSuccess;
+
+  /// No description provided for @taxProviderNotConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'Broker credentials have not been saved yet.'**
+  String get taxProviderNotConfigured;
+
+  /// No description provided for @taxProviderActiveState.
+  ///
+  /// In en, this message translates to:
+  /// **'Broker connection status'**
+  String get taxProviderActiveState;
+
+  /// No description provided for @settingsTaxProviders.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax submission providers'**
+  String get settingsTaxProviders;
+
+  /// No description provided for @settingsTaxProvidersDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure tax brokers such as Hamrah Fanava'**
+  String get settingsTaxProvidersDescription;
+
+  /// No description provided for @taxProviderInvalidUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid HTTPS URL.'**
+  String get taxProviderInvalidUrl;
+
+  /// No description provided for @taxProviderNumericBrokerCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Broker code must be numeric.'**
+  String get taxProviderNumericBrokerCode;
+
+  /// No description provided for @taxProviderContractRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Contract duration must be between 1 and 3650 days.'**
+  String get taxProviderContractRange;
+
+  /// No description provided for @taxProviderActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get taxProviderActive;
+
+  /// No description provided for @taxProviderInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'Inactive'**
+  String get taxProviderInactive;
+
+  /// No description provided for @fanavaSandboxUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Fanava has no sandbox. Turn off sandbox mode to select Fanava.'**
+  String get fanavaSandboxUnavailable;
+
+  /// No description provided for @taxProviderBrokerCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Brokers'**
+  String get taxProviderBrokerCount;
+
+  /// No description provided for @taxProviderActiveBrokerCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Active brokers'**
+  String get taxProviderActiveBrokerCount;
+
+  /// No description provided for @taxProviderEnabledHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The connection is active. Businesses may register with Fanava after approval.'**
+  String get taxProviderEnabledHint;
+
+  /// No description provided for @taxProviderDisabledHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The connection is disabled. Businesses cannot select Fanava.'**
+  String get taxProviderDisabledHint;
+
+  /// No description provided for @taxProviderSaveBeforeTest.
+  ///
+  /// In en, this message translates to:
+  /// **'Save the new broker credentials before testing the connection.'**
+  String get taxProviderSaveBeforeTest;
 }
 
 class _AppLocalizationsDelegate

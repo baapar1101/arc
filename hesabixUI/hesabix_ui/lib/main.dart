@@ -198,6 +198,7 @@ import 'pages/business/warehouse_locations_page.dart';
 import 'pages/warehouse/warehouse_docs_page.dart';
 import 'pages/warehouse/warehouse_document_details_page.dart';
 import 'pages/warehouse/stock_count_page.dart';
+import 'pages/warehouse/quick_sales_stock_discrepancies_page.dart';
 import 'pages/warehouse/goods_expense_income_list_page.dart';
 import 'pages/business/installments_report_page.dart';
 import 'pages/business/credit_settings_page.dart';
@@ -275,6 +276,7 @@ import 'pages/admin/ai_skills_admin_page.dart';
 import 'pages/admin/ai_marketplace_settings_page.dart';
 import 'pages/admin/ai_eval_admin_page.dart';
 import 'pages/admin/tax_product_codes_page.dart';
+import 'pages/admin/tax_provider_admin_page.dart';
 import 'pages/admin/zohal_settings_page.dart';
 import 'pages/admin/zohal_services_admin_page.dart';
 import 'pages/admin/zohal_statistics_page.dart';
@@ -2022,6 +2024,22 @@ class _MyAppState extends State<MyApp> {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const TaxProductCodesPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'tax-providers',
+                  name: 'system_settings_tax_providers',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed =
+                        _authStore!.isSuperAdmin ||
+                        _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const TaxProviderAdminPage();
                   },
                 ),
                 GoRoute(
@@ -5474,6 +5492,21 @@ class _MyAppState extends State<MyApp> {
                                 StockCountPage(
                                   businessId: businessId,
                                   calendarController: calendarController,
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'quick-sales-stock-discrepancies',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                QuickSalesStockDiscrepanciesPage(
+                                  businessId: businessId,
+                                  calendarController: _calendarController!,
                                 ),
                               );
                             },

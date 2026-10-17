@@ -333,7 +333,7 @@
 - مشکل: `approve_writes=true` روی URL یعنی هر کلاینت MCP با همان API key می‌تواند ابزار مخرب را بدون HITL بزند.
 - معیار پذیرش: MCP به‌صورت پیش‌فرض read-only؛ write فقط با header/body امضاشده یا همان کارت تأیید آسنکرون؛ هرگز query flag.
 - پیشنهاد: حذف query؛ scope در API key (`ai:tools:read` / `ai:tools:write`)؛ audit log اجباری.
-- یادداشت اصلاح: ۱۴۰۵/۰۵/۲۶ — query flag حذف شد؛ `_approve_writes` در آرگومان ابزار نادیده گرفته می‌شود؛ فقط `params.approve_writes === true` در JSON-RPC مجاز است. scope API key هنوز باز است.
+- یادداشت اصلاح: ۱۴۰۵/۰۷/۲۴ — مسیر MCP جدید از credential اختصاصی Bearer و مقید به یک کسب‌وکار استفاده می‌کند؛ پیش‌فرض فقط‌خواندنی است و write با scope مستقل و opt-in مالک فعال می‌شود. `approve_writes` و `_approve_writes` از سمت RPC/آرگومان ابزار مجوز محسوب نمی‌شوند. سرور میدانی و lifecycle تأیید per-call هنوز نیازمند کار تکمیلی است.
 
 ### SEC-03 — کانکتور HTTP SSRF را تا حدی می‌بندد؛ هنوز کامل نیست
 - وضعیت: در حال اصلاح
@@ -728,15 +728,15 @@
 
 # M. MCP و کانکتورهای خارجی
 
-### MCP-01 — پروتکل قدیمی و فقط tools روی HTTP JSON-RPC
+### MCP-01 — تکمیل یکپارچگی MCP و OAuth برای کلاینت‌های بیرونی
 - وضعیت: باز
 - اولویت: P2
 - مالک: backend
-- فایل‌ها: `ai_mcp_service.py` (`MCP_PROTOCOL_VERSION = "2024-11-05"`)، `adapters/api/v1/ai/mcp.py`
-- مشکل: استاندارد ۲۰۲۵ resources/prompts/sampling و انتقال SSE/stdio را دارد. `listChanged: false`. کلاینت‌های Cursor/Claude Desktop انتظار handshake و notifications دارند. این endpoint بیشتر یک RPC ابزار است تا MCP کامل. **کلاینت MCP وجود ندارد** — ایجنت نمی‌تواند سرور MCP خارجی کسب‌وکار را مصرف کند (برخلاف Cursor).
-- معیار پذیرش: سازگاری با spec جاری؛ resources برای دانشنامه؛ prompts برای مهارت؛ بدون write از طریق query (SEC-02)؛ حداقل یک MCP client برای کانکتور خارجی.
-- پیشنهاد: سرور MCP جدا (stdio برای دسکتاپ، SSE برای کلود) با همان registry.
-- یادداشت اصلاح:
+- فایل‌ها: `ai_mcp_service.py`, `adapters/api/v1/ai/mcp.py`, `docs/AI_MCP_EXTERNAL_SERVER.md`
+- مشکل: سرور HTTP ابزارها را از registry منتشر می‌کند و درخواست Agent چندمرحله‌ای را پشتیبانی می‌کند؛ هنوز OAuth Authorization Server و Protected Resource Metadata ندارد. MCP resources/prompts پیاده‌سازی نشده‌اند؛ app نیز MCP client برای سرورهای بیرونی ندارد.
+- معیار پذیرش: OAuth 2.1 تعاملی و metadata استاندارد برای کلاینت‌های الزام‌کنندهٔ OAuth؛ resources برای دادهٔ فقط‌خواندنی و prompts برای مهارت‌ها؛ پوشش باقیماندهٔ protocol و lifecycle مجوزها.
+- پیشنهاد: افزودن OAuth consent و token endpoints روی همین tenant-bound policy، سپس گسترش تدریجی resources/prompts.
+- یادداشت اصلاح: ۱۴۰۵/۰۷/۲۴ — Streamable HTTP stateless و نسخهٔ MCP `2025-11-25` با سازگاری نسخه‌های قدیمی‌تر اضافه شد. credential یک‌بارنمایش، hashشده، ۹۰روزه، قابل‌لغو و مقید به tenant است؛ `ask_hesabix_agent` فقط در حالت تحلیلگر اجرا می‌شود. کلاینت‌هایی که OAuth می‌خواهند هنوز نیازمند authorization server هستند؛ جزئیات اتصال در `docs/AI_MCP_EXTERNAL_SERVER.md`.
 
 ---
 

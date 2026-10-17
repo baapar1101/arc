@@ -463,6 +463,16 @@ class SettingsCategorizationService {
             categoryId: 'external_services',
             order: 3,
           ),
+          SettingsItem(
+            id: 'tax_providers',
+            title: 'settingsTaxProviders',
+            description: 'settingsTaxProvidersDescription',
+            icon: Icons.account_tree_outlined,
+            color: const Color(0xFF00695C),
+            route: '/user/profile/system-settings/tax-providers',
+            categoryId: 'external_services',
+            order: 4,
+          ),
         ],
       ),
 
