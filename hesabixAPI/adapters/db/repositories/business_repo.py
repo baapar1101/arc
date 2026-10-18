@@ -86,6 +86,7 @@ class BusinessRepository(BaseRepository[Business]):
         registration_number: str | None = None,
         economic_id: str | None = None,
         country: str | None = None,
+        default_phone_region: str = "IR",
         province: str | None = None,
         city: str | None = None,
         postal_code: str | None = None,
@@ -105,6 +106,7 @@ class BusinessRepository(BaseRepository[Business]):
             registration_number=registration_number,
             economic_id=economic_id,
             country=country,
+            default_phone_region=default_phone_region,
             province=province,
             city=city,
             postal_code=postal_code

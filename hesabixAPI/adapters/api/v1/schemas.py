@@ -760,6 +760,12 @@ class BusinessCreateRequest(BaseModel):
 	registration_number: Optional[str] = Field(default=None, max_length=50, description="شماره ثبت")
 	economic_id: Optional[str] = Field(default=None, max_length=50, description="شناسه اقتصادی")
 	country: Optional[str] = Field(default=None, max_length=100, description="کشور")
+	default_phone_region: str = Field(
+		default="IR",
+		min_length=2,
+		max_length=2,
+		description="کد ISO دوحرفی کشور پیش‌فرض شماره‌های محلی",
+	)
 	province: Optional[str] = Field(default=None, max_length=100, description="استان")
 	city: Optional[str] = Field(default=None, max_length=100, description="شهر")
 	postal_code: Optional[str] = Field(default=None, max_length=20, description="کد پستی")
@@ -786,6 +792,12 @@ class BusinessUpdateRequest(BaseModel):
 	registration_number: Optional[str] = Field(default=None, max_length=50, description="شماره ثبت")
 	economic_id: Optional[str] = Field(default=None, max_length=50, description="شناسه اقتصادی")
 	country: Optional[str] = Field(default=None, max_length=100, description="کشور")
+	default_phone_region: Optional[str] = Field(
+		default=None,
+		min_length=2,
+		max_length=2,
+		description="کد ISO دوحرفی کشور پیش‌فرض شماره‌های محلی",
+	)
 	province: Optional[str] = Field(default=None, max_length=100, description="استان")
 	city: Optional[str] = Field(default=None, max_length=100, description="شهر")
 	postal_code: Optional[str] = Field(default=None, max_length=20, description="کد پستی")
@@ -1147,6 +1159,10 @@ class BusinessResponse(BaseModel):
 	registration_number: Optional[str] = Field(default=None, description="شماره ثبت")
 	economic_id: Optional[str] = Field(default=None, description="شناسه اقتصادی")
 	country: Optional[str] = Field(default=None, description="کشور")
+	default_phone_region: str = Field(
+		default="IR",
+		description="کد ISO دوحرفی کشور پیش‌فرض شماره‌های محلی",
+	)
 	province: Optional[str] = Field(default=None, description="استان")
 	city: Optional[str] = Field(default=None, description="شهر")
 	postal_code: Optional[str] = Field(default=None, description="کد پستی")
@@ -1462,4 +1478,3 @@ class DocumentCodeReservationResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
