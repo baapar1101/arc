@@ -32,6 +32,7 @@ from adapters.db.models.product_bom import ProductBOM, ProductBOMOutput
 from adapters.db.models.business import Business
 from app.core.calendar import CalendarConverter, CalendarType
 from app.core.responses import ApiError, success_response
+from app.core.transaction_lock import acquire_transaction_lock
 from app.services.document_monetization_service import ensure_document_policy_allows_creation
 from app.services.credit_service import get_business_credit_settings
 import jdatetime
@@ -1577,6 +1578,24 @@ def _validate_outgoing_stock_before_invoice_commit(
     )
     if not lines_to_check:
         return
+    # کنترل و ثبت خروج انبار در یک تراکنش انجام می‌شوند. قفل‌های مرتب‌شده
+    # مانع عبور هم‌زمان دو فروش از روی یک موجودی می‌شوند.
+    stock_lock_keys = sorted(
+        {
+            (
+                int(line.get("product_id")),
+                int((line.get("extra_info") or {}).get("warehouse_id")),
+            )
+            for line in lines_to_check
+            if line.get("product_id") is not None
+            and (line.get("extra_info") or {}).get("warehouse_id") is not None
+        }
+    )
+    for product_id, warehouse_id in stock_lock_keys:
+        acquire_transaction_lock(
+            db,
+            f"inventory_stock:{business_id}:{warehouse_id}:{product_id}",
+        )
     shortages = collect_stock_shortages(
         db, business_id, document.document_date, lines_to_check,
         # InvoiceItemLineهای سند جاری پیش از این کنترل flush شده‌اند. اگر خود سند
@@ -1867,6 +1886,76 @@ def _extract_totals_from_lines(lines: List[Dict[str, Any]]) -> Dict[str, Decimal
         "tax": tax,
         "net": net,
     }
+
+
+def _canonicalize_quick_sale_line_amounts(lines: List[Dict[str, Any]]) -> None:
+    """Rebuild monetary line fields used by quick sales from their inputs."""
+    for line in lines:
+        info = dict(line.get("extra_info") or {})
+        try:
+            qty = Decimal(str(line.get("quantity", 0) or 0))
+            unit_price = Decimal(
+                str(info.get("unit_price", line.get("unit_price", 0)) or 0)
+            )
+            discount_type = str(
+                info.get("discount_type", line.get("discount_type", "percent"))
+                or "percent"
+            ).strip().lower()
+            discount_value = Decimal(
+                str(info.get("discount_value", line.get("discount_value", 0)) or 0)
+            )
+            tax_rate = Decimal(
+                str(info.get("tax_rate", line.get("tax_rate", 0)) or 0)
+            )
+        except Exception as exc:
+            raise ApiError(
+                "INVALID_QUICK_SALE_LINE_AMOUNT",
+                "مقادیر مالی یکی از ردیف‌های فروش سریع نامعتبر است",
+                http_status=400,
+            ) from exc
+        if qty <= 0 or unit_price < 0 or discount_value < 0 or tax_rate < 0:
+            raise ApiError(
+                "INVALID_QUICK_SALE_LINE_AMOUNT",
+                "تعداد، قیمت، تخفیف یا مالیات ردیف نامعتبر است",
+                http_status=400,
+            )
+        gross = qty * unit_price
+        if discount_type == "percent":
+            if discount_value > 100:
+                raise ApiError(
+                    "INVALID_QUICK_SALE_LINE_DISCOUNT",
+                    "درصد تخفیف ردیف باید بین صفر تا صد باشد",
+                    http_status=400,
+                )
+            line_discount = gross * discount_value / Decimal(100)
+        elif discount_type == "amount":
+            line_discount = discount_value
+        else:
+            raise ApiError(
+                "INVALID_QUICK_SALE_LINE_DISCOUNT",
+                "نوع تخفیف ردیف نامعتبر است",
+                http_status=400,
+            )
+        if line_discount > gross:
+            raise ApiError(
+                "INVALID_QUICK_SALE_LINE_DISCOUNT",
+                "تخفیف ردیف نمی‌تواند از مبلغ ردیف بیشتر باشد",
+                http_status=400,
+            )
+        taxable = gross - line_discount
+        tax_amount = taxable * tax_rate / Decimal(100)
+        info.update(
+            {
+                "unit_price": float(unit_price),
+                "discount_type": discount_type,
+                "discount_value": float(discount_value),
+                "line_discount": float(line_discount),
+                "tax_rate": float(tax_rate),
+                "tax_amount": float(tax_amount),
+                "line_total": float(taxable + tax_amount),
+            }
+        )
+        line["extra_info"] = info
 
 
 def _extract_cogs_total(lines: List[Dict[str, Any]]) -> Decimal:
@@ -2851,6 +2940,15 @@ def _normalize_quick_sale_customer_balance_application(
 
     from app.services.quick_sales_service import get_quick_sales_customer_balance
 
+    # مانده یک شخص/ارز باید تا پایان ثبت فاکتور ثابت بماند تا دو صندوق
+    # نتوانند یک اعتبار قبلی را هم‌زمان در دو فروش مصرف کنند.
+    acquire_transaction_lock(
+        db,
+        (
+            "quick_sales_customer_balance:"
+            f"{business_id}:{fiscal_year_id}:{person_id}:{currency_id}"
+        ),
+    )
     current = get_quick_sales_customer_balance(
         db,
         business_id=business_id,
@@ -3215,14 +3313,21 @@ def _create_quick_sale_change_payment(
                 "invoice_id": int(document.id),
                 "person_is_receivable": True,
                 "gross_received": float(
-                    change_amount
-                    + Decimal(
-                        str(
-                            ((document.extra_info or {}).get("totals") or {}).get(
-                                "net", 0
+                    sum(
+                        (
+                            max(
+                                Decimal(0),
+                                Decimal(
+                                    str(
+                                        item.get("settles_amount")
+                                        if item.get("settles_amount") is not None
+                                        else item.get("amount", 0)
+                                    )
+                                ),
                             )
-                            or 0
-                        )
+                            for item in payments
+                        ),
+                        Decimal(0),
                     )
                 ),
                 "overpayment_amount": float(change_amount),
@@ -5271,10 +5376,13 @@ def create_invoice(
         except Exception:
             pass
     data["extra_info"] = header_extra
+    if header_extra.get("quick_sale") is True:
+        _canonicalize_quick_sale_line_amounts(lines_input)
+    global_discount_applied = False
     try:
         from app.services.invoice_global_discount_service import apply_global_discount_to_invoice_payload
 
-        apply_global_discount_to_invoice_payload(
+        global_discount_applied = apply_global_discount_to_invoice_payload(
             db, business_id, invoice_type, lines_input, data
         )
     except ApiError:
@@ -5287,9 +5395,12 @@ def create_invoice(
             http_status=400,
         )
     header_extra = dict(data.get("extra_info") or {})
-    totals = (header_extra.get("totals") or {}) if isinstance(header_extra, dict) else {}
-    totals_missing = not all(k in totals for k in ("gross", "discount", "tax", "net"))
-    if totals_missing:
+    # جمع کلاینت مرجع ثبت حسابداری نیست. سرویس تخفیف کلی، در صورت وجود،
+    # totals را از ردیف‌ها ساخته است؛ در سایر حالت‌ها نیز مستقیماً از ردیف‌ها
+    # محاسبه می‌کنیم.
+    if global_discount_applied:
+        totals = dict(header_extra.get("totals") or {})
+    else:
         totals = _extract_totals_from_lines(lines_input)
     header_extra["totals"] = totals
     data["extra_info"] = header_extra

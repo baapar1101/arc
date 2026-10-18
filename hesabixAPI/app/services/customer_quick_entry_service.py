@@ -251,6 +251,48 @@ def load_quick_customer_candidates(
     return query.limit(int(limit)).all()
 
 
+def load_exact_quick_customer_candidates(
+    db: Session,
+    *,
+    business_id: int,
+    alias_name: str | None,
+) -> list[Person]:
+    """تطبیق دقیق نام را مستقل از سقف نتایج مشابه انجام می‌دهد."""
+    if not alias_name:
+        return []
+    variants = alias_search_variants(alias_name)
+    name_columns = (
+        Person.alias_name,
+        Person.first_name,
+        Person.last_name,
+        Person.company_name,
+    )
+    exact_filters = [
+        func.lower(func.trim(column)) == variant.casefold()
+        for column in name_columns
+        for variant in variants
+    ]
+    full_name = func.trim(
+        func.concat(
+            func.coalesce(Person.first_name, ""),
+            " ",
+            func.coalesce(Person.last_name, ""),
+        )
+    )
+    exact_filters.extend(
+        func.lower(full_name) == variant.casefold() for variant in variants
+    )
+    return (
+        db.query(Person)
+        .filter(
+            Person.business_id == int(business_id),
+            or_(*exact_filters),
+        )
+        .order_by(Person.id)
+        .all()
+    )
+
+
 def resolve_or_create_quick_customer(
     db: Session,
     *,
@@ -276,12 +318,26 @@ def resolve_or_create_quick_customer(
             {"namespace": 1129665364, "business_id": int(business_id)},
         )
 
+    exact_persons = (
+        load_exact_quick_customer_candidates(
+            db,
+            business_id=int(business_id),
+            alias_name=cleaned_alias,
+        )
+        if not normalized_mobile
+        else []
+    )
     persons = load_quick_customer_candidates(
         db,
         business_id=int(business_id),
         alias_name=cleaned_alias,
         mobile=normalized_mobile,
     )
+    if exact_persons:
+        seen_ids = {int(person.id) for person in exact_persons}
+        persons = exact_persons + [
+            person for person in persons if int(person.id) not in seen_ids
+        ]
     matches = find_quick_customer_matches(
         persons,
         alias_name=cleaned_alias,

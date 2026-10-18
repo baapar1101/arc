@@ -50,6 +50,7 @@ void main() {
                 onConfigureChange: () async => null,
                 defaultCashRegisterId: '7',
                 currencyUnit: 'ریال',
+                currencyId: 1,
                 decimalPlaces: 0,
                 enabled: true,
                 onSave: () {},

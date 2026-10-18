@@ -68,6 +68,20 @@ void setLocalStorageValue(String key, String value) {
   } catch (_) {}
 }
 
+/// Returns a value scoped to the current browser tab. `sessionStorage` survives
+/// a refresh but is not shared by separate tabs, preventing two cashiers/tabs
+/// from overwriting the same parked-sales bundle.
+String? getOrCreateSessionStorageValue(String key, String fallbackValue) {
+  try {
+    final current = web.window.sessionStorage.getItem(key);
+    if (current != null && current.isNotEmpty) return current;
+    web.window.sessionStorage.setItem(key, fallbackValue);
+    return fallbackValue;
+  } catch (_) {
+    return fallbackValue;
+  }
+}
+
 /// به‌روزرسانی لودر HTML در فاز init داخل Flutter (۹۶–۱۰۰٪).
 void notifyWebInitProgress({
   required double initProgress,

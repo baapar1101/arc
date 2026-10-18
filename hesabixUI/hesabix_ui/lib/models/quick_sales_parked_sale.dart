@@ -390,12 +390,22 @@ class QuickSalesParkedSalesBundle {
 class QuickSalesParkedSalesStorage {
   static const prefix = 'quick_sales_parked_sales_';
 
-  static String keyFor(int businessId) => '$prefix$businessId';
+  static String keyFor(int businessId, int userId, {String? scope}) {
+    final base = '$prefix${businessId}_user_$userId';
+    final cleanScope = scope?.trim();
+    return cleanScope == null || cleanScope.isEmpty
+        ? base
+        : '${base}_scope_$cleanScope';
+  }
 
-  static Future<QuickSalesParkedSalesBundle?> load(int businessId) async {
+  static Future<QuickSalesParkedSalesBundle?> load(
+    int businessId,
+    int userId, {
+    String? scope,
+  }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(keyFor(businessId));
+      final raw = prefs.getString(keyFor(businessId, userId, scope: scope));
       if (raw == null || raw.isEmpty) return null;
       return QuickSalesParkedSalesBundle.tryParse(jsonDecode(raw));
     } catch (_) {
@@ -403,14 +413,21 @@ class QuickSalesParkedSalesStorage {
     }
   }
 
-  static Future<void> save(
+  static Future<bool> save(
     int businessId,
-    QuickSalesParkedSalesBundle bundle,
-  ) async {
+    int userId,
+    QuickSalesParkedSalesBundle bundle, {
+    String? scope,
+  }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(keyFor(businessId), jsonEncode(bundle.toJson()));
-    } catch (_) {}
+      return await prefs.setString(
+        keyFor(businessId, userId, scope: scope),
+        jsonEncode(bundle.toJson()),
+      );
+    } catch (_) {
+      return false;
+    }
   }
 }
 

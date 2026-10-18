@@ -9,7 +9,6 @@ from typing import Any, Dict, List
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
-from adapters.api.v1.schema_models.person import PersonCreateRequest
 from adapters.db.models.bank_account import BankAccount
 from adapters.db.models.business import Business
 from adapters.db.models.cash_register import CashRegister
@@ -19,8 +18,12 @@ from adapters.db.models.person import Person, PersonType
 from adapters.db.models.quick_sales_payment_button import QuickSalesPaymentButton
 from adapters.db.models.quick_sales_settings import QuickSalesSetting
 from app.core.responses import ApiError
+from app.core.transaction_lock import acquire_transaction_lock
 from app.services.person_group_service import assert_assignable_person_group
-from app.services.person_service import calculate_person_balances_by_currency, create_person
+from app.services.person_service import (
+    calculate_person_balances_by_currency,
+    invalidate_persons_cache,
+)
 from app.services.user_ui_preferences_service import (
     get_quick_sales_payment_shortcuts,
     save_quick_sales_payment_shortcuts,
@@ -248,7 +251,7 @@ def _payment_button_target_id(row: QuickSalesPaymentButton) -> int:
 
 
 def _payment_button_to_dict(db: Session, row: QuickSalesPaymentButton) -> Dict[str, Any]:
-    _, target_name = _payment_button_target(
+    target, target_name = _payment_button_target(
         db, row.business_id, row.target_type, _payment_button_target_id(row)
     )
     # برای شخص، خود نام شخص روی دکمه نمایش داده می‌شود تا عنوان مبهمی مثل «کارت شخصی» نسازیم.
@@ -261,6 +264,11 @@ def _payment_button_to_dict(db: Session, row: QuickSalesPaymentButton) -> Dict[s
         "target_type": row.target_type,
         "target_id": _payment_button_target_id(row),
         "target_name": target_name,
+        "target_currency_id": (
+            int(target.currency_id)
+            if row.target_type in {"cash_register", "bank"}
+            else None
+        ),
         "label": label,
         # Shared-button defaults are stored by platform on the button row.
         # Personal choices live in user_ui_preferences and are resolved below.
@@ -505,7 +513,7 @@ def list_quick_sales_payment_buttons(
     if not register_id:
         return []
     try:
-        _, name = _payment_button_target(db, business_id, "cash_register", register_id)
+        target, name = _payment_button_target(db, business_id, "cash_register", register_id)
     except ApiError:
         return []
     return _apply_user_payment_shortcuts(db, business_id=business_id, user_id=user_id, buttons=[{
@@ -516,6 +524,7 @@ def list_quick_sales_payment_buttons(
         "target_type": "cash_register",
         "target_id": int(register_id),
         "target_name": name,
+        "target_currency_id": int(target.currency_id),
         "label": name,
         "default_shortcuts": {"windows": None, "web": None},
         "position": 0,
@@ -1284,10 +1293,16 @@ def update_quick_sales_settings(db: Session, business_id: int, payload: Dict[str
     if "default_currency_id" in payload:
         currency_id = payload.get("default_currency_id")
         if currency_id is not None:
-            from adapters.db.models.currency import Currency
-            currency = db.query(Currency).filter(Currency.id == int(currency_id)).first()
-            if not currency:
-                raise ApiError("CURRENCY_NOT_FOUND", "ارز یافت نشد", http_status=404)
+            business_currency = db.query(BusinessCurrency).filter(
+                BusinessCurrency.business_id == int(business_id),
+                BusinessCurrency.currency_id == int(currency_id),
+            ).first()
+            if not business_currency:
+                raise ApiError(
+                    "BUSINESS_CURRENCY_NOT_FOUND",
+                    "این ارز برای کسب‌وکار فعال نیست",
+                    http_status=400,
+                )
         obj.default_currency_id = int(currency_id) if currency_id is not None else None
     
     if "default_price_list_id" in payload:
@@ -1309,6 +1324,21 @@ def update_quick_sales_settings(db: Session, business_id: int, payload: Dict[str
     
     if "print_template_id" in payload:
         template_id = payload.get("print_template_id")
+        if template_id is not None:
+            from adapters.db.models.report_template import ReportTemplate
+
+            template = db.query(ReportTemplate).filter(
+                ReportTemplate.id == int(template_id),
+                ReportTemplate.business_id == int(business_id),
+                ReportTemplate.module_key == "invoices",
+                ReportTemplate.status == "published",
+            ).first()
+            if template is None:
+                raise ApiError(
+                    "PRINT_TEMPLATE_NOT_FOUND",
+                    "قالب چاپ منتشرشده متعلق به این کسب‌وکار نیست",
+                    http_status=400,
+                )
         obj.print_template_id = int(template_id) if template_id is not None else None
 
     if "print_paper_size" in payload:
@@ -1372,11 +1402,22 @@ def get_or_create_anonymous_customer(
     settings: Dict[str, Any] | None = None
 ) -> Person:
     """دریافت یا ایجاد مشتری ناشناس"""
+    acquire_transaction_lock(db, f"quick_sales_anonymous_customer:{business_id}")
+    settings_row = (
+        db.query(QuickSalesSetting)
+        .filter(QuickSalesSetting.business_id == int(business_id))
+        .first()
+    )
     if settings is None:
         settings = get_quick_sales_settings(db, business_id)
-    
-    # بررسی مشتری پیش‌فرض
-    customer_id = settings.get("default_anonymous_customer_id")
+
+    # شناسه ذخیره‌شده تنها مرجع تشخیص مشتری سیستمی است. نام نمایشی نباید
+    # باعث شود یک مشتری واقعی به اشتباه مشتری ناشناس شناخته شود.
+    customer_id = (
+        settings_row.default_anonymous_customer_id
+        if settings_row is not None
+        else settings.get("default_anonymous_customer_id")
+    )
     if customer_id:
         customer = db.query(Person).filter(
             and_(
@@ -1387,99 +1428,60 @@ def get_or_create_anonymous_customer(
         ).first()
         if customer:
             return customer
-    
-    # جستجوی مشتری ناشناس موجود
+
     customer_name = settings.get("anonymous_customer_name", "مشتری ناشناس")
     name_fa = str(customer_name) if customer_name else "مشتری ناشناس"
-    
-    # جستجوی مشتری با نام و نوع مشتری
-    # اولویت با مشتری‌هایی که کد دارند (کد None نباشد)
-    customer = db.query(Person).filter(
-        and_(
-            Person.business_id == int(business_id),
-            Person.alias_name == name_fa,
-            Person.person_types.like(f'%{PersonType.CUSTOMER.value}%'),
-            Person.code.isnot(None),  # اولویت با مشتری‌هایی که کد دارند
-        )
-    ).first()
-    
-    # اگر مشتری با کد پیدا نشد، مشتری بدون کد را جستجو کن
-    if not customer:
-        customer = db.query(Person).filter(
-            and_(
-                Person.business_id == int(business_id),
-                Person.alias_name == name_fa,
-                Person.person_types.like(f'%{PersonType.CUSTOMER.value}%'),
-            )
-        ).first()
-    
-    if customer:
-        # به‌روزرسانی تنظیمات (مستقیماً بدون بررسی مجدد)
-        obj = (
-            db.query(QuickSalesSetting)
-            .filter(QuickSalesSetting.business_id == int(business_id))
-            .first()
-        )
-        if not obj:
-            obj = QuickSalesSetting(business_id=int(business_id))
-            db.add(obj)
-        obj.default_anonymous_customer_id = customer.id
-        db.flush()
-        db.commit()
-        return customer
-    
-    # ایجاد جدید با استفاده از create_person برای تولید صحیح کد
+
     if settings.get("auto_create_anonymous_customer", True):
-        # استفاده از create_person برای تولید صحیح کد
-        person_data = PersonCreateRequest(
+        next_code = (
+            db.query(func.max(Person.code))
+            .filter(Person.business_id == int(business_id))
+            .scalar()
+            or 0
+        ) + 1
+        customer = Person(
+            business_id=int(business_id),
+            code=next_code,
             alias_name=name_fa,
-            person_types=[PersonType.CUSTOMER],
-            code=None,  # None = تولید خودکار کد
+            person_types=json.dumps([PersonType.CUSTOMER.value], ensure_ascii=False),
         )
-        
-        result = create_person(db, int(business_id), person_data)
-        logger.debug(f"create_person result: {result}")
-        customer_id = result.get("data", {}).get("id")
-        
-        if not customer_id:
-            logger.error(f"Failed to get customer_id from create_person result: {result}")
-            raise ApiError(
-                "FAILED_TO_CREATE_ANONYMOUS_CUSTOMER",
-                "خطا در ایجاد مشتری ناشناس",
-                http_status=500
-            )
-        
-        # دریافت مشتری ایجاد شده
-        customer = db.query(Person).filter(
-            and_(
-                Person.id == int(customer_id),
-                Person.business_id == int(business_id),
-            )
-        ).first()
-        
-        if not customer:
-            raise ApiError(
-                "ANONYMOUS_CUSTOMER_NOT_FOUND",
-                "مشتری ناشناس ایجاد شد اما یافت نشد",
-                http_status=500
-            )
-        
-        # به‌روزرسانی تنظیمات (مستقیماً بدون بررسی مجدد)
-        obj = (
-            db.query(QuickSalesSetting)
-            .filter(QuickSalesSetting.business_id == int(business_id))
-            .first()
-        )
-        if not obj:
-            obj = QuickSalesSetting(business_id=int(business_id))
-            db.add(obj)
-        obj.default_anonymous_customer_id = customer.id
+        db.add(customer)
+        db.flush()
+        if settings_row is None:
+            settings_row = QuickSalesSetting(business_id=int(business_id))
+            db.add(settings_row)
+        settings_row.default_anonymous_customer_id = customer.id
         db.flush()
         db.commit()
+        db.refresh(customer)
+        invalidate_persons_cache(int(business_id), fiscal_year_id=None)
         return customer
     
     raise ApiError(
         "ANONYMOUS_CUSTOMER_NOT_SET", 
         "مشتری ناشناس تعریف نشده است. لطفاً در تنظیمات فروش سریع یک مشتری پیش‌فرض انتخاب کنید.",
         http_status=400
+    )
+
+
+def get_configured_anonymous_customer(db: Session, business_id: int) -> Person:
+    """Return the explicitly configured anonymous customer without mutation."""
+    row = (
+        db.query(QuickSalesSetting)
+        .filter(QuickSalesSetting.business_id == int(business_id))
+        .first()
+    )
+    customer_id = row.default_anonymous_customer_id if row is not None else None
+    if customer_id is not None:
+        customer = db.query(Person).filter(
+            Person.id == int(customer_id),
+            Person.business_id == int(business_id),
+            Person.person_types.like(f'%{PersonType.CUSTOMER.value}%'),
+        ).first()
+        if customer is not None:
+            return customer
+    raise ApiError(
+        "ANONYMOUS_CUSTOMER_NOT_SET",
+        "مشتری ناشناس تعریف نشده است",
+        http_status=404,
     )

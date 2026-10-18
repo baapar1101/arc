@@ -37,6 +37,7 @@ class QuickSalesPaymentButtonModel {
   final QuickSalesPaymentTargetType targetType;
   final int targetId;
   final String targetName;
+  final int? targetCurrencyId;
   final String label;
   final String? defaultShortcut;
   final String? userShortcut;
@@ -56,6 +57,7 @@ class QuickSalesPaymentButtonModel {
     required this.targetType,
     required this.targetId,
     required this.targetName,
+    required this.targetCurrencyId,
     required this.label,
     required this.defaultShortcut,
     required this.userShortcut,
@@ -108,6 +110,7 @@ class QuickSalesPaymentButtonModel {
       targetType: target,
       targetId: (json['target_id'] as num).toInt(),
       targetName: (json['target_name'] ?? '').toString(),
+      targetCurrencyId: (json['target_currency_id'] as num?)?.toInt(),
       label: (json['label'] ?? json['target_name'] ?? '').toString(),
       defaultShortcut: json['default_shortcut']?.toString(),
       userShortcut: json['user_shortcut']?.toString(),

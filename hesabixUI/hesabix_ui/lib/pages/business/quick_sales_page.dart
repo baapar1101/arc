@@ -53,6 +53,7 @@ import '../../widgets/inputs/frequent_description_text_field.dart';
 import '../../widgets/barcode/web_barcode_scan_screen.dart';
 import '../../utils/general_barcode_utils.dart';
 import '../../utils/responsive_helper.dart';
+import '../../utils/web/web_utils.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
@@ -154,8 +155,15 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   final CategoryService _categoryService = CategoryService(ApiClient());
 
   bool _loading = true;
+  bool _parkedStorageWarningShown = false;
+  late final String? _parkedStorageScope = getOrCreateSessionStorageValue(
+    'hesabix_quick_sales_tab_scope_v1',
+    QuickSalesParkedSale.newId(),
+  );
   _QuickSalesSaveAction _saveAction = _QuickSalesSaveAction.none;
   bool get _isSaving => _saveAction != _QuickSalesSaveAction.none;
+  String _errorText(Object error) =>
+      mounted ? ErrorExtractor.forContext(error, context) : error.toString();
   Map<String, dynamic>? _settings;
   Customer? _anonymousCustomer;
 
@@ -170,7 +178,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   Timer? _stockBatchTimer;
 
   // کش قیمت لیست قیمت (per session)
-  final Map<int, num> _priceListCache = <int, num>{};
+  final Map<int, num?> _priceListCache = <int, num?>{};
 
   // جستجو / افزودن به سبد
   bool _barcodeSearching = false;
@@ -328,7 +336,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         _restoreDesktopRailAfterQuit = () => scope.setRailVisible(true);
       }
       _barcodeFocus.requestFocus();
-      _keyboardListenerFocus.requestFocus();
     });
   }
 
@@ -456,10 +463,12 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       unawaited(
         QuickSalesParkedSalesStorage.save(
           widget.businessId,
+          widget.authStore.currentUserId ?? 0,
           QuickSalesParkedSalesBundle(
             activeId: _activeSaleId,
             sales: List.of(_sales),
           ),
+          scope: _parkedStorageScope,
         ),
       );
     }
@@ -645,13 +654,23 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   Future<void> _persistParkedSalesNow() async {
     if (!_parkedHydrated || _activeSaleId.isEmpty) return;
     _captureActiveSaleIntoList();
-    await QuickSalesParkedSalesStorage.save(
+    final saved = await QuickSalesParkedSalesStorage.save(
       widget.businessId,
+      widget.authStore.currentUserId ?? 0,
       QuickSalesParkedSalesBundle(
         activeId: _activeSaleId,
         sales: List.of(_sales),
       ),
+      scope: _parkedStorageScope,
     );
+    if (!saved && mounted && !_parkedStorageWarningShown) {
+      _parkedStorageWarningShown = true;
+      SnackBarHelper.show(
+        context,
+        message: 'ذخیره محلی فروش‌های پارک‌شده انجام نشد.',
+        isError: true,
+      );
+    }
   }
 
   void _captureActiveSaleIntoList() {
@@ -773,7 +792,11 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   }
 
   Future<void> _hydrateParkedSalesIntoFields() async {
-    final bundle = await QuickSalesParkedSalesStorage.load(widget.businessId);
+    final bundle = await QuickSalesParkedSalesStorage.load(
+      widget.businessId,
+      widget.authStore.currentUserId ?? 0,
+      scope: _parkedStorageScope,
+    );
     if (!mounted) return;
     if (bundle == null || bundle.sales.isEmpty) {
       _activeSaleId = QuickSalesParkedSale.newId();
@@ -799,7 +822,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _barcodeFocus.requestFocus();
-      _keyboardListenerFocus.requestFocus();
     });
     if (_showInventory && _cartItems.isNotEmpty) {
       _refreshAllStocks();
@@ -1504,7 +1526,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
               }
             }
           } catch (e) {
-            notes.add(ErrorExtractor.forContext(e, context));
+            notes.add(_errorText(e));
           }
         }
       }
@@ -1543,7 +1565,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
               }
             }
           } catch (e) {
-            notes.add(ErrorExtractor.forContext(e, context));
+            notes.add(_errorText(e));
           }
         }
       }
@@ -1554,9 +1576,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
 
       return notes;
     } catch (e) {
-      notes.add(
-        '${t.quickSalesShareLinkFailed}: ${ErrorExtractor.forContext(e, context)}',
-      );
+      notes.add('${t.quickSalesShareLinkFailed}: ${_errorText(e)}');
       return notes;
     }
   }
@@ -1867,6 +1887,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
 
             await _addToCart(product, skipHydrate: true);
             await _saveRecentProduct(product);
+            if (!mounted) return;
 
             // پاک کردن جستجوی ناموفق و فیلد جستجو
             setState(() {
@@ -1877,8 +1898,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           } catch (e) {
             SnackBarHelper.show(
               context,
-              message:
-                  'کالا ثبت شد اما خطا در افزودن به سبد: ${ErrorExtractor.forContext(e, context)}',
+              message: 'کالا ثبت شد اما خطا در افزودن به سبد: ${_errorText(e)}',
               isError: true,
             );
           }
@@ -1889,7 +1909,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           });
           _barcodeController.clear();
           _barcodeFocus.requestFocus();
-          SnackBarHelper.show(context, message: 'کالا با موفقیت ثبت شد');
         }
       } else {
         // اگر دیالوگ بسته شد بدون ثبت، جستجوی ناموفق را نگه دار
@@ -1917,13 +1936,13 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     return num.tryParse(value.toString()) ?? defaultValue;
   }
 
-  Future<num> _getPriceFromPriceList(int productId) async {
+  Future<num?> _getPriceFromPriceList(int productId) async {
     if (_priceListCache.containsKey(productId)) {
-      return _priceListCache[productId]!;
+      return _priceListCache[productId];
     }
     // اگر لیست قیمت پیش‌فرض وجود ندارد یا ارز مشخص نشده، null برگردان
     if (_defaultPriceListId == null || _defaultCurrencyId == null) {
-      return 0;
+      return null;
     }
 
     try {
@@ -1952,18 +1971,18 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         }
 
         // اگر unit_id null باشد، یعنی قیمت برای واحد اصلی است
-        if (unitId == null && price != null && price > 0) {
+        if (unitId == null && price != null && price >= 0) {
           _priceListCache[productId] = price;
           return price;
         }
       }
     } catch (e) {
-      // در صورت خطا، 0 برگردان تا از قیمت پایه استفاده شود
+      // در صورت خطا، null برگردان تا از قیمت پایه استفاده شود
       debugPrint('خطا در دریافت قیمت از لیست قیمت: $e');
     }
 
-    _priceListCache[productId] = 0;
-    return 0;
+    _priceListCache[productId] = null;
+    return null;
   }
 
   bool get _hasUniqueItemsInCart =>
@@ -2131,14 +2150,14 @@ class _QuickSalesPageState extends State<QuickSalesPage>
 
       if (_defaultPriceListId != null && _defaultCurrencyId != null) {
         final priceFromList = await _getPriceFromPriceList(productId);
-        if (priceFromList > 0) {
+        if (priceFromList != null) {
           unitPrice = priceFromList;
           unitPriceSource = 'priceList';
         }
       }
 
-      // اگر قیمت از لیست قیمت پیدا نشد یا صفر بود، از قیمت پایه استفاده کن
-      if (unitPrice == 0) {
+      // صفر یک قیمت معتبر (هدیه/پروموشن) است؛ فقط نبود نتیجه fallback می‌شود.
+      if (unitPriceSource != 'priceList') {
         unitPrice = _toNum(
           product['base_sales_price'] ?? product['sales_price'],
         );
@@ -2664,9 +2683,16 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     bool debtConfirmed = false,
     String? appliedStockCorrectionToken,
   }) async {
+    if (_isSaving) return;
+    setState(() {
+      _saveAction = print
+          ? _QuickSalesSaveAction.saveAndPrint
+          : _QuickSalesSaveAction.save;
+    });
     // اعتبارسنجی سبد خرید
     if (_cartItems.isEmpty) {
       SnackBarHelper.show(context, message: 'سبد خرید خالی است', isError: true);
+      setState(() => _saveAction = _QuickSalesSaveAction.none);
       return;
     }
 
@@ -2678,6 +2704,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             'ارز پیش‌فرض تنظیم نشده است. لطفاً در تنظیمات فاکتور سریع تنظیم کنید.',
         isError: true,
       );
+      setState(() => _saveAction = _QuickSalesSaveAction.none);
       return;
     }
 
@@ -2688,6 +2715,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         message: 'برای صدور حواله انبار، انتخاب انبار الزامی است',
         isError: true,
       );
+      setState(() => _saveAction = _QuickSalesSaveAction.none);
       return;
     }
 
@@ -2697,6 +2725,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       final paymentError = _validatePayments(t);
       if (paymentError != null) {
         SnackBarHelper.show(context, message: paymentError, isError: true);
+        setState(() => _saveAction = _QuickSalesSaveAction.none);
         return;
       }
     }
@@ -2723,13 +2752,19 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           ],
         ),
       );
-      if (!mounted || confirmed != true) return;
+      if (!mounted || confirmed != true) {
+        if (mounted) setState(() => _saveAction = _QuickSalesSaveAction.none);
+        return;
+      }
       debtConfirmed = true;
     }
     QuickSalesChangeResolution? changeResolution = _validChangeResolution;
     if (_isOverpaid && changeResolution == null) {
       changeResolution = await _openChangeResolutionDialog();
-      if (!mounted || changeResolution == null) return;
+      if (!mounted || changeResolution == null) {
+        if (mounted) setState(() => _saveAction = _QuickSalesSaveAction.none);
+        return;
+      }
     }
     if (_shouldShareAfterSave) {
       if (_shareOnlinePaymentEnabled) {
@@ -2739,6 +2774,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             message: t.quickSalesShareNoGateway,
             isError: true,
           );
+          setState(() => _saveAction = _QuickSalesSaveAction.none);
           return;
         }
         if (_shareGatewayId == null) {
@@ -2747,6 +2783,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             message: t.quickSalesShareGatewayRequired,
             isError: true,
           );
+          setState(() => _saveAction = _QuickSalesSaveAction.none);
           return;
         }
       }
@@ -2760,6 +2797,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           message: t.invoiceGlobalDiscountPercentInvalid,
           isError: true,
         );
+        setState(() => _saveAction = _QuickSalesSaveAction.none);
         return;
       }
       if (_globalDiscountType == 'amount' && gv0 < 0) {
@@ -2768,15 +2806,10 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           message: t.invoiceGlobalDiscountAmountInvalid,
           isError: true,
         );
+        setState(() => _saveAction = _QuickSalesSaveAction.none);
         return;
       }
     }
-
-    setState(() {
-      _saveAction = print
-          ? _QuickSalesSaveAction.saveAndPrint
-          : _QuickSalesSaveAction.save;
-    });
 
     final shouldPrint = print || _autoPrint;
     final shouldShare = _shouldShareAfterSave;
@@ -2867,6 +2900,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       // ساخت extra_info با person_id و تنظیمات حواله انبار
       final extraInfo = <String, dynamic>{
         'quick_sale': true,
+        'quick_sale_request_id': _activeSaleId,
         'person_id': personId, // همیشه person_id را اضافه می‌کنیم
         'post_inventory': _enableWarehouseDocument, // آیا حواله ایجاد شود؟
         'auto_post_warehouse':
@@ -3042,9 +3076,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       try {
         await _printInvoice(invoiceId: invoiceId, invoiceCode: invoiceCode);
       } catch (e) {
-        followUpNotes.add(
-          'خطا در چاپ: ${ErrorExtractor.forContext(e, context)}',
-        );
+        followUpNotes.add('خطا در چاپ: ${_errorText(e)}');
       }
     }
 
@@ -3059,7 +3091,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         );
         followUpNotes.addAll(shareNotes);
       } catch (e) {
-        followUpNotes.add(ErrorExtractor.forContext(e, context));
+        followUpNotes.add(_errorText(e));
       }
     }
 
@@ -4677,6 +4709,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
                           onConfigureChange: _openChangeResolutionDialog,
                           defaultCashRegisterId: _selectedCashRegisterId,
                           currencyUnit: _paymentCurrencyUnit,
+                          currencyId: _defaultCurrencyId!,
                           decimalPlaces: _invoiceCurrencyDecimalPlaces,
                           enabled: !_isSaving,
                           onSave: () => _saveInvoice(print: false),

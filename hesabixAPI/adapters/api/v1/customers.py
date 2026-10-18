@@ -7,6 +7,7 @@ from adapters.db.models.person import Person
 from adapters.db.session import get_db
 from app.core.responses import ApiError
 from app.core.auth_dependency import get_current_user, AuthContext
+from app.core.permissions import has_business_permission_for_business
 from app.services.person_service import search_persons, count_persons, get_person_by_id
 from app.services.customer_quick_entry_service import resolve_or_create_quick_customer
 
@@ -19,6 +20,32 @@ def _require_business_access(ctx: AuthContext, business_id: int) -> None:
         raise ApiError(
             "FORBIDDEN",
             f"No access to business {business_id}",
+            http_status=403,
+        )
+
+
+def _require_quick_sales_permission(
+    ctx: AuthContext,
+    db: Session,
+    business_id: int,
+    action: str,
+    *,
+    people_action: str | None = None,
+) -> None:
+    _require_business_access(ctx, business_id)
+    quick_sales_allowed = has_business_permission_for_business(
+        ctx, db, int(business_id), "quick_sales", action
+    )
+    people_allowed = bool(
+        people_action
+        and has_business_permission_for_business(
+            ctx, db, int(business_id), "people", people_action
+        )
+    )
+    if not quick_sales_allowed and not people_allowed:
+        raise ApiError(
+            "FORBIDDEN",
+            f"Missing business permission: quick_sales.{action}",
             http_status=403,
         )
 
@@ -93,7 +120,13 @@ async def quick_resolve_customer(
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _require_business_access(ctx, payload.business_id)
+    _require_quick_sales_permission(
+        ctx,
+        db,
+        payload.business_id,
+        "create_customer",
+        people_action="add",
+    )
     resolution = resolve_or_create_quick_customer(
         db,
         business_id=payload.business_id,
@@ -151,7 +184,13 @@ async def search_customers(
     db: Session = Depends(get_db),
 ):
     """جست‌وجو در لیست مشتری‌ها"""
-    _require_business_access(ctx, search_request.business_id)
+    _require_quick_sales_permission(
+        ctx,
+        db,
+        search_request.business_id,
+        "view_customer_contact",
+        people_action="view",
+    )
 
     # جست‌وجو در اشخاص
     persons = search_persons(

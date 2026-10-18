@@ -30,7 +30,7 @@ class QuickSalesService {
   Future<Map<String, dynamic>> getAnonymousCustomer({
     required int businessId,
   }) async {
-    final res = await _api.get<Map<String, dynamic>>(
+    final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/businesses/$businessId/quick-sales/anonymous-customer',
     );
     return Map<String, dynamic>.from(res.data?['data'] ?? const {});

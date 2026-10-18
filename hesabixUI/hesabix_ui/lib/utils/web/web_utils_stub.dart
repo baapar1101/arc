@@ -23,6 +23,11 @@ String? getLocalStorageValue(String key) => null;
 
 void setLocalStorageValue(String key, String value) {}
 
+/// Desktop/mobile use one application window, so parked-sale storage needs no
+/// browser-tab suffix.
+String? getOrCreateSessionStorageValue(String key, String fallbackValue) =>
+    null;
+
 /// Signals the HTML boot loader to hide (web only).
 void notifyWebAppReady() {}
 
@@ -33,4 +38,3 @@ void notifyWebInitProgress({
   required int totalSteps,
   String? statusKey,
 }) {}
-
