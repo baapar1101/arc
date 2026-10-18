@@ -24,19 +24,27 @@ String _collapseCustomerName(String value) => value
     .where((part) => part.isNotEmpty)
     .join(' ');
 
-String? _canonicalIranianMobile(String value) {
+String? _canonicalPhoneCandidate(String value) {
+  final normalized = toEnglishDigits(value).trim();
   final digits = toEnglishDigits(value).replaceAll(RegExp(r'\D'), '');
+  if (normalized.startsWith('+')) {
+    return digits.length >= 8 && digits.length <= 15 ? '+$digits' : null;
+  }
+  if (normalized.startsWith('00')) {
+    final international = digits.substring(2);
+    return international.length >= 8 && international.length <= 15
+        ? '+$international'
+        : null;
+  }
   late final String canonical;
-  if (digits.startsWith('0098') && digits.length == 14) {
-    canonical = '0${digits.substring(4)}';
-  } else if (digits.startsWith('98') && digits.length == 12) {
+  if (digits.startsWith('98') && digits.length == 12) {
     canonical = '0${digits.substring(2)}';
   } else if (digits.startsWith('09') && digits.length == 11) {
     canonical = digits;
   } else if (digits.startsWith('9') && digits.length == 10) {
     canonical = '0$digits';
   } else {
-    return null;
+    return digits.length >= 7 && digits.length <= 15 ? digits : null;
   }
   return RegExp(r'^09\d{9}$').hasMatch(canonical) ? canonical : null;
 }
@@ -45,9 +53,7 @@ CustomerQuickEntry? parseCustomerQuickEntry(String rawInput) {
   final input = toEnglishDigits(rawInput).trim();
   if (input.isEmpty) return null;
 
-  final mobilePattern = RegExp(
-    r'(?:(?:\+98|0098|98)9|0?9)(?:[\s\-\(\)]?\d){9}',
-  );
+  final mobilePattern = RegExp(r'(?:(?:\+|00)?\d)(?:[\s\-\(\)]*\d){6,14}');
   final matches = mobilePattern.allMatches(input).where((match) {
     final before = match.start > 0 ? input[match.start - 1] : '';
     final after = match.end < input.length ? input[match.end] : '';
@@ -63,7 +69,7 @@ CustomerQuickEntry? parseCustomerQuickEntry(String rawInput) {
   }
 
   final rawMobile = matches.single.group(0)!;
-  final mobile = _canonicalIranianMobile(rawMobile);
+  final mobile = _canonicalPhoneCandidate(rawMobile);
   if (mobile == null) return null;
   final alias = _collapseCustomerName(
     input.replaceRange(matches.single.start, matches.single.end, ' '),

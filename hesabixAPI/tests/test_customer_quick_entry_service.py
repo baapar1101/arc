@@ -9,7 +9,7 @@ from app.services.customer_quick_entry_service import (
     alias_search_variants,
     clean_customer_alias,
     find_quick_customer_matches,
-    mobile_search_needles,
+    load_quick_customer_mobile_matches,
     normalize_customer_alias,
     normalize_customer_mobile,
     resolve_or_create_quick_customer,
@@ -38,23 +38,46 @@ def _person(
         mobile_2=None,
         mobile_3=None,
         phone=None,
+        mobile_normalized=None,
+        mobile_2_normalized=None,
+        mobile_3_normalized=None,
+        phone_normalized=None,
     )
 
 
 def test_normalizes_customer_alias_and_mobile_variants():
     assert clean_customer_alias("  علي   رضايي  ") == "علی رضایی"
     assert normalize_customer_alias("علي‌ رضايي") == "علی رضایی"
-    assert normalize_customer_mobile("+98 912 123 4567") == "09121234567"
-    assert normalize_customer_mobile("۰۹۱۲۱۲۳۴۵۶۷") == "09121234567"
+    assert normalize_customer_mobile("+98 912 123 4567") == "+989121234567"
+    assert normalize_customer_mobile("۰۹۱۲۱۲۳۴۵۶۷") == "+989121234567"
 
 
-def test_alias_and_mobile_search_helpers_cover_common_variants():
+def test_alias_search_helpers_cover_common_variants():
     assert "علی" in alias_search_variants("علي")
     assert "علي" in alias_search_variants("علی")
-    needles = mobile_search_needles("09121234567")
-    assert "09121234567" in needles
-    assert "9121234567" in needles
-    assert "989121234567" in needles
+
+
+def test_normalizes_foreign_local_mobile_with_business_region():
+    assert normalize_customer_mobile("050 123 4567", default_region="AE") == "+971501234567"
+    assert normalize_customer_mobile("(415) 555-2671", default_region="US") == "+14155552671"
+
+
+def test_mobile_identity_query_is_not_limited_to_500_candidates():
+    db = MagicMock()
+    rows = [_person(i, f"مشتری {i}", mobile="09121234567") for i in range(1, 602)]
+    query = db.query.return_value
+    ordered = query.filter.return_value.order_by.return_value
+    ordered.all.return_value = rows
+
+    result = load_quick_customer_mobile_matches(
+        db,
+        business_id=8,
+        normalized_mobile="+989121234567",
+    )
+
+    assert len(result) == 601
+    query.limit.assert_not_called()
+    ordered.limit.assert_not_called()
 
 
 def test_finds_existing_person_by_mobile_before_creation():
@@ -194,6 +217,8 @@ def test_new_quick_customer_uses_group_from_quick_sales_settings(
 
     db.query.side_effect = query_for
     monkeypatch.setattr(service, "load_quick_customer_candidates", lambda *args, **kwargs: [])
+    monkeypatch.setattr(service, "get_business_default_phone_region", lambda *_args: "IR")
+    monkeypatch.setattr(service, "load_quick_customer_mobile_matches", lambda *args, **kwargs: [])
     captured_request = {}
 
     def fake_create_person(_db, _business_id, request):
@@ -223,9 +248,10 @@ def test_existing_quick_customer_keeps_its_current_group(monkeypatch):
     existing.person_group_id = 4
     monkeypatch.setattr(
         service,
-        "load_quick_customer_candidates",
+        "load_quick_customer_mobile_matches",
         lambda *args, **kwargs: [existing],
     )
+    monkeypatch.setattr(service, "get_business_default_phone_region", lambda *_args: "IR")
     create_person = MagicMock()
     monkeypatch.setattr(service, "create_person", create_person)
 
@@ -241,6 +267,34 @@ def test_existing_quick_customer_keeps_its_current_group(monkeypatch):
     assert existing.person_group_id == 4
     create_person.assert_not_called()
     db.query.assert_not_called()
+
+
+def test_postgresql_quick_customer_resolution_takes_transaction_lock(monkeypatch):
+    from app.services import customer_quick_entry_service as service
+
+    db = MagicMock()
+    db.get_bind.return_value = SimpleNamespace(
+        dialect=SimpleNamespace(name="postgresql")
+    )
+    existing = _person(9, "مشتری موجود", mobile="+989121234567")
+    monkeypatch.setattr(service, "get_business_default_phone_region", lambda *_args: "IR")
+    monkeypatch.setattr(
+        service,
+        "load_quick_customer_mobile_matches",
+        lambda *args, **kwargs: [existing],
+    )
+
+    result = resolve_or_create_quick_customer(
+        db,
+        business_id=8,
+        alias_name="مشتری موجود",
+        mobile="09121234567",
+    )
+
+    assert result.created is False
+    assert result.persons == [existing]
+    db.execute.assert_called_once()
+    assert "pg_advisory_xact_lock" in str(db.execute.call_args.args[0])
 
 
 @pytest.mark.asyncio

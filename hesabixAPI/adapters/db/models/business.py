@@ -52,6 +52,13 @@ class Business(Base):
     
     # فیلدهای جغرافیایی
     country: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    default_phone_region: Mapped[str] = mapped_column(
+        String(2),
+        nullable=False,
+        default="IR",
+        server_default="IR",
+        comment="ISO-3166 alpha-2 region used to parse local phone numbers",
+    )
     province: Mapped[str | None] = mapped_column(String(100), nullable=True)
     city: Mapped[str | None] = mapped_column(String(100), nullable=True)
     postal_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
