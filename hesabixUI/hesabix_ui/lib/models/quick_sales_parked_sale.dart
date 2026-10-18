@@ -337,6 +337,27 @@ class QuickSalesParkedSalesBundle {
     required this.sales,
   });
 
+  /// فروش ثبت‌شده را می‌بندد، فروش‌های پارک‌شدهٔ واقعی را نگه می‌دارد و
+  /// یک فروش خالی تازه را فعال می‌کند.
+  QuickSalesParkedSalesBundle afterCompletedActiveSale({
+    required QuickSalesParkedSale blankSale,
+    int? anonymousCustomerId,
+  }) {
+    final remainingSales =
+        sales
+            .where(
+              (sale) =>
+                  sale.id != activeId &&
+                  !sale.isBlank(anonymousCustomerId: anonymousCustomerId),
+            )
+            .toList()
+          ..add(blankSale);
+    return QuickSalesParkedSalesBundle(
+      activeId: blankSale.id,
+      sales: remainingSales,
+    );
+  }
+
   Map<String, dynamic> toJson() => {
     'version': version,
     'active_id': activeId,
