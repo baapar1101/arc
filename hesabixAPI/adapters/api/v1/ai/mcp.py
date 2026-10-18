@@ -281,7 +281,7 @@ async def mcp_jsonrpc_endpoint(
     # Business identity comes only from the credential. Never trust query/body tenant selectors.
     protocol_version = request.headers.get("mcp-protocol-version")
     modern_versions = {"2026-07-28"}
-    legacy_versions = {"2025-11-25", "2025-03-26"}
+    legacy_versions = {"2025-11-25", "2025-06-18", "2025-03-26"}
     params = body.get("params") or {}
     params_meta = params.get("_meta") if isinstance(params, dict) else None
     modern_version = params_meta.get("io.modelcontextprotocol/protocolVersion") if isinstance(params_meta, dict) else None

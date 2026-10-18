@@ -1,0 +1,13 @@
+{
+  "name": "hesabix",
+  "displayName": "Hesabix",
+  "version": "1.0.1",
+  "description": "Connect Claude Code to your Hesabix business with secure MCP access, accounting skills, and analysis agents.",
+  "author": {
+    "name": "Hesabix",
+    "url": "https://hesabix.ir"
+  },
+  "homepage": "https://hesabix.ir",
+  "license": "Proprietary",
+  "keywords": ["hesabix", "accounting", "erp", "mcp", "finance"]
+}

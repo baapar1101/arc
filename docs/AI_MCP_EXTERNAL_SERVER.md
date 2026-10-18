@@ -11,7 +11,7 @@
 در محیط production مقدار origin عمومی و ثابت API را تنظیم کنید؛ این مقدار منبع issuer و audience است و از `Host` درخواست گرفته نمی‌شود:
 
 ```env
-MCP_PUBLIC_BASE_URL=https://agent.hesabix.ir
+MCP_PUBLIC_BASE_URL=https://hsxn.hesabix.ir
 ```
 
 HTTPS در production اجباری است. سپس migrationها را اجرا کنید:
@@ -25,7 +25,7 @@ Originهای مرورگری و hostهای callback مجاز را در deployment
 
 ## اتصال در ChatGPT
 
-1. آدرس MCP را به صورت `https://agent.hesabix.ir/api/v1/ai/mcp` به عنوان Custom MCP server اضافه کنید.
+1. آدرس MCP را به صورت `https://hsxn.hesabix.ir/api/v1/ai/mcp` به عنوان Custom MCP server اضافه کنید.
 2. روش احراز هویت را OAuth بگذارید و جریان اتصال را کامل کنید.
 3. وارد حساب حسابیکس شوید، کسب‌وکار درست را انتخاب کنید و فقط مجوزهای مورد نیاز را تایید کنید.
 4. مجوز نوشتن به صورت پیش‌فرض داده نمی‌شود. فقط مالک کسب‌وکار می‌تواند گزینهٔ آن را در صفحهٔ رضایت انتخاب کند.
@@ -63,7 +63,7 @@ APIهای قبلی credential دستی همچنان موجودند:
 - `GET /api/v1/ai/mcp/connections?business_id=<id>` فهرست اتصالات
 - `DELETE /api/v1/ai/mcp/connections/<connection_id>` لغو اتصال؛ برای OAuth، کل grant و refresh tokenهایش نیز لغو می‌شوند
 
-سرور نسخه‌های قدیمی MCP تا `2025-11-25` را با `initialize` و نسخهٔ `2026-07-28` را با متادیتای هر درخواست و `server/discover` می‌پذیرد. درخواست‌های modern باید `MCP-Protocol-Version` و `Mcp-Method` را مطابق body بفرستند؛ درخواست‌های `tools/call`، `resources/read` و `prompts/get` همچنین به `Mcp-Name` منطبق نیاز دارند.
+سرور نسخه‌های MCP `2025-03-26`، `2025-06-18` و `2025-11-25` را با `initialize` و نسخهٔ `2026-07-28` را با متادیتای هر درخواست و `server/discover` می‌پذیرد. درخواست‌های modern باید `MCP-Protocol-Version` و `Mcp-Method` را مطابق body بفرستند؛ درخواست‌های `tools/call`، `resources/read` و `prompts/get` همچنین به `Mcp-Name` منطبق نیاز دارند.
 
 ## عملیات نگهداری
 

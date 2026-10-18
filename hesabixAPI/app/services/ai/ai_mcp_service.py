@@ -127,7 +127,7 @@ async def handle_mcp_request(
         if not modern:
             return _jsonrpc_error(req_id, -32601, "Method not found")
         return _jsonrpc_result(req_id, {
-            "supportedVersions": ["2026-07-28", MCP_PROTOCOL_VERSION],
+            "supportedVersions": ["2026-07-28", MCP_PROTOCOL_VERSION, "2025-06-18", "2025-03-26"],
             "capabilities": {
                 "tools": {"listChanged": False},
                 "resources": {"subscribe": False, "listChanged": False},
@@ -142,7 +142,7 @@ async def handle_mcp_request(
         if modern:
             return _jsonrpc_error(req_id, -32601, "Method not found")
         requested = params.get("protocolVersion")
-        supported = {"2025-11-25", "2025-03-26"}
+        supported = {"2025-11-25", "2025-06-18", "2025-03-26"}
         version = requested if requested in supported else MCP_PROTOCOL_VERSION
         return _jsonrpc_result(
             req_id,

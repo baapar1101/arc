@@ -1,0 +1,4986 @@
+{
+  "generated_from": [
+    "hesabixAPI/app/services/ai/function_registry.py",
+    "hesabixAPI/app/services/ai/ai_function_extensions*.py",
+    "hesabixAPI/app/services/ai/ai_tool_manifest.py"
+  ],
+  "tool_count": 180,
+  "tools": [
+    {
+      "name": "adjust_customer_club_points",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase8.py",
+      "line": 137,
+      "category": "customer_club",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "customer_club.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "high",
+      "is_readonly": false,
+      "domains": [
+        "customer_club"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": true,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "await_subagent",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_subagent.py",
+      "line": 84,
+      "category": "agent",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "agent"
+      ],
+      "capability": null,
+      "permission_policy": "agent_internal",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "batch_query_business_data",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase4.py",
+      "line": 51,
+      "category": "query",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "query",
+        "reports_meta"
+      ],
+      "capability": null,
+      "permission_policy": "handler",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "cancel_subagent",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_subagent.py",
+      "line": 109,
+      "category": "agent",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "agent"
+      ],
+      "capability": null,
+      "permission_policy": "agent_internal",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "create_account",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 120,
+      "category": "accounting",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "chart_of_accounts.add"
+      ],
+      "requires_approval": true,
+      "risk_level": "medium",
+      "is_readonly": false,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "create_check",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase4.py",
+      "line": 446,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "checks.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "high",
+      "is_readonly": false,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "create_expense_income",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase5.py",
+      "line": 47,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "expenses_income.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "high",
+      "is_readonly": false,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "create_invoice",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 413,
+      "category": "invoices",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "invoices.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "medium",
+      "is_readonly": false,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "create_lead",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase5.py",
+      "line": 199,
+      "category": "crm",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "crm.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "medium",
+      "is_readonly": false,
+      "domains": [
+        "crm"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "create_person",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 752,
+      "category": "persons",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "persons.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "medium",
+      "is_readonly": false,
+      "domains": [
+        "people"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "create_product",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase4.py",
+      "line": 367,
+      "category": "products",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "products.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "medium",
+      "is_readonly": false,
+      "domains": [
+        "products_write"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "create_product_attribute",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 328,
+      "category": "products",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "product_attributes.add",
+        "products.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "medium",
+      "is_readonly": false,
+      "domains": [
+        "products_write"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "create_receipt_payment",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 970,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "receipts_payments.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "high",
+      "is_readonly": false,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "create_session_plan",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_session_todos.py",
+      "line": 94,
+      "category": "agent",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": false,
+      "domains": [
+        "agent"
+      ],
+      "capability": null,
+      "permission_policy": "agent_internal",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "create_transfer",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase4.py",
+      "line": 476,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "transfers.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "high",
+      "is_readonly": false,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "create_warehouse_document",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions.py",
+      "line": 189,
+      "category": "warehouse",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "warehouses.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "high",
+      "is_readonly": false,
+      "domains": [
+        "warehouse"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "create_workflow",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_workflow.py",
+      "line": 169,
+      "category": "workflow",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "workflows.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "high",
+      "is_readonly": false,
+      "domains": [
+        "workflow"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": true,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "delete_account",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 169,
+      "category": "accounting",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "chart_of_accounts.delete"
+      ],
+      "requires_approval": true,
+      "risk_level": "high",
+      "is_readonly": false,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "delete_check",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 618,
+      "category": "checks",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "checks.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "high",
+      "is_readonly": false,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "delete_expense_income",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 753,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "expenses_income.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "high",
+      "is_readonly": false,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "delete_invoice",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase5.py",
+      "line": 101,
+      "category": "invoices",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "invoices.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "high",
+      "is_readonly": false,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": true,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "delete_memory_entry",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_memory.py",
+      "line": 170,
+      "category": "memory",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [],
+      "requires_approval": false,
+      "risk_level": "medium",
+      "is_readonly": false,
+      "domains": [
+        "memory"
+      ],
+      "capability": null,
+      "permission_policy": "self_scoped",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "delete_person",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase4.py",
+      "line": 233,
+      "category": "persons",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "people.delete"
+      ],
+      "requires_approval": true,
+      "risk_level": "high",
+      "is_readonly": false,
+      "domains": [
+        "people"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": true,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "delete_product_attribute",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 389,
+      "category": "products",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "product_attributes.delete",
+        "products.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "medium",
+      "is_readonly": false,
+      "domains": [
+        "products_write"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "delete_receipt_payment",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 719,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "receipts_payments.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "high",
+      "is_readonly": false,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "delete_transfer",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 678,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "transfers.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "high",
+      "is_readonly": false,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "delete_workflow",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_workflow.py",
+      "line": 247,
+      "category": "workflow",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "workflows.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "high",
+      "is_readonly": false,
+      "domains": [
+        "workflow"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": true,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "execute_workflow",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase5.py",
+      "line": 271,
+      "category": "workflow",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "workflows.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "high",
+      "is_readonly": false,
+      "domains": [
+        "workflow"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": true,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "export_business_data",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase5.py",
+      "line": 330,
+      "category": "export",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "reports.read"
+      ],
+      "requires_approval": true,
+      "risk_level": "medium",
+      "is_readonly": false,
+      "domains": [
+        "reports_meta"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": true,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_account",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 104,
+      "category": "accounting",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "chart_of_accounts.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "get_basalam_overview",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase8.py",
+      "line": 67,
+      "category": "integration",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "basalam.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "integration"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_bom_details",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase2.py",
+      "line": 91,
+      "category": "production",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "inventory.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "warehouse"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_business_credit_settings",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase3.py",
+      "line": 200,
+      "category": "credit",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "USER"
+      ],
+      "required_permissions": [
+        "credit.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_business_dashboard",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions.py",
+      "line": 381,
+      "category": "business",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "reports.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial",
+        "reports_meta"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_business_info",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 195,
+      "category": "business",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "misc"
+      ],
+      "capability": null,
+      "permission_policy": "user_context",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_cash_flow",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 1300,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "reports.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial",
+        "reports_meta"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_check_details",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions.py",
+      "line": 224,
+      "category": "checks",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "checks.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_creditors_report",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 889,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "reports.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial",
+        "reports_meta"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_crm_summary",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 1609,
+      "category": "crm",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "crm.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "crm"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_current_fiscal_year",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions.py",
+      "line": 368,
+      "category": "accounting",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "fiscal_years.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_customer_club_rfm_summary",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase3.py",
+      "line": 72,
+      "category": "customer_club",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "USER"
+      ],
+      "required_permissions": [
+        "customer_club.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "customer_club"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_customer_club_settings",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase3.py",
+      "line": 29,
+      "category": "customer_club",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "customer_club.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "customer_club"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_customer_info",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 590,
+      "category": "persons",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "persons.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "people"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_deal_details",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 1575,
+      "category": "crm",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "crm.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "crm"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_debtors_report",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 852,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "reports.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial",
+        "reports_meta"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_document_details",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions.py",
+      "line": 296,
+      "category": "accounting",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "accounting_documents.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_document_numbering_settings",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 188,
+      "category": "accounting",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "settings.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "get_financial_summary",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 821,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "USER"
+      ],
+      "required_permissions": [
+        "reports.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_inventory_status",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 519,
+      "category": "products",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "inventory.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "warehouse"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_inventory_valuation",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 1226,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "inventory.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "reports_meta",
+        "warehouse"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_invoice_details",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 282,
+      "category": "invoices",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "invoices.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_invoices_count",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 351,
+      "category": "invoices",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "invoices.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_lead_details",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 1539,
+      "category": "crm",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "crm.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "crm"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_lead_funnel_report",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 1633,
+      "category": "crm",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "crm.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "crm"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_loan_facility",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 501,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "loan_facilities.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "get_opening_balance",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase3.py",
+      "line": 184,
+      "category": "accounting",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "USER"
+      ],
+      "required_permissions": [
+        "opening_balance.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_person_balance",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 681,
+      "category": "persons",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "persons.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "people"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_person_credit",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase3.py",
+      "line": 228,
+      "category": "credit",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "credit.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_person_transactions",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions.py",
+      "line": 393,
+      "category": "persons",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "persons.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "misc",
+        "people"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_pipeline_report",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 1619,
+      "category": "crm",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "crm.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "crm"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_product_attribute",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 312,
+      "category": "products",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "product_attributes.view",
+        "products.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "products_write"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "get_product_info",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 486,
+      "category": "products",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "inventory.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "products_write"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_product_kardex",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 559,
+      "category": "products",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "inventory.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "warehouse"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_project_summary",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase2.py",
+      "line": 57,
+      "category": "projects",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "accounting_documents.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "projects"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_purchase_report",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 1152,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "reports.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial",
+        "reports_meta"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_quick_sales_settings",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase3.py",
+      "line": 105,
+      "category": "sales",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "settings.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "misc"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_repair_order_details",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase2.py",
+      "line": 139,
+      "category": "repair",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "invoices.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "misc"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_report",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase4.py",
+      "line": 101,
+      "category": "reports",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "reports.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "reports_meta"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_report_template",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase7.py",
+      "line": 81,
+      "category": "report_templates",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "report_templates.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "report_templates"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_report_template_scope_catalog",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase7.py",
+      "line": 103,
+      "category": "report_templates",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "report_templates.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "report_templates"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_sales_report",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 1002,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "reports.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial",
+        "reports_meta"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_tax_data_quality",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase2.py",
+      "line": 187,
+      "category": "tax",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "USER"
+      ],
+      "required_permissions": [
+        "moadian.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "tax"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_tax_settings",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase2.py",
+      "line": 155,
+      "category": "tax",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "USER"
+      ],
+      "required_permissions": [
+        "moadian.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "tax"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_wallet_metrics",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 553,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "wallet.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "get_wallet_overview",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 520,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "wallet.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "get_warehouse_document_details",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions.py",
+      "line": 119,
+      "category": "warehouse",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "warehouses.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "warehouse"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_warehouse_report",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 247,
+      "category": "warehouse",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "reports.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "warehouse"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "get_warehouse_stock_summary",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions.py",
+      "line": 149,
+      "category": "warehouse",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "inventory.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "warehouse"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_workflow",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_workflow.py",
+      "line": 149,
+      "category": "workflow",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "workflows.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "workflow"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_workflow_component_schema",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_workflow.py",
+      "line": 94,
+      "category": "workflow",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "workflows.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "workflow"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_workflow_design_rules",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_workflow.py",
+      "line": 117,
+      "category": "workflow",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "workflows.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "workflow"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "get_workflow_execution_debug",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_workflow.py",
+      "line": 328,
+      "category": "workflow",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "workflows.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "workflow"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "hscript_fix_script",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_hscript.py",
+      "line": 226,
+      "category": "hscript",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "reports.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "hscript"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "hscript_language_guide",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_hscript.py",
+      "line": 192,
+      "category": "hscript",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "reports.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "hscript"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "hscript_read_doc",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_hscript.py",
+      "line": 154,
+      "category": "hscript",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "reports.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "hscript"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "hscript_retrieve_docs",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_hscript.py",
+      "line": 134,
+      "category": "hscript",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "reports.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "hscript"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "hscript_run_preview",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_hscript.py",
+      "line": 205,
+      "category": "hscript",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "reports.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "medium",
+      "is_readonly": true,
+      "domains": [
+        "hscript"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "hscript_search_docs",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_hscript.py",
+      "line": 114,
+      "category": "hscript",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "reports.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "hscript"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "hscript_validate_script",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_hscript.py",
+      "line": 173,
+      "category": "hscript",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "reports.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "hscript"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "invoke_business_connector",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 1667,
+      "category": "integration",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "USER"
+      ],
+      "required_permissions": [
+        "settings.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "integration"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": true,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_accounts",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 81,
+      "category": "accounting",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "chart_of_accounts.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "list_announcements",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 872,
+      "category": "user",
+      "business_context_required": false,
+      "roles": [],
+      "required_permissions": [],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "misc"
+      ],
+      "capability": null,
+      "permission_policy": "user_context",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "list_available_reports",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase6.py",
+      "line": 27,
+      "category": "reports",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "reports.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "reports_meta"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_bank_accounts",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions.py",
+      "line": 313,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "bank_accounts.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_basalam_dead_letter",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase8.py",
+      "line": 98,
+      "category": "integration",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "basalam.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "integration"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_basalam_product_conflicts",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase3.py",
+      "line": 306,
+      "category": "integration",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "USER"
+      ],
+      "required_permissions": [
+        "basalam.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "integration"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_basalam_synced_invoices",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase3.py",
+      "line": 285,
+      "category": "integration",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "USER"
+      ],
+      "required_permissions": [
+        "basalam.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "integration"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_boms",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase2.py",
+      "line": 73,
+      "category": "production",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "inventory.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "warehouse"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_business_notification_logs",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 827,
+      "category": "business",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "settings.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "misc"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "list_business_notification_templates",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 805,
+      "category": "business",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "settings.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "misc"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "list_business_plugins",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase8.py",
+      "line": 46,
+      "category": "marketplace",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "marketplace.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "marketplace"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_business_users",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 793,
+      "category": "business",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER"
+      ],
+      "required_permissions": [
+        "settings.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "misc"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_cash_registers",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions.py",
+      "line": 334,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "cash_registers.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_credit_installment_plans",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase3.py",
+      "line": 212,
+      "category": "credit",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "USER"
+      ],
+      "required_permissions": [
+        "credit.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_currencies",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase4.py",
+      "line": 200,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "invoices.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial",
+        "products_write"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_currency_rates",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 442,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "currency_revaluation.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "list_customer_club_ledger",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase3.py",
+      "line": 53,
+      "category": "customer_club",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "customer_club.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "customer_club"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_customer_club_tiers",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase3.py",
+      "line": 41,
+      "category": "customer_club",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "customer_club.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "customer_club"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_distribution_routes",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase2.py",
+      "line": 240,
+      "category": "distribution",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "distribution.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "misc"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_fiscal_years",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions.py",
+      "line": 356,
+      "category": "accounting",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "fiscal_years.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_frequent_descriptions",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 775,
+      "category": "business",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "invoices.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "list_loan_facilities",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 481,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "loan_facilities.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "list_marketplace_plugins",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase8.py",
+      "line": 25,
+      "category": "marketplace",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "marketplace.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "marketplace"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_my_businesses",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 849,
+      "category": "user",
+      "business_context_required": false,
+      "roles": [],
+      "required_permissions": [],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "misc"
+      ],
+      "capability": null,
+      "permission_policy": "user_context",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "list_payment_gateways",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 572,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "settings.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "list_person_groups",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase4.py",
+      "line": 172,
+      "category": "persons",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "people.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "people"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_petty_cash",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase2.py",
+      "line": 273,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "petty_cash.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "misc"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_price_list_items",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase3.py",
+      "line": 137,
+      "category": "products",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "price_lists.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "products_write"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_price_lists",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase3.py",
+      "line": 117,
+      "category": "products",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "price_lists.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "misc",
+        "products_write"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_product_attributes",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 296,
+      "category": "products",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "product_attributes.view",
+        "products.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "products_write"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "list_queryable_fields",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase10.py",
+      "line": 31,
+      "category": "query",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "query"
+      ],
+      "capability": null,
+      "permission_policy": "handler",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_report_templates",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase7.py",
+      "line": 46,
+      "category": "report_templates",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "report_templates.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "report_templates"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_session_todos",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_session_todos.py",
+      "line": 154,
+      "category": "agent",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "agent"
+      ],
+      "capability": null,
+      "permission_policy": "agent_internal",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_user_notifications",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 894,
+      "category": "user",
+      "business_context_required": false,
+      "roles": [],
+      "required_permissions": [],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "misc"
+      ],
+      "capability": null,
+      "permission_policy": "user_context",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "list_wallet_transactions",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 532,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "wallet.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "list_warehouse_locations",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 209,
+      "category": "warehouse",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "warehouses.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "warehouse"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "list_warehouse_placements",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 227,
+      "category": "warehouse",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "warehouses.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "warehouse"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "list_warehouses",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions.py",
+      "line": 137,
+      "category": "warehouse",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "warehouses.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "warehouse"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_woocommerce_orders",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase3.py",
+      "line": 244,
+      "category": "integration",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "USER"
+      ],
+      "required_permissions": [
+        "woocommerce.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "integration"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_woocommerce_products",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase3.py",
+      "line": 265,
+      "category": "integration",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "USER"
+      ],
+      "required_permissions": [
+        "woocommerce.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "integration"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_workflow_action_catalog",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_workflow.py",
+      "line": 58,
+      "category": "workflow",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "workflows.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "workflow"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_workflow_builtin_nodes",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_workflow.py",
+      "line": 78,
+      "category": "workflow",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "workflows.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "workflow"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_workflow_executions",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase2.py",
+      "line": 220,
+      "category": "workflow",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "workflows.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "workflow"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_workflow_trigger_catalog",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_workflow.py",
+      "line": 35,
+      "category": "workflow",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "workflows.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "workflow"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "list_workflows",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase2.py",
+      "line": 199,
+      "category": "workflow",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "workflows.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "workflow"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "poll_workflow_execution",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_workflow.py",
+      "line": 303,
+      "category": "workflow",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "workflows.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "workflow"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "publish_report_template",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase7.py",
+      "line": 163,
+      "category": "report_templates",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "report_templates.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "high",
+      "is_readonly": false,
+      "domains": [
+        "report_templates"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": true,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "query_business_data",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions.py",
+      "line": 51,
+      "category": "query",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "query"
+      ],
+      "capability": null,
+      "permission_policy": "handler",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "read_memory",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_memory.py",
+      "line": 101,
+      "category": "memory",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "memory"
+      ],
+      "capability": null,
+      "permission_policy": "self_scoped",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "recalculate_customer_club_rfm",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase8.py",
+      "line": 167,
+      "category": "customer_club",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "customer_club.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "medium",
+      "is_readonly": false,
+      "domains": [
+        "customer_club"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": true,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "resolve_currency_rate",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 462,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "currency_revaluation.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "resolve_date_range",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase10.py",
+      "line": 73,
+      "category": "query",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "query"
+      ],
+      "capability": null,
+      "permission_policy": "user_context",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "search_activities",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 1589,
+      "category": "crm",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "crm.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "crm"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "search_activity_logs",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase3.py",
+      "line": 162,
+      "category": "audit",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "activity_logs.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "misc"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "search_categories",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase4.py",
+      "line": 142,
+      "category": "products",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "categories.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "products_write"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "search_checks",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions.py",
+      "line": 205,
+      "category": "checks",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "checks.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial",
+        "query"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "search_customer_club_rfm_persons",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase3.py",
+      "line": 84,
+      "category": "customer_club",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "USER"
+      ],
+      "required_permissions": [
+        "customer_club.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "customer_club"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "search_deals",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 1553,
+      "category": "crm",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "crm.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "crm"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "search_documents",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions.py",
+      "line": 276,
+      "category": "accounting",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "accounting_documents.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial",
+        "query"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "search_expense_income",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions.py",
+      "line": 253,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "expenses_income.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial",
+        "query"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "search_invoices",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 227,
+      "category": "invoices",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "invoices.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial",
+        "query"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "search_leads",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 1518,
+      "category": "crm",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "crm.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "crm"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "search_persons",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 635,
+      "category": "persons",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "persons.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "people",
+        "query"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "search_product_instances",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 408,
+      "category": "products",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "inventory.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "products_write"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "search_production_documents",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase2.py",
+      "line": 107,
+      "category": "production",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "invoices.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "warehouse"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "search_products",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 448,
+      "category": "products",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "inventory.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "products_write",
+        "query"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "search_projects",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase2.py",
+      "line": 36,
+      "category": "projects",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "accounting_documents.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "projects"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "search_receipts_payments",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 923,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "receipts_payments.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial",
+        "query"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "search_repair_orders",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase2.py",
+      "line": 119,
+      "category": "repair",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "invoices.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "misc"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "search_tax_workspace",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase2.py",
+      "line": 167,
+      "category": "tax",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "moadian.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "tax"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "search_transfers",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions.py",
+      "line": 241,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "transfers.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "financial",
+        "query"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "search_warehouse_documents",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions.py",
+      "line": 98,
+      "category": "warehouse",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "warehouses.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "query",
+        "warehouse"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "search_warranty_codes",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase2.py",
+      "line": 252,
+      "category": "warranty",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "warranty.read"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "misc"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "set_default_report_template",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase7.py",
+      "line": 130,
+      "category": "report_templates",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "report_templates.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "medium",
+      "is_readonly": false,
+      "domains": [
+        "report_templates"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": true,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "spawn_subagent",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_subagent.py",
+      "line": 40,
+      "category": "agent",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "agent"
+      ],
+      "capability": null,
+      "permission_policy": "agent_internal",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "test_workflow",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_workflow.py",
+      "line": 266,
+      "category": "workflow",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "workflows.write"
+      ],
+      "requires_approval": false,
+      "risk_level": "medium",
+      "is_readonly": false,
+      "domains": [
+        "workflow"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "execute",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "update_account",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 144,
+      "category": "accounting",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "chart_of_accounts.edit"
+      ],
+      "requires_approval": true,
+      "risk_level": "medium",
+      "is_readonly": false,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "update_check",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 587,
+      "category": "checks",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "checks.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "medium",
+      "is_readonly": false,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "update_customer_club_settings",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase8.py",
+      "line": 192,
+      "category": "customer_club",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "customer_club.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "high",
+      "is_readonly": false,
+      "domains": [
+        "customer_club"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": true,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "update_expense_income",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 738,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "expenses_income.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "high",
+      "is_readonly": false,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "update_invoice",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase5.py",
+      "line": 78,
+      "category": "invoices",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "invoices.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "high",
+      "is_readonly": false,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "update_person",
+      "source": "hesabixAPI/app/services/ai/function_registry.py",
+      "line": 793,
+      "category": "persons",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "persons.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "medium",
+      "is_readonly": false,
+      "domains": [
+        "people"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "update_product",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase4.py",
+      "line": 418,
+      "category": "products",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "products.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "medium",
+      "is_readonly": false,
+      "domains": [
+        "products_write"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "update_product_attribute",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 360,
+      "category": "products",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "product_attributes.edit",
+        "products.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "medium",
+      "is_readonly": false,
+      "domains": [
+        "products_write"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "update_receipt_payment",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 704,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "receipts_payments.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "high",
+      "is_readonly": false,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "update_session_todo",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_session_todos.py",
+      "line": 181,
+      "category": "agent",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": false,
+      "domains": [
+        "agent"
+      ],
+      "capability": null,
+      "permission_policy": "agent_internal",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "update_transfer",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_phase11.py",
+      "line": 637,
+      "category": "financial",
+      "business_context_required": true,
+      "roles": [],
+      "required_permissions": [
+        "transfers.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "high",
+      "is_readonly": false,
+      "domains": [
+        "financial"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": false
+    },
+    {
+      "name": "update_workflow",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_workflow.py",
+      "line": 211,
+      "category": "workflow",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "workflows.write"
+      ],
+      "requires_approval": true,
+      "risk_level": "high",
+      "is_readonly": false,
+      "domains": [
+        "workflow"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": true,
+      "always_confirm": true,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "upsert_memory_entry",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_memory.py",
+      "line": 122,
+      "category": "memory",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [],
+      "requires_approval": false,
+      "risk_level": "medium",
+      "is_readonly": false,
+      "domains": [
+        "memory"
+      ],
+      "capability": null,
+      "permission_policy": "self_scoped",
+      "intent_write": true,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:write",
+      "potentially_listed_for_business_user": true
+    },
+    {
+      "name": "validate_workflow_draft",
+      "source": "hesabixAPI/app/services/ai/ai_function_extensions_workflow.py",
+      "line": 130,
+      "category": "workflow",
+      "business_context_required": true,
+      "roles": [
+        "ADMIN",
+        "BUSINESS_OWNER",
+        "OPERATOR",
+        "USER"
+      ],
+      "required_permissions": [
+        "workflows.view"
+      ],
+      "requires_approval": false,
+      "risk_level": "safe",
+      "is_readonly": true,
+      "domains": [
+        "workflow"
+      ],
+      "capability": null,
+      "permission_policy": "required",
+      "intent_write": false,
+      "always_confirm": false,
+      "side_effect": "none",
+      "mcp_scope": "ai:tools:read",
+      "potentially_listed_for_business_user": true
+    }
+  ]
+}

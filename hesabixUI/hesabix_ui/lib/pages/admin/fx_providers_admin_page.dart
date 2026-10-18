@@ -75,6 +75,10 @@ class _FxProvidersAdminPageState extends State<FxProvidersAdminPage> {
     final intervalCtrl = TextEditingController(
       text: '${p['fetch_interval_seconds'] ?? 900}',
     );
+    final providerConfig = p['config'] is Map
+        ? Map<String, dynamic>.from(p['config'] as Map)
+        : <String, dynamic>{};
+    var quoteUnit = '${providerConfig['quote_unit'] ?? 'IRT'}'.toUpperCase();
     var isActive = p['is_active'] == true;
     final hasKey = p['has_api_key'] == true;
 
@@ -106,6 +110,24 @@ class _FxProvidersAdminPageState extends State<FxProvidersAdminPage> {
                           border: OutlineInputBorder(),
                         ),
                       ),
+                      if (code == 'navasan') ...[
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: quoteUnit == 'IRR' ? 'IRR' : 'IRT',
+                          decoration: const InputDecoration(
+                            labelText: 'واحد قیمت‌های نوسان',
+                            helperText: 'پیش‌فرض نوسان تومان است؛ فقط در صورت دریافت ریال تغییر دهید.',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'IRT', child: Text('تومان (IRT)')),
+                            DropdownMenuItem(value: 'IRR', child: Text('ریال (IRR)')),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) setLocal(() => quoteUnit = value);
+                          },
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       TextField(
                         controller: keyCtrl,
@@ -159,6 +181,8 @@ class _FxProvidersAdminPageState extends State<FxProvidersAdminPage> {
           'api_base_url': urlCtrl.text.trim().isEmpty ? null : urlCtrl.text.trim(),
           'is_active': isActive,
           'fetch_interval_seconds': interval,
+          if (code == 'navasan')
+            'config': {...providerConfig, 'quote_unit': quoteUnit},
           if (keyCtrl.text.trim().isNotEmpty) 'api_key': keyCtrl.text.trim(),
         },
       );

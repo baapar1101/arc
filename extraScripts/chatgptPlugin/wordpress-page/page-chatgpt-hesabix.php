@@ -25,7 +25,7 @@ add_action('wp_head', static function () {
     }
 }, 2);
 
-$hx_chatgpt_mcp_url = 'https://arc.hesabix.ir/api/v1/ai/mcp';
+$hx_chatgpt_mcp_url = 'https://hsxn.hesabix.ir/api/v1/ai/mcp';
 $hx_chatgpt_zip_url = 'https://source.hesabix.ir/hesabix/arc/raw/branch/master/extraScripts/chatgptPlugin/plugin-1.0.0.zip';
 $hx_chatgpt_source  = 'https://source.hesabix.ir/hesabix/arc/src/branch/master/extraScripts/chatgptPlugin';
 $hx_chatgpt_openai  = 'https://help.openai.com/en/articles/20001256-plugins-in-chatgpt';
