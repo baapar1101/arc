@@ -1514,6 +1514,21 @@ def _validate_outgoing_stock_before_invoice_commit(
     if not invoice_lines_have_trackable_inventory_products(db, business_id, lines_candidates):
         return
 
+    candidate_product_ids = {
+        int(ln["product_id"])
+        for ln in lines_candidates
+        if ln.get("product_id") is not None
+    }
+    products_by_id = {
+        int(product.id): product
+        for product in db.query(Product)
+        .filter(
+            Product.business_id == business_id,
+            Product.id.in_(candidate_product_ids),
+        )
+        .all()
+    } if candidate_product_ids else {}
+
     inv_wh = (document.extra_info or {}).get("warehouse_id")
     try:
         inv_wh_int = int(inv_wh) if inv_wh is not None else None
@@ -1529,9 +1544,7 @@ def _validate_outgoing_stock_before_invoice_commit(
             qty = Decimal(0)
         if not pid or qty <= 0:
             continue
-        product = db.query(Product).filter(
-            and_(Product.id == int(pid), Product.business_id == business_id)
-        ).first()
+        product = products_by_id.get(int(pid))
         if not product or not getattr(product, "track_inventory", False):
             continue
         extra = dict(ln.get("extra_info") or {})
@@ -8071,10 +8084,14 @@ def invoice_document_to_dict(
     include_tags: bool = True,
 ) -> Dict[str, Any]:
     # اقلام فاکتور از جدول مجزا خوانده می‌شوند
-    item_rows = db.query(InvoiceItemLine).filter(InvoiceItemLine.document_id == document.id).all()
+    item_rows = (
+        db.query(InvoiceItemLine, Product)
+        .outerjoin(Product, Product.id == InvoiceItemLine.product_id)
+        .filter(InvoiceItemLine.document_id == document.id)
+        .all()
+    )
     product_lines: List[Dict[str, Any]] = []
-    for it in item_rows:
-        product = db.query(Product).filter(Product.id == it.product_id).first()
+    for it, product in item_rows:
         line_extra = it.extra_info or {}
         row_dict: Dict[str, Any] = {
             "id": it.id,
@@ -8108,10 +8125,14 @@ def invoice_document_to_dict(
         product_lines.append(row_dict)
 
     # سطرهای حسابداری از document_lines خوانده می‌شوند
-    acc_rows = db.query(DocumentLine).filter(DocumentLine.document_id == document.id, DocumentLine.account_id != None).all()  # noqa: E711
+    acc_rows = (
+        db.query(DocumentLine, Account)
+        .outerjoin(Account, Account.id == DocumentLine.account_id)
+        .filter(DocumentLine.document_id == document.id, DocumentLine.account_id != None)  # noqa: E711
+        .all()
+    )
     account_lines: List[Dict[str, Any]] = []
-    for line in acc_rows:
-        account = db.query(Account).filter(Account.id == line.account_id).first()
+    for line, account in acc_rows:
         account_lines.append({
             "id": line.id,
             "account_id": line.account_id,

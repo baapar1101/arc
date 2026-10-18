@@ -5,6 +5,7 @@ import '../../utils/responsive_helper.dart';
 
 class WarehouseComboboxWidget extends StatefulWidget {
   final int businessId;
+  final Future<List<Warehouse>>? warehousesFuture;
   final int? selectedWarehouseId;
   final ValueChanged<int?> onChanged;
   final String label;
@@ -20,6 +21,7 @@ class WarehouseComboboxWidget extends StatefulWidget {
   const WarehouseComboboxWidget({
     super.key,
     required this.businessId,
+    this.warehousesFuture,
     required this.onChanged,
     this.selectedWarehouseId,
     this.label = 'انبار',
@@ -39,6 +41,7 @@ class _WarehouseComboboxWidgetState extends State<WarehouseComboboxWidget> {
   bool _loading = false;
   int? _selectedValue;
   bool _resolvedInitialDefault = false;
+  bool _loadFailed = false;
 
   @override
   void initState() {
@@ -93,10 +96,18 @@ class _WarehouseComboboxWidgetState extends State<WarehouseComboboxWidget> {
     _resolvedInitialDefault = true;
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  Future<void> _load({bool retry = false}) async {
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _loadFailed = false;
+      });
+    }
     try {
-      final items = await _service.listWarehouses(businessId: widget.businessId);
+      final items = await (retry
+          ? _service.listWarehouses(businessId: widget.businessId)
+          : widget.warehousesFuture ??
+              _service.listWarehouses(businessId: widget.businessId));
       if (!mounted) return;
       setState(() {
         _items = items;
@@ -106,6 +117,7 @@ class _WarehouseComboboxWidgetState extends State<WarehouseComboboxWidget> {
       if (!mounted) return;
       setState(() {
         _items = const <Warehouse>[];
+        _loadFailed = true;
         _resolvedInitialDefault = true;
       });
     } finally {
@@ -123,6 +135,16 @@ class _WarehouseComboboxWidgetState extends State<WarehouseComboboxWidget> {
         height: effectiveHeight,
         child: Center(
           child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.primary)),
+        ),
+      );
+    }
+    if (_loadFailed) {
+      return SizedBox(
+        height: effectiveHeight,
+        child: OutlinedButton.icon(
+          onPressed: () => _load(retry: true),
+          icon: const Icon(Icons.refresh, size: 18),
+          label: const Text('بارگذاری انبار ناموفق بود؛ تلاش مجدد'),
         ),
       );
     }

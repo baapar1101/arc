@@ -85,6 +85,29 @@ class ProductService {
     return const {};
   }
 
+  /// دریافت یکجای فرادادهٔ کالاهای سطرهای اولیهٔ فاکتور.
+  Future<Map<int, Map<String, dynamic>>> getProductsMetadata({
+    required int businessId,
+    required List<int> productIds,
+  }) async {
+    if (productIds.isEmpty) return const <int, Map<String, dynamic>>{};
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/products/business/$businessId/metadata',
+      data: {'product_ids': productIds.toSet().toList(growable: false)},
+    );
+    final rawItems = res.data?['data']?['items'];
+    if (rawItems is! List) return const <int, Map<String, dynamic>>{};
+    final result = <int, Map<String, dynamic>>{};
+    for (final raw in rawItems) {
+      if (raw is! Map) continue;
+      final item = Map<String, dynamic>.from(raw);
+      final id = item['id'];
+      final productId = id is int ? id : int.tryParse(id?.toString() ?? '');
+      if (productId != null) result[productId] = item;
+    }
+    return result;
+  }
+
   Future<Map<String, dynamic>> updateProduct({
     required int businessId,
     required int productId,

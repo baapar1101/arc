@@ -17,6 +17,8 @@ import '../../core/calendar_controller.dart';
 import './unique_product_instance_selector_dialog.dart';
 import './invoice_line_attributes_dialog.dart';
 import '../../services/product_service.dart';
+import '../../services/warehouse_service.dart';
+import '../../models/warehouse_model.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
 import '../../utils/invoice_line_preferences.dart';
@@ -76,6 +78,8 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   final List<InvoiceLineItem> _rows = <InvoiceLineItem>[];
   final PriceListService _priceListService = PriceListService(apiClient: ApiClient());
   final ProductService _productService = ProductService();
+  final WarehouseService _warehouseService = WarehouseService();
+  Future<List<Warehouse>>? _warehouseItemsFuture;
   Map<String, dynamic>? _inlinePriceList; // کش لیست قیمت برای آیکون انتخاب قیمت
   final Map<int, Map<String, dynamic>> _productCache = {}; // کش اطلاعات کالاها برای بررسی یونیک بودن
   /// جلوگیری از اسپم لاگ وقتی کش هنوز برای productId پر نشده
@@ -768,8 +772,16 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   Future<void> _loadProductInfosForInitialRows() async {
     final ids = _rows.map((e) => e.productId).whereType<int>().toSet();
     _invoiceLineAttrsLog('loadProductInfosForInitialRows productIds=$ids rowCount=${_rows.length}');
-    for (final pid in ids) {
-      await _loadProductInfo(pid, force: true);
+    if (ids.isNotEmpty) {
+      try {
+        final products = await _productService.getProductsMetadata(
+          businessId: widget.businessId,
+          productIds: ids.toList(growable: false),
+        );
+        _productCache.addAll(products);
+      } catch (e) {
+        _invoiceLineAttrsLog('loadProductsMetadata FAIL productIds=$ids error=$e');
+      }
     }
     _hydrateProductMetadataWithoutChangingUnitPrice();
     for (var i = 0; i < _rows.length; i++) {
@@ -814,6 +826,8 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
         purchasePriceFxMainUnit: item.purchasePriceFxMainUnit ??
             (p['purchase_price_fx'] != null ? _toNum(p['purchase_price_fx']) : null),
         priceFxCurrencyId: item.priceFxCurrencyId ?? _toInt(p['price_fx_currency_id']),
+        trackInventory: p['track_inventory'] == true,
+        warehouseId: item.warehouseId ?? _toInt(p['default_warehouse_id']),
       );
     }
   }
@@ -821,6 +835,10 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   @override
   void didUpdateWidget(covariant InvoiceLineItemsTable oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.businessId != widget.businessId) {
+      _warehouseItemsFuture = null;
+      _productCache.clear();
+    }
     if (!identical(oldWidget.authStore, widget.authStore)) {
       oldWidget.authStore?.removeListener(_onAuthStoreChanged);
       widget.authStore?.addListener(_onAuthStoreChanged);
@@ -1370,19 +1388,22 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   /// ساخت لیست ردیف‌ها با قابلیت drag & drop
   Widget _buildRowsList(BuildContext context) {
     final isMobile = ResponsiveHelper.isMobile(context);
+    if (widget.postInventory) {
+      _warehouseItemsFuture ??= _warehouseService.listWarehouses(businessId: widget.businessId);
+    }
     
     // استفاده از ReorderableListView برای هر دو حالت
-    return ReorderableListView(
+    return ReorderableListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       onReorder: _reorderRows,
-      children: _rows.asMap().entries.map((e) {
-        if (isMobile) {
-          return _buildMobileRow(context, e.key, e.value);
-        } else {
-          return _buildDesktopRow(context, e.key, e.value);
-        }
-      }).toList(),
+      itemCount: _rows.length,
+      itemBuilder: (context, index) {
+        final item = _rows[index];
+        return isMobile
+            ? _buildMobileRow(context, index, item)
+            : _buildDesktopRow(context, index, item);
+      },
     );
   }
   
@@ -1567,6 +1588,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                         WarehouseComboboxWidget(
                           key: ValueKey('inv_wh_${item.lineKey}_${item.productId}_${item.trackInventory}'),
                           businessId: widget.businessId,
+                          warehousesFuture: _warehouseItemsFuture,
                           selectedWarehouseId: item.warehouseId,
                           onChanged: (wid) {
                             _updateRow(index, item.copyWith(warehouseId: wid));
@@ -1845,6 +1867,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                   child: WarehouseComboboxWidget(
                     key: ValueKey('inv_wh_${item.lineKey}_${item.productId}_${item.trackInventory}'),
                     businessId: widget.businessId,
+                    warehousesFuture: _warehouseItemsFuture,
                     selectedWarehouseId: item.warehouseId,
                     onChanged: (wid) {
                       _updateRow(index, item.copyWith(warehouseId: wid));
