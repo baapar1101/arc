@@ -5340,6 +5340,7 @@ def create_invoice(
     *,
     commit: bool = True,
     skip_post_commit_hooks: bool = False,
+    lightweight_response: bool = False,
 ) -> Dict[str, Any]:
     logger.info("=== شروع ایجاد فاکتور ===")
 
@@ -6421,7 +6422,17 @@ def create_invoice(
         # عدم موفقیت در trigger نباید مانع بازگشت فاکتور شود
         logger.warning(f"Failed to trigger workflows for invoice {document.id}: {e}")
 
-    result = invoice_document_to_dict(db, document)
+    # فروش سریع فقط شناسه و شماره فاکتور را مصرف می‌کند. ساخت پاسخ کامل در این
+    # مسیر دوباره محاسبه تحلیلی سود، اطلاعات خطوط و محدودیت‌های مالیاتی را اجرا
+    # می‌کرد؛ محاسبهٔ لازم برای ثبت دفتر پیش‌تر در تراکنش انجام شده است.
+    if lightweight_response:
+        result = {
+            "id": document.id,
+            "code": document.code,
+            "document_type": document.document_type,
+        }
+    else:
+        result = invoice_document_to_dict(db, document)
     
     # Invalidate cache بعد از ایجاد موفق فاکتور
     invalidate_invoices_cache(

@@ -331,6 +331,7 @@ def create_invoice_endpoint(
         data=payload,
         user_can_select_fx_rate=can_pick,
         user_can_change_invoice_unit_price=can_change_unit,
+        lightweight_response=extra.get("quick_sale") is True,
     )
     return success_response(data=result, request=request, message="INVOICE_CREATED")
 
