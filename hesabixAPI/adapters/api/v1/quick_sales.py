@@ -2,21 +2,34 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import re
 from datetime import date, datetime
 from typing import Any, Dict
 
-from fastapi import APIRouter, Body, Depends, Request
+from fastapi import APIRouter, Body, Depends, Request, Response
 from sqlalchemy.orm import Session
 
 from adapters.db.models.person import PersonType
+from adapters.db.models.document import Document
+from adapters.db.models.quick_sales_settings import QuickSalesSetting
 from adapters.db.session import get_db
 from app.core.auth_dependency import AuthContext, get_current_user
 from app.core.permissions import (
     has_business_permission_for_business,
     require_business_access_dep,
     require_business_permission_dep,
+    require_invoice_type_permission_from_payload_dep,
+    user_can_change_invoice_unit_price,
 )
 from app.core.responses import ApiError, success_response
+from app.services.quick_sale_invoice_job_service import (
+    enqueue_quick_sale_invoice,
+    find_quick_sale_invoice,
+    get_quick_sale_invoice_job,
+    list_quick_sale_invoice_jobs,
+    serialize_quick_sale_job,
+)
 from app.services.quick_sales_service import (
     create_quick_sales_payment_button,
     delete_quick_sales_payment_button,
@@ -68,6 +81,138 @@ def _body_date(value: Any) -> date:
         return datetime.fromisoformat(str(value)).date()
     except Exception as exc:
         raise ApiError("INVALID_DATE", "تاریخ اصلاح موجودی نامعتبر است", http_status=400) from exc
+
+
+@router.post(
+    "/invoices",
+    summary="ثبت async فاکتور فروش سریع",
+    description="درخواست را در outbox پایدار ذخیره می‌کند و شناسهٔ پیگیری برمی‌گرداند.",
+)
+def enqueue_quick_sale_invoice_endpoint(
+	request: Request,
+	response: Response,
+	business_id: int,
+	payload: Dict[str, Any] = Body(...),
+	_: None = Depends(require_business_permission_dep("invoices", "add")),
+	__: None = Depends(require_invoice_type_permission_from_payload_dep("add")),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	if os.getenv("HESABIX_BACKGROUND_JOBS_ENABLED", "true").strip().lower() in {"0", "false", "no", "off"}:
+		raise ApiError(
+			"QUICK_SALE_ASYNC_WORKER_DISABLED",
+			"ثبت غیرهم‌زمان فروش سریع موقتاً در دسترس نیست؛ دوباره تلاش کنید.",
+			http_status=503,
+		)
+	job_payload = dict(payload)
+	extra = dict(job_payload.get("extra_info") or {})
+	extra.pop("_stock_override", None)
+	if extra.get("quick_sale") is not True or job_payload.get("invoice_type") != "invoice_sales":
+		raise ApiError("QUICK_SALE_ASYNC_ONLY", "این مسیر فقط برای فاکتور فروش سریع است", http_status=400)
+	request_id = str(extra.get("quick_sale_request_id") or "").strip()
+	if not re.fullmatch(r"[A-Za-z0-9._:-]{16,160}", request_id):
+		raise ApiError("QUICK_SALE_REQUEST_ID_REQUIRED", "شناسه یکتای درخواست فروش سریع نامعتبر است", http_status=400)
+	job_payload["extra_info"] = extra
+
+	requested_override = job_payload.pop("stock_override", None)
+	if requested_override is not None:
+		settings_row = (
+			db.query(QuickSalesSetting)
+			.filter(QuickSalesSetting.business_id == int(business_id))
+			.first()
+		)
+		if not bool(settings_row and getattr(settings_row, "enable_stock_shortage_override", False)):
+			raise ApiError("STOCK_OVERRIDE_DISABLED", "ثبت فروش با موجودی منفی در تنظیمات فروش سریع فعال نیست", http_status=403)
+		if not _can(ctx, db, business_id, "inventory", "negative_stock_override"):
+			raise ApiError("STOCK_OVERRIDE_FORBIDDEN", "مجوز ثبت یک‌باره موجودی منفی را ندارید", http_status=403)
+		override = requested_override if isinstance(requested_override, dict) else {}
+		reason_code = str(override.get("reason_code") or "").strip()
+		reason_note = str(override.get("reason_note") or "").strip()
+		request_token = str(override.get("request_token") or "").strip()
+		if reason_code not in {"physical_stock_exists", "urgent_sale", "other"}:
+			raise ApiError("STOCK_OVERRIDE_REASON_REQUIRED", "علت ثبت موجودی منفی را انتخاب کنید", http_status=400)
+		if reason_code == "other" and not reason_note:
+			raise ApiError("STOCK_OVERRIDE_NOTE_REQUIRED", "برای علت «سایر» توضیح وارد کنید", http_status=400)
+		if not request_token or len(request_token) > 80:
+			raise ApiError("STOCK_OVERRIDE_TOKEN_REQUIRED", "شناسه درخواست نامعتبر است", http_status=400)
+		extra["_stock_override"] = {
+			"authorized": True,
+			"authorized_by_user_id": ctx.get_user_id(),
+			"reason_code": reason_code,
+			"reason_note": reason_note or None,
+			"request_token": request_token,
+			"authorized_at": datetime.utcnow().isoformat(),
+		}
+	job_payload["extra_info"] = extra
+
+	from adapters.api.v1.invoices import _user_can_select_fx_rate_for_business
+
+	job = enqueue_quick_sale_invoice(
+		db,
+		business_id=business_id,
+		user_id=ctx.get_user_id(),
+		request_id=request_id,
+		payload=job_payload,
+		user_can_select_fx_rate=_user_can_select_fx_rate_for_business(db, ctx, business_id),
+		user_can_change_invoice_unit_price=user_can_change_invoice_unit_price(ctx, db, business_id),
+	)
+	response.status_code = 202 if job.status in {"queued", "processing"} else 200
+	return success_response(serialize_quick_sale_job(job), request, message="QUICK_SALE_INVOICE_QUEUED")
+
+
+@router.get(
+	"/invoices/jobs/{request_id}",
+	summary="وضعیت ثبت async فروش سریع",
+)
+def get_quick_sale_invoice_job_endpoint(
+	request: Request,
+	business_id: int,
+	request_id: str,
+	_: None = Depends(require_business_permission_dep("invoices", "add")),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	job = get_quick_sale_invoice_job(
+		db,
+		business_id=business_id,
+		user_id=ctx.get_user_id(),
+		request_id=request_id,
+	)
+	if job is None:
+		invoice = find_quick_sale_invoice(db, business_id, request_id)
+		if invoice is not None and int(invoice.created_by_user_id or 0) == ctx.get_user_id():
+			return success_response({
+				"request_id": request_id,
+				"status": "completed",
+				"invoice_id": int(invoice.id),
+				"invoice_code": invoice.code,
+			}, request, message="QUICK_SALE_INVOICE_STATUS")
+		raise ApiError("QUICK_SALE_JOB_NOT_FOUND", "درخواست ثبت فروش سریع پیدا نشد", http_status=404)
+	return success_response(serialize_quick_sale_job(job), request, message="QUICK_SALE_INVOICE_STATUS")
+
+
+@router.get(
+	"/invoices/jobs",
+	summary="فهرست فروش‌های سریع async جاری کاربر",
+)
+def list_quick_sale_invoice_jobs_endpoint(
+	request: Request,
+	business_id: int,
+	_: None = Depends(require_business_permission_dep("invoices", "add")),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	jobs = list_quick_sale_invoice_jobs(
+		db,
+		business_id=business_id,
+		user_id=ctx.get_user_id(),
+		limit=20,
+	)
+	return success_response(
+		[serialize_quick_sale_job(job) for job in jobs],
+		request,
+		message="QUICK_SALE_INVOICE_JOBS",
+	)
 
 
 @router.get("/customer-balance", summary="مانده مشتری در فروش سریع")

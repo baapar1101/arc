@@ -1439,6 +1439,30 @@ def collect_stock_shortages(
     return shortages
 
 
+def _acquire_inventory_stock_locks(
+	db: Session,
+	business_id: int,
+	outgoing_lines: List[Dict[str, Any]],
+) -> None:
+	"""Serialize outgoing stock checks across invoice and warehouse routes."""
+	stock_lock_keys = sorted(
+		{
+			(
+				int(line.get("product_id")),
+				int((line.get("extra_info") or {}).get("warehouse_id")),
+			)
+			for line in outgoing_lines
+			if line.get("product_id") is not None
+			and (line.get("extra_info") or {}).get("warehouse_id") is not None
+		}
+	)
+	for product_id, warehouse_id in stock_lock_keys:
+		acquire_transaction_lock(
+			db,
+			f"inventory_stock:{business_id}:{warehouse_id}:{product_id}",
+		)
+
+
 def _ensure_stock_sufficient(
     db: Session,
     business_id: int,
@@ -1449,6 +1473,9 @@ def _ensure_stock_sufficient(
     exclude_invoice_source_document_id: Optional[int] = None,
     exclude_warehouse_document_ids: Optional[List[int]] = None,
 ) -> None:
+    # قفل تا commit/rollback تراکنش caller نگه داشته می‌شود.
+    _acquire_inventory_stock_locks(db, business_id, outgoing_lines)
+
     shortages = collect_stock_shortages(
         db,
         business_id,
@@ -1591,24 +1618,9 @@ def _validate_outgoing_stock_before_invoice_commit(
     )
     if not lines_to_check:
         return
-    # کنترل و ثبت خروج انبار در یک تراکنش انجام می‌شوند. قفل‌های مرتب‌شده
-    # مانع عبور هم‌زمان دو فروش از روی یک موجودی می‌شوند.
-    stock_lock_keys = sorted(
-        {
-            (
-                int(line.get("product_id")),
-                int((line.get("extra_info") or {}).get("warehouse_id")),
-            )
-            for line in lines_to_check
-            if line.get("product_id") is not None
-            and (line.get("extra_info") or {}).get("warehouse_id") is not None
-        }
-    )
-    for product_id, warehouse_id in stock_lock_keys:
-        acquire_transaction_lock(
-            db,
-            f"inventory_stock:{business_id}:{warehouse_id}:{product_id}",
-        )
+    # قفل مرتب‌شده در _ensure_stock_sufficient گرفته می‌شود تا همین مسیر
+    # برای ثبت مستقیم حوالهٔ انبار نیز به کار رود.
+    _acquire_inventory_stock_locks(db, business_id, lines_to_check)
     shortages = collect_stock_shortages(
         db, business_id, document.document_date, lines_to_check,
         # InvoiceItemLineهای سند جاری پیش از این کنترل flush شده‌اند. اگر خود سند

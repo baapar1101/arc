@@ -1245,6 +1245,10 @@ def create_app() -> FastAPI:
             return
 
         asyncio.create_task(notifications_background_loop(30))
+        # Durable quick-sale invoice outbox. The DB lease allows recovery after
+        # process restarts and ensures only one worker claims a queued sale.
+        from app.services.quick_sale_invoice_job_service import quick_sale_invoice_outbox_loop
+        asyncio.create_task(quick_sale_invoice_outbox_loop(0.5))
         # Storage cleanup: هر 24 ساعت یکبار
         asyncio.create_task(storage_cleanup_loop(24))
         # Subscription check: هر 6 ساعت یکبار

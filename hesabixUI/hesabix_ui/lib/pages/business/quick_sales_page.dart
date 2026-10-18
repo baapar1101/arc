@@ -93,6 +93,19 @@ enum _QuickSalesSaveAction { none, save, saveAndPrint }
 enum _StockShortageAction { cancel, park, correct, override }
 
 class _QuickSalesShareSnapshot {
+  static const empty = _QuickSalesShareSnapshot(
+    onlinePaymentEnabled: false,
+    hasGateways: false,
+    gatewayId: null,
+    expiryHours: 168,
+    sendSms: false,
+    sendEmail: false,
+    useNativeShare: false,
+    customerName: '',
+    customerMobile: null,
+    customerEmail: null,
+  );
+
   final bool onlinePaymentEnabled;
   final bool hasGateways;
   final int? gatewayId;
@@ -292,6 +305,8 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   static const int _maxParkedSales = 12;
   final List<QuickSalesParkedSale> _sales = [];
   String _activeSaleId = '';
+  final Set<String> _pendingQuickSaleRequestIds = <String>{};
+  final Completer<void> _parkedSalesHydratedCompleter = Completer<void>();
   bool _parkedHydrated = false;
   Timer? _parkedPersistDebounce;
   bool _checkoutDiscountExpanded = false;
@@ -336,7 +351,93 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         _restoreDesktopRailAfterQuit = () => scope.setRailVisible(true);
       }
       _barcodeFocus.requestFocus();
+      unawaited(_resumePendingQuickSaleJobs());
     });
+  }
+
+  Future<void> _resumePendingQuickSaleJobs() async {
+    try {
+      await _parkedSalesHydratedCompleter.future;
+      if (!mounted || !_parkedHydrated) return;
+      final jobs = await _invoiceService.listQuickSaleInvoiceJobs(
+        businessId: widget.businessId,
+      );
+      if (!mounted || _isSaving) return;
+
+      final pending = jobs
+          .where((job) =>
+              job['status'] == 'queued' || job['status'] == 'processing')
+          .toList();
+      final failed = jobs.where((job) => job['status'] == 'failed').toList();
+      final completed = jobs
+          .where((job) => job['status'] == 'completed')
+          .toList();
+
+      if (pending.isNotEmpty) {
+        SnackBarHelper.show(
+          context,
+          message: '${pending.length} فروش قبلی هنوز در حال ثبت است؛ وضعیتشان پیگیری می‌شود.',
+        );
+        for (final job in pending) {
+          final requestId = job['request_id']?.toString();
+          if (requestId == null || requestId.isEmpty) continue;
+          final alreadyTracked = !_pendingQuickSaleRequestIds.add(requestId);
+          if (_activeSaleId == requestId) {
+            _openBlankSaleAfterQueuedSave(requestId);
+          }
+          if (alreadyTracked) continue;
+          unawaited(
+            _watchQuickSaleInvoiceJob(
+              requestId: requestId,
+              personId: 0,
+              totalAmount: 0,
+              shouldPrint: false,
+              shouldShare: false,
+              shareSnapshot: _QuickSalesShareSnapshot.empty,
+            ),
+          );
+        }
+      }
+
+      if (failed.isNotEmpty && mounted) {
+        for (final job in failed) {
+          final requestId = job['request_id']?.toString();
+          if (requestId != null && requestId.isNotEmpty) {
+            _markQueuedSaleFailed(requestId, notify: false);
+          }
+        }
+        final message = failed.first['error_message']?.toString().trim();
+        SnackBarHelper.show(
+          context,
+          message: message == null || message.isEmpty
+              ? 'یکی از فروش‌های قبلی ثبت نشده است؛ سبد را بررسی و دوباره ثبت کنید.'
+              : 'یک فروش قبلی ثبت نشد: $message',
+          isError: true,
+        );
+      }
+
+      for (final job in completed) {
+        final requestId = job['request_id']?.toString();
+        if (requestId == null || requestId.isEmpty) continue;
+        final localSaleExists = _activeSaleId == requestId ||
+            _sales.any((sale) => sale.id == requestId);
+        if (!localSaleExists) continue;
+        if (_activeSaleId == requestId) {
+          _openBlankSaleAfterSuccessfulSave();
+        } else {
+          _completeQueuedSale(requestId);
+        }
+        final invoiceCode = job['invoice_code']?.toString();
+        SnackBarHelper.show(
+          context,
+          message: invoiceCode == null || invoiceCode.isEmpty
+              ? 'ثبت فروش قبلی تکمیل شد.'
+              : 'ثبت فروش قبلی تکمیل شد ($invoiceCode).',
+        );
+      }
+    } catch (_) {
+      // Status recovery must not block opening the quick-sales screen.
+    }
   }
 
   Future<void> _loadCategories() async {
@@ -571,6 +672,9 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         _loading = false;
         _parkedHydrated = true;
       });
+      if (!_parkedSalesHydratedCompleter.isCompleted) {
+        _parkedSalesHydratedCompleter.complete();
+      }
 
       unawaited(_refreshCustomerBalance(preserveApply: _applyCustomerBalance));
 
@@ -581,6 +685,9 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         _refreshAllStocks();
       }
     } catch (e) {
+      if (!_parkedSalesHydratedCompleter.isCompleted) {
+        _parkedSalesHydratedCompleter.complete();
+      }
       if (mounted) {
         SnackBarHelper.show(
           context,
@@ -881,8 +988,65 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     _afterSaleSwitchUi();
   }
 
+  void _openBlankSaleAfterQueuedSave(String requestId) {
+    _pendingQuickSaleRequestIds.add(requestId);
+    _captureActiveSaleIntoList();
+    final newSaleId = QuickSalesParkedSale.newId();
+    setState(() {
+      _activeSaleId = newSaleId;
+      _applyBlankSaleState();
+      _saveAction = _QuickSalesSaveAction.none;
+      _sales.add(_snapshotActiveSale());
+    });
+    unawaited(_persistParkedSalesNow());
+    _afterSaleSwitchUi();
+  }
+
+  void _completeQueuedSale(String requestId) {
+    _pendingQuickSaleRequestIds.remove(requestId);
+    if (!mounted) return;
+    setState(() {
+      _sales.removeWhere((sale) => sale.id == requestId && sale.id != _activeSaleId);
+    });
+    unawaited(_persistParkedSalesNow());
+  }
+
+  void _markQueuedSaleFailed(String requestId, {bool notify = true}) {
+    _pendingQuickSaleRequestIds.remove(requestId);
+    if (!mounted) return;
+    final index = _sales.indexWhere((sale) => sale.id == requestId);
+    if (index < 0) return;
+    final oldSale = _sales[index];
+    final renewedSale = QuickSalesParkedSale.fromJson({
+      ...oldSale.toJson(),
+      'id': QuickSalesParkedSale.newId(),
+      'updated_at': DateTime.now().toIso8601String(),
+    });
+    setState(() {
+      _sales[index] = renewedSale;
+      if (_activeSaleId == requestId) {
+        _activeSaleId = renewedSale.id;
+        _applySaleState(renewedSale);
+      }
+    });
+    unawaited(_persistParkedSalesNow());
+    if (notify) {
+      SnackBarHelper.show(
+        context,
+        message: 'سبد فروش نگه داشته شد؛ پس از اصلاح می‌توانید دوباره ثبت کنید.',
+      );
+    }
+  }
+
   void _selectParkedSale(String id) {
     if (_isSaving || id == _activeSaleId) return;
+    if (_pendingQuickSaleRequestIds.contains(id)) {
+      SnackBarHelper.show(
+        context,
+        message: 'این سبد هنوز در حال ثبت است؛ پس از پایان پردازش قابل انتخاب می‌شود.',
+      );
+      return;
+    }
     QuickSalesParkedSale? target;
     for (final sale in _sales) {
       if (sale.id == id) {
@@ -2949,15 +3113,52 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         if (stockOverride != null) 'stock_override': stockOverride,
       };
 
-      final result = await _invoiceService.createInvoice(
+      final queuedJob = await _invoiceService.enqueueQuickSaleInvoice(
         businessId: widget.businessId,
         payload: payload,
       );
 
       if (!mounted) return;
 
+      final jobStatus = queuedJob['status']?.toString();
+      final queuedRequestId = queuedJob['request_id']?.toString() ?? _activeSaleId;
+      if (jobStatus == 'failed') {
+        final errorMessage = queuedJob['error_message']?.toString().trim();
+        SnackBarHelper.show(
+          context,
+          message: errorMessage == null || errorMessage.isEmpty
+              ? 'ثبت قبلی این فروش ناموفق بود؛ سبد نگه داشته شد و می‌توانید دوباره تلاش کنید.'
+              : 'ثبت قبلی این فروش ناموفق بود: $errorMessage',
+          isError: true,
+        );
+        _markCurrentSaleRequestForRetry();
+        return;
+      }
+      if (jobStatus != 'completed') {
+        _openBlankSaleAfterQueuedSave(queuedRequestId);
+        SnackBarHelper.show(
+          context,
+          message: 'درخواست فروش برای ثبت ارسال شد؛ می‌توانید فروش بعدی را شروع کنید.',
+        );
+        unawaited(
+          _watchQuickSaleInvoiceJob(
+            requestId: queuedRequestId,
+            personId: personId,
+            totalAmount: savedShareAmount,
+            shouldPrint: shouldPrint,
+            shouldShare: shouldShare,
+            shareSnapshot: shareSnapshot,
+          ),
+        );
+        return;
+      }
+
+      final result = queuedJob;
       final invoiceId = (result['id'] as num?)?.toInt();
-      final invoiceCode = result['code']?.toString();
+      final invoiceIdFromJob = (result['invoice_id'] as num?)?.toInt();
+      final resolvedInvoiceId = invoiceId ?? invoiceIdFromJob;
+      final invoiceCode =
+          result['code']?.toString() ?? result['invoice_code']?.toString();
 
       _openBlankSaleAfterSuccessfulSave();
 
@@ -2965,10 +3166,10 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       if (invoiceCode != null) successMsg.write(' ($invoiceCode)');
       SnackBarHelper.show(context, message: successMsg.toString());
 
-      if (invoiceId != null && (shouldPrint || shouldShare)) {
+      if (resolvedInvoiceId != null && (shouldPrint || shouldShare)) {
         unawaited(
           _runPostSaveTasks(
-            invoiceId: invoiceId,
+            invoiceId: resolvedInvoiceId,
             invoiceCode: invoiceCode,
             personId: personId,
             totalAmount: savedShareAmount,
@@ -2977,7 +3178,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             shareSnapshot: shareSnapshot,
           ),
         );
-      } else if (shouldPrint && invoiceId == null) {
+      } else if (shouldPrint && resolvedInvoiceId == null) {
         SnackBarHelper.show(
           context,
           message: 'فاکتور ثبت شد اما شناسه فاکتور برای چاپ در دسترس نیست',
@@ -3059,6 +3260,118 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         appliedStockCorrectionToken: retryCorrectionToken,
       );
     }
+  }
+
+  Future<void> _watchQuickSaleInvoiceJob({
+    required String requestId,
+    required int personId,
+    required num totalAmount,
+    required bool shouldPrint,
+    required bool shouldShare,
+    required _QuickSalesShareSnapshot shareSnapshot,
+  }) async {
+    var pollDelay = const Duration(milliseconds: 500);
+    final deadline = DateTime.now().add(const Duration(minutes: 15));
+
+    while (mounted && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(pollDelay);
+      if (!mounted) return;
+
+      Map<String, dynamic> job;
+      try {
+        job = await _invoiceService.getQuickSaleInvoiceJob(
+          businessId: widget.businessId,
+          requestId: requestId,
+        );
+      } catch (_) {
+        pollDelay = Duration(
+          milliseconds: (pollDelay.inMilliseconds * 1.5)
+              .round()
+              .clamp(500, 3000)
+              .toInt(),
+        );
+        continue;
+      }
+
+      final status = job['status']?.toString();
+      if (status == 'completed') {
+        final invoiceId = (job['invoice_id'] as num?)?.toInt();
+        final invoiceCode = job['invoice_code']?.toString();
+        if (invoiceId == null) {
+          SnackBarHelper.show(
+            context,
+            message: 'ثبت فروش تکمیل شد اما شناسهٔ فاکتور برنگشت.',
+            isError: true,
+          );
+          return;
+        }
+        _completeQueuedSale(requestId);
+        var message = 'فاکتور با موفقیت ثبت شد';
+        if (invoiceCode != null && invoiceCode.isNotEmpty) {
+          message += ' ($invoiceCode)';
+        }
+        SnackBarHelper.show(context, message: message);
+        if (shouldPrint || shouldShare) {
+          unawaited(
+            _runPostSaveTasks(
+              invoiceId: invoiceId,
+              invoiceCode: invoiceCode,
+              personId: personId,
+              totalAmount: totalAmount,
+              shouldPrint: shouldPrint,
+              shouldShare: shouldShare,
+              shareSnapshot: shareSnapshot,
+            ),
+          );
+        }
+        return;
+      }
+
+      if (status == 'failed') {
+        final errorCode = job['error_code']?.toString();
+        final message = errorCode == 'INSUFFICIENT_STOCK'
+            ? 'فروش ثبت نشد؛ موجودی کافی نیست. لطفاً موجودی کالاها را بررسی کنید.'
+            : (job['error_message']?.toString().trim().isNotEmpty == true
+                  ? job['error_message'].toString()
+                  : 'ثبت فروش ناموفق بود. لطفاً دوباره تلاش کنید.');
+        SnackBarHelper.show(context, message: message, isError: true);
+        _markQueuedSaleFailed(requestId);
+        return;
+      }
+
+      pollDelay = Duration(
+        milliseconds: (pollDelay.inMilliseconds * 1.5)
+            .round()
+            .clamp(500, 3000)
+            .toInt(),
+      );
+    }
+
+    if (mounted) {
+      SnackBarHelper.show(
+        context,
+        message: 'ثبت فروش هنوز در حال انجام است؛ وضعیت آن در سرور ذخیره شده است.',
+      );
+    }
+  }
+
+  void _markCurrentSaleRequestForRetry() {
+    final oldId = _activeSaleId;
+    _captureActiveSaleIntoList();
+    final index = _sales.indexWhere((sale) => sale.id == oldId);
+    if (index < 0) return;
+    final newId = QuickSalesParkedSale.newId();
+    final oldSale = _sales[index];
+    final renewedSale = QuickSalesParkedSale.fromJson({
+      ...oldSale.toJson(),
+      'id': newId,
+      'updated_at': DateTime.now().toIso8601String(),
+    });
+    setState(() {
+      _sales[index] = renewedSale;
+      _activeSaleId = newId;
+    });
+    unawaited(_persistParkedSalesNow());
   }
 
   Future<void> _runPostSaveTasks({

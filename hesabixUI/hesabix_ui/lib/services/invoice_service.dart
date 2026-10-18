@@ -31,6 +31,51 @@ class InvoiceService {
     return Map<String, dynamic>.from(res.data?['data'] ?? const {});
   }
 
+  Future<Map<String, dynamic>> enqueueQuickSaleInvoice({
+    required int businessId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final documentDate = _parseDocumentDate(payload['document_date']);
+    final documentType = (payload['invoice_type'] as String?) ?? 'invoice_sales';
+    final amount = _extractInvoiceAmount(payload);
+    await _policyGuard.ensureAllowed(
+      businessId: businessId,
+      documentType: documentType,
+      documentDate: documentDate,
+      amount: amount,
+    );
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/quick-sales/invoices',
+      data: payload,
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
+  Future<Map<String, dynamic>> getQuickSaleInvoiceJob({
+    required int businessId,
+    required String requestId,
+  }) async {
+    final encodedRequestId = Uri.encodeComponent(requestId);
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/quick-sales/invoices/jobs/$encodedRequestId',
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
+  Future<List<Map<String, dynamic>>> listQuickSaleInvoiceJobs({
+    required int businessId,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/quick-sales/invoices/jobs',
+    );
+    final raw = res.data?['data'];
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((row) => Map<String, dynamic>.from(row))
+        .toList();
+  }
+
   Future<Map<String, dynamic>> updateInvoice({
     required int businessId,
     required int invoiceId,
