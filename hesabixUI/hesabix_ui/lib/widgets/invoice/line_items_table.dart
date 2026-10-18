@@ -1514,6 +1514,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
               child: ProductComboboxWidget(
                 businessId: widget.businessId,
                 authStore: widget.authStore,
+                loadPickerDataOnInit: false,
                 selectedProduct: item.productId != null
                     ? {
                         'id': item.productId,
@@ -1812,6 +1813,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                   child: ProductComboboxWidget(
                     businessId: widget.businessId,
                     authStore: widget.authStore,
+                    loadPickerDataOnInit: false,
                     selectedProduct: item.productId != null
                         ? {
                             'id': item.productId,

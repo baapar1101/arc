@@ -326,6 +326,7 @@ class ProductComboboxWidget extends StatefulWidget {
   final AuthStore? authStore;
   final ValueChanged<List<Map<String, dynamic>>>? onProductsLoaded;
   final bool productsOnly;
+  final bool loadPickerDataOnInit;
 
   const ProductComboboxWidget({
     super.key,
@@ -337,6 +338,7 @@ class ProductComboboxWidget extends StatefulWidget {
     this.authStore,
     this.onProductsLoaded,
     this.productsOnly = false,
+    this.loadPickerDataOnInit = true,
   });
 
   @override
@@ -384,6 +386,8 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   // دسته‌بندی‌ها
   List<CategoryNode> _categoryTree = [];
   bool _loadingCategories = false;
+  bool _categoriesLoaded = false;
+  Future<void>? _categoriesLoadFuture;
   int? _selectedCategoryId;
 
   double _desktopOverlayHeight(_ProductPickerState state) {
@@ -414,12 +418,17 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
     _scrollController.addListener(_onPickerListScroll);
     _overlayScrollController.addListener(_onOverlayListScroll);
     _initializeSelectedProduct();
-    _loadCategories();
-    _loadRecent();
+    if (widget.loadPickerDataOnInit) {
+      _loadCategories();
+      _loadRecent();
+    }
   }
 
-  Future<void> _loadCategories() async {
-    if (_loadingCategories) return;
+  Future<void> _loadCategories() {
+    return _categoriesLoadFuture ??= _fetchCategoriesImpl();
+  }
+
+  Future<void> _fetchCategoriesImpl() async {
     setState(() {
       _loadingCategories = true;
     });
@@ -432,6 +441,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
           _categoryTree = categories
               .map((e) => CategoryNode.fromMap(e))
               .toList();
+          _categoriesLoaded = true;
           _loadingCategories = false;
         });
       }
@@ -442,6 +452,8 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
           _loadingCategories = false;
         });
       }
+    } finally {
+      _categoriesLoadFuture = null;
     }
   }
 
@@ -1197,9 +1209,18 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
     await _handleProductFormDialogResult(result);
   }
 
-  void _openPicker() {
+  Future<void> _openPicker() async {
     _removeDesktopOverlay();
     FocusManager.instance.primaryFocus?.unfocus();
+    // Invoice rows create one combobox each. Fetch picker data only when the
+    // user opens it, instead of once per row while building the invoice form.
+    if (!_categoriesLoaded) {
+      await _loadCategories();
+    }
+    if (!mounted) return;
+    if (_searchCtrl.text.trim().isEmpty && _items.isEmpty && !_loading) {
+      unawaited(_loadRecent());
+    }
     final isMobile = ResponsiveHelper.isMobile(context);
 
     if (isMobile) {
