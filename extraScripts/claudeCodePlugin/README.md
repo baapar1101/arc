@@ -18,13 +18,14 @@ From the repository root:
 claude --plugin-dir .\extraScripts\claudeCodePlugin
 ```
 
-Or load the packaged ZIP for a session:
+For a packaged release, extract the ZIP first, then point Claude Code at the extracted plugin directory:
 
 ```powershell
-claude --plugin-dir .\extraScripts\hesabix-claude-code-1.0.1.zip
+Expand-Archive .\extraScripts\hesabix-claude-code-1.0.1.zip .\hesabix-claude-code
+claude --plugin-dir .\hesabix-claude-code
 ```
 
-The archive has the plugin root (`.claude-plugin/`, `.mcp.json`, `skills/`, and `agents/`) at its top level. For persistent installations and managed updates, use a Git marketplace.
+`--plugin-dir` takes a plugin directory, so do not pass the ZIP file directly. The archive extracts the plugin root (`.claude-plugin/`, `.mcp.json`, `skills/`, and `agents/`) into the target directory. For persistent installations and managed updates, use a Git marketplace.
 
 In the Claude Code session:
 
@@ -37,7 +38,7 @@ Claude Code supports project, local, and user plugin-install scopes. For an indi
 
 ## OAuth and permissions
 
-The configured MCP URL is `https://hsxn.hesabix.ir/api/v1/ai/mcp`. The production API currently publishes this as its canonical OAuth issuer and protected-resource URL. The legacy `arc.hesabix.ir` host returns OAuth metadata whose `resource` and `issuer` point to `hsxn.hesabix.ir`; clients that strictly match the protected-resource URL can fail discovery when started from the `arc` alias. Use the canonical `hsxn` URL when adding the Claude connector.
+The configured MCP URL is `https://hsxn.hesabix.ir/api/v1/ai/mcp`. Use this canonical URL in the plugin configuration. The legacy `arc.hesabix.ir` hostname is not used because it advertises `hsxn.hesabix.ir` as its OAuth issuer and resource, which can fail strict resource matching in OAuth clients.
 
 The server uses OAuth authorization code with PKCE and Dynamic Client Registration. Its current OAuth metadata advertises public clients (`token_endpoint_auth_methods_supported: ["none"]`), PKCE `S256`, and the Hesabix scopes. The authenticated connection is pinned to the business selected during consent; the model cannot choose another tenant by passing an argument.
 

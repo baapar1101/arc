@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "hesabix": {
+      "type": "http",
+      "url": "https://hsxn.hesabix.ir/api/v1/ai/mcp"
+    }
+  }
+}
