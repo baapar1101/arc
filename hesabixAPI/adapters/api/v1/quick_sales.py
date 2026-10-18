@@ -21,9 +21,14 @@ from app.services.quick_sales_service import (
     create_quick_sales_payment_button,
     delete_quick_sales_payment_button,
     get_or_create_anonymous_customer,
+    get_quick_sales_customer_balance,
     get_quick_sales_settings,
+    list_quick_sales_payment_default_shortcuts,
     list_quick_sales_payment_buttons,
     reorder_quick_sales_payment_buttons,
+    set_quick_sales_payment_default_shortcuts,
+    set_quick_sales_payment_button_shortcut,
+    set_quick_sales_payment_button_shortcuts,
     update_quick_sales_payment_button,
     update_quick_sales_settings,
 )
@@ -43,6 +48,27 @@ def _body_date(value: Any) -> date:
         return datetime.fromisoformat(str(value)).date()
     except Exception as exc:
         raise ApiError("INVALID_DATE", "تاریخ اصلاح موجودی نامعتبر است", http_status=400) from exc
+
+
+@router.get("/customer-balance", summary="مانده مشتری در فروش سریع")
+def get_customer_balance_endpoint(
+    request: Request,
+    business_id: int,
+    person_id: int,
+    currency_id: int,
+    as_of_date: date,
+    _: None = Depends(require_business_access_dep),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+    data = get_quick_sales_customer_balance(
+        db,
+        business_id=business_id,
+        person_id=person_id,
+        currency_id=currency_id,
+        as_of_date=as_of_date,
+    )
+    return success_response(data, request)
 
 
 @router.get(
@@ -165,6 +191,85 @@ def reorder_payment_buttons_endpoint(
     return success_response(data, request, message="QUICK_SALES_PAYMENT_BUTTONS_REORDERED")
 
 
+@router.put(
+    "/payment-buttons/{button_key}/shortcut",
+    summary="تنظیم میانبر دکمه پرداخت برای کاربر جاری",
+)
+def update_payment_button_shortcut_endpoint(
+    request: Request,
+    business_id: int,
+    button_key: str,
+    payload: Dict[str, Any] = Body(...),
+    _: None = Depends(require_business_access_dep),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+    if "platforms" in payload:
+        data = set_quick_sales_payment_button_shortcuts(
+            db,
+            business_id=business_id,
+            user_id=ctx.get_user_id(),
+            button_key=button_key,
+            platforms=payload.get("platforms"),
+        )
+    else:
+        data = set_quick_sales_payment_button_shortcut(
+            db,
+            business_id=business_id,
+            user_id=ctx.get_user_id(),
+            button_key=button_key,
+            shortcut=payload.get("shortcut"),
+            mode=payload.get("mode"),
+            platform=str(payload.get("platform") or "windows").strip().lower(),
+        )
+    return success_response(data, request, message="QUICK_SALES_PAYMENT_SHORTCUT_UPDATED")
+
+
+@router.get(
+    "/payment-buttons/default-shortcuts",
+    summary="فهرست میانبرهای پیش‌فرض دکمه‌های مشترک فروش سریع",
+)
+def list_payment_button_default_shortcuts_endpoint(
+    request: Request,
+    business_id: int,
+    _: None = Depends(
+        require_business_permission_dep(
+            "quick_sales", "manage_default_payment_shortcuts"
+        )
+    ),
+    db: Session = Depends(get_db),
+) -> dict:
+    data = list_quick_sales_payment_default_shortcuts(db, business_id)
+    return success_response(data, request)
+
+
+@router.put(
+    "/payment-buttons/default-shortcuts",
+    summary="ذخیره یکجای میانبرهای پیش‌فرض دکمه‌های مشترک فروش سریع",
+)
+def update_payment_button_default_shortcuts_endpoint(
+    request: Request,
+    business_id: int,
+    payload: Dict[str, Any] = Body(...),
+    _: None = Depends(
+        require_business_permission_dep(
+            "quick_sales", "manage_default_payment_shortcuts"
+        )
+    ),
+    db: Session = Depends(get_db),
+) -> dict:
+    data = set_quick_sales_payment_default_shortcuts(
+        db,
+        business_id=business_id,
+        items=payload.get("shortcuts"),
+    )
+    return success_response(
+        data,
+        request,
+        message="QUICK_SALES_DEFAULT_PAYMENT_SHORTCUTS_UPDATED",
+    )
+
+
 @router.put("/payment-buttons/{button_id}", summary="ویرایش دکمه پرداخت فروش سریع")
 def update_payment_button_endpoint(
     request: Request,
@@ -230,6 +335,13 @@ def create_stock_correction_endpoint(
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
+    request_token = str(payload.get("request_token") or "").strip()
+    if not request_token:
+        raise ApiError(
+            "STOCK_CORRECTION_REQUEST_TOKEN_REQUIRED",
+            "شناسه درخواست اصلاح موجودی الزامی است",
+            http_status=400,
+        )
     if payload.get("confirm_unexplained_physical_surplus") is not True:
         raise ApiError(
             "PHYSICAL_SURPLUS_CONFIRMATION_REQUIRED",
@@ -250,6 +362,7 @@ def create_stock_correction_endpoint(
         user_can_allocate=_can(ctx, db, business_id, "goods_expense_income", "allocate"),
         user_can_post=_can(ctx, db, business_id, "goods_expense_income", "post"),
         user_can_change_unit_cost=_can(ctx, db, business_id, "goods_expense_income", "change_unit_cost"),
+        request_token=request_token,
     )
     db.commit()
     return success_response(result, request, message="QUICK_SALES_STOCK_CORRECTED")

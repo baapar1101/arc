@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import json
+import re
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
@@ -8,16 +11,73 @@ from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.orm.attributes import flag_modified
 
 from adapters.db.models.document import Document
+from adapters.db.models.goods_expense_income import GoodsExpenseIncomeDocument
 from adapters.db.models.inventory_discrepancy import (
     InventoryDiscrepancyCase,
     InventoryDiscrepancyLine,
 )
 from adapters.db.models.invoice_item_line import InvoiceItemLine
 from app.core.responses import ApiError
+from app.core.transaction_lock import acquire_transaction_lock
+
+_QUICK_SALES_CORRECTION_TOKEN_RE = re.compile(r"^[A-Za-z0-9._:-]{16,160}$")
 
 
 def _decimal(value: Any) -> Decimal:
     return Decimal(str(value or 0))
+
+
+def _correction_request_fingerprint(document_date: date, lines: list[dict[str, Any]]) -> str:
+    try:
+        normalized_lines = sorted(
+            (
+                int(line.get("product_id")),
+                int(line.get("warehouse_id")),
+                format(_decimal(line.get("quantity")).normalize(), "f"),
+            )
+            for line in lines
+        )
+    except (TypeError, ValueError, ArithmeticError) as exc:
+        raise ApiError(
+            "INVALID_STOCK_CORRECTION_LINES",
+            "اطلاعات ردیف‌های اصلاح موجودی نامعتبر است",
+            http_status=400,
+        ) from exc
+    raw = json.dumps(
+        {"document_date": document_date.isoformat(), "lines": normalized_lines},
+        ensure_ascii=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _normalize_correction_request_token(value: Any) -> str | None:
+    token = str(value or "").strip()
+    if not token:
+        return None
+    if not _QUICK_SALES_CORRECTION_TOKEN_RE.fullmatch(token):
+        raise ApiError(
+            "INVALID_STOCK_CORRECTION_REQUEST_TOKEN",
+            "شناسه درخواست اصلاح موجودی نامعتبر است",
+            http_status=400,
+        )
+    return token
+
+
+def _find_quick_sales_correction_by_token(
+    db: Session,
+    *,
+    business_id: int,
+    request_token: str,
+) -> GoodsExpenseIncomeDocument | None:
+    return db.query(GoodsExpenseIncomeDocument).filter(
+        GoodsExpenseIncomeDocument.business_id == int(business_id),
+        GoodsExpenseIncomeDocument.doc_kind == "goods_income",
+        GoodsExpenseIncomeDocument.extra_info["source"].as_string()
+        == "quick_sales_stock_correction",
+        GoodsExpenseIncomeDocument.extra_info["request_token"].as_string()
+        == request_token,
+    ).first()
 
 
 def _correction_lines_by_case_line(lines: list[dict[str, Any]]) -> dict[int, dict[str, Any]]:
@@ -184,6 +244,7 @@ def create_goods_income_correction(
     user_can_post: bool,
     user_can_change_unit_cost: bool,
     case_id: int | None = None,
+    request_token: str | None = None,
 ) -> dict[str, Any]:
     """کسری ناشی از موجودی فیزیکی ثبت‌نشده را با تاریخ واقعی کشف اصلاح می‌کند."""
     if not user_can_post:
@@ -192,7 +253,35 @@ def create_goods_income_correction(
             "برای اصلاح فوری موجودی، مجوز قطعی‌کردن کالای درآمدشده لازم است",
             http_status=403,
         )
-    from app.services.goods_expense_income_service import create_document, post_document
+    from app.services.goods_expense_income_service import (
+        _document_to_dict,
+        create_document,
+        post_document,
+    )
+
+    normalized_token = _normalize_correction_request_token(request_token)
+    fingerprint = _correction_request_fingerprint(document_date, lines)
+    if normalized_token:
+        acquire_transaction_lock(
+            db,
+            f"quick_sales_stock_correction:{business_id}:{normalized_token}",
+        )
+        existing = _find_quick_sales_correction_by_token(
+            db,
+            business_id=business_id,
+            request_token=normalized_token,
+        )
+        if existing is not None:
+            existing_fingerprint = (existing.extra_info or {}).get("request_fingerprint")
+            if existing_fingerprint != fingerprint:
+                raise ApiError(
+                    "STOCK_CORRECTION_REQUEST_TOKEN_REUSED",
+                    "این شناسه درخواست قبلاً برای اصلاح دیگری استفاده شده است",
+                    http_status=409,
+                )
+            result = _document_to_dict(existing, db)
+            result["idempotent_replay"] = True
+            return result
 
     payload = {
         "doc_kind": "goods_income",
@@ -202,6 +291,8 @@ def create_goods_income_correction(
         "extra_info": {
             "source": "quick_sales_stock_correction",
             "inventory_discrepancy_case_id": case_id,
+            "request_token": normalized_token,
+            "request_fingerprint": fingerprint,
         },
         "lines": lines,
     }
@@ -217,6 +308,7 @@ def create_goods_income_correction(
     )
     if result.get("status") != "posted":
         result = post_document(db, business_id, user_id, int(result["id"]), commit=False)
+    result["idempotent_replay"] = False
     return result
 
 

@@ -2761,9 +2761,141 @@ def _create_receipt_payment_documents_for_invoice_payments(
     return payment_docs
 
 
+def _quick_sale_customer_balance_meta(document: Document) -> Dict[str, Any]:
+    extra = document.extra_info if isinstance(document.extra_info, dict) else {}
+    raw = extra.get("quick_sale_customer_balance")
+    return dict(raw) if isinstance(raw, dict) and raw.get("applied") is True else {}
+
+
+def _quick_sale_payment_target(document: Document) -> Decimal:
+    """Amount to collect after applying the customer's prior balance."""
+    meta = _quick_sale_customer_balance_meta(document)
+    if meta.get("payment_target") is not None:
+        try:
+            return max(Decimal(0), Decimal(str(meta["payment_target"])))
+        except Exception:
+            pass
+    return Decimal(str(((document.extra_info or {}).get("totals") or {}).get("net", 0) or 0))
+
+
+def _adjust_quick_sale_invoice_paid(document: Document, total_paid: Decimal) -> Decimal:
+    """Allocate receipts to prior debt first and prior credit to this invoice."""
+    meta = _quick_sale_customer_balance_meta(document)
+    if not meta:
+        return total_paid
+    try:
+        prior_debt = max(Decimal(0), Decimal(str(meta.get("prior_debt_amount", 0) or 0)))
+        credit_applied = max(Decimal(0), Decimal(str(meta.get("credit_applied_amount", 0) or 0)))
+        invoice_total = Decimal(
+            str(((document.extra_info or {}).get("totals") or {}).get("net", 0) or 0)
+        )
+    except Exception:
+        return total_paid
+    old_debt_settled = min(max(total_paid, Decimal(0)), prior_debt)
+    return min(
+        max(invoice_total, Decimal(0)),
+        max(Decimal(0), total_paid - old_debt_settled) + credit_applied,
+    )
+
+
+def _normalize_quick_sale_customer_balance_application(
+    db: Session,
+    *,
+    business_id: int,
+    person_id: int,
+    currency_id: int,
+    document_date: date,
+    fiscal_year_id: int,
+    invoice_total: Decimal,
+    header_extra: Dict[str, Any],
+) -> Dict[str, Any]:
+    request = header_extra.get("quick_sale_customer_balance")
+    if not isinstance(request, dict) or request.get("apply") is not True:
+        header_extra.pop("quick_sale_customer_balance", None)
+        return header_extra
+
+    try:
+        requested_person_id = int(request.get("person_id"))
+        requested_currency_id = int(request.get("currency_id"))
+        expected_balance = Decimal(str(request.get("balance_before")))
+    except Exception as exc:
+        raise ApiError(
+            "QUICK_SALE_CUSTOMER_BALANCE_INVALID",
+            "اطلاعات مانده مشتری نامعتبر است؛ مانده را دوباره دریافت کنید",
+            http_status=400,
+        ) from exc
+    if requested_person_id != int(person_id) or requested_currency_id != int(currency_id):
+        raise ApiError(
+            "QUICK_SALE_CUSTOMER_BALANCE_MISMATCH",
+            "مشتری یا ارز مانده با فاکتور هم‌خوانی ندارد",
+            http_status=400,
+        )
+
+    from adapters.db.models.quick_sales_settings import QuickSalesSetting
+
+    quick_sales_settings = (
+        db.query(QuickSalesSetting)
+        .filter(QuickSalesSetting.business_id == int(business_id))
+        .first()
+    )
+    if (
+        quick_sales_settings is not None
+        and quick_sales_settings.default_anonymous_customer_id is not None
+        and int(quick_sales_settings.default_anonymous_customer_id) == int(person_id)
+    ):
+        raise ApiError(
+            "QUICK_SALE_ANONYMOUS_BALANCE_NOT_ALLOWED",
+            "اعمال مانده برای مشتری ناشناس مجاز نیست",
+            http_status=400,
+        )
+
+    from app.services.quick_sales_service import get_quick_sales_customer_balance
+
+    current = get_quick_sales_customer_balance(
+        db,
+        business_id=business_id,
+        person_id=person_id,
+        currency_id=currency_id,
+        as_of_date=document_date,
+        fiscal_year_id=fiscal_year_id,
+    )
+    current_balance = Decimal(str(current.get("balance", 0) or 0))
+    decimal_places = max(0, int(current.get("decimal_places", 2) or 2))
+    epsilon = Decimal(1).scaleb(-decimal_places) / Decimal(2)
+    if abs(current_balance - expected_balance) > epsilon:
+        raise ApiError(
+            "QUICK_SALE_CUSTOMER_BALANCE_CHANGED",
+            "مانده حساب مشتری تغییر کرده است؛ مانده را به‌روزرسانی و دوباره ثبت کنید",
+            http_status=409,
+            details={
+                "balance": float(current_balance),
+                "status": current.get("status"),
+                "currency_id": int(currency_id),
+                "as_of_date": document_date.isoformat(),
+            },
+        )
+
+    normalized_total = max(Decimal(0), invoice_total)
+    prior_debt = max(Decimal(0), -current_balance)
+    credit_applied = min(max(Decimal(0), current_balance), normalized_total)
+    payment_target = max(Decimal(0), normalized_total + prior_debt - credit_applied)
+    header_extra["quick_sale_customer_balance"] = {
+        "applied": True,
+        "person_id": int(person_id),
+        "currency_id": int(currency_id),
+        "as_of_date": document_date.isoformat(),
+        "balance_before": float(current_balance),
+        "status": current.get("status"),
+        "prior_debt_amount": float(prior_debt),
+        "credit_applied_amount": float(credit_applied),
+        "payment_target": float(payment_target),
+    }
+    return header_extra
+
+
 def _quick_sale_change_amount(document: Document, payments: List[Dict[str, Any]]) -> Decimal:
-    """مبلغ اضافه‌دریافت نسبت به خالص فاکتور، به ارز خود فاکتور."""
-    total = Decimal(str(((document.extra_info or {}).get("totals") or {}).get("net", 0) or 0))
+    """مبلغ اضافه‌دریافت نسبت به مبلغ قابل تسویه، به ارز خود فاکتور."""
+    total = _quick_sale_payment_target(document)
     paid = Decimal(0)
     for item in payments:
         raw = item.get("settles_amount")
@@ -5189,6 +5321,24 @@ def create_invoice(
 
     header_extra = dict(data.get("extra_info") or {})
     totals = dict(header_extra.get("totals") or {})
+
+    if (
+        invoice_type == INVOICE_SALES
+        and not bool(data.get("is_proforma", False))
+        and person_id
+        and header_extra.get("quick_sale") is True
+    ):
+        header_extra = _normalize_quick_sale_customer_balance_application(
+            db,
+            business_id=business_id,
+            person_id=int(person_id),
+            currency_id=int(currency_id),
+            document_date=document_date,
+            fiscal_year_id=int(fiscal_year.id),
+            invoice_total=Decimal(str(totals.get("net", 0) or 0)),
+            header_extra=header_extra,
+        )
+        data["extra_info"] = header_extra
 
     # Inventory posting is decoupled; no stock validation here
     post_inventory: bool = _is_inventory_posting_enabled(data)
@@ -10913,6 +11063,7 @@ def batch_calculate_invoices_remaining(
                 processed_doc_ids.add(parsed_change_doc_id)
                 total_paid -= _quick_sale_change_document_amount(change_doc)
 
+        total_paid = _adjust_quick_sale_invoice_paid(doc, total_paid)
         remaining = total_amount - total_paid
         results[inv_id] = {
             "invoice_id": inv_id,
@@ -11067,6 +11218,7 @@ def calculate_invoice_remaining(
                 processed_doc_ids.add(parsed_change_doc_id)
                 total_paid -= _quick_sale_change_document_amount(change_doc)
         
+        total_paid = _adjust_quick_sale_invoice_paid(invoice, total_paid)
         remaining = total_amount - total_paid
         
         logger.debug(

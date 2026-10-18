@@ -45,6 +45,7 @@ void main() {
                 payments: [payment],
                 onChanged: (value) => changedPayments = value,
                 invoiceTotal: 2800000,
+                paymentTarget: 2800000,
                 changeResolution: null,
                 onConfigureChange: () async => null,
                 defaultCashRegisterId: '7',
@@ -66,6 +67,12 @@ void main() {
     expect(find.text('پرداخت‌شده'), findsOneWidget);
     expect(find.text('ثبت'), findsOneWidget);
     expect(find.text('ثبت و چاپ'), findsOneWidget);
+    expect(
+      tester
+          .getSize(find.byKey(const ValueKey('quick-sales-payment-summary')))
+          .height,
+      QuickSalesPaymentDock.desktopSummaryHeight,
+    );
     expect(find.text('پرداخت‌ها (1)'), findsOneWidget);
     expect(find.text('دریافت در صندوق اصلی'), findsNothing);
 

@@ -65,6 +65,7 @@ class QuickSalesPaymentButton(Base):
     )
     label: Mapped[str | None] = mapped_column(String(120), nullable=True)
     shortcut: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    web_shortcut: Mapped[str | None] = mapped_column(String(32), nullable=True)
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_by_user_id: Mapped[int | None] = mapped_column(
