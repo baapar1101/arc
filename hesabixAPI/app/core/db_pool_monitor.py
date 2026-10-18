@@ -10,6 +10,7 @@ from typing import Dict, Optional
 from datetime import datetime
 
 from adapters.db.session import engine
+from app.core.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -26,16 +27,19 @@ class ConnectionPoolMonitor:
 			Dict شامل آمار Pool
 		"""
 		pool = engine.pool
-		total_capacity = pool.size() + pool.overflow()
+		settings = get_settings()
+		pool_size = settings.db_pool_size
+		max_overflow = settings.db_max_overflow
+		total_capacity = pool_size + max_overflow
 		checked_out = pool.checkedout()
-		available = pool.size() - checked_out
-		overflow_used = pool.overflow()
+		overflow_used = max(0, pool.overflow())
+		available = max(0, total_capacity - checked_out)
 		
 		usage_percent = (checked_out / total_capacity * 100) if total_capacity > 0 else 0
 		
 		return {
-			"pool_size": pool.size(),
-			"max_overflow": pool.overflow(),  # این max_overflow است، نه overflow فعلی
+			"pool_size": pool_size,
+			"max_overflow": max_overflow,
 			"checked_out": checked_out,
 			"available": available,
 			"overflow_used": overflow_used,
