@@ -42,6 +42,7 @@ def serialize_quick_sale_job(job: QuickSaleInvoiceJob) -> dict[str, Any]:
 		"invoice_code": job.invoice_code,
 		"error_code": job.error_code,
 		"error_message": job.error_message,
+		"error_details": job.error_details,
 		"attempt_count": int(job.attempt_count or 0),
 		"created_at": job.created_at.isoformat() if job.created_at else None,
 		"finished_at": job.finished_at.isoformat() if job.finished_at else None,
@@ -234,6 +235,7 @@ def _claim_one_job() -> Optional[int]:
 			job.status = "failed"
 			job.error_code = "QUICK_SALE_WORKER_RETRIES_EXHAUSTED"
 			job.error_message = "پردازش فروش پس از چند تلاش ناموفق متوقف شد."
+			job.error_details = None
 			job.locked_until = None
 			job.finished_at = now
 			db.commit()
@@ -243,20 +245,45 @@ def _claim_one_job() -> Optional[int]:
 		job.locked_until = now + JOB_LEASE
 		job.error_code = None
 		job.error_message = None
+		job.error_details = None
 		db.commit()
 		return int(job.id)
 
 
-def _error_data(exc: Exception) -> tuple[str, str, bool]:
+def _error_data(exc: Exception) -> tuple[str, str, bool, Optional[dict[str, Any]]]:
 	if isinstance(exc, ApiError):
 		code = str(getattr(exc, "code", "QUICK_SALE_INVOICE_FAILED"))
 		message = str(getattr(exc, "message", None) or getattr(exc, "detail", None) or code)
 		status_code = int(getattr(exc, "status_code", 400) or 400)
-		return code[:100], message[:4000], status_code >= 500
+		details = None
+		if code == "INSUFFICIENT_STOCK":
+			raw_details = getattr(exc, "details", None)
+			raw_shortages = raw_details.get("shortages") if isinstance(raw_details, dict) else None
+			if isinstance(raw_shortages, list):
+				allowed_fields = {
+					"product_id",
+					"product_name",
+					"product_code",
+					"warehouse_id",
+					"warehouse_name",
+					"inventory_mode",
+					"available_quantity",
+					"requested_quantity",
+					"shortage_quantity",
+				}
+				details = {
+					"shortages": [
+						{key: value for key, value in item.items() if key in allowed_fields}
+						for item in raw_shortages
+						if isinstance(item, dict)
+					]
+				}
+		return code[:100], message[:4000], status_code >= 500, details
 	return (
 		"QUICK_SALE_INVOICE_FAILED",
 		"پردازش فروش به دلیل خطای داخلی ناموفق شد. لطفاً دوباره تلاش کنید.",
 		True,
+		None,
 	)
 
 
@@ -274,6 +301,7 @@ def _process_job(job_id: int) -> None:
 		invoice = find_quick_sale_invoice(db, business_id, request_id)
 		if invoice is None:
 			payload = dict(job.payload or {})
+			payload.pop("_quick_sale_stock_correction_token", None)
 			result = create_invoice(
 				db=db,
 				business_id=business_id,
@@ -302,6 +330,7 @@ def _process_job(job_id: int) -> None:
 		job.invoice_code = str(invoice_code) if invoice_code is not None else None
 		job.error_code = None
 		job.error_message = None
+		job.error_details = None
 		job.locked_until = None
 		job.finished_at = datetime.utcnow()
 		db.commit()
@@ -314,15 +343,20 @@ def process_quick_sale_invoice_jobs_once() -> bool:
 	try:
 		_process_job(job_id)
 	except Exception as exc:
-		code, message, transient = _error_data(exc)
+		code, message, transient, details = _error_data(exc)
 		logger.exception("quick_sale_invoice_job_failed job_id=%s code=%s", job_id, code)
 		from adapters.db.session import get_db_session
 		with get_db_session() as db:
 			job = db.query(QuickSaleInvoiceJob).filter(QuickSaleInvoiceJob.id == int(job_id)).first()
 			if job is None:
 				return True
+			if details is not None:
+				payload = job.payload if isinstance(job.payload, dict) else {}
+				if payload.get("_quick_sale_stock_correction_token"):
+					details["stock_correction_already_applied"] = True
 			job.error_code = code
 			job.error_message = message
+			job.error_details = details
 			job.locked_until = None
 			if transient and int(job.attempt_count or 0) < MAX_ATTEMPTS:
 				delay_seconds = min(30 * (2 ** max(0, int(job.attempt_count or 1) - 1)), 300)

@@ -365,8 +365,9 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       if (!mounted || _isSaving) return;
 
       final pending = jobs
-          .where((job) =>
-              job['status'] == 'queued' || job['status'] == 'processing')
+          .where(
+            (job) => job['status'] == 'queued' || job['status'] == 'processing',
+          )
           .toList();
       final failed = jobs.where((job) => job['status'] == 'failed').toList();
       final completed = jobs
@@ -376,7 +377,8 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       if (pending.isNotEmpty) {
         SnackBarHelper.show(
           context,
-          message: '${pending.length} فروش قبلی هنوز در حال ثبت است؛ وضعیتشان پیگیری می‌شود.',
+          message:
+              '${pending.length} فروش قبلی هنوز در حال ثبت است؛ وضعیتشان پیگیری می‌شود.',
         );
         for (final job in pending) {
           final requestId = job['request_id']?.toString();
@@ -400,10 +402,22 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       }
 
       if (failed.isNotEmpty && mounted) {
+        Map<String, dynamic>? firstStockShortageJob;
+        String? firstStockShortageSaleId;
         for (final job in failed) {
           final requestId = job['request_id']?.toString();
           if (requestId != null && requestId.isNotEmpty) {
-            _markQueuedSaleFailed(requestId, notify: false);
+            final saleId = _markQueuedSaleFailed(requestId, notify: false);
+            final details = job['error_details'];
+            final shortages = details is Map ? details['shortages'] : null;
+            if (firstStockShortageJob == null &&
+                job['error_code'] == 'INSUFFICIENT_STOCK' &&
+                saleId != null &&
+                shortages is List &&
+                shortages.isNotEmpty) {
+              firstStockShortageJob = job;
+              firstStockShortageSaleId = saleId;
+            }
           }
         }
         final message = failed.first['error_message']?.toString().trim();
@@ -414,12 +428,20 @@ class _QuickSalesPageState extends State<QuickSalesPage>
               : 'یک فروش قبلی ثبت نشد: $message',
           isError: true,
         );
+        if (firstStockShortageJob != null && firstStockShortageSaleId != null) {
+          await _handleQueuedStockShortage(
+            saleId: firstStockShortageSaleId,
+            job: firstStockShortageJob,
+            shouldPrint: false,
+          );
+        }
       }
 
       for (final job in completed) {
         final requestId = job['request_id']?.toString();
         if (requestId == null || requestId.isEmpty) continue;
-        final localSaleExists = _activeSaleId == requestId ||
+        final localSaleExists =
+            _activeSaleId == requestId ||
             _sales.any((sale) => sale.id == requestId);
         if (!localSaleExists) continue;
         if (_activeSaleId == requestId) {
@@ -1006,20 +1028,23 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     _pendingQuickSaleRequestIds.remove(requestId);
     if (!mounted) return;
     setState(() {
-      _sales.removeWhere((sale) => sale.id == requestId && sale.id != _activeSaleId);
+      _sales.removeWhere(
+        (sale) => sale.id == requestId && sale.id != _activeSaleId,
+      );
     });
     unawaited(_persistParkedSalesNow());
   }
 
-  void _markQueuedSaleFailed(String requestId, {bool notify = true}) {
+  String? _markQueuedSaleFailed(String requestId, {bool notify = true}) {
     _pendingQuickSaleRequestIds.remove(requestId);
-    if (!mounted) return;
+    if (!mounted) return null;
     final index = _sales.indexWhere((sale) => sale.id == requestId);
-    if (index < 0) return;
+    if (index < 0) return null;
     final oldSale = _sales[index];
+    final renewedSaleId = QuickSalesParkedSale.newId();
     final renewedSale = QuickSalesParkedSale.fromJson({
       ...oldSale.toJson(),
-      'id': QuickSalesParkedSale.newId(),
+      'id': renewedSaleId,
       'updated_at': DateTime.now().toIso8601String(),
     });
     setState(() {
@@ -1033,9 +1058,11 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     if (notify) {
       SnackBarHelper.show(
         context,
-        message: 'سبد فروش نگه داشته شد؛ پس از اصلاح می‌توانید دوباره ثبت کنید.',
+        message:
+            'سبد فروش نگه داشته شد؛ پس از اصلاح می‌توانید دوباره ثبت کنید.',
       );
     }
+    return renewedSaleId;
   }
 
   void _selectParkedSale(String id) {
@@ -1043,7 +1070,8 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     if (_pendingQuickSaleRequestIds.contains(id)) {
       SnackBarHelper.show(
         context,
-        message: 'این سبد هنوز در حال ثبت است؛ پس از پایان پردازش قابل انتخاب می‌شود.',
+        message:
+            'این سبد هنوز در حال ثبت است؛ پس از پایان پردازش قابل انتخاب می‌شود.',
       );
       return;
     }
@@ -2645,8 +2673,9 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   }
 
   Future<_StockShortageAction?> _showStockShortageDialog(
-    List<Map<String, dynamic>> shortages,
-  ) {
+    List<Map<String, dynamic>> shortages, {
+    bool correctionAlreadyApplied = false,
+  }) {
     final canOverride =
         _enableStockShortageOverride &&
         widget.authStore.hasBusinessPermission(
@@ -2693,6 +2722,13 @@ class _QuickSalesPageState extends State<QuickSalesPage>
                     'گردش‌کار کسری موجودی در تنظیمات فروش سریع فعال نیست.',
                   ),
                 ),
+              if (correctionAlreadyApplied)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Text(
+                    'اصلاح موجودی این فروش قبلاً ثبت شده است؛ برای جلوگیری از ثبت سند تکراری، اصلاح دوباره در دسترس نیست.',
+                  ),
+                ),
             ],
           ),
         ),
@@ -2707,7 +2743,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
                 Navigator.pop(dialogContext, _StockShortageAction.park),
             child: const Text('پارک فروش'),
           ),
-          if (canCorrect)
+          if (canCorrect && !correctionAlreadyApplied)
             OutlinedButton(
               onPressed: () =>
                   Navigator.pop(dialogContext, _StockShortageAction.correct),
@@ -3108,6 +3144,8 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         'is_proforma': false,
         'extra_info': extraInfo,
         'lines': lines,
+        if (appliedStockCorrectionToken != null)
+          '_quick_sale_stock_correction_token': appliedStockCorrectionToken,
         if (payments.isNotEmpty) 'payments': payments,
         if (desc.isNotEmpty) 'description': desc,
         if (stockOverride != null) 'stock_override': stockOverride,
@@ -3121,7 +3159,8 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       if (!mounted) return;
 
       final jobStatus = queuedJob['status']?.toString();
-      final queuedRequestId = queuedJob['request_id']?.toString() ?? _activeSaleId;
+      final queuedRequestId =
+          queuedJob['request_id']?.toString() ?? _activeSaleId;
       if (jobStatus == 'failed') {
         final errorMessage = queuedJob['error_message']?.toString().trim();
         SnackBarHelper.show(
@@ -3138,7 +3177,8 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         _openBlankSaleAfterQueuedSave(queuedRequestId);
         SnackBarHelper.show(
           context,
-          message: 'درخواست فروش برای ثبت ارسال شد؛ می‌توانید فروش بعدی را شروع کنید.',
+          message:
+              'درخواست فروش برای ثبت ارسال شد؛ می‌توانید فروش بعدی را شروع کنید.',
         );
         unawaited(
           _watchQuickSaleInvoiceJob(
@@ -3262,6 +3302,73 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     }
   }
 
+  Future<void> _handleQueuedStockShortage({
+    required String saleId,
+    required Map<String, dynamic> job,
+    required bool shouldPrint,
+  }) async {
+    final shortagesValue = job['error_details'] is Map
+        ? (job['error_details'] as Map)['shortages']
+        : null;
+    final shortages = shortagesValue is List
+        ? shortagesValue
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList()
+        : const <Map<String, dynamic>>[];
+    if (shortages.isEmpty || !mounted) return;
+
+    // Keep the next sale intact while bringing the failed basket back for its
+    // correction/override workflow. The failed request already has a new ID,
+    // so any retry gets a fresh idempotency key.
+    _selectParkedSale(saleId);
+    final correctionAlreadyApplied =
+        (job['error_details'] as Map?)?['stock_correction_already_applied'] ==
+        true;
+    if (correctionAlreadyApplied) {
+      SnackBarHelper.show(
+        context,
+        message:
+            'اصلاح موجودی قبلی ثبت شده، اما فاکتور هنوز کسری دارد؛ موجودی و تاریخ گردش را بررسی کنید.',
+        isError: true,
+      );
+    }
+    final action = await _showStockShortageDialog(
+      shortages,
+      correctionAlreadyApplied: correctionAlreadyApplied,
+    );
+    if (!mounted || action == null || action == _StockShortageAction.cancel) {
+      return;
+    }
+    if (action == _StockShortageAction.park) {
+      _startNewSale();
+      return;
+    }
+    if (action == _StockShortageAction.override) {
+      final override = await _askStockOverrideReason();
+      if (!mounted || override == null) return;
+      await _saveInvoice(print: shouldPrint, stockOverride: override);
+      return;
+    }
+
+    try {
+      final correctionToken = await _correctShortagesBeforeSale(shortages);
+      if (!mounted || correctionToken == null) return;
+      await _saveInvoice(
+        print: shouldPrint,
+        appliedStockCorrectionToken: correctionToken,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      SnackBarHelper.show(
+        context,
+        message:
+            'اصلاح موجودی انجام نشد: ${ErrorExtractor.forContext(error, context)}',
+        isError: true,
+      );
+    }
+  }
+
   Future<void> _watchQuickSaleInvoiceJob({
     required String requestId,
     required int personId,
@@ -3329,13 +3436,35 @@ class _QuickSalesPageState extends State<QuickSalesPage>
 
       if (status == 'failed') {
         final errorCode = job['error_code']?.toString();
+        final failedSaleId = _markQueuedSaleFailed(requestId, notify: false);
+        final errorDetails = job['error_details'];
+        final shortageList = errorDetails is Map
+            ? errorDetails['shortages']
+            : null;
+        if (errorCode == 'INSUFFICIENT_STOCK' &&
+            failedSaleId != null &&
+            shortageList is List &&
+            shortageList.isNotEmpty) {
+          await _handleQueuedStockShortage(
+            saleId: failedSaleId,
+            job: job,
+            shouldPrint: shouldPrint,
+          );
+          return;
+        }
         final message = errorCode == 'INSUFFICIENT_STOCK'
             ? 'فروش ثبت نشد؛ موجودی کافی نیست. لطفاً موجودی کالاها را بررسی کنید.'
             : (job['error_message']?.toString().trim().isNotEmpty == true
                   ? job['error_message'].toString()
                   : 'ثبت فروش ناموفق بود. لطفاً دوباره تلاش کنید.');
         SnackBarHelper.show(context, message: message, isError: true);
-        _markQueuedSaleFailed(requestId);
+        if (failedSaleId != null) {
+          SnackBarHelper.show(
+            context,
+            message:
+                'سبد فروش نگه داشته شد؛ پس از اصلاح می‌توانید دوباره ثبت کنید.',
+          );
+        }
         return;
       }
 
@@ -3350,7 +3479,8 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     if (mounted) {
       SnackBarHelper.show(
         context,
-        message: 'ثبت فروش هنوز در حال انجام است؛ وضعیت آن در سرور ذخیره شده است.',
+        message:
+            'ثبت فروش هنوز در حال انجام است؛ وضعیت آن در سرور ذخیره شده است.',
       );
     }
   }
