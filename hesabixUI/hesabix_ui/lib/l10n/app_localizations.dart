@@ -37474,6 +37474,600 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Save the new broker credentials before testing the connection.'**
   String get taxProviderSaveBeforeTest;
+
+  /// No description provided for @taxSubmissionMotamedAsa.
+  ///
+  /// In en, this message translates to:
+  /// **'Send through Motamed ASA'**
+  String get taxSubmissionMotamedAsa;
+
+  /// No description provided for @taxSubmissionMotamedAsaDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign up on the Motamed ASA page; the trusted company signs and sends the invoices, so the business private key and memory ID are not needed here.'**
+  String get taxSubmissionMotamedAsaDescription;
+
+  /// No description provided for @motamedAsaUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The Motamed ASA connection has not been set up by the system administrator yet.'**
+  String get motamedAsaUnavailable;
+
+  /// No description provided for @motamedAsaSandboxUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Motamed ASA sends to the production tax system only. Turn off sandbox mode to select it.'**
+  String get motamedAsaSandboxUnavailable;
+
+  /// No description provided for @motamedAsaEconomicCodeRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the 11 or 14 digit economic code of the business first.'**
+  String get motamedAsaEconomicCodeRequired;
+
+  /// No description provided for @motamedAsaConsentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send invoices through Motamed ASA'**
+  String get motamedAsaConsentTitle;
+
+  /// No description provided for @motamedAsaConsentDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Motamed ASA is a trusted tax service provider. If you continue, the Motamed ASA sign-up page opens. There the business owner signs in with the one-time code of the tax system, accepts the Motamed ASA terms and allows the API key of this business to be handed to Hesabix.'**
+  String get motamedAsaConsentDescription;
+
+  /// No description provided for @motamedAsaSharedDataTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What Hesabix shares with Motamed ASA'**
+  String get motamedAsaSharedDataTitle;
+
+  /// No description provided for @motamedAsaSharedDataSignup.
+  ///
+  /// In en, this message translates to:
+  /// **'For sign-up: the economic code, the business name and the mobile number of the owner, to fill in the sign-up form.'**
+  String get motamedAsaSharedDataSignup;
+
+  /// No description provided for @motamedAsaSharedDataInvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'For every invoice you send: the data the tax system requires, including the buyer identifiers, items, amounts and payments.'**
+  String get motamedAsaSharedDataInvoices;
+
+  /// No description provided for @motamedAsaSharedDataPurpose.
+  ///
+  /// In en, this message translates to:
+  /// **'Motamed ASA uses this data to issue, send and follow up your invoices in the tax system, under its terms and privacy policy. Your choice is not limited: you can change the sending method at any time.'**
+  String get motamedAsaSharedDataPurpose;
+
+  /// No description provided for @motamedAsaTermsLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Motamed ASA terms'**
+  String get motamedAsaTermsLink;
+
+  /// No description provided for @motamedAsaPrivacyLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Motamed ASA privacy policy'**
+  String get motamedAsaPrivacyLink;
+
+  /// No description provided for @motamedAsaConsentCheckbox.
+  ///
+  /// In en, this message translates to:
+  /// **'I have read the above and agree that the data of this business is shared with Motamed ASA for sending invoices.'**
+  String get motamedAsaConsentCheckbox;
+
+  /// No description provided for @motamedAsaContinueButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue on Motamed ASA'**
+  String get motamedAsaContinueButton;
+
+  /// No description provided for @motamedAsaConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'This business is connected to Motamed ASA.'**
+  String get motamedAsaConnected;
+
+  /// No description provided for @motamedAsaOnboarding.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-up on Motamed ASA is in progress. When it is finished there, check the connection.'**
+  String get motamedAsaOnboarding;
+
+  /// No description provided for @motamedAsaCredentialsRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'The API key of this business was not received. Enter the client ID and secret from the Motamed ASA panel.'**
+  String get motamedAsaCredentialsRequired;
+
+  /// No description provided for @motamedAsaNotConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'This business is not connected to Motamed ASA.'**
+  String get motamedAsaNotConnected;
+
+  /// No description provided for @motamedAsaMemoryId.
+  ///
+  /// In en, this message translates to:
+  /// **'Fiscal memory ID'**
+  String get motamedAsaMemoryId;
+
+  /// No description provided for @motamedAsaOpenSignup.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the sign-up page'**
+  String get motamedAsaOpenSignup;
+
+  /// No description provided for @motamedAsaEnterCredentials.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter API key'**
+  String get motamedAsaEnterCredentials;
+
+  /// No description provided for @motamedAsaCheckConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Check connection'**
+  String get motamedAsaCheckConnection;
+
+  /// No description provided for @motamedAsaConnectedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'The business is connected to Motamed ASA and its invoices are sent through it.'**
+  String get motamedAsaConnectedSuccess;
+
+  /// No description provided for @motamedAsaSignupOpened.
+  ///
+  /// In en, this message translates to:
+  /// **'The Motamed ASA sign-up page was opened. After finishing there, select Check connection.'**
+  String get motamedAsaSignupOpened;
+
+  /// No description provided for @motamedAsaLinkCopyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The page did not open. Open this link in your browser:'**
+  String get motamedAsaLinkCopyHint;
+
+  /// No description provided for @motamedAsaSyncSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'The Motamed ASA connection status was updated.'**
+  String get motamedAsaSyncSuccess;
+
+  /// No description provided for @motamedAsaCredentialsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Motamed ASA API key'**
+  String get motamedAsaCredentialsTitle;
+
+  /// No description provided for @motamedAsaCredentialsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'In the Motamed ASA panel, open Business settings › API v2 and copy the client ID and client secret of this business.'**
+  String get motamedAsaCredentialsDescription;
+
+  /// No description provided for @motamedAsaClientId.
+  ///
+  /// In en, this message translates to:
+  /// **'Client ID'**
+  String get motamedAsaClientId;
+
+  /// No description provided for @motamedAsaClientSecret.
+  ///
+  /// In en, this message translates to:
+  /// **'Client secret'**
+  String get motamedAsaClientSecret;
+
+  /// No description provided for @motamedAsaClientIdInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'The client ID looks like v2-customer-12345.'**
+  String get motamedAsaClientIdInvalid;
+
+  /// No description provided for @motamedAsaSaveCredentials.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect'**
+  String get motamedAsaSaveCredentials;
+
+  /// No description provided for @motamedAsaAdminTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Motamed ASA connection'**
+  String get motamedAsaAdminTitle;
+
+  /// No description provided for @motamedAsaAdminDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the partner client ID and secret that Motamed ASA issued for Hesabix in its API partners section. Businesses then sign up on the Motamed ASA page, and their API key is handed to Hesabix after the owner agrees.'**
+  String get motamedAsaAdminDescription;
+
+  /// No description provided for @motamedAsaBaseUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Motamed ASA API address'**
+  String get motamedAsaBaseUrl;
+
+  /// No description provided for @motamedAsaPartnerClientId.
+  ///
+  /// In en, this message translates to:
+  /// **'Partner client ID'**
+  String get motamedAsaPartnerClientId;
+
+  /// No description provided for @motamedAsaPartnerClientIdInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'The partner client ID starts with v2-partner-.'**
+  String get motamedAsaPartnerClientIdInvalid;
+
+  /// No description provided for @motamedAsaPartnerClientSecret.
+  ///
+  /// In en, this message translates to:
+  /// **'Partner client secret'**
+  String get motamedAsaPartnerClientSecret;
+
+  /// No description provided for @motamedAsaKeepSecretHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty to keep the saved value.'**
+  String get motamedAsaKeepSecretHint;
+
+  /// No description provided for @motamedAsaActivate.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow sending through Motamed ASA'**
+  String get motamedAsaActivate;
+
+  /// No description provided for @motamedAsaEnabledHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Businesses can select Motamed ASA as their sending method.'**
+  String get motamedAsaEnabledHint;
+
+  /// No description provided for @motamedAsaDisabledHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Businesses cannot select Motamed ASA.'**
+  String get motamedAsaDisabledHint;
+
+  /// No description provided for @motamedAsaSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Motamed ASA settings'**
+  String get motamedAsaSave;
+
+  /// No description provided for @motamedAsaSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Motamed ASA settings were saved.'**
+  String get motamedAsaSaved;
+
+  /// No description provided for @motamedAsaNotConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'The partner client ID and secret are not saved yet.'**
+  String get motamedAsaNotConfigured;
+
+  /// No description provided for @motamedAsaTestSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Hesabix signed in to Motamed ASA. No business or invoice was created.'**
+  String get motamedAsaTestSuccess;
+
+  /// No description provided for @motamedAsaHostedOnboarding.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-up link'**
+  String get motamedAsaHostedOnboarding;
+
+  /// No description provided for @motamedAsaCredentialHandover.
+  ///
+  /// In en, this message translates to:
+  /// **'API key handover'**
+  String get motamedAsaCredentialHandover;
+
+  /// No description provided for @settingsMotamedAsa.
+  ///
+  /// In en, this message translates to:
+  /// **'Motamed ASA connection'**
+  String get settingsMotamedAsa;
+
+  /// No description provided for @settingsMotamedAsaDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Partner credentials for the Motamed ASA trusted tax company'**
+  String get settingsMotamedAsaDescription;
+
+  /// No description provided for @taxWorkspaceStatusColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace status'**
+  String get taxWorkspaceStatusColumn;
+
+  /// No description provided for @taxWorkspaceStatusNoNeedReaction.
+  ///
+  /// In en, this message translates to:
+  /// **'No reaction needed'**
+  String get taxWorkspaceStatusNoNeedReaction;
+
+  /// No description provided for @taxWorkspaceStatusAwaitingReaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Awaiting buyer reaction'**
+  String get taxWorkspaceStatusAwaitingReaction;
+
+  /// No description provided for @taxWorkspaceStatusApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved by buyer'**
+  String get taxWorkspaceStatusApproved;
+
+  /// No description provided for @taxWorkspaceStatusSystemicApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Systemically approved'**
+  String get taxWorkspaceStatusSystemicApproved;
+
+  /// No description provided for @taxWorkspaceStatusImpossibleReaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Reaction not possible'**
+  String get taxWorkspaceStatusImpossibleReaction;
+
+  /// No description provided for @taxWorkspaceStatusRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejected by buyer'**
+  String get taxWorkspaceStatusRejected;
+
+  /// No description provided for @taxWorkspaceStatusSystemicRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Systemically rejected'**
+  String get taxWorkspaceStatusSystemicRejected;
+
+  /// No description provided for @taxWorkspaceStatusCanceled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get taxWorkspaceStatusCanceled;
+
+  /// No description provided for @taxArticle6Column.
+  ///
+  /// In en, this message translates to:
+  /// **'Article 6'**
+  String get taxArticle6Column;
+
+  /// No description provided for @taxArticle6Violated.
+  ///
+  /// In en, this message translates to:
+  /// **'Limit exceeded'**
+  String get taxArticle6Violated;
+
+  /// No description provided for @taxArticle6NotViolated.
+  ///
+  /// In en, this message translates to:
+  /// **'Within the limit'**
+  String get taxArticle6NotViolated;
+
+  /// No description provided for @motamedAsaPaymentsAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Payments in the tax workspace'**
+  String get motamedAsaPaymentsAction;
+
+  /// No description provided for @motamedAsaPaymentsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment table of invoice'**
+  String get motamedAsaPaymentsTitle;
+
+  /// No description provided for @motamedAsaPaymentsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Payments made after the invoice was sent are registered in the tax workspace through Motamed ASA. Enter the amount the buyer paid, including VAT; the tax workspace keeps the share without VAT. Rows held by the tax system cannot be edited or deleted.'**
+  String get motamedAsaPaymentsDescription;
+
+  /// No description provided for @motamedAsaPaymentsNotEligible.
+  ///
+  /// In en, this message translates to:
+  /// **'New payments cannot be registered on this invoice.'**
+  String get motamedAsaPaymentsNotEligible;
+
+  /// No description provided for @motamedAsaPaymentsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No payment row yet.'**
+  String get motamedAsaPaymentsEmpty;
+
+  /// No description provided for @motamedAsaPaymentsAddRow.
+  ///
+  /// In en, this message translates to:
+  /// **'Add payment'**
+  String get motamedAsaPaymentsAddRow;
+
+  /// No description provided for @motamedAsaPaymentsRegister.
+  ///
+  /// In en, this message translates to:
+  /// **'Register in tax workspace'**
+  String get motamedAsaPaymentsRegister;
+
+  /// No description provided for @motamedAsaPaymentsRegistered.
+  ///
+  /// In en, this message translates to:
+  /// **'The payments were sent for registration in the tax workspace.'**
+  String get motamedAsaPaymentsRegistered;
+
+  /// No description provided for @motamedAsaPaymentsResultUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'The answer did not arrive. The rows below are what Motamed ASA holds now; check them before sending anything again.'**
+  String get motamedAsaPaymentsResultUnknown;
+
+  /// No description provided for @motamedAsaPaymentType.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment method'**
+  String get motamedAsaPaymentType;
+
+  /// No description provided for @motamedAsaPaymentDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment date'**
+  String get motamedAsaPaymentDate;
+
+  /// No description provided for @motamedAsaPaymentAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount paid (rial, including VAT)'**
+  String get motamedAsaPaymentAmount;
+
+  /// No description provided for @motamedAsaPaymentTraceNo.
+  ///
+  /// In en, this message translates to:
+  /// **'Trace number'**
+  String get motamedAsaPaymentTraceNo;
+
+  /// No description provided for @motamedAsaPaymentTerminal.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminal number'**
+  String get motamedAsaPaymentTerminal;
+
+  /// No description provided for @motamedAsaPaymentDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get motamedAsaPaymentDescription;
+
+  /// No description provided for @motamedAsaPaymentRegisteredAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Registered amount'**
+  String get motamedAsaPaymentRegisteredAmount;
+
+  /// No description provided for @motamedAsaPaymentRemoveRow.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove row'**
+  String get motamedAsaPaymentRemoveRow;
+
+  /// No description provided for @motamedAsaPaymentAmountInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a whole rial amount greater than zero.'**
+  String get motamedAsaPaymentAmountInvalid;
+
+  /// No description provided for @motamedAsaPaymentDigitsInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Digits only, within the allowed length.'**
+  String get motamedAsaPaymentDigitsInvalid;
+
+  /// No description provided for @motamedAsaPaymentDateRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the payment date of every row.'**
+  String get motamedAsaPaymentDateRequired;
+
+  /// No description provided for @motamedAsaPaymentTypeCheque.
+  ///
+  /// In en, this message translates to:
+  /// **'Cheque'**
+  String get motamedAsaPaymentTypeCheque;
+
+  /// No description provided for @motamedAsaPaymentTypeBarter.
+  ///
+  /// In en, this message translates to:
+  /// **'Offset'**
+  String get motamedAsaPaymentTypeBarter;
+
+  /// No description provided for @motamedAsaPaymentTypeCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash'**
+  String get motamedAsaPaymentTypeCash;
+
+  /// No description provided for @motamedAsaPaymentTypePos.
+  ///
+  /// In en, this message translates to:
+  /// **'Card reader (POS)'**
+  String get motamedAsaPaymentTypePos;
+
+  /// No description provided for @motamedAsaPaymentTypeInternet.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment gateway'**
+  String get motamedAsaPaymentTypeInternet;
+
+  /// No description provided for @motamedAsaPaymentTypeCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Card to card'**
+  String get motamedAsaPaymentTypeCard;
+
+  /// No description provided for @motamedAsaPaymentTypeTransfer.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank transfer'**
+  String get motamedAsaPaymentTypeTransfer;
+
+  /// No description provided for @motamedAsaPaymentTypeOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get motamedAsaPaymentTypeOther;
+
+  /// No description provided for @motamedAsaPaymentStatusRegistered.
+  ///
+  /// In en, this message translates to:
+  /// **'Registered'**
+  String get motamedAsaPaymentStatusRegistered;
+
+  /// No description provided for @motamedAsaPaymentStatusSentWithInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent with the invoice'**
+  String get motamedAsaPaymentStatusSentWithInvoice;
+
+  /// No description provided for @motamedAsaPaymentStatusQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'Queued for registration'**
+  String get motamedAsaPaymentStatusQueued;
+
+  /// No description provided for @motamedAsaPaymentStatusNotRegistered.
+  ///
+  /// In en, this message translates to:
+  /// **'Goes with the invoice'**
+  String get motamedAsaPaymentStatusNotRegistered;
+
+  /// No description provided for @motamedAsaPaymentStatusUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Result unknown'**
+  String get motamedAsaPaymentStatusUnknown;
+
+  /// No description provided for @motamedAsaPaymentStatusRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejected'**
+  String get motamedAsaPaymentStatusRejected;
+
+  /// No description provided for @motamedAsaPaymentStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get motamedAsaPaymentStatusFailed;
+
+  /// No description provided for @motamedAsaPaymentStatusNotApplicable.
+  ///
+  /// In en, this message translates to:
+  /// **'Not sent'**
+  String get motamedAsaPaymentStatusNotApplicable;
 }
 
 class _AppLocalizationsDelegate

@@ -45,6 +45,14 @@ def check_tax_system_health(
         .first()
     )
 
+    from app.services.motamed_asa_provider_service import MOTAMED_ASA_PROVIDER, motamed_asa_health
+
+    if tax_setting is not None and tax_setting.submission_provider == MOTAMED_ASA_PROVIDER:
+        # «معتمد آسا» signs and sends with its own memory; its connection is checked instead of a tax-system login.
+        result["checks"] = motamed_asa_health(db, business_id)
+        result["healthy"] = all(check.get("status") == "ok" for check in result["checks"].values())
+        return result
+
     if not tax_setting:
         result["checks"]["settings"] = {
             "status": "error",

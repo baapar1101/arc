@@ -14,6 +14,12 @@ from app.services.tax_provider_service import (
     serialize_provider_credential,
     test_provider_connection,
 )
+from app.services.motamed_asa_provider_service import (
+    get_motamed_asa_credential,
+    save_motamed_asa_credential,
+    serialize_motamed_asa_credential,
+    test_motamed_asa_connection,
+)
 
 router = APIRouter(prefix="/admin/tax-providers", tags=["مدیریت ارائه‌دهندگان مالیاتی"])
 
@@ -56,3 +62,38 @@ def test_fanava_settings(
     _require_admin(ctx)
     data = test_provider_connection(db)
     return success_response(data, request, "اتصال خواندنی فن‌آوا موفق بود.")
+
+
+@router.get("/motamed-asa")
+def get_motamed_asa_settings(
+    request: Request,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    _require_admin(ctx)
+    return success_response(serialize_motamed_asa_credential(get_motamed_asa_credential(db)), request)
+
+
+@router.put("/motamed-asa")
+def put_motamed_asa_settings(
+    request: Request,
+    payload: Dict[str, Any] = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    _require_admin(ctx)
+    credential = save_motamed_asa_credential(db, payload)
+    db.commit()
+    db.refresh(credential)
+    return success_response(serialize_motamed_asa_credential(credential), request, "تنظیم معتمد آسا ذخیره شد.")
+
+
+@router.post("/motamed-asa/test-connection")
+def test_motamed_asa_settings(
+    request: Request,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    _require_admin(ctx)
+    data = test_motamed_asa_connection(db)
+    return success_response(data, request, "اتصال حسابیکس به معتمد آسا برقرار است.")

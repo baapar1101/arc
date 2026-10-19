@@ -174,7 +174,10 @@ def get_business_provider_state(db: Session, business_id: int) -> dict[str, Any]
         .first()
     )
     credential = get_provider_credential(db)
+    from app.services.motamed_asa_provider_service import motamed_asa_provider_state
+
     return {
+        **motamed_asa_provider_state(db, int(business_id)),
         "submission_provider": setting.submission_provider if setting else DIRECT_PROVIDER,
         "fanava_available": bool(credential and credential.is_active and credential.username_encrypted and credential.password_encrypted and credential.broker_code),
         "enrollment_prefill": {
@@ -361,6 +364,17 @@ def select_business_provider(
     enrollment: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     provider_code = str(provider_code or "").strip().lower()
+    from app.services.motamed_asa_provider_service import MOTAMED_ASA_PROVIDER, start_motamed_asa_onboarding
+
+    if provider_code == MOTAMED_ASA_PROVIDER:
+        # ASA signs as the trusted company: the business's own private key and memory id are not needed.
+        return start_motamed_asa_onboarding(
+            db,
+            business_id=int(business_id),
+            consent=consent,
+            consented_by_user_id=consented_by_user_id,
+            economic_code=(enrollment or {}).get("economic_code"),
+        )
     if provider_code not in {DIRECT_PROVIDER, FANAVA_PROVIDER}:
         raise ApiError("INVALID_TAX_PROVIDER", "روش ارسال مالیاتی نامعتبر است.", http_status=400)
     setting = db.query(TaxSetting).filter(TaxSetting.business_id == int(business_id)).first()

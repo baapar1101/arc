@@ -173,7 +173,8 @@ def serialize_tax_setting(
     if setting is None:
         from app.services.tax_provider_service import get_business_provider_state
         provider_state = get_business_provider_state(db, int(business_id)) if db is not None else {
-            "submission_provider": "moadian_direct", "fanava_available": False, "fanava_account": None
+            "submission_provider": "moadian_direct", "fanava_available": False, "fanava_account": None,
+            "motamed_asa_available": False, "motamed_asa_account": None,
         }
         return {
             "business_id": int(business_id),
@@ -215,6 +216,8 @@ def serialize_tax_setting(
         "submission_provider": getattr(setting, "submission_provider", "moadian_direct"),
         "fanava_available": False,
         "fanava_account": None,
+        "motamed_asa_available": False,
+        "motamed_asa_account": None,
     }
 
     return {

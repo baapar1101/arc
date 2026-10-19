@@ -20329,4 +20329,336 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get taxProviderSaveBeforeTest =>
       'ابتدا اعتبارنامه‌های جدید را ذخیره کنید؛ سپس اتصال را بررسی کنید.';
+
+  @override
+  String get taxSubmissionMotamedAsa => 'ارسال از طریق معتمد آسا';
+
+  @override
+  String get taxSubmissionMotamedAsaDescription =>
+      'ثبت‌نام در صفحه معتمد آسا و ارسال صورت‌حساب‌ها با امضای شرکت معتمد؛ کلید خصوصی و شناسه حافظه کسب‌وکار در اینجا لازم نیست.';
+
+  @override
+  String get motamedAsaUnavailable =>
+      'اتصال معتمد آسا هنوز توسط مدیر سیستم راه‌اندازی نشده است.';
+
+  @override
+  String get motamedAsaSandboxUnavailable =>
+      'معتمد آسا فقط به محیط اصلی سامانه مودیان ارسال می‌کند. برای انتخاب آن، حالت آزمایشی را خاموش کنید.';
+
+  @override
+  String get motamedAsaEconomicCodeRequired =>
+      'ابتدا کد اقتصادی ۱۱ یا ۱۴ رقمی کسب‌وکار را وارد کنید.';
+
+  @override
+  String get motamedAsaConsentTitle => 'ارسال صورت‌حساب از طریق معتمد آسا';
+
+  @override
+  String get motamedAsaConsentDescription =>
+      'معتمد آسا از شرکت‌های معتمد ارائه‌دهنده خدمات مالیاتی است. با ادامه، صفحه ثبت‌نام معتمد آسا باز می‌شود؛ مالک کسب‌وکار در آن صفحه با کد یک‌بارمصرف سامانه مودیان وارد می‌شود، قوانین معتمد آسا را می‌پذیرد و اجازه می‌دهد کلید API این کسب‌وکار به حسابیکس تحویل شود.';
+
+  @override
+  String get motamedAsaSharedDataTitle =>
+      'اطلاعاتی که حسابیکس در اختیار معتمد آسا می‌گذارد';
+
+  @override
+  String get motamedAsaSharedDataSignup =>
+      'برای ثبت‌نام: کد اقتصادی، نام کسب‌وکار و شماره همراه مالک، برای پر کردن فرم ثبت‌نام.';
+
+  @override
+  String get motamedAsaSharedDataInvoices =>
+      'برای هر صورت‌حسابی که ارسال می‌کنید: اطلاعاتی که سامانه مودیان لازم دارد، از جمله شناسه خریدار، اقلام، مبالغ و پرداخت‌ها.';
+
+  @override
+  String get motamedAsaSharedDataPurpose =>
+      'معتمد آسا این اطلاعات را برای صدور، ارسال و پیگیری صورت‌حساب‌های شما در سامانه مودیان و طبق قوانین و سیاست حریم خصوصی خود به کار می‌برد. انتخاب شما محدود نمی‌شود و هر زمان بخواهید می‌توانید روش ارسال را تغییر دهید.';
+
+  @override
+  String get motamedAsaTermsLink => 'قوانین و مقررات معتمد آسا';
+
+  @override
+  String get motamedAsaPrivacyLink => 'حریم خصوصی معتمد آسا';
+
+  @override
+  String get motamedAsaConsentCheckbox =>
+      'توضیحات بالا را خواندم و موافقم اطلاعات این کسب‌وکار برای ارسال صورت‌حساب در اختیار معتمد آسا قرار گیرد.';
+
+  @override
+  String get motamedAsaContinueButton => 'ادامه در معتمد آسا';
+
+  @override
+  String get motamedAsaConnected => 'این کسب‌وکار به معتمد آسا متصل است.';
+
+  @override
+  String get motamedAsaOnboarding =>
+      'ثبت‌نام در معتمد آسا در جریان است. پس از پایان ثبت‌نام در آن صفحه، اتصال را بررسی کنید.';
+
+  @override
+  String get motamedAsaCredentialsRequired =>
+      'کلید API این کسب‌وکار دریافت نشد. شناسه و رمز کلاینت را از پنل معتمد آسا وارد کنید.';
+
+  @override
+  String get motamedAsaNotConnected => 'این کسب‌وکار به معتمد آسا متصل نیست.';
+
+  @override
+  String get motamedAsaMemoryId => 'شناسه یکتای حافظه مالیاتی';
+
+  @override
+  String get motamedAsaOpenSignup => 'باز کردن صفحه ثبت‌نام';
+
+  @override
+  String get motamedAsaEnterCredentials => 'ورود کلید API';
+
+  @override
+  String get motamedAsaCheckConnection => 'بررسی اتصال';
+
+  @override
+  String get motamedAsaConnectedSuccess =>
+      'کسب‌وکار به معتمد آسا متصل شد و صورت‌حساب‌ها از این راه ارسال می‌شوند.';
+
+  @override
+  String get motamedAsaSignupOpened =>
+      'صفحه ثبت‌نام معتمد آسا باز شد. پس از پایان ثبت‌نام، «بررسی اتصال» را بزنید.';
+
+  @override
+  String get motamedAsaLinkCopyHint =>
+      'صفحه باز نشد. این لینک را در مرورگر باز کنید:';
+
+  @override
+  String get motamedAsaSyncSuccess => 'وضعیت اتصال معتمد آسا به‌روز شد.';
+
+  @override
+  String get motamedAsaCredentialsTitle => 'کلید API معتمد آسا';
+
+  @override
+  String get motamedAsaCredentialsDescription =>
+      'در پنل معتمد آسا به «تنظیمات کسب‌وکار › API نسخه ۲» بروید و شناسه و رمز کلاینت همین کسب‌وکار را کپی کنید.';
+
+  @override
+  String get motamedAsaClientId => 'شناسه کلاینت (Client ID)';
+
+  @override
+  String get motamedAsaClientSecret => 'رمز کلاینت (Client Secret)';
+
+  @override
+  String get motamedAsaClientIdInvalid =>
+      'شناسه کلاینت به شکل v2-customer-12345 است.';
+
+  @override
+  String get motamedAsaSaveCredentials => 'اتصال';
+
+  @override
+  String get motamedAsaAdminTitle => 'اتصال معتمد آسا';
+
+  @override
+  String get motamedAsaAdminDescription =>
+      'شناسه و رمز کلاینت همکاری را که معتمد آسا در بخش «همکاران API» برای حسابیکس صادر کرده است وارد کنید. کسب‌وکارها در صفحه معتمد آسا ثبت‌نام می‌کنند و کلید API آن‌ها پس از موافقت مالک به حسابیکس تحویل می‌شود.';
+
+  @override
+  String get motamedAsaBaseUrl => 'نشانی API معتمد آسا';
+
+  @override
+  String get motamedAsaPartnerClientId => 'شناسه کلاینت همکار';
+
+  @override
+  String get motamedAsaPartnerClientIdInvalid =>
+      'شناسه کلاینت همکار با v2-partner- شروع می‌شود.';
+
+  @override
+  String get motamedAsaPartnerClientSecret => 'رمز کلاینت همکار';
+
+  @override
+  String get motamedAsaKeepSecretHint =>
+      'برای نگه‌داشتن مقدار ذخیره‌شده، این کادر را خالی بگذارید.';
+
+  @override
+  String get motamedAsaActivate => 'فعال بودن ارسال از طریق معتمد آسا';
+
+  @override
+  String get motamedAsaEnabledHint =>
+      'کسب‌وکارها می‌توانند معتمد آسا را به‌عنوان روش ارسال انتخاب کنند.';
+
+  @override
+  String get motamedAsaDisabledHint =>
+      'کسب‌وکارها نمی‌توانند معتمد آسا را انتخاب کنند.';
+
+  @override
+  String get motamedAsaSave => 'ذخیره تنظیمات معتمد آسا';
+
+  @override
+  String get motamedAsaSaved => 'تنظیمات معتمد آسا ذخیره شد.';
+
+  @override
+  String get motamedAsaNotConfigured =>
+      'شناسه و رمز کلاینت همکار هنوز ذخیره نشده است.';
+
+  @override
+  String get motamedAsaTestSuccess =>
+      'حسابیکس با موفقیت به معتمد آسا وارد شد. هیچ کسب‌وکار یا صورت‌حسابی ساخته نشد.';
+
+  @override
+  String get motamedAsaHostedOnboarding => 'لینک ثبت‌نام';
+
+  @override
+  String get motamedAsaCredentialHandover => 'تحویل کلید API';
+
+  @override
+  String get settingsMotamedAsa => 'اتصال معتمد آسا';
+
+  @override
+  String get settingsMotamedAsaDescription =>
+      'اعتبارنامه همکاری با شرکت معتمد مالیاتی «معتمد آسا»';
+
+  @override
+  String get taxWorkspaceStatusColumn => 'وضعیت کارپوشه';
+
+  @override
+  String get taxWorkspaceStatusNoNeedReaction => 'عدم نیاز به واکنش';
+
+  @override
+  String get taxWorkspaceStatusAwaitingReaction => 'در انتظار واکنش خریدار';
+
+  @override
+  String get taxWorkspaceStatusApproved => 'تأیید شده توسط خریدار';
+
+  @override
+  String get taxWorkspaceStatusSystemicApproved => 'تأیید سیستمی';
+
+  @override
+  String get taxWorkspaceStatusImpossibleReaction => 'عدم امکان واکنش';
+
+  @override
+  String get taxWorkspaceStatusRejected => 'رد شده توسط خریدار';
+
+  @override
+  String get taxWorkspaceStatusSystemicRejected => 'رد سیستمی';
+
+  @override
+  String get taxWorkspaceStatusCanceled => 'باطل شده';
+
+  @override
+  String get taxArticle6Column => 'ماده ۶';
+
+  @override
+  String get taxArticle6Violated => 'عدول';
+
+  @override
+  String get taxArticle6NotViolated => 'عدم عدول';
+
+  @override
+  String get motamedAsaPaymentsAction => 'پرداخت‌ها و ثبت در کارپوشه';
+
+  @override
+  String get motamedAsaPaymentsTitle => 'جدول پرداخت صورت‌حساب';
+
+  @override
+  String get motamedAsaPaymentsDescription =>
+      'پرداخت‌هایی که پس از ارسال صورت‌حساب انجام شده‌اند از طریق معتمد آسا در کارپوشه سامانه مودیان ثبت می‌شوند. مبلغی را که خریدار پرداخته است (با مالیات بر ارزش افزوده) وارد کنید؛ کارپوشه سهم بدون مالیات را نگه می‌دارد. ردیف‌هایی که نزد سازمان ثبت شده‌اند قابل ویرایش یا حذف نیستند.';
+
+  @override
+  String get motamedAsaPaymentsNotEligible =>
+      'ثبت پرداخت تازه روی این صورت‌حساب ممکن نیست.';
+
+  @override
+  String get motamedAsaPaymentsEmpty =>
+      'هنوز ردیف پرداختی برای این صورت‌حساب نیست.';
+
+  @override
+  String get motamedAsaPaymentsAddRow => 'افزودن پرداخت';
+
+  @override
+  String get motamedAsaPaymentsRegister => 'ثبت در کارپوشه';
+
+  @override
+  String get motamedAsaPaymentsRegistered =>
+      'پرداخت‌ها برای ثبت در کارپوشه ارسال شد.';
+
+  @override
+  String get motamedAsaPaymentsResultUnknown =>
+      'پاسخ ثبت نرسید. ردیف‌های زیر وضعیت فعلی نزد معتمد آسا است؛ پیش از ارسال دوباره آن‌ها را بررسی کنید.';
+
+  @override
+  String get motamedAsaPaymentType => 'روش پرداخت';
+
+  @override
+  String get motamedAsaPaymentDate => 'تاریخ پرداخت';
+
+  @override
+  String get motamedAsaPaymentAmount => 'مبلغ پرداختی (ریال، با مالیات)';
+
+  @override
+  String get motamedAsaPaymentTraceNo => 'شماره پیگیری';
+
+  @override
+  String get motamedAsaPaymentTerminal => 'شماره پایانه';
+
+  @override
+  String get motamedAsaPaymentDescription => 'توضیح';
+
+  @override
+  String get motamedAsaPaymentRegisteredAmount => 'مبلغ ثبت‌شده';
+
+  @override
+  String get motamedAsaPaymentRemoveRow => 'حذف ردیف';
+
+  @override
+  String get motamedAsaPaymentAmountInvalid =>
+      'مبلغ را به ریال، عدد صحیح و بزرگ‌تر از صفر وارد کنید.';
+
+  @override
+  String get motamedAsaPaymentDigitsInvalid =>
+      'فقط رقم و در حد طول مجاز وارد کنید.';
+
+  @override
+  String get motamedAsaPaymentDateRequired =>
+      'تاریخ پرداخت همه ردیف‌ها را انتخاب کنید.';
+
+  @override
+  String get motamedAsaPaymentTypeCheque => 'چک';
+
+  @override
+  String get motamedAsaPaymentTypeBarter => 'تهاتر';
+
+  @override
+  String get motamedAsaPaymentTypeCash => 'نقد';
+
+  @override
+  String get motamedAsaPaymentTypePos => 'کارت‌خوان';
+
+  @override
+  String get motamedAsaPaymentTypeInternet => 'درگاه پرداخت اینترنتی';
+
+  @override
+  String get motamedAsaPaymentTypeCard => 'کارت به کارت';
+
+  @override
+  String get motamedAsaPaymentTypeTransfer => 'انتقال به حساب';
+
+  @override
+  String get motamedAsaPaymentTypeOther => 'سایر';
+
+  @override
+  String get motamedAsaPaymentStatusRegistered => 'ثبت شده';
+
+  @override
+  String get motamedAsaPaymentStatusSentWithInvoice =>
+      'همراه صورت‌حساب ارسال شده';
+
+  @override
+  String get motamedAsaPaymentStatusQueued => 'در صف ثبت';
+
+  @override
+  String get motamedAsaPaymentStatusNotRegistered =>
+      'همراه صورت‌حساب ارسال می‌شود';
+
+  @override
+  String get motamedAsaPaymentStatusUnknown => 'نتیجه نامشخص';
+
+  @override
+  String get motamedAsaPaymentStatusRejected => 'رد شده';
+
+  @override
+  String get motamedAsaPaymentStatusFailed => 'ناموفق';
+
+  @override
+  String get motamedAsaPaymentStatusNotApplicable => 'ارسال نمی‌شود';
 }

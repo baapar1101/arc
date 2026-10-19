@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../models/tax_settings_model.dart';
@@ -39,6 +40,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
   bool _saving = false;
   bool _providerSaving = false;
   bool _fanavaSyncing = false;
+  bool _motamedAsaBusy = false;
   String? _error;
   TaxSettingsModel? _settings;
   TaxDataQualityReport? _dataQuality;
@@ -85,6 +87,10 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
           _loading = false;
         });
         _loadDataQuality();
+        // Coming back from the Motamed ASA sign-up page: pick up the result without a click.
+        if (_settings?.motamedAsaAccount?['status'] == 'onboarding') {
+          _syncMotamedAsa(silent: true);
+        }
       }
     }
   }
@@ -359,6 +365,333 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
       if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     } finally {
       if (mounted) setState(() => _fanavaSyncing = false);
+    }
+  }
+
+  static final Uri _motamedAsaRulesUri = Uri.parse('https://asatsp.ir/rules');
+  static final Uri _motamedAsaPrivacyUri = Uri.parse('https://asatsp.ir/privacy#partner-software');
+
+  Future<bool> _requestMotamedAsaConsent() async {
+    final t = AppLocalizations.of(context);
+    bool consent = false;
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          final textTheme = Theme.of(dialogContext).textTheme;
+          return AlertDialog(
+            title: Text(t.motamedAsaConsentTitle),
+            content: SizedBox(
+              width: 560,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(t.motamedAsaConsentDescription),
+                    const SizedBox(height: 16),
+                    Text(t.motamedAsaSharedDataTitle, style: textTheme.titleSmall),
+                    const SizedBox(height: 8),
+                    _consentBullet(t.motamedAsaSharedDataSignup),
+                    _consentBullet(t.motamedAsaSharedDataInvoices),
+                    const SizedBox(height: 8),
+                    Text(t.motamedAsaSharedDataPurpose, style: textTheme.bodySmall),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        TextButton.icon(
+                          onPressed: () => launchUrl(_motamedAsaRulesUri, mode: LaunchMode.externalApplication),
+                          icon: const Icon(Icons.gavel_outlined, size: 18),
+                          label: Text(t.motamedAsaTermsLink),
+                        ),
+                        TextButton.icon(
+                          onPressed: () => launchUrl(_motamedAsaPrivacyUri, mode: LaunchMode.externalApplication),
+                          icon: const Icon(Icons.privacy_tip_outlined, size: 18),
+                          label: Text(t.motamedAsaPrivacyLink),
+                        ),
+                      ],
+                    ),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: consent,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      onChanged: (value) => setDialogState(() => consent = value == true),
+                      title: Text(t.motamedAsaConsentCheckbox),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: Text(t.cancel),
+              ),
+              FilledButton.icon(
+                onPressed: consent ? () => Navigator.pop(dialogContext, true) : null,
+                icon: const Icon(Icons.open_in_new),
+                label: Text(t.motamedAsaContinueButton),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    return result == true;
+  }
+
+  Widget _consentBullet(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 2),
+            child: Icon(Icons.check_circle_outline, size: 18),
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text)),
+        ],
+      ),
+    );
+  }
+
+  String? _validMotamedAsaEconomicCode() {
+    final economicCode = _convertDigitsToEnglish(_economicCodeController.text.trim());
+    if (!RegExp(r'^(\d{11}|\d{14})$').hasMatch(economicCode)) {
+      SnackBarHelper.showError(context, message: AppLocalizations.of(context).motamedAsaEconomicCodeRequired);
+      return null;
+    }
+    return economicCode;
+  }
+
+  Future<void> _selectMotamedAsa() async {
+    final t = AppLocalizations.of(context);
+    if (_providerSaving || _saving || _motamedAsaBusy) return;
+    if (_settings?.submissionProvider == 'motamed_asa' &&
+        _settings?.motamedAsaAccount?['connected'] == true) {
+      return;
+    }
+    final economicCode = _validMotamedAsaEconomicCode();
+    if (economicCode == null) return;
+    if (!await _requestMotamedAsaConsent() || !mounted) return;
+
+    setState(() => _providerSaving = true);
+    try {
+      final result = await _service.selectProvider(
+        businessId: widget.businessId,
+        providerCode: 'motamed_asa',
+        consent: true,
+        economicCode: economicCode,
+      );
+      if (!mounted) return;
+      setState(() => _settings = result);
+      final url = result.motamedAsaOnboardingUrl;
+      if (url != null) {
+        await _openMotamedAsaSignup(url);
+      } else if (result.motamedAsaAccount?['connected'] == true) {
+        SnackBarHelper.show(context, message: t.motamedAsaConnectedSuccess);
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+        await _load();
+      }
+    } finally {
+      if (mounted) setState(() => _providerSaving = false);
+    }
+  }
+
+  Future<void> _openMotamedAsaSignup(String url) async {
+    final t = AppLocalizations.of(context);
+    final uri = Uri.tryParse(url);
+    var opened = false;
+    if (uri != null && uri.scheme == 'https') {
+      try {
+        opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } catch (_) {
+        opened = false;
+      }
+    }
+    if (!mounted) return;
+    if (opened) {
+      SnackBarHelper.show(context, message: t.motamedAsaSignupOpened);
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(t.motamedAsaOpenSignup),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(t.motamedAsaLinkCopyHint),
+            const SizedBox(height: 8),
+            SelectableText(url, textDirection: TextDirection.ltr),
+          ],
+        ),
+        actions: [
+          TextButton.icon(
+            onPressed: () => _copyToClipboard(url),
+            icon: const Icon(Icons.copy, size: 18),
+            label: Text(t.copyLink),
+          ),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text(t.close)),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _renewMotamedAsaLink() async {
+    if (_motamedAsaBusy) return;
+    setState(() => _motamedAsaBusy = true);
+    try {
+      final data = await _service.renewMotamedAsaLink(widget.businessId);
+      final onboarding = data['motamed_asa_onboarding'];
+      final url = onboarding is Map ? onboarding['url']?.toString() : null;
+      final refreshed = await _service.fetchSettings(widget.businessId);
+      if (!mounted) return;
+      setState(() => _settings = refreshed);
+      if (url != null && url.isNotEmpty) {
+        await _openMotamedAsaSignup(url);
+      } else if (refreshed.motamedAsaAccount?['connected'] == true) {
+        SnackBarHelper.show(context, message: AppLocalizations.of(context).motamedAsaConnectedSuccess);
+      }
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    } finally {
+      if (mounted) setState(() => _motamedAsaBusy = false);
+    }
+  }
+
+  Future<void> _syncMotamedAsa({bool silent = false}) async {
+    if (_motamedAsaBusy) return;
+    setState(() => _motamedAsaBusy = true);
+    try {
+      await _service.syncMotamedAsaAccount(widget.businessId);
+      final refreshed = await _service.fetchSettings(widget.businessId);
+      if (!mounted) return;
+      setState(() => _settings = refreshed);
+      final t = AppLocalizations.of(context);
+      if (refreshed.motamedAsaAccount?['connected'] == true &&
+          refreshed.submissionProvider == 'motamed_asa') {
+        if (!silent) SnackBarHelper.show(context, message: t.motamedAsaConnectedSuccess);
+      } else if (!silent) {
+        SnackBarHelper.show(context, message: t.motamedAsaSyncSuccess);
+      }
+    } catch (e) {
+      if (mounted && !silent) {
+        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+      }
+    } finally {
+      if (mounted) setState(() => _motamedAsaBusy = false);
+    }
+  }
+
+  Future<void> _enterMotamedAsaCredentials() async {
+    final t = AppLocalizations.of(context);
+    if (_motamedAsaBusy) return;
+    final economicCode = _validMotamedAsaEconomicCode();
+    if (economicCode == null) return;
+    final formKey = GlobalKey<FormState>();
+    final clientId = TextEditingController();
+    final clientSecret = TextEditingController();
+    bool consent = false;
+    try {
+      final submitted = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, setDialogState) => AlertDialog(
+            title: Text(t.motamedAsaCredentialsTitle),
+            content: SizedBox(
+              width: 520,
+              child: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(t.motamedAsaCredentialsDescription),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: clientId,
+                        textDirection: TextDirection.ltr,
+                        decoration: InputDecoration(
+                          labelText: t.motamedAsaClientId,
+                          hintText: 'v2-customer-12345',
+                          border: const OutlineInputBorder(),
+                        ),
+                        validator: (value) => RegExp(r'^v2-customer-\d+$').hasMatch(value?.trim() ?? '')
+                            ? null
+                            : t.motamedAsaClientIdInvalid,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: clientSecret,
+                        obscureText: true,
+                        textDirection: TextDirection.ltr,
+                        decoration: InputDecoration(
+                          labelText: t.motamedAsaClientSecret,
+                          border: const OutlineInputBorder(),
+                        ),
+                        validator: (value) => value == null || value.trim().isEmpty ? t.required : null,
+                      ),
+                      const SizedBox(height: 12),
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        value: consent,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        onChanged: (value) => setDialogState(() => consent = value == true),
+                        title: Text(t.motamedAsaConsentCheckbox),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: Text(t.cancel),
+              ),
+              FilledButton.icon(
+                onPressed: consent
+                    ? () {
+                        if (!(formKey.currentState?.validate() ?? false)) return;
+                        Navigator.pop(dialogContext, true);
+                      }
+                    : null,
+                icon: const Icon(Icons.link),
+                label: Text(t.motamedAsaSaveCredentials),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (submitted != true || !mounted) return;
+      setState(() => _motamedAsaBusy = true);
+      await _service.saveMotamedAsaCredentials(
+        businessId: widget.businessId,
+        clientId: clientId.text.trim(),
+        clientSecret: clientSecret.text.trim(),
+        economicCode: economicCode,
+      );
+      final refreshed = await _service.fetchSettings(widget.businessId);
+      if (!mounted) return;
+      setState(() => _settings = refreshed);
+      SnackBarHelper.show(context, message: t.motamedAsaConnectedSuccess);
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    } finally {
+      clientId.dispose();
+      clientSecret.dispose();
+      if (mounted) setState(() => _motamedAsaBusy = false);
     }
   }
 
@@ -950,6 +1283,24 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
                     : t.fanavaUnavailable,
           ),
         ),
+        RadioListTile<String>(
+          contentPadding: EdgeInsets.zero,
+          value: 'motamed_asa',
+          groupValue: provider,
+          onChanged: (_saving || _providerSaving || _motamedAsaBusy || _sandboxMode ||
+                  _settings?.motamedAsaAvailable != true)
+              ? null
+              : (_) => _selectMotamedAsa(),
+          title: Text(t.taxSubmissionMotamedAsa),
+          subtitle: Text(
+            _sandboxMode
+                ? t.motamedAsaSandboxUnavailable
+                : _settings?.motamedAsaAvailable == true
+                    ? t.taxSubmissionMotamedAsaDescription
+                    : t.motamedAsaUnavailable,
+          ),
+        ),
+        _buildMotamedAsaStatus(t),
         if (_providerSaving)
           const LinearProgressIndicator(minHeight: 2)
         else if (status != 'not_connected' || connected)
@@ -1002,6 +1353,84 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
             ),
           ),
       ],
+    );
+  }
+
+  Widget _buildMotamedAsaStatus(AppLocalizations t) {
+    final account = _settings?.motamedAsaAccount;
+    if (account == null) return const SizedBox.shrink();
+    final status = account['status']?.toString() ?? 'not_connected';
+    final connected = account['connected'] == true;
+    final lastError = account['last_error']?.toString();
+    if (!connected && status == 'not_connected' && (lastError == null || lastError.trim().isEmpty)) {
+      return const SizedBox.shrink();
+    }
+    final memoryId = account['memory_unique_id']?.toString();
+    final tone = connected
+        ? SemanticColorResolver.positive(context)
+        : SemanticColorResolver.warning(context);
+    final label = connected
+        ? t.motamedAsaConnected
+        : switch (status) {
+            'onboarding' => t.motamedAsaOnboarding,
+            'credentials_required' => t.motamedAsaCredentialsRequired,
+            _ => t.motamedAsaNotConnected,
+          };
+    final busy = _motamedAsaBusy || _providerSaving || _saving;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 8, bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: tone.withValues(alpha: connected ? 0.10 : 0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(connected ? Icons.check_circle_outline : Icons.sync_problem_outlined, color: tone),
+              const SizedBox(width: 8),
+              Expanded(child: Text(label)),
+            ],
+          ),
+          if (connected && memoryId != null && memoryId.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text('${t.motamedAsaMemoryId}: $memoryId', style: Theme.of(context).textTheme.bodySmall),
+          ],
+          if (!connected && lastError != null && lastError.trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(lastError, style: Theme.of(context).textTheme.bodySmall),
+          ],
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 4,
+            children: [
+              if (!connected && status != 'credentials_required')
+                TextButton.icon(
+                  onPressed: busy ? null : _renewMotamedAsaLink,
+                  icon: const Icon(Icons.open_in_new, size: 18),
+                  label: Text(t.motamedAsaOpenSignup),
+                ),
+              if (!connected)
+                TextButton.icon(
+                  onPressed: busy ? null : _enterMotamedAsaCredentials,
+                  icon: const Icon(Icons.vpn_key_outlined, size: 18),
+                  label: Text(t.motamedAsaEnterCredentials),
+                ),
+              TextButton.icon(
+                onPressed: busy ? null : () => _syncMotamedAsa(),
+                icon: _motamedAsaBusy
+                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.refresh, size: 18),
+                label: Text(t.motamedAsaCheckConnection),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 

@@ -473,6 +473,16 @@ class SettingsCategorizationService {
             categoryId: 'external_services',
             order: 4,
           ),
+          SettingsItem(
+            id: 'tax_provider_motamed_asa',
+            title: 'settingsMotamedAsa',
+            description: 'settingsMotamedAsaDescription',
+            icon: Icons.verified_outlined,
+            color: const Color(0xFF00695C),
+            route: '/user/profile/system-settings/tax-provider-motamed-asa',
+            categoryId: 'external_services',
+            order: 5,
+          ),
         ],
       ),
 

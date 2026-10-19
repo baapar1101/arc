@@ -11,6 +11,7 @@ import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/tax/tax_workspace_widgets.dart';
+import 'package:hesabix_ui/widgets/tax/motamed_asa_payments_dialog.dart';
 import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import '../../utils/error_extractor.dart';
@@ -966,6 +967,12 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
               },
             ),
             DataTableAction(
+              icon: Icons.payments_outlined,
+              label: t.motamedAsaPaymentsAction,
+              onTap: (item) => _onMotamedAsaPayments(item as Map<String, dynamic>),
+              enabled: (item) => _canRegisterMotamedAsaPayments(item as Map<String, dynamic>),
+            ),
+            DataTableAction(
               icon: Icons.remove_circle_outline,
               label: t.taxRemoveFromWorkspaceSingle,
               onTap: (item) => _onRemoveSingleFromWorkspace(item as Map<String, dynamic>),
@@ -1053,6 +1060,20 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
           },
         ),
         TextColumn(
+          'tax_workspace_status',
+          t.taxWorkspaceStatusColumn,
+          formatter: (item) =>
+              taxWorkspaceStatusLabel(t, (item as Map<String, dynamic>)['tax_workspace_status']) ?? '-',
+          width: ColumnWidth.medium,
+        ),
+        TextColumn(
+          'tax_article6_status',
+          t.taxArticle6Column,
+          formatter: (item) =>
+              taxArticle6Label(t, (item as Map<String, dynamic>)['tax_article6_status']) ?? '-',
+          width: ColumnWidth.small,
+        ),
+        TextColumn(
           'tax_error_message',
           t.taxErrorMessageColumn,
           formatter: (item) {
@@ -1134,6 +1155,8 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
           PopupMenuItem(value: 'cancel', child: Text(t.taxCancelInModian)),
         if (_taxIsSubmitted(item) && item['tax_cancelled_in_modian'] != true)
           PopupMenuItem(value: 'corrective', child: Text(t.taxSendCorrective)),
+        if (_canRegisterMotamedAsaPayments(item))
+          PopupMenuItem(value: 'payments', child: Text(t.motamedAsaPaymentsAction)),
         PopupMenuItem(value: 'open', child: Text(t.taxOpenInvoice)),
       ],
       onMoreSelected: (value) {
@@ -1143,6 +1166,9 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
             break;
           case 'corrective':
             _onSendCorrective(item);
+            break;
+          case 'payments':
+            _onMotamedAsaPayments(item);
             break;
           case 'open':
             _openInvoice(id);
@@ -1155,6 +1181,27 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
   bool _taxIsSubmitted(Map<String, dynamic> map) {
     final status = map['tax_status']?.toString() ?? '';
     return status == 'sent' || status == 'finalized' || status == 'accepted';
+  }
+
+  /// Payments are registered in the کارپوشه through Motamed ASA for invoices sent that way.
+  bool _canRegisterMotamedAsaPayments(Map<String, dynamic> map) {
+    return map['tax_submission_provider'] == 'motamed_asa' &&
+        _taxIsSubmitted(map) &&
+        map['tax_cancelled_in_modian'] != true &&
+        map['document_type']?.toString() != 'invoice_sales_return';
+  }
+
+  Future<void> _onMotamedAsaPayments(Map<String, dynamic> item) async {
+    final id = item['id'] is int ? item['id'] as int : int.tryParse(item['id']?.toString() ?? '');
+    if (id == null) return;
+    await MotamedAsaPaymentsDialog.show(
+      context,
+      businessId: widget.businessId,
+      invoiceId: id,
+      invoiceCode: item['code']?.toString() ?? '',
+      apiClient: widget.apiClient,
+      calendarController: widget.calendarController,
+    );
   }
 
   Future<int?> _pickTaxReferenceInvoice() async {
