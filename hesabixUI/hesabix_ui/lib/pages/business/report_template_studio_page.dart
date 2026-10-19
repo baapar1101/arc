@@ -17,10 +17,13 @@ import '../../widgets/permission/permission_widgets.dart';
 import '../../widgets/report_template/studio/report_template_studio_customize_panel.dart';
 import '../../widgets/report_template/studio/report_template_studio_gallery.dart';
 import '../../widgets/report_template/studio/report_template_studio_preview_panel.dart';
+import '../../widgets/report_template/studio/report_template_studio_v3_builder.dart';
 import '../../core/hesabix_back.dart';
 import 'report_template_html_editor_page.dart';
 
 enum _StudioStep { gallery, customize }
+
+enum _StudioToolbarAction { changeTemplate, advancedHtml, pageSettings }
 
 class ReportTemplateStudioPage extends StatefulWidget {
   final int businessId;
@@ -43,7 +46,8 @@ class ReportTemplateStudioPage extends StatefulWidget {
   bool get isNew => template == null && templateId == null;
 
   @override
-  State<ReportTemplateStudioPage> createState() => _ReportTemplateStudioPageState();
+  State<ReportTemplateStudioPage> createState() =>
+      _ReportTemplateStudioPageState();
 }
 
 class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
@@ -69,14 +73,18 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
 
   List<Map<String, dynamic>> _galleryItems = const [];
   List<Map<String, dynamic>> _scopeCatalog = const [];
+  List<Map<String, dynamic>> _blockCatalog = const [];
   Map<String, dynamic>? _design;
   Map<String, dynamic> _assets = {'images': <String, String>{}};
   Map<String, dynamic> _sampleContext = const {};
 
   String? _paperSize = 'A4';
   String? _orientation = 'portrait';
+  String? _previewHtml;
   Uint8List? _previewPdfBytes;
+  bool _showPdfPreview = false;
   int _previewRevision = 0;
+  int _previewRequestId = 0;
   List<String> _validationErrors = const [];
   List<String> _validationWarnings = const [];
 
@@ -109,25 +117,30 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
   }
 
   String _fingerprint() => jsonEncode({
-        'name': _nameCtrl.text.trim(),
-        'desc': _descCtrl.text.trim(),
-        'module': _moduleKey,
-        'subtype': _subtype,
-        'design': _design,
-        'paperSize': _paperSize,
-        'orientation': _orientation,
-        'margins': {
-          'top': _marginTopCtrl.text.trim(),
-          'right': _marginRightCtrl.text.trim(),
-          'bottom': _marginBottomCtrl.text.trim(),
-          'left': _marginLeftCtrl.text.trim(),
-        },
-      });
+    'name': _nameCtrl.text.trim(),
+    'desc': _descCtrl.text.trim(),
+    'module': _moduleKey,
+    'subtype': _subtype,
+    'design': _design,
+    'paperSize': _paperSize,
+    'orientation': _orientation,
+    'margins': {
+      'top': _marginTopCtrl.text.trim(),
+      'right': _marginRightCtrl.text.trim(),
+      'bottom': _marginBottomCtrl.text.trim(),
+      'left': _marginLeftCtrl.text.trim(),
+    },
+  });
 
   Future<void> _bootstrap() async {
     setState(() => _loading = true);
     try {
-      await Future.wait([_loadScopeCatalog(), _loadGallery(), _loadSampleContext()]);
+      await Future.wait([
+        _loadScopeCatalog(),
+        _loadGallery(),
+        _loadSampleContext(),
+        _loadBlockCatalog(),
+      ]);
       if (widget.template != null) {
         await _loadExistingTemplate();
       } else if (widget.templateId != null) {
@@ -137,9 +150,15 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
         _step = _StudioStep.customize;
         _schedulePreview();
       }
+      if (_lastSavedFingerprint.isEmpty) {
+        _lastSavedFingerprint = _fingerprint();
+      }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -170,8 +189,20 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
     if (mounted) setState(() => _sampleContext = sample ?? const {});
   }
 
+  Future<void> _loadBlockCatalog() async {
+    final items = await _service.studioBlocks(
+      businessId: widget.businessId,
+      moduleKey: _moduleKey ?? 'invoices',
+      subtype: _subtype,
+    );
+    if (mounted) setState(() => _blockCatalog = items);
+  }
+
   Future<void> _loadExistingTemplateById(int templateId) async {
-    final full = await _service.getTemplate(businessId: widget.businessId, templateId: templateId);
+    final full = await _service.getTemplate(
+      businessId: widget.businessId,
+      templateId: templateId,
+    );
     _templateId = templateId;
     await _applyLoadedTemplate(full);
   }
@@ -179,7 +210,10 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
   Future<void> _loadExistingTemplate() async {
     final tid = (widget.template!['id'] as num?)?.toInt();
     if (tid == null) return;
-    final full = await _service.getTemplate(businessId: widget.businessId, templateId: tid);
+    final full = await _service.getTemplate(
+      businessId: widget.businessId,
+      templateId: tid,
+    );
     _templateId = tid;
     await _applyLoadedTemplate(full);
   }
@@ -191,10 +225,13 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
     _descCtrl.text = (full['description'] ?? '').toString();
     _paperSize = (full['paper_size'] ?? _paperSize)?.toString();
     _orientation = (full['orientation'] ?? _orientation)?.toString();
-    final margins = (full['margins'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final margins =
+        (full['margins'] as Map?)?.cast<String, dynamic>() ?? const {};
     _marginTopCtrl.text = margins['top']?.toString() ?? _marginTopCtrl.text;
-    _marginRightCtrl.text = margins['right']?.toString() ?? _marginRightCtrl.text;
-    _marginBottomCtrl.text = margins['bottom']?.toString() ?? _marginBottomCtrl.text;
+    _marginRightCtrl.text =
+        margins['right']?.toString() ?? _marginRightCtrl.text;
+    _marginBottomCtrl.text =
+        margins['bottom']?.toString() ?? _marginBottomCtrl.text;
     _marginLeftCtrl.text = margins['left']?.toString() ?? _marginLeftCtrl.text;
 
     final engine = (full['engine'] ?? '').toString().toLowerCase();
@@ -204,7 +241,9 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
     if (engine == 'template_v2') {
       _design = (assets['template_design'] as Map?)?.cast<String, dynamic>();
     } else if (engine == 'builder') {
-      final builderDesign = (assets['builder_design'] as Map?)?.cast<String, dynamic>() ?? const {};
+      final builderDesign =
+          (assets['builder_design'] as Map?)?.cast<String, dynamic>() ??
+          const {};
       if (mounted && builderDesign.isNotEmpty) {
         final migrate = await showDialog<bool>(
           context: context,
@@ -215,8 +254,14 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
               'برخی جزئیات ممکن است نیاز به بازبینی داشته باشند.',
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
-              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('انتقال')),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('انصراف'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('انتقال'),
+              ),
             ],
           ),
         );
@@ -234,8 +279,24 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
       }
     }
 
-    await _loadGallery();
+    await _upgradeDesignToV3IfSupported();
+
+    await Future.wait([_loadGallery(), _loadBlockCatalog()]);
     _lastSavedFingerprint = _fingerprint();
+  }
+
+  Future<void> _upgradeDesignToV3IfSupported() async {
+    final design = _design;
+    if (design == null || (design['schema_version'] as num?)?.toInt() != 2)
+      return;
+    if (_moduleKey != 'invoices' ||
+        !const {'detail', 'receipt'}.contains(_subtype))
+      return;
+    final out = await _service.migrateV2ToV3(
+      businessId: widget.businessId,
+      design: design,
+    );
+    _design = (out['design'] as Map?)?.cast<String, dynamic>() ?? design;
   }
 
   void _onScopeChanged(String? scopeId) {
@@ -247,7 +308,12 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
       _subtype = scopeId.substring(idx + 1);
       _step = _StudioStep.gallery;
       _design = null;
+      _previewHtml = null;
       _previewPdfBytes = null;
+      _showPdfPreview = false;
+      _previewLoading = false;
+      _previewRequestId++;
+      _blockCatalog = const [];
       if (_moduleKey == 'invoices' && _subtype == 'receipt') {
         _applyReceiptPageDefaultsIfNeeded();
       } else if (kInvoiceReceiptPaperSizeOptions.contains(_paperSize)) {
@@ -259,82 +325,135 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
         _marginLeftCtrl.text = '10';
       }
     });
-    Future.wait([_loadGallery(), _loadSampleContext()]);
+    Future.wait([_loadGallery(), _loadSampleContext(), _loadBlockCatalog()]);
   }
 
   void _selectGalleryItem(Map<String, dynamic> item) {
-    final design = (item['default_design'] as Map?)?.cast<String, dynamic>();
+    final design = ((item['studio_design'] ?? item['default_design']) as Map?)
+        ?.cast<String, dynamic>();
     if (design == null) return;
     setState(() {
       _design = Map<String, dynamic>.from(design);
       _step = _StudioStep.customize;
+      _previewHtml = null;
+      _previewPdfBytes = null;
+      _showPdfPreview = false;
       _applyReceiptPageDefaultsIfNeeded();
     });
     _schedulePreview();
   }
 
   void _onDesignChanged(Map<String, dynamic> design) {
-    setState(() => _design = design);
+    setState(() {
+      _design = design;
+      _previewPdfBytes = null;
+      _showPdfPreview = false;
+    });
     _schedulePreview();
   }
 
   void _schedulePreview() {
+    if (mounted && (_showPdfPreview || _previewPdfBytes != null)) {
+      setState(() {
+        _showPdfPreview = false;
+        _previewPdfBytes = null;
+      });
+    }
     _previewDebouncer.schedule(_refreshPreview);
   }
 
   Future<void> _refreshPreview() async {
-    if (_design == null || !mounted) return;
+    final design = _design;
+    if (design == null || !mounted) return;
+    final requestId = ++_previewRequestId;
     setState(() {
       _previewLoading = true;
       _validationErrors = const [];
       _validationWarnings = const [];
     });
     try {
-      final validation = await _service.validateV2Design(
+      final validation = await _service.validateStudioDesign(
         businessId: widget.businessId,
         moduleKey: _moduleKey ?? 'invoices',
         subtype: _subtype,
-        design: _design!,
+        design: design,
       );
-      final errors = ((validation['errors'] as List?) ?? const []).map((e) => e.toString()).toList();
-      final warnings = ((validation['warnings'] as List?) ?? const []).map((e) => e.toString()).toList();
+      final errors = ((validation['errors'] as List?) ?? const [])
+          .map((e) => e.toString())
+          .toList();
+      final warnings = ((validation['warnings'] as List?) ?? const [])
+          .map((e) => e.toString())
+          .toList();
+      if (!mounted || requestId != _previewRequestId) return;
       if (errors.isNotEmpty) {
         if (mounted) {
           setState(() {
             _validationErrors = errors;
             _validationWarnings = warnings;
             _previewLoading = false;
+            _previewHtml = null;
             _previewPdfBytes = null;
           });
         }
         return;
       }
 
-      final pdfBytes = await _service.previewPdf(
+      final html = await _service.previewHtml(
         businessId: widget.businessId,
         engine: 'template_v2',
-        design: _design,
-        assets: {'template_design': _design, ..._assets},
+        design: design,
+        assets: {..._assets, 'template_design': design},
         context: _sampleContext,
         paperSize: _effectivePaperSize(),
         orientation: _orientation,
         margins: _parseMargins(),
       );
-      if (mounted) {
+      if (mounted && requestId == _previewRequestId) {
         setState(() {
-          _previewPdfBytes = Uint8List.fromList(pdfBytes);
+          _previewHtml = html;
           _previewRevision++;
           _validationWarnings = warnings;
           _previewLoading = false;
         });
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted && requestId == _previewRequestId) {
         setState(() {
           _previewLoading = false;
           _validationErrors = [ErrorExtractor.forContext(e, context)];
         });
       }
+    }
+  }
+
+  Future<void> _refreshPdfPreview() async {
+    if (_design == null || !mounted) return;
+    final requestId = ++_previewRequestId;
+    setState(() => _previewLoading = true);
+    try {
+      final pdfBytes = await _service.previewPdf(
+        businessId: widget.businessId,
+        engine: 'template_v2',
+        design: _design,
+        assets: {..._assets, 'template_design': _design},
+        context: _sampleContext,
+        paperSize: _effectivePaperSize(),
+        orientation: _orientation,
+        margins: _parseMargins(),
+      );
+      if (!mounted || requestId != _previewRequestId) return;
+      setState(() {
+        _previewPdfBytes = Uint8List.fromList(pdfBytes);
+        _previewRevision++;
+        _showPdfPreview = true;
+        _previewLoading = false;
+      });
+    } catch (e) {
+      if (!mounted || requestId != _previewRequestId) return;
+      setState(() {
+        _previewLoading = false;
+        _validationErrors = [ErrorExtractor.forContext(e, context)];
+      });
     }
   }
 
@@ -392,13 +511,15 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
 
     setState(() => _saving = true);
     try {
-      final validation = await _service.validateV2Design(
+      final validation = await _service.validateStudioDesign(
         businessId: widget.businessId,
         moduleKey: _moduleKey ?? 'invoices',
         subtype: _subtype,
         design: _design!,
       );
-      final errors = ((validation['errors'] as List?) ?? const []).map((e) => e.toString()).toList();
+      final errors = ((validation['errors'] as List?) ?? const [])
+          .map((e) => e.toString())
+          .toList();
       if (errors.isNotEmpty) {
         SnackBarHelper.showError(context, message: errors.join(' | '));
         return;
@@ -416,7 +537,9 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
           moduleKey: _moduleKey ?? 'invoices',
           subtype: _subtype,
           name: name,
-          description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
+          description: _descCtrl.text.trim().isEmpty
+              ? null
+              : _descCtrl.text.trim(),
           contentHtml: '<html><body></body></html>',
           paperSize: _effectivePaperSize(),
           orientation: _orientation,
@@ -431,7 +554,9 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
           templateId: _templateId!,
           changes: {
             'name': name,
-            'description': _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
+            'description': _descCtrl.text.trim().isEmpty
+                ? null
+                : _descCtrl.text.trim(),
             'module_key': _moduleKey,
             'subtype': _subtype,
             'engine': 'template_v2',
@@ -450,7 +575,10 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -465,8 +593,14 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
         title: const Text('خروج بدون ذخیره؟'),
         content: const Text('تغییرات ذخیره نشده از بین می‌رود.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('ماندن')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('خروج')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('ماندن'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('خروج'),
+          ),
         ],
       ),
     );
@@ -484,15 +618,21 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
           'می‌توانید کد را در ادیتور پیشرفته ویرایش کنید.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('ادامه')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('انصراف'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('ادامه'),
+          ),
         ],
       ),
     );
     if (ok != true || !mounted) return;
 
     try {
-      final fragments = await _service.compileV2Design(
+      final fragments = await _service.compileStudioDesign(
         businessId: widget.businessId,
         design: _design!,
       );
@@ -500,7 +640,9 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
 
       final seed = ReportTemplateHtmlEditorSeed(
         name: _nameCtrl.text.trim(),
-        description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
+        description: _descCtrl.text.trim().isEmpty
+            ? null
+            : _descCtrl.text.trim(),
         moduleKey: _moduleKey,
         subtype: _subtype,
         contentHtml: fragments['content_html']?.toString(),
@@ -536,7 +678,10 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
       if (mounted) context.pop(true);
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
       }
     }
   }
@@ -569,7 +714,8 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
 
   String _scopeLabel() {
     for (final s in _scopeCatalog) {
-      final id = '${(s['module_key'] ?? '').toString()}:${(s['subtype'] ?? '').toString()}';
+      final id =
+          '${(s['module_key'] ?? '').toString()}:${(s['subtype'] ?? '').toString()}';
       if (id == _currentScopeId()) return (s['label_fa'] ?? id).toString();
     }
     return _currentScopeId();
@@ -586,14 +732,23 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
-                value: _paperChoices.contains(_paperSize) ? _paperSize : _paperChoices.first,
+                value: _paperChoices.contains(_paperSize)
+                    ? _paperSize
+                    : _paperChoices.first,
                 decoration: InputDecoration(
                   labelText: 'سایز کاغذ',
                   border: const OutlineInputBorder(),
-                  helperText: _isReceiptScope ? 'عرض فیش؛ ارتفاع هر صفحه ۲۹۷ میلی‌متر است' : null,
+                  helperText: _isReceiptScope
+                      ? 'عرض فیش؛ ارتفاع هر صفحه ۲۹۷ میلی‌متر است'
+                      : null,
                 ),
                 items: _paperChoices
-                    .map((e) => DropdownMenuItem(value: e, child: Text(reportTemplatePaperSizeLabel(e))))
+                    .map(
+                      (e) => DropdownMenuItem(
+                        value: e,
+                        child: Text(reportTemplatePaperSizeLabel(e)),
+                      ),
+                    )
                     .toList(),
                 onChanged: (v) => setState(() {
                   _paperSize = v;
@@ -606,13 +761,17 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
                 decoration: InputDecoration(
                   labelText: 'جهت',
                   border: const OutlineInputBorder(),
-                  helperText: _isReceiptScope ? 'فیش پرینتر همیشه عمودی است' : null,
+                  helperText: _isReceiptScope
+                      ? 'فیش پرینتر همیشه عمودی است'
+                      : null,
                 ),
                 items: const [
                   DropdownMenuItem(value: 'portrait', child: Text('عمودی')),
                   DropdownMenuItem(value: 'landscape', child: Text('افقی')),
                 ],
-                onChanged: _isReceiptScope ? null : (v) => setState(() => _orientation = v),
+                onChanged: _isReceiptScope
+                    ? null
+                    : (v) => setState(() => _orientation = v),
               ),
               const SizedBox(height: 12),
               Row(
@@ -634,7 +793,10 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('بستن')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('بستن'),
+          ),
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
@@ -650,63 +812,153 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
   Widget _marginField(String label, TextEditingController ctrl) {
     return TextField(
       controller: ctrl,
-      decoration: InputDecoration(labelText: label, border: const OutlineInputBorder(), isDense: true),
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+        isDense: true,
+      ),
       keyboardType: TextInputType.number,
       inputFormatters: [EnglishDigitsFormatter()],
     );
   }
 
+  Future<void> _handleToolbarAction(_StudioToolbarAction action) async {
+    switch (action) {
+      case _StudioToolbarAction.changeTemplate:
+        setState(() => _step = _StudioStep.gallery);
+        return;
+      case _StudioToolbarAction.advancedHtml:
+        await _openAdvancedHtml();
+        return;
+      case _StudioToolbarAction.pageSettings:
+        await _showPageSettings();
+        return;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!widget.authStore.hasBusinessPermission('report_templates', 'write')) {
-      return const AccessDeniedPage(message: 'شما دسترسی لازم برای ویرایش قالب‌ها را ندارید');
+      return const AccessDeniedPage(
+        message: 'شما دسترسی لازم برای ویرایش قالب‌ها را ندارید',
+      );
     }
 
     final isNew = widget.isNew;
     final title = isNew ? 'استودیو قالب — جدید' : 'استودیو قالب — ویرایش';
+    final compactToolbar = MediaQuery.sizeOf(context).width < 900;
 
     return HesabixBackInterceptor(
       onWillPop: _confirmDiscard,
       child: Scaffold(
         appBar: AppBar(
           title: Text(title),
-          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+          leading: hesabixBackAppBarLeading(
+            context,
+            businessId: widget.businessId,
+          ),
           actions: [
-            if (_step == _StudioStep.customize && isNew)
+            if (!compactToolbar && _step == _StudioStep.customize && isNew)
               TextButton.icon(
                 onPressed: () => setState(() => _step = _StudioStep.gallery),
                 icon: const Icon(Icons.grid_view),
                 label: const Text('تغییر قالب'),
               ),
-            if (_step == _StudioStep.customize && _design != null)
+            if (!compactToolbar &&
+                _step == _StudioStep.customize &&
+                _design != null)
               TextButton.icon(
                 onPressed: _openAdvancedHtml,
                 icon: const Icon(Icons.code),
                 label: const Text('حالت پیشرفته'),
               ),
-            IconButton(icon: const Icon(Icons.settings), tooltip: 'تنظیمات صفحه', onPressed: _showPageSettings),
-            if (_hasUnsavedChanges)
+            if (!compactToolbar)
+              IconButton(
+                icon: const Icon(Icons.settings),
+                tooltip: 'تنظیمات صفحه',
+                onPressed: _showPageSettings,
+              ),
+            if (compactToolbar)
+              PopupMenuButton<_StudioToolbarAction>(
+                tooltip: 'گزینه‌های استودیو',
+                onSelected: _handleToolbarAction,
+                itemBuilder: (context) => [
+                  if (_step == _StudioStep.customize && isNew)
+                    const PopupMenuItem(
+                      value: _StudioToolbarAction.changeTemplate,
+                      child: ListTile(
+                        leading: Icon(Icons.grid_view),
+                        title: Text('تغییر قالب'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  if (_step == _StudioStep.customize && _design != null)
+                    const PopupMenuItem(
+                      value: _StudioToolbarAction.advancedHtml,
+                      child: ListTile(
+                        leading: Icon(Icons.code),
+                        title: Text('حالت پیشرفته'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  const PopupMenuItem(
+                    value: _StudioToolbarAction.pageSettings,
+                    child: ListTile(
+                      leading: Icon(Icons.settings),
+                      title: Text('تنظیمات صفحه'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
+              ),
+            if (_hasUnsavedChanges && !compactToolbar)
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 8),
-                child: Chip(label: Text('ذخیره نشده'), visualDensity: VisualDensity.compact),
+                child: Chip(
+                  label: Text('ذخیره نشده'),
+                  visualDensity: VisualDensity.compact,
+                ),
               ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              child: FilledButton.icon(
-                onPressed: _saving || _loading || _design == null ? null : _save,
-                icon: _saving
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.save),
-                label: Text(_saving ? 'در حال ذخیره...' : 'ذخیره'),
+              padding: EdgeInsets.symmetric(
+                horizontal: compactToolbar ? 2 : 8,
+                vertical: 8,
               ),
+              child: compactToolbar
+                  ? IconButton(
+                      tooltip: _saving ? 'در حال ذخیره...' : 'ذخیره',
+                      onPressed: _saving || _loading || _design == null
+                          ? null
+                          : _save,
+                      icon: _saving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.save),
+                    )
+                  : FilledButton.icon(
+                      onPressed: _saving || _loading || _design == null
+                          ? null
+                          : _save,
+                      icon: _saving
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.save),
+                      label: Text(_saving ? 'در حال ذخیره...' : 'ذخیره'),
+                    ),
             ),
           ],
         ),
         body: _loading
             ? const Center(child: LoadingIndicator())
             : _step == _StudioStep.gallery
-                ? _buildGalleryStep(context)
-                : _buildCustomizeStep(context),
+            ? _buildGalleryStep(context)
+            : _buildCustomizeStep(context),
       ),
     );
   }
@@ -720,20 +972,30 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('انتخاب قالب', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                'انتخاب قالب',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 4),
               Text(
                 'یک قالب حرفه‌ای انتخاب کنید؛ سپس آن را سفارشی کنید.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      value: _scopeCatalog.any((s) =>
-                              '${(s['module_key'] ?? '').toString()}:${(s['subtype'] ?? '').toString()}' ==
-                              _currentScopeId())
+                      value:
+                          _scopeCatalog.any(
+                            (s) =>
+                                '${(s['module_key'] ?? '').toString()}:${(s['subtype'] ?? '').toString()}' ==
+                                _currentScopeId(),
+                          )
                           ? _currentScopeId()
                           : null,
                       decoration: const InputDecoration(
@@ -744,7 +1006,8 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
                       items: _scopeCatalog
                           .map(
                             (s) => DropdownMenuItem<String>(
-                              value: '${(s['module_key'] ?? '').toString()}:${(s['subtype'] ?? '').toString()}',
+                              value:
+                                  '${(s['module_key'] ?? '').toString()}:${(s['subtype'] ?? '').toString()}',
                               child: Text((s['label_fa'] ?? '').toString()),
                             ),
                           )
@@ -777,62 +1040,121 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
       return const Center(child: Text('قالبی انتخاب نشده است.'));
     }
 
-    return Row(
-      children: [
-        SizedBox(
-          width: 360,
+    if ((design['schema_version'] as num?)?.toInt() == 3) {
+      return ReportTemplateStudioV3Builder(
+        design: design,
+        blockCatalog: _blockCatalog,
+        onDesignChanged: _onDesignChanged,
+        editorHeader: _buildTemplateIdentityFields(),
+        previewPane: _buildPreviewPane(),
+      );
+    }
+
+    final settingsPane = _buildCustomizeSettings(design);
+    final previewPane = _buildPreviewPane();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 900) {
+          return Row(
+            children: [
+              SizedBox(width: 520, child: settingsPane),
+              VerticalDivider(width: 1, color: Theme.of(context).dividerColor),
+              Expanded(flex: 3, child: previewPane),
+            ],
+          );
+        }
+
+        return DefaultTabController(
+          length: 2,
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Column(
-                  children: [
-                    TextField(
-                      controller: _nameCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'نام قالب',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _descCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'توضیحات (اختیاری)',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                      maxLines: 2,
+              const Material(
+                child: TabBar(
+                  tabs: [
+                    Tab(icon: Icon(Icons.tune), text: 'تنظیمات'),
+                    Tab(
+                      icon: Icon(Icons.picture_as_pdf_outlined),
+                      text: 'پیش‌نمایش',
                     ),
                   ],
                 ),
               ),
-              const Divider(height: 16),
               Expanded(
-                child: ReportTemplateStudioCustomizePanel(
-                  design: design,
-                  moduleKey: _moduleKey ?? 'invoices',
-                  subtype: _subtype,
-                  onDesignChanged: _onDesignChanged,
-                ),
+                child: TabBarView(children: [settingsPane, previewPane]),
               ),
             ],
           ),
-        ),
-        VerticalDivider(width: 1, color: Theme.of(context).dividerColor),
+        );
+      },
+    );
+  }
+
+  Widget _buildCustomizeSettings(Map<String, dynamic> design) {
+    return Column(
+      children: [
+        _buildTemplateIdentityFields(),
+        const Divider(height: 16),
         Expanded(
-          flex: 3,
-          child: ReportTemplateStudioPreviewPanel(
-            loading: _previewLoading,
-            pdfBytes: _previewPdfBytes,
-            previewRevision: _previewRevision,
-            errors: _validationErrors,
-            warnings: _validationWarnings,
-            onRefresh: _refreshPreview,
+          child: ReportTemplateStudioCustomizePanel(
+            design: design,
+            moduleKey: _moduleKey ?? 'invoices',
+            subtype: _subtype,
+            blockCatalog: _blockCatalog,
+            onDesignChanged: _onDesignChanged,
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildTemplateIdentityFields() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Column(
+        children: [
+          TextField(
+            controller: _nameCtrl,
+            decoration: const InputDecoration(
+              labelText: 'نام قالب',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _descCtrl,
+            decoration: const InputDecoration(
+              labelText: 'توضیحات (اختیاری)',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            maxLines: 2,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreviewPane() {
+    return ReportTemplateStudioPreviewPanel(
+      loading: _previewLoading,
+      pdfBytes: _previewPdfBytes,
+      html: _previewHtml,
+      previewRevision: _previewRevision,
+      paperSize: _effectivePaperSize(),
+      orientation: _orientation,
+      errors: _validationErrors,
+      warnings: _validationWarnings,
+      onRefresh: _refreshPreview,
+      onGeneratePdf: () {
+        if (_previewPdfBytes != null && _previewPdfBytes!.isNotEmpty) {
+          setState(() => _showPdfPreview = true);
+        } else {
+          _refreshPdfPreview();
+        }
+      },
+      onShowHtml: () => setState(() => _showPdfPreview = false),
+      showPdf: _showPdfPreview,
     );
   }
 }

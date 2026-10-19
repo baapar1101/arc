@@ -3,10 +3,13 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import 'report_template_studio_v3_builder.dart';
+
 class ReportTemplateStudioCustomizePanel extends StatelessWidget {
   final Map<String, dynamic> design;
   final String moduleKey;
   final String? subtype;
+  final List<Map<String, dynamic>> blockCatalog;
   final ValueChanged<Map<String, dynamic>> onDesignChanged;
 
   const ReportTemplateStudioCustomizePanel({
@@ -14,6 +17,7 @@ class ReportTemplateStudioCustomizePanel extends StatelessWidget {
     required this.design,
     required this.moduleKey,
     required this.subtype,
+    this.blockCatalog = const [],
     required this.onDesignChanged,
   });
 
@@ -69,6 +73,13 @@ class ReportTemplateStudioCustomizePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if ((design['schema_version'] as num?)?.toInt() == 3) {
+      return ReportTemplateStudioV3Builder(
+        design: design,
+        blockCatalog: blockCatalog,
+        onDesignChanged: onDesignChanged,
+      );
+    }
     final theme = _theme();
     final sections = _sections();
     final branding = _branding();

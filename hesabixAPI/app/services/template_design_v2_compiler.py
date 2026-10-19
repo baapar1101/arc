@@ -69,7 +69,11 @@ def _total_display_flag(row: Dict[str, Any]) -> str | None:
 def _wrap_if_flag(flag: str | None, inner: str) -> str:
 	if not flag:
 		return inner
-	return f"{{% if {flag} %}}{inner}{{% endif %}}"
+	# A Studio preview can be rendered with a sample/legacy context that does not
+	# yet contain the business print-display flags.  The design itself marks the
+	# column/row as visible, so an absent runtime flag must not make the whole
+	# template fail under StrictUndefined.
+	return f"{{% if {flag} | default(true) %}}{inner}{{% endif %}}"
 
 
 def _cell_expr(col: Dict[str, Any]) -> str:
@@ -113,6 +117,10 @@ def _total_expr(row: Dict[str, Any]) -> str:
 
 def _theme_css(design: Dict[str, Any], family_id: str) -> str:
 	theme = design.get("theme") or {}
+	direction = str(theme.get("direction") or "rtl").strip().lower()
+	if direction not in ("rtl", "ltr"):
+		direction = "rtl"
+	default_align = "right" if direction == "rtl" else "left"
 	primary = _color(theme.get("primary_color"), "#1e3a5f")
 	accent = _color(theme.get("accent_color"), "#366092")
 	text = _color(theme.get("text_color"), "#212529")
@@ -127,6 +135,10 @@ def _theme_css(design: Dict[str, Any], family_id: str) -> str:
   --rt-text: {text};
   --rt-base: {base_font}px;
   --rt-table: {table_font}px;
+}}
+html, body {{
+  direction: {direction};
+  text-align: {default_align};
 }}
 .rt-layout {{
   font-size: var(--rt-base);
@@ -872,14 +884,18 @@ def _compile_invoice_receipt(design: Dict[str, Any]) -> Tuple[str, str, str, str
 			if key == "product_name":
 				inner = (
 					"<div class='rt-item-name'>"
-					"{% if row.product_code %}{{ row.product_code }} — {% endif %}{{ row.product_name | default('-') }}"
+					"{% if row.product_code is defined and row.product_code %}{{ row.product_code }} — {% endif %}"
+					"{{ row.product_name | default('-') }}"
 					"</div>"
-					"{% if row.description %}<div class='rt-item-meta'>{{ row.description }}</div>{% endif %}"
+					"{% if row.description is defined and row.description %}"
+					"<div class='rt-item-meta'>{{ row.description }}</div>{% endif %}"
 				)
 				if sections.get("show_unit_price", True):
 					inner += (
-						"{% if row.unit_price %}<div class='rt-item-meta'>{{ row.unit_price | money }}"
-						"{% if row.unit_display %} / {{ row.unit_display }}{% endif %}</div>{% endif %}"
+						"{% if row.unit_price is defined and row.unit_price %}"
+						"<div class='rt-item-meta'>{{ row.unit_price | money }}"
+						"{% if row.unit_display is defined and row.unit_display %}"
+						" / {{ row.unit_display }}{% endif %}</div>{% endif %}"
 					)
 				return inner
 			if key in ("quantity", "quantity_display"):
