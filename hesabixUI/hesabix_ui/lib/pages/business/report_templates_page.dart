@@ -29,6 +29,7 @@ class ReportTemplatesPage extends StatefulWidget {
   State<ReportTemplatesPage> createState() => _ReportTemplatesPageState();
 }
 
+
 class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
   late final ReportTemplateService _service;
   final _moduleCtrl = TextEditingController(text: 'invoices');
@@ -1260,43 +1261,68 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
       await showDialog<void>(
         context: context,
         builder: (ctx) {
-          return DefaultTabController(
-            length: 2,
-            child: AlertDialog(
-              title: Text(t.reportTemplatePreviewTitle),
-              content: SizedBox(
-                width: 720,
-                height: 480,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TabBar(
-                      tabs: [
-                        Tab(text: t.reportTemplatePreviewHtmlTab),
-                        Tab(text: t.reportTemplatePreviewPdfTab),
-                      ],
-                    ),
-                    Expanded(
-                      child: TabBarView(
-                        children: [
-                          SingleChildScrollView(
-                            child: SelectableText(html.isEmpty ? '—' : html),
-                          ),
-                          _listPreviewPdfPane(
-                            t,
-                            pdfBytes,
-                            lenFromPreview,
-                            pdfFetchFailed,
-                          ),
+          final viewport = MediaQuery.sizeOf(ctx);
+          final availableWidth = viewport.width > 32 ? viewport.width - 32 : viewport.width;
+          final availableHeight = viewport.height > 32 ? viewport.height - 32 : viewport.height;
+          final dialogWidth = availableWidth > 900 ? 900.0 : availableWidth;
+          final dialogHeight = availableHeight > 720 ? 720.0 : availableHeight;
+          return SafeArea(
+            child: Dialog(
+              insetPadding: const EdgeInsets.all(16),
+              clipBehavior: Clip.antiAlias,
+              child: SizedBox(
+                width: dialogWidth,
+                height: dialogHeight,
+                child: DefaultTabController(
+                  length: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsetsDirectional.fromSTEB(20, 12, 8, 4),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                t.reportTemplatePreviewTitle,
+                                style: Theme.of(ctx).textTheme.titleLarge,
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: t.close,
+                              onPressed: () => Navigator.pop(ctx),
+                              icon: const Icon(Icons.close),
+                            ),
+                          ],
+                        ),
+                      ),
+                      TabBar(
+                        tabs: [
+                          Tab(text: t.reportTemplatePreviewHtmlTab),
+                          Tab(text: t.reportTemplatePreviewPdfTab),
                         ],
                       ),
-                    ),
-                  ],
+                      const Divider(height: 1),
+                      Expanded(
+                        child: TabBarView(
+                          children: [
+                            SingleChildScrollView(
+                              padding: const EdgeInsets.all(16),
+                              child: SelectableText(html.isEmpty ? '—' : html),
+                            ),
+                            _listPreviewPdfPane(
+                              t,
+                              pdfBytes,
+                              lenFromPreview,
+                              pdfFetchFailed,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.close)),
-              ],
             ),
           );
         },
@@ -1978,4 +2004,3 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
   }
 
 }
-

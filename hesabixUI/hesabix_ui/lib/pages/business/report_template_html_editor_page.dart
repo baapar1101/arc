@@ -382,17 +382,23 @@ class _ReportTemplateHtmlEditorPageState extends State<ReportTemplateHtmlEditorP
       if (!mounted) return;
       await showDialog<void>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(t.reportTemplatePreview),
-          content: SizedBox(
-            width: 720,
-            height: 520,
-            child: ReportTemplateEmbeddedPdf(bytes: Uint8List.fromList(pdfBytes)),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.close)),
-          ],
-        ),
+        builder: (ctx) {
+          final viewport = MediaQuery.sizeOf(ctx);
+          final availableWidth = viewport.width > 64 ? viewport.width - 64 : viewport.width;
+          final availableHeight = viewport.height > 180 ? viewport.height - 180 : viewport.height;
+          return AlertDialog(
+            insetPadding: const EdgeInsets.all(16),
+            title: Text(t.reportTemplatePreview),
+            content: SizedBox(
+              width: availableWidth > 720 ? 720 : availableWidth,
+              height: availableHeight > 520 ? 520 : availableHeight,
+              child: ReportTemplateEmbeddedPdf(bytes: Uint8List.fromList(pdfBytes)),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.close)),
+            ],
+          );
+        },
       );
     } catch (e) {
       if (mounted) {
