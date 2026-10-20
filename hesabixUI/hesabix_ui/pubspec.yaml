@@ -94,6 +94,9 @@ dev_dependencies:
   flutter_launcher_icons: ^0.14.4
 
 dependency_overrides:
+  # image 4.11.0 calls ZLibDecoder.decodeLazy, which is absent from archive 4.0.9.
+  # Keep the compatible version recorded in pubspec.lock until archive is upgraded.
+  image: 4.10.1
   intl: ^0.20.2
   desktop_drop:
     path: third_party/desktop_drop
