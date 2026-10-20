@@ -3,18 +3,19 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
 from app.core.responses import ApiError
 from app.integrations.moadian.dto import InvoiceBodyDto, InvoiceDto, InvoiceHeaderDto, InvoicePaymentDto
+from app.services import motamed_asa_tax_submission_service as service
 from app.services.motamed_asa_tax_submission_service import (
     _document_result,
     _hesabix_status,
     _payments_internal_id,
     build_motamed_asa_invoice,
     build_motamed_asa_payment_rows,
-    build_motamed_asa_return_invoice,
     motamed_asa_internal_id,
     normalize_article6_status,
 )
@@ -69,56 +70,79 @@ def test_type_two_sends_no_payments() -> None:
     assert data["Payments"] == []
 
 
-def _reference(rows: list[dict], *, setm: int = 1) -> dict:
-    return {
-        "asatspId": 900,
-        "taxId": "ATAXIDOFTHELATESTCHAIN",
-        "status": 2,
-        "issue": 1,
-        "json": {"Header": {"inty": 1, "inp": 1, "setm": setm}, "Body": rows},
-    }
+def test_return_sends_the_return_document_lines_without_the_buyer() -> None:
+    returned = _dto([_row("2720000114542", 1, 1000, dis=100)], ins=5)
+    data = build_motamed_asa_invoice(returned, document_id=77, subject=4)
+
+    header = data["Header"]
+    assert (header["ins"], header["inp"], header["inno"]) == (4, 1, "000000004D")
+    assert not set(header) & {"tob", "tinb", "bid", "bpc"}, "the buyer of a return comes from the reference"
+    assert [(row["sstid"], row["am"], row["dis"]) for row in data["Body"]] == [("2720000114542", 1, 100)]
+    assert header["tbill"] == sum(row["tsstam"] for row in data["Body"])
 
 
-def test_return_sends_remaining_rows_and_recomputes_totals() -> None:
-    reference = _reference([
-        {"sstid": "2720000114542", "sstt": "کالا 42", "mu": "1627", "am": 3, "fee": 1000, "dis": 300, "vra": 10},
-        {"sstid": "2720000114559", "sstt": "کالا 59", "mu": "1627", "am": 1, "fee": 5000, "dis": 0, "vra": 10},
-    ])
-    returned = _dto([_row("2720000114542", 1, 1000, dis=100)], ins=4)
-    data = build_motamed_asa_return_invoice(returned, document_id=77, reference=reference)
+def _return_document(monkeypatch: pytest.MonkeyPatch, reference_extra: dict | None) -> SimpleNamespace:
+    reference = None if reference_extra is None else SimpleNamespace(id=42, extra_info=reference_extra)
+    monkeypatch.setattr(service, "resolve_reference_document", lambda db, business_id, document: reference)
+    return SimpleNamespace(id=77, business_id=5, extra_info={"reference_invoice_id": 42})
 
-    header, body = data["Header"], data["Body"]
-    assert (header["ins"], header["irtaxid"], header["inno"]) == (4, "ATAXIDOFTHELATESTCHAIN", "000000004D")
-    assert [(row["sstid"], row["am"], row["dis"]) for row in body] == [
-        ("2720000114542", 2, 200),
-        ("2720000114559", 1, 0),
+
+def test_return_refers_to_the_sale_tax_id_asa_gave(monkeypatch: pytest.MonkeyPatch) -> None:
+    document = _return_document(
+        monkeypatch, {"tax_submission_provider": "motamed_asa", "tax_moadian_taxid": "A" * 22}
+    )
+    assert service.motamed_asa_return_reference_tax_id(MagicMock(), document) == "A" * 22
+
+
+@pytest.mark.parametrize(
+    ("reference_extra", "code"),
+    [
+        (None, "TAX_REFERENCE_INVOICE_MISSING"),
+        ({"tax_submission_provider": "moadian_direct", "tax_moadian_taxid": "A" * 22}, "MOTAMED_ASA_REFERENCE_OTHER_PROVIDER"),
+        ({"tax_submission_provider": "motamed_asa"}, "MOTAMED_ASA_REFERENCE_NOT_REGISTERED"),
+    ],
+)
+def test_return_needs_a_sale_registered_through_motamed_asa(
+    monkeypatch: pytest.MonkeyPatch, reference_extra: dict | None, code: str
+) -> None:
+    document = _return_document(monkeypatch, reference_extra)
+    with pytest.raises(ApiError) as error:
+        service.motamed_asa_return_reference_tax_id(MagicMock(), document)
+    assert error.value.code == code
+
+
+def test_return_goes_to_send_as_returned_goods() -> None:
+    client = MagicMock()
+    client.inquire_internal_ids.return_value = [{"internalId": "hesabix-77", "status": 3, "error": ["صورتحساب یافت نشد"]}]
+    client.send_invoices.return_value = {"result": 1, "data": [{"asatspId": 9, "taxId": "B" * 22, "status": 0}]}
+    document = SimpleNamespace(id=77, description=None, extra_info={})
+    data = {"Header": {"ins": 4, "irtaxid": "A" * 22}, "Body": [], "Payments": []}
+
+    result = service._send_or_update(
+        MagicMock(), client, "token", document, "hesabix-77", data,
+        mode="return", fiscal_id=None, item_fields={"returnRows": "returned"},
+    )
+
+    item = client.send_invoices.call_args.args[1]["data"][0]
+    assert item["returnRows"] == "returned" and item["internalId"] == "hesabix-77"
+    assert (result["status"], result["tax_id"]) == ("pending", "B" * 22)
+
+
+def test_a_rejected_return_is_not_rewritten_as_remaining_rows() -> None:
+    client = MagicMock()
+    client.inquire_internal_ids.return_value = [
+        {"internalId": "hesabix-77", "asatspId": 9, "issue": 4, "status": 3, "error": ["خطای سازمان"]}
     ]
-    assert body[0]["prdis"] == 2000 and body[0]["adis"] == 1800 and body[0]["vam"] == 180
-    assert header["tbill"] == sum(row["tsstam"] for row in body) == header["cap"]
-    assert "tob" not in header and "tinb" not in header
-    assert data["Payments"] == []
+    document = SimpleNamespace(id=77, description=None, extra_info={})
 
-
-def test_returning_everything_asks_for_cancellation() -> None:
-    reference = _reference([{"sstid": "2720000114542", "am": 2, "fee": 1000, "dis": 0, "vra": 10}])
     with pytest.raises(ApiError) as error:
-        build_motamed_asa_return_invoice(_dto([_row("2720000114542", 2, 1000)], ins=4), document_id=1, reference=reference)
-    assert error.value.code == "MOTAMED_ASA_RETURN_NEEDS_CANCELLATION"
-
-
-def test_returning_more_than_remaining_is_refused() -> None:
-    reference = _reference([{"sstid": "2720000114542", "am": 1, "fee": 1000, "dis": 0, "vra": 10}])
-    with pytest.raises(ApiError) as error:
-        build_motamed_asa_return_invoice(_dto([_row("2720000114542", 2, 1000)], ins=4), document_id=1, reference=reference)
-    assert error.value.code == "MOTAMED_ASA_RETURN_ROW_INVALID"
-
-
-def test_return_needs_the_accepted_reference_json() -> None:
-    with pytest.raises(ApiError) as error:
-        build_motamed_asa_return_invoice(
-            _dto([_row("2720000114542", 1, 1000)], ins=4), document_id=1, reference={"taxId": "X", "status": 1}
+        service._send_or_update(
+            MagicMock(), client, "token", document, "hesabix-77", {"Header": {}, "Body": []},
+            mode="return", fiscal_id=None, item_fields={"returnRows": "returned"},
         )
-    assert error.value.code == "MOTAMED_ASA_REFERENCE_UNAVAILABLE"
+
+    assert error.value.code == "MOTAMED_ASA_RETURN_REJECTED"
+    client.edit_invoice.assert_not_called()
 
 
 @pytest.mark.parametrize(

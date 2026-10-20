@@ -11,8 +11,10 @@ Operations (API v2 docs, sections 05, 07, 08D):
 - correction: /api/invoice/editInvoice with confirmCorrection (ASA sets ins=2
   and the reference);
 - cancellation: /api/invoice/cancelInvoice on the chain;
-- sales return: /send with ins=4 whose Body is the rows remaining after the
-  return, per RC_IITP.IS_V7.9 table 1 (pp. 14-18).
+- sales return: /send with ins=4 and returnRows "returned": the Body is the
+  return document's own lines (the goods taken back) and ASA matches them to
+  the registered reference rows and builds the rows left after the return
+  (RC_IITP.IS_V7.9 table 1, pp. 14-18) with every tax field of the reference.
 """
 from __future__ import annotations
 
@@ -27,7 +29,7 @@ from adapters.db.models.document import Document
 from adapters.db.models.tax_setting import TaxSetting
 from app.core.responses import ApiError
 from app.integrations.moadian.dto import InvoiceDto
-from app.integrations.moadian.utils import normalize_invoice_number, round_to_int, timestamp_to_unix_ms
+from app.integrations.moadian.utils import normalize_invoice_number, timestamp_to_unix_ms
 from app.integrations.motamed_asa.client import MotamedAsaApiError, MotamedAsaClient
 from app.services.motamed_asa_provider_service import (
     MOTAMED_ASA_PROVIDER,
@@ -66,6 +68,7 @@ _BODY_FIELDS = (
     "vop", "ssrv", "bsrn", "nw",
 )
 _PAYMENT_FIELDS = ("iinn", "acn", "trmn", "trn", "pcn", "pid", "pdt", "pmt", "pv")
+_BUYER_FIELDS = ("tob", "bid", "tinb", "sbc", "bpc", "bbc", "bpn")
 
 
 # --- Identifiers ----------------------------------------------------------------------------
@@ -97,6 +100,10 @@ def build_motamed_asa_invoice(invoice_dto: InvoiceDto, *, document_id: int, subj
     header["inno"] = normalize_invoice_number(document_id)
     if subject == _ISSUE_ORIGINAL:
         header.pop("irtaxid", None)
+    if subject == _ISSUE_RETURN:
+        # In a return the buyer is outside the pattern and comes from the reference (V7.9 table 1).
+        for key in _BUYER_FIELDS:
+            header.pop(key, None)
 
     body = [
         {key: row[key] for key in _BODY_FIELDS if row.get(key) is not None}
@@ -133,166 +140,11 @@ def _unix_ms(value: Any) -> int | None:
     return None
 
 
-def _lower_keys(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {str(key).lower(): _lower_keys(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_lower_keys(item) for item in value]
-    return value
-
-
-def _sent_invoice(info: dict[str, Any]) -> dict[str, Any] | None:
-    """The invoice JSON the tax organisation accepted, as API v2 returns it in «json»."""
-    raw = info.get("json")
-    if isinstance(raw, list):
-        raw = next((item for item in raw if isinstance(item, dict)), None)
-    if not isinstance(raw, dict):
-        return None
-    invoice = _lower_keys(raw)
-    if not isinstance(invoice.get("header"), dict) or not isinstance(invoice.get("body"), list):
-        return None
-    return invoice
-
-
 def _decimal(value: Any) -> Decimal:
     try:
         return Decimal(str(value if value not in (None, "") else 0))
     except (InvalidOperation, ValueError):
         return Decimal(0)
-
-
-def _number(value: Decimal) -> int | float:
-    return int(value) if value == value.to_integral_value() else float(value)
-
-
-def _remaining_row(row: dict[str, Any], quantity: Decimal, discount: Decimal) -> dict[str, Any]:
-    fee = _decimal(row.get("fee"))
-    vra = _decimal(row.get("vra"))
-    prdis = round_to_int(quantity * fee)
-    dis = min(max(round_to_int(discount), 0), prdis)
-    adis = prdis - dis
-    vam = round_to_int(adis * vra / 100) if vra > 0 else 0
-    odam = round_to_int(adis * _decimal(row.get("odr")) / 100) if row.get("odr") not in (None, "") else 0
-    olam = round_to_int(adis * _decimal(row.get("olr")) / 100) if row.get("olr") not in (None, "") else 0
-    remaining = {
-        "sstid": str(row.get("sstid") or ""),
-        "sstt": row.get("sstt"),
-        "mu": row.get("mu"),
-        "am": _number(quantity),
-        "fee": _number(fee),
-        "prdis": prdis,
-        "dis": dis,
-        "adis": adis,
-        "vra": _number(vra),
-        "vam": vam,
-        "odam": odam,
-        "olam": olam,
-        "tsstam": adis + vam + odam + olam,
-    }
-    for key in ("odt", "odr", "olt", "olr", "bsrn"):
-        if row.get(key) not in (None, ""):
-            remaining[key] = row[key]
-    return {key: value for key, value in remaining.items() if value is not None}
-
-
-def build_motamed_asa_return_invoice(
-    invoice_dto: InvoiceDto,
-    *,
-    document_id: int,
-    reference: dict[str, Any],
-) -> dict[str, Any]:
-    """
-    A sales return (ins=4) on the latest registered invoice of the reference chain.
-    Its Body is the reference's rows after the return (RC_IITP.IS_V7.9 table 1,
-    pp. 14-18): no row is added, a fully returned row is left out, and unit price,
-    VAT rate and unit stay the reference's. Hesabix's return lines give the
-    returned quantity and discount of each row.
-    """
-    sent = _sent_invoice(reference)
-    reference_tax_id = str(reference.get("taxId") or "").strip()
-    if sent is None or not reference_tax_id:
-        raise ApiError(
-            "MOTAMED_ASA_REFERENCE_UNAVAILABLE",
-            "اقلام صورتحساب مرجع از معتمد آسا خوانده نشد؛ برگشت از فروش فقط برای صورتحساب ثبت‌شده در سامانهٔ مؤدیان صادر می‌شود.",
-            http_status=409,
-        )
-    reference_header = sent["header"]
-    rows = [dict(row) for row in sent["body"] if isinstance(row, dict)]
-    quantities = [_decimal(row.get("am")) for row in rows]
-    discounts = [_decimal(row.get("dis")) for row in rows]
-
-    for index, returned in enumerate(invoice_dto.body, start=1):
-        returned_quantity = _decimal(returned.am)
-        if returned_quantity <= 0:
-            continue
-        match = next(
-            (
-                position
-                for position, row in enumerate(rows)
-                if str(row.get("sstid") or "") == str(returned.sstid or "")
-                and quantities[position] >= returned_quantity
-            ),
-            None,
-        )
-        if match is None:
-            raise ApiError(
-                "MOTAMED_ASA_RETURN_ROW_INVALID",
-                f"ردیف {index} برگشت («{returned.sstt}») در صورتحساب مرجع نیست یا مقدار برگشتی آن از مقدار باقی‌مانده بیشتر است.",
-                http_status=400,
-                details={"line_number": index, "sstid": returned.sstid},
-            )
-        quantities[match] -= returned_quantity
-        discounts[match] = max(discounts[match] - _decimal(returned.dis), Decimal(0))
-
-    if all(quantities[position] == _decimal(row.get("am")) for position, row in enumerate(rows)):
-        raise ApiError(
-            "MOTAMED_ASA_RETURN_NOTHING_RETURNED",
-            "در این برگشت از فروش مقدار هیچ ردیفی کم نشده است.",
-            http_status=400,
-        )
-    body = [
-        _remaining_row(row, quantities[position], discounts[position])
-        for position, row in enumerate(rows)
-        if quantities[position] > 0
-    ]
-    if not body:
-        raise ApiError(
-            "MOTAMED_ASA_RETURN_NEEDS_CANCELLATION",
-            "با این برگشت چیزی از صورتحساب مرجع باقی نمی‌ماند؛ به‌جای برگشت از فروش، صورتحساب مرجع را در سامانهٔ مؤدیان ابطال کنید.",
-            http_status=400,
-        )
-
-    totals = {
-        "tprdis": sum(row["prdis"] for row in body),
-        "tdis": sum(row["dis"] for row in body),
-        "tadis": sum(row["adis"] for row in body),
-        "tvam": sum(row["vam"] for row in body),
-        "todam": sum(row["odam"] + row["olam"] for row in body),
-    }
-    totals["tbill"] = totals["tadis"] + totals["tvam"] + totals["todam"]
-    inty = int(_decimal(reference_header.get("inty") or 1))
-    header: dict[str, Any] = {
-        "indatim": invoice_dto.header.indatim,
-        "inty": inty,
-        "inp": int(_decimal(reference_header.get("inp") or 1)),
-        "ins": _ISSUE_RETURN,
-        "inno": normalize_invoice_number(document_id),
-        "tins": invoice_dto.header.tins,
-        "irtaxid": reference_tax_id,
-        **totals,
-    }
-    if inty == 1:
-        setm = int(_decimal(reference_header.get("setm") or 1))
-        header["setm"] = setm if setm in (1, 2, 3) else 1
-        if header["setm"] == 2:
-            header["insp"] = totals["tbill"]
-        else:
-            header["cap"] = totals["tbill"]
-            if header["setm"] == 3:
-                header["insp"] = 0
-        if totals["tvam"] > 0:
-            header["tvop"] = totals["tvam"]
-    return {"Header": header, "Body": body, "Payments": []}
 
 
 # --- Results ----------------------------------------------------------------------------------
@@ -496,12 +348,23 @@ def _send_or_update(
     *,
     mode: str,
     fiscal_id: str | None,
+    item_fields: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     current = _inquire_one(client, token, internal_id)
     if current is not None:
-        status, _ = _hesabix_status(current)
+        status, error = _hesabix_status(current)
         if status in ("pending", "finalized"):
             return _record(db, document, current, mode=mode, status=status)
+        if mode == "return":
+            # editInvoice takes a return's Body as the rows left after it, not as returned goods, so a
+            # rejected return is not rewritten from here.
+            raise ApiError(
+                "MOTAMED_ASA_RETURN_REJECTED",
+                "برگشت از فروش این سند پیش‌تر به معتمد آسا رسیده و پذیرفته نشده است"
+                + (f" ({error})" if error else "")
+                + "؛ آن را در پنل معتمد آسا اصلاح و ارسال کنید.",
+                http_status=409,
+            )
         # Rejected or never sent: a new version of the same invoice (same serial) is sent.
         response = client.edit_invoice(
             token,
@@ -528,6 +391,7 @@ def _send_or_update(
         "internalId": internal_id,
         "send": True,
         "description": _description(document),
+        **(item_fields or {}),
         "data": data,
     }
     if fiscal_id:
@@ -644,12 +508,11 @@ def _cancel(
     raise _rejected(response, item)
 
 
-def _return_reference(
-    db: Session,
-    client: MotamedAsaClient,
-    token: str,
-    document: Document,
-) -> dict[str, Any]:
+def motamed_asa_return_reference_tax_id(db: Session, document: Document) -> str:
+    """
+    The tax id of the sale a return refers to. Any registered invoice of the reference's
+    chain will do: ASA finds the chain's latest itself (returnRows "returned").
+    """
     reference = resolve_reference_document(db, int(document.business_id), document)
     if reference is None:
         raise ApiError(
@@ -664,14 +527,14 @@ def _return_reference(
             "فاکتور مرجع از طریق معتمد آسا ارسال نشده است؛ برگشت آن را از همان روشی بفرستید که فاکتور مرجع با آن ارسال شده است.",
             http_status=409,
         )
-    latest = _inquire_one(client, token, motamed_asa_internal_id(reference))
-    if latest is None or _phase(latest) != _PHASE_SUCCESS:
+    tax_id = str(reference_extra.get("tax_moadian_taxid") or "").strip()
+    if len(tax_id) != 22:
         raise ApiError(
             "MOTAMED_ASA_REFERENCE_NOT_REGISTERED",
-            "آخرین صورتحساب زنجیرهٔ فاکتور مرجع هنوز در سامانهٔ مؤدیان ثبت نشده است؛ پس از ثبت آن، برگشت از فروش را بفرستید.",
+            "شماره مالیاتی فاکتور مرجع از معتمد آسا ثبت نشده است؛ پس از ثبت آن در سامانهٔ مؤدیان، برگشت از فروش را بفرستید.",
             http_status=409,
         )
-    return latest
+    return tax_id
 
 
 def send_document_via_motamed_asa(
@@ -698,15 +561,16 @@ def send_document_via_motamed_asa(
         if submission_mode == "corrective":
             data = build_motamed_asa_invoice(invoice_dto, document_id=int(document.id), subject=_ISSUE_CORRECTION)
             return _correct(db, client, token, document, internal_id, data)
-        if submission_mode == "return":
-            data = build_motamed_asa_return_invoice(
-                invoice_dto,
-                document_id=int(document.id),
-                reference=_return_reference(db, client, token, document),
-            )
-        else:
-            data = build_motamed_asa_invoice(invoice_dto, document_id=int(document.id), subject=_ISSUE_ORIGINAL)
         fiscal_id = str(account.memory_number or "").strip() or None
+        if submission_mode == "return":
+            # The return document's own lines; ASA matches them to the reference rows (API v2 05, «ارسال اقلام برگشتی»).
+            data = build_motamed_asa_invoice(invoice_dto, document_id=int(document.id), subject=_ISSUE_RETURN)
+            data["Header"]["irtaxid"] = motamed_asa_return_reference_tax_id(db, document)
+            return _send_or_update(
+                db, client, token, document, internal_id, data,
+                mode=submission_mode, fiscal_id=fiscal_id, item_fields={"returnRows": "returned"},
+            )
+        data = build_motamed_asa_invoice(invoice_dto, document_id=int(document.id), subject=_ISSUE_ORIGINAL)
         return _send_or_update(db, client, token, document, internal_id, data, mode=submission_mode, fiscal_id=fiscal_id)
 
     try:
