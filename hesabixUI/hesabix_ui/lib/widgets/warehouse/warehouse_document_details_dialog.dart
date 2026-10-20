@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/warehouse_service.dart';
+import '../../services/pdf_output_service.dart';
 import '../../core/api_client.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
 import '../../widgets/document/document_details_dialog.dart';
@@ -14,7 +15,6 @@ import '../../utils/snackbar_helper.dart';
 import '../../core/date_utils.dart' show HesabixDateUtils;
 import 'warehouse_postal_label_print_dialog.dart';
 import '../../utils/error_extractor.dart';
-import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class WarehouseDocumentDetailsDialog extends StatefulWidget {
@@ -343,12 +343,13 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
         '/warehouse-docs/business/${widget.businessId}/${widget.documentId}/pdf',
       );
       if (!mounted) return;
-      final result = await BytesExportService.export(
+      await PdfOutputService.deliverPdf(
+        context: context,
         bytes: bytes,
         filename: 'warehouse_doc_${widget.documentId}.pdf',
-        mimeType: 'application/pdf',
+        businessId: widget.businessId,
+        paperSize: 'A4',
       );
-      if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.show(

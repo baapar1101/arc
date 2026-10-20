@@ -12,6 +12,7 @@ import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousand
 import 'package:hesabix_ui/services/warehouse_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/report_template_service.dart';
+import 'package:hesabix_ui/services/pdf_output_service.dart';
 import 'package:hesabix_ui/services/receipt_payment_service.dart';
 import 'package:hesabix_ui/models/receipt_payment_document.dart';
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
@@ -50,7 +51,6 @@ import 'package:hesabix_ui/utils/responsive_helper.dart';
 import 'package:hesabix_ui/utils/invoice_transaction_preferences.dart';
 import 'package:hesabix_ui/models/invoice_transaction.dart' show TransactionType;
 import 'package:share_plus/share_plus.dart';
-import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 int? _parseInstallmentSeq(dynamic v) {
@@ -679,9 +679,14 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         final api = ApiClient();
         final path = '/documents/${doc.id}/pdf';
         final bytes = await api.downloadPdf(path, query: null);
-        final result = await InvoicePdfPrintFlow.savePdfBytesWeb(bytes, doc.code);
         if (!mounted) return;
-        BytesExportService.showFeedback(context, result);
+        await PdfOutputService.deliverPdf(
+          context: context,
+          bytes: bytes,
+          filename: doc.code,
+          businessId: doc.businessId,
+          paperSize: 'A4',
+        );
       }
     } catch (e) {
       if (!mounted) return;

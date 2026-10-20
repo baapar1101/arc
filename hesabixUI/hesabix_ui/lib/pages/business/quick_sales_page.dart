@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/quick_sales_service.dart';
 import '../../services/invoice_service.dart';
+import '../../services/pdf_output_service.dart';
 import '../../services/payment_gateway_service.dart';
 import '../../services/product_service.dart';
 import '../../services/warehouse_service.dart';
@@ -54,7 +55,6 @@ import '../../widgets/barcode/web_barcode_scan_screen.dart';
 import '../../utils/general_barcode_utils.dart';
 import '../../utils/responsive_helper.dart';
 import '../../utils/web/web_utils.dart';
-import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// کد کسب‌وکاری برای نمایش در فروش سریع: اگر [code] با [id] یکی باشد، از `product_code`، `tax_code` یا اولین بارکد عمومی استفاده می‌شود.
@@ -3568,17 +3568,13 @@ class _QuickSalesPageState extends State<QuickSalesPage>
 
       if (!mounted) return;
 
-      final filename = invoiceCode ?? 'invoice_$invoiceId';
-      final safeName = filename.trim().isEmpty ? 'invoice.pdf' : filename;
-      final finalName = safeName.toLowerCase().endsWith('.pdf')
-          ? safeName
-          : '$safeName.pdf';
-      final result = await BytesExportService.export(
+      await PdfOutputService.deliverPdf(
+        context: context,
         bytes: bytes,
-        filename: finalName,
-        mimeType: 'application/pdf',
+        filename: invoiceCode ?? 'invoice_$invoiceId',
+        businessId: widget.businessId,
+        paperSize: paperSize,
       );
-      if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (mounted) {
         SnackBarHelper.show(

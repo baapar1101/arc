@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/business_api_service.dart';
 import 'package:hesabix_ui/services/report_template_service.dart';
+import 'package:hesabix_ui/services/pdf_output_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 
@@ -119,9 +120,14 @@ class InvoicePdfPrintFlow {
       if (tid != null) query['template_id'] = tid;
 
       final bytes = await api.downloadPdf(path, query: query.isNotEmpty ? query : null);
-      final result = await savePdfBytesWeb(bytes, invoiceCode);
       if (!context.mounted) return;
-      BytesExportService.showFeedback(context, result);
+      await PdfOutputService.deliverPdf(
+        context: context,
+        bytes: bytes,
+        filename: invoiceCode,
+        businessId: businessId,
+        paperSize: invoicePrint.paperSize,
+      );
     } catch (e) {
       if (!context.mounted) return;
       SnackBarHelper.showError(

@@ -41,7 +41,7 @@ import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/utils/currency_display_utils.dart';
 import 'package:hesabix_ui/utils/invoice_payment_tx_from_receipt.dart';
 import '../../services/business_dashboard_service.dart';
-import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/services/pdf_output_service.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// صفحه لیست اسناد دریافت و پرداخت با ویجت جدول
@@ -1130,7 +1130,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       }
 
       // نمایش دیالوگ مشاهده جزئیات
-      if (!context.mounted) return;
+      if (!mounted) return;
       final ctx = context;
       await showDialog(
         context: ctx,
@@ -4582,10 +4582,16 @@ class _ReceiptPaymentViewDialogState extends State<ReceiptPaymentViewDialog> {
       final pdfBytes = await widget.apiClient.downloadPdf(
         '/receipts-payments/${widget.document.id}/pdf',
       );
+      if (!mounted) return;
 
-      // ذخیره فایل
-      final result = await _savePdfFile(pdfBytes, widget.document.code);
-      if (mounted) BytesExportService.showFeedback(context, result);
+      // Deliver the PDF using this device's configured print/save behavior.
+      await PdfOutputService.deliverPdf(
+        context: context,
+        bytes: pdfBytes,
+        filename: widget.document.code,
+        businessId: widget.businessId,
+        paperSize: 'A4',
+      );
     } catch (e) {
       if (mounted) {
         final t = AppLocalizations.of(context);
@@ -4603,12 +4609,5 @@ class _ReceiptPaymentViewDialogState extends State<ReceiptPaymentViewDialog> {
     }
   }
 
-  Future<BytesExportResult> _savePdfFile(List<int> bytes, String filename) async {
-    return BytesExportService.export(
-      bytes: bytes,
-      filename: filename.endsWith('.pdf') ? filename : '$filename.pdf',
-      mimeType: 'application/pdf',
-    );
-  }
 }
 
