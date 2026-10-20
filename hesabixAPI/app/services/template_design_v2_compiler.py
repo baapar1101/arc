@@ -121,6 +121,11 @@ def _theme_css(design: Dict[str, Any], family_id: str) -> str:
 	if direction not in ("rtl", "ltr"):
 		direction = "rtl"
 	default_align = "right" if direction == "rtl" else "left"
+	font_family = (
+		"'YekanBakhFaNum', 'Vazirmatn', Tahoma, Arial, sans-serif"
+		if direction == "rtl"
+		else "Roboto, Arial, sans-serif"
+	)
 	primary = _color(theme.get("primary_color"), "#1e3a5f")
 	accent = _color(theme.get("accent_color"), "#366092")
 	text = _color(theme.get("text_color"), "#212529")
@@ -136,10 +141,24 @@ def _theme_css(design: Dict[str, Any], family_id: str) -> str:
   --rt-base: {base_font}px;
   --rt-table: {table_font}px;
 }}
+@font-face {{
+  font-family: 'YekanBakhFaNum';
+  src: url("{{{{ fa_font_url_regular | default('') }}}}") format('truetype');
+  font-weight: 400;
+  font-style: normal;
+}}
+@font-face {{
+  font-family: 'YekanBakhFaNum';
+  src: url("{{{{ fa_font_url_bold | default('') }}}}") format('truetype');
+  font-weight: 700;
+  font-style: normal;
+}}
 html, body {{
   direction: {direction};
   text-align: {default_align};
+  font-family: {font_family};
 }}
+body * {{ font-family: inherit; }}
 .rt-layout {{
   font-size: var(--rt-base);
   color: var(--rt-text);

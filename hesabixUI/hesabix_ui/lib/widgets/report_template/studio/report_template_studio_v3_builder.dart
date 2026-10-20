@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import 'report_template_media_settings.dart';
+
 class ReportTemplateStudioV3Builder extends StatefulWidget {
   final Map<String, dynamic> design;
   final List<Map<String, dynamic>> blockCatalog;
@@ -38,6 +40,7 @@ class _ReportTemplateStudioV3BuilderState
   int _historyIndex = -1;
   int _idSequence = 0;
   String? _selectedBlockId;
+  bool _showLivePreview = false;
 
   @override
   void initState() {
@@ -159,7 +162,7 @@ class _ReportTemplateStudioV3BuilderState
       'type': type,
       'visible': true,
       'props': _cloneMap(definition['default_props']),
-      'style': <String, dynamic>{},
+      'style': <String, dynamic>{'width_mode': 'full'},
     };
     blocks.insert(index.clamp(0, blocks.length), block);
     regions[region] = blocks;
@@ -229,6 +232,10 @@ class _ReportTemplateStudioV3BuilderState
     } else if (data.blockId != null) {
       _moveBlock(data.blockId!, region, index);
     }
+  }
+
+  void _selectBlock(String id) {
+    setState(() => _selectedBlockId = id);
   }
 
   void _removeBlock(String id) {
@@ -343,7 +350,7 @@ class _ReportTemplateStudioV3BuilderState
             children: [
               SizedBox(width: spacious ? 420 : 380, child: designerPane),
               VerticalDivider(width: 1, color: Theme.of(context).dividerColor),
-              Expanded(child: widget.previewPane!),
+              Expanded(child: _workspacePane(context)),
               VerticalDivider(width: 1, color: Theme.of(context).dividerColor),
               SizedBox(
                 width: spacious ? 350 : 320,
@@ -361,8 +368,8 @@ class _ReportTemplateStudioV3BuilderState
                 child: TabBar(
                   tabs: [
                     Tab(icon: Icon(Icons.dashboard_customize), text: 'طراحی'),
-                    Tab(icon: Icon(Icons.preview_outlined), text: 'پیش‌نمایش'),
-                    Tab(icon: Icon(Icons.tune), text: 'تنظیمات بلوک'),
+                    Tab(icon: Icon(Icons.edit_note_outlined), text: 'صفحه'),
+                    Tab(icon: Icon(Icons.tune), text: 'تنظیمات'),
                   ],
                 ),
               ),
@@ -370,7 +377,7 @@ class _ReportTemplateStudioV3BuilderState
                 child: TabBarView(
                   children: [
                     designerPane,
-                    widget.previewPane!,
+                    _workspacePane(context),
                     _inspectorPane(context, selected?.block),
                   ],
                 ),
@@ -380,6 +387,573 @@ class _ReportTemplateStudioV3BuilderState
         );
       },
     );
+  }
+
+  Widget _workspacePane(BuildContext context) {
+    return Column(
+      children: [
+        Material(
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Row(
+              children: [
+                const Icon(Icons.dashboard_customize_outlined, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _showLivePreview
+                        ? 'پیش‌نمایش واقعی خروجی'
+                        : 'بوم طراحی تعاملی',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                SegmentedButton<bool>(
+                  showSelectedIcon: false,
+                  segments: const [
+                    ButtonSegment(
+                      value: false,
+                      icon: Icon(Icons.touch_app_outlined, size: 18),
+                      label: Text('طراحی'),
+                    ),
+                    ButtonSegment(
+                      value: true,
+                      icon: Icon(Icons.visibility_outlined, size: 18),
+                      label: Text('خروجی'),
+                    ),
+                  ],
+                  selected: {_showLivePreview},
+                  onSelectionChanged: (value) => setState(() {
+                    _showLivePreview = value.first;
+                  }),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: _showLivePreview
+              ? widget.previewPane!
+              : _visualCanvas(context),
+        ),
+      ],
+    );
+  }
+
+  Widget _visualCanvas(BuildContext context) {
+    final media = normalizedReportTemplateMedia(
+      widget.design,
+      preferRoll: widget.design['layout'] == 'invoice_receipt',
+    );
+    final mediaSize = reportTemplateMediaSizeMm(media);
+    final isRoll = media['type'] == 'roll';
+    final margins =
+        (media['margins_mm'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final direction = ((widget.design['theme'] as Map?)?['direction'] == 'ltr')
+        ? TextDirection.ltr
+        : TextDirection.rtl;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : 800.0;
+        final pageWidth = (availableWidth - 48).clamp(280.0, 760.0).toDouble();
+        final pageHeight = isRoll
+            ? 760.0
+            : pageWidth * mediaSize.height / mediaSize.width;
+        double pageMargin(String side, double fallback) {
+          final raw = margins[side];
+          final mm = raw is num ? raw.toDouble() : double.tryParse('$raw');
+          final reference = side == 'top' || side == 'bottom'
+              ? mediaSize.height
+              : mediaSize.width;
+          return (((mm ?? fallback) / reference) * pageWidth).clamp(6.0, 64.0);
+        }
+
+        return ColoredBox(
+          color: const Color(0xffe5e7eb),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Center(
+              child: Container(
+                key: const ValueKey('interactive-invoice-canvas'),
+                width: pageWidth,
+                constraints: BoxConstraints(minHeight: pageHeight),
+                padding: EdgeInsets.fromLTRB(
+                  pageMargin('left', isRoll ? 2 : 10),
+                  pageMargin('top', isRoll ? 3 : 10),
+                  pageMargin('right', isRoll ? 2 : 10),
+                  pageMargin('bottom', isRoll ? 4 : 10),
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: isRoll
+                      ? Border.symmetric(
+                          vertical: BorderSide(color: Colors.grey.shade400),
+                        )
+                      : null,
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x26000000),
+                      blurRadius: 18,
+                      offset: Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Directionality(
+                  textDirection: direction,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _canvasRegion(context, 'header', 'سربرگ'),
+                      _canvasRegion(context, 'body', 'بدنه فاکتور'),
+                      _canvasRegion(context, 'footer', 'پاورقی'),
+                      if (isRoll)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 16),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Divider(color: Colors.grey.shade400),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                ),
+                                child: Text(
+                                  'ادامه رول',
+                                  style: Theme.of(context).textTheme.labelSmall
+                                      ?.copyWith(color: Colors.grey.shade600),
+                                ),
+                              ),
+                              Expanded(
+                                child: Divider(color: Colors.grey.shade400),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _canvasRegion(BuildContext context, String region, String title) {
+    final blocks = _regionBlocks(widget.design, region);
+    return DragTarget<_BlockDragData>(
+      onWillAcceptWithDetails: (details) =>
+          _canDropOnRegion(details.data, region),
+      onAcceptWithDetails: (details) =>
+          _handleDrop(details.data, region, blocks.length),
+      builder: (context, candidates, rejected) {
+        final active = candidates.isNotEmpty;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: active
+                ? Theme.of(
+                    context,
+                  ).colorScheme.primaryContainer.withValues(alpha: 0.45)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            border: active
+                ? Border.all(color: Theme.of(context).colorScheme.primary)
+                : null,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (blocks.isEmpty)
+                _canvasEmptyRegion(context, region, title)
+              else
+                for (var index = 0; index < blocks.length; index++) ...[
+                  _canvasDropLine(region, index),
+                  _canvasBlock(context, blocks[index]),
+                ],
+              _canvasDropLine(region, blocks.length, expanded: active),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  bool _canDropOnRegion(_BlockDragData data, String region) {
+    final type =
+        data.blockType ??
+        _findBlock(data.blockId ?? '')?.block['type']?.toString();
+    final allowed = List<String>.from(
+      (_definition(type ?? '')?['allowed_regions'] as List?) ?? const [],
+    );
+    return allowed.contains(region);
+  }
+
+  Widget _canvasEmptyRegion(BuildContext context, String region, String title) {
+    return DragTarget<_BlockDragData>(
+      onWillAcceptWithDetails: (details) =>
+          _canDropOnRegion(details.data, region),
+      onAcceptWithDetails: (details) => _handleDrop(details.data, region, 0),
+      builder: (context, candidates, rejected) => Container(
+        height: 48,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: candidates.isNotEmpty
+              ? Theme.of(context).colorScheme.primaryContainer
+              : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: candidates.isNotEmpty
+                ? Theme.of(context).colorScheme.primary
+                : Colors.grey.shade300,
+            style: BorderStyle.solid,
+          ),
+        ),
+        child: Text(
+          '$title — بلوک را اینجا رها کنید',
+          style: Theme.of(
+            context,
+          ).textTheme.labelSmall?.copyWith(color: Colors.grey.shade600),
+        ),
+      ),
+    );
+  }
+
+  Widget _canvasDropLine(String region, int index, {bool expanded = false}) {
+    return DragTarget<_BlockDragData>(
+      onWillAcceptWithDetails: (details) =>
+          _canDropOnRegion(details.data, region),
+      onAcceptWithDetails: (details) =>
+          _handleDrop(details.data, region, index),
+      builder: (context, candidates, rejected) {
+        final active = candidates.isNotEmpty;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 100),
+          height: active || expanded ? 24 : 6,
+          margin: const EdgeInsets.symmetric(vertical: 2),
+          decoration: BoxDecoration(
+            color: active
+                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.18)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(4),
+            border: active
+                ? Border.all(color: Theme.of(context).colorScheme.primary)
+                : null,
+          ),
+          alignment: Alignment.center,
+          child: active
+              ? Icon(
+                  Icons.add,
+                  size: 16,
+                  color: Theme.of(context).colorScheme.primary,
+                )
+              : null,
+        );
+      },
+    );
+  }
+
+  Widget _canvasBlock(BuildContext context, Map<String, dynamic> block) {
+    final id = block['id'].toString();
+    final type = block['type'].toString();
+    final selected = id == _selectedBlockId;
+    final style = (block['style'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final widthMode = (style['width_mode'] ?? 'full').toString();
+    final media = normalizedReportTemplateMedia(widget.design);
+    final pageWidthMm = (media['width_mm'] as num?)?.toDouble() ?? 210;
+    final widthValue = (style['width_value'] as num?)?.toDouble();
+    final widthFactor = switch (widthMode) {
+      'percentage' => ((widthValue ?? 100) / 100).clamp(0.1, 1.0),
+      'fixed' => ((widthValue ?? 80) / pageWidthMm).clamp(0.1, 1.0),
+      'content' => 0.62,
+      _ => 1.0,
+    }.toDouble();
+    final alignment = switch (style['text_align']) {
+      'left' => Alignment.centerLeft,
+      'center' => Alignment.center,
+      _ => Alignment.centerRight,
+    };
+    final blockCard = GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _selectBlock(id),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: selected
+              ? Theme.of(
+                  context,
+                ).colorScheme.primaryContainer.withValues(alpha: 0.35)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: selected
+                ? Theme.of(context).colorScheme.primary
+                : Colors.transparent,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Align(
+              alignment: alignment,
+              child: _canvasBlockContent(context, block),
+            ),
+            if (selected)
+              PositionedDirectional(
+                top: -20,
+                end: -4,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.drag_indicator,
+                        size: 13,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        _labelForType(type),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+
+    return Align(
+      alignment: alignment,
+      child: FractionallySizedBox(
+        widthFactor: widthFactor,
+        child: Opacity(
+          opacity: block['visible'] == false ? 0.42 : 1,
+          child: Draggable<_BlockDragData>(
+            data: _BlockDragData.existing(id),
+            onDragStarted: () => _selectBlock(id),
+            feedback: Material(
+              elevation: 8,
+              borderRadius: BorderRadius.circular(8),
+              child: SizedBox(
+                width: 280,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Icon(_iconForType(type), size: 18),
+                      const SizedBox(width: 8),
+                      Text(_labelForType(type)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            childWhenDragging: Opacity(opacity: 0.25, child: blockCard),
+            child: MouseRegion(
+              cursor: SystemMouseCursors.grab,
+              child: blockCard,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _canvasBlockContent(BuildContext context, Map<String, dynamic> block) {
+    final type = block['type'].toString();
+    final props = (block['props'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final theme =
+        (widget.design['theme'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final primary = _colorFromHex(
+      (theme['primary_color'] ?? '#1e3a5f').toString(),
+    );
+    final small = Theme.of(context).textTheme.bodySmall;
+    switch (type) {
+      case 'brand_header':
+        return Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'فاکتور فروش',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text('شماره: ۱۰۰۱  •  تاریخ: ۱۴۰۵/۰۷/۲۷', style: small),
+                ],
+              ),
+            ),
+            Icon(Icons.business, color: primary, size: 34),
+          ],
+        );
+      case 'party_info':
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(9),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                (props['title'] ?? 'طرف حساب').toString(),
+                style: small?.copyWith(
+                  color: primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text('نام و مشخصات طرف حساب'),
+            ],
+          ),
+        );
+      case 'invoice_lines':
+        final columns = ((props['columns'] as List?) ?? const [])
+            .whereType<Map>()
+            .where((column) => column['visible'] != false)
+            .take(4)
+            .toList();
+        final titles = columns.isEmpty
+            ? const ['شرح', 'تعداد', 'مبلغ']
+            : columns
+                  .map(
+                    (column) => (column['title'] ?? column['key']).toString(),
+                  )
+                  .toList();
+        return Table(
+          border: TableBorder.all(color: Colors.grey.shade300),
+          children: [
+            TableRow(
+              decoration: BoxDecoration(color: primary),
+              children: [
+                for (final title in titles)
+                  Padding(
+                    padding: const EdgeInsets.all(5),
+                    child: Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white, fontSize: 10),
+                    ),
+                  ),
+              ],
+            ),
+            for (var row = 0; row < 3; row++)
+              TableRow(
+                children: [
+                  for (var column = 0; column < titles.length; column++)
+                    Padding(
+                      padding: const EdgeInsets.all(5),
+                      child: Text(
+                        column == 0
+                            ? 'نمونه کالا ${row + 1}'
+                            : '${row + column + 1}',
+                        style: const TextStyle(fontSize: 9),
+                      ),
+                    ),
+                ],
+              ),
+          ],
+        );
+      case 'invoice_totals':
+        return Column(
+          children: const [
+            _CanvasTotalRow(label: 'جمع اقلام', value: '۱٬۲۰۰٬۰۰۰'),
+            _CanvasTotalRow(label: 'تخفیف', value: '۵۰٬۰۰۰'),
+            _CanvasTotalRow(
+              label: 'قابل پرداخت',
+              value: '۱٬۱۵۰٬۰۰۰',
+              bold: true,
+            ),
+          ],
+        );
+      case 'payments':
+        return const ListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(Icons.payments_outlined),
+          title: Text('پرداخت‌ها'),
+          subtitle: Text('کارت‌خوان — ۱٬۱۵۰٬۰۰۰'),
+        );
+      case 'note':
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(8),
+          color: const Color(0xfffffbeb),
+          child: const Text('یادداشت فاکتور در این قسمت نمایش داده می‌شود.'),
+        );
+      case 'signatures':
+        return const Row(
+          children: [
+            Expanded(child: _CanvasSignature(label: 'امضای فروشنده')),
+            SizedBox(width: 12),
+            Expanded(child: _CanvasSignature(label: 'امضای خریدار')),
+          ],
+        );
+      case 'qr':
+        return const Center(child: Icon(Icons.qr_code_2, size: 72));
+      case 'footer_meta':
+        return Text(
+          'زمان چاپ  •  تهیه‌کننده سند',
+          textAlign: TextAlign.center,
+          style: small?.copyWith(color: Colors.grey.shade600),
+        );
+      case 'custom_text':
+        return Text((props['text'] ?? 'متن دلخواه').toString());
+      case 'divider':
+        return Divider(color: Colors.grey.shade500);
+      case 'spacer':
+        return SizedBox(
+          height: ((props['height'] as num?)?.toDouble() ?? 12)
+              .clamp(4, 80)
+              .toDouble(),
+        );
+      default:
+        return Row(
+          children: [
+            Icon(_iconForType(type), size: 18),
+            const SizedBox(width: 8),
+            Text(_labelForType(type)),
+          ],
+        );
+    }
+  }
+
+  Color _colorFromHex(String value) {
+    final hex = value.replaceFirst('#', '');
+    final parsed = int.tryParse(hex.length == 6 ? 'ff$hex' : hex, radix: 16);
+    return Color(parsed ?? 0xff1e3a5f);
   }
 
   Widget _designerPane(BuildContext context, {Map<String, dynamic>? selected}) {
@@ -450,6 +1024,28 @@ class _ReportTemplateStudioV3BuilderState
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
+        ExpansionTile(
+          key: ValueKey('studio-media-settings-${selected == null}'),
+          initiallyExpanded: selected == null,
+          tilePadding: EdgeInsets.zero,
+          leading: const Icon(Icons.straighten_outlined),
+          title: const Text('صفحه و چاپ'),
+          subtitle: Text(_mediaSummary()),
+          children: [
+            ReportTemplateMediaSettings(
+              media: normalizedReportTemplateMedia(
+                widget.design,
+                preferRoll: widget.design['layout'] == 'invoice_receipt',
+              ),
+              compact: true,
+              onChanged: (media) => _patchRoot((design) {
+                design['media'] = media;
+              }),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+        const Divider(),
         if (selected == null)
           Card(
             margin: EdgeInsets.zero,
@@ -464,7 +1060,7 @@ class _ReportTemplateStudioV3BuilderState
                   ),
                   const SizedBox(height: 12),
                   const Text(
-                    'یک بلوک را انتخاب کنید تا تنظیمات آن در این ستون نمایش داده شود.',
+                    'یک بلوک را انتخاب کنید تا تنظیمات آن زیر تنظیمات صفحه نمایش داده شود.',
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -475,6 +1071,19 @@ class _ReportTemplateStudioV3BuilderState
           _inspector(context, selected),
       ],
     );
+  }
+
+  String _mediaSummary() {
+    final media = normalizedReportTemplateMedia(
+      widget.design,
+      preferRoll: widget.design['layout'] == 'invoice_receipt',
+    );
+    if (media['type'] == 'roll') {
+      return 'رول ${reportTemplatePaperSizeFromMedia(media)} با ارتفاع خودکار';
+    }
+    final orientation = media['orientation'] == 'landscape' ? 'افقی' : 'عمودی';
+    final preset = (media['preset'] ?? 'A4').toString();
+    return '${preset == 'custom' ? reportTemplatePaperSizeFromMedia(media) : preset}، $orientation';
   }
 
   Widget _buildAppearance(BuildContext context) {
@@ -783,7 +1392,7 @@ class _ReportTemplateStudioV3BuilderState
       margin: const EdgeInsets.symmetric(vertical: 2),
       child: ListTile(
         dense: true,
-        onTap: () => setState(() => _selectedBlockId = id),
+        onTap: () => _selectBlock(id),
         leading: Draggable<_BlockDragData>(
           data: _BlockDragData.existing(id),
           feedback: Material(
@@ -854,6 +1463,19 @@ class _ReportTemplateStudioV3BuilderState
                 (type == 'custom_text' ? props['align'] : null) ??
                 defaultAlignment)
             .toString();
+    final widthMode =
+        const {
+          'full',
+          'percentage',
+          'fixed',
+          'content',
+        }.contains(style['width_mode'])
+        ? style['width_mode'].toString()
+        : 'full';
+    final widthValue =
+        ((style['width_value'] as num?)?.toDouble() ??
+                (widthMode == 'percentage' ? 100 : 80))
+            .clamp(10.0, widthMode == 'percentage' ? 100.0 : 500.0);
     const alignableTypes = {
       'brand_header',
       'party_info',
@@ -916,6 +1538,60 @@ class _ReportTemplateStudioV3BuilderState
               ),
               const SizedBox(height: 12),
             ],
+            const Text('عرض بلوک'),
+            const SizedBox(height: 6),
+            DropdownButtonFormField<String>(
+              key: ValueKey('$id-width-mode-$widthMode'),
+              isExpanded: true,
+              initialValue: widthMode,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              items: const [
+                DropdownMenuItem(value: 'full', child: Text('تمام عرض')),
+                DropdownMenuItem(
+                  value: 'percentage',
+                  child: Text('درصدی از صفحه'),
+                ),
+                DropdownMenuItem(
+                  value: 'fixed',
+                  child: Text('عرض ثابت (میلی‌متر)'),
+                ),
+                DropdownMenuItem(
+                  value: 'content',
+                  child: Text('متناسب با محتوا'),
+                ),
+              ],
+              onChanged: (value) {
+                if (value == null) return;
+                _patchBlockStyle(id, {
+                  'width_mode': value,
+                  if (value == 'percentage') 'width_value': 100,
+                  if (value == 'fixed') 'width_value': 80,
+                });
+              },
+            ),
+            if (widthMode == 'percentage' || widthMode == 'fixed') ...[
+              const SizedBox(height: 8),
+              Text(
+                widthMode == 'percentage'
+                    ? 'عرض: ${widthValue.round()}٪'
+                    : 'عرض: ${widthValue.toStringAsFixed(0)} میلی‌متر',
+              ),
+              Slider(
+                min: 10,
+                max: widthMode == 'percentage' ? 100 : 300,
+                divisions: widthMode == 'percentage' ? 18 : 29,
+                value: widthValue.clamp(
+                  10.0,
+                  widthMode == 'percentage' ? 100.0 : 300.0,
+                ),
+                onChanged: (value) =>
+                    _patchBlockStyle(id, {'width_value': value.round()}),
+              ),
+            ],
+            const SizedBox(height: 12),
             if (type == 'custom_text')
               TextFormField(
                 key: ValueKey('$id-custom-text'),
@@ -1185,6 +1861,58 @@ class _ReportTemplateStudioV3BuilderState
             );
           },
         ),
+      ],
+    );
+  }
+}
+
+class _CanvasTotalRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool bold;
+
+  const _CanvasTotalRow({
+    required this.label,
+    required this.value,
+    this.bold = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final style = TextStyle(
+      fontSize: 10,
+      fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          Expanded(child: Text(label, style: style)),
+          Text(value, style: style),
+        ],
+      ),
+    );
+  }
+}
+
+class _CanvasSignature extends StatelessWidget {
+  final String label;
+
+  const _CanvasSignature({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          height: 54,
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade400),
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(label, style: Theme.of(context).textTheme.labelSmall),
       ],
     );
   }

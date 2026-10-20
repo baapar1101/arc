@@ -4,6 +4,7 @@ from jinja2 import BaseLoader, StrictUndefined
 from jinja2.sandbox import SandboxedEnvironment
 
 from app.services.report_template_gallery import default_design_for_family, list_gallery_items
+from app.services.report_template_service import ReportTemplateService
 from app.services.report_template_v2_service import migrate_builder_design_to_v2, validate_v2_design
 from app.services.report_template_v3_service import (
 	migrate_v2_design_to_v3,
@@ -168,6 +169,8 @@ def test_migrate_invoice_design_to_v3_and_render_strict():
 	design = migrate_v2_design_to_v3(design_v2)
 	assert design["schema_version"] == 3
 	assert design["theme"]["direction"] == "rtl"
+	assert design["media"]["preset"] == "A4"
+	assert design["media"]["width_mm"] == 210
 	assert [block["type"] for block in design["regions"]["body"]][:3] == [
 		"party_info",
 		"party_info",
@@ -209,12 +212,44 @@ def test_v3_compiler_applies_ltr_direction_and_block_text_alignment():
 			"style": {"text_align": "center"},
 		},
 	)
+	design["regions"]["body"][0]["style"]["width_mode"] = "percentage"
+	design["regions"]["body"][0]["style"]["width_value"] = 60
 	validation = validate_v3_design("invoices", "detail", design)
 	assert validation["errors"] == []
 	html, css, _, _ = compile_v3_design_to_jinja_html(design)
 	assert '<html dir="ltr">' in html
 	assert "direction: ltr;" in css
 	assert 'class="rt-block rt-block-align-center"' in html
+	assert 'style="width:60%;"' in html
+
+
+def test_v3_render_uses_hesabix_persian_font_in_css():
+	design_v2 = default_design_for_family("invoice_classic")
+	assert design_v2 is not None
+	design = migrate_v2_design_to_v3(design_v2)
+	template = type(
+		"Template",
+		(),
+		{
+			"engine": "template_v2",
+			"assets": {"template_design": design},
+			"content_html": "",
+			"content_css": "",
+			"header_html": "",
+			"footer_html": "",
+			"paper_size": "A4",
+			"orientation": "portrait",
+			"margins": None,
+		},
+	)()
+	context = _sample_invoice_context()
+	context["fa_font_url_regular"] = "data:font/ttf;base64,UkVHVUxBUg=="
+	context["fa_font_url_bold"] = "data:font/ttf;base64,Qk9MRA=="
+	rendered = ReportTemplateService.render_with_template(template, context)
+	assert "font-family: 'YekanBakhFaNum'" in rendered
+	assert "data:font/ttf;base64,UkVHVUxBUg==" in rendered
+	assert "data:font/ttf;base64,Qk9MRA==" in rendered
+	assert "{{ fa_font_url" not in rendered
 
 
 def test_v3_validation_rejects_invalid_direction_and_alignment():
@@ -226,6 +261,27 @@ def test_v3_validation_rejects_invalid_direction_and_alignment():
 	validation = validate_v3_design("invoices", "detail", design)
 	assert "Invalid theme.direction" in validation["errors"]
 	assert any("Invalid text alignment" in error for error in validation["errors"])
+
+
+def test_v3_validation_accepts_custom_roll_and_rejects_impossible_margins():
+	design_v2 = default_design_for_family("invoice_receipt_simple")
+	assert design_v2 is not None
+	design = migrate_v2_design_to_v3(design_v2)
+	assert design["media"]["type"] == "roll"
+	design["media"] = {
+		"type": "roll",
+		"preset": "custom",
+		"width_mm": 72.5,
+		"height_mode": "auto",
+		"orientation": "portrait",
+		"margins_mm": {"top": 3, "right": 2, "bottom": 4, "left": 2},
+	}
+	assert validate_v3_design("invoices", "receipt", design)["errors"] == []
+	design["media"]["margins_mm"]["right"] = 40
+	design["media"]["margins_mm"]["left"] = 40
+	assert "Horizontal margins leave no printable width" in validate_v3_design(
+		"invoices", "receipt", design
+	)["errors"]
 
 
 def test_v3_catalog_and_required_invoice_lines_validation():

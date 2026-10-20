@@ -801,7 +801,10 @@ class ReportTemplateService:
 			pass
 
 		# درج CSS سفارشی در <style>
-		css = (template.content_css or "").strip()
+		css = _render_jinja_fragment(
+			getattr(template, "content_css", None) or "",
+			fragment="CSS قالب",
+		)
 		if css:
 			# ساده: تزریق داخل head اگر وجود دارد
 			if "</head>" in html:
@@ -895,4 +898,3 @@ class ReportTemplateService:
 		except Exception as e:
 			errors.append(f"خطای رندر: {str(e)}")
 		return errors
-
