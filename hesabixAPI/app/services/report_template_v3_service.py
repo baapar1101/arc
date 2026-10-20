@@ -13,6 +13,82 @@ _HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{3,8}$")
 _ID_RE = re.compile(r"^[a-zA-Z0-9_-]{1,80}$")
 _KEY_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
+def default_media(*, receipt: bool = False) -> dict[str, Any]:
+	if receipt:
+		return {
+			"type": "roll",
+			"preset": "80mm",
+			"width_mm": 80,
+			"height_mode": "auto",
+			"orientation": "portrait",
+			"margins_mm": {"top": 3, "right": 2, "bottom": 4, "left": 2},
+		}
+	return {
+		"type": "sheet",
+		"preset": "A4",
+		"width_mm": 210,
+		"height_mm": 297,
+		"orientation": "portrait",
+		"margins_mm": {"top": 10, "right": 10, "bottom": 10, "left": 10},
+	}
+
+
+def _validate_media(media: Any) -> list[str]:
+	if media is None:
+		return []
+	if not isinstance(media, dict):
+		return ["media must be an object"]
+	errors: list[str] = []
+	media_type = str(media.get("type") or "sheet").strip().lower()
+	if media_type not in ("sheet", "roll"):
+		errors.append("Invalid media.type")
+		return errors
+	def number(key: str, *, minimum: float, maximum: float, required: bool = True) -> float | None:
+		raw = media.get(key)
+		if raw in (None, ""):
+			if required:
+				errors.append(f"media.{key} is required")
+			return None
+		try:
+			value = float(raw)
+		except (TypeError, ValueError):
+			errors.append(f"media.{key} must be a number")
+			return None
+		if value < minimum or value > maximum:
+			errors.append(f"media.{key} must be between {minimum:g} and {maximum:g} mm")
+		return value
+
+	width = number("width_mm", minimum=20, maximum=500)
+	height = None
+	if media_type == "sheet":
+		height = number("height_mm", minimum=40, maximum=2000)
+		orientation = str(media.get("orientation") or "portrait").strip().lower()
+		if orientation not in ("portrait", "landscape"):
+			errors.append("Invalid media.orientation")
+	elif str(media.get("height_mode") or "auto").strip().lower() != "auto":
+		errors.append("Roll media.height_mode must be auto")
+
+	margins = media.get("margins_mm") or {}
+	if not isinstance(margins, dict):
+		errors.append("media.margins_mm must be an object")
+		return errors
+	parsed_margins: dict[str, float] = {}
+	for side in ("top", "right", "bottom", "left"):
+		raw = margins.get(side, 0)
+		try:
+			value = float(raw)
+		except (TypeError, ValueError):
+			errors.append(f"media.margins_mm.{side} must be a number")
+			continue
+		if value < 0 or value > 100:
+			errors.append(f"media.margins_mm.{side} must be between 0 and 100 mm")
+		parsed_margins[side] = value
+	if width is not None and parsed_margins.get("left", 0) + parsed_margins.get("right", 0) >= width:
+		errors.append("Horizontal margins leave no printable width")
+	if height is not None and parsed_margins.get("top", 0) + parsed_margins.get("bottom", 0) >= height:
+		errors.append("Vertical margins leave no printable height")
+	return errors
+
 
 _BLOCKS: dict[str, dict[str, Any]] = {
 	"brand_header": {
@@ -110,7 +186,7 @@ def _block(block_id: str, block_type: str, props: dict[str, Any] | None = None) 
 		"type": block_type,
 		"visible": True,
 		"props": deepcopy(props or {}),
-		"style": {},
+		"style": {"width_mode": "full"},
 	}
 
 
@@ -178,6 +254,7 @@ def migrate_v2_design_to_v3(design: dict[str, Any]) -> dict[str, Any]:
 		"theme": theme,
 		"branding": deepcopy(design.get("branding") or {}),
 		"custom_css": str(design.get("custom_css") or ""),
+		"media": deepcopy(design.get("media") or default_media(receipt=family.layout == "invoice_receipt")),
 		"regions": {"header": header, "body": body, "footer": footer},
 	}
 
@@ -200,6 +277,7 @@ def validate_v3_design(
 		errors.append("family_id does not match template scope")
 	if family.layout not in ("invoice_detail", "invoice_receipt"):
 		errors.append("Studio v3 currently supports invoice detail and receipt layouts")
+	errors.extend(_validate_media(design.get("media")))
 
 	theme = design.get("theme") or {}
 	direction = str(theme.get("direction") or "rtl").strip().lower()
@@ -251,6 +329,18 @@ def validate_v3_design(
 			text_align = str(style.get("text_align") or "").strip().lower()
 			if text_align and text_align not in ("right", "center", "left"):
 				errors.append(f"Invalid text alignment in block '{block_id}'")
+			width_mode = str(style.get("width_mode") or "full").strip().lower()
+			if width_mode not in ("full", "percentage", "fixed", "content"):
+				errors.append(f"Invalid width mode in block '{block_id}'")
+			if width_mode in ("percentage", "fixed"):
+				try:
+					width_value = float(style.get("width_value"))
+				except (TypeError, ValueError):
+					errors.append(f"Width value is required in block '{block_id}'")
+				else:
+					limit = 100 if width_mode == "percentage" else 500
+					if width_value < 10 or width_value > limit:
+						errors.append(f"Invalid width value in block '{block_id}'")
 			if block_type == "invoice_lines":
 				items_var = str(props.get("items_var") or "lines")
 				if not _KEY_RE.fullmatch(items_var):

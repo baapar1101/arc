@@ -10,12 +10,12 @@ import '../../core/auth_store.dart';
 import '../../core/business_named_route_locations.dart';
 import '../../services/report_template_service.dart';
 import '../../utils/error_extractor.dart';
-import '../../utils/number_normalizer.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/loading_indicator.dart';
 import '../../widgets/permission/permission_widgets.dart';
 import '../../widgets/report_template/studio/report_template_studio_customize_panel.dart';
 import '../../widgets/report_template/studio/report_template_studio_gallery.dart';
+import '../../widgets/report_template/studio/report_template_media_settings.dart';
 import '../../widgets/report_template/studio/report_template_studio_preview_panel.dart';
 import '../../widgets/report_template/studio/report_template_studio_v3_builder.dart';
 import '../../core/hesabix_back.dart';
@@ -279,7 +279,15 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
       }
     }
 
+    final hadStoredMedia = _design?['media'] is Map;
     await _upgradeDesignToV3IfSupported();
+    if (hadStoredMedia) {
+      _applyMediaToLegacyFields(
+        normalizedReportTemplateMedia(_design!, preferRoll: _isReceiptScope),
+      );
+    } else {
+      _syncDesignMediaFromLegacy();
+    }
 
     await Future.wait([_loadGallery(), _loadBlockCatalog()]);
     _lastSavedFingerprint = _fingerprint();
@@ -332,8 +340,16 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
     final design = ((item['studio_design'] ?? item['default_design']) as Map?)
         ?.cast<String, dynamic>();
     if (design == null) return;
+    final nextDesign = Map<String, dynamic>.from(design);
+    nextDesign['media'] = normalizedReportTemplateMedia(
+      nextDesign,
+      preferRoll: _isReceiptScope,
+    );
+    _applyMediaToLegacyFields(
+      (nextDesign['media'] as Map).cast<String, dynamic>(),
+    );
     setState(() {
-      _design = Map<String, dynamic>.from(design);
+      _design = nextDesign;
       _step = _StudioStep.customize;
       _previewHtml = null;
       _previewPdfBytes = null;
@@ -344,6 +360,12 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
   }
 
   void _onDesignChanged(Map<String, dynamic> design) {
+    final media = normalizedReportTemplateMedia(
+      design,
+      preferRoll: _isReceiptScope,
+    );
+    design['media'] = media;
+    _applyMediaToLegacyFields(media);
     setState(() {
       _design = design;
       _previewPdfBytes = null;
@@ -458,6 +480,15 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
   }
 
   Map<String, dynamic>? _parseMargins() {
+    final design = _design;
+    if (design != null && design['media'] is Map) {
+      final media = normalizedReportTemplateMedia(
+        design,
+        preferRoll: _isReceiptScope,
+      );
+      final margins = (media['margins_mm'] as Map?)?.cast<String, dynamic>();
+      if (margins != null) return Map<String, dynamic>.from(margins);
+    }
     double? parse(String s) {
       try {
         if (s.trim().isEmpty) return null;
@@ -481,11 +512,70 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
   }
 
   String _effectivePaperSize() {
+    final design = _design;
+    if (design != null && design['media'] is Map) {
+      return reportTemplatePaperSizeFromMedia(
+        normalizedReportTemplateMedia(design, preferRoll: _isReceiptScope),
+      );
+    }
     final c = _paperCustomCtrl.text.trim();
     if (c.isEmpty) return _paperSize ?? 'A4';
     return c.length > kReportTemplatePaperSizeMaxLength
         ? c.substring(0, kReportTemplatePaperSizeMaxLength)
         : c;
+  }
+
+  void _syncDesignMediaFromLegacy() {
+    final design = _design;
+    if (design == null) return;
+    final media = reportTemplateMediaFromLegacy(
+      paperSize: _paperSize,
+      orientation: _orientation,
+      margins: _parseLegacyMargins(),
+      preferRoll: _isReceiptScope,
+    );
+    _design = Map<String, dynamic>.from(design)..['media'] = media;
+    _applyMediaToLegacyFields(media);
+  }
+
+  Map<String, dynamic>? _parseLegacyMargins() {
+    double? parse(String value) => double.tryParse(value.trim());
+    final values = <String, dynamic>{
+      if (parse(_marginTopCtrl.text) != null) 'top': parse(_marginTopCtrl.text),
+      if (parse(_marginRightCtrl.text) != null)
+        'right': parse(_marginRightCtrl.text),
+      if (parse(_marginBottomCtrl.text) != null)
+        'bottom': parse(_marginBottomCtrl.text),
+      if (parse(_marginLeftCtrl.text) != null)
+        'left': parse(_marginLeftCtrl.text),
+    };
+    return values.isEmpty ? null : values;
+  }
+
+  void _applyMediaToLegacyFields(Map<String, dynamic> media) {
+    _paperSize = reportTemplatePaperSizeFromMedia(media);
+    _paperCustomCtrl.clear();
+    _orientation = media['type'] == 'roll'
+        ? 'portrait'
+        : (media['orientation'] == 'landscape' ? 'landscape' : 'portrait');
+    final margins =
+        (media['margins_mm'] as Map?)?.cast<String, dynamic>() ?? const {};
+    String textFor(String side, String fallback) {
+      final value = margins[side];
+      if (value == null) return fallback;
+      final number = value is num
+          ? value.toDouble()
+          : double.tryParse('$value');
+      if (number == null) return fallback;
+      return number == number.roundToDouble()
+          ? number.toInt().toString()
+          : number.toString();
+    }
+
+    _marginTopCtrl.text = textFor('top', _marginTopCtrl.text);
+    _marginRightCtrl.text = textFor('right', _marginRightCtrl.text);
+    _marginBottomCtrl.text = textFor('bottom', _marginBottomCtrl.text);
+    _marginLeftCtrl.text = textFor('left', _marginLeftCtrl.text);
   }
 
   void _navigateBackAfterSave() {
@@ -722,103 +812,53 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
   }
 
   Future<void> _showPageSettings() async {
+    final design = _design;
+    var media = design == null
+        ? reportTemplateMediaFromLegacy(
+            paperSize: _paperSize,
+            orientation: _orientation,
+            margins: _parseLegacyMargins(),
+            preferRoll: _isReceiptScope,
+          )
+        : normalizedReportTemplateMedia(design, preferRoll: _isReceiptScope);
     await showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('تنظیمات صفحه'),
-        content: SizedBox(
-          width: 420,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<String>(
-                value: _paperChoices.contains(_paperSize)
-                    ? _paperSize
-                    : _paperChoices.first,
-                decoration: InputDecoration(
-                  labelText: 'سایز کاغذ',
-                  border: const OutlineInputBorder(),
-                  helperText: _isReceiptScope
-                      ? 'عرض فیش؛ ارتفاع هر صفحه ۲۹۷ میلی‌متر است'
-                      : null,
-                ),
-                items: _paperChoices
-                    .map(
-                      (e) => DropdownMenuItem(
-                        value: e,
-                        child: Text(reportTemplatePaperSizeLabel(e)),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (v) => setState(() {
-                  _paperSize = v;
-                  if (_isReceiptScope) _orientation = 'portrait';
-                }),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('صفحه و چاپ'),
+          content: SizedBox(
+            width: 520,
+            child: SingleChildScrollView(
+              child: ReportTemplateMediaSettings(
+                media: media,
+                onChanged: (next) => setDialogState(() => media = next),
               ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: _orientation,
-                decoration: InputDecoration(
-                  labelText: 'جهت',
-                  border: const OutlineInputBorder(),
-                  helperText: _isReceiptScope
-                      ? 'فیش پرینتر همیشه عمودی است'
-                      : null,
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'portrait', child: Text('عمودی')),
-                  DropdownMenuItem(value: 'landscape', child: Text('افقی')),
-                ],
-                onChanged: _isReceiptScope
-                    ? null
-                    : (v) => setState(() => _orientation = v),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(child: _marginField('بالا', _marginTopCtrl)),
-                  const SizedBox(width: 8),
-                  Expanded(child: _marginField('راست', _marginRightCtrl)),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(child: _marginField('پایین', _marginBottomCtrl)),
-                  const SizedBox(width: 8),
-                  Expanded(child: _marginField('چپ', _marginLeftCtrl)),
-                ],
-              ),
-            ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('انصراف'),
+            ),
+            FilledButton(
+              onPressed: () {
+                FocusScope.of(context).unfocus();
+                Navigator.pop(ctx);
+                if (design != null) {
+                  _onDesignChanged(
+                    Map<String, dynamic>.from(design)..['media'] = media,
+                  );
+                } else {
+                  _applyMediaToLegacyFields(media);
+                  setState(() {});
+                  _schedulePreview();
+                }
+              },
+              child: const Text('اعمال'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('بستن'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _schedulePreview();
-            },
-            child: const Text('اعمال'),
-          ),
-        ],
       ),
-    );
-  }
-
-  Widget _marginField(String label, TextEditingController ctrl) {
-    return TextField(
-      controller: ctrl,
-      decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
-        isDense: true,
-      ),
-      keyboardType: TextInputType.number,
-      inputFormatters: [EnglishDigitsFormatter()],
     );
   }
 
@@ -1143,6 +1183,12 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
       previewRevision: _previewRevision,
       paperSize: _effectivePaperSize(),
       orientation: _orientation,
+      media: _design == null
+          ? null
+          : normalizedReportTemplateMedia(
+              _design!,
+              preferRoll: _isReceiptScope,
+            ),
       errors: _validationErrors,
       warnings: _validationWarnings,
       onRefresh: _refreshPreview,

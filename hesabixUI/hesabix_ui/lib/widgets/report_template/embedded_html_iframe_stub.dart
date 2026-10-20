@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 
 class ReportTemplateEmbeddedHtml extends StatelessWidget {
   final String html;
+  final Map<String, dynamic>? previewMarginsMm;
 
-  const ReportTemplateEmbeddedHtml({super.key, required this.html});
+  const ReportTemplateEmbeddedHtml({
+    super.key,
+    required this.html,
+    this.previewMarginsMm,
+  });
 
   @override
   Widget build(BuildContext context) {

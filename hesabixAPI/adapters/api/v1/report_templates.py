@@ -40,6 +40,18 @@ def _preview_assets(body: Dict[str, Any], engine: str) -> Optional[Dict[str, Any
 	return None
 
 
+def _preview_context(body: Dict[str, Any], *, include_farsi_fonts: bool) -> Dict[str, Any]:
+	context = dict((body or {}).get("context") or {})
+	if not include_farsi_fonts or context.get("is_fa", True) is False:
+		return context
+	from app.services.pdf.template_renderer import load_farsi_font_data_uris
+
+	regular, bold = load_farsi_font_data_uris()
+	context.setdefault("fa_font_url_regular", regular or "")
+	context.setdefault("fa_font_url_bold", bold or "")
+	return context
+
+
 def _validate_design_for_publish(entity) -> None:
 	engine = (entity.engine or "").lower()
 	if engine not in ("builder", "template_v2"):
@@ -571,7 +583,7 @@ async def preview_report_template(
 	engine = str((body or {}).get("engine") or "").lower() or "jinja2"
 	content_html = (body or {}).get("content_html") or ""
 	content_css = (body or {}).get("content_css") or ""
-	context = (body or {}).get("context") or {}
+	context = _preview_context(body or {}, include_farsi_fonts=True)
 	# محدودیت ساده روی اندازه ورودی‌ها
 	max_len = 1_000_000  # 1MB
 	if len(content_html) > max_len or len(content_css) > max_len:
@@ -636,7 +648,10 @@ async def preview_report_template_html(
 		"assets": _preview_assets(body or {}, engine),
 	})()
 	try:
-		rendered = ReportTemplateService.render_with_template(temp, (body or {}).get("context") or {})
+		rendered = ReportTemplateService.render_with_template(
+			temp,
+			_preview_context(body or {}, include_farsi_fonts=False),
+		)
 	except ApiError:
 		raise
 	except Exception as ex:
@@ -665,7 +680,7 @@ async def preview_report_template_pdf(
 	engine = str((body or {}).get("engine") or "").lower() or "jinja2"
 	content_html = (body or {}).get("content_html") or ""
 	content_css = (body or {}).get("content_css") or ""
-	context = (body or {}).get("context") or {}
+	context = _preview_context(body or {}, include_farsi_fonts=True)
 	# محدودیت ساده روی اندازه ورودی‌ها
 	max_len = 1_000_000  # 1MB
 	if len(content_html) > max_len or len(content_css) > max_len:

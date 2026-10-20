@@ -253,12 +253,27 @@ def _compile_block(design: dict[str, Any], block: dict[str, Any], *, receipt: bo
 	if not content:
 		return ""
 	style = block.get("style") or {}
+	classes = ["rt-block"]
 	align = str(style.get("text_align") or "").strip().lower()
 	if not align and str(block.get("type") or "") == "custom_text":
 		align = str((block.get("props") or {}).get("align") or "").strip().lower()
 	if align in ("right", "center", "left"):
-		return f'<div class="rt-block rt-block-align-{align}">{content}</div>'
-	return content
+		classes.append(f"rt-block-align-{align}")
+	width_mode = str(style.get("width_mode") or "full").strip().lower()
+	width_css = "width:100%;"
+	if width_mode == "percentage":
+		try:
+			width_css = f"width:{max(10, min(100, float(style.get('width_value') or 100))):g}%;"
+		except (TypeError, ValueError):
+			pass
+	elif width_mode == "fixed":
+		try:
+			width_css = f"width:{max(10, min(500, float(style.get('width_value') or 100))):g}mm;"
+		except (TypeError, ValueError):
+			pass
+	elif width_mode == "content":
+		width_css = "width:max-content;"
+	return f'<div class="{" ".join(classes)}" style="{width_css}">{content}</div>'
 
 
 def compile_v3_design_to_jinja_html(design: dict[str, Any]) -> tuple[str, str, str, str]:
@@ -282,6 +297,11 @@ def compile_v3_design_to_jinja_html(design: dict[str, Any]) -> tuple[str, str, s
 	else:
 		css = v2._theme_css(design, family_id)
 	css += """
+.rt-layout, .rt-layout * { box-sizing: border-box; }
+.rt-layout { width: 100%; max-width: 100%; overflow-wrap: anywhere; }
+.rt-layout table { width: 100%; table-layout: auto; }
+.rt-layout img { max-width: 100%; height: auto; }
+.rt-block { max-width: 100%; }
 .rt-studio-footer-meta { font-size: 10px; color: #64748b; text-align: center; margin-top: 8px; }
 .rt-custom-text { white-space: pre-wrap; margin: 6px 0; }
 .rt-block-align-right, .rt-block-align-right * { text-align: right !important; }

@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -81,7 +79,9 @@ class _ReportTemplateHtmlEditorPageState extends State<ReportTemplateHtmlEditorP
   final _htmlCtrl = TextEditingController(
     text: '<html><head></head><body><h3>{{ title_text }}</h3></body></html>',
   );
-  final _cssCtrl = TextEditingController(text: 'body { font-family: Tahoma, Arial; }');
+  final _cssCtrl = TextEditingController(
+    text: "body { font-family: 'YekanBakhFaNum', 'Vazirmatn', Tahoma, Arial, sans-serif; }",
+  );
   final _headerCtrl = TextEditingController();
   final _footerCtrl = TextEditingController();
   final _marginTopCtrl = TextEditingController(text: '10');
