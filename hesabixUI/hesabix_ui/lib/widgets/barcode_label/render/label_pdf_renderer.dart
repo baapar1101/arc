@@ -16,11 +16,7 @@ String resolveLabelBinding(String? binding, Map<String, dynamic> context) {
   final indexed = RegExp(r'^product\.general_barcode\[(\d+)\]$').firstMatch(key);
   if (indexed != null) {
     final raw = '${(context['product'] as Map?)?['general_barcode'] ?? ''}';
-    final parts = raw
-        .split(RegExp(r'[,،\n]+'))
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
+    final parts = raw.split(RegExp(r'[,،\n]+')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
     final i = int.parse(indexed.group(1)!);
     return (i >= 0 && i < parts.length) ? parts[i] : '';
   }
@@ -76,9 +72,6 @@ String _asciiForBarcode(String input) {
 }
 
 PdfPageFormat _paperFormat(LabelSheet sheet, {double? labelW, double? labelH}) {
-  if (sheet.isRollMode && labelW != null && labelH != null) {
-    return PdfPageFormat(labelW, labelH, marginAll: 0);
-  }
   if (sheet.paper == 'custom') {
     final w = (sheet.customPaperMm?['width'] ?? 210) * PdfPageFormat.mm;
     final h = (sheet.customPaperMm?['height'] ?? 297) * PdfPageFormat.mm;
@@ -127,6 +120,9 @@ class LabelPdfRenderer {
     if (contexts.isEmpty) {
       throw ArgumentError('contexts must not be empty');
     }
+    if (contexts.length > 10000) {
+      throw ArgumentError('A single label job cannot exceed 10000 labels.');
+    }
 
     final imageCache = await LabelImageResolver.preloadForDesign(
       design: design,
@@ -134,26 +130,44 @@ class LabelPdfRenderer {
       contexts: contexts,
     );
 
-    final fontRegular = await _loadFont('assets/fonts/YekanBakhFaNum-Regular.ttf') ??
+    final fontRegular =
+        await _loadFont('assets/fonts/YekanBakhFaNum-Regular.ttf') ??
         await _loadFont('assets/fonts/Vazirmatn-Regular.ttf');
-    final fontBold = await _loadFont('assets/fonts/YekanBakhFaNum-Bold.ttf') ??
+    final fontBold =
+        await _loadFont('assets/fonts/YekanBakhFaNum-Bold.ttf') ??
         await _loadFont('assets/fonts/Vazirmatn-Bold.ttf') ??
         fontRegular;
 
-    final theme = pw.ThemeData.withFont(
-      base: fontRegular,
-      bold: fontBold,
-    );
+    final theme = pw.ThemeData.withFont(base: fontRegular, bold: fontBold);
 
     final doc = pw.Document(theme: theme);
     final labelW = design.canvas.widthMm * PdfPageFormat.mm;
     final labelH = design.canvas.heightMm * PdfPageFormat.mm;
     final useRoll = rollMode || sheet.isRollMode;
+    final rollColumns = sheet.rollColumns.clamp(1, 20).toInt();
+    final rollRows = (contexts.length + rollColumns - 1) ~/ rollColumns;
+    final rollLeft = (sheet.rollMarginMm['left'] ?? 0) * PdfPageFormat.mm;
+    final rollRight = (sheet.rollMarginMm['right'] ?? 0) * PdfPageFormat.mm;
+    final rollTop = (sheet.rollMarginMm['top'] ?? 0) * PdfPageFormat.mm;
+    final rollBottom = (sheet.rollMarginMm['bottom'] ?? 0) * PdfPageFormat.mm;
+    final rollGapX = (sheet.rollGapMm['x'] ?? 2) * PdfPageFormat.mm;
+    final rollGapY = (sheet.rollGapMm['y'] ?? 2) * PdfPageFormat.mm;
+    final rollWidth = sheet.rollPaperWidthMm > 0
+        ? sheet.rollPaperWidthMm * PdfPageFormat.mm
+        : rollLeft + rollRight + rollColumns * labelW + (rollColumns - 1) * rollGapX;
+    final rollHeight = rollTop + rollBottom + rollRows * labelH + (rollRows - 1) * rollGapY;
+    final requiredRollWidth = rollLeft + rollRight + rollColumns * labelW + (rollColumns - 1) * rollGapX;
+    if (useRoll && rollWidth + 0.01 < requiredRollWidth) {
+      throw ArgumentError(
+        'Roll width (${(rollWidth / PdfPageFormat.mm).toStringAsFixed(1)} mm) is too small for '
+        '$rollColumns columns; at least ${(requiredRollWidth / PdfPageFormat.mm).toStringAsFixed(1)} mm is required.',
+      );
+    }
     final format = useRoll
-        ? PdfPageFormat(labelW, labelH, marginAll: 0)
+        ? PdfPageFormat(rollWidth, rollHeight, marginAll: 0)
         : _paperFormat(sheet, labelW: labelW, labelH: labelH);
     final margin = useRoll
-        ? pw.EdgeInsets.zero
+        ? pw.EdgeInsets.fromLTRB(rollLeft, rollTop, rollRight, rollBottom)
         : pw.EdgeInsets.only(
             top: (sheet.marginMm['top'] ?? 8) * PdfPageFormat.mm,
             right: (sheet.marginMm['right'] ?? 8) * PdfPageFormat.mm,
@@ -162,14 +176,15 @@ class LabelPdfRenderer {
           );
     final gapX = (sheet.gapMm['x'] ?? 2) * PdfPageFormat.mm;
     final gapY = (sheet.gapMm['y'] ?? 2) * PdfPageFormat.mm;
-    final cols = useRoll ? 1 : math.max<int>(1, sheet.columns);
-    final rows = useRoll ? 1 : math.max<int>(1, sheet.rows);
+    final cols = useRoll ? rollColumns : math.max<int>(1, sheet.columns);
+    final rows = useRoll ? rollRows : math.max<int>(1, sheet.rows);
+    final effectiveGapX = useRoll ? rollGapX : gapX;
+    final effectiveGapY = useRoll ? rollGapY : gapY;
     final int slots = cols * rows;
 
     pw.Widget buildLabel(Map<String, dynamic> ctx, int ctxIndex) {
       final children = <pw.Widget>[];
-      final els = List<LabelElement>.from(design.elements)
-        ..sort((a, b) => a.zIndex.compareTo(b.zIndex));
+      final els = List<LabelElement>.from(design.elements)..sort((a, b) => a.zIndex.compareTo(b.zIndex));
       for (final el in els) {
         if (!el.visible) continue;
         final imageBytes = imageCache['${el.id}:$ctxIndex'] ?? imageCache[el.id];
@@ -195,11 +210,7 @@ class LabelPdfRenderer {
       return pw.Container(
         width: labelW,
         height: labelH,
-        decoration: useRoll
-            ? null
-            : pw.BoxDecoration(
-                border: pw.Border.all(width: 0.2, color: PdfColors.grey400),
-              ),
+        decoration: useRoll ? null : pw.BoxDecoration(border: pw.Border.all(width: 0.2, color: PdfColors.grey400)),
         child: pw.Stack(children: children),
       );
     }
@@ -224,23 +235,15 @@ class LabelPdfRenderer {
                   cells.add(pw.SizedBox(width: labelW, height: labelH));
                 }
                 if (c < cols - 1) {
-                  cells.add(pw.SizedBox(width: gapX));
+                  cells.add(pw.SizedBox(width: effectiveGapX));
                 }
               }
-              rowWidgets.add(
-                pw.Row(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: cells,
-                ),
-              );
+              rowWidgets.add(pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: cells));
               if (r < rows - 1) {
-                rowWidgets.add(pw.SizedBox(height: gapY));
+                rowWidgets.add(pw.SizedBox(height: effectiveGapY));
               }
             }
-            return pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: rowWidgets,
-            );
+            return pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: rowWidgets);
           },
         ),
       );
@@ -262,9 +265,7 @@ class LabelPdfRenderer {
         final raw = resolveElementValue(el, ctx);
         final text = shapePdfPersianText(raw);
         final size = (props['font_size_pt'] as num?)?.toDouble() ?? 9;
-        final weight = (props['font_weight']?.toString() == 'bold')
-            ? pw.FontWeight.bold
-            : pw.FontWeight.normal;
+        final weight = (props['font_weight']?.toString() == 'bold') ? pw.FontWeight.bold : pw.FontWeight.normal;
         final align = switch (props['align']?.toString()) {
           'left' => pw.TextAlign.left,
           'right' => pw.TextAlign.right,
@@ -295,38 +296,22 @@ class LabelPdfRenderer {
             barcode: _linearBarcode(sym),
             data: value,
             drawText: props['show_text'] != false,
-            textStyle: pw.TextStyle(
-              fontSize: (props['text_size_pt'] as num?)?.toDouble() ?? 7,
-            ),
+            textStyle: pw.TextStyle(fontSize: (props['text_size_pt'] as num?)?.toDouble() ?? 7),
           );
         } catch (_) {
-          return pw.Center(
-            child: pw.Text(value, style: const pw.TextStyle(fontSize: 7)),
-          );
+          return pw.Center(child: pw.Text(value, style: const pw.TextStyle(fontSize: 7)));
         }
       case LabelElementType.qr:
         final value = resolveElementValue(el, ctx);
         if (value.isEmpty) return pw.SizedBox();
-        return pw.BarcodeWidget(
-          barcode: Barcode.qrCode(),
-          data: value,
-          drawText: false,
-        );
+        return pw.BarcodeWidget(barcode: Barcode.qrCode(), data: value, drawText: false);
       case LabelElementType.datamatrix:
         final value = resolveElementValue(el, ctx);
         if (value.isEmpty) return pw.SizedBox();
         try {
-          return pw.BarcodeWidget(
-            barcode: Barcode.dataMatrix(),
-            data: value,
-            drawText: false,
-          );
+          return pw.BarcodeWidget(barcode: Barcode.dataMatrix(), data: value, drawText: false);
         } catch (_) {
-          return pw.BarcodeWidget(
-            barcode: Barcode.qrCode(),
-            data: value,
-            drawText: false,
-          );
+          return pw.BarcodeWidget(barcode: Barcode.qrCode(), data: value, drawText: false);
         }
       case LabelElementType.shape:
         final stroke = _parseColor(props['stroke']?.toString() ?? '#000000');

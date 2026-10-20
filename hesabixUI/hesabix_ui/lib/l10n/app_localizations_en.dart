@@ -19085,7 +19085,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get barcodeLabelPrinterEscPosFallback =>
-      'ESC/POS not spiked yet; printing via roll PDF';
+      'This ESC/POS connection or precise roll layout is unsupported; system PDF printing will preserve the configured size and spacing.';
 
   @override
   String get barcodeLabelPrinterUnsupportedMode => 'Unsupported printer mode';
@@ -19109,8 +19109,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get barcodeLabelPrintLayoutSheet => 'Sheet (A4, grid)';
 
   @override
-  String get barcodeLabelPrintLayoutRoll =>
-      'Roll / thermal (one label per page)';
+  String get barcodeLabelPrintLayoutRoll => 'Multi-column roll / thermal';
 
   @override
   String get barcodeLabelPaperSize => 'Paper size';
@@ -19141,7 +19140,36 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get barcodeLabelRollModeHint =>
-      'Roll mode uses the design area size only; paper height is not fixed.';
+      'Set roll width, columns, label spacing and edge margins. Paper height follows the label count.';
+
+  @override
+  String get barcodeLabelRollWidth => 'Total roll width (mm)';
+
+  @override
+  String get barcodeLabelRollColumns => 'Roll columns';
+
+  @override
+  String get barcodeLabelRollGapX => 'Horizontal label gap (mm)';
+
+  @override
+  String get barcodeLabelRollGapY => 'Vertical label gap (mm)';
+
+  @override
+  String get barcodeLabelRollLeftMargin => 'Left roll margin (mm)';
+
+  @override
+  String get barcodeLabelRollRightMargin => 'Right roll margin (mm)';
+
+  @override
+  String get barcodeLabelRollTopMargin => 'Top roll margin (mm)';
+
+  @override
+  String get barcodeLabelRollBottomMargin => 'Bottom roll margin (mm)';
+
+  @override
+  String barcodeLabelRollFitError(Object width) {
+    return 'The roll is too narrow for these columns and label size. Minimum required width: $width mm.';
+  }
 
   @override
   String get barcodeLabelPreviewData => 'Preview test data';

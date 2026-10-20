@@ -13,39 +13,58 @@ class LabelZplGenerator {
 
   static Future<String> forContexts({
     required LabelDesignDocument design,
+    required LabelSheet sheet,
     required List<Map<String, dynamic>> contexts,
     int dpi = 203,
     int? businessId,
   }) async {
     final buf = StringBuffer();
     final dotsPerMm = dpi / 25.4;
-    for (var ci = 0; ci < contexts.length; ci++) {
-      final ctx = contexts[ci];
+    final columns = sheet.rollColumns.clamp(1, 20).toInt();
+    final labelWidthMm = design.canvas.widthMm;
+    final labelHeightMm = design.canvas.heightMm;
+    final gapX = sheet.rollGapMm['x'] ?? 2;
+    final gapY = sheet.rollGapMm['y'] ?? 2;
+    final left = sheet.rollMarginMm['left'] ?? 0;
+    final right = sheet.rollMarginMm['right'] ?? 0;
+    final top = sheet.rollMarginMm['top'] ?? 0;
+    final bottom = sheet.rollMarginMm['bottom'] ?? 0;
+    final requiredWidth = left + right + columns * labelWidthMm + (columns - 1) * gapX;
+    final rollWidth = sheet.rollPaperWidthMm > 0 ? sheet.rollPaperWidthMm : requiredWidth;
+    if (rollWidth + 0.01 < requiredWidth) {
+      throw ArgumentError('Roll width is too small for the selected label grid.');
+    }
+    final els = List<LabelElement>.from(design.elements)..sort((a, b) => a.zIndex.compareTo(b.zIndex));
+    for (var start = 0; start < contexts.length; start += columns) {
+      final rowEnd = (start + columns).clamp(0, contexts.length);
+      final isFirstRow = start == 0;
+      final isLastRow = rowEnd == contexts.length;
+      final rowTop = isFirstRow ? top : 0.0;
+      final rowTail = isLastRow ? bottom : gapY;
       buf.writeln('^XA');
       buf.writeln('^CI28');
-      final labelW = (design.canvas.widthMm * dotsPerMm).round();
-      final labelH = (design.canvas.heightMm * dotsPerMm).round();
-      buf.writeln('^PW$labelW');
-      buf.writeln('^LL$labelH');
-      final els = List<LabelElement>.from(design.elements)
-        ..sort((a, b) => a.zIndex.compareTo(b.zIndex));
-      for (final el in els) {
-        if (!el.visible) continue;
-        Uint8List? imageBytes;
-        if (el.type == LabelElementType.image) {
-          imageBytes = await LabelImageResolver.resolveElement(
-            el,
-            context: ctx,
-            businessId: businessId,
+      buf.writeln('^PW${(rollWidth * dotsPerMm).round()}');
+      buf.writeln('^LL${((rowTop + labelHeightMm + rowTail) * dotsPerMm).round()}');
+      for (var ci = start; ci < rowEnd; ci++) {
+        final ctx = contexts[ci];
+        final offsetX = ((left + (ci - start) * (labelWidthMm + gapX)) * dotsPerMm).round();
+        final offsetY = (rowTop * dotsPerMm).round();
+        for (final el in els) {
+          if (!el.visible) continue;
+          Uint8List? imageBytes;
+          if (el.type == LabelElementType.image) {
+            imageBytes = await LabelImageResolver.resolveElement(el, context: ctx, businessId: businessId);
+          }
+          await _writeElement(
+            buf,
+            el: el,
+            ctx: ctx,
+            dotsPerMm: dotsPerMm,
+            offsetX: offsetX,
+            offsetY: offsetY,
+            imageBytes: imageBytes,
           );
         }
-        await _writeElement(
-          buf,
-          el: el,
-          ctx: ctx,
-          dotsPerMm: dotsPerMm,
-          imageBytes: imageBytes,
-        );
       }
       buf.writeln('^XZ');
     }
@@ -57,11 +76,13 @@ class LabelZplGenerator {
     required LabelElement el,
     required Map<String, dynamic> ctx,
     required double dotsPerMm,
+    required int offsetX,
+    required int offsetY,
     Uint8List? imageBytes,
   }) async {
     final orient = _zplOrientation(el.rotationDeg);
-    final x = (el.xMm * dotsPerMm).round().clamp(0, 9999);
-    final y = (el.yMm * dotsPerMm).round().clamp(0, 9999);
+    final x = (offsetX + el.xMm * dotsPerMm).round().clamp(0, 9999);
+    final y = (offsetY + el.yMm * dotsPerMm).round().clamp(0, 9999);
     final w = (el.wMm * dotsPerMm).round().clamp(1, 9999);
     final h = (el.hMm * dotsPerMm).round().clamp(1, 9999);
     final value = escape(resolveElementValue(el, ctx));
@@ -104,11 +125,7 @@ class LabelZplGenerator {
         break;
       case LabelElementType.image:
         if (imageBytes == null || imageBytes.isEmpty) break;
-        final raster = await LabelImageRaster.toZplGfaBytes(
-          imageBytes,
-          widthPx: w,
-          heightPx: h,
-        );
+        final raster = await LabelImageRaster.toZplGfaBytes(imageBytes, widthPx: w, heightPx: h);
         if (raster == null) break;
         final bytesPerRow = (w + 7) ~/ 8;
         final totalBytes = bytesPerRow * h;

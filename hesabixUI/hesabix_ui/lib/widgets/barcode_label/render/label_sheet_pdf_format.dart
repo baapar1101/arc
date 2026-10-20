@@ -7,13 +7,22 @@ PdfPageFormat pdfPageFormatForLabelSheet(
   LabelSheet sheet, {
   required double labelWidthMm,
   required double labelHeightMm,
+  int labelCount = 1,
 }) {
   if (sheet.isRollMode) {
-    return PdfPageFormat(
-      labelWidthMm * PdfPageFormat.mm,
-      labelHeightMm * PdfPageFormat.mm,
-      marginAll: 0,
-    );
+    final left = sheet.rollMarginMm['left'] ?? 0;
+    final right = sheet.rollMarginMm['right'] ?? 0;
+    final top = sheet.rollMarginMm['top'] ?? 0;
+    final bottom = sheet.rollMarginMm['bottom'] ?? 0;
+    final columns = sheet.rollColumns.clamp(1, 20).toInt();
+    final gapX = sheet.rollGapMm['x'] ?? 2;
+    final gapY = sheet.rollGapMm['y'] ?? 2;
+    final widthMm = sheet.rollPaperWidthMm > 0
+        ? sheet.rollPaperWidthMm
+        : left + right + columns * labelWidthMm + (columns - 1) * gapX;
+    final rows = ((labelCount.clamp(1, 10000).toInt() + columns - 1) ~/ columns);
+    final heightMm = top + bottom + rows * labelHeightMm + (rows - 1) * gapY;
+    return PdfPageFormat(widthMm * PdfPageFormat.mm, heightMm * PdfPageFormat.mm, marginAll: 0);
   }
   if (sheet.paper == 'custom') {
     final w = (sheet.customPaperMm?['width'] ?? 210) * PdfPageFormat.mm;

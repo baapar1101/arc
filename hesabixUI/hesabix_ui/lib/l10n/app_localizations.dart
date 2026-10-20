@@ -34929,7 +34929,7 @@ abstract class AppLocalizations {
   /// No description provided for @barcodeLabelPrinterEscPosFallback.
   ///
   /// In en, this message translates to:
-  /// **'ESC/POS not spiked yet; printing via roll PDF'**
+  /// **'This ESC/POS connection or precise roll layout is unsupported; system PDF printing will preserve the configured size and spacing.'**
   String get barcodeLabelPrinterEscPosFallback;
 
   /// No description provided for @barcodeLabelPrinterUnsupportedMode.
@@ -34977,7 +34977,7 @@ abstract class AppLocalizations {
   /// No description provided for @barcodeLabelPrintLayoutRoll.
   ///
   /// In en, this message translates to:
-  /// **'Roll / thermal (one label per page)'**
+  /// **'Multi-column roll / thermal'**
   String get barcodeLabelPrintLayoutRoll;
 
   /// No description provided for @barcodeLabelPaperSize.
@@ -35037,8 +35037,62 @@ abstract class AppLocalizations {
   /// No description provided for @barcodeLabelRollModeHint.
   ///
   /// In en, this message translates to:
-  /// **'Roll mode uses the design area size only; paper height is not fixed.'**
+  /// **'Set roll width, columns, label spacing and edge margins. Paper height follows the label count.'**
   String get barcodeLabelRollModeHint;
+
+  /// No description provided for @barcodeLabelRollWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Total roll width (mm)'**
+  String get barcodeLabelRollWidth;
+
+  /// No description provided for @barcodeLabelRollColumns.
+  ///
+  /// In en, this message translates to:
+  /// **'Roll columns'**
+  String get barcodeLabelRollColumns;
+
+  /// No description provided for @barcodeLabelRollGapX.
+  ///
+  /// In en, this message translates to:
+  /// **'Horizontal label gap (mm)'**
+  String get barcodeLabelRollGapX;
+
+  /// No description provided for @barcodeLabelRollGapY.
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical label gap (mm)'**
+  String get barcodeLabelRollGapY;
+
+  /// No description provided for @barcodeLabelRollLeftMargin.
+  ///
+  /// In en, this message translates to:
+  /// **'Left roll margin (mm)'**
+  String get barcodeLabelRollLeftMargin;
+
+  /// No description provided for @barcodeLabelRollRightMargin.
+  ///
+  /// In en, this message translates to:
+  /// **'Right roll margin (mm)'**
+  String get barcodeLabelRollRightMargin;
+
+  /// No description provided for @barcodeLabelRollTopMargin.
+  ///
+  /// In en, this message translates to:
+  /// **'Top roll margin (mm)'**
+  String get barcodeLabelRollTopMargin;
+
+  /// No description provided for @barcodeLabelRollBottomMargin.
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom roll margin (mm)'**
+  String get barcodeLabelRollBottomMargin;
+
+  /// No description provided for @barcodeLabelRollFitError.
+  ///
+  /// In en, this message translates to:
+  /// **'The roll is too narrow for these columns and label size. Minimum required width: {width} mm.'**
+  String barcodeLabelRollFitError(Object width);
 
   /// No description provided for @barcodeLabelPreviewData.
   ///
