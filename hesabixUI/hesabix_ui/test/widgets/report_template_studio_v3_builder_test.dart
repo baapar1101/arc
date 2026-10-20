@@ -216,6 +216,30 @@ void main() {
         .cast<Map<String, dynamic>>();
     expect(footer.map((block) => block['type']), contains('custom_text'));
 
+    final customId = footer.first['id'].toString();
+    await tester.drag(
+      find.byKey(ValueKey('canvas-block-$customId')),
+      tester.getCenter(
+            find.byKey(
+              const ValueKey(
+                'canvas-row-drop-legacy-body-invoice-lines-invoice-lines',
+              ),
+            ),
+          ) -
+          tester.getCenter(find.byKey(ValueKey('canvas-block-$customId'))),
+    );
+    await tester.pumpAndSettle();
+    final sideBySideBody = ((design['regions'] as Map)['body'] as List)
+        .cast<Map<String, dynamic>>();
+    expect(sideBySideBody, hasLength(2));
+    final firstStyle = (sideBySideBody.first['style'] as Map)
+        .cast<String, dynamic>();
+    final secondStyle = (sideBySideBody.last['style'] as Map)
+        .cast<String, dynamic>();
+    expect(firstStyle['row_id'], secondStyle['row_id']);
+    expect(firstStyle['grid_span'], 30);
+    expect(secondStyle['grid_span'], 30);
+
     await tester.tap(find.text('نمونه کالا 1'));
     await tester.pump();
 
@@ -239,6 +263,31 @@ void main() {
     final body = ((design['regions'] as Map)['body'] as List)
         .cast<Map<String, dynamic>>();
     expect((body.first['style'] as Map)['text_align'], 'center');
+
+    await tester.drag(
+      find.byKey(const ValueKey('block-width-handle-invoice-lines')),
+      const Offset(40, 0),
+    );
+    await tester.pump();
+    final resizedBody = ((design['regions'] as Map)['body'] as List)
+        .cast<Map<String, dynamic>>();
+    expect(
+      ((resizedBody.first['style'] as Map)['grid_span'] as num),
+      lessThan(30),
+    );
+
+    final rowId = (resizedBody.first['style'] as Map)['row_id'].toString();
+    await tester.drag(
+      find.byKey(ValueKey('row-height-handle-$rowId')),
+      const Offset(0, 30),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    final resizedRowBody = ((design['regions'] as Map)['body'] as List)
+        .cast<Map<String, dynamic>>();
+    expect(
+      (resizedRowBody.first['style'] as Map)['row_height_mode'],
+      'minimum',
+    );
 
     await tester.tap(find.text('خروجی'));
     await tester.pump();

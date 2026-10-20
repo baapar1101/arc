@@ -223,6 +223,32 @@ def test_v3_compiler_applies_ltr_direction_and_block_text_alignment():
 	assert 'style="width:60%;"' in html
 
 
+def test_v3_compiler_groups_blocks_in_a_sixty_column_resizable_row():
+	design_v2 = default_design_for_family("invoice_classic")
+	assert design_v2 is not None
+	design = migrate_v2_design_to_v3(design_v2)
+	first, second = design["regions"]["body"][:2]
+	for block in (first, second):
+		block["style"].update(
+			{
+				"row_id": "party-row",
+				"grid_span": 30,
+				"row_height_mode": "minimum",
+				"row_height_mm": 24,
+			}
+		)
+	validation = validate_v3_design("invoices", "detail", design)
+	assert validation["errors"] == []
+	html, css, _, _ = compile_v3_design_to_jinja_html(design)
+	assert "grid-template-columns:repeat(60" in css
+	assert html.count('grid-column:span 30;') == 2
+	assert html.count('class="rt-grid-row" style="min-height:24mm;"') == 1
+
+	second["style"]["grid_span"] = 31
+	validation = validate_v3_design("invoices", "detail", design)
+	assert any("exceeds 60 columns" in error for error in validation["errors"])
+
+
 def test_v3_render_uses_hesabix_persian_font_in_css():
 	design_v2 = default_design_for_family("invoice_classic")
 	assert design_v2 is not None
