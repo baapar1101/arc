@@ -363,6 +363,12 @@ def compile_v3_design_to_jinja_html(design: dict[str, Any]) -> tuple[str, str, s
 
 
 def compile_template_design_to_jinja_html(design: dict[str, Any]) -> tuple[str, str, str, str]:
+	from app.services.report_template_v4_service import is_v4_design
+
+	if is_v4_design(design):
+		from app.services.template_design_v4_compiler import compile_v4_design_to_jinja_html
+
+		return compile_v4_design_to_jinja_html(design)
 	if is_v3_design(design):
 		return compile_v3_design_to_jinja_html(design)
 	return v2.compile_v2_design_to_jinja_html(design)

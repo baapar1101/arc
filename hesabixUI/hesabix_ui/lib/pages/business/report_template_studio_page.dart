@@ -18,6 +18,7 @@ import '../../widgets/report_template/studio/report_template_studio_gallery.dart
 import '../../widgets/report_template/studio/report_template_media_settings.dart';
 import '../../widgets/report_template/studio/report_template_studio_preview_panel.dart';
 import '../../widgets/report_template/studio/report_template_studio_v3_builder.dart';
+import '../../widgets/report_template/studio/report_template_studio_v4_adapter.dart';
 import '../../core/hesabix_back.dart';
 import 'report_template_html_editor_page.dart';
 
@@ -69,6 +70,7 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
   String? _moduleKey;
   String? _subtype;
   int? _templateId;
+  bool _legacyTemplateCopied = false;
   String _lastSavedFingerprint = '';
 
   List<Map<String, dynamic>> _galleryItems = const [];
@@ -280,7 +282,7 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
     }
 
     final hadStoredMedia = _design?['media'] is Map;
-    await _upgradeDesignToV3IfSupported();
+    await _upgradeDesignToV4IfSupported();
     if (hadStoredMedia) {
       _applyMediaToLegacyFields(
         normalizedReportTemplateMedia(_design!, preferRoll: _isReceiptScope),
@@ -293,18 +295,38 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
     _lastSavedFingerprint = _fingerprint();
   }
 
-  Future<void> _upgradeDesignToV3IfSupported() async {
-    final design = _design;
-    if (design == null || (design['schema_version'] as num?)?.toInt() != 2)
-      return;
+  Future<void> _upgradeDesignToV4IfSupported() async {
+    var design = _design;
+    if (design == null) return;
     if (_moduleKey != 'invoices' ||
-        !const {'detail', 'receipt'}.contains(_subtype))
+        !const {'detail', 'receipt'}.contains(_subtype)) {
       return;
-    final out = await _service.migrateV2ToV3(
-      businessId: widget.businessId,
-      design: design,
-    );
-    _design = (out['design'] as Map?)?.cast<String, dynamic>() ?? design;
+    }
+    final originalSchema = (design['schema_version'] as num?)?.toInt();
+    if (originalSchema == 2) {
+      final out = await _service.migrateV2ToV3(
+        businessId: widget.businessId,
+        design: design,
+      );
+      design = (out['design'] as Map?)?.cast<String, dynamic>() ?? design;
+    }
+    if ((design['schema_version'] as num?)?.toInt() == 3) {
+      final out = await _service.migrateV3ToV4(
+        businessId: widget.businessId,
+        design: design,
+      );
+      design = (out['design'] as Map?)?.cast<String, dynamic>() ?? design;
+    }
+    _design = design;
+    if (originalSchema != 4 && _templateId != null) {
+      // Copy-on-write: saving a migrated legacy design must never overwrite v3.
+      _templateId = null;
+      _legacyTemplateCopied = true;
+      final currentName = _nameCtrl.text.trim();
+      if (currentName.isNotEmpty && !currentName.endsWith('(نسخه جدید)')) {
+        _nameCtrl.text = '$currentName (نسخه جدید)';
+      }
+    }
   }
 
   void _onScopeChanged(String? scopeId) {
@@ -316,6 +338,7 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
       _subtype = scopeId.substring(idx + 1);
       _step = _StudioStep.gallery;
       _design = null;
+      _legacyTemplateCopied = false;
       _previewHtml = null;
       _previewPdfBytes = null;
       _showPdfPreview = false;
@@ -350,6 +373,7 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
     );
     setState(() {
       _design = nextDesign;
+      _legacyTemplateCopied = false;
       _step = _StudioStep.customize;
       _previewHtml = null;
       _previewPdfBytes = null;
@@ -535,6 +559,7 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
       preferRoll: _isReceiptScope,
     );
     _design = Map<String, dynamic>.from(design)..['media'] = media;
+    syncReportTemplateV4ActiveMedia(_design!);
     _applyMediaToLegacyFields(media);
   }
 
@@ -1080,7 +1105,7 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
       return const Center(child: Text('قالبی انتخاب نشده است.'));
     }
 
-    if ((design['schema_version'] as num?)?.toInt() == 3) {
+    if (const {3, 4}.contains((design['schema_version'] as num?)?.toInt())) {
       return ReportTemplateStudioV3Builder(
         design: design,
         blockCatalog: _blockCatalog,
@@ -1152,6 +1177,17 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Column(
         children: [
+          if (_legacyTemplateCopied) ...[
+            MaterialBanner(
+              padding: const EdgeInsets.all(10),
+              leading: const Icon(Icons.copy_all_outlined),
+              content: const Text(
+                'این طراحی از قالب قدیمی به v4 منتقل شده است. ذخیره، یک قالب جدید می‌سازد و نسخه قبلی را تغییر نمی‌دهد.',
+              ),
+              actions: const [SizedBox.shrink()],
+            ),
+            const SizedBox(height: 8),
+          ],
           TextField(
             controller: _nameCtrl,
             decoration: const InputDecoration(
