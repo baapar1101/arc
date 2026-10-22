@@ -40,6 +40,14 @@ def upgrade():
         sa.Column("rows_changed", sa.Integer(), nullable=False, server_default="0"), sa.Column("error", sa.Text()),
         sa.Column("started_at", sa.DateTime(), nullable=False), sa.Column("finished_at", sa.DateTime()))
     op.create_index("ix_sepidar_import_runs_business_id", "sepidar_import_runs", ["business_id"])
+    from sqlalchemy.orm import Session
+    from adapters.db.seed_data.marketplace_plugins_seed import ensure_default_marketplace_plugins
+    session = Session(bind=op.get_bind())
+    try:
+        ensure_default_marketplace_plugins(session)
+        session.commit()
+    finally:
+        session.close()
 
 
 def downgrade():
