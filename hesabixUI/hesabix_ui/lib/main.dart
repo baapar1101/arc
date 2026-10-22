@@ -198,6 +198,8 @@ import 'pages/warehouse/warehouse_document_details_page.dart';
 import 'pages/warehouse/stock_count_page.dart';
 import 'pages/warehouse/quick_sales_stock_discrepancies_page.dart';
 import 'pages/warehouse/goods_expense_income_list_page.dart';
+import 'pages/warehouse/production_orders_page.dart';
+import 'pages/warehouse/production_order_details_page.dart';
 import 'pages/business/installments_report_page.dart';
 import 'pages/business/credit_settings_page.dart';
 import 'pages/business/business_ai_provider_settings_page.dart';
@@ -782,6 +784,7 @@ class _MyAppState extends State<MyApp> {
       );
       WarehousesPage(businessId: dummyBusinessId);
       WarehouseDocsPage(businessId: dummyBusinessId);
+      ProductionOrdersPage(businessId: dummyBusinessId);
       DocumentsPage(
         businessId: dummyBusinessId,
         calendarController: calendarController,
@@ -3440,6 +3443,13 @@ class _MyAppState extends State<MyApp> {
                                       personIdRaw.trim().isNotEmpty
                                   ? int.tryParse(personIdRaw.trim())
                                   : null;
+                              final productionOrderRaw =
+                                  state.uri.queryParameters['production_order_id'];
+                              final initialProductionOrderId =
+                                  productionOrderRaw != null &&
+                                      productionOrderRaw.trim().isNotEmpty
+                                  ? int.tryParse(productionOrderRaw.trim())
+                                  : null;
                               return hesabixNoTransitionPage(
                                 state,
                                 NewInvoicePage(
@@ -3448,6 +3458,8 @@ class _MyAppState extends State<MyApp> {
                                   calendarController: _calendarController!,
                                   copyFromInvoiceId: copyFromId,
                                   initialPersonId: initialPersonId,
+                                  initialProductionOrderId:
+                                      initialProductionOrderId,
                                 ),
                               );
                             },
@@ -5503,6 +5515,36 @@ class _MyAppState extends State<MyApp> {
                                 state,
                                 GoodsExpenseIncomeListPage(
                                   businessId: businessId,
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'production-orders',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                ProductionOrdersPage(businessId: businessId),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'production-orders/:order_id',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              final orderId = int.parse(
+                                state.pathParameters['order_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                ProductionOrderDetailsPage(
+                                  businessId: businessId,
+                                  orderId: orderId,
                                 ),
                               );
                             },

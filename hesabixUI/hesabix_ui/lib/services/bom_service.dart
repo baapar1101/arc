@@ -38,11 +38,13 @@ class BomService {
     return res.statusCode == 200 && (res.data?['data']?['deleted'] == true);
   }
 
-  Future<BomExplosionResult> explode({required int businessId, int? productId, int? bomId, required double quantity}) async {
+  Future<BomExplosionResult> explode({required int businessId, int? productId, int? bomId, required double quantity, bool recursive = false, String? date}) async {
     final payload = <String, dynamic>{
       if (productId != null) 'product_id': productId,
       if (bomId != null) 'bom_id': bomId,
       'quantity': quantity,
+      'recursive': recursive,
+      if (date != null) 'date': date,
     };
     final res = await _api.post<Map<String, dynamic>>('/api/v1/boms/business/$businessId/explode', data: payload);
     final data = (res.data?['data'] as Map<String, dynamic>? ?? <String, dynamic>{});

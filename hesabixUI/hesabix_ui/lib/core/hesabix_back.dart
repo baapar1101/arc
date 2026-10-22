@@ -379,6 +379,7 @@ const Set<String> _level1RelativePaths = {
   'warehouse-docs',
   'stock-count',
   'goods-expense-income',
+  'production-orders',
   'storage-files',
   'tax-workspace',
   'ai/chat',

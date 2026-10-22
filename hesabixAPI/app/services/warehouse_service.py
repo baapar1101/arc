@@ -1369,6 +1369,184 @@ def create_from_invoice(
 	return wh
 
 
+def _sync_production_order_posted_document(
+	db: Session,
+	warehouse_document: WarehouseDocument,
+	lines: List[WarehouseDocumentLine],
+	production_order_id: int,
+) -> None:
+	"""Apply posted material issues and product receipts to the linked order and reservations."""
+	from adapters.db.models.production_order import ProductionOrder, ProductionOrderMaterial, ProductionOrderOutput
+
+	order = db.query(ProductionOrder).filter(
+		ProductionOrder.id == int(production_order_id),
+		ProductionOrder.business_id == int(warehouse_document.business_id),
+	).with_for_update().first()
+	if not order:
+		raise ApiError("PRODUCTION_ORDER_NOT_FOUND", "سفارش تولید پیوندخورده با حواله یافت نشد", http_status=404)
+	if order.status != "in_progress":
+		raise ApiError("PRODUCTION_ORDER_NOT_IN_PROGRESS", "حوالهٔ سفارش فقط هنگام اجرای سفارش قابل قطعی‌سازی است", http_status=409)
+
+	if warehouse_document.doc_type in ("issue", "production_out"):
+		materials = db.query(ProductionOrderMaterial).filter(
+			ProductionOrderMaterial.production_order_id == order.id,
+		).order_by(ProductionOrderMaterial.line_no).with_for_update().all()
+		for line in lines:
+			if line.movement != "out":
+				continue
+			remaining = Decimal(str(line.quantity or 0))
+			matches = [m for m in materials if int(m.product_id) == int(line.product_id) and int(m.warehouse_id) == int(line.warehouse_id or 0)]
+			line_extra = line.extra_info or {}
+			row_id = line_extra.get("production_order_material_id")
+			if row_id is not None:
+				try:
+					matches = [m for m in matches if int(m.id) == int(row_id)]
+				except (TypeError, ValueError):
+					matches = []
+			for material in matches:
+				capacity = Decimal(str(material.planned_quantity or 0)) - Decimal(str(material.issued_quantity or 0))
+				applied = min(capacity, remaining)
+				if applied <= 0:
+					continue
+				material.issued_quantity = Decimal(str(material.issued_quantity or 0)) + applied
+				material.reserved_quantity = max(
+					Decimal(str(material.planned_quantity or 0)) - Decimal(str(material.issued_quantity or 0)),
+					Decimal("0"),
+				)
+				remaining -= applied
+				if remaining == 0:
+					break
+			if remaining > 0:
+				raise ApiError(
+					"PRODUCTION_MATERIAL_OVER_ISSUE",
+					f"مصرف کالای #{line.product_id} از مقدار برنامه‌ریزی‌شدهٔ سفارش بیشتر است",
+					http_status=409,
+				)
+	elif warehouse_document.doc_type in ("receipt", "production_in"):
+		outputs = db.query(ProductionOrderOutput).filter(
+			ProductionOrderOutput.production_order_id == order.id,
+		).order_by(ProductionOrderOutput.line_no).with_for_update().all()
+		for line in lines:
+			if line.movement != "in":
+				continue
+			remaining = Decimal(str(line.quantity or 0))
+			matches = [o for o in outputs if int(o.product_id) == int(line.product_id)]
+			line_extra = line.extra_info or {}
+			row_id = line_extra.get("production_order_output_id")
+			if row_id is not None:
+				try:
+					matches = [o for o in matches if int(o.id) == int(row_id)]
+				except (TypeError, ValueError):
+					matches = []
+			for output in matches:
+				capacity = Decimal(str(output.planned_quantity or 0)) - Decimal(str(output.produced_quantity or 0))
+				applied = min(capacity, remaining)
+				if applied <= 0:
+					continue
+				output.produced_quantity = Decimal(str(output.produced_quantity or 0)) + applied
+				remaining -= applied
+				if remaining == 0:
+					break
+			if remaining > 0:
+				raise ApiError(
+					"PRODUCTION_OUTPUT_OVER_REPORT",
+					f"مقدار ورود کالای #{line.product_id} از برنامهٔ سفارش تولید بیشتر است",
+					http_status=409,
+				)
+		order.produced_quantity = sum(
+			(Decimal(str(output.produced_quantity or 0)) for output in outputs if int(output.product_id) == int(order.product_id)),
+			Decimal("0"),
+		)
+	else:
+		return
+	order.version += 1
+	db.flush()
+
+
+def _reverse_production_order_cancelled_document(
+	db: Session,
+	warehouse_document: WarehouseDocument,
+	lines: List[WarehouseDocumentLine],
+	production_order_id: int,
+) -> None:
+	"""Reverse order actuals when a posted issue/receipt is cancelled."""
+	from adapters.db.models.production_order import ProductionOrder, ProductionOrderMaterial, ProductionOrderOutput
+
+	order = db.query(ProductionOrder).filter(
+		ProductionOrder.id == int(production_order_id),
+		ProductionOrder.business_id == int(warehouse_document.business_id),
+	).with_for_update().first()
+	if not order:
+		raise ApiError("PRODUCTION_ORDER_NOT_FOUND", "سفارش تولید پیوندخورده با حواله یافت نشد", http_status=404)
+	if order.status not in ("released", "in_progress"):
+		raise ApiError("PRODUCTION_ORDER_DOCUMENT_NOT_REVERSIBLE", "حوالهٔ سفارش بسته‌شده یا لغوشده قابل ابطال نیست", http_status=409)
+
+	if warehouse_document.doc_type in ("issue", "production_out"):
+		materials = db.query(ProductionOrderMaterial).filter(
+			ProductionOrderMaterial.production_order_id == order.id,
+		).order_by(ProductionOrderMaterial.line_no).with_for_update().all()
+		for line in lines:
+			if line.movement != "out":
+				continue
+			remaining = Decimal(str(line.quantity or 0))
+			matches = [m for m in materials if int(m.product_id) == int(line.product_id) and int(m.warehouse_id) == int(line.warehouse_id or 0)]
+			line_extra = line.extra_info or {}
+			row_id = line_extra.get("production_order_material_id")
+			if row_id is not None:
+				try:
+					matches = [m for m in matches if int(m.id) == int(row_id)]
+				except (TypeError, ValueError):
+					matches = []
+			for material in reversed(matches):
+				applied = min(Decimal(str(material.issued_quantity or 0)), remaining)
+				if applied <= 0:
+					continue
+				material.issued_quantity = Decimal(str(material.issued_quantity or 0)) - applied
+				material.reserved_quantity = max(
+					Decimal(str(material.planned_quantity or 0)) - Decimal(str(material.issued_quantity or 0)),
+					Decimal("0"),
+				)
+				remaining -= applied
+				if remaining == 0:
+					break
+			if remaining > 0:
+				raise ApiError("PRODUCTION_ISSUE_REVERSAL_MISMATCH", "مقدار حوالهٔ ابطالی با مصرف ثبت‌شدهٔ سفارش تطبیق ندارد", http_status=409)
+	elif warehouse_document.doc_type in ("receipt", "production_in"):
+		outputs = db.query(ProductionOrderOutput).filter(
+			ProductionOrderOutput.production_order_id == order.id,
+		).order_by(ProductionOrderOutput.line_no).with_for_update().all()
+		for line in lines:
+			if line.movement != "in":
+				continue
+			remaining = Decimal(str(line.quantity or 0))
+			matches = [o for o in outputs if int(o.product_id) == int(line.product_id)]
+			line_extra = line.extra_info or {}
+			row_id = line_extra.get("production_order_output_id")
+			if row_id is not None:
+				try:
+					matches = [o for o in matches if int(o.id) == int(row_id)]
+				except (TypeError, ValueError):
+					matches = []
+			for output in reversed(matches):
+				applied = min(Decimal(str(output.produced_quantity or 0)), remaining)
+				if applied <= 0:
+					continue
+				output.produced_quantity = Decimal(str(output.produced_quantity or 0)) - applied
+				remaining -= applied
+				if remaining == 0:
+					break
+			if remaining > 0:
+				raise ApiError("PRODUCTION_RECEIPT_REVERSAL_MISMATCH", "مقدار حوالهٔ ابطالی با تولید ثبت‌شدهٔ سفارش تطبیق ندارد", http_status=409)
+		order.produced_quantity = sum(
+			(Decimal(str(output.produced_quantity or 0)) for output in outputs if int(output.product_id) == int(order.product_id)),
+			Decimal("0"),
+		)
+	else:
+		return
+	order.version += 1
+	db.flush()
+
+
 def create_manual_warehouse_document(
 	db: Session,
 	business_id: int,
@@ -2796,6 +2974,17 @@ def post_warehouse_document(
 	lines = db.query(WarehouseDocumentLine).filter(WarehouseDocumentLine.warehouse_document_id == wh.id).all()
 	if not lines:
 		raise ApiError("NO_LINES", "حواله باید حداقل یک خط داشته باشد", http_status=400)
+	production_order_ids: set[int] = set()
+	for line in lines:
+		try:
+			order_id = (line.extra_info or {}).get("production_order_id")
+			if order_id is not None:
+				production_order_ids.add(int(order_id))
+		except (TypeError, ValueError):
+			raise ApiError("INVALID_PRODUCTION_ORDER", "شناسهٔ سفارش تولید روی خط حواله نامعتبر است", http_status=400)
+	if len(production_order_ids) > 1:
+		raise ApiError("MULTIPLE_PRODUCTION_ORDERS", "یک حوالهٔ تولید نمی‌تواند به چند سفارش تولید متصل باشد", http_status=409)
+	exclude_production_order_id = next(iter(production_order_ids), None)
 	tracked_product_ids = {
 		int(row.id)
 		for row in db.query(Product.id).filter(
@@ -2824,6 +3013,7 @@ def post_warehouse_document(
 						"warehouse_id": ln.warehouse_id,
 						"movement": "out",
 						"inventory_tracked": True,
+						**({"production_order_id": exclude_production_order_id} if exclude_production_order_id is not None else {}),
 					},
 				})
 	
@@ -2923,6 +3113,7 @@ def post_warehouse_document(
 						exclude_document_id=exclude_fin_doc,
 						exclude_invoice_source_document_id=exclude_inv_src,
 						exclude_warehouse_document_ids=_ex_wh,
+						exclude_production_order_id=exclude_production_order_id,
 					)
 				except ApiError:
 					raise
@@ -2981,6 +3172,8 @@ def post_warehouse_document(
 	wh.status = "posted"
 	wh.touch()
 	db.flush()
+	if exclude_production_order_id is not None:
+		_sync_production_order_posted_document(db, wh, lines, int(exclude_production_order_id))
 	
 	# Invalidate cache بعد از تغییر status به posted
 	invalidate_warehouse_docs_cache(
@@ -3768,6 +3961,19 @@ def cancel_warehouse_document(
 	lines = db.query(WarehouseDocumentLine).filter(WarehouseDocumentLine.warehouse_document_id == wh.id).all()
 	if not lines:
 		raise ApiError("NO_LINES", "حواله خطی ندارد", http_status=400)
+
+	linked_order_ids: set[int] = set()
+	for value in [*((wh.extra_info or {}).get("production_order_id"),), *[(line.extra_info or {}).get("production_order_id") for line in lines]]:
+		if value is None:
+			continue
+		try:
+			linked_order_ids.add(int(value))
+		except (TypeError, ValueError):
+			raise ApiError("INVALID_PRODUCTION_ORDER_LINK", "شناسهٔ سفارش تولید در حواله نامعتبر است", http_status=409)
+	if len(linked_order_ids) > 1:
+		raise ApiError("MULTIPLE_PRODUCTION_ORDER_LINKS", "حواله به چند سفارش تولید متصل است و قابل ابطال نیست", http_status=409)
+	if linked_order_ids:
+		_reverse_production_order_cancelled_document(db, wh, lines, next(iter(linked_order_ids)))
 
 	from app.services.warehouse_placement_sync import reverse_placement_effects_for_cancelled_document
 

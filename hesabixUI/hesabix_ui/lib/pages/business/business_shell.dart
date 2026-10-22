@@ -1821,6 +1821,15 @@ class _BusinessShellState extends State<BusinessShell> {
             type: _MenuItemType.simple,
             hasAddButton: false,
           ),
+          _MenuItem(
+            key: 'production-orders',
+            label: 'سفارش‌های تولید',
+            icon: Icons.precision_manufacturing_outlined,
+            selectedIcon: Icons.precision_manufacturing,
+            path: _bu('production-orders'),
+            type: _MenuItemType.simple,
+            hasAddButton: true,
+          ),
         ],
       ),
       _MenuItem(
@@ -3001,6 +3010,8 @@ class _BusinessShellState extends State<BusinessShell> {
                                             showAddWarehouseDocumentDialog();
                                           } else if (child.label == 'کالای هزینه/درآمد شده') {
                                             context.go(_bu('goods-expense-income'));
+                                          } else if (child.label == 'سفارش‌های تولید') {
+                                            context.go(_bu('production-orders'));
                                           } else if (child.label == 'فرایندها و مراحل قیف') {
                                             context.go('${_bu('crm/process-definitions')}?openAdd=1');
                                           } else if (child.label == 'سرنخ‌ها') {
@@ -3446,6 +3457,8 @@ class _BusinessShellState extends State<BusinessShell> {
                             } else if (child.label == 'حواله‌های انبار') {
                               // Show add warehouse document dialog
                               showAddWarehouseDocumentDialog();
+                            } else if (child.label == 'سفارش‌های تولید') {
+                              context.go(_bu('production-orders'));
                             } else if (child.label == 'فرایندها و مراحل قیف') {
                               context.go('${_bu('crm/process-definitions')}?openAdd=1');
                             } else if (child.label == 'سرنخ‌ها') {
@@ -3935,6 +3948,9 @@ class _BusinessShellState extends State<BusinessShell> {
         label == 'کالای هزینه‌شده / کالای درآمدشده' ||
         label == 'Goods Expense/Income') {
       return 'goods_expense_income';
+    }
+    if (label == 'سفارش‌های تولید' || label == 'Production Orders') {
+      return 'inventory';
     }
     if (label == t.storageSpace) return 'storage';
     if (label == t.taxpayers) return 'moadian';

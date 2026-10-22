@@ -1029,6 +1029,9 @@ def create_app() -> FastAPI:
     application.include_router(warehouse_locations_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.boms import router as boms_router
     application.include_router(boms_router, prefix=settings.api_v1_prefix)
+
+    from adapters.api.v1.production_orders import router as production_orders_router
+    application.include_router(production_orders_router, prefix=settings.api_v1_prefix)
     application.include_router(price_lists_router, prefix=settings.api_v1_prefix)
     application.include_router(invoices_router, prefix=settings.api_v1_prefix)
     application.include_router(persons_router, prefix=settings.api_v1_prefix)

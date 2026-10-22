@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Dict, Any, Optional, List, Set
 from decimal import Decimal
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 
 from app.core.responses import ApiError
 from adapters.db.models.product import Product
@@ -465,9 +465,16 @@ def delete_bom(db: Session, business_id: int, bom_id: int) -> bool:
 
 
 def explode_bom(db: Session, business_id: int, req: BOMExplosionRequest) -> Dict[str, Any]:
-    # minimal explosion without stock checks
+    # BOM explosion is planning-only: it never reserves or posts stock.
     if not req.bom_id and not req.product_id:
         raise ApiError("INVALID_REQUEST", "bom_id یا product_id الزامی است", http_status=400)
+
+    from datetime import date as date_type
+
+    try:
+        as_of_date = date_type.fromisoformat(str(req.date)[:10]) if req.date else date_type.today()
+    except (TypeError, ValueError) as exc:
+        raise ApiError("INVALID_BOM_DATE", "تاریخ اعتبار فرمول نامعتبر است", http_status=400) from exc
 
     bom: Optional[ProductBOM] = None
     if req.bom_id:
@@ -475,96 +482,182 @@ def explode_bom(db: Session, business_id: int, req: BOMExplosionRequest) -> Dict
         if not bom or bom.business_id != business_id:
             raise ApiError("NOT_FOUND", "BOM یافت نشد", http_status=404)
     else:
-        # pick default bom for product
-        bom = db.query(ProductBOM).filter(
-            and_(ProductBOM.business_id == business_id, ProductBOM.product_id == req.product_id, ProductBOM.is_default == True)
-        ).first()
+        query = db.query(ProductBOM).filter(
+            ProductBOM.business_id == business_id,
+            ProductBOM.product_id == req.product_id,
+            ProductBOM.is_default.is_(True),
+        )
+        if req.recursive:
+            query = query.filter(
+                ProductBOM.status == "approved",
+                or_(ProductBOM.effective_from.is_(None), ProductBOM.effective_from <= as_of_date),
+                or_(ProductBOM.effective_to.is_(None), ProductBOM.effective_to >= as_of_date),
+            )
+        bom = query.order_by(ProductBOM.effective_from.desc().nullslast(), ProductBOM.id.desc()).first()
         if not bom:
-            raise ApiError("NOT_FOUND", "برای این کالا فرمول پیش‌فرضی تعریف نشده است", http_status=404)
+            raise ApiError("NOT_FOUND", "فرمول پیش‌فرض معتبر برای این کالا یافت نشد", http_status=404)
 
-    items = db.query(ProductBOMItem).filter(ProductBOMItem.bom_id == bom.id).order_by(ProductBOMItem.line_no).all()
+    if req.recursive:
+        if (bom.status or "").strip().lower() != "approved":
+            raise ApiError("BOM_NOT_APPROVED", "انفجار چندسطحی فقط با نسخهٔ تأییدشدهٔ فرمول مجاز است", http_status=409)
+        if bom.effective_from and bom.effective_from > as_of_date:
+            raise ApiError("BOM_NOT_EFFECTIVE", "فرمول در تاریخ انتخاب‌شده هنوز معتبر نشده است", http_status=409)
+        if bom.effective_to and bom.effective_to < as_of_date:
+            raise ApiError("BOM_EXPIRED", "اعتبار فرمول در تاریخ انتخاب‌شده پایان یافته است", http_status=409)
+
     outputs = db.query(ProductBOMOutput).filter(ProductBOMOutput.bom_id == bom.id).order_by(ProductBOMOutput.line_no).all()
-
-    # Prepare product lookup for enriching names/units in response
-    product_ids: set[int] = set([it.component_product_id for it in items] + [ot.output_product_id for ot in outputs])
-    products_by_id: dict[int, Product] = {}
-    if product_ids:
-        for p in db.query(Product).filter(Product.id.in_(product_ids)).all():
-            products_by_id[p.id] = p
-
     qty = Decimal(str(req.quantity))
-
-    # Apply BOM-level wastage and yield to inputs
-    # factor_inputs scales required input quantities. Example: yield 80% => factor 1.25; wastage 5% => factor * 1.05
-    factor_inputs = Decimal("1")
-    if bom.wastage_percent:
-        factor_inputs *= (Decimal("1.0") + Decimal(str(bom.wastage_percent)) / Decimal("100"))
-    if bom.yield_percent:
-        try:
-            y = Decimal(str(bom.yield_percent))
-            if y > 0:
-                factor_inputs *= (Decimal("100") / y)
-        except Exception:
-            pass
     explosion_items: List[Dict[str, Any]] = []
-    for it in items:
-        base = Decimal(str(it.qty_per)) * qty
-        # apply line wastage
-        if it.wastage_percent:
-            base = base * (Decimal("1.0") + Decimal(str(it.wastage_percent)) / Decimal("100"))
-        # apply BOM-level factors
-        base = base * factor_inputs
-        prod = products_by_id.get(it.component_product_id)
+    ops_scaled: List[Dict[str, Any]] = []
+    ops_total = Decimal("0")
+    bom_cache: Dict[int, ProductBOM] = {int(bom.id): bom}
+    product_cache: Dict[int, Product] = {}
 
-        # Unit conversion to main unit (if BOM line uom equals secondary and factor exists)
-        required_qty_main_unit = None
-        main_unit = getattr(prod, "main_unit", None) if prod else None
-        secondary_unit = getattr(prod, "secondary_unit", None) if prod else None
-        unit_factor = getattr(prod, "unit_conversion_factor", None) if prod else None
-        if it.uom and prod and secondary_unit and main_unit and unit_factor is not None:
-            try:
-                # When line uom is secondary, convert to main by multiplying factor
-                if str(it.uom) == str(secondary_unit):
-                    required_qty_main_unit = base * Decimal(str(unit_factor))
-                elif str(it.uom) == str(main_unit):
-                    required_qty_main_unit = base
-                else:
-                    required_qty_main_unit = None
-            except Exception:
-                required_qty_main_unit = None
-        explosion_items.append({
-            "component_product_id": it.component_product_id,
-            "required_qty": base,
-            "uom": it.uom,
-            "suggested_warehouse_id": it.suggested_warehouse_id,
-            "is_optional": it.is_optional,
-            "substitute_group": it.substitute_group,
-            # enriched (optional) fields for UI friendliness
-            "component_product_name": getattr(prod, "name", None) if prod else None,
-            "component_product_code": getattr(prod, "code", None) if prod else None,
-            "component_product_main_unit": getattr(prod, "main_unit", None) if prod else None,
-            "required_qty_main_unit": required_qty_main_unit,
-            "main_unit": main_unit,
-        })
+    def _product(product_id: int) -> Optional[Product]:
+        if product_id not in product_cache:
+            product_cache[product_id] = db.query(Product).filter(
+                Product.id == product_id, Product.business_id == business_id
+            ).first()
+        return product_cache[product_id]
+
+    def _input_factor(current: ProductBOM) -> Decimal:
+        factor = Decimal("1")
+        if current.wastage_percent:
+            factor *= Decimal("1") + Decimal(str(current.wastage_percent)) / Decimal("100")
+        if current.yield_percent:
+            yield_percent = Decimal(str(current.yield_percent))
+            if yield_percent <= 0 or yield_percent > 100:
+                raise ApiError("INVALID_BOM_YIELD", f"بازده فرمول {current.name} باید بیشتر از صفر و حداکثر ۱۰۰ باشد", http_status=409)
+            factor *= Decimal("100") / yield_percent
+        return factor
+
+    def _approved_child_bom(product_id: int) -> Optional[ProductBOM]:
+        child = db.query(ProductBOM).filter(
+            ProductBOM.business_id == business_id,
+            ProductBOM.product_id == product_id,
+            ProductBOM.is_default.is_(True),
+            ProductBOM.status == "approved",
+            or_(ProductBOM.effective_from.is_(None), ProductBOM.effective_from <= as_of_date),
+            or_(ProductBOM.effective_to.is_(None), ProductBOM.effective_to >= as_of_date),
+        ).order_by(ProductBOM.effective_from.desc().nullslast(), ProductBOM.id.desc()).first()
+        if child:
+            bom_cache[int(child.id)] = child
+        return child
+
+    def _walk(current: ProductBOM, order_qty: Decimal, ancestors: tuple[int, ...], path: str, inherited_optional: bool, depth: int) -> None:
+        nonlocal ops_total
+        if int(current.id) in ancestors:
+            cycle = " → ".join(str(value) for value in (*ancestors, int(current.id)))
+            raise ApiError("CIRCULAR_BOM", f"وابستگی چرخه‌ای در فرمول تولید شناسایی شد: {cycle}", http_status=409)
+        if depth > req.max_depth:
+            raise ApiError("BOM_MAX_DEPTH", f"عمق انفجار فرمول از سقف {req.max_depth} بیشتر است", http_status=409)
+        operations = db.query(ProductBOMOperation).filter(
+            ProductBOMOperation.bom_id == current.id
+        ).order_by(ProductBOMOperation.line_no).all()
+        for op in operations:
+            fixed = Decimal(str(op.cost_fixed or 0))
+            per_unit = Decimal(str(op.cost_per_unit or 0))
+            total = fixed + (per_unit * order_qty)
+            ops_total += total
+            ops_scaled.append({
+                "line_no": len(ops_scaled) + 1,
+                "operation_name": op.operation_name,
+                "work_center": op.work_center,
+                "cost_uom": op.cost_uom,
+                "cost_fixed": fixed,
+                "cost_per_unit": per_unit,
+                "total_cost": total,
+                "source_bom_id": int(current.id),
+            })
+        lines = db.query(ProductBOMItem).filter(ProductBOMItem.bom_id == current.id).order_by(ProductBOMItem.line_no).all()
+        factor = _input_factor(current)
+        next_ancestors = (*ancestors, int(current.id))
+        for item in lines:
+            component_qty = Decimal(str(item.qty_per)) * order_qty
+            if item.wastage_percent:
+                wastage = Decimal(str(item.wastage_percent))
+                if wastage < 0 or wastage > 100:
+                    raise ApiError("INVALID_BOM_WASTAGE", f"درصد پرت خط {item.line_no} در فرمول {current.name} نامعتبر است", http_status=409)
+                component_qty *= Decimal("1") + wastage / Decimal("100")
+            component_qty *= factor
+            component_product = _product(int(item.component_product_id))
+            if not component_product:
+                raise ApiError("BOM_PRODUCT_NOT_FOUND", f"کالای جزء فرمول {current.name} دیگر در کسب‌وکار موجود نیست", http_status=409)
+            main_unit = getattr(component_product, "main_unit", None)
+            secondary_unit = getattr(component_product, "secondary_unit", None)
+            unit_factor = getattr(component_product, "unit_conversion_factor", None)
+            required_qty_main_unit = None
+            if item.uom and secondary_unit and main_unit and unit_factor is not None:
+                if str(item.uom) == str(secondary_unit):
+                    conversion = Decimal(str(unit_factor))
+                    if conversion <= 0:
+                        raise ApiError("INVALID_UNIT_CONVERSION", f"ضریب تبدیل کالای {component_product.name} باید مثبت باشد", http_status=409)
+                    # Product.unit_conversion_factor is secondary units per main unit.
+                    required_qty_main_unit = component_qty / conversion
+                elif str(item.uom) == str(main_unit):
+                    required_qty_main_unit = component_qty
+            elif not item.uom or str(item.uom) == str(main_unit):
+                required_qty_main_unit = component_qty
+            elif req.recursive:
+                raise ApiError(
+                    "BOM_UOM_NOT_CONVERTIBLE",
+                    f"واحد «{item.uom}» برای کالای {component_product.name} به واحد اصلی موجودی قابل تبدیل نیست",
+                    http_status=409,
+                )
+            item_path = f"{path}/{current.id}:{item.line_no}:{item.component_product_id}"
+            optional = inherited_optional or bool(item.is_optional)
+            child = _approved_child_bom(int(item.component_product_id)) if req.recursive and not optional else None
+            if child:
+                if int(child.id) in next_ancestors:
+                    cycle = " → ".join(str(value) for value in (*next_ancestors, int(child.id)))
+                    raise ApiError("CIRCULAR_BOM", f"وابستگی چرخه‌ای در فرمول تولید شناسایی شد: {cycle}", http_status=409)
+                _walk(child, required_qty_main_unit, next_ancestors, item_path, optional, depth + 1)
+                continue
+            explosion_items.append({
+                "component_product_id": int(item.component_product_id),
+                "required_qty": component_qty,
+                "uom": item.uom,
+                "suggested_warehouse_id": item.suggested_warehouse_id,
+                "is_optional": optional,
+                "substitute_group": item.substitute_group,
+                "component_product_name": component_product.name,
+                "component_product_code": component_product.code,
+                "component_product_main_unit": main_unit,
+                "required_qty_main_unit": required_qty_main_unit,
+                "inventory_required_qty": required_qty_main_unit,
+                "main_unit": main_unit,
+                "source_bom_id": int(current.id),
+                "bom_path": item_path,
+            })
+
+    _walk(bom, qty, tuple(), str(bom.id), False, 1)
 
     # outputs scaling
     out_scaled = []
     for ot in outputs:
-        prod = products_by_id.get(ot.output_product_id)
+        prod = _product(int(ot.output_product_id))
         # Convert output to main unit if needed
         ratio_val = Decimal(str(ot.ratio)) * qty
         ratio_main_unit = None
-        try:
-            main_unit = getattr(prod, "main_unit", None) if prod else None
-            secondary_unit = getattr(prod, "secondary_unit", None) if prod else None
-            unit_factor = getattr(prod, "unit_conversion_factor", None) if prod else None
-            if ot.uom and prod and secondary_unit and main_unit and unit_factor is not None:
-                if str(ot.uom) == str(secondary_unit):
-                    ratio_main_unit = ratio_val * Decimal(str(unit_factor))
-                elif str(ot.uom) == str(main_unit):
-                    ratio_main_unit = ratio_val
-        except Exception:
-            ratio_main_unit = None
+        main_unit = getattr(prod, "main_unit", None) if prod else None
+        secondary_unit = getattr(prod, "secondary_unit", None) if prod else None
+        unit_factor = getattr(prod, "unit_conversion_factor", None) if prod else None
+        if ot.uom and prod and secondary_unit and main_unit and unit_factor is not None:
+            if str(ot.uom) == str(secondary_unit):
+                factor = Decimal(str(unit_factor))
+                if factor <= 0:
+                    raise ApiError("INVALID_UNIT_CONVERSION", f"ضریب تبدیل کالای خروجی {getattr(prod, 'name', ot.output_product_id)} باید مثبت باشد", http_status=409)
+                ratio_main_unit = ratio_val / factor
+            elif str(ot.uom) == str(main_unit):
+                ratio_main_unit = ratio_val
+        elif not ot.uom or str(ot.uom) == str(main_unit):
+            ratio_main_unit = ratio_val
+        elif req.recursive:
+            raise ApiError(
+                "BOM_OUTPUT_UOM_NOT_CONVERTIBLE",
+                f"واحد «{ot.uom}» برای کالای خروجی #{ot.output_product_id} به واحد اصلی موجودی قابل تبدیل نیست",
+                http_status=409,
+            )
         out_scaled.append({
             "line_no": ot.line_no,
             "output_product_id": ot.output_product_id,
@@ -574,10 +667,19 @@ def explode_bom(db: Session, business_id: int, req: BOMExplosionRequest) -> Dict
             "output_product_name": getattr(prod, "name", None) if prod else None,
             "output_product_code": getattr(prod, "code", None) if prod else None,
             "ratio_main_unit": ratio_main_unit,
+            "inventory_ratio": ratio_main_unit,
             "main_unit": getattr(prod, "main_unit", None) if prod else None,
         })
 
-    return {"items": explosion_items, "outputs": out_scaled}
+    return {
+        "bom_id": int(bom.id),
+        "bom_version": bom.version,
+        "effective_date": as_of_date.isoformat(),
+        "items": explosion_items,
+        "outputs": out_scaled,
+        "operations": ops_scaled,
+        "operations_total": ops_total,
+    }
 
 
 def produce_draft(db: Session, business_id: int, req: ProductionDraftRequest) -> Dict[str, Any]:

@@ -97,6 +97,12 @@ from .quick_sales_payment_button import QuickSalesPaymentButton  # noqa: F401
 from .quick_sale_invoice_job import QuickSaleInvoiceJob  # noqa: F401
 from .hscript_report import HScriptReport, HScriptReportVersion, HScriptReportRun, HScriptReportSchedule  # noqa: F401
 from .product_bom import ProductBOM, ProductBOMItem, ProductBOMOutput, ProductBOMOperation  # noqa: F401
+from .production_order import (  # noqa: F401
+	ProductionOrder,
+	ProductionOrderMaterial,
+	ProductionOrderOperation,
+	ProductionOrderOutput,
+)
 from .ping_pong_score import PingPongScore  # noqa: F401
 from .storage_plan import StoragePlan, BusinessStorageSubscription, StorageInvoice, StorageUsageTransaction  # noqa: F401
 from .document_monetization import (  # noqa: F401

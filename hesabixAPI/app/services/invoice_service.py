@@ -1518,6 +1518,8 @@ def collect_stock_shortages(
     *,
     exclude_invoice_source_document_id: Optional[int] = None,
     exclude_warehouse_document_ids: Optional[List[int]] = None,
+    exclude_production_order_id: Optional[int] = None,
+    include_production_reservations: bool = False,
 ) -> List[Dict[str, Any]]:
     # تجمیع نیاز خروجی به تفکیک کالا/انبار
     required: Dict[Tuple[int, Optional[int]], Decimal] = {}
@@ -1572,6 +1574,23 @@ def collect_stock_shortages(
             exclude_invoice_source_document_id=exclude_invoice_source_document_id,
             exclude_warehouse_document_ids=exclude_warehouse_document_ids,
         )
+        # Production reservations affect only explicitly production-linked stock
+        # checks. Keeping this opt-in preserves the established behavior of
+        # sales, purchases, returns, waste, and direct-consumption invoices.
+        if include_production_reservations and wh_id is not None:
+            from adapters.db.models.production_order import ProductionOrder, ProductionOrderMaterial
+
+            reserved_query = db.query(func.coalesce(func.sum(ProductionOrderMaterial.reserved_quantity), 0)).join(
+                ProductionOrder, ProductionOrder.id == ProductionOrderMaterial.production_order_id
+            ).filter(
+                ProductionOrder.business_id == int(business_id),
+                ProductionOrder.status.in_(("released", "in_progress")),
+                ProductionOrderMaterial.product_id == int(pid),
+                ProductionOrderMaterial.warehouse_id == int(wh_id),
+            )
+            if exclude_production_order_id is not None:
+                reserved_query = reserved_query.filter(ProductionOrder.id != int(exclude_production_order_id))
+            avail -= Decimal(str(reserved_query.scalar() or 0))
         if avail < req:
             pname, pcode = product_labels.get(pid, ("", ""))
             shortages.append(
@@ -1623,6 +1642,8 @@ def _ensure_stock_sufficient(
     *,
     exclude_invoice_source_document_id: Optional[int] = None,
     exclude_warehouse_document_ids: Optional[List[int]] = None,
+    exclude_production_order_id: Optional[int] = None,
+    include_production_reservations: bool = False,
 ) -> None:
     # قفل تا commit/rollback تراکنش caller نگه داشته می‌شود.
     _acquire_inventory_stock_locks(db, business_id, outgoing_lines)
@@ -1635,6 +1656,8 @@ def _ensure_stock_sufficient(
         exclude_document_id,
         exclude_invoice_source_document_id=exclude_invoice_source_document_id,
         exclude_warehouse_document_ids=exclude_warehouse_document_ids,
+        exclude_production_order_id=exclude_production_order_id,
+        include_production_reservations=include_production_reservations,
     )
     if not shortages:
         return
@@ -1780,6 +1803,11 @@ def _validate_outgoing_stock_before_invoice_commit(
         exclude_document_id=int(document.id),
         exclude_invoice_source_document_id=None,
         exclude_warehouse_document_ids=None,
+        exclude_production_order_id=(document.extra_info or {}).get("production_order_id"),
+        include_production_reservations=(
+            document.document_type == INVOICE_PRODUCTION
+            and (document.extra_info or {}).get("production_order_id") is not None
+        ),
     )
     if not shortages:
         return
@@ -2545,6 +2573,7 @@ def _validate_production_invoice_lines(
     business_id: int,
     lines_input: List[Dict[str, Any]],
     header_extra: Dict[str, Any],
+    exclude_document_id: Optional[int] = None,
 ) -> None:
     """اعتبارسنجی ردیف‌ها و فرمول تولید برای فاکتور تولید."""
     has_out = False
@@ -2641,6 +2670,289 @@ def _validate_production_invoice_lines(
                 f"لطفاً همه خروجی‌های فرمول تولید را در فاکتور شامل کنید.",
                 http_status=400,
             )
+
+    production_order_id = header_extra.get("production_order_id")
+    if production_order_id is None:
+        return  # legacy production invoices remain supported
+    try:
+        production_order_id = int(production_order_id)
+    except (TypeError, ValueError) as exc:
+        raise ApiError("INVALID_PRODUCTION_ORDER", "شناسهٔ سفارش تولید نامعتبر است", http_status=400) from exc
+
+    from adapters.db.models.production_order import ProductionOrder, ProductionOrderMaterial, ProductionOrderOutput
+
+    acquire_transaction_lock(db, f"production_order:{business_id}:{production_order_id}")
+    order = db.query(ProductionOrder).filter(
+        ProductionOrder.id == production_order_id,
+        ProductionOrder.business_id == int(business_id),
+    ).with_for_update().first()
+    if not order:
+        raise ApiError("PRODUCTION_ORDER_NOT_FOUND", "سفارش تولید مرتبط یافت نشد", http_status=404)
+    if order.status != "in_progress":
+        raise ApiError("PRODUCTION_ORDER_NOT_IN_PROGRESS", "ثبت فاکتور تولید فقط برای سفارش در حال اجرا مجاز است", http_status=409)
+    if int(order.bom_id) not in {int(value) for value in bom_ids if str(value).isdigit()}:
+        raise ApiError("PRODUCTION_ORDER_BOM_MISMATCH", "فرمول فاکتور با فرمول سفارش تولید یکسان نیست", http_status=409)
+
+    planned_inputs: Dict[int, Decimal] = defaultdict(Decimal)
+    planned_input_warehouses: Dict[int, set[int]] = defaultdict(set)
+    for item in db.query(ProductionOrderMaterial).filter(ProductionOrderMaterial.production_order_id == order.id).all():
+        planned_inputs[int(item.product_id)] += Decimal(str(item.planned_quantity or 0))
+        planned_input_warehouses[int(item.product_id)].add(int(item.warehouse_id))
+    planned_outputs: Dict[int, Decimal] = defaultdict(Decimal)
+    order_outputs = db.query(ProductionOrderOutput).filter(ProductionOrderOutput.production_order_id == order.id).all()
+    order_materials = db.query(ProductionOrderMaterial).filter(ProductionOrderMaterial.production_order_id == order.id).all()
+    materials_by_id = {int(item.id): item for item in order_materials}
+    outputs_by_id = {int(item.id): item for item in order_outputs}
+    for item in order_outputs:
+        planned_outputs[int(item.product_id)] += Decimal(str(item.planned_quantity or 0))
+
+    already_used: Dict[Tuple[str, int], Decimal] = defaultdict(Decimal)
+    already_used_by_row: Dict[Tuple[str, int], Decimal] = defaultdict(Decimal)
+    linked_documents = db.query(Document).filter(
+        Document.business_id == int(business_id),
+        Document.document_type == INVOICE_PRODUCTION,
+        Document.is_proforma.is_(False),
+    ).all()
+    for linked in linked_documents:
+        if exclude_document_id is not None and int(linked.id) == int(exclude_document_id):
+            continue
+        linked_extra = linked.extra_info or {}
+        try:
+            linked_order_id = int(linked_extra.get("production_order_id"))
+        except (TypeError, ValueError):
+            continue
+        if linked_order_id != production_order_id:
+            continue
+        for old_line in db.query(InvoiceItemLine).filter(InvoiceItemLine.document_id == linked.id).all():
+            old_extra = old_line.extra_info or {}
+            movement = old_extra.get("movement")
+            if movement in ("in", "out"):
+                already_used[(movement, int(old_line.product_id))] += Decimal(str(old_line.quantity or 0))
+                row_key = "production_order_material_id" if movement == "out" else "production_order_output_id"
+                try:
+                    old_row_id = int(old_extra.get(row_key))
+                    already_used_by_row[(movement, old_row_id)] += Decimal(str(old_line.quantity or 0))
+                except (TypeError, ValueError):
+                    pass
+
+    requested: Dict[Tuple[str, int], Decimal] = defaultdict(Decimal)
+    requested_by_row: Dict[Tuple[str, int], Decimal] = defaultdict(Decimal)
+    for line in lines_input:
+        line_extra = line.get("extra_info") or {}
+        movement = line_extra.get("movement")
+        product_id = line.get("product_id")
+        row_key = "production_order_material_id" if movement == "out" else "production_order_output_id" if movement == "in" else None
+        if row_key and line_extra.get(row_key) is not None:
+            try:
+                order_row = (materials_by_id if movement == "out" else outputs_by_id).get(int(line_extra[row_key]))
+            except (TypeError, ValueError):
+                order_row = None
+            if order_row is None or int(order_row.product_id) != int(product_id or 0):
+                raise ApiError("PRODUCTION_ORDER_LINE_MISMATCH", "ردیف فاکتور به ردیف معتبری از سفارش تولید متصل نیست", http_status=409)
+            if movement == "out" and line_extra.get("warehouse_id") is not None:
+                try:
+                    if int(line_extra["warehouse_id"]) != int(order_row.warehouse_id):
+                        raise ApiError("PRODUCTION_MATERIAL_WAREHOUSE_MISMATCH", "انبار ردیف مواد با ردیف سفارش تولید مطابقت ندارد", http_status=409)
+                except (TypeError, ValueError) as exc:
+                    raise ApiError("INVALID_PRODUCTION_WAREHOUSE", "انبار مصرف ماده نامعتبر است", http_status=400) from exc
+            requested_by_row[(movement, int(order_row.id))] += Decimal(str(line.get("quantity", 0) or 0))
+        if movement in ("in", "out") and product_id:
+            requested[(movement, int(product_id))] += Decimal(str(line.get("quantity", 0) or 0))
+
+    for (movement, product_id), quantity in requested.items():
+        if movement == "out":
+            planned = planned_inputs.get(product_id, Decimal("0"))
+            if planned <= 0:
+                raise ApiError("PRODUCTION_MATERIAL_NOT_PLANNED", f"کالای #{product_id} در مواد این سفارش برنامه‌ریزی نشده است", http_status=409)
+            previous = already_used[("out", product_id)]
+            if previous + quantity > planned:
+                raise ApiError(
+                    "PRODUCTION_MATERIAL_OVER_ISSUE",
+                    f"مصرف ثبت‌شده از مقدار برنامه‌ریزی‌شدهٔ کالای #{product_id} بیشتر می‌شود",
+                    http_status=409,
+                    details={"product_id": product_id, "planned_quantity": float(planned), "previous_quantity": float(previous), "requested_quantity": float(quantity)},
+                )
+        else:
+            planned = planned_outputs.get(product_id, Decimal("0"))
+            if planned <= 0:
+                raise ApiError("PRODUCTION_OUTPUT_NOT_PLANNED", f"کالای خروجی #{product_id} در سفارش برنامه‌ریزی نشده است", http_status=409)
+            previous = already_used[("in", product_id)]
+            if previous + quantity > planned:
+                raise ApiError(
+                    "PRODUCTION_OUTPUT_OVER_REPORT",
+                    f"مقدار محصول ثبت‌شده از برنامهٔ سفارش بیشتر می‌شود (کالا #{product_id})",
+                    http_status=409,
+                    details={"product_id": product_id, "planned_quantity": float(planned), "previous_quantity": float(previous), "requested_quantity": float(quantity)},
+                )
+
+    for (movement, row_id), quantity in requested_by_row.items():
+        row = (materials_by_id if movement == "out" else outputs_by_id)[row_id]
+        planned = Decimal(str(row.planned_quantity or 0))
+        previous = already_used_by_row[(movement, row_id)]
+        if previous + quantity > planned:
+            raise ApiError(
+                "PRODUCTION_ORDER_LINE_OVER_REPORT",
+                f"مقدار ثبت‌شده از برنامهٔ ردیف #{row_id} سفارش تولید بیشتر می‌شود",
+                http_status=409,
+                details={"production_order_line_id": row_id, "planned_quantity": float(planned), "previous_quantity": float(previous), "requested_quantity": float(quantity)},
+            )
+
+    for line in lines_input:
+        extra = dict(line.get("extra_info") or {})
+        movement = extra.get("movement")
+        if movement == "out":
+            product_id = int(line.get("product_id"))
+            material_row_id = extra.get("production_order_material_id")
+            if material_row_id is not None:
+                try:
+                    material_row = materials_by_id[int(material_row_id)]
+                except (TypeError, ValueError, KeyError) as exc:
+                    raise ApiError("PRODUCTION_ORDER_LINE_MISMATCH", "ردیف مادهٔ سفارش تولید معتبر نیست", http_status=409) from exc
+                raw_line_warehouse = extra.get("warehouse_id")
+                if raw_line_warehouse is not None:
+                    try:
+                        if int(raw_line_warehouse) != int(material_row.warehouse_id):
+                            raise ApiError("PRODUCTION_MATERIAL_WAREHOUSE_MISMATCH", "انبار ردیف مواد با سفارش تولید مطابقت ندارد", http_status=409)
+                    except (TypeError, ValueError) as exc:
+                        raise ApiError("INVALID_PRODUCTION_WAREHOUSE", "انبار مصرف ماده نامعتبر است", http_status=400) from exc
+                warehouse_id = int(material_row.warehouse_id)
+            else:
+                raw_warehouse = extra.get("warehouse_id", header_extra.get("warehouse_id"))
+                if raw_warehouse is None:
+                    allowed = planned_input_warehouses.get(product_id, set())
+                    if len(allowed) == 1:
+                        raw_warehouse = next(iter(allowed))
+                    else:
+                        raise ApiError("PRODUCTION_MATERIAL_WAREHOUSE_REQUIRED", "برای ردیف مادهٔ سفارش، انبار مشخص و بدون ابهام الزامی است", http_status=409)
+                try:
+                    warehouse_id = int(raw_warehouse)
+                except (TypeError, ValueError) as exc:
+                    raise ApiError("INVALID_PRODUCTION_WAREHOUSE", "انبار مصرف ماده نامعتبر است", http_status=400) from exc
+                allowed = planned_input_warehouses.get(product_id, set())
+                if not allowed or warehouse_id not in allowed:
+                    raise ApiError("PRODUCTION_MATERIAL_WAREHOUSE_MISMATCH", f"انبار مصرف کالای #{product_id} با سفارش تولید مطابقت ندارد", http_status=409)
+            extra["warehouse_id"] = warehouse_id
+        elif movement == "in":
+            expected_warehouse_id = int(order.output_warehouse_id)
+            raw_warehouse = extra.get("warehouse_id", header_extra.get("warehouse_id"))
+            if raw_warehouse is not None:
+                try:
+                    if int(raw_warehouse) != expected_warehouse_id:
+                        raise ApiError("PRODUCTION_OUTPUT_WAREHOUSE_MISMATCH", "انبار دریافت محصول با انبار خروجی سفارش تولید مطابقت ندارد", http_status=409)
+                except (TypeError, ValueError) as exc:
+                    raise ApiError("INVALID_PRODUCTION_WAREHOUSE", "انبار دریافت محصول نامعتبر است", http_status=400) from exc
+            extra["warehouse_id"] = expected_warehouse_id
+        extra["production_order_id"] = production_order_id
+        line["extra_info"] = extra
+
+
+def _attach_production_order_to_invoice_lines(lines_input: List[Dict[str, Any]], header_extra: Dict[str, Any]) -> None:
+	"""Keep source-order identity on invoice lines so warehouse issue/receipt documents retain it."""
+	order_id = header_extra.get("production_order_id")
+	if order_id is None:
+		return
+	for line in lines_input:
+		extra = dict(line.get("extra_info") or {})
+		extra["production_order_id"] = int(order_id)
+		line["extra_info"] = extra
+
+
+def _strip_production_order_metadata(
+	lines_input: List[Dict[str, Any]],
+	header_extra: Dict[str, Any],
+) -> Dict[str, Any]:
+	"""Prevent production-order metadata from leaking into non-production invoices."""
+	clean_header = dict(header_extra)
+	for key in ("production_order_id", "production_operations_total", "bom_ids"):
+		clean_header.pop(key, None)
+	for line in lines_input:
+		extra = dict(line.get("extra_info") or {})
+		for key in (
+			"production_order_id",
+			"production_order_material_id",
+			"production_order_output_id",
+		):
+			extra.pop(key, None)
+		line["extra_info"] = extra
+	return clean_header
+
+
+def _parse_production_operations_total(value: Any) -> Optional[Decimal]:
+	if value is None:
+		return None
+	try:
+		amount = Decimal(str(value))
+	except Exception as exc:
+		raise ApiError("INVALID_PRODUCTION_OPERATIONS_COST", "هزینهٔ عملیات تولید باید عدد معتبر باشد", http_status=400) from exc
+	if not amount.is_finite() or amount < 0 or amount > Decimal("9999999999999999.99"):
+		raise ApiError("INVALID_PRODUCTION_OPERATIONS_COST", "هزینهٔ عملیات تولید باید نامنفی و در محدودهٔ مجاز باشد", http_status=400)
+	return amount
+
+
+def _attach_production_order_lots_to_invoice_lines(
+	db: Session,
+	business_id: int,
+	lines_input: List[Dict[str, Any]],
+	header_extra: Dict[str, Any],
+) -> None:
+	"""Pass light lot codes from the manufacturing order onto invoice lines when present."""
+	order_id = header_extra.get("production_order_id")
+	if order_id is None:
+		return
+	from adapters.db.models.production_order import ProductionOrder, ProductionOrderMaterial, ProductionOrderOutput
+
+	order = db.query(ProductionOrder).filter(
+		ProductionOrder.id == int(order_id),
+		ProductionOrder.business_id == int(business_id),
+	).first()
+	if not order:
+		return
+	material_rows = db.query(ProductionOrderMaterial).filter(ProductionOrderMaterial.production_order_id == order.id).all()
+	output_rows = db.query(ProductionOrderOutput).filter(ProductionOrderOutput.production_order_id == order.id).all()
+	for line in lines_input:
+		extra = dict(line.get("extra_info") or {})
+		if extra.get("lot_code"):
+			continue
+		movement = extra.get("movement")
+		pid = line.get("product_id")
+		if not pid:
+			continue
+		pid = int(pid)
+		if movement == "out":
+			rows = [row for row in material_rows if int(row.product_id) == pid]
+			row_id = extra.get("production_order_material_id")
+			warehouse_id = extra.get("warehouse_id", header_extra.get("warehouse_id"))
+			if warehouse_id is not None:
+				try:
+					matches = [row for row in rows if int(row.warehouse_id) == int(warehouse_id)]
+					if matches:
+						rows = matches
+				except (TypeError, ValueError):
+					pass
+		elif movement == "in":
+			rows = [row for row in output_rows if int(row.product_id) == pid]
+			row_id = extra.get("production_order_output_id")
+		else:
+			rows = []
+			row_id = None
+		if row_id is not None:
+			try:
+				rows = [row for row in rows if int(row.id) == int(row_id)]
+			except (TypeError, ValueError):
+				rows = []
+		# Product-only fallback is safe only for a unique BOM/order line. With
+		# duplicate lines, assigning a lot or standard cost to an arbitrary row
+		# would corrupt traceability and valuation.
+		row = rows[0] if len(rows) == 1 else None
+		if row and row.lot_code:
+			extra["lot_code"] = row.lot_code
+			line["extra_info"] = extra
+		if movement == "in" and extra.get("cost_price") is None and row is not None:
+			std = Decimal(str(row.standard_unit_cost or 0))
+			if std is not None and std > 0:
+				extra["cost_price"] = float(std)
+				extra["standard_cost"] = float(std)
+				line["extra_info"] = extra
 
 
 def _build_invoice_payment_account_line(p: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -5528,8 +5840,39 @@ def create_invoice(
 
     # اعتبارسنجی ویژه برای فاکتور تولید
     if invoice_type == INVOICE_PRODUCTION:
-        header_extra_check = data.get("extra_info") or {}
+        raw_header_extra_check = data.get("extra_info")
+        header_extra_check = dict(raw_header_extra_check) if isinstance(raw_header_extra_check, dict) else {}
+        # اگر سفارش تولید لینک شده و هزینه عملیات خالی باشد، استاندارد باقیماندهٔ سفارش را پیشنهاد بده.
+        order_id_hint = header_extra_check.get("production_order_id")
+        ops_hint = _parse_production_operations_total(header_extra_check.get("production_operations_total"))
+        if order_id_hint is not None and (ops_hint is None or ops_hint <= 0):
+            try:
+                order_id_hint = int(order_id_hint)
+            except (TypeError, ValueError):
+                order_id_hint = None  # The production-order validator returns the precise API error below.
+        if order_id_hint is not None and (ops_hint is None or ops_hint <= 0):
+            from adapters.db.models.production_order import ProductionOrder
+            from app.services.production_order_service import suggested_operations_total_for_order
+
+            linked_order = db.query(ProductionOrder).filter(
+                ProductionOrder.id == order_id_hint,
+                ProductionOrder.business_id == int(business_id),
+            ).first()
+            if linked_order:
+                primary_output_qty = sum(
+                    (Decimal(str(line.get("quantity", 0) or 0)) for line in lines_input
+                     if (line.get("extra_info") or {}).get("movement") == "in"
+                     and int(line.get("product_id") or 0) == int(linked_order.product_id)),
+                    Decimal("0"),
+                )
+                suggested = suggested_operations_total_for_order(
+                    db, business_id, order_id_hint, primary_output_qty
+                )
+                header_extra_check["production_operations_total"] = float(suggested)
+                data["extra_info"] = header_extra_check
         _validate_production_invoice_lines(db, business_id, lines_input, header_extra_check)
+        _attach_production_order_to_invoice_lines(lines_input, header_extra_check)
+        _attach_production_order_lots_to_invoice_lines(db, business_id, lines_input, header_extra_check)
 
     _stamp_movement_on_invoice_lines(invoice_type, lines_input)
 
@@ -5541,6 +5884,8 @@ def create_invoice(
     # جمع‌ها: تخفیف کلی (در صورت وجود) سپس totals از extra_info یا خطوط
     raw_extra = data.get("extra_info")
     header_extra: Dict[str, Any] = dict(raw_extra) if isinstance(raw_extra, dict) else {}
+    if invoice_type == INVOICE_PRODUCTION and header_extra.get("production_order_id") is not None:
+        header_extra["production_order_id"] = int(header_extra["production_order_id"])
     if person_id and header_extra.get("person_id") is None:
         header_extra["person_id"] = int(person_id)
     dd_top = data.get("due_date")
@@ -6553,6 +6898,33 @@ def create_invoice(
         logger.exception("stamp_document_lines_fx_base failed (create) doc_id=%s", getattr(document, "id", None))
         raise ApiError("FX_BASE_STAMP_ERROR", "خطا در ثبت مبالغ پایه خطوط سند", http_status=400)
 
+    if (
+        not document.is_proforma
+        and invoice_type == INVOICE_PRODUCTION
+        and (document.extra_info or {}).get("production_order_id") is not None
+    ):
+        try:
+            from app.services.production_order_service import refresh_production_order_actual_costs
+
+            refresh_production_order_actual_costs(
+                db,
+                business_id,
+                int((document.extra_info or {})["production_order_id"]),
+            )
+        except ApiError:
+            raise
+        except Exception as cost_ex:
+            logger.exception(
+                "production order costing refresh failed doc_id=%s err=%s",
+                document.id,
+                cost_ex,
+            )
+            raise ApiError(
+                "PRODUCTION_COSTING_REFRESH_FAILED",
+                "به‌روزرسانی بهای واقعی سفارش تولید ناموفق بود؛ فاکتور ذخیره نشد",
+                http_status=409,
+            ) from cost_ex
+
     if commit:
         db.commit()
         db.refresh(document)
@@ -6669,9 +7041,36 @@ def update_invoice(
         pass
 
     _old_document_type = str(document.document_type or "")
+    _old_production_order_id: Optional[int] = None
+    if _old_document_type == INVOICE_PRODUCTION:
+        try:
+            raw_old_order_id = (document.extra_info or {}).get("production_order_id")
+            _old_production_order_id = int(raw_old_order_id) if raw_old_order_id is not None else None
+        except (TypeError, ValueError):
+            raise ApiError("INVALID_PRODUCTION_ORDER", "شناسهٔ سفارش تولید قبلی نامعتبر است", http_status=409)
     inv_type = _resolve_invoice_type_from_payload(data, fallback=_old_document_type)
     if inv_type not in SUPPORTED_INVOICE_TYPES:
         raise ApiError("INVALID_INVOICE_TYPE", "Unsupported invoice_type", http_status=400)
+    _new_production_order_id: Optional[int] = None
+    if inv_type == INVOICE_PRODUCTION:
+        proposed_extra = data.get("extra_info")
+        if not isinstance(proposed_extra, dict):
+            proposed_extra = document.extra_info or {}
+        raw_new_order_id = proposed_extra.get("production_order_id")
+        if raw_new_order_id is not None:
+            try:
+                _new_production_order_id = int(raw_new_order_id)
+            except (TypeError, ValueError) as exc:
+                raise ApiError("INVALID_PRODUCTION_ORDER", "شناسهٔ سفارش تولید نامعتبر است", http_status=400) from exc
+    # Serialize order-link changes in stable order so concurrent edits/invoices
+    # cannot race their usage limits or deadlock while switching orders.
+    for linked_order_id in sorted({
+        order_id for order_id in (_old_production_order_id, _new_production_order_id)
+        if order_id is not None
+    }):
+        acquire_transaction_lock(
+            db, f"production_order:{int(document.business_id)}:{linked_order_id}"
+        )
     if inv_type != _old_document_type:
         from app.services.tax_reference_service import validate_invoice_type_change_for_tax
 
@@ -6826,8 +7225,67 @@ def update_invoice(
 
     if inv_type == INVOICE_PRODUCTION:
         prod_extra = dict(data.get("extra_info") or document.extra_info or {})
+        explicit_operations_total = (
+            isinstance(data.get("extra_info"), dict)
+            and "production_operations_total" in data["extra_info"]
+        )
+        operations_total = _parse_production_operations_total(
+            prod_extra.get("production_operations_total")
+        )
+        if (
+            _new_production_order_id == _old_production_order_id
+            and not explicit_operations_total
+            and (document.extra_info or {}).get("production_operations_total") is not None
+        ):
+            operations_total = _parse_production_operations_total(
+                (document.extra_info or {}).get("production_operations_total")
+            )
+            prod_extra["production_operations_total"] = float(operations_total or 0)
+        if (
+            _new_production_order_id is not None
+            and not explicit_operations_total
+            and (
+                _new_production_order_id != _old_production_order_id
+                or operations_total is None
+                or operations_total <= 0
+            )
+        ):
+            from adapters.db.models.production_order import ProductionOrder
+            from app.services.production_order_service import suggested_operations_total_for_order
+
+            linked_order = db.query(ProductionOrder).filter(
+                ProductionOrder.id == _new_production_order_id,
+                ProductionOrder.business_id == int(document.business_id),
+            ).first()
+            if linked_order:
+                primary_output_qty = sum(
+                    (Decimal(str(line.get("quantity", 0) or 0)) for line in lines_input
+                     if (line.get("extra_info") or {}).get("movement") == "in"
+                     and int(line.get("product_id") or 0) == int(linked_order.product_id)),
+                    Decimal("0"),
+                )
+                operations_total = suggested_operations_total_for_order(
+                    db,
+                    int(document.business_id),
+                    _new_production_order_id,
+                    primary_output_qty,
+                )
+                prod_extra["production_operations_total"] = float(operations_total)
+                data["extra_info"] = prod_extra
         _validate_production_invoice_lines(
+            db, int(document.business_id), lines_input, prod_extra, exclude_document_id=int(document.id)
+        )
+        _attach_production_order_to_invoice_lines(lines_input, prod_extra)
+        _attach_production_order_lots_to_invoice_lines(
             db, int(document.business_id), lines_input, prod_extra
+        )
+    else:
+        non_production_extra = data.get("extra_info")
+        if not isinstance(non_production_extra, dict):
+            non_production_extra = document.extra_info or {}
+        data["extra_info"] = _strip_production_order_metadata(
+            lines_input,
+            non_production_extra,
         )
 
     _stamp_movement_on_invoice_lines(inv_type, lines_input)
@@ -7628,6 +8086,34 @@ def update_invoice(
             http_status=409,
         )
 
+    if not document.is_proforma and (
+        _old_document_type == INVOICE_PRODUCTION or inv_type == INVOICE_PRODUCTION
+    ):
+        try:
+            from app.services.production_order_service import refresh_production_order_actual_costs
+
+            new_order_id = _new_production_order_id if inv_type == INVOICE_PRODUCTION else None
+            for production_order_id in sorted({
+                order_id for order_id in (_old_production_order_id, new_order_id)
+                if order_id is not None
+            }):
+                refresh_production_order_actual_costs(
+                    db, int(document.business_id), production_order_id
+                )
+        except ApiError:
+            raise
+        except Exception as cost_ex:
+            logger.exception(
+                "production order costing refresh on update failed doc_id=%s err=%s",
+                document.id,
+                cost_ex,
+            )
+            raise ApiError(
+                "PRODUCTION_COSTING_REFRESH_FAILED",
+                "به‌روزرسانی بهای واقعی سفارش تولید ناموفق بود؛ فاکتور ذخیره نشد",
+                http_status=409,
+            ) from cost_ex
+
     if not document.is_proforma:
         db.flush()
         from adapters.db.models.business import Business as _BizForPriceSyncU
@@ -7828,6 +8314,19 @@ def delete_invoice(db: Session, document_id: int, *, commit: bool = True) -> boo
         if document.document_type not in SUPPORTED_INVOICE_TYPES:
             logger.error(f"[DELETE_INVOICE] Invoice {document_id}: Invalid document type {document.document_type}")
             raise ApiError("INVALID_DOCUMENT_TYPE", "Document is not an invoice", http_status=400)
+
+        _deleted_production_order_id: Optional[int] = None
+        if document.document_type == INVOICE_PRODUCTION:
+            raw_order_id = (document.extra_info or {}).get("production_order_id")
+            if raw_order_id is not None:
+                try:
+                    _deleted_production_order_id = int(raw_order_id)
+                except (TypeError, ValueError) as exc:
+                    raise ApiError("INVALID_PRODUCTION_ORDER", "شناسهٔ سفارش تولید متصل به فاکتور نامعتبر است", http_status=409) from exc
+                acquire_transaction_lock(
+                    db,
+                    f"production_order:{int(document.business_id)}:{_deleted_production_order_id}",
+                )
         
         # 1) جلوگیری از حذف در سال مالی غیر جاری
         try:
@@ -8065,6 +8564,30 @@ def delete_invoice(db: Session, document_id: int, *, commit: bool = True) -> boo
         # حذف سند فاکتور
         db.delete(document)
         logger.info(f"[DELETE_INVOICE] Invoice {document_id}: Marked invoice document for deletion")
+
+        if _deleted_production_order_id is not None:
+            db.flush()
+            try:
+                from app.services.production_order_service import refresh_production_order_actual_costs
+
+                refresh_production_order_actual_costs(
+                    db,
+                    int(document.business_id),
+                    _deleted_production_order_id,
+                )
+            except ApiError:
+                raise
+            except Exception as cost_ex:
+                logger.exception(
+                    "production order costing refresh after invoice delete failed doc_id=%s err=%s",
+                    document_id,
+                    cost_ex,
+                )
+                raise ApiError(
+                    "PRODUCTION_COSTING_REFRESH_FAILED",
+                    "بازمحاسبهٔ بهای واقعی سفارش تولید پس از حذف فاکتور ناموفق بود؛ حذف انجام نشد",
+                    http_status=409,
+                ) from cost_ex
         
         # commit یا flush (برای حذف گروهی / برگشت سال مالی بدون commit میانی)
         if commit:
