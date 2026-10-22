@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 from datetime import datetime, date, timedelta, timezone
 from app.core.datetime_utils import utc_now, utc_now_aware, utc_naive_to_iso_z
 from decimal import Decimal, ROUND_HALF_UP
@@ -776,17 +776,25 @@ def _remove_old_invoice_warehouse_documents(
     invoice_document_id: int,
     warehouse_document_ids: List[int],
     user_id: int,
-) -> None:
+) -> Set[str]:
     """
-    حذف حوالهٔ پیش‌نویس یا لغو+پست معکوس برای حوالهٔ قطعی.
+    حذف حوالهٔ پیش‌نویس یا لغو حوالهٔ قطعی و ثبت معکوس بایگانی.
     شناسه‌ها از links فاکتور می‌آید؛ اگر source_document_id با فاکتور دیگری ست شده باشد رد می‌شود.
     (source_type قدیمی اجباری نیست تا حواله‌های قدیمی بدون متادیتای درست لغو شوند.)
+
+    موجودی اسناد فاکتور از invoice_item_lines محاسبه می‌شود؛ پست معکوس کل حوالهٔ فاکتور
+    هنگام ویرایش، برای خطوطی که تغییر نکرده‌اند کنترل موجودی کاذب ایجاد می‌کند. فقط کاهش
+    واقعیِ رسیدهای قبلی کنترل می‌شود و وضعیت posted برای ساخت حوالهٔ جایگزین حفظ می‌گردد.
     """
     from adapters.db.models.warehouse_document import WarehouseDocument
     from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
-    from app.services.warehouse_service import cancel_warehouse_document, post_warehouse_document
+    from adapters.db.models.warehouse import Warehouse
+    from app.services.warehouse_service import cancel_warehouse_document
 
     seen: set[int] = set()
+    posted_document_types: Set[str] = set()
+    posted_receipts: Dict[Tuple[int, int], Decimal] = defaultdict(Decimal)
+    posted_documents: Dict[int, Any] = {}
     for raw_id in warehouse_document_ids:
         try:
             wid = int(raw_id)
@@ -801,16 +809,152 @@ def _remove_old_invoice_warehouse_documents(
         if wh.source_document_id is not None and int(wh.source_document_id) != int(invoice_document_id):
             continue
         st = (wh.status or "").strip().lower()
+        if st == "posted":
+            posted_document_types.add(str(wh.doc_type or "").strip().lower())
+            posted_documents[wid] = wh
         if st == "draft":
             db.query(WarehouseDocumentLine).filter(
                 WarehouseDocumentLine.warehouse_document_id == wh.id
             ).delete(synchronize_session=False)
             db.delete(wh)
-        elif st == "posted":
-            cancel_wh = cancel_warehouse_document(db, business_id, int(wh.id), user_id)
-            post_warehouse_document(db, int(cancel_wh.id))
         # cancelled: بدون اقدام
+
+    if posted_documents:
+        for line in db.query(WarehouseDocumentLine).filter(
+            WarehouseDocumentLine.warehouse_document_id.in_(list(posted_documents))
+        ).all():
+            if str(line.movement or "").strip().lower() != "in" or line.warehouse_id is None:
+                continue
+            key = (int(line.product_id), int(line.warehouse_id))
+            posted_receipts[key] += Decimal(str(line.quantity or 0))
+
+        # The invoice lines have already been replaced by update_invoice. Compare the new
+        # receipts with the old posted receipt lines and reject only reductions that would
+        # leave stock negative. Unchanged receipt lines must not be treated as withdrawals.
+        invoice = db.query(Document).filter(
+            Document.id == int(invoice_document_id),
+            Document.business_id == int(business_id),
+        ).first()
+        new_receipts: Dict[Tuple[int, int], Decimal] = defaultdict(Decimal)
+        tracked_product_ids = {
+            int(row.id)
+            for row in db.query(Product.id).filter(
+                Product.business_id == int(business_id),
+                Product.track_inventory.is_(True),
+                Product.id.in_({product_id for product_id, _ in posted_receipts}),
+            ).all()
+        }
+        if invoice and not bool(invoice.is_proforma) and _is_inventory_posting_enabled(
+            {"extra_info": invoice.extra_info or {}}
+        ):
+            invoice_warehouse_id = (invoice.extra_info or {}).get("warehouse_id")
+            for line in db.query(InvoiceItemLine).filter(
+                InvoiceItemLine.document_id == int(invoice_document_id)
+            ).all():
+                info = line.extra_info or {}
+                if int(line.product_id) not in tracked_product_ids or info.get("inventory_tracked") is False:
+                    continue
+                movement = info.get("movement") or _movement_from_type(invoice.document_type)[0]
+                warehouse_id = info.get("warehouse_id", invoice_warehouse_id)
+                if movement != "in" or warehouse_id is None:
+                    continue
+                try:
+                    key = (int(line.product_id), int(warehouse_id))
+                except (TypeError, ValueError):
+                    continue
+                new_receipts[key] += Decimal(str(line.quantity or 0))
+
+        reductions = {
+            key: quantity - new_receipts.get(key, Decimal(0))
+            for key, quantity in posted_receipts.items()
+            if quantity > new_receipts.get(key, Decimal(0))
+        }
+        if reductions and invoice:
+            biz = db.query(Business).filter(Business.id == int(business_id)).first()
+            reduction_lines = [
+                {
+                    "product_id": product_id,
+                    "quantity": float(quantity),
+                    "extra_info": {"warehouse_id": warehouse_id},
+                }
+                for (product_id, warehouse_id), quantity in reductions.items()
+            if product_id in tracked_product_ids
+            ]
+            enforced_lines = filter_outgoing_lines_for_stock_enforcement(
+                db,
+                int(business_id),
+                reduction_lines,
+                allow_negative_for_bulk=bool(getattr(biz, "allow_negative_inventory_for_bulk", False)),
+                allow_negative_for_unique=bool(getattr(biz, "allow_negative_inventory_for_unique", False)),
+                warehouse_doc_type="issue",
+                transfer_require_positive_stock=False,
+            )
+            enforced_keys = {
+                (int(line["product_id"]), int((line.get("extra_info") or {}).get("warehouse_id")))
+                for line in enforced_lines
+            }
+            product_ids = sorted({product_id for product_id, _ in enforced_keys})
+            warehouse_ids = sorted({warehouse_id for _, warehouse_id in enforced_keys})
+            product_labels = {
+                int(row.id): (str(row.name or ""), str(row.code or ""), str(row.inventory_mode or "bulk"))
+                for row in db.query(Product.id, Product.name, Product.code, Product.inventory_mode).filter(
+                    Product.business_id == int(business_id), Product.id.in_(product_ids)
+                ).all()
+            } if product_ids else {}
+            warehouse_labels = {
+                int(row.id): str(row.name or "")
+                for row in db.query(Warehouse.id, Warehouse.name).filter(
+                    Warehouse.business_id == int(business_id), Warehouse.id.in_(warehouse_ids)
+                ).all()
+            } if warehouse_ids else {}
+            shortages: List[Dict[str, Any]] = []
+            stock_check_date = max(
+                [invoice.document_date]
+                + [
+                    warehouse_document.document_date
+                    for warehouse_document in posted_documents.values()
+                    if warehouse_document.document_date is not None
+                ]
+            )
+            for product_id, warehouse_id in sorted(enforced_keys):
+                final_available = _compute_available_stock(
+                    db,
+                    int(business_id),
+                    product_id,
+                    warehouse_id,
+                    stock_check_date,
+                    exclude_warehouse_document_ids=list(posted_documents),
+                )
+                if final_available >= 0:
+                    continue
+                reduction = reductions[(product_id, warehouse_id)]
+                name, code, mode = product_labels.get(product_id, ("", "", "bulk"))
+                shortages.append({
+                    "product_id": product_id,
+                    "product_name": name or "کالا",
+                    "product_code": code or None,
+                    "warehouse_id": warehouse_id,
+                    "warehouse_name": warehouse_labels.get(warehouse_id),
+                    "inventory_mode": mode,
+                    "available_quantity": float(final_available + reduction),
+                    "requested_quantity": float(reduction),
+                    "shortage_quantity": float(-final_available),
+                })
+            if shortages:
+                raise ApiError(
+                    "INSUFFICIENT_STOCK",
+                    "موجودی کافی برای کاهش اقلام رسیدشدهٔ فاکتور وجود ندارد",
+                    http_status=409,
+                    details={"shortages": shortages},
+                )
+
+    for wid in posted_documents:
+        # Invoice movement is represented by the current invoice lines. Seal the old
+        # warehouse mirror instead of posting its full inverse; that inverse would remove
+        # unchanged receipts and can fail when any part of them has since been sold.
+        cancel_warehouse_document(db, business_id, wid, user_id, seal_reversal=True)
     db.flush()
+    return posted_document_types
 
 
 def _persisted_invoice_lines_for_warehouse(db: Session, document_id: int) -> List[Dict[str, Any]]:
@@ -847,6 +991,7 @@ def _create_warehouse_documents_for_invoice(
     invoice_type: str,
     *,
     stock_exclude_warehouse_document_ids: Optional[List[int]] = None,
+    post_warehouse_document_types: Optional[Set[str]] = None,
 ) -> List[int]:
     """
     ایجاد حواله(های) انبار از روی فاکتور در صورت فعال بودن post_inventory.
@@ -878,6 +1023,12 @@ def _create_warehouse_documents_for_invoice(
 
     created_wh_ids: List[int] = []
     auto_post_warehouse = bool((document.extra_info or {}).get("auto_post_warehouse", False))
+    forced_post_types = {
+        str(value or "").strip().lower() for value in (post_warehouse_document_types or set())
+    }
+
+    def should_post(warehouse_doc_type: str) -> bool:
+        return auto_post_warehouse or str(warehouse_doc_type or "").strip().lower() in forced_post_types
 
     if invoice_type == INVOICE_PRODUCTION:
         out_lines = [ln for ln in lines_for_wh if (ln.get("extra_info") or {}).get("movement") == "out"]
@@ -885,14 +1036,14 @@ def _create_warehouse_documents_for_invoice(
         if out_lines and invoice_lines_have_trackable_inventory_products(db, business_id, out_lines):
             wh_issue = create_from_invoice(db, business_id, document, out_lines, "issue", user_id)
             created_wh_ids.append(int(wh_issue.id))
-            if auto_post_warehouse:
+            if should_post("issue"):
                 post_warehouse_document(
                     db, int(wh_issue.id), stock_exclude_warehouse_document_ids=_stock_ex_wh
                 )
         if in_lines and invoice_lines_have_trackable_inventory_products(db, business_id, in_lines):
             wh_receipt = create_from_invoice(db, business_id, document, in_lines, "receipt", user_id)
             created_wh_ids.append(int(wh_receipt.id))
-            if auto_post_warehouse:
+            if should_post("receipt"):
                 post_warehouse_document(
                     db, int(wh_receipt.id), stock_exclude_warehouse_document_ids=_stock_ex_wh
                 )
@@ -906,7 +1057,7 @@ def _create_warehouse_documents_for_invoice(
         wh = create_from_invoice(db, business_id, document, lines_for_wh, wh_type, user_id)
         created_wh_ids.append(int(wh.id))
 
-        if auto_post_warehouse:
+        if should_post(wh_type):
             post_warehouse_document(
                 db, int(wh.id), stock_exclude_warehouse_document_ids=_stock_ex_wh
             )
@@ -7436,7 +7587,7 @@ def update_invoice(
                 flag_modified(document, "extra_info")
 
     try:
-        _remove_old_invoice_warehouse_documents(
+        _old_posted_warehouse_types = _remove_old_invoice_warehouse_documents(
             db,
             int(document.business_id),
             int(document.id),
@@ -7452,6 +7603,11 @@ def update_invoice(
         db.flush()
 
         if not document.is_proforma:
+            _post_warehouse_types_for_rebuild = set(_old_posted_warehouse_types)
+            if inv_type != _old_document_type and _post_warehouse_types_for_rebuild:
+                # A type change can switch the replacement from receipt to issue (or vice
+                # versa); preserve the prior finalized state for the replacement movement.
+                _post_warehouse_types_for_rebuild.update({"issue", "receipt"})
             _create_warehouse_documents_for_invoice(
                 db,
                 int(document.business_id),
@@ -7460,6 +7616,7 @@ def update_invoice(
                 lines_input,
                 inv_type,
                 stock_exclude_warehouse_document_ids=_old_warehouse_document_ids,
+                post_warehouse_document_types=_post_warehouse_types_for_rebuild,
             )
     except ApiError:
         raise
