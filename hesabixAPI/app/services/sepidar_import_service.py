@@ -3,15 +3,63 @@ from __future__ import annotations
 import hashlib
 import asyncio
 import json
+import logging
+from contextlib import contextmanager
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any
+from uuid import UUID
 
+from sqlalchemy import or_, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from adapters.db.models.sepidar_live_import import SepidarImportRow, SepidarImportRun, SepidarImportSetting
 from app.services.encryption_service import EncryptionService
+
+logger = logging.getLogger(__name__)
+
+
+class SyncAlreadyRunning(ValueError):
+    pass
+
+
+def plugin_active(db: Session, business_id: int) -> bool:
+    from adapters.db.models.marketplace import BusinessPlugin, MarketplacePlugin
+    now = datetime.utcnow()
+    return db.query(BusinessPlugin.id).join(MarketplacePlugin).filter(
+        BusinessPlugin.business_id == business_id, BusinessPlugin.status == "active",
+        BusinessPlugin.starts_at <= now,
+        or_(BusinessPlugin.ends_at.is_(None), BusinessPlugin.ends_at >= now),
+        MarketplacePlugin.code == "sepidar_live_import", MarketplacePlugin.is_active.is_(True),
+    ).first() is not None
+
+
+def error_message(exc: Exception) -> str:
+    # SQLAlchemy exceptions can contain imported row payloads and connection details.
+    # Persist only a safe category, never SQL parameters or provider credentials.
+    if isinstance(exc, SyncAlreadyRunning):
+        return "یک همگام‌سازی برای این کسب‌وکار در حال اجراست."
+    if "18456" in str(exc):
+        return "ورود به SQL Server رد شد (18456). نام کاربری، رمز و دسترسی دیتابیس را بررسی کنید."
+    return f"همگام‌سازی یا اتصال ناموفق بود ({type(exc).__name__}). تنظیمات اتصال و دسترسی خواندن را بررسی کنید."
+
+
+@contextmanager
+def _sync_lock(db: Session, business_id: int):
+    # A dedicated physical connection keeps the session lock across batch commits.
+    with db.get_bind().connect().execution_options(isolation_level="AUTOCOMMIT") as connection:
+        params = {"namespace": 5457232, "business_id": business_id}
+        acquired = connection.execute(text("SELECT pg_try_advisory_lock(:namespace, :business_id)"), params).scalar()
+        if not acquired:
+            raise SyncAlreadyRunning()
+        try:
+            yield
+        finally:
+            try:
+                connection.execute(text("SELECT pg_advisory_unlock(:namespace, :business_id)"), params)
+            except Exception:
+                connection.invalidate()
 
 
 def _json_value(value: Any) -> Any:
@@ -19,8 +67,10 @@ def _json_value(value: Any) -> Any:
         return value.isoformat()
     if isinstance(value, Decimal):
         return str(value)
-    if isinstance(value, bytes):
-        return value.hex()
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        return bytes(value).hex()
+    if isinstance(value, UUID):
+        return str(value)
     return value
 
 
@@ -97,10 +147,22 @@ def _primary_keys(cur, schema: str, table: str) -> list[str]:
     return [r["COLUMN_NAME"] for r in cur.fetchall()]
 
 
-def run_sync(db: Session, business_id: int) -> dict[str, Any]:
+def run_sync(db: Session, business_id: int, *, scheduled: bool = False) -> dict[str, Any]:
+    with _sync_lock(db, business_id):
+        # Another worker may have finished while this worker was waiting for a connection.
+        db.expire_all()
+        return _run_sync(db, business_id, scheduled=scheduled)
+
+
+def _run_sync(db: Session, business_id: int, *, scheduled: bool = False) -> dict[str, Any]:
     setting = db.query(SepidarImportSetting).filter_by(business_id=business_id).first()
     if not setting:
         raise ValueError("تنظیمات سپیدار ثبت نشده است.")
+    if scheduled:
+        if not setting.enabled or not plugin_active(db, business_id):
+            return {"status": "skipped"}
+        if setting.last_started_at and setting.last_started_at + timedelta(minutes=setting.sync_interval_minutes) > datetime.utcnow():
+            return {"status": "skipped"}
     run = SepidarImportRun(business_id=business_id, status="running")
     db.add(run); setting.last_started_at = datetime.utcnow(); setting.last_error = None; db.commit(); db.refresh(run)
     try:
@@ -117,19 +179,26 @@ def run_sync(db: Session, business_id: int) -> dict[str, Any]:
                 schema, table = item["schema"], item["table"]
                 keys = _primary_keys(cur, schema, table)
                 cur.execute(f"SELECT * FROM [{schema.replace(']', ']]')}].[{table.replace(']', ']]')}]")
-                ordinal = 0
+                occurrences: dict[str, int] = {}
                 while True:
                     rows = cur.fetchmany(setting.batch_size)
                     if not rows: break
                     values = []
                     for raw in rows:
-                        ordinal += 1
                         payload = {str(k): _json_value(v) for k, v in raw.items()}
-                        source_key = json.dumps([payload.get(k) for k in keys], ensure_ascii=False, default=str) if keys else str(ordinal)
                         canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+                        content_hash = hashlib.sha256(canonical.encode()).hexdigest()
+                        if keys:
+                            key_json = json.dumps([payload.get(k) for k in keys], ensure_ascii=False, default=str)
+                            source_key = "pk:" + hashlib.sha256(key_json.encode()).hexdigest()
+                        else:
+                            # No reliable identity exists without a primary key. Preserve identical
+                            # duplicates while remaining independent of SQL Server's row order.
+                            occurrences[content_hash] = occurrences.get(content_hash, 0) + 1
+                            source_key = f"{content_hash}:{occurrences[content_hash]}"
                         values.append({"business_id": business_id, "source_schema": schema, "source_table": table,
                                        "source_key": source_key, "payload": payload,
-                                       "content_hash": hashlib.sha256(canonical.encode()).hexdigest(),
+                                       "content_hash": content_hash,
                                        "first_seen_at": now, "last_seen_at": now})
                     stmt = insert(SepidarImportRow).values(values)
                     stmt = stmt.on_conflict_do_update(
@@ -143,7 +212,7 @@ def run_sync(db: Session, business_id: int) -> dict[str, Any]:
         return {"run_id": run.id, "status": run.status, "tables": run.tables_completed, "rows_seen": run.rows_seen, "rows_changed": run.rows_changed}
     except Exception as exc:
         db.rollback(); run = db.get(SepidarImportRun, run.id); setting = db.get(SepidarImportSetting, setting.id)
-        message = str(exc)[:2000]; run.status = "failed"; run.error = message; run.finished_at = datetime.utcnow(); setting.last_error = message; db.commit()
+        message = error_message(exc); run.status = "failed"; run.error = message; run.finished_at = datetime.utcnow(); setting.last_error = message; db.commit()
         raise
 
 
@@ -164,7 +233,7 @@ def _run_due_settings() -> None:
             due = not row.last_started_at or row.last_started_at + timedelta(minutes=row.sync_interval_minutes) <= now
             if due:
                 try:
-                    run_sync(db, int(row.business_id))
+                    run_sync(db, int(row.business_id), scheduled=True)
                 except Exception:
                     db.rollback()
     finally:
@@ -173,5 +242,8 @@ def _run_due_settings() -> None:
 
 async def sepidar_import_background_loop() -> None:
     while True:
-        await asyncio.to_thread(_run_due_settings)
+        try:
+            await asyncio.to_thread(_run_due_settings)
+        except Exception as exc:
+            logger.warning("Sepidar scheduler failed (%s); retrying in 60 seconds", type(exc).__name__)
         await asyncio.sleep(60)
