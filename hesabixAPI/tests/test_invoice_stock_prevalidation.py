@@ -22,10 +22,12 @@ def _prevalidation_db() -> MagicMock:
     def _query(model, *unused_models):
         query = MagicMock()
         if model is Product:
-            query.filter.return_value.first.return_value = SimpleNamespace(
+            product = SimpleNamespace(
                 id=520098,
                 track_inventory=True,
             )
+            query.filter.return_value.first.return_value = product
+            query.filter.return_value.all.return_value = [product]
         elif model is Business:
             query.filter.return_value.first.return_value = SimpleNamespace(
                 allow_negative_inventory_for_bulk=False,
