@@ -265,7 +265,7 @@ PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -U hesabix -d hesabix -tAc "
   END \$\$;
 " 2>/dev/null || true
 log_info "Running Alembic migrations..."
-if ! alembic upgrade head; then
+if ! alembic upgrade heads; then
   log_err "Migrations failed."
   exit 1
 fi
