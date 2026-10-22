@@ -94,6 +94,7 @@ def handle_invalidation_message(message_data: dict):
 					warehouse_id=message_data.get("warehouse_id"),
 					status=message_data.get("status"),
 					document_id=message_data.get("document_id"),
+					publish=False,
 				)
 				logger.info(f"Received warehouse docs invalidation: deleted={deleted_count}, payload={message_data}")
 		

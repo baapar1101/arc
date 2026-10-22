@@ -19,6 +19,15 @@ from app.services.report_template_scope_registry import (
 )
 from app.services.report_template_gallery import list_gallery_items
 from app.services.report_template_v2_service import migrate_builder_design_to_v2
+from app.services.report_template_v3_service import (
+	migrate_v2_design_to_v3,
+	studio_block_catalog,
+)
+from app.services.report_template_v4_service import (
+	migrate_v3_design_to_v4,
+	studio_v4_contract,
+)
+from app.services.template_design_v3_compiler import compile_template_design_to_jinja_html
 
 router = APIRouter(prefix="/report-templates", tags=["قالب‌های گزارش", "گزارش‌ها"])
 
@@ -33,6 +42,18 @@ def _preview_assets(body: Dict[str, Any], engine: str) -> Optional[Dict[str, Any
 	if engine == "template_v2" and design is not None:
 		return {"template_design": design}
 	return None
+
+
+def _preview_context(body: Dict[str, Any], *, include_farsi_fonts: bool) -> Dict[str, Any]:
+	context = dict((body or {}).get("context") or {})
+	if not include_farsi_fonts or context.get("is_fa", True) is False:
+		return context
+	from app.services.pdf.template_renderer import load_farsi_font_data_uris
+
+	regular, bold = load_farsi_font_data_uris()
+	context.setdefault("fa_font_url_regular", regular or "")
+	context.setdefault("fa_font_url_bold", bold or "")
+	return context
 
 
 def _validate_design_for_publish(entity) -> None:
@@ -566,7 +587,7 @@ async def preview_report_template(
 	engine = str((body or {}).get("engine") or "").lower() or "jinja2"
 	content_html = (body or {}).get("content_html") or ""
 	content_css = (body or {}).get("content_css") or ""
-	context = (body or {}).get("context") or {}
+	context = _preview_context(body or {}, include_farsi_fonts=True)
 	# محدودیت ساده روی اندازه ورودی‌ها
 	max_len = 1_000_000  # 1MB
 	if len(content_html) > max_len or len(content_css) > max_len:
@@ -600,6 +621,49 @@ async def preview_report_template(
 
 
 @router.post(
+	"/business/{business_id}/preview-html",
+	summary="پیش‌نمایش سریع HTML قالب",
+	description="بدون ذخیره‌سازی و بدون تولید PDF؛ برای پیش‌نمایش زنده Studio.",
+)
+@require_business_access("business_id")
+async def preview_report_template_html(
+	request: Request,
+	business_id: int,
+	body: Dict[str, Any] = Body(...),
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+):
+	if not ctx.can_write_section("report_templates"):
+		raise ApiError("FORBIDDEN", "Missing permission: report_templates.write", http_status=403)
+	engine = str((body or {}).get("engine") or "").lower() or "jinja2"
+	content_html = (body or {}).get("content_html") or ""
+	content_css = (body or {}).get("content_css") or ""
+	if len(content_html) > 1_000_000 or len(content_css) > 1_000_000:
+		raise ApiError("PAYLOAD_TOO_LARGE", "HTML/CSS too large for preview", http_status=413)
+	temp = type("T", (), {
+		"engine": engine,
+		"content_html": content_html,
+		"content_css": content_css,
+		"header_html": (body or {}).get("header_html") or "",
+		"footer_html": (body or {}).get("footer_html") or "",
+		"paper_size": (body or {}).get("paper_size") or None,
+		"orientation": (body or {}).get("orientation") or None,
+		"margins": (body or {}).get("margins") or None,
+		"assets": _preview_assets(body or {}, engine),
+	})()
+	try:
+		rendered = ReportTemplateService.render_with_template(
+			temp,
+			_preview_context(body or {}, include_farsi_fonts=False),
+		)
+	except ApiError:
+		raise
+	except Exception as ex:
+		raise ApiError("TEMPLATE_ERROR", f"Render error: {ex}", http_status=400) from ex
+	return {"ok": True, "html": rendered}
+
+
+@router.post(
 	"/business/{business_id}/preview-pdf",
 	summary="پیش‌نمایش PDF قالب (فقط سازندگان)",
 	description="بدون ذخیره‌سازی؛ HTML/CSS ارسالی با داده نمونه رندر و به PDF تبدیل می‌شود. فایل PDF به صورت bytes برگردانده می‌شود.",
@@ -620,7 +684,7 @@ async def preview_report_template_pdf(
 	engine = str((body or {}).get("engine") or "").lower() or "jinja2"
 	content_html = (body or {}).get("content_html") or ""
 	content_css = (body or {}).get("content_css") or ""
-	context = (body or {}).get("context") or {}
+	context = _preview_context(body or {}, include_farsi_fonts=True)
 	# محدودیت ساده روی اندازه ورودی‌ها
 	max_len = 1_000_000  # 1MB
 	if len(content_html) > max_len or len(content_css) > max_len:
@@ -715,6 +779,13 @@ async def report_template_schema(
 			{"name": "business_logo_data_uri", "desc": "لوگوی کسب‌وکار"},
 			{"name": "invoice_footer_note", "desc": "یادداشت پاورقی"},
 			{"name": "invoice_verify_qr_data_uri", "desc": "QR تأیید فاکتور"},
+			{"name": "show_line_discount_column", "desc": "نمایش ستون تخفیف سطری"},
+			{"name": "show_line_tax_column", "desc": "نمایش ستون مالیات سطری"},
+			{"name": "show_line_amount_before_discount_column", "desc": "نمایش مبلغ پیش از تخفیف"},
+			{"name": "show_line_amount_before_tax_column", "desc": "نمایش مبلغ پیش از مالیات"},
+			{"name": "show_summary_discount", "desc": "نمایش تخفیف در جمع‌بندی"},
+			{"name": "show_summary_tax", "desc": "نمایش مالیات در جمع‌بندی"},
+			{"name": "show_summary_amount_without_tax", "desc": "نمایش مبلغ بدون مالیات در جمع‌بندی"},
 		]
 		data["sample_context"].update(
 			{
@@ -727,6 +798,8 @@ async def report_template_schema(
 					"issue_date": "1403/10/01",
 					"subtotal": 1000000,
 					"discount_total": 50000,
+					"discount_summary_display": "۵٪ (50,000)",
+					"amount_without_tax": 950000,
 					"tax_total": 85500,
 					"payable_total": 1035500,
 				},
@@ -738,7 +811,12 @@ async def report_template_schema(
 						"quantity_display": "2",
 						"unit_display": "عدد",
 						"unit_price": 250000,
-						"line_total": 500000,
+						"discount": 25000,
+						"discount_display": "۵٪ (25,000)",
+						"amount_before_discount": 500000,
+						"amount_before_tax": 475000,
+						"tax_amount": 42750,
+						"line_total": 517750,
 					},
 					{
 						"product_name": "کالای نمونه ۲",
@@ -747,7 +825,12 @@ async def report_template_schema(
 						"quantity_display": "1",
 						"unit_display": "عدد",
 						"unit_price": 500000,
-						"line_total": 500000,
+						"discount": 25000,
+						"discount_display": "۵٪ (25,000)",
+						"amount_before_discount": 500000,
+						"amount_before_tax": 475000,
+						"tax_amount": 42750,
+						"line_total": 517750,
 					},
 				],
 				"buyer": {"name": "مشتری نمونه"},
@@ -755,6 +838,15 @@ async def report_template_schema(
 				"payments": [{"method_name": "نقد", "amount": 500000}],
 				"invoice_footer_note": "این یک پیش‌نمایش نمونه است.",
 				"show_invoice_verify_qr": False,
+				"show_line_discount_column": True,
+				"show_line_tax_column": True,
+				"show_line_amount_before_discount_column": True,
+				"show_line_amount_before_tax_column": True,
+				"show_summary_discount": True,
+				"show_summary_tax": True,
+				"show_summary_amount_without_tax": True,
+				"has_line_discount": True,
+				"has_line_tax": True,
 				"generated_at": "1403/10/01 12:00",
 				"issuer_name": "کاربر نمونه",
 				"is_fa": True,
@@ -1015,7 +1107,48 @@ async def report_template_gallery(
 	ctx: AuthContext = Depends(get_current_user),
 	db: Session = Depends(get_db),
 ):
-	return {"items": list_gallery_items(module_key=module_key, subtype=subtype)}
+	items = list_gallery_items(module_key=module_key, subtype=subtype)
+	for item in items:
+		try:
+			item["studio_design"] = migrate_v3_design_to_v4(
+				migrate_v2_design_to_v3(item["default_design"])
+			)
+		except ValueError:
+			# Scopeهایی که هنوز وارد Studio v3 نشده‌اند، با ویرایشگر v2 باز می‌شوند.
+			pass
+	return {"items": items}
+
+
+@router.get(
+	"/business/{business_id}/studio-blocks",
+	summary="کاتالوگ بلوک‌های Studio v3",
+)
+@require_business_access("business_id")
+async def report_template_studio_blocks(
+	request: Request,
+	business_id: int,
+	module_key: str,
+	subtype: Optional[str] = None,
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+):
+	return {"items": studio_block_catalog(module_key, subtype)}
+
+
+@router.get(
+	"/business/{business_id}/studio-contract",
+	summary="قرارداد schema، compiler، component و binding استودیو v4",
+)
+@require_business_access("business_id")
+async def report_template_studio_contract(
+	request: Request,
+	business_id: int,
+	module_key: str,
+	subtype: Optional[str] = None,
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+):
+	return studio_v4_contract(module_key, subtype)
 
 
 @router.post(
@@ -1060,10 +1193,8 @@ async def compile_v2_design_endpoint(
 	design = (body or {}).get("design") or {}
 	if not isinstance(design, dict):
 		raise ApiError("VALIDATION_ERROR", "design must be an object", http_status=400)
-	from app.services.template_design_v2_compiler import compile_v2_design_to_jinja_html
-
 	try:
-		html, css, header, footer = compile_v2_design_to_jinja_html(design)
+		html, css, header, footer = compile_template_design_to_jinja_html(design)
 	except Exception as ex:
 		raise ApiError("COMPILE_ERROR", str(ex), http_status=400)
 	return {
@@ -1072,6 +1203,107 @@ async def compile_v2_design_endpoint(
 		"header_html": header,
 		"footer_html": footer,
 	}
+
+
+@router.post(
+	"/business/{business_id}/validate-studio-design",
+	summary="اعتبارسنجی طراحی Studio",
+)
+@require_business_access("business_id")
+async def validate_studio_design_endpoint(
+	request: Request,
+	business_id: int,
+	body: Dict[str, Any] = Body(...),
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+):
+	if not ctx.can_write_section("report_templates"):
+		raise ApiError("FORBIDDEN", "Missing permission: report_templates.write", http_status=403)
+	module_key = str((body or {}).get("module_key") or "")
+	subtype_raw = (body or {}).get("subtype")
+	subtype = str(subtype_raw) if subtype_raw not in (None, "") else None
+	design = (body or {}).get("design") or {}
+	if not isinstance(design, dict):
+		raise ApiError("VALIDATION_ERROR", "design must be an object", http_status=400)
+	return ReportTemplateService.validate_template_v2_design_scope(module_key, subtype, design)
+
+
+@router.post(
+	"/business/{business_id}/compile-studio-design",
+	summary="کامپایل طراحی Studio به HTML/CSS",
+)
+@require_business_access("business_id")
+async def compile_studio_design_endpoint(
+	request: Request,
+	business_id: int,
+	body: Dict[str, Any] = Body(...),
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+):
+	if not ctx.can_write_section("report_templates"):
+		raise ApiError("FORBIDDEN", "Missing permission: report_templates.write", http_status=403)
+	design = (body or {}).get("design") or {}
+	if not isinstance(design, dict):
+		raise ApiError("VALIDATION_ERROR", "design must be an object", http_status=400)
+	try:
+		html, css, header, footer = compile_template_design_to_jinja_html(design)
+	except Exception as ex:
+		raise ApiError("COMPILE_ERROR", str(ex), http_status=400)
+	return {
+		"content_html": html,
+		"content_css": css,
+		"header_html": header,
+		"footer_html": footer,
+	}
+
+
+@router.post(
+	"/business/{business_id}/migrate-v2-to-v3",
+	summary="تبدیل طراحی Studio v2 به v3",
+)
+@require_business_access("business_id")
+async def migrate_v2_to_v3_endpoint(
+	request: Request,
+	business_id: int,
+	body: Dict[str, Any] = Body(...),
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+):
+	if not ctx.can_write_section("report_templates"):
+		raise ApiError("FORBIDDEN", "Missing permission: report_templates.write", http_status=403)
+	design = (body or {}).get("design") or {}
+	if not isinstance(design, dict):
+		raise ApiError("VALIDATION_ERROR", "design must be an object", http_status=400)
+	try:
+		migrated = migrate_v2_design_to_v3(design)
+	except Exception as ex:
+		raise ApiError("MIGRATION_ERROR", str(ex), http_status=400)
+	return {"design": migrated}
+
+
+@router.post(
+	"/business/{business_id}/migrate-v3-to-v4",
+	summary="تبدیل غیرمخرب طراحی Studio v3 به v4",
+	description="فقط یک design جدید برمی‌گرداند و قالب اصلی را تغییر نمی‌دهد.",
+)
+@require_business_access("business_id")
+async def migrate_v3_to_v4_endpoint(
+	request: Request,
+	business_id: int,
+	body: Dict[str, Any] = Body(...),
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+):
+	if not ctx.can_write_section("report_templates"):
+		raise ApiError("FORBIDDEN", "Missing permission: report_templates.write", http_status=403)
+	design = (body or {}).get("design") or {}
+	if not isinstance(design, dict):
+		raise ApiError("VALIDATION_ERROR", "design must be an object", http_status=400)
+	try:
+		migrated = migrate_v3_design_to_v4(design)
+	except Exception as ex:
+		raise ApiError("MIGRATION_ERROR", str(ex), http_status=400)
+	return {"design": migrated, "source_preserved": True}
 
 
 @router.post(
@@ -1101,5 +1333,3 @@ async def migrate_builder_to_v2(
 		raise ApiError("MIGRATION_ERROR", str(ex), http_status=400)
 	validation = ReportTemplateService.validate_template_v2_design_scope(module_key, subtype, design)
 	return {"design": design, **validation}
-
-

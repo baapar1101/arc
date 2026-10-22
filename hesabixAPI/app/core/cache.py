@@ -362,15 +362,8 @@ class CacheService:
 					self.client.delete(business_tag_key)
 					total_deleted += deleted
 				
-				# همچنین تمام tag های مربوط به fiscal_year های مختلف را هم حذف می‌کنیم
-				fiscal_pattern = f"cache_tag:persons:business:{business_id}:fiscal_year:*"
-				fiscal_tag_keys = self.client.keys(fiscal_pattern)
-				for fiscal_tag_key in fiscal_tag_keys:
-					fiscal_keys = self.client.smembers(fiscal_tag_key)
-					if fiscal_keys:
-						deleted = self.client.delete(*fiscal_keys)
-						self.client.delete(fiscal_tag_key)
-						total_deleted += deleted
+				# Business tag already indexes every cache key. Sub-tags expire with
+				# their cached values, so no global key scan is needed here.
 			
 			return total_deleted
 		except (RedisError, Exception) as e:
@@ -536,15 +529,8 @@ class CacheService:
 					self.client.delete(business_tag_key)
 					total_deleted += deleted
 				
-				# همچنین تمام tag های مربوط به category های مختلف را هم حذف می‌کنیم
-				category_pattern = f"cache_tag:products:business:{business_id}:category:*"
-				category_tag_keys = self.client.keys(category_pattern)
-				for category_tag_key in category_tag_keys:
-					category_keys = self.client.smembers(category_tag_key)
-					if category_keys:
-						deleted = self.client.delete(*category_keys)
-						self.client.delete(category_tag_key)
-						total_deleted += deleted
+				# Business tag already indexes every product cache key; category
+				# sub-tags expire with their cached values.
 			
 			return total_deleted
 		except (RedisError, Exception) as e:
@@ -659,15 +645,8 @@ class CacheService:
 					self.client.delete(business_tag_key)
 					total_deleted += deleted
 				
-				# همچنین تمام tag های مربوط به fiscal_year های مختلف را هم حذف می‌کنیم
-				fiscal_pattern = f"cache_tag:invoices:business:{business_id}:fiscal_year:*"
-				fiscal_tag_keys = self.client.keys(fiscal_pattern)
-				for fiscal_tag_key in fiscal_tag_keys:
-					fiscal_keys = self.client.smembers(fiscal_tag_key)
-					if fiscal_keys:
-						deleted = self.client.delete(*fiscal_keys)
-						self.client.delete(fiscal_tag_key)
-						total_deleted += deleted
+				# Business tag already indexes all invoice cache keys; sub-tags
+				# expire with their cached values.
 			
 			# حذف tag های document_type
 			if document_type:
@@ -786,15 +765,8 @@ class CacheService:
 					self.client.delete(business_tag_key)
 					total_deleted += deleted
 				
-				# همچنین تمام tag های مربوط به fiscal_year های مختلف را هم حذف می‌کنیم
-				fiscal_pattern = f"cache_tag:documents:business:{business_id}:fiscal_year:*"
-				fiscal_tag_keys = self.client.keys(fiscal_pattern)
-				for fiscal_tag_key in fiscal_tag_keys:
-					fiscal_keys = self.client.smembers(fiscal_tag_key)
-					if fiscal_keys:
-						deleted = self.client.delete(*fiscal_keys)
-						self.client.delete(fiscal_tag_key)
-						total_deleted += deleted
+				# Business tag already indexes all document cache keys; sub-tags
+				# expire with their cached values.
 			
 			# حذف tag های document_type
 			if document_type:
@@ -895,15 +867,8 @@ class CacheService:
 					self.client.delete(business_tag_key)
 					total_deleted += deleted
 				
-				# همچنین تمام tag های مربوط به fiscal_year های مختلف را هم حذف می‌کنیم
-				fiscal_pattern = f"cache_tag:expense_income:business:{business_id}:fiscal_year:*"
-				fiscal_tag_keys = self.client.keys(fiscal_pattern)
-				for fiscal_tag_key in fiscal_tag_keys:
-					fiscal_keys = self.client.smembers(fiscal_tag_key)
-					if fiscal_keys:
-						deleted = self.client.delete(*fiscal_keys)
-						self.client.delete(fiscal_tag_key)
-						total_deleted += deleted
+				# Business tag already indexes all expense/income cache keys;
+				# fiscal sub-tags expire with their cached values.
 			
 			return total_deleted
 		except (RedisError, Exception) as e:
@@ -963,13 +928,6 @@ class CacheService:
 			if keys:
 				deleted = self.client.delete(*keys)
 				self.client.delete(business_tag_key)
-				total_deleted += deleted
-			
-			# Pattern-based invalidation به عنوان fallback
-			pattern = f"warehouses_list:*"
-			pattern_keys = self.client.keys(pattern)
-			if pattern_keys:
-				deleted = self.client.delete(*pattern_keys)
 				total_deleted += deleted
 			
 			# ارسال پیام invalidation از طریق Pub/Sub
@@ -1048,7 +1006,7 @@ class CacheService:
 			logger.warning(f"Cache set_with_warehouse_docs_tag error for key {key}, business_id {business_id}: {e}")
 			return False
 	
-	def invalidate_warehouse_docs_by_business(self, business_id: int, fiscal_year_id: Optional[int] = None, doc_type: Optional[str] = None, warehouse_id: Optional[int] = None, status: Optional[str] = None, document_id: Optional[int] = None) -> int:
+	def invalidate_warehouse_docs_by_business(self, business_id: int, fiscal_year_id: Optional[int] = None, doc_type: Optional[str] = None, warehouse_id: Optional[int] = None, status: Optional[str] = None, document_id: Optional[int] = None, publish: bool = True) -> int:
 		"""
 		حذف انتخابی کش‌های مربوط به warehouse_docs بر اساس business_id, fiscal_year_id, doc_type, warehouse_id, status و document_id
 		
@@ -1076,99 +1034,13 @@ class CacheService:
 					self.client.delete(document_key)
 					total_deleted += 1
 			
-			# جمع‌آوری کلیدها از tag های مختلف
-			keys_to_delete = set()
-			
-			# اگر fiscal_year_id مشخص باشد، فقط کش‌های مربوط به آن را حذف می‌کنیم
-			if fiscal_year_id:
-				fiscal_tag_key = f"cache_tag:warehouse_docs:business:{business_id}:fiscal_year:{fiscal_year_id}"
-				keys = self.client.smembers(fiscal_tag_key)
-				if keys:
-					keys_to_delete.update(keys)
-					self.client.delete(fiscal_tag_key)
-			else:
-				# حذف تمام کش‌های مربوط به business_id
-				business_tag_key = f"cache_tag:warehouse_docs:business:{business_id}"
-				keys = self.client.smembers(business_tag_key)
-				if keys:
-					keys_to_delete.update(keys)
-				
-				# همچنین تمام tag های مربوط به fiscal_year های مختلف را هم حذف می‌کنیم
-				fiscal_pattern = f"cache_tag:warehouse_docs:business:{business_id}:fiscal_year:*"
-				fiscal_tag_keys = self.client.keys(fiscal_pattern)
-				for fiscal_tag_key in fiscal_tag_keys:
-					fiscal_keys = self.client.smembers(fiscal_tag_key)
-					if fiscal_keys:
-						keys_to_delete.update(fiscal_keys)
-						self.client.delete(fiscal_tag_key)
-			
-			# حذف tag های doc_type
-			if doc_type:
-				doc_type_tag_key = f"cache_tag:warehouse_docs:business:{business_id}:doc_type:{doc_type}"
-				keys = self.client.smembers(doc_type_tag_key)
-				if keys:
-					keys_to_delete.update(keys)
-					self.client.delete(doc_type_tag_key)
-			else:
-				# حذف تمام tag های doc_type
-				doc_type_pattern = f"cache_tag:warehouse_docs:business:{business_id}:doc_type:*"
-				doc_type_tag_keys = self.client.keys(doc_type_pattern)
-				for doc_type_tag_key in doc_type_tag_keys:
-					doc_type_keys = self.client.smembers(doc_type_tag_key)
-					if doc_type_keys:
-						keys_to_delete.update(doc_type_keys)
-						self.client.delete(doc_type_tag_key)
-			
-			# حذف tag های warehouse
-			if warehouse_id:
-				warehouse_tag_key = f"cache_tag:warehouse_docs:business:{business_id}:warehouse:{warehouse_id}"
-				keys = self.client.smembers(warehouse_tag_key)
-				if keys:
-					keys_to_delete.update(keys)
-					self.client.delete(warehouse_tag_key)
-			else:
-				# حذف تمام tag های warehouse
-				warehouse_pattern = f"cache_tag:warehouse_docs:business:{business_id}:warehouse:*"
-				warehouse_tag_keys = self.client.keys(warehouse_pattern)
-				for warehouse_tag_key in warehouse_tag_keys:
-					warehouse_keys = self.client.smembers(warehouse_tag_key)
-					if warehouse_keys:
-						keys_to_delete.update(warehouse_keys)
-						self.client.delete(warehouse_tag_key)
-			
-			# حذف tag های status
-			if status:
-				status_tag_key = f"cache_tag:warehouse_docs:business:{business_id}:status:{status}"
-				keys = self.client.smembers(status_tag_key)
-				if keys:
-					keys_to_delete.update(keys)
-					self.client.delete(status_tag_key)
-			else:
-				# حذف تمام tag های status
-				status_pattern = f"cache_tag:warehouse_docs:business:{business_id}:status:*"
-				status_tag_keys = self.client.keys(status_pattern)
-				for status_tag_key in status_tag_keys:
-					status_keys = self.client.smembers(status_tag_key)
-					if status_keys:
-						keys_to_delete.update(status_keys)
-						self.client.delete(status_tag_key)
-			
-			# حذف کلیدهای جمع‌آوری شده
-			if keys_to_delete:
-				deleted = self.client.delete(*keys_to_delete)
-				total_deleted += deleted
-			
-			# حذف business tag
+			# Every warehouse document list key is indexed by this business tag.
+			# Delete only this business's entries; never scan Redis or other tenants.
 			business_tag_key = f"cache_tag:warehouse_docs:business:{business_id}"
-			if self.client.exists(business_tag_key):
-				self.client.delete(business_tag_key)
-			
-			# Pattern-based invalidation به عنوان fallback
-			pattern = f"warehouse_docs_list:*"
-			pattern_keys = self.client.keys(pattern)
-			if pattern_keys:
-				deleted = self.client.delete(*pattern_keys)
-				total_deleted += deleted
+			keys = self.client.smembers(business_tag_key)
+			if keys:
+				total_deleted += self.client.delete(*keys)
+			self.client.delete(business_tag_key)
 			
 			# ارسال پیام invalidation از طریق Pub/Sub
 			invalidation_message = {
@@ -1181,7 +1053,8 @@ class CacheService:
 				"document_id": document_id,
 				"timestamp": time.time()
 			}
-			self.publish_invalidation("cache_invalidation", invalidation_message)
+			if publish:
+				self.publish_invalidation("cache_invalidation", invalidation_message)
 			
 			return total_deleted
 		except (RedisError, Exception) as e:

@@ -1162,6 +1162,13 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'export': '${t.export} ${t.invoices}',
         'change_unit_price': t.permissionInvoiceChangeUnitPrice,
       },
+      'quick_sales': {
+        'create_customer': 'ثبت سریع مشتری در فروش سریع',
+        'view_customer_contact': 'مشاهده اطلاعات تماس مشتری در فروش سریع',
+        'view_customer_balance': 'مشاهده مانده حساب مشتری در فروش سریع',
+        'manage_default_payment_shortcuts':
+            'مدیریت میانبرهای پیش‌فرض پرداخت در فروش سریع',
+      },
       'invoice_types': {
         'sales': t.invoiceTypeSales,
         'sales_return': t.invoiceTypeSalesReturn,
@@ -1874,7 +1881,13 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       {
         'title': t.permissionsCategoryInvoicesAndExpenses,
         'icon': Icons.receipt,
-        'sections': ['invoices', 'invoice_types', 'pricing', 'expenses_income'],
+        'sections': [
+          'invoices',
+          'quick_sales',
+          'invoice_types',
+          'pricing',
+          'expenses_income',
+        ],
       },
       {
         'title': t.accounting,
@@ -2050,6 +2063,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.transfers;
       case 'invoices':
         return t.invoices;
+      case 'quick_sales':
+        return 'فروش سریع';
       case 'invoice_types':
         return t.permissionSectionInvoiceTypes;
       case 'pricing':
@@ -2178,6 +2193,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.settingsPermissionManageFtp;
       case 'manage_ai_provider':
         return 'مدیریت ارائه‌دهنده هوش مصنوعی';
+      case 'manage_default_payment_shortcuts':
+        return 'مدیریت میانبرهای پیش‌فرض پرداخت در فروش سریع';
       case 'collect':
         return t.collect;
       case 'transfer':

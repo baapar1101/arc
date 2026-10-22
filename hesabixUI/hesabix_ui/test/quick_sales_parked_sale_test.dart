@@ -5,6 +5,20 @@ import 'package:hesabix_ui/models/quick_sales_parked_sale.dart';
 import 'package:hesabix_ui/models/quick_sales_change_resolution.dart';
 
 void main() {
+  test('parked-sale storage is isolated by user inside one business', () {
+    expect(
+      QuickSalesParkedSalesStorage.keyFor(5, 11),
+      isNot(QuickSalesParkedSalesStorage.keyFor(5, 12)),
+    );
+  });
+
+  test('parked-sale storage is isolated by browser-tab scope', () {
+    expect(
+      QuickSalesParkedSalesStorage.keyFor(12, 3, scope: 'tab-a'),
+      isNot(QuickSalesParkedSalesStorage.keyFor(12, 3, scope: 'tab-b')),
+    );
+  });
+
   test('parked sale round-trips cart, customer and totals', () {
     final sale = QuickSalesParkedSale(
       id: 'sale-1',
@@ -30,6 +44,7 @@ void main() {
       documentDescription: 'فروش صندوق',
       globalDiscountType: 'percent',
       globalDiscountValue: '5',
+      applyCustomerBalance: true,
       itemCount: 1,
       totalAmount: 33000,
     );
@@ -44,6 +59,7 @@ void main() {
     expect(parsed.cartItems.first.warehouseId, 3);
     expect(parsed.cartItems.first.extraInfo?['unit_price_source'], 'base');
     expect(parsed.globalDiscountValue, '5');
+    expect(parsed.applyCustomerBalance, isTrue);
     expect(parsed.totalAmount, 33000);
     expect(parsed.isBlank(anonymousCustomerId: 1), isFalse);
   });
@@ -76,6 +92,61 @@ void main() {
     expect(parsed?.activeId, 'a');
     expect(parsed?.sales, hasLength(1));
   });
+
+  test(
+    'completed active sale is replaced by a blank default-customer sale',
+    () {
+      final now = DateTime.utc(2026, 10, 17);
+      const defaultCustomer = Customer(id: 1, name: 'مشتری عمومی');
+      final completed = QuickSalesParkedSale(
+        id: 'completed',
+        createdAt: now,
+        updatedAt: now,
+        customer: const Customer(id: 42, name: 'زارع'),
+        documentDate: now,
+        documentDescription: 'فاکتور ثبت‌شده',
+      );
+      final parked = QuickSalesParkedSale(
+        id: 'parked',
+        createdAt: now,
+        updatedAt: now,
+        customer: const Customer(id: 43, name: 'موسوی'),
+        documentDate: now,
+        documentDescription: 'فروش پارک‌شده',
+      );
+      final staleBlank = QuickSalesParkedSale(
+        id: 'old-blank',
+        createdAt: now,
+        updatedAt: now,
+        customer: defaultCustomer,
+        documentDate: now,
+      );
+      final newBlank = QuickSalesParkedSale(
+        id: 'new-blank',
+        createdAt: now,
+        updatedAt: now,
+        customer: defaultCustomer,
+        documentDate: now,
+      );
+
+      final result =
+          QuickSalesParkedSalesBundle(
+            activeId: completed.id,
+            sales: [completed, parked, staleBlank],
+          ).afterCompletedActiveSale(
+            blankSale: newBlank,
+            anonymousCustomerId: defaultCustomer.id,
+          );
+
+      expect(result.activeId, newBlank.id);
+      expect(result.sales.map((sale) => sale.id), ['parked', 'new-blank']);
+      expect(result.sales.last.customer?.id, defaultCustomer.id);
+      expect(
+        result.sales.last.isBlank(anonymousCustomerId: defaultCustomer.id),
+        isTrue,
+      );
+    },
+  );
 
   test('parked sale preserves split change resolution', () {
     final sale = QuickSalesParkedSale(

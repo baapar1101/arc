@@ -4325,11 +4325,15 @@ class _MyAppState extends State<MyApp> {
                               final businessId = int.parse(
                                 state.pathParameters['business_id']!,
                               );
-                              // گارد دسترسی: فقط کاربرانی که دسترسی join دارند
-                              if (!_authStore!.hasBusinessPermission(
-                                'settings',
-                                'join',
-                              )) {
+                              final canJoinSettings = _authStore!
+                                  .hasBusinessPermission('settings', 'join');
+                              final canManageDefaultShortcuts = _authStore!
+                                  .hasBusinessPermission(
+                                    'quick_sales',
+                                    'manage_default_payment_shortcuts',
+                                  );
+                              if (!canJoinSettings &&
+                                  !canManageDefaultShortcuts) {
                                 return hesabixNoTransitionPage(
                                   state,
                                   PermissionGuard.buildAccessDeniedPage(),
@@ -4648,10 +4652,18 @@ class _MyAppState extends State<MyApp> {
                               final businessId = int.parse(
                                 state.pathParameters['business_id']!,
                               );
-                              if (!_authStore!.hasBusinessPermission(
-                                'settings',
-                                'business',
-                              )) {
+                              final canManageSettings = _authStore!
+                                  .hasBusinessPermission(
+                                    'settings',
+                                    'business',
+                                  );
+                              final canManageDefaultShortcuts = _authStore!
+                                  .hasBusinessPermission(
+                                    'quick_sales',
+                                    'manage_default_payment_shortcuts',
+                                  );
+                              if (!canManageSettings &&
+                                  !canManageDefaultShortcuts) {
                                 return hesabixNoTransitionPage(
                                   state,
                                   PermissionGuard.buildAccessDeniedPage(),

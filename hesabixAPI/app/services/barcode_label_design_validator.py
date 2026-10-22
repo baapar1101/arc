@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from typing import Any, Dict, List
 
@@ -34,10 +35,41 @@ def validate_sheet_json(sheet: Any) -> Dict[str, Any]:
 	rows = int(sheet.get("rows") or 1)
 	if columns < 1 or columns > 20 or rows < 1 or rows > 40:
 		_err("INVALID_SHEET_GRID", "columns/rows out of allowed range")
-	margin = sheet.get("margin_mm") or {"top": 5, "right": 5, "bottom": 5, "left": 5}
-	gap = sheet.get("gap_mm") or {"x": 2, "y": 2}
+	print_mode = sheet.get("print_mode") or "sheet"
+	if print_mode not in ("sheet", "roll"):
+		_err("INVALID_PRINT_MODE", "print_mode must be sheet or roll")
+
+	def dimensions(raw: Any, keys: tuple[str, ...], defaults: Dict[str, float], maximum: float) -> Dict[str, float]:
+		if raw is None:
+			raw = defaults
+		if not isinstance(raw, dict):
+			_err("INVALID_SHEET_DIMENSIONS", "sheet dimensions must be an object")
+			return defaults
+		result: Dict[str, float] = {}
+		for key in keys:
+			try:
+				value = float(raw.get(key, defaults[key]))
+			except (TypeError, ValueError):
+				_err("INVALID_SHEET_DIMENSIONS", f"{key} must be a number")
+				return defaults
+			if not math.isfinite(value) or value < 0 or value > maximum:
+				_err("INVALID_SHEET_DIMENSIONS", f"{key} must be between 0 and {maximum} mm")
+			result[key] = value
+		return result
+
+	margin = dimensions(sheet.get("margin_mm"), ("top", "right", "bottom", "left"), {"top": 5, "right": 5, "bottom": 5, "left": 5}, 100)
+	gap = dimensions(sheet.get("gap_mm"), ("x", "y"), {"x": 2, "y": 2}, 100)
+	roll_margin = dimensions(sheet.get("roll_margin_mm"), ("top", "right", "bottom", "left"), {"top": 0, "right": 0, "bottom": 0, "left": 0}, 100)
+	roll_gap = dimensions(sheet.get("roll_gap_mm"), ("x", "y"), {"x": 2, "y": 2}, 100)
+	try:
+		roll_width = float(sheet.get("roll_paper_width_mm") or 0)
+		roll_columns = int(sheet.get("roll_columns") or 1)
+	except (TypeError, ValueError):
+		_err("INVALID_ROLL_GEOMETRY", "roll width and columns must be numeric")
+	if not math.isfinite(roll_width) or roll_width < 0 or roll_width > 1000 or roll_columns < 1 or roll_columns > 20:
+		_err("INVALID_ROLL_GEOMETRY", "roll width must be 0..1000 mm and columns 1..20")
 	return {
-		"print_mode": sheet.get("print_mode") or "sheet",
+		"print_mode": print_mode,
 		"paper": paper,
 		"orientation": orientation,
 		"custom_paper_mm": sheet.get("custom_paper_mm"),
@@ -45,6 +77,10 @@ def validate_sheet_json(sheet: Any) -> Dict[str, Any]:
 		"columns": columns,
 		"rows": rows,
 		"gap_mm": gap,
+		"roll_paper_width_mm": roll_width,
+		"roll_columns": roll_columns,
+		"roll_gap_mm": roll_gap,
+		"roll_margin_mm": roll_margin,
 		"label_from_canvas": bool(sheet.get("label_from_canvas", True)),
 	}
 

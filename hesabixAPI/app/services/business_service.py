@@ -258,6 +258,15 @@ def create_business(
             error_message or "شما اجازه ایجاد کسب و کار را ندارید",
             http_status=403
         )
+
+    from app.services.person_phone_normalization import validate_phone_region
+
+    try:
+        default_phone_region = validate_phone_region(
+            getattr(business_data, "default_phone_region", "IR")
+        )
+    except ValueError as exc:
+        raise ApiError("INVALID_PHONE_REGION", str(exc), http_status=400) from exc
     
     business_repo = BusinessRepository(db)
     fiscal_repo = FiscalYearRepository(db)
@@ -281,6 +290,7 @@ def create_business(
         registration_number=business_data.registration_number,
         economic_id=business_data.economic_id,
         country=business_data.country,
+        default_phone_region=default_phone_region,
         province=business_data.province,
         city=business_data.city,
         postal_code=business_data.postal_code,
@@ -634,6 +644,27 @@ def update_business(db: Session, business_id: int, business_data, owner_id: int)
                 db.flush()
     
     # به‌روزرسانی سایر فیلدها
+    phone_region_changed = False
+    if "default_phone_region" in update_data:
+        from app.services.person_phone_normalization import (
+            invalidate_business_phone_region_cache,
+            normalize_phone_region,
+            validate_phone_region,
+        )
+
+        try:
+            update_data["default_phone_region"] = validate_phone_region(
+                update_data.get("default_phone_region")
+            )
+        except ValueError as exc:
+            raise ApiError("INVALID_PHONE_REGION", str(exc), http_status=400) from exc
+        phone_region_changed = (
+            normalize_phone_region(business.default_phone_region)
+            != update_data["default_phone_region"]
+        )
+        if phone_region_changed:
+            invalidate_business_phone_region_cache(db, int(business_id))
+
     if "display_timezone" in update_data:
         from app.services.business_timezone_service import (
             invalidate_business_display_timezone_cache,
@@ -646,6 +677,18 @@ def update_business(db: Session, business_id: int, business_data, owner_id: int)
 
     for field, value in update_data.items():
         setattr(business, field, value)
+
+    if phone_region_changed:
+        from app.services.person_phone_normalization import (
+            renormalize_business_person_phones,
+        )
+
+        db.flush()
+        renormalize_business_person_phones(
+            db,
+            business_id=int(business_id),
+            default_region=update_data["default_phone_region"],
+        )
 
     # ذخیره تغییرات
     updated_business = business_repo.update(business)
@@ -1620,6 +1663,7 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
         "registration_number": business.registration_number,
         "economic_id": business.economic_id,
         "country": business.country,
+        "default_phone_region": getattr(business, "default_phone_region", "IR") or "IR",
         "province": business.province,
         "city": business.city,
         "postal_code": business.postal_code,

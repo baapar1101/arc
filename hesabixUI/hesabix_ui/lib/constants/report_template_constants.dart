@@ -7,11 +7,13 @@ const List<String> kReportTemplatePaperSizeOptions = [
   'Letter',
   'A3',
   'A5',
+  'A6',
   'Legal',
 ];
 
 /// سایزهای فیش پرینتر برای قالب فاکتور (عرض ثابت، ارتفاع تکه‌تکه).
 const List<String> kInvoiceReceiptPaperSizeOptions = [
+  '58mm',
   '60mm',
   '80mm',
   '100mm',
@@ -19,6 +21,8 @@ const List<String> kInvoiceReceiptPaperSizeOptions = [
 
 String reportTemplatePaperSizeLabel(String value) {
   switch (value) {
+    case '58mm':
+      return '۵۸ میلی‌متر (فیش)';
     case '60mm':
       return '۶ سانتی‌متر (فیش)';
     case '80mm':

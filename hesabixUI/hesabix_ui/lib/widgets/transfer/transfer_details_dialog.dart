@@ -4,7 +4,7 @@ import '../../core/calendar_controller.dart';
 import '../../core/api_client.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
-import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import '../../services/pdf_output_service.dart';
 
 class TransferDetailsDialog extends StatefulWidget {
   final Map<String, dynamic> document;
@@ -56,8 +56,16 @@ class _TransferDetailsDialogState extends State<TransferDetailsDialog> {
       
       final path = '/transfers/$documentId/pdf';
       final bytes = await api.downloadPdf(path);
-      final result = await _savePdfFile(bytes, widget.document['code'] as String? ?? 'transfer');
-      if (mounted) BytesExportService.showFeedback(context, result);
+      if (!mounted) return;
+      await PdfOutputService.deliverPdf(
+        context: context,
+        bytes: bytes,
+        filename: widget.document['code'] as String? ?? 'transfer',
+        businessId: widget.document['business_id'] is num
+            ? (widget.document['business_id'] as num).toInt()
+            : int.tryParse('${widget.document['business_id'] ?? ''}'),
+        paperSize: 'A4',
+      );
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(
@@ -72,14 +80,6 @@ class _TransferDetailsDialogState extends State<TransferDetailsDialog> {
         });
       }
     }
-  }
-
-  Future<BytesExportResult> _savePdfFile(List<int> bytes, String filename) async {
-    return BytesExportService.export(
-      bytes: bytes,
-      filename: filename.endsWith('.pdf') ? filename : '$filename.pdf',
-      mimeType: 'application/pdf',
-    );
   }
 
   @override

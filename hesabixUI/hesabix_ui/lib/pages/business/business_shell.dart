@@ -3826,7 +3826,11 @@ class _BusinessShellState extends State<BusinessShell> {
     // تنظیمات: نیازمند دسترسی join
     if (section == 'settings' && item.label == AppLocalizations.of(context).settings) {
       final hasJoin = widget.authStore.hasBusinessPermission('settings', 'join');
-      return hasJoin;
+      final canManageDefaultShortcuts = widget.authStore.hasBusinessPermission(
+        'quick_sales',
+        'manage_default_payment_shortcuts',
+      );
+      return hasJoin || canManageDefaultShortcuts;
     }
     
     // استعلامات: نیازمند دسترسی read برای settings

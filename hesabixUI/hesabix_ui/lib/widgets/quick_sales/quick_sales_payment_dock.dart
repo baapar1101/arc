@@ -1,6 +1,7 @@
 import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,15 +24,19 @@ import '../invoice/cash_register_combobox_widget.dart';
 import '../invoice/person_combobox_widget.dart';
 
 class QuickSalesPaymentDock extends StatefulWidget {
+  static const double desktopSummaryHeight = 128;
+
   final int businessId;
   final AuthStore authStore;
   final List<InvoiceTransaction> payments;
   final ValueChanged<List<InvoiceTransaction>> onChanged;
   final num invoiceTotal;
+  final num paymentTarget;
   final QuickSalesChangeResolution? changeResolution;
   final Future<QuickSalesChangeResolution?> Function() onConfigureChange;
   final String? defaultCashRegisterId;
   final String currencyUnit;
+  final int currencyId;
   final int decimalPlaces;
   final bool enabled;
   final VoidCallback onSave;
@@ -45,10 +50,12 @@ class QuickSalesPaymentDock extends StatefulWidget {
     required this.payments,
     required this.onChanged,
     required this.invoiceTotal,
+    required this.paymentTarget,
     required this.changeResolution,
     required this.onConfigureChange,
     required this.defaultCashRegisterId,
     required this.currencyUnit,
+    required this.currencyId,
     required this.decimalPlaces,
     required this.enabled,
     required this.onSave,
@@ -78,9 +85,17 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
   final ScrollController _paymentScroll = ScrollController();
   final ScrollController _buttonScroll = ScrollController();
   List<QuickSalesPaymentButtonModel> _buttons = const [];
+  Map<String, QuickSalesPaymentButtonModel> _buttonsByShortcut = const {};
   bool _loadingButtons = true;
   double _buttonWidth = _defaultButtonWidth;
   bool _expanded = false;
+
+  String? get _activeShortcutPlatform => kIsWeb
+      ? 'web'
+      : defaultTargetPlatform == TargetPlatform.windows
+      ? 'windows'
+      : null;
+  bool get _shortcutsEnabled => _activeShortcutPlatform != null;
 
   num get _epsilon {
     if (widget.decimalPlaces <= 0) return 0.5;
@@ -93,11 +108,11 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
 
   num get _paid =>
       widget.payments.fold<num>(0, (sum, p) => sum + p.settlesAgainstInvoice);
-  num get _remaining => (widget.invoiceTotal - _paid) > _epsilon
-      ? widget.invoiceTotal - _paid
+  num get _remaining => (widget.paymentTarget - _paid) > _epsilon
+      ? widget.paymentTarget - _paid
       : 0;
-  num get _change => (_paid - widget.invoiceTotal) > _epsilon
-      ? _paid - widget.invoiceTotal
+  num get _change => (_paid - widget.paymentTarget) > _epsilon
+      ? _paid - widget.paymentTarget
       : 0;
 
   String get _preferenceKey =>
@@ -109,7 +124,9 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
   void initState() {
     super.initState();
     _service = widget.service ?? QuickSalesService();
-    HardwareKeyboard.instance.addHandler(_handleShortcutKeyEvent);
+    if (_shortcutsEnabled) {
+      HardwareKeyboard.instance.addHandler(_handleShortcutKeyEvent);
+    }
     _amountFocus.addListener(() {
       if (_amountFocus.hasFocus) {
         _amountController.selection = TextSelection(
@@ -127,7 +144,7 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
   @override
   void didUpdateWidget(covariant QuickSalesPaymentDock oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.invoiceTotal != widget.invoiceTotal ||
+    if (oldWidget.paymentTarget != widget.paymentTarget ||
         oldWidget.payments != widget.payments) {
       _syncAmount();
     }
@@ -135,7 +152,9 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
 
   @override
   void dispose() {
-    HardwareKeyboard.instance.removeHandler(_handleShortcutKeyEvent);
+    if (_shortcutsEnabled) {
+      HardwareKeyboard.instance.removeHandler(_handleShortcutKeyEvent);
+    }
     _amountController.dispose();
     _amountFocus.dispose();
     _paymentScroll.dispose();
@@ -161,6 +180,7 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
     }
     final route = ModalRoute.of(context);
     if (route != null && !route.isCurrent) return false;
+    if (kIsWeb && _hasEditableTextFocus()) return false;
     final key = event.logicalKey.keyLabel.trim().toUpperCase();
     if (key.isEmpty) return false;
     final keyboard = HardwareKeyboard.instance;
@@ -171,14 +191,32 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
       key,
     ];
     final shortcut = parts.join('+');
-    for (final button in _buttons) {
-      if ((button.shortcut ?? '').replaceAll(' ', '').toUpperCase() ==
-          shortcut) {
-        _addPayment(button);
-        return true;
-      }
-    }
-    return false;
+    final button = _buttonsByShortcut[shortcut];
+    if (button == null) return false;
+    _addPayment(button);
+    return true;
+  }
+
+  bool _hasEditableTextFocus() {
+    final focusContext = FocusManager.instance.primaryFocus?.context;
+    if (focusContext == null) return false;
+    if (focusContext.widget is EditableText) return true;
+    return focusContext.findAncestorWidgetOfExactType<EditableText>() != null;
+  }
+
+  void _replaceButtons(List<QuickSalesPaymentButtonModel> rows) {
+    _buttons = rows;
+    final platform = _activeShortcutPlatform;
+    _buttonsByShortcut = {
+      for (final button in rows)
+        if (platform != null &&
+            (button.shortcutForPlatform(platform) ?? '').trim().isNotEmpty)
+          button
+                  .shortcutForPlatform(platform)!
+                  .replaceAll(' ', '')
+                  .toUpperCase():
+              button,
+    };
   }
 
   Future<void> _loadButtons() async {
@@ -188,7 +226,7 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
       );
       if (!mounted) return;
       setState(() {
-        _buttons = rows;
+        _replaceButtons(rows);
         _loadingButtons = false;
       });
     } catch (e) {
@@ -234,6 +272,15 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
 
   void _addPayment(QuickSalesPaymentButtonModel button) {
     if (!widget.enabled) return;
+    if (button.targetCurrencyId != null &&
+        button.targetCurrencyId != widget.currencyId) {
+      SnackBarHelper.show(
+        context,
+        message: 'ارز مقصد این دکمه با ارز فاکتور یکسان نیست.',
+        isError: true,
+      );
+      return;
+    }
     if (widget.payments.length >= _maxPaymentLines) {
       SnackBarHelper.show(
         context,
@@ -357,8 +404,9 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
                 left: 0,
                 bottom: 0,
                 width: _summaryWidth,
-                height: _expandedHeight,
+                height: QuickSalesPaymentDock.desktopSummaryHeight,
                 child: Material(
+                  key: const ValueKey('quick-sales-payment-summary'),
                   elevation: 6,
                   color: cs.surfaceContainerLow,
                   shape: Border(
@@ -552,12 +600,12 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
       );
     }
     return Padding(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ...figures,
-          const Spacer(),
+          const SizedBox(height: 4),
           Row(
             children: [
               Expanded(child: actions.first),
@@ -824,6 +872,7 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
                           onEdit: button.isSystem
                               ? null
                               : () => _openEditor(existing: button),
+                          onShortcut: () => _openShortcutEditor(button),
                           onDelete: button.isSystem
                               ? null
                               : () => _deleteButton(button),
@@ -902,13 +951,13 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
       if (id == null) return;
       ids.add(id);
     }
-    setState(() => _buttons = next);
+    setState(() => _replaceButtons(next));
     try {
       final saved = await _service.reorderPaymentButtons(
         businessId: widget.businessId,
         buttonIds: ids,
       );
-      if (mounted) setState(() => _buttons = saved);
+      if (mounted) setState(() => _replaceButtons(saved));
     } catch (e) {
       if (!mounted) return;
       await _loadButtons();
@@ -937,10 +986,22 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
         service: _service,
         existing: existing,
         initialPerson: selectedPerson,
-        canCreateShared: widget.authStore.hasBusinessPermission(
+        canManageShared: widget.authStore.hasBusinessPermission(
           'settings',
           'business',
         ),
+      ),
+    );
+    if (changed == true) await _loadButtons();
+  }
+
+  Future<void> _openShortcutEditor(QuickSalesPaymentButtonModel button) async {
+    final changed = await showGlassDialog<bool>(
+      context: context,
+      builder: (context) => _PaymentShortcutDialog(
+        businessId: widget.businessId,
+        service: _service,
+        button: button,
       ),
     );
     if (changed == true) await _loadButtons();
@@ -1073,6 +1134,7 @@ class _PaymentTargetTile extends StatelessWidget {
   final bool enabled;
   final VoidCallback onPressed;
   final VoidCallback? onEdit;
+  final VoidCallback? onShortcut;
   final VoidCallback? onDelete;
   final VoidCallback? onMoveBefore;
   final VoidCallback? onMoveAfter;
@@ -1083,6 +1145,7 @@ class _PaymentTargetTile extends StatelessWidget {
     required this.enabled,
     required this.onPressed,
     this.onEdit,
+    this.onShortcut,
     this.onDelete,
     this.onMoveBefore,
     this.onMoveAfter,
@@ -1105,16 +1168,25 @@ class _PaymentTargetTile extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (button.shortcut != null)
+                if (button.shortcutForPlatform(kIsWeb ? 'web' : 'windows') !=
+                    null)
                   Text(
-                    button.shortcut!,
+                    '${kIsWeb ? 'وب' : 'ویندوز'}: ${button.shortcutForPlatform(kIsWeb ? 'web' : 'windows')!}',
                     style: Theme.of(context).textTheme.labelSmall,
+                  ),
+                if (button.shortcutProfile(kIsWeb ? 'web' : 'windows').conflict)
+                  Text(
+                    'تداخل میانبر',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                   ),
               ],
             ),
           ),
         ),
         if (onEdit != null ||
+            onShortcut != null ||
             onDelete != null ||
             onMoveBefore != null ||
             onMoveAfter != null)
@@ -1130,6 +1202,9 @@ class _PaymentTargetTile extends StatelessWidget {
                   case 'edit':
                     onEdit?.call();
                     break;
+                  case 'shortcut':
+                    onShortcut?.call();
+                    break;
                   case 'delete':
                     onDelete?.call();
                     break;
@@ -1144,6 +1219,11 @@ class _PaymentTargetTile extends StatelessWidget {
               itemBuilder: (_) => [
                 if (onEdit != null)
                   const PopupMenuItem(value: 'edit', child: Text('ویرایش')),
+                if (onShortcut != null)
+                  const PopupMenuItem(
+                    value: 'shortcut',
+                    child: Text('میانبرهای شخصی'),
+                  ),
                 if (onMoveBefore != null)
                   const PopupMenuItem(
                     value: 'before',
@@ -1169,14 +1249,14 @@ class _PaymentButtonEditorDialog extends StatefulWidget {
   final QuickSalesService service;
   final QuickSalesPaymentButtonModel? existing;
   final Person? initialPerson;
-  final bool canCreateShared;
+  final bool canManageShared;
 
   const _PaymentButtonEditorDialog({
     required this.businessId,
     required this.service,
     required this.existing,
     required this.initialPerson,
-    required this.canCreateShared,
+    required this.canManageShared,
   });
 
   @override
@@ -1188,7 +1268,6 @@ class _PaymentButtonEditorDialogState
     extends State<_PaymentButtonEditorDialog> {
   late QuickSalesPaymentTargetType _type;
   late final TextEditingController _labelController;
-  late final TextEditingController _shortcutController;
   String? _cashId;
   String? _bankId;
   Person? _person;
@@ -1205,7 +1284,6 @@ class _PaymentButtonEditorDialogState
           ? ''
           : existing?.label ?? '',
     );
-    _shortcutController = TextEditingController(text: existing?.shortcut ?? '');
     _shared = existing?.scope == 'business';
     if (existing?.targetType == QuickSalesPaymentTargetType.cashRegister) {
       _cashId = existing!.targetId.toString();
@@ -1219,7 +1297,6 @@ class _PaymentButtonEditorDialogState
   @override
   void dispose() {
     _labelController.dispose();
-    _shortcutController.dispose();
     super.dispose();
   }
 
@@ -1245,7 +1322,6 @@ class _PaymentButtonEditorDialogState
       'target_id': _targetId,
       if (_type != QuickSalesPaymentTargetType.person)
         'label': _labelController.text.trim(),
-      'shortcut': _shortcutController.text.trim(),
     };
     try {
       final existingId = widget.existing?.id;
@@ -1347,22 +1423,18 @@ class _PaymentButtonEditorDialogState
                   ),
                 ),
               ],
-              const SizedBox(height: 12),
-              TextField(
-                controller: _shortcutController,
-                textDirection: TextDirection.ltr,
-                decoration: const InputDecoration(
-                  labelText: 'کلید میانبر (اختیاری)',
-                  hintText: 'مثلاً Alt+1',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              if (widget.canCreateShared)
+              if (widget.canManageShared)
                 SwitchListTile.adaptive(
+                  key: const ValueKey('quick-sales-payment-shared-switch'),
                   contentPadding: EdgeInsets.zero,
                   title: const Text('نمایش برای همه کاربران'),
+                  subtitle: Text(
+                    _shared
+                        ? 'این دکمه برای همه کاربران کسب‌وکار نمایش داده می‌شود.'
+                        : 'این دکمه فقط برای شما نمایش داده می‌شود.',
+                  ),
                   value: _shared,
-                  onChanged: _saving || widget.existing != null
+                  onChanged: _saving
                       ? null
                       : (value) => setState(() => _shared = value),
                 ),
@@ -1386,6 +1458,324 @@ class _PaymentButtonEditorDialogState
               : const Text('ذخیره'),
         ),
       ],
+    );
+  }
+}
+
+class _PaymentShortcutDialog extends StatefulWidget {
+  final int businessId;
+  final QuickSalesService service;
+  final QuickSalesPaymentButtonModel button;
+
+  const _PaymentShortcutDialog({
+    required this.businessId,
+    required this.service,
+    required this.button,
+  });
+
+  @override
+  State<_PaymentShortcutDialog> createState() => _PaymentShortcutDialogState();
+}
+
+class _PaymentShortcutDialogState extends State<_PaymentShortcutDialog> {
+  late final Map<String, TextEditingController> _controllers;
+  late final Map<String, String> _modes;
+  String _platform = kIsWeb ? 'web' : 'windows';
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controllers = {
+      for (final platform in const ['windows', 'web'])
+        platform: TextEditingController(
+          text: widget.button.shortcutProfile(platform).userShortcut ?? '',
+        ),
+    };
+    _modes = {
+      for (final platform in const ['windows', 'web'])
+        platform: _initialMode(widget.button.shortcutProfile(platform)),
+    };
+  }
+
+  String _initialMode(QuickSalesShortcutProfile profile) =>
+      profile.userShortcutDisabled
+      ? 'disabled'
+      : profile.userShortcut != null
+      ? 'custom'
+      : 'inherit';
+
+  @override
+  void dispose() {
+    for (final controller in _controllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      await widget.service.updatePaymentButtonShortcuts(
+        businessId: widget.businessId,
+        buttonId: widget.button.id,
+        platforms: {
+          for (final platform in const ['windows', 'web'])
+            platform: {
+              'mode': _modes[platform]!,
+              'shortcut': _modes[platform] == 'custom'
+                  ? _controllers[platform]!.text.trim()
+                  : null,
+            },
+        },
+      );
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      SnackBarHelper.show(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+        isError: true,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = widget.button.shortcutProfile(_platform);
+    final mode = _modes[_platform]!;
+    return AlertDialog(
+      title: Text('میانبرهای شخصی «${widget.button.label}»'),
+      content: SizedBox(
+        width: 470,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(
+                  value: 'windows',
+                  icon: Icon(Icons.desktop_windows_outlined),
+                  label: Text('ویندوز'),
+                ),
+                ButtonSegment(
+                  value: 'web',
+                  icon: Icon(Icons.language_outlined),
+                  label: Text('وب'),
+                ),
+              ],
+              selected: {_platform},
+              onSelectionChanged: _saving
+                  ? null
+                  : (value) => setState(() => _platform = value.first),
+            ),
+            const SizedBox(height: 12),
+            if (profile.defaultShortcut != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Text(
+                  'پیش‌فرض کسب‌وکار: ${profile.defaultShortcut}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            RadioGroup<String>(
+              groupValue: mode,
+              onChanged: (value) {
+                if (!_saving) {
+                  setState(() => _modes[_platform] = value ?? 'inherit');
+                }
+              },
+              child: Column(
+                children: [
+                  RadioListTile<String>(
+                    value: 'inherit',
+                    title: Text(
+                      profile.defaultShortcut == null
+                          ? 'استفاده از پیش‌فرض کسب‌وکار (فعلاً بدون میانبر)'
+                          : 'استفاده از پیش‌فرض کسب‌وکار',
+                    ),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  const RadioListTile<String>(
+                    value: 'custom',
+                    title: Text('میانبر شخصی من'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  const RadioListTile<String>(
+                    value: 'disabled',
+                    title: Text('بدون میانبر برای من'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ],
+              ),
+            ),
+            if (mode == 'custom') ...[
+              const SizedBox(height: 8),
+              _ShortcutRecorderField(
+                controller: _controllers[_platform]!,
+                enabled: !_saving,
+                platform: _platform,
+              ),
+            ],
+            if (_platform == 'web') ...[
+              const SizedBox(height: 8),
+              Text(
+                'میانبر وب باید شامل Ctrl یا Alt و یک حرف یا عدد باشد. ترکیب‌های رزروشده مرورگر قابل ذخیره نیستند.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.pop(context, false),
+          child: const Text('انصراف'),
+        ),
+        FilledButton(
+          onPressed: _saving ? null : _save,
+          child: _saving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('ذخیره'),
+        ),
+      ],
+    );
+  }
+}
+
+class _ShortcutRecorderField extends StatefulWidget {
+  final TextEditingController controller;
+  final bool enabled;
+  final String platform;
+
+  const _ShortcutRecorderField({
+    required this.controller,
+    required this.enabled,
+    this.platform = 'windows',
+  });
+
+  @override
+  State<_ShortcutRecorderField> createState() => _ShortcutRecorderFieldState();
+}
+
+class _ShortcutRecorderFieldState extends State<_ShortcutRecorderField> {
+  final FocusNode _focusNode = FocusNode();
+  bool _manualEntry = false;
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  bool _isModifier(LogicalKeyboardKey key) =>
+      key == LogicalKeyboardKey.controlLeft ||
+      key == LogicalKeyboardKey.controlRight ||
+      key == LogicalKeyboardKey.metaLeft ||
+      key == LogicalKeyboardKey.metaRight ||
+      key == LogicalKeyboardKey.altLeft ||
+      key == LogicalKeyboardKey.altRight ||
+      key == LogicalKeyboardKey.shiftLeft ||
+      key == LogicalKeyboardKey.shiftRight;
+
+  KeyEventResult _record(KeyEvent event) {
+    if (_manualEntry || !widget.enabled || event is! KeyDownEvent) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+    if (_isModifier(key)) return KeyEventResult.handled;
+    if (key == LogicalKeyboardKey.escape) {
+      _focusNode.unfocus();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.backspace ||
+        key == LogicalKeyboardKey.delete) {
+      setState(widget.controller.clear);
+      return KeyEventResult.handled;
+    }
+    final keyLabel = key.keyLabel.trim().toUpperCase();
+    if (keyLabel.isEmpty) return KeyEventResult.ignored;
+    final keyboard = HardwareKeyboard.instance;
+    final parts = <String>[
+      if (keyboard.isControlPressed || keyboard.isMetaPressed) 'CTRL',
+      if (keyboard.isAltPressed) 'ALT',
+      if (keyboard.isShiftPressed) 'SHIFT',
+      keyLabel,
+    ];
+    final value = parts.join('+');
+    setState(() {
+      widget.controller.value = TextEditingValue(
+        text: value,
+        selection: TextSelection.collapsed(offset: value.length),
+      );
+    });
+    return KeyEventResult.handled;
+  }
+
+  void _toggleMode() {
+    setState(() => _manualEntry = !_manualEntry);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && widget.enabled) _focusNode.requestFocus();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isWeb = widget.platform == 'web';
+    return Focus(
+      onKeyEvent: (_, event) => _record(event),
+      child: TextField(
+        controller: widget.controller,
+        focusNode: _focusNode,
+        enabled: widget.enabled,
+        readOnly: !_manualEntry,
+        textDirection: TextDirection.ltr,
+        textCapitalization: TextCapitalization.characters,
+        decoration: InputDecoration(
+          labelText: 'کلید میانبر ${isWeb ? 'وب' : 'ویندوز'} (اختیاری)',
+          hintText: _manualEntry
+              ? (isWeb ? 'مثلاً Alt+1' : 'مثلاً F12 یا Alt+R')
+              : 'اینجا کلیک کنید و کلیدها را فشار دهید',
+          helperText: _manualEntry
+              ? 'ورود دستی فعال است.'
+              : 'برای پاک‌کردن Backspace بزنید.',
+          helperMaxLines: 2,
+          border: const OutlineInputBorder(),
+          prefixIcon: const Icon(Icons.keyboard_outlined),
+          suffixIcon: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (widget.controller.text.isNotEmpty)
+                IconButton(
+                  tooltip: 'پاک‌کردن میانبر',
+                  onPressed: widget.enabled
+                      ? () => setState(widget.controller.clear)
+                      : null,
+                  icon: const Icon(Icons.clear),
+                ),
+              TextButton(
+                onPressed: widget.enabled ? _toggleMode : null,
+                child: Text(_manualEntry ? 'ضبط کلید' : 'ورود دستی'),
+              ),
+            ],
+          ),
+        ),
+        onChanged: (_) => setState(() {}),
+        onTap: () {
+          if (!_manualEntry) {
+            widget.controller.selection = TextSelection(
+              baseOffset: 0,
+              extentOffset: widget.controller.text.length,
+            );
+          }
+        },
+      ),
     );
   }
 }

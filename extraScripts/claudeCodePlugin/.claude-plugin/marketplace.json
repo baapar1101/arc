@@ -1,0 +1,20 @@
+{
+  "name": "hesabix-marketplace",
+  "owner": {
+    "name": "Hesabix"
+  },
+  "metadata": {
+    "description": "Official Hesabix extensions for Claude Code",
+    "version": "1.0.1"
+  },
+  "plugins": [
+    {
+      "name": "hesabix",
+      "source": "./",
+      "description": "Secure MCP connection to Hesabix with accounting skills and analysis agents",
+      "version": "1.0.1",
+      "category": "productivity",
+      "tags": ["accounting", "erp", "finance", "mcp"]
+    }
+  ]
+}

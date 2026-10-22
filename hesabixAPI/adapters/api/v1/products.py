@@ -107,6 +107,7 @@ from app.services.bulk_product_prices_sheet_service import (
 )
 from adapters.db.models.business import Business
 from adapters.db.models.product import Product
+from adapters.db.models.product_attribute_link import ProductAttributeLink
 from adapters.db.models.price_list import PriceList, PriceItem
 from adapters.db.models.currency import Currency
 from app.core.i18n import negotiate_locale
@@ -806,6 +807,91 @@ def list_recent_from_sales_invoices_endpoint(
     ]
     formatted = format_datetime_fields(result, request)
     return success_response(data=formatted, request=request)
+
+
+@router.post(
+    "/business/{business_id}/metadata",
+    summary="دریافت گروهی فرادادهٔ کالاها",
+)
+@require_business_access("business_id")
+def get_products_metadata_endpoint(
+    request: Request,
+    business_id: int,
+    payload: Dict[str, Any] = Body(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("products", "view")),
+) -> Dict[str, Any]:
+    raw_ids = payload.get("product_ids") or []
+    if not isinstance(raw_ids, list):
+        raise ApiError("INVALID_PRODUCT_IDS", "product_ids باید آرایه باشد", http_status=400)
+    product_ids: List[int] = []
+    for raw_id in raw_ids:
+        try:
+            product_ids.append(int(raw_id))
+        except (TypeError, ValueError):
+            raise ApiError("INVALID_PRODUCT_IDS", "شناسهٔ کالا نامعتبر است", http_status=400)
+    product_ids = list(dict.fromkeys(product_ids))
+    if len(product_ids) > 2000:
+        raise ApiError("TOO_MANY_PRODUCT_IDS", "حداکثر ۲۰۰۰ کالا در هر درخواست مجاز است", http_status=400)
+    if not product_ids:
+        return success_response(data={"items": []}, request=request)
+
+    products = db.query(
+        Product.id,
+        Product.code,
+        Product.name,
+        Product.description,
+        Product.main_unit,
+        Product.secondary_unit,
+        Product.unit_conversion_factor,
+        Product.base_sales_price,
+        Product.base_purchase_price,
+        Product.sales_price_fx,
+        Product.purchase_price_fx,
+        Product.price_fx_currency_id,
+        Product.default_warehouse_id,
+        Product.track_inventory,
+        Product.inventory_mode,
+    ).filter(
+        Product.business_id == business_id,
+        Product.id.in_(product_ids),
+    ).all()
+    attribute_rows = db.query(
+        ProductAttributeLink.product_id,
+        ProductAttributeLink.attribute_id,
+    ).filter(ProductAttributeLink.product_id.in_([p.id for p in products])).all()
+    attribute_ids_by_product: Dict[int, List[int]] = {}
+    for product_id, attribute_id in attribute_rows:
+        attribute_ids_by_product.setdefault(int(product_id), []).append(int(attribute_id))
+
+    can_view_purchase_price = has_business_permission_for_business(
+        ctx, db, business_id, "pricing", "purchase_price_view"
+    )
+    items = []
+    for product in products:
+        item = {
+            "id": product.id,
+            "code": product.code,
+            "name": product.name,
+            "description": product.description,
+            "main_unit": product.main_unit,
+            "secondary_unit": product.secondary_unit,
+            "unit_conversion_factor": product.unit_conversion_factor,
+            "base_sales_price": product.base_sales_price,
+            "base_purchase_price": product.base_purchase_price,
+            "sales_price_fx": product.sales_price_fx,
+            "purchase_price_fx": product.purchase_price_fx,
+            "price_fx_currency_id": product.price_fx_currency_id,
+            "default_warehouse_id": product.default_warehouse_id,
+            "track_inventory": product.track_inventory,
+            "inventory_mode": product.inventory_mode or "bulk",
+            "attribute_ids": attribute_ids_by_product.get(int(product.id), []),
+        }
+        if not can_view_purchase_price:
+            item["base_purchase_price"] = None
+        items.append(item)
+    return success_response(data={"items": items}, request=request)
 
 
 @router.get(

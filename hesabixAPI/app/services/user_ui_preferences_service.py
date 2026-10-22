@@ -10,6 +10,9 @@ from adapters.db.models.user_ui_preferences import UserUiPreferences
 
 _BUSINESS_PATH_RE = re.compile(r"^/business/(\d+)(/.*)?$")
 _MAX_TABS_PER_BUSINESS = 24
+_MAX_QUICK_SALES_SHORTCUT_BUSINESSES = 100
+_MAX_QUICK_SALES_SHORTCUTS_PER_BUSINESS = 100
+_QUICK_SALES_SHORTCUT_PLATFORMS = frozenset({"windows", "web"})
 
 
 def _default_preferences() -> Dict[str, Any]:
@@ -101,6 +104,37 @@ def _normalize_tabs_payload(raw: Any) -> Dict[str, Any]:
 	return out
 
 
+def _normalize_quick_sales_payment_shortcuts(raw: Any) -> Dict[str, Any]:
+	"""Keep per-user quick-sales shortcuts small and safe inside the JSON preferences row."""
+	if not isinstance(raw, dict):
+		return {}
+	out: Dict[str, Any] = {}
+	for business_key, platform_payload in list(raw.items())[:_MAX_QUICK_SALES_SHORTCUT_BUSINESSES]:
+		try:
+			business_id = int(str(business_key))
+		except (TypeError, ValueError):
+			continue
+		if business_id <= 0 or not isinstance(platform_payload, dict):
+			continue
+		platforms: Dict[str, Dict[str, str]] = {}
+		for platform in _QUICK_SALES_SHORTCUT_PLATFORMS:
+			button_payload = platform_payload.get(platform)
+			if not isinstance(button_payload, dict):
+				continue
+			buttons: Dict[str, str] = {}
+			for button_key, shortcut in list(button_payload.items())[:_MAX_QUICK_SALES_SHORTCUTS_PER_BUSINESS]:
+				key = str(button_key or "").strip()
+				value = str(shortcut or "").strip().upper().replace(" ", "")
+				if not key or len(key) > 64 or not value or len(value) > 32:
+					continue
+				buttons[key] = value
+			if buttons:
+				platforms[platform] = buttons
+		if platforms:
+			out[str(business_id)] = platforms
+	return out
+
+
 def _parse_business_path(path: str) -> Tuple[bool, int, str]:
 	m = _BUSINESS_PATH_RE.match(path.split("?")[0])
 	if not m:
@@ -125,6 +159,9 @@ def get_user_ui_preferences(db: Session, user_id: int) -> Dict[str, Any]:
 		data["business_panel_sidebar_tab_behavior"] = base["business_panel_sidebar_tab_behavior"]
 	tabs = _normalize_tabs_payload(stored.get("business_panel_tabs"))
 	data["business_panel_tabs"] = tabs
+	data["quick_sales_payment_shortcuts"] = _normalize_quick_sales_payment_shortcuts(
+		stored.get("quick_sales_payment_shortcuts")
+	)
 	# فقط اگر کاربر قبلاً تم را صریحاً ذخیره کرده باشد برگردان
 	if "theme_id" in stored:
 		tid = _normalize_theme_id(stored.get("theme_id"))
@@ -168,6 +205,17 @@ def save_user_ui_preferences(db: Session, user_id: int, payload: Dict[str, Any])
 		"business_panel_tabs": tabs,
 	}
 
+	if "quick_sales_payment_shortcuts" in payload:
+		quick_sales_shortcuts = _normalize_quick_sales_payment_shortcuts(
+			payload.get("quick_sales_payment_shortcuts")
+		)
+	else:
+		quick_sales_shortcuts = _normalize_quick_sales_payment_shortcuts(
+			stored_raw.get("quick_sales_payment_shortcuts")
+		)
+	if quick_sales_shortcuts:
+		next_prefs["quick_sales_payment_shortcuts"] = quick_sales_shortcuts
+
 	# تم فقط وقتی در payload باشد یا قبلاً توسط کاربر ذخیره شده باشد حفظ می‌شود
 	if "theme_id" in payload:
 		tid = _normalize_theme_id(payload.get("theme_id"), "classic_blue")
@@ -195,3 +243,56 @@ def save_user_ui_preferences(db: Session, user_id: int, payload: Dict[str, Any])
 		row.updated_at = now
 	db.flush()
 	return get_user_ui_preferences(db, user_id)
+
+
+def get_quick_sales_payment_shortcuts(
+	db: Session,
+	user_id: int,
+	business_id: int,
+	*,
+	platform: str = "windows",
+) -> Dict[str, str]:
+	preferences = get_user_ui_preferences(db, user_id)
+	all_shortcuts = preferences.get("quick_sales_payment_shortcuts") or {}
+	business_shortcuts = all_shortcuts.get(str(int(business_id))) or {}
+	platform_shortcuts = business_shortcuts.get(platform) or {}
+	return dict(platform_shortcuts) if isinstance(platform_shortcuts, dict) else {}
+
+
+def save_quick_sales_payment_shortcuts(
+	db: Session,
+	user_id: int,
+	business_id: int,
+	shortcuts: Dict[str, str],
+	*,
+	platform: str = "windows",
+) -> Dict[str, str]:
+	if platform not in _QUICK_SALES_SHORTCUT_PLATFORMS:
+		raise ValueError("Unsupported quick-sales shortcut platform")
+	preferences = get_user_ui_preferences(db, user_id)
+	all_shortcuts = dict(preferences.get("quick_sales_payment_shortcuts") or {})
+	business_key = str(int(business_id))
+	business_shortcuts = dict(all_shortcuts.get(business_key) or {})
+	clean_shortcuts = {
+		str(key): str(value)
+		for key, value in shortcuts.items()
+		if str(key).strip() and str(value).strip()
+	}
+	if clean_shortcuts:
+		business_shortcuts[platform] = clean_shortcuts
+		all_shortcuts[business_key] = business_shortcuts
+	else:
+		business_shortcuts.pop(platform, None)
+		if business_shortcuts:
+			all_shortcuts[business_key] = business_shortcuts
+		else:
+			all_shortcuts.pop(business_key, None)
+	result = save_user_ui_preferences(
+		db,
+		user_id,
+		{"quick_sales_payment_shortcuts": all_shortcuts},
+	)
+	return dict(
+		((result.get("quick_sales_payment_shortcuts") or {}).get(business_key) or {}).get(platform)
+		or {}
+	)

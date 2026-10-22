@@ -28,7 +28,6 @@ class BusinessInfoSettingsPage extends StatefulWidget {
   @override
   State<BusinessInfoSettingsPage> createState() => _BusinessInfoSettingsPageState();
 }
-
 class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
   final _formKey = GlobalKey<FormState>();
 
@@ -47,6 +46,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
   final _registrationNumberController = TextEditingController();
   final _economicIdController = TextEditingController();
   final _countryController = TextEditingController();
+  final _defaultPhoneRegionController = TextEditingController(text: 'IR');
   final _provinceController = TextEditingController();
   final _cityController = TextEditingController();
   final _displayTimezoneController = TextEditingController();
@@ -142,6 +142,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     _registrationNumberController.dispose();
     _economicIdController.dispose();
     _countryController.dispose();
+    _defaultPhoneRegionController.dispose();
     _provinceController.dispose();
     _cityController.dispose();
     _displayTimezoneController.dispose();
@@ -190,6 +191,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       _registrationNumberController.text = resp.registrationNumber ?? '';
       _economicIdController.text = resp.economicId ?? '';
       _countryController.text = resp.country ?? '';
+      _defaultPhoneRegionController.text = resp.defaultPhoneRegion;
       _provinceController.text = resp.province ?? '';
       _cityController.text = resp.city ?? '';
       _displayTimezoneController.text = resp.displayTimezone ?? '';
@@ -326,6 +328,10 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     if ((orig.economicId ?? '') != eco) payload['economic_id'] = eco.isEmpty ? null : eco;
     final country = _countryController.text.trim();
     if ((orig.country ?? '') != country) payload['country'] = country.isEmpty ? null : country;
+    final phoneRegion = _defaultPhoneRegionController.text.trim().toUpperCase();
+    if (orig.defaultPhoneRegion != phoneRegion) {
+      payload['default_phone_region'] = phoneRegion;
+    }
     final province = _provinceController.text.trim();
     if ((orig.province ?? '') != province) payload['province'] = province.isEmpty ? null : province;
     final city = _cityController.text.trim();
@@ -1129,6 +1135,25 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
                       ],
                     );
                   }
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _defaultPhoneRegionController,
+                textCapitalization: TextCapitalization.characters,
+                maxLength: 2,
+                decoration: const InputDecoration(
+                  labelText: 'منطقه پیش‌فرض شماره‌های محلی',
+                  hintText: 'IR',
+                  helperText: 'کد دوحرفی کشور مانند IR، AE، TR یا US؛ شماره‌های دارای + مستقل از این تنظیم هستند.',
+                  counterText: '',
+                ),
+                validator: (value) {
+                  final region = (value ?? '').trim();
+                  if (!RegExp(r'^[A-Za-z]{2}$').hasMatch(region)) {
+                    return 'کد دوحرفی معتبر کشور را وارد کنید';
+                  }
+                  return null;
                 },
               ),
               const SizedBox(height: 12),
@@ -2308,5 +2333,3 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     );
   }
 }
-
-

@@ -1151,7 +1151,7 @@ def create_receipt_payment(
                 else:
                     commission_account_code = "20202"  # اسناد پرداختنی
             elif normalized_transaction_type == "person":
-                commission_account_code = "20201"  # حساب‌های پرداختنی
+                commission_account_code = "10401" if is_receipt else "20201"
             elif normalized_transaction_type == "wallet":
                 commission_account_code = "10204"  # کیف‌پول / نزد پرداخت‌یار
             
@@ -1159,11 +1159,10 @@ def create_receipt_payment(
                 commission_account = _get_fixed_account_by_code(db, commission_account_code)
                 logger.info(f"حساب کارمزد پیدا شد: id={commission_account.id}, code={commission_account.code}, name={commission_account.name}")
                 
-                # ایجاد خط کارمزد برای حساب (بانک/صندوق/تنخواهگردان)
-                # در دریافت: کارمزد از حساب کم می‌شود (credit)
-                # در پرداخت: کارمزد به حساب اضافه می‌شود (debit)
-                commission_debit = commission_amount if not is_receipt else Decimal(0)
-                commission_credit = commission_amount if is_receipt else Decimal(0)
+                # کارمزد هزینه است و در هر دو نوع سند بدهکار می‌شود؛
+                # مبلغ کارمزد نیز از حساب مبدأ کسر می‌شود (بستانکار).
+                commission_debit = Decimal(0)
+                commission_credit = commission_amount
 
                 commission_check_id = None
                 if account_line.get("check_id"):
@@ -1192,17 +1191,15 @@ def create_receipt_payment(
                 logger.info(f"خط کارمزد حساب ایجاد شد: {commission_line}")
                 db.add(commission_line)
                 
-                # ایجاد خط کارمزد برای حساب کارمزد خدمات بانکی (کد 70902)
-                # در دریافت: کارمزد به حساب کارمزد اضافه می‌شود (debit)
-                # در پرداخت: کارمزد از حساب کارمزد کم می‌شود (credit)
+                # هزینه کارمزد خدمات بانکی در هر دو نوع سند بدهکار می‌شود.
                 logger.info(f"ایجاد خط کارمزد برای حساب کارمزد خدمات بانکی")
                 
                 # دریافت حساب کارمزد خدمات بانکی
                 commission_service_account = _get_fixed_account_by_code(db, "70902")
                 logger.info(f"حساب کارمزد خدمات بانکی پیدا شد: id={commission_service_account.id}, code={commission_service_account.code}, name={commission_service_account.name}")
                 
-                commission_service_debit = commission_amount if is_receipt else Decimal(0)
-                commission_service_credit = commission_amount if not is_receipt else Decimal(0)
+                commission_service_debit = commission_amount
+                commission_service_credit = Decimal(0)
                 
                 commission_service_line = DocumentLine(
                     document_id=document.id,
@@ -2309,11 +2306,13 @@ def update_receipt_payment(
             elif normalized_transaction_type == "check":
                 commission_account_code = "10403" if is_receipt else "20202"
             elif normalized_transaction_type == "person":
-                commission_account_code = "20201"
+                commission_account_code = "10401" if is_receipt else "20201"
+            elif normalized_transaction_type == "wallet":
+                commission_account_code = "10204"
             if commission_account_code:
                 commission_account = _get_fixed_account_by_code(db, commission_account_code)
-                commission_debit = commission_amount if not is_receipt else Decimal(0)
-                commission_credit = commission_amount if is_receipt else Decimal(0)
+                commission_debit = Decimal(0)
+                commission_credit = commission_amount
                 commission_check_id = None
                 if account_line.get("check_id"):
                     try:
@@ -2338,8 +2337,8 @@ def update_receipt_payment(
                     },
                 ))
                 commission_service_account = _get_fixed_account_by_code(db, "70902")
-                commission_service_debit = commission_amount if is_receipt else Decimal(0)
-                commission_service_credit = commission_amount if not is_receipt else Decimal(0)
+                commission_service_debit = commission_amount
+                commission_service_credit = Decimal(0)
                 db.add(DocumentLine(
                     document_id=document.id,
                     account_id=commission_service_account.id,

@@ -175,6 +175,31 @@ class ReportTemplateService {
     return res.data ?? const <String, dynamic>{};
   }
 
+  Future<String> previewHtml({
+    required int businessId,
+    required String engine,
+    required Map<String, dynamic> design,
+    required Map<String, dynamic> assets,
+    required Map<String, dynamic> context,
+    String? paperSize,
+    String? orientation,
+    Map<String, dynamic>? margins,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/report-templates/business/$businessId/preview-html',
+      data: {
+        'engine': engine,
+        'design': design,
+        'assets': assets,
+        'context': context,
+        if (paperSize != null) 'paper_size': paperSize,
+        if (orientation != null) 'orientation': orientation,
+        if (margins != null) 'margins': margins,
+      },
+    );
+    return (res.data?['html'] ?? '').toString();
+  }
+
   Future<Map<String, dynamic>> schema({
     required int businessId,
     required String moduleKey,
@@ -267,6 +292,72 @@ class ReportTemplateService {
     return items.cast<Map<String, dynamic>>();
   }
 
+  Future<List<Map<String, dynamic>>> studioBlocks({
+    required int businessId,
+    required String moduleKey,
+    String? subtype,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/report-templates/business/$businessId/studio-blocks',
+      query: {
+        'module_key': moduleKey,
+        if (subtype != null && subtype.isNotEmpty) 'subtype': subtype,
+      },
+    );
+    final items = (res.data?['items'] as List?) ?? const [];
+    return items.cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> validateStudioDesign({
+    required int businessId,
+    required String moduleKey,
+    String? subtype,
+    required Map<String, dynamic> design,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/report-templates/business/$businessId/validate-studio-design',
+      data: {
+        'module_key': moduleKey,
+        if (subtype != null) 'subtype': subtype,
+        'design': design,
+      },
+    );
+    return res.data ?? const <String, dynamic>{};
+  }
+
+  Future<Map<String, dynamic>> compileStudioDesign({
+    required int businessId,
+    required Map<String, dynamic> design,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/report-templates/business/$businessId/compile-studio-design',
+      data: {'design': design},
+    );
+    return res.data ?? const <String, dynamic>{};
+  }
+
+  Future<Map<String, dynamic>> migrateV2ToV3({
+    required int businessId,
+    required Map<String, dynamic> design,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/report-templates/business/$businessId/migrate-v2-to-v3',
+      data: {'design': design},
+    );
+    return res.data ?? const <String, dynamic>{};
+  }
+
+  Future<Map<String, dynamic>> migrateV3ToV4({
+    required int businessId,
+    required Map<String, dynamic> design,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/report-templates/business/$businessId/migrate-v3-to-v4',
+      data: {'design': design},
+    );
+    return res.data ?? const <String, dynamic>{};
+  }
+
   Future<Map<String, dynamic>> validateV2Design({
     required int businessId,
     required String moduleKey,
@@ -328,8 +419,10 @@ class ReportTemplateService {
       query: {
         if (status != null && status.trim().isNotEmpty) 'status': status.trim(),
         if (actorUserId != null) 'actor_user_id': actorUserId,
-        if (fromDate != null && fromDate.trim().isNotEmpty) 'from_date': fromDate.trim(),
-        if (toDate != null && toDate.trim().isNotEmpty) 'to_date': toDate.trim(),
+        if (fromDate != null && fromDate.trim().isNotEmpty)
+          'from_date': fromDate.trim(),
+        if (toDate != null && toDate.trim().isNotEmpty)
+          'to_date': toDate.trim(),
         'offset': offset,
         'sort_by': sortBy,
         'sort_order': sortOrder,
@@ -339,5 +432,3 @@ class ReportTemplateService {
     return res.data ?? const <String, dynamic>{};
   }
 }
-
-

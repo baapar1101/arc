@@ -3,8 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import String, DateTime, Integer, ForeignKey, Enum as SQLEnum, Text, UniqueConstraint, Numeric, Boolean
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import String, DateTime, Integer, ForeignKey, Enum as SQLEnum, Text, UniqueConstraint, Numeric, Boolean, event, inspect as sa_inspect, select
+from sqlalchemy.orm import Mapped, mapped_column, object_session, relationship
 
 from adapters.db.session import Base
 
@@ -83,6 +83,10 @@ class Person(Base):
     mobile: Mapped[str | None] = mapped_column(String(20), nullable=True, comment="موبایل")
     mobile_2: Mapped[str | None] = mapped_column(String(20), nullable=True, comment="موبایل ۲")
     mobile_3: Mapped[str | None] = mapped_column(String(20), nullable=True, comment="موبایل ۳")
+    phone_normalized: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    mobile_normalized: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    mobile_2_normalized: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    mobile_3_normalized: Mapped[str | None] = mapped_column(String(32), nullable=True)
     fax: Mapped[str | None] = mapped_column(String(20), nullable=True, comment="فکس")
     email: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="پست الکترونیکی")
     website: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="وب‌سایت")
@@ -102,6 +106,47 @@ class Person(Base):
     )
     crm_deals: Mapped[list["Deal"]] = relationship("Deal", back_populates="person", foreign_keys="[Deal.person_id]")
     crm_activities: Mapped[list["CrmActivity"]] = relationship("CrmActivity", back_populates="person", cascade="all, delete-orphan")
+
+
+@event.listens_for(Person, "before_insert")
+@event.listens_for(Person, "before_update")
+def _sync_person_normalized_phones(_mapper, connection, target: Person) -> None:
+    """Keep indexed identities in sync for every ORM create/update path."""
+    from adapters.db.models.business import Business
+    from app.services.person_phone_normalization import (
+        PHONE_REGION_SESSION_CACHE_KEY,
+        normalized_person_phone_values,
+    )
+
+    state = sa_inspect(target)
+    phone_fields = ("mobile", "mobile_2", "mobile_3", "phone")
+    if target.id is not None and not any(
+        state.attrs[field].history.has_changes() for field in phone_fields
+    ):
+        return
+
+    business_id = int(target.business_id)
+    session = object_session(target)
+    region_cache = (
+        session.info.setdefault(PHONE_REGION_SESSION_CACHE_KEY, {})
+        if session is not None
+        else {}
+    )
+    region = region_cache.get(business_id)
+    if region is None:
+        region = connection.execute(
+            select(Business.default_phone_region).where(Business.id == business_id)
+        ).scalar_one_or_none() or "IR"
+        region_cache[business_id] = region
+    values = normalized_person_phone_values(
+        default_region=region,
+        mobile=target.mobile,
+        mobile_2=target.mobile_2,
+        mobile_3=target.mobile_3,
+        phone=target.phone,
+    )
+    for field, value in values.items():
+        setattr(target, field, value)
 
 
 class PersonBankAccount(Base):

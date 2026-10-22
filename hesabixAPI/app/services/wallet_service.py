@@ -1107,15 +1107,14 @@ def _post_payout_document(db: Session, business_id: int, user_id: int, net_amoun
 	wallet_acc = _get_fixed_account_by_code(db, "10205")  # حساب کیف پول
 	bank_acc = _get_fixed_account_by_code(db, "10203")
 	fee_amt = Decimal(str(fee_amount or 0))
-	# Per existing commission logic for Payment: Dr bank = fee, Cr 70902 = fee
+	# تسویهٔ ناخالص کیف‌پول برابر خالص واریزی به بانک به‌علاوهٔ کارمزد است.
 	lines = [
 		{"account_id": bank_acc.id, "debit": net_amount, "credit": 0, "description": "وصول تسویه کیف‌پول (خالص)"},
-		{"account_id": wallet_acc.id, "debit": 0, "credit": net_amount, "description": "انتقال از کیف‌پول"},
+		{"account_id": wallet_acc.id, "debit": 0, "credit": net_amount + fee_amt, "description": "انتقال از کیف‌پول (ناخالص)"},
 	]
 	if fee_amt > 0:
 		commission_expense = _get_fixed_account_by_code(db, "70902")
-		lines.append({"account_id": bank_acc.id, "debit": fee_amt, "credit": 0, "description": "کارمزد تسویه (الگوی پرداخت)"})
-		lines.append({"account_id": commission_expense.id, "debit": 0, "credit": fee_amt, "description": "کارمزد خدمات بانکی"})
+		lines.append({"account_id": commission_expense.id, "debit": fee_amt, "credit": 0, "description": "کارمزد خدمات بانکی"})
 	document = _create_simple_document(
 		db=db,
 		business_id=business_id,

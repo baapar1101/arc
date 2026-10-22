@@ -470,7 +470,7 @@ def search_instance_by_code(
 			)
 			.order_by(Product.created_at.desc())
 			.limit(20)
-			.distinct(Product.id)
+			.distinct()
 			.all()
 		)
 

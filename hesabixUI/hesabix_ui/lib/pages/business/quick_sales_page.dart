@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/quick_sales_service.dart';
 import '../../services/invoice_service.dart';
+import '../../services/pdf_output_service.dart';
 import '../../services/payment_gateway_service.dart';
 import '../../services/product_service.dart';
 import '../../services/warehouse_service.dart';
@@ -25,6 +26,8 @@ import '../../utils/number_normalizer.dart' as number_utils;
 import '../../utils/number_formatters.dart';
 import '../../utils/product_search_overlay_policy.dart';
 import '../../utils/invoice_global_discount_calculator.dart';
+import '../../utils/quick_sales_customer_balance.dart';
+import '../../utils/quick_sales_stock_correction.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/business_api_service.dart';
 import '../../services/currency_service.dart';
@@ -52,7 +55,7 @@ import '../../widgets/inputs/frequent_description_text_field.dart';
 import '../../widgets/barcode/web_barcode_scan_screen.dart';
 import '../../utils/general_barcode_utils.dart';
 import '../../utils/responsive_helper.dart';
-import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import '../../utils/web/web_utils.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// کد کسب‌وکاری برای نمایش در فروش سریع: اگر [code] با [id] یکی باشد، از `product_code`، `tax_code` یا اولین بارکد عمومی استفاده می‌شود.
@@ -89,6 +92,45 @@ String? _quickSalesDisplayProductBusinessCode(Map<String, dynamic> p) {
 enum _QuickSalesSaveAction { none, save, saveAndPrint }
 
 enum _StockShortageAction { cancel, park, correct, override }
+
+class _QuickSalesShareSnapshot {
+  static const empty = _QuickSalesShareSnapshot(
+    onlinePaymentEnabled: false,
+    hasGateways: false,
+    gatewayId: null,
+    expiryHours: 168,
+    sendSms: false,
+    sendEmail: false,
+    useNativeShare: false,
+    customerName: '',
+    customerMobile: null,
+    customerEmail: null,
+  );
+
+  final bool onlinePaymentEnabled;
+  final bool hasGateways;
+  final int? gatewayId;
+  final int expiryHours;
+  final bool sendSms;
+  final bool sendEmail;
+  final bool useNativeShare;
+  final String customerName;
+  final String? customerMobile;
+  final String? customerEmail;
+
+  const _QuickSalesShareSnapshot({
+    required this.onlinePaymentEnabled,
+    required this.hasGateways,
+    required this.gatewayId,
+    required this.expiryHours,
+    required this.sendSms,
+    required this.sendEmail,
+    required this.useNativeShare,
+    required this.customerName,
+    required this.customerMobile,
+    required this.customerEmail,
+  });
+}
 
 class QuickSalesPage extends StatefulWidget {
   final int businessId;
@@ -127,8 +169,15 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   final CategoryService _categoryService = CategoryService(ApiClient());
 
   bool _loading = true;
+  bool _parkedStorageWarningShown = false;
+  late final String? _parkedStorageScope = getOrCreateSessionStorageValue(
+    'hesabix_quick_sales_tab_scope_v1',
+    QuickSalesParkedSale.newId(),
+  );
   _QuickSalesSaveAction _saveAction = _QuickSalesSaveAction.none;
   bool get _isSaving => _saveAction != _QuickSalesSaveAction.none;
+  String _errorText(Object error) =>
+      mounted ? ErrorExtractor.forContext(error, context) : error.toString();
   Map<String, dynamic>? _settings;
   Customer? _anonymousCustomer;
 
@@ -143,7 +192,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   Timer? _stockBatchTimer;
 
   // کش قیمت لیست قیمت (per session)
-  final Map<int, num> _priceListCache = <int, num>{};
+  final Map<int, num?> _priceListCache = <int, num?>{};
 
   // جستجو / افزودن به سبد
   bool _barcodeSearching = false;
@@ -157,6 +206,12 @@ class _QuickSalesPageState extends State<QuickSalesPage>
 
   // مشتری
   Customer? _selectedCustomer;
+  num? _customerBalance;
+  String? _customerBalanceStatus;
+  bool _customerBalanceLoading = false;
+  String? _customerBalanceError;
+  bool _applyCustomerBalance = false;
+  int _customerBalanceRequestGeneration = 0;
 
   // پرداخت
   List<InvoiceTransaction> _payments = [];
@@ -251,6 +306,8 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   static const int _maxParkedSales = 12;
   final List<QuickSalesParkedSale> _sales = [];
   String _activeSaleId = '';
+  final Set<String> _pendingQuickSaleRequestIds = <String>{};
+  final Completer<void> _parkedSalesHydratedCompleter = Completer<void>();
   bool _parkedHydrated = false;
   Timer? _parkedPersistDebounce;
   bool _checkoutDiscountExpanded = false;
@@ -295,8 +352,115 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         _restoreDesktopRailAfterQuit = () => scope.setRailVisible(true);
       }
       _barcodeFocus.requestFocus();
-      _keyboardListenerFocus.requestFocus();
+      unawaited(_resumePendingQuickSaleJobs());
     });
+  }
+
+  Future<void> _resumePendingQuickSaleJobs() async {
+    try {
+      await _parkedSalesHydratedCompleter.future;
+      if (!mounted || !_parkedHydrated) return;
+      final jobs = await _invoiceService.listQuickSaleInvoiceJobs(
+        businessId: widget.businessId,
+      );
+      if (!mounted || _isSaving) return;
+
+      final pending = jobs
+          .where(
+            (job) => job['status'] == 'queued' || job['status'] == 'processing',
+          )
+          .toList();
+      final failed = jobs.where((job) => job['status'] == 'failed').toList();
+      final completed = jobs
+          .where((job) => job['status'] == 'completed')
+          .toList();
+
+      if (pending.isNotEmpty) {
+        SnackBarHelper.show(
+          context,
+          message:
+              '${pending.length} فروش قبلی هنوز در حال ثبت است؛ وضعیتشان پیگیری می‌شود.',
+        );
+        for (final job in pending) {
+          final requestId = job['request_id']?.toString();
+          if (requestId == null || requestId.isEmpty) continue;
+          final alreadyTracked = !_pendingQuickSaleRequestIds.add(requestId);
+          if (_activeSaleId == requestId) {
+            _openBlankSaleAfterQueuedSave(requestId);
+          }
+          if (alreadyTracked) continue;
+          unawaited(
+            _watchQuickSaleInvoiceJob(
+              requestId: requestId,
+              personId: 0,
+              totalAmount: 0,
+              shouldPrint: false,
+              shouldShare: false,
+              shareSnapshot: _QuickSalesShareSnapshot.empty,
+            ),
+          );
+        }
+      }
+
+      if (failed.isNotEmpty && mounted) {
+        Map<String, dynamic>? firstStockShortageJob;
+        String? firstStockShortageSaleId;
+        for (final job in failed) {
+          final requestId = job['request_id']?.toString();
+          if (requestId != null && requestId.isNotEmpty) {
+            final saleId = _markQueuedSaleFailed(requestId, notify: false);
+            final details = job['error_details'];
+            final shortages = details is Map ? details['shortages'] : null;
+            if (firstStockShortageJob == null &&
+                job['error_code'] == 'INSUFFICIENT_STOCK' &&
+                saleId != null &&
+                shortages is List &&
+                shortages.isNotEmpty) {
+              firstStockShortageJob = job;
+              firstStockShortageSaleId = saleId;
+            }
+          }
+        }
+        final message = failed.first['error_message']?.toString().trim();
+        SnackBarHelper.show(
+          context,
+          message: message == null || message.isEmpty
+              ? 'یکی از فروش‌های قبلی ثبت نشده است؛ سبد را بررسی و دوباره ثبت کنید.'
+              : 'یک فروش قبلی ثبت نشد: $message',
+          isError: true,
+        );
+        if (firstStockShortageJob != null && firstStockShortageSaleId != null) {
+          await _handleQueuedStockShortage(
+            saleId: firstStockShortageSaleId,
+            job: firstStockShortageJob,
+            shouldPrint: false,
+          );
+        }
+      }
+
+      for (final job in completed) {
+        final requestId = job['request_id']?.toString();
+        if (requestId == null || requestId.isEmpty) continue;
+        final localSaleExists =
+            _activeSaleId == requestId ||
+            _sales.any((sale) => sale.id == requestId);
+        if (!localSaleExists) continue;
+        if (_activeSaleId == requestId) {
+          _openBlankSaleAfterSuccessfulSave();
+        } else {
+          _completeQueuedSale(requestId);
+        }
+        final invoiceCode = job['invoice_code']?.toString();
+        SnackBarHelper.show(
+          context,
+          message: invoiceCode == null || invoiceCode.isEmpty
+              ? 'ثبت فروش قبلی تکمیل شد.'
+              : 'ثبت فروش قبلی تکمیل شد ($invoiceCode).',
+        );
+      }
+    } catch (_) {
+      // Status recovery must not block opening the quick-sales screen.
+    }
   }
 
   Future<void> _loadCategories() async {
@@ -423,10 +587,12 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       unawaited(
         QuickSalesParkedSalesStorage.save(
           widget.businessId,
+          widget.authStore.currentUserId ?? 0,
           QuickSalesParkedSalesBundle(
             activeId: _activeSaleId,
             sales: List.of(_sales),
           ),
+          scope: _parkedStorageScope,
         ),
       );
     }
@@ -529,6 +695,11 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         _loading = false;
         _parkedHydrated = true;
       });
+      if (!_parkedSalesHydratedCompleter.isCompleted) {
+        _parkedSalesHydratedCompleter.complete();
+      }
+
+      unawaited(_refreshCustomerBalance(preserveApply: _applyCustomerBalance));
 
       unawaited(_loadShareGatewaysAndDefaults());
       unawaited(_loadBusinessMetadata());
@@ -537,6 +708,9 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         _refreshAllStocks();
       }
     } catch (e) {
+      if (!_parkedSalesHydratedCompleter.isCompleted) {
+        _parkedSalesHydratedCompleter.complete();
+      }
       if (mounted) {
         SnackBarHelper.show(
           context,
@@ -610,13 +784,23 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   Future<void> _persistParkedSalesNow() async {
     if (!_parkedHydrated || _activeSaleId.isEmpty) return;
     _captureActiveSaleIntoList();
-    await QuickSalesParkedSalesStorage.save(
+    final saved = await QuickSalesParkedSalesStorage.save(
       widget.businessId,
+      widget.authStore.currentUserId ?? 0,
       QuickSalesParkedSalesBundle(
         activeId: _activeSaleId,
         sales: List.of(_sales),
       ),
+      scope: _parkedStorageScope,
     );
+    if (!saved && mounted && !_parkedStorageWarningShown) {
+      _parkedStorageWarningShown = true;
+      SnackBarHelper.show(
+        context,
+        message: 'ذخیره محلی فروش‌های پارک‌شده انجام نشد.',
+        isError: true,
+      );
+    }
   }
 
   void _captureActiveSaleIntoList() {
@@ -647,6 +831,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       cartItems: _cartItems.map(QuickSalesParkedSale.cloneLine).toList(),
       payments: List<InvoiceTransaction>.from(_payments),
       cashFollowsTotal: _cashFollowsTotal,
+      applyCustomerBalance: _applyCustomerBalance,
       cashRegisterId: _selectedCashRegisterId,
       warehouseId: _defaultWarehouseId,
       documentDate: _documentDate,
@@ -679,6 +864,11 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     _payments = List<InvoiceTransaction>.from(sale.payments);
     _changeResolution = sale.changeResolution;
     _cashFollowsTotal = sale.cashFollowsTotal;
+    _applyCustomerBalance = sale.applyCustomerBalance;
+    _customerBalance = null;
+    _customerBalanceStatus = null;
+    _customerBalanceError = null;
+    _customerBalanceLoading = false;
     _shareRemainingEnabled = false;
     _checkoutDiscountExpanded = false;
     _selectedCashRegisterId =
@@ -707,6 +897,11 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     _payments = [];
     _changeResolution = null;
     _cashFollowsTotal = false;
+    _applyCustomerBalance = false;
+    _customerBalance = null;
+    _customerBalanceStatus = null;
+    _customerBalanceError = null;
+    _customerBalanceLoading = false;
     _shareRemainingEnabled = false;
     _checkoutDiscountExpanded = false;
     _selectedCashRegisterId = _settingsDefaultCashRegisterId;
@@ -727,7 +922,11 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   }
 
   Future<void> _hydrateParkedSalesIntoFields() async {
-    final bundle = await QuickSalesParkedSalesStorage.load(widget.businessId);
+    final bundle = await QuickSalesParkedSalesStorage.load(
+      widget.businessId,
+      widget.authStore.currentUserId ?? 0,
+      scope: _parkedStorageScope,
+    );
     if (!mounted) return;
     if (bundle == null || bundle.sales.isEmpty) {
       _activeSaleId = QuickSalesParkedSale.newId();
@@ -753,11 +952,11 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _barcodeFocus.requestFocus();
-      _keyboardListenerFocus.requestFocus();
     });
     if (_showInventory && _cartItems.isNotEmpty) {
       _refreshAllStocks();
     }
+    unawaited(_refreshCustomerBalance(preserveApply: _applyCustomerBalance));
   }
 
   void _startNewSale() {
@@ -787,8 +986,96 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     _afterSaleSwitchUi();
   }
 
+  void _openBlankSaleAfterSuccessfulSave() {
+    final completedSaleId = _activeSaleId;
+    final newSaleId = QuickSalesParkedSale.newId();
+    setState(() {
+      _activeSaleId = newSaleId;
+      _applyBlankSaleState();
+      _saveAction = _QuickSalesSaveAction.none;
+
+      final nextBundle =
+          QuickSalesParkedSalesBundle(
+            activeId: completedSaleId,
+            sales: List<QuickSalesParkedSale>.from(_sales),
+          ).afterCompletedActiveSale(
+            blankSale: _snapshotActiveSale(),
+            anonymousCustomerId: _anonymousCustomer?.id,
+          );
+      _sales
+        ..clear()
+        ..addAll(nextBundle.sales);
+      _activeSaleId = nextBundle.activeId;
+    });
+    unawaited(_persistParkedSalesNow());
+    _afterSaleSwitchUi();
+  }
+
+  void _openBlankSaleAfterQueuedSave(String requestId) {
+    _pendingQuickSaleRequestIds.add(requestId);
+    _captureActiveSaleIntoList();
+    final newSaleId = QuickSalesParkedSale.newId();
+    setState(() {
+      _activeSaleId = newSaleId;
+      _applyBlankSaleState();
+      _saveAction = _QuickSalesSaveAction.none;
+      _sales.add(_snapshotActiveSale());
+    });
+    unawaited(_persistParkedSalesNow());
+    _afterSaleSwitchUi();
+  }
+
+  void _completeQueuedSale(String requestId) {
+    _pendingQuickSaleRequestIds.remove(requestId);
+    if (!mounted) return;
+    setState(() {
+      _sales.removeWhere(
+        (sale) => sale.id == requestId && sale.id != _activeSaleId,
+      );
+    });
+    unawaited(_persistParkedSalesNow());
+  }
+
+  String? _markQueuedSaleFailed(String requestId, {bool notify = true}) {
+    _pendingQuickSaleRequestIds.remove(requestId);
+    if (!mounted) return null;
+    final index = _sales.indexWhere((sale) => sale.id == requestId);
+    if (index < 0) return null;
+    final oldSale = _sales[index];
+    final renewedSaleId = QuickSalesParkedSale.newId();
+    final renewedSale = QuickSalesParkedSale.fromJson({
+      ...oldSale.toJson(),
+      'id': renewedSaleId,
+      'updated_at': DateTime.now().toIso8601String(),
+    });
+    setState(() {
+      _sales[index] = renewedSale;
+      if (_activeSaleId == requestId) {
+        _activeSaleId = renewedSale.id;
+        _applySaleState(renewedSale);
+      }
+    });
+    unawaited(_persistParkedSalesNow());
+    if (notify) {
+      SnackBarHelper.show(
+        context,
+        message:
+            'سبد فروش نگه داشته شد؛ پس از اصلاح می‌توانید دوباره ثبت کنید.',
+      );
+    }
+    return renewedSaleId;
+  }
+
   void _selectParkedSale(String id) {
     if (_isSaving || id == _activeSaleId) return;
+    if (_pendingQuickSaleRequestIds.contains(id)) {
+      SnackBarHelper.show(
+        context,
+        message:
+            'این سبد هنوز در حال ثبت است؛ پس از پایان پردازش قابل انتخاب می‌شود.',
+      );
+      return;
+    }
     QuickSalesParkedSale? target;
     for (final sale in _sales) {
       if (sale.id == id) {
@@ -1058,8 +1345,102 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     });
   }
 
+  void _onCustomerChanged(Customer? customer) {
+    setState(() {
+      _selectedCustomer = customer ?? _anonymousCustomer;
+      _applyCustomerBalance = false;
+      _customerBalance = null;
+      _customerBalanceStatus = null;
+      _customerBalanceError = null;
+      _changeResolution = null;
+      _syncShareChannelDefaults();
+    });
+    unawaited(_refreshCustomerBalance());
+  }
+
+  void _onDocumentDateChanged(DateTime value) {
+    setState(() {
+      _documentDate = value;
+      _applyCustomerBalance = false;
+      _changeResolution = null;
+    });
+    unawaited(_refreshCustomerBalance());
+  }
+
+  Future<void> _refreshCustomerBalance({bool preserveApply = false}) async {
+    final customer = _selectedCustomer;
+    final currencyId = _defaultCurrencyId;
+    final requestGeneration = ++_customerBalanceRequestGeneration;
+    if (customer == null || currencyId == null || _isAnonymousSelected) {
+      if (!mounted) return;
+      setState(() {
+        _customerBalance = null;
+        _customerBalanceStatus = null;
+        _customerBalanceError = null;
+        _customerBalanceLoading = false;
+        _applyCustomerBalance = false;
+      });
+      return;
+    }
+
+    final requestedPersonId = customer.id;
+    final requestedDate = _documentDate;
+    final keepApply = preserveApply && _applyCustomerBalance;
+    setState(() {
+      _customerBalanceLoading = true;
+      _customerBalanceError = null;
+      if (!preserveApply) _applyCustomerBalance = false;
+    });
+    try {
+      final result = await _quickSalesService.getCustomerBalance(
+        businessId: widget.businessId,
+        personId: requestedPersonId,
+        currencyId: currencyId,
+        asOfDate: requestedDate,
+      );
+      if (!mounted || requestGeneration != _customerBalanceRequestGeneration) {
+        return;
+      }
+      if (_selectedCustomer?.id != requestedPersonId ||
+          _defaultCurrencyId != currencyId ||
+          _documentDate.year != requestedDate.year ||
+          _documentDate.month != requestedDate.month ||
+          _documentDate.day != requestedDate.day) {
+        return;
+      }
+      final balance = (result['balance'] as num?) ?? 0;
+      setState(() {
+        _customerBalance = balance;
+        _customerBalanceStatus =
+            result['status']?.toString() ??
+            quickSalesCustomerBalanceStatus(balance);
+        _customerBalanceLoading = false;
+        _customerBalanceError = null;
+        _applyCustomerBalance = keepApply && balance.abs() > _paymentEpsilon;
+        _changeResolution = null;
+      });
+    } catch (error) {
+      if (!mounted || requestGeneration != _customerBalanceRequestGeneration) {
+        return;
+      }
+      setState(() {
+        _customerBalance = null;
+        _customerBalanceStatus = null;
+        _customerBalanceLoading = false;
+        _customerBalanceError = ErrorExtractor.forContext(error, context);
+        _applyCustomerBalance = false;
+      });
+    }
+  }
+
   num get _paidAmount =>
       _payments.fold<num>(0, (sum, p) => sum + p.settlesAgainstInvoice);
+
+  num get _paymentTargetAmount => quickSalesPaymentTarget(
+    invoiceTotal: _totalAmount,
+    customerBalance: _customerBalance ?? 0,
+    applyBalance: _applyCustomerBalance,
+  );
 
   num get _paymentEpsilon {
     if (_invoiceCurrencyDecimalPlaces <= 0) return 0.5;
@@ -1071,17 +1452,17 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   }
 
   num get _remainingAmount {
-    if (!_autoCreatePaymentDocument) return _totalAmount;
-    final raw = _totalAmount - _paidAmount;
+    if (!_autoCreatePaymentDocument) return _paymentTargetAmount;
+    final raw = _paymentTargetAmount - _paidAmount;
     if (raw.abs() <= _paymentEpsilon) return 0;
     return raw;
   }
 
   bool get _isOverpaid =>
       _autoCreatePaymentDocument &&
-      _paidAmount > _totalAmount + _paymentEpsilon;
+      _paidAmount > _paymentTargetAmount + _paymentEpsilon;
 
-  num get _changeAmount => _isOverpaid ? _paidAmount - _totalAmount : 0;
+  num get _changeAmount => _isOverpaid ? _paidAmount - _paymentTargetAmount : 0;
 
   QuickSalesChangeResolution? get _validChangeResolution {
     final value = _changeResolution;
@@ -1231,6 +1612,8 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     required String? invoiceCode,
     required num totalAmount,
     required String channel,
+    required String customerName,
+    required String? customerMobile,
   }) async {
     final api = ApiClient();
     final response = await api.post<Map<String, dynamic>>(
@@ -1240,15 +1623,15 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         'event_type': 'invoice_share_link',
         'context': {
           'share_link': shareLink,
-          'customer_name': _selectedCustomer?.name ?? '',
-          'customer_mobile': _selectedCustomerPhone ?? '',
+          'customer_name': customerName,
+          'customer_mobile': customerMobile ?? '',
           'invoice_number': invoiceCode ?? '',
           'invoice_code': invoiceCode ?? '',
           'final_amount': totalAmount.toDouble(),
         },
         'channel': channel,
-        if (channel == 'sms' && _selectedCustomerPhone != null)
-          'recipient_mobile': _selectedCustomerPhone,
+        if (channel == 'sms' && customerMobile != null)
+          'recipient_mobile': customerMobile,
       },
     );
     return response.data;
@@ -1259,6 +1642,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     required String? invoiceCode,
     required int personId,
     required num totalAmount,
+    required _QuickSalesShareSnapshot shareSnapshot,
   }) async {
     final t = AppLocalizations.of(context);
     final notes = <String>[];
@@ -1268,12 +1652,12 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       return notes;
     }
 
-    if (_shareOnlinePaymentEnabled) {
-      if (_shareGateways.isEmpty) {
+    if (shareSnapshot.onlinePaymentEnabled) {
+      if (!shareSnapshot.hasGateways) {
         notes.add(t.quickSalesShareNoGateway);
         return notes;
       }
-      if (_shareGatewayId == null) {
+      if (shareSnapshot.gatewayId == null) {
         notes.add(t.quickSalesShareGatewayRequired);
         return notes;
       }
@@ -1283,10 +1667,10 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       final link = await _invoiceService.createInvoiceShareLink(
         businessId: widget.businessId,
         invoiceId: invoiceId,
-        expiresInHours: _shareExpiryHours,
-        onlinePaymentEnabled: _shareOnlinePaymentEnabled,
-        onlinePaymentGatewayId: _shareOnlinePaymentEnabled
-            ? _shareGatewayId
+        expiresInHours: shareSnapshot.expiryHours,
+        onlinePaymentEnabled: shareSnapshot.onlinePaymentEnabled,
+        onlinePaymentGatewayId: shareSnapshot.onlinePaymentEnabled
+            ? shareSnapshot.gatewayId
             : null,
       );
       final shortUrl = link['short_url']?.toString();
@@ -1301,8 +1685,8 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         'send',
       );
 
-      if (_shareSendSms) {
-        if (_selectedCustomerPhone == null) {
+      if (shareSnapshot.sendSms) {
+        if (shareSnapshot.customerMobile == null) {
           notes.add(t.quickSalesShareSmsSkippedNoPhone);
         } else if (!canNotify) {
           notes.add(t.quickSalesShareNoNotificationPermission);
@@ -1314,6 +1698,8 @@ class _QuickSalesPageState extends State<QuickSalesPage>
               invoiceCode: invoiceCode,
               totalAmount: totalAmount,
               channel: 'sms',
+              customerName: shareSnapshot.customerName,
+              customerMobile: shareSnapshot.customerMobile,
             );
             if (!mounted) return notes;
             final result = response?['data'] as Map<String, dynamic>?;
@@ -1333,13 +1719,13 @@ class _QuickSalesPageState extends State<QuickSalesPage>
               }
             }
           } catch (e) {
-            notes.add(ErrorExtractor.forContext(e, context));
+            notes.add(_errorText(e));
           }
         }
       }
 
-      if (_shareSendEmail) {
-        if (_selectedCustomerEmail == null) {
+      if (shareSnapshot.sendEmail) {
+        if (shareSnapshot.customerEmail == null) {
           notes.add(t.quickSalesShareEmailSkippedNoEmail);
         } else if (!canNotify) {
           notes.add(t.quickSalesShareNoNotificationPermission);
@@ -1351,6 +1737,8 @@ class _QuickSalesPageState extends State<QuickSalesPage>
               invoiceCode: invoiceCode,
               totalAmount: totalAmount,
               channel: 'email',
+              customerName: shareSnapshot.customerName,
+              customerMobile: shareSnapshot.customerMobile,
             );
             if (!mounted) return notes;
             final result = response?['data'] as Map<String, dynamic>?;
@@ -1370,20 +1758,18 @@ class _QuickSalesPageState extends State<QuickSalesPage>
               }
             }
           } catch (e) {
-            notes.add(ErrorExtractor.forContext(e, context));
+            notes.add(_errorText(e));
           }
         }
       }
 
-      if (_shareViaNativeShare) {
+      if (shareSnapshot.useNativeShare) {
         await Share.share(shortUrl);
       }
 
       return notes;
     } catch (e) {
-      notes.add(
-        '${t.quickSalesShareLinkFailed}: ${ErrorExtractor.forContext(e, context)}',
-      );
+      notes.add('${t.quickSalesShareLinkFailed}: ${_errorText(e)}');
       return notes;
     }
   }
@@ -1410,12 +1796,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       );
       await _addToCart(fullProduct, skipHydrate: true);
       await _saveRecentProduct(fullProduct);
-      if (mounted) {
-        SnackBarHelper.show(
-          context,
-          message: '${product['name'] ?? 'محصول'} به سبد اضافه شد',
-        );
-      }
     } catch (e) {
       if (mounted) {
         SnackBarHelper.show(
@@ -1516,12 +1896,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
                   _lastFailedSearchQuery = null;
                 });
               }
-              if (mounted) {
-                SnackBarHelper.show(
-                  context,
-                  message: '${product['name'] ?? 'محصول'} به سبد اضافه شد',
-                );
-              }
               return;
             }
           }
@@ -1564,13 +1938,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             setState(() {
               _lastFailedSearchQuery = null;
             });
-          }
-          // فیدبک بصری
-          if (mounted) {
-            SnackBarHelper.show(
-              context,
-              message: '${product['name'] ?? 'محصول'} به سبد اضافه شد',
-            );
           }
           return;
         }
@@ -1625,13 +1992,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
               _lastFailedSearchQuery = null;
             });
           }
-          // فیدبک بصری
-          if (mounted) {
-            SnackBarHelper.show(
-              context,
-              message: '${selected['name'] ?? 'محصول'} به سبد اضافه شد',
-            );
-          }
         } else {
           // اگر دیالوگ انتخاب بسته شد بدون انتخاب، جستجوی ناموفق را ثبت کن
           if (mounted) {
@@ -1653,13 +2013,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         setState(() {
           _lastFailedSearchQuery = null;
         });
-      }
-      // فیدبک بصری
-      if (mounted) {
-        SnackBarHelper.show(
-          context,
-          message: '${product['name'] ?? 'محصول'} به سبد اضافه شد',
-        );
       }
     } catch (e) {
       if (mounted) {
@@ -1727,6 +2080,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
 
             await _addToCart(product, skipHydrate: true);
             await _saveRecentProduct(product);
+            if (!mounted) return;
 
             // پاک کردن جستجوی ناموفق و فیلد جستجو
             setState(() {
@@ -1734,17 +2088,10 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             });
             _barcodeController.clear();
             _barcodeFocus.requestFocus();
-
-            SnackBarHelper.show(
-              context,
-              message:
-                  '${product['name'] ?? 'محصول'} با موفقیت اضافه شد و به سبد خرید اضافه گردید',
-            );
           } catch (e) {
             SnackBarHelper.show(
               context,
-              message:
-                  'کالا ثبت شد اما خطا در افزودن به سبد: ${ErrorExtractor.forContext(e, context)}',
+              message: 'کالا ثبت شد اما خطا در افزودن به سبد: ${_errorText(e)}',
               isError: true,
             );
           }
@@ -1755,7 +2102,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           });
           _barcodeController.clear();
           _barcodeFocus.requestFocus();
-          SnackBarHelper.show(context, message: 'کالا با موفقیت ثبت شد');
         }
       } else {
         // اگر دیالوگ بسته شد بدون ثبت، جستجوی ناموفق را نگه دار
@@ -1783,13 +2129,13 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     return num.tryParse(value.toString()) ?? defaultValue;
   }
 
-  Future<num> _getPriceFromPriceList(int productId) async {
+  Future<num?> _getPriceFromPriceList(int productId) async {
     if (_priceListCache.containsKey(productId)) {
-      return _priceListCache[productId]!;
+      return _priceListCache[productId];
     }
     // اگر لیست قیمت پیش‌فرض وجود ندارد یا ارز مشخص نشده، null برگردان
     if (_defaultPriceListId == null || _defaultCurrencyId == null) {
-      return 0;
+      return null;
     }
 
     try {
@@ -1818,18 +2164,18 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         }
 
         // اگر unit_id null باشد، یعنی قیمت برای واحد اصلی است
-        if (unitId == null && price != null && price > 0) {
+        if (unitId == null && price != null && price >= 0) {
           _priceListCache[productId] = price;
           return price;
         }
       }
     } catch (e) {
-      // در صورت خطا، 0 برگردان تا از قیمت پایه استفاده شود
+      // در صورت خطا، null برگردان تا از قیمت پایه استفاده شود
       debugPrint('خطا در دریافت قیمت از لیست قیمت: $e');
     }
 
-    _priceListCache[productId] = 0;
-    return 0;
+    _priceListCache[productId] = null;
+    return null;
   }
 
   bool get _hasUniqueItemsInCart =>
@@ -1997,14 +2343,14 @@ class _QuickSalesPageState extends State<QuickSalesPage>
 
       if (_defaultPriceListId != null && _defaultCurrencyId != null) {
         final priceFromList = await _getPriceFromPriceList(productId);
-        if (priceFromList > 0) {
+        if (priceFromList != null) {
           unitPrice = priceFromList;
           unitPriceSource = 'priceList';
         }
       }
 
-      // اگر قیمت از لیست قیمت پیدا نشد یا صفر بود، از قیمت پایه استفاده کن
-      if (unitPrice == 0) {
+      // صفر یک قیمت معتبر (هدیه/پروموشن) است؛ فقط نبود نتیجه fallback می‌شود.
+      if (unitPriceSource != 'priceList') {
         unitPrice = _toNum(
           product['base_sales_price'] ?? product['sales_price'],
         );
@@ -2328,8 +2674,9 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   }
 
   Future<_StockShortageAction?> _showStockShortageDialog(
-    List<Map<String, dynamic>> shortages,
-  ) {
+    List<Map<String, dynamic>> shortages, {
+    bool correctionAlreadyApplied = false,
+  }) {
     final canOverride =
         _enableStockShortageOverride &&
         widget.authStore.hasBusinessPermission(
@@ -2376,6 +2723,13 @@ class _QuickSalesPageState extends State<QuickSalesPage>
                     'گردش‌کار کسری موجودی در تنظیمات فروش سریع فعال نیست.',
                   ),
                 ),
+              if (correctionAlreadyApplied)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Text(
+                    'اصلاح موجودی این فروش قبلاً ثبت شده است؛ برای جلوگیری از ثبت سند تکراری، اصلاح دوباره در دسترس نیست.',
+                  ),
+                ),
             ],
           ),
         ),
@@ -2390,7 +2744,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
                 Navigator.pop(dialogContext, _StockShortageAction.park),
             child: const Text('پارک فروش'),
           ),
-          if (canCorrect)
+          if (canCorrect && !correctionAlreadyApplied)
             OutlinedButton(
               onPressed: () =>
                   Navigator.pop(dialogContext, _StockShortageAction.correct),
@@ -2473,7 +2827,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     return result;
   }
 
-  Future<bool> _correctShortagesBeforeSale(
+  Future<String?> _correctShortagesBeforeSale(
     List<Map<String, dynamic>> shortages,
   ) async {
     final confirmed = await showGlassDialog<bool>(
@@ -2481,7 +2835,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       builder: (dialogContext) => AlertDialog(
         title: const Text('اصلاح موجودی'),
         content: const Text(
-          'این گزینه «کالای درآمدشده» را با تاریخ امروز ثبت می‌کند. فقط وقتی ادامه دهید که کالا واقعاً در انبار موجود است و خرید، انتقال یا موجودی اول دوره‌ای از قلم نیفتاده باشد.',
+          'این گزینه «کالای درآمدشده» را با همان تاریخ فاکتور ثبت می‌کند. فقط وقتی ادامه دهید که کالا واقعاً در انبار موجود است و خرید، انتقال یا موجودی اول دوره‌ای از قلم نیفتاده باشد.',
         ),
         actions: [
           TextButton(
@@ -2495,12 +2849,19 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         ],
       ),
     );
-    if (confirmed != true) return false;
-    final today = DateTime.now().toIso8601String().split('T').first;
+    if (confirmed != true) return null;
+    final documentDate = _documentDate.toIso8601String().split('T').first;
+    final requestToken = quickSalesStockCorrectionToken(
+      businessId: widget.businessId,
+      saleId: _activeSaleId,
+      documentDate: _documentDate,
+      shortages: shortages,
+    );
     await _quickSalesService.createStockCorrection(
       businessId: widget.businessId,
       payload: {
-        'document_date': today,
+        'document_date': documentDate,
+        'request_token': requestToken,
         'confirm_unexplained_physical_surplus': true,
         'description': 'اصلاح کسری کشف‌شده هنگام فروش سریع',
         'lines': shortages
@@ -2514,17 +2875,25 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             .toList(),
       },
     );
-    return true;
+    return requestToken;
   }
 
   Future<void> _saveInvoice({
     bool print = false,
     Map<String, dynamic>? stockOverride,
     bool debtConfirmed = false,
+    String? appliedStockCorrectionToken,
   }) async {
+    if (_isSaving) return;
+    setState(() {
+      _saveAction = print
+          ? _QuickSalesSaveAction.saveAndPrint
+          : _QuickSalesSaveAction.save;
+    });
     // اعتبارسنجی سبد خرید
     if (_cartItems.isEmpty) {
       SnackBarHelper.show(context, message: 'سبد خرید خالی است', isError: true);
+      setState(() => _saveAction = _QuickSalesSaveAction.none);
       return;
     }
 
@@ -2536,6 +2905,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             'ارز پیش‌فرض تنظیم نشده است. لطفاً در تنظیمات فاکتور سریع تنظیم کنید.',
         isError: true,
       );
+      setState(() => _saveAction = _QuickSalesSaveAction.none);
       return;
     }
 
@@ -2546,6 +2916,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         message: 'برای صدور حواله انبار، انتخاب انبار الزامی است',
         isError: true,
       );
+      setState(() => _saveAction = _QuickSalesSaveAction.none);
       return;
     }
 
@@ -2555,19 +2926,20 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       final paymentError = _validatePayments(t);
       if (paymentError != null) {
         SnackBarHelper.show(context, message: paymentError, isError: true);
+        setState(() => _saveAction = _QuickSalesSaveAction.none);
         return;
       }
     }
     if (_autoCreatePaymentDocument &&
         _payments.isEmpty &&
-        _totalAmount > 0 &&
+        _paymentTargetAmount > 0 &&
         !debtConfirmed) {
       final confirmed = await showGlassDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
           title: const Text('ثبت بدون دریافت'),
-          content: const Text(
-            'هیچ پرداختی ثبت نشده است و کل مبلغ فاکتور به حساب مشتری بدهکار می‌شود. ادامه می‌دهید؟',
+          content: Text(
+            'هیچ پرداختی ثبت نشده است و مبلغ ${_formatNumber(_paymentTargetAmount)} $_paymentCurrencyUnit در حساب مشتری تسویه‌نشده می‌ماند. ادامه می‌دهید؟',
           ),
           actions: [
             TextButton(
@@ -2581,13 +2953,19 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           ],
         ),
       );
-      if (!mounted || confirmed != true) return;
+      if (!mounted || confirmed != true) {
+        if (mounted) setState(() => _saveAction = _QuickSalesSaveAction.none);
+        return;
+      }
       debtConfirmed = true;
     }
     QuickSalesChangeResolution? changeResolution = _validChangeResolution;
     if (_isOverpaid && changeResolution == null) {
       changeResolution = await _openChangeResolutionDialog();
-      if (!mounted || changeResolution == null) return;
+      if (!mounted || changeResolution == null) {
+        if (mounted) setState(() => _saveAction = _QuickSalesSaveAction.none);
+        return;
+      }
     }
     if (_shouldShareAfterSave) {
       if (_shareOnlinePaymentEnabled) {
@@ -2597,6 +2975,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             message: t.quickSalesShareNoGateway,
             isError: true,
           );
+          setState(() => _saveAction = _QuickSalesSaveAction.none);
           return;
         }
         if (_shareGatewayId == null) {
@@ -2605,6 +2984,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             message: t.quickSalesShareGatewayRequired,
             isError: true,
           );
+          setState(() => _saveAction = _QuickSalesSaveAction.none);
           return;
         }
       }
@@ -2618,6 +2998,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           message: t.invoiceGlobalDiscountPercentInvalid,
           isError: true,
         );
+        setState(() => _saveAction = _QuickSalesSaveAction.none);
         return;
       }
       if (_globalDiscountType == 'amount' && gv0 < 0) {
@@ -2626,23 +3007,30 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           message: t.invoiceGlobalDiscountAmountInvalid,
           isError: true,
         );
+        setState(() => _saveAction = _QuickSalesSaveAction.none);
         return;
       }
     }
 
-    setState(() {
-      _saveAction = print
-          ? _QuickSalesSaveAction.saveAndPrint
-          : _QuickSalesSaveAction.save;
-    });
-
     final shouldPrint = print || _autoPrint;
     final shouldShare = _shouldShareAfterSave;
+    final shareSnapshot = _QuickSalesShareSnapshot(
+      onlinePaymentEnabled: _shareOnlinePaymentEnabled,
+      hasGateways: _shareGateways.isNotEmpty,
+      gatewayId: _shareGatewayId,
+      expiryHours: _shareExpiryHours,
+      sendSms: _shareSendSms,
+      sendEmail: _shareSendEmail,
+      useNativeShare: _shareViaNativeShare,
+      customerName: _selectedCustomer?.name ?? '',
+      customerMobile: _selectedCustomerPhone,
+      customerEmail: _selectedCustomerEmail,
+    );
     final savedShareAmount = _remainingAmount > 0
         ? _remainingAmount
-        : _totalAmount;
+        : _paymentTargetAmount;
     Map<String, dynamic>? retryOverride;
-    var retryAfterCorrection = false;
+    String? retryCorrectionToken;
     var parkAfterFailure = false;
 
     try {
@@ -2713,6 +3101,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       // ساخت extra_info با person_id و تنظیمات حواله انبار
       final extraInfo = <String, dynamic>{
         'quick_sale': true,
+        'quick_sale_request_id': _activeSaleId,
         'person_id': personId, // همیشه person_id را اضافه می‌کنیم
         'post_inventory': _enableWarehouseDocument, // آیا حواله ایجاد شود؟
         'auto_post_warehouse':
@@ -2725,6 +3114,14 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           'tax': _totalTax,
           'net': _totalAmount,
         },
+        if (_applyCustomerBalance && _customerBalance != null)
+          'quick_sale_customer_balance': {
+            'apply': true,
+            'person_id': personId,
+            'currency_id': _defaultCurrencyId,
+            'as_of_date': _documentDate.toIso8601String().split('T')[0],
+            'balance_before': _customerBalance,
+          },
         if (_isOverpaid) 'quick_sale_change': changeResolution!.toJson(),
       };
 
@@ -2748,54 +3145,81 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         'is_proforma': false,
         'extra_info': extraInfo,
         'lines': lines,
+        if (appliedStockCorrectionToken != null)
+          '_quick_sale_stock_correction_token': appliedStockCorrectionToken,
         if (payments.isNotEmpty) 'payments': payments,
         if (desc.isNotEmpty) 'description': desc,
         if (stockOverride != null) 'stock_override': stockOverride,
       };
 
-      final result = await _invoiceService.createInvoice(
+      final queuedJob = await _invoiceService.enqueueQuickSaleInvoice(
         businessId: widget.businessId,
         payload: payload,
       );
 
       if (!mounted) return;
 
+      final jobStatus = queuedJob['status']?.toString();
+      final queuedRequestId =
+          queuedJob['request_id']?.toString() ?? _activeSaleId;
+      if (jobStatus == 'failed') {
+        final errorMessage = queuedJob['error_message']?.toString().trim();
+        SnackBarHelper.show(
+          context,
+          message: errorMessage == null || errorMessage.isEmpty
+              ? 'ثبت قبلی این فروش ناموفق بود؛ سبد نگه داشته شد و می‌توانید دوباره تلاش کنید.'
+              : 'ثبت قبلی این فروش ناموفق بود: $errorMessage',
+          isError: true,
+        );
+        _markCurrentSaleRequestForRetry();
+        return;
+      }
+      if (jobStatus != 'completed') {
+        _openBlankSaleAfterQueuedSave(queuedRequestId);
+        SnackBarHelper.show(
+          context,
+          message:
+              'درخواست فروش برای ثبت ارسال شد؛ می‌توانید فروش بعدی را شروع کنید.',
+        );
+        unawaited(
+          _watchQuickSaleInvoiceJob(
+            requestId: queuedRequestId,
+            personId: personId,
+            totalAmount: savedShareAmount,
+            shouldPrint: shouldPrint,
+            shouldShare: shouldShare,
+            shareSnapshot: shareSnapshot,
+          ),
+        );
+        return;
+      }
+
+      final result = queuedJob;
       final invoiceId = (result['id'] as num?)?.toInt();
-      final invoiceCode = result['code']?.toString();
+      final invoiceIdFromJob = (result['invoice_id'] as num?)?.toInt();
+      final resolvedInvoiceId = invoiceId ?? invoiceIdFromJob;
+      final invoiceCode =
+          result['code']?.toString() ?? result['invoice_code']?.toString();
 
-      setState(() {
-        _cartItems.clear();
-        _payments = [];
-        _changeResolution = null;
-        _cashFollowsTotal = false;
-        _shareRemainingEnabled = false;
-        _checkoutDiscountExpanded = false;
-        _productStocks.clear();
-        _pendingStockProductIds.clear();
-        _documentDate = DateTime.now();
-        _documentDescriptionController.clear();
-        _globalDiscountValueController.clear();
-        _saveAction = _QuickSalesSaveAction.none;
-      });
-
-      _barcodeFocus.requestFocus();
+      _openBlankSaleAfterSuccessfulSave();
 
       final successMsg = StringBuffer('فاکتور با موفقیت ثبت شد');
       if (invoiceCode != null) successMsg.write(' ($invoiceCode)');
       SnackBarHelper.show(context, message: successMsg.toString());
 
-      if (invoiceId != null && (shouldPrint || shouldShare)) {
+      if (resolvedInvoiceId != null && (shouldPrint || shouldShare)) {
         unawaited(
           _runPostSaveTasks(
-            invoiceId: invoiceId,
+            invoiceId: resolvedInvoiceId,
             invoiceCode: invoiceCode,
             personId: personId,
             totalAmount: savedShareAmount,
             shouldPrint: shouldPrint,
             shouldShare: shouldShare,
+            shareSnapshot: shareSnapshot,
           ),
         );
-      } else if (shouldPrint && invoiceId == null) {
+      } else if (shouldPrint && resolvedInvoiceId == null) {
         SnackBarHelper.show(
           context,
           message: 'فاکتور ثبت شد اما شناسه فاکتور برای چاپ در دسترس نیست',
@@ -2805,7 +3229,14 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     } catch (e) {
       if (mounted) {
         final shortages = _stockShortagesFromError(e);
-        if (shortages.isNotEmpty && stockOverride == null) {
+        if (shortages.isNotEmpty && appliedStockCorrectionToken != null) {
+          SnackBarHelper.show(
+            context,
+            message:
+                'اصلاح موجودی ثبت شد، اما فاکتور هنوز به علت کسری موجودی ثبت نشد. تاریخ فاکتور و گردش انبار را بررسی کنید؛ با تکرار ثبت، سند اصلاح جدید ساخته نمی‌شود.',
+            isError: true,
+          );
+        } else if (shortages.isNotEmpty && stockOverride == null) {
           final action = await _showStockShortageDialog(shortages);
           if (!mounted) return;
           if (action == _StockShortageAction.override) {
@@ -2813,7 +3244,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             if (!mounted) return;
           } else if (action == _StockShortageAction.correct) {
             try {
-              retryAfterCorrection = await _correctShortagesBeforeSale(
+              retryCorrectionToken = await _correctShortagesBeforeSale(
                 shortages,
               );
             } catch (correctionError) {
@@ -2837,6 +3268,12 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           String errorMessage = 'خطا در ثبت فاکتور';
           if (e.toString().contains('INSUFFICIENT_STOCK')) {
             errorMessage = 'موجودی کافی برای برخی محصولات وجود ندارد';
+          } else if (e.toString().contains(
+            'QUICK_SALE_CUSTOMER_BALANCE_CHANGED',
+          )) {
+            errorMessage =
+                'مانده حساب مشتری تغییر کرده است؛ مانده جدید را بررسی کنید';
+            unawaited(_refreshCustomerBalance());
           } else if (e.toString().contains('CURRENCY')) {
             errorMessage = 'خطا در تنظیمات ارز';
           } else {
@@ -2856,13 +3293,216 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     if (!mounted) return;
     if (parkAfterFailure) {
       _startNewSale();
-    } else if (retryAfterCorrection || retryOverride != null) {
+    } else if (retryCorrectionToken != null || retryOverride != null) {
       await _saveInvoice(
         print: print,
         stockOverride: retryOverride,
         debtConfirmed: debtConfirmed,
+        appliedStockCorrectionToken: retryCorrectionToken,
       );
     }
+  }
+
+  Future<void> _handleQueuedStockShortage({
+    required String saleId,
+    required Map<String, dynamic> job,
+    required bool shouldPrint,
+  }) async {
+    final shortagesValue = job['error_details'] is Map
+        ? (job['error_details'] as Map)['shortages']
+        : null;
+    final shortages = shortagesValue is List
+        ? shortagesValue
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList()
+        : const <Map<String, dynamic>>[];
+    if (shortages.isEmpty || !mounted) return;
+
+    // Keep the next sale intact while bringing the failed basket back for its
+    // correction/override workflow. The failed request already has a new ID,
+    // so any retry gets a fresh idempotency key.
+    _selectParkedSale(saleId);
+    final correctionAlreadyApplied =
+        (job['error_details'] as Map?)?['stock_correction_already_applied'] ==
+        true;
+    if (correctionAlreadyApplied) {
+      SnackBarHelper.show(
+        context,
+        message:
+            'اصلاح موجودی قبلی ثبت شده، اما فاکتور هنوز کسری دارد؛ موجودی و تاریخ گردش را بررسی کنید.',
+        isError: true,
+      );
+    }
+    final action = await _showStockShortageDialog(
+      shortages,
+      correctionAlreadyApplied: correctionAlreadyApplied,
+    );
+    if (!mounted || action == null || action == _StockShortageAction.cancel) {
+      return;
+    }
+    if (action == _StockShortageAction.park) {
+      _startNewSale();
+      return;
+    }
+    if (action == _StockShortageAction.override) {
+      final override = await _askStockOverrideReason();
+      if (!mounted || override == null) return;
+      await _saveInvoice(print: shouldPrint, stockOverride: override);
+      return;
+    }
+
+    try {
+      final correctionToken = await _correctShortagesBeforeSale(shortages);
+      if (!mounted || correctionToken == null) return;
+      await _saveInvoice(
+        print: shouldPrint,
+        appliedStockCorrectionToken: correctionToken,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      SnackBarHelper.show(
+        context,
+        message:
+            'اصلاح موجودی انجام نشد: ${ErrorExtractor.forContext(error, context)}',
+        isError: true,
+      );
+    }
+  }
+
+  Future<void> _watchQuickSaleInvoiceJob({
+    required String requestId,
+    required int personId,
+    required num totalAmount,
+    required bool shouldPrint,
+    required bool shouldShare,
+    required _QuickSalesShareSnapshot shareSnapshot,
+  }) async {
+    var pollDelay = const Duration(milliseconds: 500);
+    final deadline = DateTime.now().add(const Duration(minutes: 15));
+
+    while (mounted && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(pollDelay);
+      if (!mounted) return;
+
+      Map<String, dynamic> job;
+      try {
+        job = await _invoiceService.getQuickSaleInvoiceJob(
+          businessId: widget.businessId,
+          requestId: requestId,
+        );
+      } catch (_) {
+        pollDelay = Duration(
+          milliseconds: (pollDelay.inMilliseconds * 1.5)
+              .round()
+              .clamp(500, 3000)
+              .toInt(),
+        );
+        continue;
+      }
+
+      final status = job['status']?.toString();
+      if (status == 'completed') {
+        final invoiceId = (job['invoice_id'] as num?)?.toInt();
+        final invoiceCode = job['invoice_code']?.toString();
+        if (invoiceId == null) {
+          SnackBarHelper.show(
+            context,
+            message: 'ثبت فروش تکمیل شد اما شناسهٔ فاکتور برنگشت.',
+            isError: true,
+          );
+          return;
+        }
+        _completeQueuedSale(requestId);
+        var message = 'فاکتور با موفقیت ثبت شد';
+        if (invoiceCode != null && invoiceCode.isNotEmpty) {
+          message += ' ($invoiceCode)';
+        }
+        SnackBarHelper.show(context, message: message);
+        if (shouldPrint || shouldShare) {
+          unawaited(
+            _runPostSaveTasks(
+              invoiceId: invoiceId,
+              invoiceCode: invoiceCode,
+              personId: personId,
+              totalAmount: totalAmount,
+              shouldPrint: shouldPrint,
+              shouldShare: shouldShare,
+              shareSnapshot: shareSnapshot,
+            ),
+          );
+        }
+        return;
+      }
+
+      if (status == 'failed') {
+        final errorCode = job['error_code']?.toString();
+        final failedSaleId = _markQueuedSaleFailed(requestId, notify: false);
+        final errorDetails = job['error_details'];
+        final shortageList = errorDetails is Map
+            ? errorDetails['shortages']
+            : null;
+        if (errorCode == 'INSUFFICIENT_STOCK' &&
+            failedSaleId != null &&
+            shortageList is List &&
+            shortageList.isNotEmpty) {
+          await _handleQueuedStockShortage(
+            saleId: failedSaleId,
+            job: job,
+            shouldPrint: shouldPrint,
+          );
+          return;
+        }
+        final message = errorCode == 'INSUFFICIENT_STOCK'
+            ? 'فروش ثبت نشد؛ موجودی کافی نیست. لطفاً موجودی کالاها را بررسی کنید.'
+            : (job['error_message']?.toString().trim().isNotEmpty == true
+                  ? job['error_message'].toString()
+                  : 'ثبت فروش ناموفق بود. لطفاً دوباره تلاش کنید.');
+        SnackBarHelper.show(context, message: message, isError: true);
+        if (failedSaleId != null) {
+          SnackBarHelper.show(
+            context,
+            message:
+                'سبد فروش نگه داشته شد؛ پس از اصلاح می‌توانید دوباره ثبت کنید.',
+          );
+        }
+        return;
+      }
+
+      pollDelay = Duration(
+        milliseconds: (pollDelay.inMilliseconds * 1.5)
+            .round()
+            .clamp(500, 3000)
+            .toInt(),
+      );
+    }
+
+    if (mounted) {
+      SnackBarHelper.show(
+        context,
+        message:
+            'ثبت فروش هنوز در حال انجام است؛ وضعیت آن در سرور ذخیره شده است.',
+      );
+    }
+  }
+
+  void _markCurrentSaleRequestForRetry() {
+    final oldId = _activeSaleId;
+    _captureActiveSaleIntoList();
+    final index = _sales.indexWhere((sale) => sale.id == oldId);
+    if (index < 0) return;
+    final newId = QuickSalesParkedSale.newId();
+    final oldSale = _sales[index];
+    final renewedSale = QuickSalesParkedSale.fromJson({
+      ...oldSale.toJson(),
+      'id': newId,
+      'updated_at': DateTime.now().toIso8601String(),
+    });
+    setState(() {
+      _sales[index] = renewedSale;
+      _activeSaleId = newId;
+    });
+    unawaited(_persistParkedSalesNow());
   }
 
   Future<void> _runPostSaveTasks({
@@ -2872,6 +3512,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     required num totalAmount,
     required bool shouldPrint,
     required bool shouldShare,
+    required _QuickSalesShareSnapshot shareSnapshot,
   }) async {
     final followUpNotes = <String>[];
 
@@ -2879,9 +3520,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       try {
         await _printInvoice(invoiceId: invoiceId, invoiceCode: invoiceCode);
       } catch (e) {
-        followUpNotes.add(
-          'خطا در چاپ: ${ErrorExtractor.forContext(e, context)}',
-        );
+        followUpNotes.add('خطا در چاپ: ${_errorText(e)}');
       }
     }
 
@@ -2892,10 +3531,11 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           invoiceCode: invoiceCode,
           personId: personId,
           totalAmount: totalAmount,
+          shareSnapshot: shareSnapshot,
         );
         followUpNotes.addAll(shareNotes);
       } catch (e) {
-        followUpNotes.add(ErrorExtractor.forContext(e, context));
+        followUpNotes.add(_errorText(e));
       }
     }
 
@@ -2929,17 +3569,13 @@ class _QuickSalesPageState extends State<QuickSalesPage>
 
       if (!mounted) return;
 
-      final filename = invoiceCode ?? 'invoice_$invoiceId';
-      final safeName = filename.trim().isEmpty ? 'invoice.pdf' : filename;
-      final finalName = safeName.toLowerCase().endsWith('.pdf')
-          ? safeName
-          : '$safeName.pdf';
-      final result = await BytesExportService.export(
+      await PdfOutputService.deliverPdf(
+        context: context,
         bytes: bytes,
-        filename: finalName,
-        mimeType: 'application/pdf',
+        filename: invoiceCode ?? 'invoice_$invoiceId',
+        businessId: widget.businessId,
+        paperSize: paperSize,
       );
-      if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (mounted) {
         SnackBarHelper.show(
@@ -3407,10 +4043,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     setState(() {
       _lastFailedSearchQuery = null;
     });
-    SnackBarHelper.show(
-      context,
-      message: '${product['name'] ?? 'محصول'} به سبد اضافه شد',
-    );
   }
 
   bool _handleKeyEvent(KeyEvent event) {
@@ -3519,6 +4151,138 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     return false;
   }
 
+  Widget _buildCustomerSelector({bool dense = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        CustomerComboboxWidget(
+          selectedCustomer: _selectedCustomer,
+          onCustomerChanged: _onCustomerChanged,
+          businessId: widget.businessId,
+          authStore: widget.authStore,
+          isRequired: false,
+          enableQuickCreateOnSubmit: true,
+          dense: dense,
+          label: 'مشتری',
+          hintText: 'مشتری ناشناس',
+        ),
+        if (!_isAnonymousSelected) ...[
+          const SizedBox(height: 6),
+          _buildCustomerBalancePanel(),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildCustomerBalancePanel() {
+    final cs = Theme.of(context).colorScheme;
+    if (_customerBalanceLoading) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 8),
+            Expanded(child: Text('در حال دریافت مانده حساب…')),
+          ],
+        ),
+      );
+    }
+    if (_customerBalanceError != null) {
+      return Container(
+        padding: const EdgeInsetsDirectional.only(start: 10),
+        decoration: BoxDecoration(
+          color: cs.errorContainer,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                'مانده حساب دریافت نشد',
+                style: TextStyle(color: cs.onErrorContainer),
+              ),
+            ),
+            IconButton(
+              tooltip: 'تلاش دوباره',
+              onPressed: () => unawaited(_refreshCustomerBalance()),
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
+        ),
+      );
+    }
+    final balance = _customerBalance;
+    if (balance == null) return const SizedBox.shrink();
+    final isSettled = balance.abs() <= _paymentEpsilon;
+    final status =
+        _customerBalanceStatus ?? quickSalesCustomerBalanceStatus(balance);
+    final statusColor = isSettled
+        ? cs.onSurfaceVariant
+        : balance < 0
+        ? cs.error
+        : Colors.green.shade700;
+    final remainingCredit = balance > _totalAmount ? balance - _totalAmount : 0;
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: SwitchListTile.adaptive(
+        dense: true,
+        contentPadding: const EdgeInsetsDirectional.only(start: 10, end: 4),
+        secondary: Icon(
+          balance < 0
+              ? Icons.account_balance_wallet_outlined
+              : Icons.savings_outlined,
+          color: statusColor,
+        ),
+        title: Text.rich(
+          TextSpan(
+            text: 'مانده حساب: ',
+            children: [
+              TextSpan(
+                text: isSettled
+                    ? 'تسویه'
+                    : '${_formatNumber(balance.abs())} $_paymentCurrencyUnit — $status',
+                style: TextStyle(
+                  color: statusColor,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+        subtitle: Text(
+          _applyCustomerBalance
+              ? remainingCredit > _paymentEpsilon
+                    ? 'قابل تسویه: ${_formatNumber(_paymentTargetAmount)} $_paymentCurrencyUnit • اعتبار باقی‌مانده: ${_formatNumber(remainingCredit)}'
+                    : 'مبلغ قابل تسویه: ${_formatNumber(_paymentTargetAmount)} $_paymentCurrencyUnit'
+              : 'اعمال مانده در مبلغ قابل تسویه این فروش',
+        ),
+        value: _applyCustomerBalance,
+        onChanged: isSettled || _isSaving
+            ? null
+            : (value) {
+                setState(() {
+                  _applyCustomerBalance = value;
+                  _changeResolution = null;
+                  _shareRemainingEnabled = false;
+                });
+              },
+      ),
+    );
+  }
+
   /// تاریخ فاکتور (شمسی/میلادی طبق تنظیم کاربر) و شرح سند — چیدمان فشرده
   Widget _buildDocumentDateAndDescription({
     required bool isMobile,
@@ -3530,9 +4294,15 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       hintText: 'انتخاب تاریخ',
       calendarController: widget.calendarController,
       isDense: true,
+      contentPadding: const EdgeInsetsDirectional.only(
+        start: 12,
+        top: 14,
+        bottom: 12,
+        end: 12,
+      ),
       onChanged: (d) {
         if (d != null) {
-          setState(() => _documentDate = d);
+          _onDocumentDateChanged(d);
         }
       },
     );
@@ -3570,7 +4340,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            dateWidget,
+            Padding(padding: const EdgeInsets.only(top: 4), child: dateWidget),
             Theme(
               data: Theme.of(
                 context,
@@ -3923,23 +4693,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
                             ],
                           ),
                           SizedBox(height: isCompact ? 6 : 8),
-                          CustomerComboboxWidget(
-                            selectedCustomer: _selectedCustomer,
-                            onCustomerChanged: (customer) {
-                              setState(() {
-                                _selectedCustomer =
-                                    customer ?? _anonymousCustomer;
-                                _changeResolution = null;
-                                _syncShareChannelDefaults();
-                              });
-                            },
-                            businessId: widget.businessId,
-                            authStore: widget.authStore,
-                            isRequired: false,
-                            enableQuickCreateOnSubmit: true,
-                            label: 'مشتری',
-                            hintText: 'مشتری ناشناس',
-                          ),
+                          _buildCustomerSelector(),
                           SizedBox(height: isCompact ? 6 : 8),
                           _buildDocumentDateAndDescription(
                             isMobile: true,
@@ -4390,10 +5144,12 @@ class _QuickSalesPageState extends State<QuickSalesPage>
                           payments: _payments,
                           onChanged: _onPaymentsChanged,
                           invoiceTotal: _totalAmount,
+                          paymentTarget: _paymentTargetAmount,
                           changeResolution: _validChangeResolution,
                           onConfigureChange: _openChangeResolutionDialog,
                           defaultCashRegisterId: _selectedCashRegisterId,
                           currencyUnit: _paymentCurrencyUnit,
+                          currencyId: _defaultCurrencyId!,
                           decimalPlaces: _invoiceCurrencyDecimalPlaces,
                           enabled: !_isSaving,
                           onSave: () => _saveInvoice(print: false),
@@ -4846,22 +5602,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CustomerComboboxWidget(
-            selectedCustomer: _selectedCustomer,
-            onCustomerChanged: (customer) {
-              setState(() {
-                _selectedCustomer = customer ?? _anonymousCustomer;
-                _changeResolution = null;
-                _syncShareChannelDefaults();
-              });
-            },
-            businessId: widget.businessId,
-            authStore: widget.authStore,
-            isRequired: false,
-            enableQuickCreateOnSubmit: true,
-            label: 'مشتری',
-            hintText: 'مشتری ناشناس',
-          ),
+          _buildCustomerSelector(),
           const SizedBox(height: 12),
           _buildDocumentDateAndDescription(isMobile: true, compact: isCompact),
         ],
@@ -5223,7 +5964,9 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             12,
             12,
             12,
-            _autoCreatePaymentDocument ? 232 : 8,
+            _autoCreatePaymentDocument
+                ? QuickSalesPaymentDock.desktopSummaryHeight + 8
+                : 8,
           ),
           child: _buildCheckoutScrollBody(
             cs,
@@ -5248,23 +5991,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (includeCustomer) ...[
-          CustomerComboboxWidget(
-            selectedCustomer: _selectedCustomer,
-            onCustomerChanged: (customer) {
-              setState(() {
-                _selectedCustomer = customer ?? _anonymousCustomer;
-                _changeResolution = null;
-                _syncShareChannelDefaults();
-              });
-            },
-            businessId: widget.businessId,
-            authStore: widget.authStore,
-            isRequired: false,
-            enableQuickCreateOnSubmit: true,
-            dense: true,
-            label: 'مشتری',
-            hintText: 'مشتری ناشناس',
-          ),
+          _buildCustomerSelector(dense: true),
           const SizedBox(height: 10),
         ],
         if (includeTotal) ...[
@@ -5589,7 +6316,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
               if (v == _cashFollowsTotal) return;
               setState(() => _cashFollowsTotal = v);
             },
-            invoiceTotal: _totalAmount,
+            invoiceTotal: _paymentTargetAmount,
             defaultCashRegisterId: _selectedCashRegisterId,
             enabled: !_isSaving,
             currencyId: _defaultCurrencyId,

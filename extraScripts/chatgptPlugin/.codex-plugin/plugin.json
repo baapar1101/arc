@@ -1,11 +1,12 @@
 {
-  "apps": "./.app.json",
+  "name": "hesabix",
+  "version": "1.0.1",
+  "description": "Connect ChatGPT to Hesabix accounting and business tools for reporting and authorized bookkeeping operations.",
   "author": {
     "name": "TFS company LTD",
     "email": "support@hesabix.ir",
     "url": "https://hesabix.ir/"
   },
-  "description": "Connect ChatGPT to Hesabix accounting and business tools for reporting and authorized bookkeeping operations.",
   "interface": {
     "capabilities": [
       "Read accounting and business data",
@@ -20,7 +21,7 @@
     ],
     "developerName": "TFS company LTD",
     "displayName": "Hesabix",
-    "longDescription": "Connect ChatGPT to your Hesabix accounting workspace. Review financial and business records, prepare reports, and carry out supported bookkeeping, sales, and other business operations with Hesabix tools. The available tools are limited to the connected business and your Hesabix role. Reading is available by default; creating or changing records requires a separately authorized write connection. Review generated reports and proposed changes before relying on them. For support, email support@hesabix.ir.",
+    "longDescription": "Connect ChatGPT to your Hesabix accounting workspace. Review financial and business records, prepare reports, and carry out supported bookkeeping, sales, and other business operations with Hesabix tools.",
     "shortDescription": "Accounting, reports & actions",
     "websiteURL": "https://hesabix.ir/",
     "supportURL": "https://hesabix.ir/contact/",
@@ -31,8 +32,6 @@
     "logo": "./assets/hesabix-mark.png",
     "composerIcon": "./assets/hesabix-mark.png"
   },
-  "name": "dev-6ad2078c85fc8191b8db6c2c618a5d9c",
-  "version": "1.0.0",
   "extensions": {
     "com.openai": {
       "publication": {

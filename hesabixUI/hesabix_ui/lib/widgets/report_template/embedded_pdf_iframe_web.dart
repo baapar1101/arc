@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'dart:ui_web' as ui_web;
 
 import 'package:flutter/foundation.dart';
@@ -16,20 +15,24 @@ bool _isPdfBytes(Uint8List bytes) {
 }
 
 /// نمایش PDF داخل صفحه (وب) با platform view و blob URL.
+///
+/// استفاده از embed به جای iframe مهم است: برخی مرورگرها نمایشگر PDF را برای
+/// blob داخل iframe سفید رندر می‌کنند، در حالی که همان URL در تب جدید سالم است.
 class ReportTemplateEmbeddedPdf extends StatefulWidget {
   final Uint8List bytes;
 
   const ReportTemplateEmbeddedPdf({super.key, required this.bytes});
 
   @override
-  State<ReportTemplateEmbeddedPdf> createState() => _ReportTemplateEmbeddedPdfState();
+  State<ReportTemplateEmbeddedPdf> createState() =>
+      _ReportTemplateEmbeddedPdfState();
 }
 
 class _ReportTemplateEmbeddedPdfState extends State<ReportTemplateEmbeddedPdf> {
   static int _factorySeq = 0;
 
   late final String _viewType;
-  web.HTMLIFrameElement? _iframe;
+  web.HTMLEmbedElement? _embed;
   String? _objectUrl;
   String? _error;
   bool _viewMounted = false;
@@ -55,36 +58,25 @@ class _ReportTemplateEmbeddedPdfState extends State<ReportTemplateEmbeddedPdf> {
   }
 
   web.Element _createView(int viewId) {
-    final root = web.document.createElement('div') as web.HTMLDivElement
+    final embed = web.document.createElement('embed') as web.HTMLEmbedElement
+      ..type = 'application/pdf'
+      ..style.border = 'none'
       ..style.width = '100%'
       ..style.height = '100%'
-      ..style.minHeight = '320px'
-      ..style.position = 'relative'
-      ..style.overflow = 'hidden'
       ..style.display = 'block'
       ..style.backgroundColor = '#ffffff';
 
-    final iframe = web.document.createElement('iframe') as web.HTMLIFrameElement
-      ..title = 'PDF preview'
-      ..style.border = 'none'
-      ..style.position = 'absolute'
-      ..style.left = '0'
-      ..style.top = '0'
-      ..style.width = '100%'
-      ..style.height = '100%'
-      ..style.display = 'block';
-
-    root.append(iframe);
-    _iframe = iframe;
+    embed.setAttribute('aria-label', 'PDF preview');
+    _embed = embed;
     _viewMounted = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _applyBytes();
     });
-    return root;
+    return embed;
   }
 
   void _applyBytes() {
-    if (!_viewMounted || _iframe == null) return;
+    if (!_viewMounted || _embed == null) return;
 
     if (widget.bytes.isEmpty) {
       setState(() => _error = 'فایل PDF خالی است');
@@ -101,7 +93,7 @@ class _ReportTemplateEmbeddedPdfState extends State<ReportTemplateEmbeddedPdf> {
       widget.bytes,
       mimeType: 'application/pdf',
     );
-    _iframe!.src = url;
+    _embed!.src = url;
     _objectUrl = url;
     if (previousUrl != null && previousUrl != url) {
       _scheduleRevoke(previousUrl);
@@ -123,7 +115,8 @@ class _ReportTemplateEmbeddedPdfState extends State<ReportTemplateEmbeddedPdf> {
   void dispose() {
     final url = _objectUrl;
     _objectUrl = null;
-    _iframe = null;
+    _embed = null;
+    _viewMounted = false;
     super.dispose();
     if (url != null) {
       _scheduleRevoke(url);
@@ -140,8 +133,8 @@ class _ReportTemplateEmbeddedPdfState extends State<ReportTemplateEmbeddedPdf> {
             _error!,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.error,
-                ),
+              color: Theme.of(context).colorScheme.error,
+            ),
           ),
         ),
       );
@@ -152,8 +145,8 @@ class _ReportTemplateEmbeddedPdfState extends State<ReportTemplateEmbeddedPdf> {
         child: Text(
           'فایل PDF خالی است',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
       );
     }
@@ -163,10 +156,12 @@ class _ReportTemplateEmbeddedPdfState extends State<ReportTemplateEmbeddedPdf> {
         var width = constraints.maxWidth;
         var height = constraints.maxHeight;
         if (!width.isFinite || width <= 0) {
-          width = MediaQuery.sizeOf(context).width;
+          final screenWidth = MediaQuery.sizeOf(context).width;
+          width = screenWidth > 720 ? 720 : screenWidth;
         }
         if (!height.isFinite || height <= 0) {
-          height = MediaQuery.sizeOf(context).height * 0.55;
+          final screenHeight = MediaQuery.sizeOf(context).height;
+          height = screenHeight > 520 ? 520 : screenHeight;
         }
         return SizedBox(
           width: width,

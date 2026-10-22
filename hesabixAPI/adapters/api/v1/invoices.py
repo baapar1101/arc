@@ -29,6 +29,7 @@ from app.core.permissions import (
 )
 from app.core.responses import success_response, format_datetime_fields
 from app.core.cache import get_cache
+from app.core.transaction_lock import acquire_transaction_lock
 from adapters.api.v1.schemas import QueryInfo, InvoiceListQuery
 from adapters.api.v1.list_query_common import model_to_legacy_body
 from adapters.db.models.document import Document
@@ -222,6 +223,36 @@ def create_invoice_endpoint(
     # پس از کنترل ویژگی فروش سریع، تنظیمات کسب‌وکار و مجوز کاربر در سرور ساخته می‌شود.
     extra = dict(payload.get("extra_info") or {})
     extra.pop("_stock_override", None)
+    if extra.get("quick_sale") is True:
+        if payload.get("invoice_type") != "invoice_sales":
+            raise ApiError(
+                "QUICK_SALE_INVOICE_TYPE_INVALID",
+                "فروش سریع فقط برای فاکتور فروش قابل استفاده است",
+                http_status=400,
+            )
+        request_id = str(extra.get("quick_sale_request_id") or "").strip()
+        if not re.fullmatch(r"[A-Za-z0-9._:-]{16,160}", request_id):
+            raise ApiError(
+                "QUICK_SALE_REQUEST_ID_REQUIRED",
+                "شناسه یکتای درخواست فروش سریع نامعتبر است",
+                http_status=400,
+            )
+        acquire_transaction_lock(
+            db,
+            f"quick_sale_invoice:{business_id}:{request_id}",
+        )
+        existing_invoice = db.query(Document).filter(
+            Document.business_id == int(business_id),
+            Document.document_type == "invoice_sales",
+            Document.extra_info["quick_sale"].as_string() == "true",
+            Document.extra_info["quick_sale_request_id"].as_string() == request_id,
+        ).first()
+        if existing_invoice is not None:
+            return success_response(
+                data=invoice_document_to_dict(db, existing_invoice),
+                request=request,
+                message="INVOICE_ALREADY_CREATED",
+            )
     requested_override = payload.pop("stock_override", None)
     if requested_override is not None:
         from adapters.db.models.quick_sales_settings import QuickSalesSetting
@@ -300,6 +331,7 @@ def create_invoice_endpoint(
         data=payload,
         user_can_select_fx_rate=can_pick,
         user_can_change_invoice_unit_price=can_change_unit,
+        lightweight_response=extra.get("quick_sale") is True,
     )
     return success_response(data=result, request=request, message="INVOICE_CREATED")
 

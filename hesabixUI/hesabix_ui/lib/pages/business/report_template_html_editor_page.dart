@@ -1,6 +1,4 @@
 import 'package:hesabix_ui/theme/glass.dart';
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -82,7 +80,9 @@ class _ReportTemplateHtmlEditorPageState extends State<ReportTemplateHtmlEditorP
   final _htmlCtrl = TextEditingController(
     text: '<html><head></head><body><h3>{{ title_text }}</h3></body></html>',
   );
-  final _cssCtrl = TextEditingController(text: 'body { font-family: Tahoma, Arial; }');
+  final _cssCtrl = TextEditingController(
+    text: "body { font-family: 'YekanBakhFaNum', 'Vazirmatn', Tahoma, Arial, sans-serif; }",
+  );
   final _headerCtrl = TextEditingController();
   final _footerCtrl = TextEditingController();
   final _marginTopCtrl = TextEditingController(text: '10');
@@ -383,17 +383,23 @@ class _ReportTemplateHtmlEditorPageState extends State<ReportTemplateHtmlEditorP
       if (!mounted) return;
       await showGlassDialog<void>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(t.reportTemplatePreview),
-          content: SizedBox(
-            width: 720,
-            height: 520,
-            child: ReportTemplateEmbeddedPdf(bytes: Uint8List.fromList(pdfBytes)),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.close)),
-          ],
-        ),
+        builder: (ctx) {
+          final viewport = MediaQuery.sizeOf(ctx);
+          final availableWidth = viewport.width > 64 ? viewport.width - 64 : viewport.width;
+          final availableHeight = viewport.height > 180 ? viewport.height - 180 : viewport.height;
+          return AlertDialog(
+            insetPadding: const EdgeInsets.all(16),
+            title: Text(t.reportTemplatePreview),
+            content: SizedBox(
+              width: availableWidth > 720 ? 720 : availableWidth,
+              height: availableHeight > 520 ? 520 : availableHeight,
+              child: ReportTemplateEmbeddedPdf(bytes: Uint8List.fromList(pdfBytes)),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.close)),
+            ],
+          );
+        },
       );
     } catch (e) {
       if (mounted) {

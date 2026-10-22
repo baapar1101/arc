@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 from datetime import datetime, date, timedelta, timezone
 from app.core.datetime_utils import utc_now, utc_now_aware, utc_naive_to_iso_z
 from decimal import Decimal, ROUND_HALF_UP
@@ -32,6 +32,7 @@ from adapters.db.models.product_bom import ProductBOM, ProductBOMOutput
 from adapters.db.models.business import Business
 from app.core.calendar import CalendarConverter, CalendarType
 from app.core.responses import ApiError, success_response
+from app.core.transaction_lock import acquire_transaction_lock
 from app.services.document_monetization_service import ensure_document_policy_allows_creation
 from app.services.credit_service import get_business_credit_settings
 import jdatetime
@@ -775,17 +776,25 @@ def _remove_old_invoice_warehouse_documents(
     invoice_document_id: int,
     warehouse_document_ids: List[int],
     user_id: int,
-) -> None:
+) -> Set[str]:
     """
-    حذف حوالهٔ پیش‌نویس یا لغو+پست معکوس برای حوالهٔ قطعی.
+    حذف حوالهٔ پیش‌نویس یا لغو حوالهٔ قطعی و ثبت معکوس بایگانی.
     شناسه‌ها از links فاکتور می‌آید؛ اگر source_document_id با فاکتور دیگری ست شده باشد رد می‌شود.
     (source_type قدیمی اجباری نیست تا حواله‌های قدیمی بدون متادیتای درست لغو شوند.)
+
+    موجودی اسناد فاکتور از invoice_item_lines محاسبه می‌شود؛ پست معکوس کل حوالهٔ فاکتور
+    هنگام ویرایش، برای خطوطی که تغییر نکرده‌اند کنترل موجودی کاذب ایجاد می‌کند. فقط کاهش
+    واقعیِ رسیدهای قبلی کنترل می‌شود و وضعیت posted برای ساخت حوالهٔ جایگزین حفظ می‌گردد.
     """
     from adapters.db.models.warehouse_document import WarehouseDocument
     from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
-    from app.services.warehouse_service import cancel_warehouse_document, post_warehouse_document
+    from adapters.db.models.warehouse import Warehouse
+    from app.services.warehouse_service import cancel_warehouse_document
 
     seen: set[int] = set()
+    posted_document_types: Set[str] = set()
+    posted_receipts: Dict[Tuple[int, int], Decimal] = defaultdict(Decimal)
+    posted_documents: Dict[int, Any] = {}
     for raw_id in warehouse_document_ids:
         try:
             wid = int(raw_id)
@@ -800,16 +809,152 @@ def _remove_old_invoice_warehouse_documents(
         if wh.source_document_id is not None and int(wh.source_document_id) != int(invoice_document_id):
             continue
         st = (wh.status or "").strip().lower()
+        if st == "posted":
+            posted_document_types.add(str(wh.doc_type or "").strip().lower())
+            posted_documents[wid] = wh
         if st == "draft":
             db.query(WarehouseDocumentLine).filter(
                 WarehouseDocumentLine.warehouse_document_id == wh.id
             ).delete(synchronize_session=False)
             db.delete(wh)
-        elif st == "posted":
-            cancel_wh = cancel_warehouse_document(db, business_id, int(wh.id), user_id)
-            post_warehouse_document(db, int(cancel_wh.id))
         # cancelled: بدون اقدام
+
+    if posted_documents:
+        for line in db.query(WarehouseDocumentLine).filter(
+            WarehouseDocumentLine.warehouse_document_id.in_(list(posted_documents))
+        ).all():
+            if str(line.movement or "").strip().lower() != "in" or line.warehouse_id is None:
+                continue
+            key = (int(line.product_id), int(line.warehouse_id))
+            posted_receipts[key] += Decimal(str(line.quantity or 0))
+
+        # The invoice lines have already been replaced by update_invoice. Compare the new
+        # receipts with the old posted receipt lines and reject only reductions that would
+        # leave stock negative. Unchanged receipt lines must not be treated as withdrawals.
+        invoice = db.query(Document).filter(
+            Document.id == int(invoice_document_id),
+            Document.business_id == int(business_id),
+        ).first()
+        new_receipts: Dict[Tuple[int, int], Decimal] = defaultdict(Decimal)
+        tracked_product_ids = {
+            int(row.id)
+            for row in db.query(Product.id).filter(
+                Product.business_id == int(business_id),
+                Product.track_inventory.is_(True),
+                Product.id.in_({product_id for product_id, _ in posted_receipts}),
+            ).all()
+        }
+        if invoice and not bool(invoice.is_proforma) and _is_inventory_posting_enabled(
+            {"extra_info": invoice.extra_info or {}}
+        ):
+            invoice_warehouse_id = (invoice.extra_info or {}).get("warehouse_id")
+            for line in db.query(InvoiceItemLine).filter(
+                InvoiceItemLine.document_id == int(invoice_document_id)
+            ).all():
+                info = line.extra_info or {}
+                if int(line.product_id) not in tracked_product_ids or info.get("inventory_tracked") is False:
+                    continue
+                movement = info.get("movement") or _movement_from_type(invoice.document_type)[0]
+                warehouse_id = info.get("warehouse_id", invoice_warehouse_id)
+                if movement != "in" or warehouse_id is None:
+                    continue
+                try:
+                    key = (int(line.product_id), int(warehouse_id))
+                except (TypeError, ValueError):
+                    continue
+                new_receipts[key] += Decimal(str(line.quantity or 0))
+
+        reductions = {
+            key: quantity - new_receipts.get(key, Decimal(0))
+            for key, quantity in posted_receipts.items()
+            if quantity > new_receipts.get(key, Decimal(0))
+        }
+        if reductions and invoice:
+            biz = db.query(Business).filter(Business.id == int(business_id)).first()
+            reduction_lines = [
+                {
+                    "product_id": product_id,
+                    "quantity": float(quantity),
+                    "extra_info": {"warehouse_id": warehouse_id},
+                }
+                for (product_id, warehouse_id), quantity in reductions.items()
+            if product_id in tracked_product_ids
+            ]
+            enforced_lines = filter_outgoing_lines_for_stock_enforcement(
+                db,
+                int(business_id),
+                reduction_lines,
+                allow_negative_for_bulk=bool(getattr(biz, "allow_negative_inventory_for_bulk", False)),
+                allow_negative_for_unique=bool(getattr(biz, "allow_negative_inventory_for_unique", False)),
+                warehouse_doc_type="issue",
+                transfer_require_positive_stock=False,
+            )
+            enforced_keys = {
+                (int(line["product_id"]), int((line.get("extra_info") or {}).get("warehouse_id")))
+                for line in enforced_lines
+            }
+            product_ids = sorted({product_id for product_id, _ in enforced_keys})
+            warehouse_ids = sorted({warehouse_id for _, warehouse_id in enforced_keys})
+            product_labels = {
+                int(row.id): (str(row.name or ""), str(row.code or ""), str(row.inventory_mode or "bulk"))
+                for row in db.query(Product.id, Product.name, Product.code, Product.inventory_mode).filter(
+                    Product.business_id == int(business_id), Product.id.in_(product_ids)
+                ).all()
+            } if product_ids else {}
+            warehouse_labels = {
+                int(row.id): str(row.name or "")
+                for row in db.query(Warehouse.id, Warehouse.name).filter(
+                    Warehouse.business_id == int(business_id), Warehouse.id.in_(warehouse_ids)
+                ).all()
+            } if warehouse_ids else {}
+            shortages: List[Dict[str, Any]] = []
+            stock_check_date = max(
+                [invoice.document_date]
+                + [
+                    warehouse_document.document_date
+                    for warehouse_document in posted_documents.values()
+                    if warehouse_document.document_date is not None
+                ]
+            )
+            for product_id, warehouse_id in sorted(enforced_keys):
+                final_available = _compute_available_stock(
+                    db,
+                    int(business_id),
+                    product_id,
+                    warehouse_id,
+                    stock_check_date,
+                    exclude_warehouse_document_ids=list(posted_documents),
+                )
+                if final_available >= 0:
+                    continue
+                reduction = reductions[(product_id, warehouse_id)]
+                name, code, mode = product_labels.get(product_id, ("", "", "bulk"))
+                shortages.append({
+                    "product_id": product_id,
+                    "product_name": name or "کالا",
+                    "product_code": code or None,
+                    "warehouse_id": warehouse_id,
+                    "warehouse_name": warehouse_labels.get(warehouse_id),
+                    "inventory_mode": mode,
+                    "available_quantity": float(final_available + reduction),
+                    "requested_quantity": float(reduction),
+                    "shortage_quantity": float(-final_available),
+                })
+            if shortages:
+                raise ApiError(
+                    "INSUFFICIENT_STOCK",
+                    "موجودی کافی برای کاهش اقلام رسیدشدهٔ فاکتور وجود ندارد",
+                    http_status=409,
+                    details={"shortages": shortages},
+                )
+
+    for wid in posted_documents:
+        # Invoice movement is represented by the current invoice lines. Seal the old
+        # warehouse mirror instead of posting its full inverse; that inverse would remove
+        # unchanged receipts and can fail when any part of them has since been sold.
+        cancel_warehouse_document(db, business_id, wid, user_id, seal_reversal=True)
     db.flush()
+    return posted_document_types
 
 
 def _persisted_invoice_lines_for_warehouse(db: Session, document_id: int) -> List[Dict[str, Any]]:
@@ -846,6 +991,7 @@ def _create_warehouse_documents_for_invoice(
     invoice_type: str,
     *,
     stock_exclude_warehouse_document_ids: Optional[List[int]] = None,
+    post_warehouse_document_types: Optional[Set[str]] = None,
 ) -> List[int]:
     """
     ایجاد حواله(های) انبار از روی فاکتور در صورت فعال بودن post_inventory.
@@ -877,6 +1023,12 @@ def _create_warehouse_documents_for_invoice(
 
     created_wh_ids: List[int] = []
     auto_post_warehouse = bool((document.extra_info or {}).get("auto_post_warehouse", False))
+    forced_post_types = {
+        str(value or "").strip().lower() for value in (post_warehouse_document_types or set())
+    }
+
+    def should_post(warehouse_doc_type: str) -> bool:
+        return auto_post_warehouse or str(warehouse_doc_type or "").strip().lower() in forced_post_types
 
     if invoice_type == INVOICE_PRODUCTION:
         out_lines = [ln for ln in lines_for_wh if (ln.get("extra_info") or {}).get("movement") == "out"]
@@ -884,14 +1036,14 @@ def _create_warehouse_documents_for_invoice(
         if out_lines and invoice_lines_have_trackable_inventory_products(db, business_id, out_lines):
             wh_issue = create_from_invoice(db, business_id, document, out_lines, "issue", user_id)
             created_wh_ids.append(int(wh_issue.id))
-            if auto_post_warehouse:
+            if should_post("issue"):
                 post_warehouse_document(
                     db, int(wh_issue.id), stock_exclude_warehouse_document_ids=_stock_ex_wh
                 )
         if in_lines and invoice_lines_have_trackable_inventory_products(db, business_id, in_lines):
             wh_receipt = create_from_invoice(db, business_id, document, in_lines, "receipt", user_id)
             created_wh_ids.append(int(wh_receipt.id))
-            if auto_post_warehouse:
+            if should_post("receipt"):
                 post_warehouse_document(
                     db, int(wh_receipt.id), stock_exclude_warehouse_document_ids=_stock_ex_wh
                 )
@@ -905,7 +1057,7 @@ def _create_warehouse_documents_for_invoice(
         wh = create_from_invoice(db, business_id, document, lines_for_wh, wh_type, user_id)
         created_wh_ids.append(int(wh.id))
 
-        if auto_post_warehouse:
+        if should_post(wh_type):
             post_warehouse_document(
                 db, int(wh.id), stock_exclude_warehouse_document_ids=_stock_ex_wh
             )
@@ -1438,6 +1590,30 @@ def collect_stock_shortages(
     return shortages
 
 
+def _acquire_inventory_stock_locks(
+	db: Session,
+	business_id: int,
+	outgoing_lines: List[Dict[str, Any]],
+) -> None:
+	"""Serialize outgoing stock checks across invoice and warehouse routes."""
+	stock_lock_keys = sorted(
+		{
+			(
+				int(line.get("product_id")),
+				int((line.get("extra_info") or {}).get("warehouse_id")),
+			)
+			for line in outgoing_lines
+			if line.get("product_id") is not None
+			and (line.get("extra_info") or {}).get("warehouse_id") is not None
+		}
+	)
+	for product_id, warehouse_id in stock_lock_keys:
+		acquire_transaction_lock(
+			db,
+			f"inventory_stock:{business_id}:{warehouse_id}:{product_id}",
+		)
+
+
 def _ensure_stock_sufficient(
     db: Session,
     business_id: int,
@@ -1448,6 +1624,9 @@ def _ensure_stock_sufficient(
     exclude_invoice_source_document_id: Optional[int] = None,
     exclude_warehouse_document_ids: Optional[List[int]] = None,
 ) -> None:
+    # قفل تا commit/rollback تراکنش caller نگه داشته می‌شود.
+    _acquire_inventory_stock_locks(db, business_id, outgoing_lines)
+
     shortages = collect_stock_shortages(
         db,
         business_id,
@@ -1513,6 +1692,21 @@ def _validate_outgoing_stock_before_invoice_commit(
     if not invoice_lines_have_trackable_inventory_products(db, business_id, lines_candidates):
         return
 
+    candidate_product_ids = {
+        int(ln["product_id"])
+        for ln in lines_candidates
+        if ln.get("product_id") is not None
+    }
+    products_by_id = {
+        int(product.id): product
+        for product in db.query(Product)
+        .filter(
+            Product.business_id == business_id,
+            Product.id.in_(candidate_product_ids),
+        )
+        .all()
+    } if candidate_product_ids else {}
+
     inv_wh = (document.extra_info or {}).get("warehouse_id")
     try:
         inv_wh_int = int(inv_wh) if inv_wh is not None else None
@@ -1528,9 +1722,7 @@ def _validate_outgoing_stock_before_invoice_commit(
             qty = Decimal(0)
         if not pid or qty <= 0:
             continue
-        product = db.query(Product).filter(
-            and_(Product.id == int(pid), Product.business_id == business_id)
-        ).first()
+        product = products_by_id.get(int(pid))
         if not product or not getattr(product, "track_inventory", False):
             continue
         extra = dict(ln.get("extra_info") or {})
@@ -1577,6 +1769,9 @@ def _validate_outgoing_stock_before_invoice_commit(
     )
     if not lines_to_check:
         return
+    # قفل مرتب‌شده در _ensure_stock_sufficient گرفته می‌شود تا همین مسیر
+    # برای ثبت مستقیم حوالهٔ انبار نیز به کار رود.
+    _acquire_inventory_stock_locks(db, business_id, lines_to_check)
     shortages = collect_stock_shortages(
         db, business_id, document.document_date, lines_to_check,
         # InvoiceItemLineهای سند جاری پیش از این کنترل flush شده‌اند. اگر خود سند
@@ -1867,6 +2062,76 @@ def _extract_totals_from_lines(lines: List[Dict[str, Any]]) -> Dict[str, Decimal
         "tax": tax,
         "net": net,
     }
+
+
+def _canonicalize_quick_sale_line_amounts(lines: List[Dict[str, Any]]) -> None:
+    """Rebuild monetary line fields used by quick sales from their inputs."""
+    for line in lines:
+        info = dict(line.get("extra_info") or {})
+        try:
+            qty = Decimal(str(line.get("quantity", 0) or 0))
+            unit_price = Decimal(
+                str(info.get("unit_price", line.get("unit_price", 0)) or 0)
+            )
+            discount_type = str(
+                info.get("discount_type", line.get("discount_type", "percent"))
+                or "percent"
+            ).strip().lower()
+            discount_value = Decimal(
+                str(info.get("discount_value", line.get("discount_value", 0)) or 0)
+            )
+            tax_rate = Decimal(
+                str(info.get("tax_rate", line.get("tax_rate", 0)) or 0)
+            )
+        except Exception as exc:
+            raise ApiError(
+                "INVALID_QUICK_SALE_LINE_AMOUNT",
+                "مقادیر مالی یکی از ردیف‌های فروش سریع نامعتبر است",
+                http_status=400,
+            ) from exc
+        if qty <= 0 or unit_price < 0 or discount_value < 0 or tax_rate < 0:
+            raise ApiError(
+                "INVALID_QUICK_SALE_LINE_AMOUNT",
+                "تعداد، قیمت، تخفیف یا مالیات ردیف نامعتبر است",
+                http_status=400,
+            )
+        gross = qty * unit_price
+        if discount_type == "percent":
+            if discount_value > 100:
+                raise ApiError(
+                    "INVALID_QUICK_SALE_LINE_DISCOUNT",
+                    "درصد تخفیف ردیف باید بین صفر تا صد باشد",
+                    http_status=400,
+                )
+            line_discount = gross * discount_value / Decimal(100)
+        elif discount_type == "amount":
+            line_discount = discount_value
+        else:
+            raise ApiError(
+                "INVALID_QUICK_SALE_LINE_DISCOUNT",
+                "نوع تخفیف ردیف نامعتبر است",
+                http_status=400,
+            )
+        if line_discount > gross:
+            raise ApiError(
+                "INVALID_QUICK_SALE_LINE_DISCOUNT",
+                "تخفیف ردیف نمی‌تواند از مبلغ ردیف بیشتر باشد",
+                http_status=400,
+            )
+        taxable = gross - line_discount
+        tax_amount = taxable * tax_rate / Decimal(100)
+        info.update(
+            {
+                "unit_price": float(unit_price),
+                "discount_type": discount_type,
+                "discount_value": float(discount_value),
+                "line_discount": float(line_discount),
+                "tax_rate": float(tax_rate),
+                "tax_amount": float(tax_amount),
+                "line_total": float(taxable + tax_amount),
+            }
+        )
+        line["extra_info"] = info
 
 
 def _extract_cogs_total(lines: List[Dict[str, Any]]) -> Decimal:
@@ -2761,9 +3026,150 @@ def _create_receipt_payment_documents_for_invoice_payments(
     return payment_docs
 
 
+def _quick_sale_customer_balance_meta(document: Document) -> Dict[str, Any]:
+    extra = document.extra_info if isinstance(document.extra_info, dict) else {}
+    raw = extra.get("quick_sale_customer_balance")
+    return dict(raw) if isinstance(raw, dict) and raw.get("applied") is True else {}
+
+
+def _quick_sale_payment_target(document: Document) -> Decimal:
+    """Amount to collect after applying the customer's prior balance."""
+    meta = _quick_sale_customer_balance_meta(document)
+    if meta.get("payment_target") is not None:
+        try:
+            return max(Decimal(0), Decimal(str(meta["payment_target"])))
+        except Exception:
+            pass
+    return Decimal(str(((document.extra_info or {}).get("totals") or {}).get("net", 0) or 0))
+
+
+def _adjust_quick_sale_invoice_paid(document: Document, total_paid: Decimal) -> Decimal:
+    """Allocate receipts to prior debt first and prior credit to this invoice."""
+    meta = _quick_sale_customer_balance_meta(document)
+    if not meta:
+        return total_paid
+    try:
+        prior_debt = max(Decimal(0), Decimal(str(meta.get("prior_debt_amount", 0) or 0)))
+        credit_applied = max(Decimal(0), Decimal(str(meta.get("credit_applied_amount", 0) or 0)))
+        invoice_total = Decimal(
+            str(((document.extra_info or {}).get("totals") or {}).get("net", 0) or 0)
+        )
+    except Exception:
+        return total_paid
+    old_debt_settled = min(max(total_paid, Decimal(0)), prior_debt)
+    return min(
+        max(invoice_total, Decimal(0)),
+        max(Decimal(0), total_paid - old_debt_settled) + credit_applied,
+    )
+
+
+def _normalize_quick_sale_customer_balance_application(
+    db: Session,
+    *,
+    business_id: int,
+    person_id: int,
+    currency_id: int,
+    document_date: date,
+    fiscal_year_id: int,
+    invoice_total: Decimal,
+    header_extra: Dict[str, Any],
+) -> Dict[str, Any]:
+    request = header_extra.get("quick_sale_customer_balance")
+    if not isinstance(request, dict) or request.get("apply") is not True:
+        header_extra.pop("quick_sale_customer_balance", None)
+        return header_extra
+
+    try:
+        requested_person_id = int(request.get("person_id"))
+        requested_currency_id = int(request.get("currency_id"))
+        expected_balance = Decimal(str(request.get("balance_before")))
+    except Exception as exc:
+        raise ApiError(
+            "QUICK_SALE_CUSTOMER_BALANCE_INVALID",
+            "اطلاعات مانده مشتری نامعتبر است؛ مانده را دوباره دریافت کنید",
+            http_status=400,
+        ) from exc
+    if requested_person_id != int(person_id) or requested_currency_id != int(currency_id):
+        raise ApiError(
+            "QUICK_SALE_CUSTOMER_BALANCE_MISMATCH",
+            "مشتری یا ارز مانده با فاکتور هم‌خوانی ندارد",
+            http_status=400,
+        )
+
+    from adapters.db.models.quick_sales_settings import QuickSalesSetting
+
+    quick_sales_settings = (
+        db.query(QuickSalesSetting)
+        .filter(QuickSalesSetting.business_id == int(business_id))
+        .first()
+    )
+    if (
+        quick_sales_settings is not None
+        and quick_sales_settings.default_anonymous_customer_id is not None
+        and int(quick_sales_settings.default_anonymous_customer_id) == int(person_id)
+    ):
+        raise ApiError(
+            "QUICK_SALE_ANONYMOUS_BALANCE_NOT_ALLOWED",
+            "اعمال مانده برای مشتری ناشناس مجاز نیست",
+            http_status=400,
+        )
+
+    from app.services.quick_sales_service import get_quick_sales_customer_balance
+
+    # مانده یک شخص/ارز باید تا پایان ثبت فاکتور ثابت بماند تا دو صندوق
+    # نتوانند یک اعتبار قبلی را هم‌زمان در دو فروش مصرف کنند.
+    acquire_transaction_lock(
+        db,
+        (
+            "quick_sales_customer_balance:"
+            f"{business_id}:{fiscal_year_id}:{person_id}:{currency_id}"
+        ),
+    )
+    current = get_quick_sales_customer_balance(
+        db,
+        business_id=business_id,
+        person_id=person_id,
+        currency_id=currency_id,
+        as_of_date=document_date,
+        fiscal_year_id=fiscal_year_id,
+    )
+    current_balance = Decimal(str(current.get("balance", 0) or 0))
+    decimal_places = max(0, int(current.get("decimal_places", 2) or 2))
+    epsilon = Decimal(1).scaleb(-decimal_places) / Decimal(2)
+    if abs(current_balance - expected_balance) > epsilon:
+        raise ApiError(
+            "QUICK_SALE_CUSTOMER_BALANCE_CHANGED",
+            "مانده حساب مشتری تغییر کرده است؛ مانده را به‌روزرسانی و دوباره ثبت کنید",
+            http_status=409,
+            details={
+                "balance": float(current_balance),
+                "status": current.get("status"),
+                "currency_id": int(currency_id),
+                "as_of_date": document_date.isoformat(),
+            },
+        )
+
+    normalized_total = max(Decimal(0), invoice_total)
+    prior_debt = max(Decimal(0), -current_balance)
+    credit_applied = min(max(Decimal(0), current_balance), normalized_total)
+    payment_target = max(Decimal(0), normalized_total + prior_debt - credit_applied)
+    header_extra["quick_sale_customer_balance"] = {
+        "applied": True,
+        "person_id": int(person_id),
+        "currency_id": int(currency_id),
+        "as_of_date": document_date.isoformat(),
+        "balance_before": float(current_balance),
+        "status": current.get("status"),
+        "prior_debt_amount": float(prior_debt),
+        "credit_applied_amount": float(credit_applied),
+        "payment_target": float(payment_target),
+    }
+    return header_extra
+
+
 def _quick_sale_change_amount(document: Document, payments: List[Dict[str, Any]]) -> Decimal:
-    """مبلغ اضافه‌دریافت نسبت به خالص فاکتور، به ارز خود فاکتور."""
-    total = Decimal(str(((document.extra_info or {}).get("totals") or {}).get("net", 0) or 0))
+    """مبلغ اضافه‌دریافت نسبت به مبلغ قابل تسویه، به ارز خود فاکتور."""
+    total = _quick_sale_payment_target(document)
     paid = Decimal(0)
     for item in payments:
         raw = item.get("settles_amount")
@@ -3083,14 +3489,21 @@ def _create_quick_sale_change_payment(
                 "invoice_id": int(document.id),
                 "person_is_receivable": True,
                 "gross_received": float(
-                    change_amount
-                    + Decimal(
-                        str(
-                            ((document.extra_info or {}).get("totals") or {}).get(
-                                "net", 0
+                    sum(
+                        (
+                            max(
+                                Decimal(0),
+                                Decimal(
+                                    str(
+                                        item.get("settles_amount")
+                                        if item.get("settles_amount") is not None
+                                        else item.get("amount", 0)
+                                    )
+                                ),
                             )
-                            or 0
-                        )
+                            for item in payments
+                        ),
+                        Decimal(0),
                     )
                 ),
                 "overpayment_amount": float(change_amount),
@@ -5090,6 +5503,7 @@ def create_invoice(
     *,
     commit: bool = True,
     skip_post_commit_hooks: bool = False,
+    lightweight_response: bool = False,
 ) -> Dict[str, Any]:
     logger.info("=== شروع ایجاد فاکتور ===")
 
@@ -5139,10 +5553,13 @@ def create_invoice(
         except Exception:
             pass
     data["extra_info"] = header_extra
+    if header_extra.get("quick_sale") is True:
+        _canonicalize_quick_sale_line_amounts(lines_input)
+    global_discount_applied = False
     try:
         from app.services.invoice_global_discount_service import apply_global_discount_to_invoice_payload
 
-        apply_global_discount_to_invoice_payload(
+        global_discount_applied = apply_global_discount_to_invoice_payload(
             db, business_id, invoice_type, lines_input, data
         )
     except ApiError:
@@ -5155,9 +5572,12 @@ def create_invoice(
             http_status=400,
         )
     header_extra = dict(data.get("extra_info") or {})
-    totals = (header_extra.get("totals") or {}) if isinstance(header_extra, dict) else {}
-    totals_missing = not all(k in totals for k in ("gross", "discount", "tax", "net"))
-    if totals_missing:
+    # جمع کلاینت مرجع ثبت حسابداری نیست. سرویس تخفیف کلی، در صورت وجود،
+    # totals را از ردیف‌ها ساخته است؛ در سایر حالت‌ها نیز مستقیماً از ردیف‌ها
+    # محاسبه می‌کنیم.
+    if global_discount_applied:
+        totals = dict(header_extra.get("totals") or {})
+    else:
         totals = _extract_totals_from_lines(lines_input)
     header_extra["totals"] = totals
     data["extra_info"] = header_extra
@@ -5189,6 +5609,24 @@ def create_invoice(
 
     header_extra = dict(data.get("extra_info") or {})
     totals = dict(header_extra.get("totals") or {})
+
+    if (
+        invoice_type == INVOICE_SALES
+        and not bool(data.get("is_proforma", False))
+        and person_id
+        and header_extra.get("quick_sale") is True
+    ):
+        header_extra = _normalize_quick_sale_customer_balance_application(
+            db,
+            business_id=business_id,
+            person_id=int(person_id),
+            currency_id=int(currency_id),
+            document_date=document_date,
+            fiscal_year_id=int(fiscal_year.id),
+            invoice_total=Decimal(str(totals.get("net", 0) or 0)),
+            header_extra=header_extra,
+        )
+        data["extra_info"] = header_extra
 
     # Inventory posting is decoupled; no stock validation here
     post_inventory: bool = _is_inventory_posting_enabled(data)
@@ -6147,7 +6585,17 @@ def create_invoice(
         # عدم موفقیت در trigger نباید مانع بازگشت فاکتور شود
         logger.warning(f"Failed to trigger workflows for invoice {document.id}: {e}")
 
-    result = invoice_document_to_dict(db, document)
+    # فروش سریع فقط شناسه و شماره فاکتور را مصرف می‌کند. ساخت پاسخ کامل در این
+    # مسیر دوباره محاسبه تحلیلی سود، اطلاعات خطوط و محدودیت‌های مالیاتی را اجرا
+    # می‌کرد؛ محاسبهٔ لازم برای ثبت دفتر پیش‌تر در تراکنش انجام شده است.
+    if lightweight_response:
+        result = {
+            "id": document.id,
+            "code": document.code,
+            "document_type": document.document_type,
+        }
+    else:
+        result = invoice_document_to_dict(db, document)
     
     # Invalidate cache بعد از ایجاد موفق فاکتور
     invalidate_invoices_cache(
@@ -7139,7 +7587,7 @@ def update_invoice(
                 flag_modified(document, "extra_info")
 
     try:
-        _remove_old_invoice_warehouse_documents(
+        _old_posted_warehouse_types = _remove_old_invoice_warehouse_documents(
             db,
             int(document.business_id),
             int(document.id),
@@ -7155,6 +7603,11 @@ def update_invoice(
         db.flush()
 
         if not document.is_proforma:
+            _post_warehouse_types_for_rebuild = set(_old_posted_warehouse_types)
+            if inv_type != _old_document_type and _post_warehouse_types_for_rebuild:
+                # A type change can switch the replacement from receipt to issue (or vice
+                # versa); preserve the prior finalized state for the replacement movement.
+                _post_warehouse_types_for_rebuild.update({"issue", "receipt"})
             _create_warehouse_documents_for_invoice(
                 db,
                 int(document.business_id),
@@ -7163,6 +7616,7 @@ def update_invoice(
                 lines_input,
                 inv_type,
                 stock_exclude_warehouse_document_ids=_old_warehouse_document_ids,
+                post_warehouse_document_types=_post_warehouse_types_for_rebuild,
             )
     except ApiError:
         raise
@@ -7810,10 +8264,14 @@ def invoice_document_to_dict(
     include_tags: bool = True,
 ) -> Dict[str, Any]:
     # اقلام فاکتور از جدول مجزا خوانده می‌شوند
-    item_rows = db.query(InvoiceItemLine).filter(InvoiceItemLine.document_id == document.id).all()
+    item_rows = (
+        db.query(InvoiceItemLine, Product)
+        .outerjoin(Product, Product.id == InvoiceItemLine.product_id)
+        .filter(InvoiceItemLine.document_id == document.id)
+        .all()
+    )
     product_lines: List[Dict[str, Any]] = []
-    for it in item_rows:
-        product = db.query(Product).filter(Product.id == it.product_id).first()
+    for it, product in item_rows:
         line_extra = it.extra_info or {}
         row_dict: Dict[str, Any] = {
             "id": it.id,
@@ -7847,10 +8305,14 @@ def invoice_document_to_dict(
         product_lines.append(row_dict)
 
     # سطرهای حسابداری از document_lines خوانده می‌شوند
-    acc_rows = db.query(DocumentLine).filter(DocumentLine.document_id == document.id, DocumentLine.account_id != None).all()  # noqa: E711
+    acc_rows = (
+        db.query(DocumentLine, Account)
+        .outerjoin(Account, Account.id == DocumentLine.account_id)
+        .filter(DocumentLine.document_id == document.id, DocumentLine.account_id != None)  # noqa: E711
+        .all()
+    )
     account_lines: List[Dict[str, Any]] = []
-    for line in acc_rows:
-        account = db.query(Account).filter(Account.id == line.account_id).first()
+    for line, account in acc_rows:
         account_lines.append({
             "id": line.id,
             "account_id": line.account_id,
@@ -10913,6 +11375,7 @@ def batch_calculate_invoices_remaining(
                 processed_doc_ids.add(parsed_change_doc_id)
                 total_paid -= _quick_sale_change_document_amount(change_doc)
 
+        total_paid = _adjust_quick_sale_invoice_paid(doc, total_paid)
         remaining = total_amount - total_paid
         results[inv_id] = {
             "invoice_id": inv_id,
@@ -11067,6 +11530,7 @@ def calculate_invoice_remaining(
                 processed_doc_ids.add(parsed_change_doc_id)
                 total_paid -= _quick_sale_change_document_amount(change_doc)
         
+        total_paid = _adjust_quick_sale_invoice_paid(invoice, total_paid)
         remaining = total_amount - total_paid
         
         logger.debug(

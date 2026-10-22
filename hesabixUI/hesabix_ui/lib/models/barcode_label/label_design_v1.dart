@@ -34,16 +34,13 @@ class LabelCanvas {
   }
 
   Map<String, dynamic> toJson() => {
-        'width_mm': widthMm,
-        'height_mm': heightMm,
-        'grid_mm': gridMm,
-        'snap_to_grid': snapToGrid,
-        'guides_mm': {
-          'vertical': guidesVertical,
-          'horizontal': guidesHorizontal,
-        },
-        'dpi': dpi,
-      };
+    'width_mm': widthMm,
+    'height_mm': heightMm,
+    'grid_mm': gridMm,
+    'snap_to_grid': snapToGrid,
+    'guides_mm': {'vertical': guidesVertical, 'horizontal': guidesHorizontal},
+    'dpi': dpi,
+  };
 
   LabelCanvas copyWith({
     double? widthMm,
@@ -76,6 +73,12 @@ class LabelSheet {
   final int columns;
   final int rows;
   final Map<String, double> gapMm;
+
+  /// Continuous roll media width. Zero means fit the configured columns and margins.
+  final double rollPaperWidthMm;
+  final int rollColumns;
+  final Map<String, double> rollGapMm;
+  final Map<String, double> rollMarginMm;
   final bool labelFromCanvas;
 
   const LabelSheet({
@@ -87,6 +90,10 @@ class LabelSheet {
     this.columns = 3,
     this.rows = 8,
     this.gapMm = const {'x': 2, 'y': 2},
+    this.rollPaperWidthMm = 0,
+    this.rollColumns = 1,
+    this.rollGapMm = const {'x': 2, 'y': 2},
+    this.rollMarginMm = const {'top': 0, 'right': 0, 'bottom': 0, 'left': 0},
     this.labelFromCanvas = true,
   });
 
@@ -96,18 +103,13 @@ class LabelSheet {
     final j = json ?? const <String, dynamic>{};
     Map<String, double> mmMap(dynamic raw, Map<String, double> fallback) {
       if (raw is! Map) return fallback;
-      return {
-        for (final e in raw.entries) e.key.toString(): (e.value as num?)?.toDouble() ?? 0,
-      };
+      return {for (final e in raw.entries) e.key.toString(): (e.value as num?)?.toDouble() ?? 0};
     }
 
     Map<String, double>? custom;
     final rawCustom = j['custom_paper_mm'];
     if (rawCustom is Map) {
-      custom = {
-        for (final e in rawCustom.entries)
-          e.key.toString(): (e.value as num?)?.toDouble() ?? 0,
-      };
+      custom = {for (final e in rawCustom.entries) e.key.toString(): (e.value as num?)?.toDouble() ?? 0};
     }
 
     return LabelSheet(
@@ -119,21 +121,29 @@ class LabelSheet {
       columns: (j['columns'] as num?)?.toInt() ?? 3,
       rows: (j['rows'] as num?)?.toInt() ?? 8,
       gapMm: mmMap(j['gap_mm'], const {'x': 2, 'y': 2}),
+      rollPaperWidthMm: (j['roll_paper_width_mm'] as num?)?.toDouble() ?? 0,
+      rollColumns: (j['roll_columns'] as num?)?.toInt() ?? 1,
+      rollGapMm: mmMap(j['roll_gap_mm'], const {'x': 2, 'y': 2}),
+      rollMarginMm: mmMap(j['roll_margin_mm'], const {'top': 0, 'right': 0, 'bottom': 0, 'left': 0}),
       labelFromCanvas: j['label_from_canvas'] != false,
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'print_mode': printMode,
-        'paper': paper,
-        'orientation': orientation,
-        'custom_paper_mm': customPaperMm,
-        'margin_mm': marginMm,
-        'columns': columns,
-        'rows': rows,
-        'gap_mm': gapMm,
-        'label_from_canvas': labelFromCanvas,
-      };
+    'print_mode': printMode,
+    'paper': paper,
+    'orientation': orientation,
+    'custom_paper_mm': customPaperMm,
+    'margin_mm': marginMm,
+    'columns': columns,
+    'rows': rows,
+    'gap_mm': gapMm,
+    'roll_paper_width_mm': rollPaperWidthMm,
+    'roll_columns': rollColumns,
+    'roll_gap_mm': rollGapMm,
+    'roll_margin_mm': rollMarginMm,
+    'label_from_canvas': labelFromCanvas,
+  };
 
   LabelSheet copyWith({
     String? printMode,
@@ -144,6 +154,10 @@ class LabelSheet {
     int? columns,
     int? rows,
     Map<String, double>? gapMm,
+    double? rollPaperWidthMm,
+    int? rollColumns,
+    Map<String, double>? rollGapMm,
+    Map<String, double>? rollMarginMm,
     bool? labelFromCanvas,
   }) {
     return LabelSheet(
@@ -155,6 +169,10 @@ class LabelSheet {
       columns: columns ?? this.columns,
       rows: rows ?? this.rows,
       gapMm: gapMm ?? this.gapMm,
+      rollPaperWidthMm: rollPaperWidthMm ?? this.rollPaperWidthMm,
+      rollColumns: rollColumns ?? this.rollColumns,
+      rollGapMm: rollGapMm ?? this.rollGapMm,
+      rollMarginMm: rollMarginMm ?? this.rollMarginMm,
       labelFromCanvas: labelFromCanvas ?? this.labelFromCanvas,
     );
   }
@@ -248,19 +266,19 @@ class LabelElement {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'type': labelElementTypeToJson(type),
-        'name': name,
-        'x_mm': xMm,
-        'y_mm': yMm,
-        'w_mm': wMm,
-        'h_mm': hMm,
-        'rotation_deg': rotationDeg,
-        'z_index': zIndex,
-        'locked': locked,
-        'visible': visible,
-        'props': props,
-      };
+    'id': id,
+    'type': labelElementTypeToJson(type),
+    'name': name,
+    'x_mm': xMm,
+    'y_mm': yMm,
+    'w_mm': wMm,
+    'h_mm': hMm,
+    'rotation_deg': rotationDeg,
+    'z_index': zIndex,
+    'locked': locked,
+    'visible': visible,
+    'props': props,
+  };
 
   LabelElement copyWith({
     String? id,
@@ -298,11 +316,7 @@ class LabelDesignDocument {
   final LabelCanvas canvas;
   final List<LabelElement> elements;
 
-  const LabelDesignDocument({
-    this.schemaVersion = 1,
-    required this.canvas,
-    this.elements = const [],
-  });
+  const LabelDesignDocument({this.schemaVersion = 1, required this.canvas, this.elements = const []});
 
   factory LabelDesignDocument.empty({double widthMm = 50, double heightMm = 30}) {
     return LabelDesignDocument(
@@ -326,15 +340,12 @@ class LabelDesignDocument {
   }
 
   Map<String, dynamic> toJson() => {
-        'schema_version': schemaVersion,
-        'canvas': canvas.toJson(),
-        'elements': elements.map((e) => e.toJson()).toList(),
-      };
+    'schema_version': schemaVersion,
+    'canvas': canvas.toJson(),
+    'elements': elements.map((e) => e.toJson()).toList(),
+  };
 
-  LabelDesignDocument copyWith({
-    LabelCanvas? canvas,
-    List<LabelElement>? elements,
-  }) {
+  LabelDesignDocument copyWith({LabelCanvas? canvas, List<LabelElement>? elements}) {
     return LabelDesignDocument(
       schemaVersion: schemaVersion,
       canvas: canvas ?? this.canvas,

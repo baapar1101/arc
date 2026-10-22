@@ -20,6 +20,7 @@ class QuickSalesParkedSale {
   final List<InvoiceLineItem> cartItems;
   final List<InvoiceTransaction> payments;
   final bool cashFollowsTotal;
+  final bool applyCustomerBalance;
   final String? cashRegisterId;
   final int? warehouseId;
   final DateTime documentDate;
@@ -45,6 +46,7 @@ class QuickSalesParkedSale {
     this.cartItems = const [],
     this.payments = const [],
     this.cashFollowsTotal = true,
+    this.applyCustomerBalance = false,
     this.cashRegisterId,
     this.warehouseId,
     required this.documentDate,
@@ -92,6 +94,7 @@ class QuickSalesParkedSale {
     List<InvoiceLineItem>? cartItems,
     List<InvoiceTransaction>? payments,
     bool? cashFollowsTotal,
+    bool? applyCustomerBalance,
     String? cashRegisterId,
     int? warehouseId,
     DateTime? documentDate,
@@ -118,6 +121,7 @@ class QuickSalesParkedSale {
       cartItems: cartItems ?? this.cartItems,
       payments: payments ?? this.payments,
       cashFollowsTotal: cashFollowsTotal ?? this.cashFollowsTotal,
+      applyCustomerBalance: applyCustomerBalance ?? this.applyCustomerBalance,
       cashRegisterId: cashRegisterId ?? this.cashRegisterId,
       warehouseId: warehouseId ?? this.warehouseId,
       documentDate: documentDate ?? this.documentDate,
@@ -150,6 +154,7 @@ class QuickSalesParkedSale {
       'cart_items': cartItems.map(encodeLine).toList(),
       'payments': payments.map((p) => p.toJson()).toList(),
       'cash_follows_total': cashFollowsTotal,
+      'apply_customer_balance': applyCustomerBalance,
       'cash_register_id': cashRegisterId,
       'warehouse_id': warehouseId,
       'document_date': documentDate.toIso8601String(),
@@ -217,6 +222,7 @@ class QuickSalesParkedSale {
       payments: payments,
       cashFollowsTotal:
           json['cash_follows_total'] != false && (payments.length <= 1),
+      applyCustomerBalance: json['apply_customer_balance'] == true,
       cashRegisterId: json['cash_register_id']?.toString(),
       warehouseId: _asInt(json['warehouse_id']),
       documentDate:
@@ -331,6 +337,27 @@ class QuickSalesParkedSalesBundle {
     required this.sales,
   });
 
+  /// فروش ثبت‌شده را می‌بندد، فروش‌های پارک‌شدهٔ واقعی را نگه می‌دارد و
+  /// یک فروش خالی تازه را فعال می‌کند.
+  QuickSalesParkedSalesBundle afterCompletedActiveSale({
+    required QuickSalesParkedSale blankSale,
+    int? anonymousCustomerId,
+  }) {
+    final remainingSales =
+        sales
+            .where(
+              (sale) =>
+                  sale.id != activeId &&
+                  !sale.isBlank(anonymousCustomerId: anonymousCustomerId),
+            )
+            .toList()
+          ..add(blankSale);
+    return QuickSalesParkedSalesBundle(
+      activeId: blankSale.id,
+      sales: remainingSales,
+    );
+  }
+
   Map<String, dynamic> toJson() => {
     'version': version,
     'active_id': activeId,
@@ -363,12 +390,22 @@ class QuickSalesParkedSalesBundle {
 class QuickSalesParkedSalesStorage {
   static const prefix = 'quick_sales_parked_sales_';
 
-  static String keyFor(int businessId) => '$prefix$businessId';
+  static String keyFor(int businessId, int userId, {String? scope}) {
+    final base = '$prefix${businessId}_user_$userId';
+    final cleanScope = scope?.trim();
+    return cleanScope == null || cleanScope.isEmpty
+        ? base
+        : '${base}_scope_$cleanScope';
+  }
 
-  static Future<QuickSalesParkedSalesBundle?> load(int businessId) async {
+  static Future<QuickSalesParkedSalesBundle?> load(
+    int businessId,
+    int userId, {
+    String? scope,
+  }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(keyFor(businessId));
+      final raw = prefs.getString(keyFor(businessId, userId, scope: scope));
       if (raw == null || raw.isEmpty) return null;
       return QuickSalesParkedSalesBundle.tryParse(jsonDecode(raw));
     } catch (_) {
@@ -376,14 +413,21 @@ class QuickSalesParkedSalesStorage {
     }
   }
 
-  static Future<void> save(
+  static Future<bool> save(
     int businessId,
-    QuickSalesParkedSalesBundle bundle,
-  ) async {
+    int userId,
+    QuickSalesParkedSalesBundle bundle, {
+    String? scope,
+  }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(keyFor(businessId), jsonEncode(bundle.toJson()));
-    } catch (_) {}
+      return await prefs.setString(
+        keyFor(businessId, userId, scope: scope),
+        jsonEncode(bundle.toJson()),
+      );
+    } catch (_) {
+      return false;
+    }
   }
 }
 

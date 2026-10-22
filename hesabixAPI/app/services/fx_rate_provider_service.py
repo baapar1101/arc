@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 ENV_BRSAPI_KEY = "HESABIX_FX_BRSAPI_API_KEY"
 ENV_MESGHAL_KEY = "HESABIX_FX_MESGHAL_API_KEY"
+ENV_NAVASAN_KEY = "HESABIX_FX_NAVASAN_API_KEY"
 DEFAULT_BRS_BASE = "https://Api.BrsApi.ir"
 DEFAULT_BRS_PATH = "/Market/Gold_Currency.php"
 DEFAULT_MESGHAL_BASE = "https://api.tala.ir"
@@ -47,6 +48,18 @@ DEFAULT_MESGHAL_SYMBOL_MAP = {
 	"OMR": "OMR",
 	"BHD": "BHD",
 	"RUB": "RUB",
+}
+DEFAULT_NAVASAN_BASE = "https://api.navasan.tech"
+DEFAULT_NAVASAN_PATH = "/latest/"
+# نمادهایی که قیمت ریالی/تومانی ارزهای متداول را نشان می‌دهند. نگاشت در config قابل تغییر است.
+DEFAULT_NAVASAN_SYMBOL_MAP = {
+	"usd_sell": "USD", "eur": "EUR", "aed_sell": "AED", "gbp_hav": "GBP",
+	"cad": "CAD", "aud": "AUD", "try_hav": "TRY", "cny_hav": "CNY",
+	"jpy_hav": "JPY", "chf": "CHF", "inr": "INR", "iqd": "IQD",
+	"afn": "AFN", "sar": "SAR", "kwd": "KWD", "qar": "QAR",
+	"omr": "OMR", "bhd": "BHD", "rub": "RUB", "nzd": "NZD",
+	"sek": "SEK", "nok": "NOK", "dkk": "DKK", "sgd": "SGD",
+	"hkd": "HKD", "myr": "MYR", "thb": "THB", "zar": "ZAR",
 }
 
 
@@ -106,6 +119,10 @@ def resolve_provider_api_key(provider: FxRateProvider) -> str:
 			return env_key
 	if provider.code == "mesghal":
 		env_key = (os.getenv(ENV_MESGHAL_KEY) or "").strip()
+		if env_key:
+			return env_key
+	if provider.code == "navasan":
+		env_key = (os.getenv(ENV_NAVASAN_KEY) or "").strip()
 		if env_key:
 			return env_key
 	return ""
@@ -487,6 +504,87 @@ def fetch_mesghal_currency_payload(
 	) from last_exc
 
 
+def fetch_navasan_latest_payload(api_key: str, base_url: str, path: str) -> Tuple[Dict[str, Any], int]:
+	"""واکشی یک‌جای آخرین نرخ‌ها از نوسان؛ کلید فقط از سمت سرور به API ارسال می‌شود."""
+	base = (base_url or DEFAULT_NAVASAN_BASE).rstrip("/")
+	p = path if path.startswith("/") else f"/{path}"
+	url = f"{base}{p}"
+	headers = {
+		"User-Agent": "HesabixFX/1.0 (+https://hesabix.ir)",
+		"Accept": "application/json",
+	}
+	last_exc: Exception | None = None
+	with httpx.Client(timeout=20.0, headers=headers, follow_redirects=True) as client:
+		for attempt in range(3):
+			try:
+				resp = client.get(url, params={"api_key": api_key})
+				status = int(resp.status_code)
+				try:
+					payload = resp.json()
+				except Exception as exc:
+					raise ApiError("FX_PROVIDER_BAD_RESPONSE", f"پاسخ JSON نوسان نامعتبر است (HTTP {status})", http_status=502) from exc
+				if status >= 400:
+					msg = payload.get("message") or payload.get("error") if isinstance(payload, dict) else None
+					raise ApiError("FX_PROVIDER_HTTP_ERROR", str(msg or f"خطای HTTP {status} از نوسان"), http_status=502)
+				if not isinstance(payload, dict):
+					raise ApiError("FX_PROVIDER_BAD_RESPONSE", "ساختار پاسخ نوسان نامعتبر است", http_status=502)
+				return payload, status
+			except ApiError:
+				raise
+			except Exception as exc:
+				last_exc = exc
+				if attempt < 2:
+					continue
+	raise ApiError("FX_PROVIDER_NETWORK", f"خطای شبکه هنگام تماس با نوسان: {last_exc}", http_status=502) from last_exc
+
+
+def _navasan_effective_config(provider: FxRateProvider) -> Dict[str, Any]:
+	cfg = _parse_config(provider.config_json)
+	if not cfg.get("symbol_map"):
+		cfg["symbol_map"] = dict(DEFAULT_NAVASAN_SYMBOL_MAP)
+	else:
+		cfg["symbol_map"] = {str(k).lower(): str(v).upper() for k, v in dict(cfg["symbol_map"]).items()}
+	cfg.setdefault("quote_unit", "IRT")
+	cfg.setdefault("endpoint_path", DEFAULT_NAVASAN_PATH)
+	return cfg
+
+
+def _normalize_navasan_payload(payload: Dict[str, Any], config: Dict[str, Any]) -> List[Dict[str, Any]]:
+	"""تبدیل پاسخ latest (نماد -> {value,timestamp,date}) به قالب نرخ داخلی."""
+	symbol_map = dict(config.get("symbol_map") or DEFAULT_NAVASAN_SYMBOL_MAP)
+	items: List[Dict[str, Any]] = []
+	for raw_symbol, currency_code in symbol_map.items():
+		symbol = str(raw_symbol).strip().lower()
+		row = payload.get(symbol)
+		if not isinstance(row, dict) or row.get("value") in (None, ""):
+			continue
+		price = _to_decimal(row["value"])
+		if price <= 0:
+			continue
+		try:
+			source_time = datetime.fromtimestamp(int(row["timestamp"]), tz=timezone.utc) if row.get("timestamp") is not None else None
+		except (TypeError, ValueError, OverflowError, OSError):
+			source_time = None
+		unit = str(config.get("quote_unit") or "IRT").upper()
+		quote_unit = "IRR" if unit in ("IRR", "RIAL") else "IRT"
+		items.append({
+			"symbol": symbol.upper(),
+			"currency_code": str(currency_code).strip().upper(),
+			"price_quote": price,
+			"quote_unit": quote_unit,
+			"price_irr": _quote_to_irr(price, quote_unit, Decimal(1)),
+			"name_fa": None,
+			"name_en": None,
+			"source_time": source_time,
+			"raw": {"symbol": symbol, **row},
+		})
+	if not items:
+		provider_error = payload.get("message") or payload.get("error")
+		detail = f": {provider_error}" if provider_error else ""
+		raise ApiError("FX_PROVIDER_BAD_RESPONSE", f"هیچ‌کدام از نمادهای ارزی پیکربندی‌شده در پاسخ نوسان موجود نیستند{detail}", http_status=502)
+	return items
+
+
 def _mesghal_effective_config(provider: FxRateProvider) -> Dict[str, Any]:
 	cfg = _parse_config(provider.config_json)
 	# پیش‌فرض‌های سازگار با Tala API اگر ادمین هنوز config خالی گذاشته
@@ -638,6 +736,37 @@ def fetch_and_store_provider(db: Session, provider: FxRateProvider) -> Dict[str,
 				"rates_upserted": n,
 				"fetched_at": now,
 			}
+		if code == "navasan":
+			api_key = resolve_provider_api_key(provider)
+			if not api_key:
+				raise ApiError(
+					"FX_API_KEY_MISSING",
+					f"کلید API نوسان تنظیم نشده است (ادمین یا متغیر محیطی {ENV_NAVASAN_KEY})",
+					http_status=400,
+				)
+			cfg = _navasan_effective_config(provider)
+			payload, http_status = fetch_navasan_latest_payload(
+				api_key,
+				provider.api_base_url or DEFAULT_NAVASAN_BASE,
+				str(cfg.get("endpoint_path") or DEFAULT_NAVASAN_PATH),
+			)
+			normalized = _normalize_navasan_payload(payload, cfg)
+			n = upsert_global_rates_from_normalized(db, provider, normalized, fetched_at=now)
+			provider.last_fetch_at = now
+			provider.last_fetch_status = "ok"
+			provider.last_fetch_error = None
+			provider.last_fetch_http_status = http_status
+			if not provider.api_base_url:
+				provider.api_base_url = DEFAULT_NAVASAN_BASE
+			provider.updated_at = now
+			db.flush()
+			return {
+				"provider": provider.code,
+				"status": "ok",
+				"http_status": http_status,
+				"rates_upserted": n,
+				"fetched_at": now,
+			}
 		raise ApiError(
 			"FX_PROVIDER_NOT_IMPLEMENTED",
 			f"واکشی برای ارائه‌دهنده «{code}» پیاده‌سازی نشده است",
@@ -671,7 +800,7 @@ def providers_due_for_fetch(db: Session, *, now: Optional[datetime] = None) -> L
 	).scalars().all()
 	due: List[FxRateProvider] = []
 	for p in rows:
-		if p.code not in ("brsapi", "mesghal"):  # فقط پیاده‌سازی‌شده‌ها
+		if p.code not in ("brsapi", "mesghal", "navasan"):  # فقط پیاده‌سازی‌شده‌ها
 			continue
 		if not resolve_provider_api_key(p):
 			continue

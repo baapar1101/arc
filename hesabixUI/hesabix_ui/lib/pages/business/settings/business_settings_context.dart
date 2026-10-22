@@ -62,6 +62,13 @@ class BusinessSettingsContext {
   bool get canManageBusiness =>
       isOwner || authStore.hasBusinessPermission('settings', 'business');
 
+  bool get canManageDefaultPaymentShortcuts =>
+      isOwner ||
+      authStore.hasBusinessPermission(
+        'quick_sales',
+        'manage_default_payment_shortcuts',
+      );
+
   bool get canEditFiscalYear =>
       isOwner || authStore.hasBusinessPermission('fiscal_years', 'edit');
 

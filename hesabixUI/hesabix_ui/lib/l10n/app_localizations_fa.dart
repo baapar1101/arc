@@ -18984,7 +18984,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get barcodeLabelPrinterEscPosFallback =>
-      'ESC/POS هنوز اسپایک نشده؛ چاپ با PDF رولی انجام می‌شود';
+      'ESC/POS خام این اتصال یا چیدمان دقیق رول را پشتیبانی نمی‌کند؛ برای حفظ اندازه و فاصله‌ها چاپ با PDF سیستم انجام می‌شود.';
 
   @override
   String get barcodeLabelPrinterUnsupportedMode =>
@@ -19009,7 +19009,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get barcodeLabelPrintLayoutSheet => 'برگه (A4 و شبکه)';
 
   @override
-  String get barcodeLabelPrintLayoutRoll => 'رول / حرارتی (هر برچسب یک صفحه)';
+  String get barcodeLabelPrintLayoutRoll => 'رول چندستونه / حرارتی';
 
   @override
   String get barcodeLabelPaperSize => 'اندازه کاغذ';
@@ -19040,7 +19040,36 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get barcodeLabelRollModeHint =>
-      'در حالت رول فقط اندازه ناحیه طراحی مهم است؛ ارتفاع کاغذ ثابت نیست.';
+      'عرض رول، تعداد ستون، فاصله‌ها و حاشیه‌ها را تنظیم کنید. ارتفاع به تعداد برچسب‌ها بستگی دارد.';
+
+  @override
+  String get barcodeLabelRollWidth => 'عرض کل رول (mm)';
+
+  @override
+  String get barcodeLabelRollColumns => 'ستون روی رول';
+
+  @override
+  String get barcodeLabelRollGapX => 'فاصله افقی لیبل‌ها (mm)';
+
+  @override
+  String get barcodeLabelRollGapY => 'فاصله عمودی لیبل‌ها (mm)';
+
+  @override
+  String get barcodeLabelRollLeftMargin => 'حاشیه چپ رول (mm)';
+
+  @override
+  String get barcodeLabelRollRightMargin => 'حاشیه راست رول (mm)';
+
+  @override
+  String get barcodeLabelRollTopMargin => 'حاشیه بالای رول (mm)';
+
+  @override
+  String get barcodeLabelRollBottomMargin => 'حاشیه پایین رول (mm)';
+
+  @override
+  String barcodeLabelRollFitError(Object width) {
+    return 'عرض رول برای این تعداد ستون و اندازه لیبل کافی نیست. حداقل عرض لازم: $width میلی‌متر.';
+  }
 
   @override
   String get barcodeLabelPreviewData => 'داده آزمایشی پیش‌نمایش';

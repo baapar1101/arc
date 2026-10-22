@@ -351,6 +351,7 @@ class BusinessResponse {
   final String? registrationNumber;
   final String? economicId;
   final String? country;
+  final String defaultPhoneRegion;
   final String? province;
   final String? city;
   final String? postalCode;
@@ -434,6 +435,7 @@ class BusinessResponse {
     this.registrationNumber,
     this.economicId,
     this.country,
+    this.defaultPhoneRegion = 'IR',
     this.province,
     this.city,
     this.postalCode,
@@ -524,6 +526,8 @@ class BusinessResponse {
       registrationNumber: json['registration_number'],
       economicId: json['economic_id'],
       country: json['country'],
+      defaultPhoneRegion:
+          (json['default_phone_region'] as String?)?.toUpperCase() ?? 'IR',
       province: json['province'],
       city: json['city'],
       postalCode: json['postal_code'],

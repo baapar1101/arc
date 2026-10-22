@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../services/quick_sales_service.dart';
@@ -15,6 +16,7 @@ import '../../widgets/banking/currency_picker_widget.dart';
 import '../../models/customer_model.dart';
 import '../../models/person_group_model.dart';
 import '../../widgets/business_subpage_back_leading.dart';
+import '../../widgets/quick_sales/quick_sales_default_shortcuts_dialog.dart';
 import '../../constants/invoice_print_paper.dart';
 import '../../services/report_template_service.dart';
 
@@ -81,6 +83,11 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
   final _gatewayService = PaymentGatewayService(ApiClient());
   final _personGroupService = PersonGroupService();
 
+  bool get _canManageGeneralSettings =>
+      widget.authStore.hasBusinessPermission('settings', 'business');
+  bool get _canManageDefaultShortcuts => widget.authStore
+      .hasBusinessPermission('quick_sales', 'manage_default_payment_shortcuts');
+
   @override
   void initState() {
     super.initState();
@@ -98,6 +105,10 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
       _loading = true;
       _error = null;
     });
+    if (!_canManageGeneralSettings) {
+      setState(() => _loading = false);
+      return;
+    }
     try {
       final settings = await _service.getSettings(businessId: widget.businessId);
       setState(() {
@@ -148,6 +159,16 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
         _loading = false;
       });
     }
+  }
+
+  Future<void> _openDefaultShortcuts() async {
+    await showGlassDialog<bool>(
+      context: context,
+      builder: (context) => QuickSalesDefaultShortcutsDialog(
+        businessId: widget.businessId,
+        service: _service,
+      ),
+    );
   }
 
   Future<void> _loadQuickCustomerGroups() async {
@@ -343,6 +364,16 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? Center(child: Text(_error!))
+              : !_canManageGeneralSettings
+              ? SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 900),
+                      child: _buildDefaultShortcutsSection(),
+                    ),
+                  ),
+                )
               : SingleChildScrollView(
                   padding: const EdgeInsets.all(16),
                   child: Center(
@@ -351,6 +382,10 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          if (_canManageDefaultShortcuts) ...[
+                            _buildDefaultShortcutsSection(),
+                            const SizedBox(height: 24),
+                          ],
                           // بخش مشتری ناشناس
                           _buildSection(
                             title: 'مشتری ناشناس',
@@ -741,6 +776,29 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
                     ),
                   ),
                 ),
+    );
+  }
+
+  Widget _buildDefaultShortcutsSection() {
+    return _buildSection(
+      title: 'میانبرهای پیش‌فرض پرداخت',
+      icon: Icons.keyboard_outlined,
+      children: [
+        const Text(
+          'میانبرهای دکمه‌های پرداخت مشترک را برای ویندوز و وب یکجا تعیین کنید. هر کاربر می‌تواند میانبر شخصی خودش را روی همان دکمه تنظیم کند.',
+        ),
+        const SizedBox(height: 12),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: FilledButton.tonalIcon(
+            onPressed: _canManageDefaultShortcuts
+                ? _openDefaultShortcuts
+                : null,
+            icon: const Icon(Icons.tune_outlined),
+            label: const Text('مدیریت میانبرهای پیش‌فرض'),
+          ),
+        ),
+      ],
     );
   }
 

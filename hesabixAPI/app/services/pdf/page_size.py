@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, Optional
 
 RECEIPT_PAGE_HEIGHT = "297mm"
@@ -13,6 +14,7 @@ RECEIPT_SUBTYPE = "receipt"
 
 # توکن UI/API → عرض استاندارد
 _RECEIPT_WIDTH_ALIASES: Dict[str, str] = {
+	"58mm": "58mm",
 	"60mm": "60mm",
 	"80mm": "80mm",
 	"100mm": "100mm",
@@ -22,6 +24,8 @@ _RECEIPT_WIDTH_ALIASES: Dict[str, str] = {
 }
 
 RECEIPT_PAPER_SIZES = frozenset(_RECEIPT_WIDTH_ALIASES.keys())
+
+_SINGLE_MM_RE = re.compile(r"^(?P<width>[0-9]+(?:\.[0-9]+)?)mm$", re.IGNORECASE)
 
 RECEIPT_DEFAULT_MARGINS_MM: Dict[str, float] = {
 	"top": 3,
@@ -36,7 +40,7 @@ def _norm_token(value: Optional[str]) -> str:
 
 
 def canonical_receipt_width(paper_size: Optional[str]) -> Optional[str]:
-	"""اگر سایز فیش باشد عرض استاندارد (مثلاً ``80mm``) برمی‌گرداند."""
+	"""اگر سایز رول باشد عرض آن (مثلاً ``80mm`` یا ``72.5mm``) را برمی‌گرداند."""
 	ps = (paper_size or "").strip()
 	if not ps:
 		return None
@@ -51,6 +55,13 @@ def canonical_receipt_width(paper_size: Optional[str]) -> Optional[str]:
 		rest = compact[len(_norm_token(mapped)) :]
 		if rest in ("", "297mm", "x297mm"):
 			return mapped
+	# یک اندازهٔ mm به‌تنهایی یعنی عرض رول. دو اندازه (مثلاً
+	# ``105mm 148mm``) همچنان کاغذ سفارشی صفحه‌ای محسوب می‌شود.
+	match = _SINGLE_MM_RE.fullmatch(compact)
+	if match:
+		width = float(match.group("width"))
+		if 20 <= width <= 500:
+			return f"{width:g}mm"
 	return None
 
 

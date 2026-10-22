@@ -8,7 +8,7 @@ import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousand
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
-import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/services/pdf_output_service.dart';
 
 /// دیالوگ مشاهده جزئیات سند هزینه/درآمد
 class ExpenseIncomeDetailsDialog extends StatefulWidget {
@@ -369,10 +369,16 @@ class _ExpenseIncomeDetailsDialogState extends State<ExpenseIncomeDetailsDialog>
       // ایجاد PDF از سند
       final service = ExpenseIncomeService(widget.apiClient);
       final pdfBytes = await service.generatePdf(widget.document.id);
+      if (!mounted) return;
 
       // ذخیره فایل
-      final result = await _savePdfFile(pdfBytes, widget.document.code);
-      if (mounted) BytesExportService.showFeedback(context, result);
+      await PdfOutputService.deliverPdf(
+        context: context,
+        bytes: pdfBytes,
+        filename: widget.document.code,
+        businessId: widget.businessId,
+        paperSize: 'A4',
+      );
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(
@@ -389,11 +395,4 @@ class _ExpenseIncomeDetailsDialogState extends State<ExpenseIncomeDetailsDialog>
     }
   }
 
-  Future<BytesExportResult> _savePdfFile(List<int> bytes, String filename) async {
-    return BytesExportService.export(
-      bytes: bytes,
-      filename: filename.endsWith('.pdf') ? filename : '$filename.pdf',
-      mimeType: 'application/pdf',
-    );
-  }
 }

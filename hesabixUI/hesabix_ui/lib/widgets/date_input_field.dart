@@ -19,6 +19,7 @@ class DateInputField extends StatefulWidget {
   final bool enabled;
   final CalendarController calendarController;
   final bool isDense;
+  final EdgeInsetsGeometry? contentPadding;
   final String? Function(String?)? validator;
 
   const DateInputField({
@@ -33,6 +34,7 @@ class DateInputField extends StatefulWidget {
     this.enabled = true,
     required this.calendarController,
     this.isDense = false,
+    this.contentPadding,
     this.validator,
   });
 
@@ -82,7 +84,8 @@ class _DateInputFieldState extends State<DateInputField> {
   @override
   void didUpdateWidget(DateInputField oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final calChanged = (oldWidget.calendarController.isJalali == true) !=
+    final calChanged =
+        (oldWidget.calendarController.isJalali == true) !=
         (widget.calendarController.isJalali == true);
     if (!_sameDateOnly(oldWidget.value, widget.value) || calChanged) {
       _updateDisplayValue();
@@ -259,7 +262,12 @@ class _DateInputFieldState extends State<DateInputField> {
         suffixIcon: IconButton(
           padding: EdgeInsets.zero,
           constraints: widget.isDense
-              ? const BoxConstraints(minWidth: 40, minHeight: 40, maxWidth: 44, maxHeight: 44)
+              ? const BoxConstraints(
+                  minWidth: 40,
+                  minHeight: 40,
+                  maxWidth: 44,
+                  maxHeight: 44,
+                )
               : null,
           icon: Icon(Icons.calendar_today, size: widget.isDense ? 20 : 24),
           tooltip: t.dateInputOpenCalendar,
@@ -270,9 +278,16 @@ class _DateInputFieldState extends State<DateInputField> {
             : null,
         border: const OutlineInputBorder(),
         isDense: widget.isDense,
-        contentPadding: widget.isDense
-            ? const EdgeInsetsDirectional.only(start: 12, top: 10, bottom: 10, end: 12)
-            : null,
+        contentPadding:
+            widget.contentPadding ??
+            (widget.isDense
+                ? const EdgeInsetsDirectional.only(
+                    start: 12,
+                    top: 10,
+                    bottom: 10,
+                    end: 12,
+                  )
+                : null),
       ),
       inputFormatters: [
         FilteringTextInputFormatter.allow(RegExp(r'[0-9/]')),

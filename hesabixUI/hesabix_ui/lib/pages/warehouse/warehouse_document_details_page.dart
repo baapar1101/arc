@@ -8,8 +8,8 @@ import '../../widgets/document/document_details_dialog.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/date_utils.dart' show HesabixDateUtils;
 import '../../utils/error_extractor.dart';
+import '../../services/pdf_output_service.dart';
 import '../../widgets/business_subpage_back_leading.dart';
-import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class WarehouseDocumentDetailsPage extends StatefulWidget {
@@ -432,14 +432,13 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
                   '/warehouse-docs/business/${widget.businessId}/${widget.documentId}/pdf',
                 );
                 if (!mounted || !context.mounted) return;
-                final result = await BytesExportService.export(
+                await PdfOutputService.deliverPdf(
+                  context: context,
                   bytes: bytes,
                   filename: 'warehouse_doc_${widget.documentId}.pdf',
-                  mimeType: 'application/pdf',
+                  businessId: widget.businessId,
+                  paperSize: 'A4',
                 );
-                if (mounted && context.mounted) {
-                  BytesExportService.showFeedback(context, result);
-                }
               } catch (e) {
                 if (!mounted || !context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(

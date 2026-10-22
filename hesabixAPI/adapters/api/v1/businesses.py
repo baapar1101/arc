@@ -326,6 +326,7 @@ async def import_business_from_backup(
                         registration_number=original_business.get('registration_number'),
                         economic_id=original_business.get('economic_id'),
                         country=original_business.get('country'),
+                        default_phone_region=original_business.get('default_phone_region') or 'IR',
                         province=original_business.get('province'),
                         city=original_business.get('city'),
                         postal_code=original_business.get('postal_code'),
@@ -402,6 +403,18 @@ async def import_business_from_backup(
                             )
 
                         _reset_session_replication_role(conn, replica_role_ok)
+
+                        from app.services.person_phone_normalization import (
+                            renormalize_business_person_phones,
+                        )
+
+                        renormalize_business_person_phones(
+                            db,
+                            business_id=int(new_business_id),
+                            default_region=(
+                                original_business.get("default_phone_region") or "IR"
+                            ),
+                        )
 
                         jm.update(job_id, 90, "Resetting financial state")
                         finalize_financial_state_after_restore(db, new_business_id)

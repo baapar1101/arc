@@ -16,9 +16,11 @@ from adapters.db.models.report_template import ReportTemplate
 from adapters.db.models.report_template_status_event import ReportTemplateStatusEvent
 from app.core.responses import ApiError
 from app.services.template_builder_compiler import compile_design_to_jinja_html
-from app.services.template_design_v2_compiler import compile_v2_design_to_jinja_html
+from app.services.template_design_v3_compiler import compile_template_design_to_jinja_html
 from app.services.report_template_scope_registry import get_scope_meta, is_known_scope
 from app.services.report_template_v2_service import validate_v2_design
+from app.services.report_template_v3_service import is_v3_design, validate_v3_design
+from app.services.report_template_v4_service import is_v4_design, validate_v4_design
 
 logger = logging.getLogger(__name__)
 
@@ -219,6 +221,10 @@ class ReportTemplateService:
 		subtype: Optional[str],
 		design: Dict[str, Any],
 	) -> Dict[str, List[str]]:
+		if is_v4_design(design):
+			return validate_v4_design(module_key, subtype, design)
+		if is_v3_design(design):
+			return validate_v3_design(module_key, subtype, design)
 		return validate_v2_design(module_key, subtype, design)
 
 	@staticmethod
@@ -527,7 +533,7 @@ class ReportTemplateService:
 				assets = getattr(template, "assets", None) or {}
 				if engine_name == "template_v2":
 					design = assets.get("template_design") or assets.get("design") or {}
-					html, css, header_html, footer_html = compile_v2_design_to_jinja_html(design)
+					html, css, header_html, footer_html = compile_template_design_to_jinja_html(design)
 				else:
 					design = assets.get("builder_design") or assets.get("design") or {}
 					html, css, header_html, footer_html = compile_design_to_jinja_html(design)
@@ -798,7 +804,10 @@ class ReportTemplateService:
 			pass
 
 		# درج CSS سفارشی در <style>
-		css = (template.content_css or "").strip()
+		css = _render_jinja_fragment(
+			getattr(template, "content_css", None) or "",
+			fragment="CSS قالب",
+		)
 		if css:
 			# ساده: تزریق داخل head اگر وجود دارد
 			if "</head>" in html:
@@ -892,5 +901,3 @@ class ReportTemplateService:
 		except Exception as e:
 			errors.append(f"خطای رندر: {str(e)}")
 		return errors
-
-

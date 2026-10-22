@@ -1123,6 +1123,7 @@ async def restore_backup(
                                     registration_number=original_business.get('registration_number'),
                                     economic_id=original_business.get('economic_id'),
                                     country=original_business.get('country'),
+                                    default_phone_region=original_business.get('default_phone_region') or 'IR',
                                     province=original_business.get('province'),
                                     city=original_business.get('city'),
                                     postal_code=original_business.get('postal_code'),
@@ -1185,6 +1186,16 @@ async def restore_backup(
                                             cols = [c for c in tables_info["businesses"]["columns"] if c not in ("id", "created_at", "updated_at", "owner_id")]
                                             assignments = ", ".join([f"{c} = :{c}" for c in cols])
                                             params = {c: row.get(c) for c in cols}
+                                            if "default_phone_region" in cols and not params.get("default_phone_region"):
+                                                params["default_phone_region"] = (
+                                                    conn.execute(
+                                                        text(
+                                                            "SELECT default_phone_region FROM businesses WHERE id = :id"
+                                                        ),
+                                                        {"id": new_business_id},
+                                                    ).scalar()
+                                                    or "IR"
+                                                )
                                             params["id"] = new_business_id
                                             conn.execute(text(f"UPDATE businesses SET {assignments} WHERE id = :id"), params)
                                     except KeyError:
@@ -1227,6 +1238,25 @@ async def restore_backup(
                                     raise
 
                             _reset_session_replication_role(conn, replica_role_ok)
+
+                            from app.services.person_phone_normalization import (
+                                renormalize_business_person_phones,
+                            )
+
+                            restored_phone_region = (
+                                conn.execute(
+                                    text(
+                                        "SELECT default_phone_region FROM businesses WHERE id = :id"
+                                    ),
+                                    {"id": new_business_id},
+                                ).scalar()
+                                or "IR"
+                            )
+                            renormalize_business_person_phones(
+                                db,
+                                business_id=int(new_business_id),
+                                default_region=restored_phone_region,
+                            )
 
                             jm.update(job_id, 85, "Resetting financial state")
                             finalize_financial_state_after_restore(db, new_business_id)
@@ -1297,5 +1327,3 @@ async def restore_backup(
         # مسیر هم‌زمان قبلی (همان منطق، بدون job)
         # برای اختصار، از مسیر async استفاده کنید؛ این شاخه برای سازگاری باقی می‌ماند
         raise ApiError("SYNC_DISABLED", "Use async_mode=true for restore")
-
-

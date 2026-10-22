@@ -17,7 +17,7 @@ import '../../l10n/app_localizations.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/warehouse_invoice_lines.dart';
 import '../../services/list_filter_preferences_service.dart';
-import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import '../../services/pdf_output_service.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class WarehouseDocsPage extends StatefulWidget {
@@ -290,12 +290,13 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
         '/warehouse-docs/business/${widget.businessId}/$docId/pdf',
       );
       if (!mounted) return;
-      final result = await BytesExportService.export(
+      await PdfOutputService.deliverPdf(
+        context: context,
         bytes: bytes,
         filename: 'warehouse_doc_$docId.pdf',
-        mimeType: 'application/pdf',
+        businessId: widget.businessId,
+        paperSize: 'A4',
       );
-      if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

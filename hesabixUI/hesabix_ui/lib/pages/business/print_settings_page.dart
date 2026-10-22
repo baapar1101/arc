@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:printing/printing.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/business_api_service.dart';
+import 'package:hesabix_ui/services/pdf_output_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
@@ -17,7 +20,13 @@ class BusinessPrintSettingsPage extends StatefulWidget {
 class _BusinessPrintSettingsPageState extends State<BusinessPrintSettingsPage> {
   bool _loading = true;
   bool _saving = false;
+  bool _loadingOutputSettings = true;
+  bool _savingOutputSettings = false;
+  bool _loadingPrinters = false;
   String? _error;
+  String? _outputSettingsError;
+  PdfOutputPreferences _outputPreferences = const PdfOutputPreferences();
+  List<Printer> _availablePrinters = const [];
 
   final Map<String, _PrintConfig> _configs = {};
   String _selectedDocType = 'all';
@@ -39,6 +48,78 @@ class _BusinessPrintSettingsPageState extends State<BusinessPrintSettingsPage> {
   void initState() {
     super.initState();
     _load();
+    _loadOutputSettings();
+  }
+
+  Future<void> _loadOutputSettings() async {
+    try {
+      final preferences = await PdfOutputService.loadPreferences(businessId: widget.businessId);
+      if (!mounted) return;
+      setState(() {
+        _outputPreferences = preferences;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _outputSettingsError = e.toString());
+    } finally {
+      if (mounted) setState(() { _loadingOutputSettings = false; });
+    }
+  }
+
+  Future<void> _refreshPrinters() async {
+    setState(() {
+      _loadingPrinters = true;
+      _outputSettingsError = null;
+    });
+    try {
+      final printers = await PdfOutputService.listAvailablePrinters();
+      if (!mounted) return;
+      setState(() => _availablePrinters = printers);
+    } catch (e) {
+      if (mounted) setState(() => _outputSettingsError = e.toString());
+    } finally {
+      if (mounted) setState(() => _loadingPrinters = false);
+    }
+  }
+
+  Future<void> _saveOutputSettings() async {
+    setState(() => _savingOutputSettings = true);
+    try {
+      await PdfOutputService.savePreferences(_outputPreferences, businessId: widget.businessId);
+      if (!mounted) return;
+      final isFa = Localizations.localeOf(context).languageCode == 'fa';
+      SnackBarHelper.showSuccess(context, message: isFa
+          ? 'تنظیمات خروجی این دستگاه ذخیره شد'
+          : 'This device’s output settings were saved');
+    } catch (e) {
+      if (mounted) setState(() => _outputSettingsError = e.toString());
+    } finally {
+      if (mounted) setState(() => _savingOutputSettings = false);
+    }
+  }
+
+  void _setPrinterForPaper(String paper, String? url) {
+    final printers = Map<String, PdfPrinterChoice>.from(_outputPreferences.printersByPaper);
+    final key = PdfOutputPreferences.normalizePaperKey(paper);
+    if (url == null) {
+      printers.remove(key);
+    } else {
+      for (final printer in _availablePrinters) {
+        if (printer.url == url) {
+          printers[key] = PdfPrinterChoice(url: printer.url, name: printer.name);
+          break;
+        }
+      }
+    }
+    setState(() => _outputPreferences = _outputPreferences.copyWith(printersByPaper: printers));
+  }
+
+  String? _availablePrinterUrl(String paper) {
+    final configuredUrl = _outputPreferences.printerFor(paper)?.url;
+    if (configuredUrl == null) return null;
+    for (final printer in _availablePrinters) {
+      if (printer.url == configuredUrl) return configuredUrl;
+    }
+    return null;
   }
 
   @override
@@ -242,9 +323,15 @@ class _BusinessPrintSettingsPageState extends State<BusinessPrintSettingsPage> {
                       ],
                       Expanded(
                         child: SingleChildScrollView(
-                          child: AbsorbPointer(
-                            absorbing: _selectedDocType != 'all' && !_hasCustomConfigForCurrentType(),
-                            child: _buildConfigForm(context),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _buildDeviceOutputSettings(context),
+                              AbsorbPointer(
+                                absorbing: _selectedDocType != 'all' && !_hasCustomConfigForCurrentType(),
+                                child: _buildConfigForm(context),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -273,6 +360,120 @@ class _BusinessPrintSettingsPageState extends State<BusinessPrintSettingsPage> {
                     ],
                   ),
                 ),
+    );
+  }
+
+  Widget _buildDeviceOutputSettings(BuildContext context) {
+    if (kIsWeb) return const SizedBox.shrink();
+    final isFa = Localizations.localeOf(context).languageCode == 'fa';
+    final isWindows = defaultTargetPlatform == TargetPlatform.windows;
+    final title = isFa ? 'روش خروجی و چاپگرهای این دستگاه' : 'Output and printers on this device';
+    if (_loadingOutputSettings) {
+      return Card(
+        child: ListTile(
+          title: Text(title),
+          trailing: const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+        ),
+      );
+    }
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text(isFa
+                ? 'این تنظیم فقط روی همین دستگاه و برای این کسب‌وکار ذخیره می‌شود.'
+                : 'These settings are stored on this device for this business.',
+              style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<PdfOutputAction>(
+              initialValue: _outputPreferences.action,
+              decoration: InputDecoration(
+                labelText: isFa ? 'رفتار پیش‌فرض دکمه چاپ' : 'Default action for Print',
+                border: const OutlineInputBorder(),
+              ),
+              items: [
+                DropdownMenuItem(value: PdfOutputAction.print, child: Text(isFa ? 'بازکردن چاپگر' : 'Open printer')),
+                DropdownMenuItem(value: PdfOutputAction.save, child: Text(isFa ? 'ذخیره یا دانلود PDF' : 'Save or download PDF')),
+                DropdownMenuItem(value: PdfOutputAction.ask, child: Text(isFa ? 'هر بار بپرس' : 'Ask every time')),
+              ],
+              onChanged: (value) {
+                if (value != null) setState(() => _outputPreferences = _outputPreferences.copyWith(action: value));
+              },
+            ),
+            const SizedBox(height: 12),
+            if (isWindows) ...[
+              Text(isFa ? 'چاپگر پیش‌فرض بر اساس کاغذ' : 'Default printer by paper size',
+                  style: Theme.of(context).textTheme.titleSmall),
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: TextButton.icon(
+                  onPressed: _loadingPrinters ? null : _refreshPrinters,
+                  icon: _loadingPrinters
+                      ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.refresh),
+                  label: Text(isFa ? 'یافتن چاپگرها' : 'Find printers'),
+                ),
+              ),
+              const SizedBox(height: 8),
+              for (final paper in const ['A4', 'A5', 'A6', '60mm', '80mm', '100mm'])
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: DropdownButtonFormField<String?>(
+                    initialValue: _availablePrinterUrl(paper),
+                    isExpanded: true,
+                    decoration: InputDecoration(labelText: paper, border: const OutlineInputBorder(), isDense: true),
+                    items: [
+                      DropdownMenuItem<String?>(value: null, child: Text(isFa ? 'انتخاب در پنجره چاپ' : 'Choose in print dialog')),
+                      ..._availablePrinters.map((printer) => DropdownMenuItem<String?>(
+                        value: printer.url,
+                        child: Text(printer.name, overflow: TextOverflow.ellipsis),
+                      )),
+                    ],
+                    onChanged: (url) => _setPrinterForPaper(paper, url),
+                  ),
+                ),
+              if (_availablePrinters.isEmpty && !_loadingPrinters)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(isFa
+                      ? 'برای نمایش چاپگرهای نصب‌شده، «یافتن چاپگرها» را بزنید.'
+                      : 'Select “Find printers” to load printers installed in Windows.',
+                    style: Theme.of(context).textTheme.bodySmall),
+                ),
+            ] else if (defaultTargetPlatform == TargetPlatform.android) ...[
+              Text(isFa
+                  ? 'در Android چاپگر از پنجرهٔ چاپ سیستم انتخاب می‌شود. برای چاپ روی چاپگر دیگری، همان‌جا چاپگر موردنظر را برگزینید.'
+                  : 'On Android, select the printer in the system print screen. Choose another printer there when needed.',
+                style: Theme.of(context).textTheme.bodySmall),
+            ] else ...[
+              Text(isFa
+                  ? 'چاپگر از پنجره چاپ سیستم انتخاب می‌شود.'
+                  : 'Select the printer in the system print dialog.',
+                style: Theme.of(context).textTheme.bodySmall),
+            ],
+            if (_outputSettingsError != null) ...[
+              const SizedBox(height: 8),
+              Text(_outputSettingsError!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            ],
+            const SizedBox(height: 8),
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: FilledButton.icon(
+                onPressed: _savingOutputSettings ? null : _saveOutputSettings,
+                icon: _savingOutputSettings
+                    ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.save_outlined),
+                label: Text(isFa ? 'ذخیره تنظیمات دستگاه' : 'Save device settings'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

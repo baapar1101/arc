@@ -1316,6 +1316,7 @@ def calculate_person_balances_by_currency(
     db: Session,
     person_id: int,
     fiscal_year_id: Optional[int] = None,
+    as_of_date: Optional[date] = None,
 ) -> Dict[str, Any]:
     """
     مانده شخص به تفکیک ارز سند (مبالغ بومی) + معادل ارز پایه.
@@ -1356,6 +1357,8 @@ def calculate_person_balances_by_currency(
     )
     if fiscal_year_id:
         line_query = line_query.filter(Document.fiscal_year_id == fiscal_year_id)
+    if as_of_date is not None:
+        line_query = line_query.filter(Document.document_date <= as_of_date)
     rows = line_query.all()
 
     # currency_id -> {debit, credit, debit_base, credit_base}

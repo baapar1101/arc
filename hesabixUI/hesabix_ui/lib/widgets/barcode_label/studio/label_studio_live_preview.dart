@@ -33,8 +33,7 @@ class _LabelStudioLivePreviewState extends State<LabelStudioLivePreview> {
   Timer? _debounce;
   String? _contentFingerprint;
 
-  String _fingerprint() =>
-      '${widget.design.toJson()}|${widget.sheet.toJson()}|${widget.sampleContext}';
+  String _fingerprint() => '${widget.design.toJson()}|${widget.sheet.toJson()}|${widget.sampleContext}';
 
   @override
   void initState() {
@@ -71,16 +70,19 @@ class _LabelStudioLivePreviewState extends State<LabelStudioLivePreview> {
   }
 
   PdfPageFormat _pageFormat() => pdfPageFormatForLabelSheet(
-        widget.sheet,
-        labelWidthMm: widget.design.canvas.widthMm,
-        labelHeightMm: widget.design.canvas.heightMm,
-      );
+    widget.sheet,
+    labelWidthMm: widget.design.canvas.widthMm,
+    labelHeightMm: widget.design.canvas.heightMm,
+  );
 
   Future<Uint8List> _buildPdf(PdfPageFormat format) {
+    final contexts = widget.sheet.isRollMode
+        ? List<Map<String, dynamic>>.filled(widget.sheet.rollColumns.clamp(1, 20).toInt(), widget.sampleContext)
+        : <Map<String, dynamic>>[widget.sampleContext];
     return LabelPdfRenderer.render(
       design: widget.design,
       sheet: widget.sheet,
-      contexts: [widget.sampleContext],
+      contexts: contexts,
       rollMode: widget.sheet.isRollMode,
       businessId: widget.businessId,
     );
@@ -92,9 +94,7 @@ class _LabelStudioLivePreviewState extends State<LabelStudioLivePreview> {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-        border: Border(
-          top: BorderSide(color: Theme.of(context).dividerColor),
-        ),
+        border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
       ),
       child: LabelPdfPreviewEmbed(
         key: ValueKey(

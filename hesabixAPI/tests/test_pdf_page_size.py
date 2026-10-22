@@ -35,6 +35,10 @@ def test_build_page_size_css_custom_mm_pair():
 	assert build_page_size_css("105mm 148mm", "landscape") == "105mm 148mm"
 
 
+def test_build_page_size_css_custom_roll_width():
+	assert build_page_size_css("72.5mm", "landscape") == "72.5mm 297mm"
+
+
 def test_is_receipt_paper():
 	assert is_receipt_paper("80mm") is True
 	assert is_receipt_paper("A5") is False

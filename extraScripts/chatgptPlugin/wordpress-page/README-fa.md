@@ -16,8 +16,8 @@
 - افزونهٔ ناوبری در `wp-content/mu-plugins/` قرار می‌گیرد.
 - برگه‌ای با نامک `chatgpt` و قالب `page-chatgpt-hesabix.php` به صفحهٔ آنلاین وصل می‌شود.
 
-نشانی MCP درج‌شده در صفحه `https://arc.hesabix.ir/api/v1/ai/mcp` است. پاسخ بی‌مجوز این endpoint در زمان انتشار `401` و فرادادهٔ OAuth معتبر برمی‌گرداند.
+نشانی canonical فعلی MCP درج‌شده در صفحه `https://hsxn.hesabix.ir/api/v1/ai/mcp` است. از همین میزبان برای سازگاری دقیق با مقدار `resource` و `issuer` در OAuth استفاده کنید؛ میزبان قدیمی `arc.hesabix.ir` فراداده را با نام canonical یعنی `hsxn.hesabix.ir` برمی‌گرداند.
 
-صفحهٔ آنلاین روش نصب ZIP در ChatGPT وب را راهنمایی می‌کند: دریافت فایل، رفتن به Admin console و Plugins، انتخاب Add و Upload plugin، و سپس تکمیل اتصال/مجوزدهی Hesabix. امکان آپلود به سطح دسترسی حساب یا فضای کاری وابسته است. بارگذاری ZIP به‌تنهایی اپ متصل را مجاز نمی‌کند؛ کاربر باید ورود و مجوزهای اتصال حسابیکس را هم کامل کند. در صورت نبود گزینهٔ Upload plugin، دسترسی Plugins را از مدیر فضای کاری پیگیری کنید.
+اتصال شخصی در ChatGPT از مسیر Plugins → Add custom MCP server انجام می‌شود؛ نشانی canonical سرور را وارد کنید، OAuth را کامل کنید و ابزارها را مرور کنید. ZIP صفحه برای توسعه‌دهنده‌ای است که می‌خواهد پلاگین را از پرتال OpenAI بارگذاری و برای بازبینی/انتشار آماده کند؛ ZIP به‌تنهایی اتصال شخصی نمی‌سازد. انتشار بسته به اتصال و تأیید دامنه در پرتال توسعه‌دهندگان نیاز دارد.
 
-منبع رسمی مراحل: https://help.openai.com/en/articles/20001256-plugins-in-chatgpt
+منبع رسمی بسته‌بندی و اتصال MCP: https://developers.openai.com/plugins/build/plugins

@@ -11,7 +11,7 @@ void main() {
 
     test('extracts a trailing international mobile', () {
       final entry = parseCustomerQuickEntry('زهرا سادات موسوی +989121234567');
-      expect(entry?.mobile, '09121234567');
+      expect(entry?.mobile, '+989121234567');
       expect(entry?.aliasName, 'زهرا سادات موسوی');
     });
 
@@ -19,6 +19,18 @@ void main() {
       final entry = parseCustomerQuickEntry('۰۹۱۲۱۲۳۴۵۶۷');
       expect(entry?.mobile, '09121234567');
       expect(entry?.aliasName, isNull);
+    });
+
+    test('keeps an international E164 mobile for server resolution', () {
+      final entry = parseCustomerQuickEntry('John Smith +1 (415) 555-2671');
+      expect(entry?.mobile, '+14155552671');
+      expect(entry?.aliasName, 'John Smith');
+    });
+
+    test('passes a local foreign mobile for business-region resolution', () {
+      final entry = parseCustomerQuickEntry('050 123 4567 Al Zahra');
+      expect(entry?.mobile, '0501234567');
+      expect(entry?.aliasName, 'Al Zahra');
     });
 
     test('accepts a name-only entry and normalizes Persian letters', () {
