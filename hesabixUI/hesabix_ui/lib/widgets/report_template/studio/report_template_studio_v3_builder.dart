@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'report_template_media_settings.dart';
 import 'report_template_snap_engine.dart';
@@ -73,6 +75,12 @@ class _ReportTemplateStudioV3BuilderState
   int? _freeformResizePointer;
   String? _freeformResizingId;
   int? _freeformMovePointer;
+  double _canvasZoom = 1;
+  String? _pendingAnchorBlockId;
+  String? _pendingAnchorPoint;
+
+  static const _horizontalAnchorPoints = {'left', 'right', 'center_x'};
+  static const _verticalAnchorPoints = {'top', 'bottom', 'center_y'};
 
   @override
   void initState() {
@@ -147,6 +155,7 @@ class _ReportTemplateStudioV3BuilderState
       design['regions'] = regions;
       return;
     }
+    _resolveProjectionAnchors(design, regions);
     final projection = reportTemplateV4StudioProjection(design)
       ..['regions'] = regions;
     final updated = applyStudioProjectionToReportTemplateV4(design, projection);
@@ -491,6 +500,34 @@ class _ReportTemplateStudioV3BuilderState
     );
     blocks.removeAt(found.index);
     regions[found.region] = blocks;
+    for (final region in const ['header', 'body', 'footer']) {
+      final candidates = List<Map<String, dynamic>>.from(
+        (regions[region] as List?) ?? const [],
+      );
+      for (var index = 0; index < candidates.length; index++) {
+        final candidate = Map<String, dynamic>.from(candidates[index]);
+        final style =
+            (candidate['style'] as Map?)?.cast<String, dynamic>() ?? const {};
+        final constraints = (style['anchor_constraints'] as Map?)
+            ?.cast<String, dynamic>();
+        if (constraints == null) continue;
+        final nextConstraints = _clone(constraints);
+        final links =
+            List<Map<String, dynamic>>.from(
+              (nextConstraints['links'] as List?) ?? const [],
+            )..removeWhere(
+              (link) =>
+                  ((link['target'] as Map?)?['id'] ?? '').toString() == id,
+            );
+        nextConstraints['links'] = links;
+        candidate['style'] = <String, dynamic>{
+          ...style,
+          'anchor_constraints': nextConstraints,
+        };
+        candidates[index] = candidate;
+      }
+      regions[region] = candidates;
+    }
     _setRegions(design, regions);
     if (_selectedBlockId == id) _selectedBlockId = null;
     _commit(design);
@@ -579,6 +616,11 @@ class _ReportTemplateStudioV3BuilderState
 
   String _labelForType(String type) {
     return (_definition(type)?['label_fa'] ?? type).toString();
+  }
+
+  String _labelForBlockId(String id) {
+    final block = _findBlock(id)?.block;
+    return block == null ? id : _labelForType(block['type'].toString());
   }
 
   IconData _iconForType(String type) {
@@ -674,6 +716,8 @@ class _ReportTemplateStudioV3BuilderState
                     _showLivePreview
                         ? 'پیش‌نمایش واقعی خروجی'
                         : 'بوم طراحی تعاملی',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -681,6 +725,14 @@ class _ReportTemplateStudioV3BuilderState
                 ),
                 SegmentedButton<bool>(
                   showSelectedIcon: false,
+                  style: const ButtonStyle(
+                    visualDensity: VisualDensity.compact,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    minimumSize: WidgetStatePropertyAll(Size(0, 34)),
+                    padding: WidgetStatePropertyAll(
+                      EdgeInsets.symmetric(horizontal: 5),
+                    ),
+                  ),
                   segments: const [
                     ButtonSegment(
                       value: false,
@@ -712,10 +764,68 @@ class _ReportTemplateStudioV3BuilderState
     );
   }
 
-  List<Map<String, dynamic>> _allPageGridBlocks() => [
-    for (final region in const ['header', 'body', 'footer'])
-      ..._regionBlocks(widget.design, region),
-  ];
+  void _setCanvasZoom(double value) {
+    setState(() => _canvasZoom = value.clamp(0.5, 2.5).toDouble());
+  }
+
+  Widget _zoomControls(BuildContext context) {
+    return Material(
+      color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.94),
+      elevation: 3,
+      borderRadius: BorderRadius.circular(8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            key: const ValueKey('studio-zoom-out'),
+            visualDensity: VisualDensity.compact,
+            tooltip: 'کوچک‌نمایی',
+            onPressed: _canvasZoom <= 0.5
+                ? null
+                : () => _setCanvasZoom(_canvasZoom - 0.1),
+            icon: const Icon(Icons.remove, size: 18),
+          ),
+          InkWell(
+            key: const ValueKey('studio-zoom-reset'),
+            onTap: () => _setCanvasZoom(1),
+            borderRadius: BorderRadius.circular(6),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              child: Text('${(_canvasZoom * 100).round()}٪'),
+            ),
+          ),
+          IconButton(
+            key: const ValueKey('studio-zoom-in'),
+            visualDensity: VisualDensity.compact,
+            tooltip: 'بزرگ‌نمایی',
+            onPressed: _canvasZoom >= 2.5
+                ? null
+                : () => _setCanvasZoom(_canvasZoom + 0.1),
+            icon: const Icon(Icons.add, size: 18),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleCanvasPointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent ||
+        !HardwareKeyboard.instance.isControlPressed) {
+      return;
+    }
+    _setCanvasZoom(_canvasZoom + (event.scrollDelta.dy < 0 ? 0.1 : -0.1));
+  }
+
+  List<Map<String, dynamic>> _allPageGridBlocks() {
+    final regions = _regions(widget.design);
+    _resolveProjectionAnchors(widget.design, regions);
+    return [
+      for (final region in const ['header', 'body', 'footer'])
+        ...List<Map<String, dynamic>>.from(
+          (regions[region] as List?) ?? const [],
+        ),
+    ];
+  }
 
   double _pageGridDefaultWidth(String type, double canvasWidthMm) =>
       switch (type) {
@@ -907,157 +1017,208 @@ class _ReportTemplateStudioV3BuilderState
         final availableWidth = constraints.maxWidth.isFinite
             ? constraints.maxWidth
             : 800.0;
-        final pageWidthPx = (availableWidth - 48)
+        final fittedPageWidthPx = (availableWidth - 48)
             .clamp(280.0, 760.0)
             .toDouble();
+        final pageWidthPx = fittedPageWidthPx * _canvasZoom;
         final pixelsPerMm = pageWidthPx / mediaSize.width;
         final pageHeightPx = (topMm + canvasHeightMm + bottomMm) * pixelsPerMm;
-        return ColoredBox(
-          color: const Color(0xffe5e7eb),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Center(
-              child: Container(
-                width: pageWidthPx,
-                height: pageHeightPx,
-                padding: EdgeInsets.fromLTRB(
-                  leftMm * pixelsPerMm,
-                  topMm * pixelsPerMm,
-                  rightMm * pixelsPerMm,
-                  bottomMm * pixelsPerMm,
-                ),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Color(0x26000000),
-                      blurRadius: 18,
-                      offset: Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: Directionality(
-                  textDirection: direction,
-                  child: Builder(
-                    builder: (canvasContext) => DragTarget<_BlockDragData>(
-                      onWillAcceptWithDetails: (details) =>
-                          _canDropOnPageGrid(details.data),
-                      onAcceptWithDetails: (details) {
-                        final box =
-                            _pageGridCanvasKey.currentContext
-                                    ?.findRenderObject()
-                                as RenderBox?;
-                        if (box == null) return;
-                        final local = box.globalToLocal(details.offset);
-                        _dropOnPageGrid(
-                          details.data,
-                          local.dx / pixelsPerMm,
-                          local.dy / pixelsPerMm,
-                          canvasWidthMm,
-                          canvasHeightMm,
-                        );
-                      },
-                      builder: (context, candidates, rejected) => Container(
-                        key: _pageGridCanvasKey,
-                        width: canvasWidthMm * pixelsPerMm,
-                        height: canvasHeightMm * pixelsPerMm,
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: candidates.isNotEmpty
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context).colorScheme.outlineVariant,
+        return Listener(
+          onPointerSignal: _handleCanvasPointerSignal,
+          child: ColoredBox(
+            color: const Color(0xffe5e7eb),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: SizedBox(
+                      width: math.max(availableWidth, pageWidthPx + 48),
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(24),
+                        child: Center(
+                          child: Container(
+                            width: pageWidthPx,
+                            height: pageHeightPx,
+                            padding: EdgeInsets.fromLTRB(
+                              leftMm * pixelsPerMm,
+                              topMm * pixelsPerMm,
+                              rightMm * pixelsPerMm,
+                              bottomMm * pixelsPerMm,
+                            ),
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Color(0x26000000),
+                                  blurRadius: 18,
+                                  offset: Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                            child: Directionality(
+                              textDirection: direction,
+                              child: Builder(
+                                builder: (canvasContext) => DragTarget<_BlockDragData>(
+                                  onWillAcceptWithDetails: (details) =>
+                                      _canDropOnPageGrid(details.data),
+                                  onAcceptWithDetails: (details) {
+                                    final box =
+                                        _pageGridCanvasKey.currentContext
+                                                ?.findRenderObject()
+                                            as RenderBox?;
+                                    if (box == null) return;
+                                    final local = box.globalToLocal(
+                                      details.offset,
+                                    );
+                                    _dropOnPageGrid(
+                                      details.data,
+                                      local.dx / pixelsPerMm,
+                                      local.dy / pixelsPerMm,
+                                      canvasWidthMm,
+                                      canvasHeightMm,
+                                    );
+                                  },
+                                  builder: (context, candidates, rejected) =>
+                                      Container(
+                                        key: _pageGridCanvasKey,
+                                        width: canvasWidthMm * pixelsPerMm,
+                                        height: canvasHeightMm * pixelsPerMm,
+                                        decoration: BoxDecoration(
+                                          border: Border.all(
+                                            color: candidates.isNotEmpty
+                                                ? Theme.of(
+                                                    context,
+                                                  ).colorScheme.primary
+                                                : Theme.of(
+                                                    context,
+                                                  ).colorScheme.outlineVariant,
+                                          ),
+                                        ),
+                                        child: Stack(
+                                          clipBehavior: Clip.none,
+                                          children: [
+                                            Positioned.fill(
+                                              child: CustomPaint(
+                                                painter: _MillimeterGridPainter(
+                                                  pixelsPerMm: pixelsPerMm,
+                                                  gridMm: gridMm,
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .outlineVariant
+                                                      .withValues(alpha: 0.5),
+                                                ),
+                                              ),
+                                            ),
+                                            for (final block in blocks)
+                                              _freeformCanvasBlock(
+                                                context,
+                                                block,
+                                                siblings: blocks
+                                                    .where(
+                                                      (candidate) =>
+                                                          candidate['id']
+                                                              ?.toString() !=
+                                                          block['id']
+                                                              ?.toString(),
+                                                    )
+                                                    .map(_freeformRect)
+                                                    .toList(),
+                                                widthMm: canvasWidthMm,
+                                                heightMm: canvasHeightMm,
+                                                pixelsPerMm: pixelsPerMm,
+                                                gridMm: gridMm,
+                                                snapEnabled: snapEnabled,
+                                              ),
+                                            Positioned.fill(
+                                              child: IgnorePointer(
+                                                child: CustomPaint(
+                                                  painter: _AnchorLinksPainter(
+                                                    segments:
+                                                        _canvasAnchorSegments(
+                                                          blocks,
+                                                        ),
+                                                    pixelsPerMm: pixelsPerMm,
+                                                    color:
+                                                        Colors.green.shade700,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                            for (final guide in _freeformGuides)
+                                              if (guide.vertical)
+                                                Positioned(
+                                                  left:
+                                                      guide.positionMm *
+                                                      pixelsPerMm,
+                                                  top: 0,
+                                                  bottom: 0,
+                                                  child: Container(
+                                                    width: 1,
+                                                    color: Theme.of(
+                                                      context,
+                                                    ).colorScheme.tertiary,
+                                                  ),
+                                                )
+                                              else
+                                                Positioned(
+                                                  top:
+                                                      guide.positionMm *
+                                                      pixelsPerMm,
+                                                  left: 0,
+                                                  right: 0,
+                                                  child: Container(
+                                                    height: 1,
+                                                    color: Theme.of(
+                                                      context,
+                                                    ).colorScheme.tertiary,
+                                                  ),
+                                                ),
+                                            PositionedDirectional(
+                                              top: 4,
+                                              end: 4,
+                                              child: DecoratedBox(
+                                                decoration: BoxDecoration(
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .surfaceContainerHighest
+                                                      .withValues(alpha: 0.9),
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
+                                                ),
+                                                child: Padding(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 8,
+                                                        vertical: 3,
+                                                      ),
+                                                  child: Text(
+                                                    'گرید کل صفحه · ${gridMm.toStringAsFixed(0)}mm${snapEnabled ? ' · Snap' : ''}',
+                                                    style: Theme.of(
+                                                      context,
+                                                    ).textTheme.labelSmall,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            Positioned.fill(
-                              child: CustomPaint(
-                                painter: _MillimeterGridPainter(
-                                  pixelsPerMm: pixelsPerMm,
-                                  gridMm: gridMm,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .outlineVariant
-                                      .withValues(alpha: 0.5),
-                                ),
-                              ),
-                            ),
-                            for (final block in blocks)
-                              _freeformCanvasBlock(
-                                context,
-                                block,
-                                siblings: blocks
-                                    .where(
-                                      (candidate) =>
-                                          candidate['id']?.toString() !=
-                                          block['id']?.toString(),
-                                    )
-                                    .map(_freeformRect)
-                                    .toList(),
-                                widthMm: canvasWidthMm,
-                                heightMm: canvasHeightMm,
-                                pixelsPerMm: pixelsPerMm,
-                                gridMm: gridMm,
-                                snapEnabled: snapEnabled,
-                              ),
-                            for (final guide in _freeformGuides)
-                              if (guide.vertical)
-                                Positioned(
-                                  left: guide.positionMm * pixelsPerMm,
-                                  top: 0,
-                                  bottom: 0,
-                                  child: Container(
-                                    width: 1,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.tertiary,
-                                  ),
-                                )
-                              else
-                                Positioned(
-                                  top: guide.positionMm * pixelsPerMm,
-                                  left: 0,
-                                  right: 0,
-                                  child: Container(
-                                    height: 1,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.tertiary,
-                                  ),
-                                ),
-                            PositionedDirectional(
-                              top: 4,
-                              end: 4,
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .surfaceContainerHighest
-                                      .withValues(alpha: 0.9),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 3,
-                                  ),
-                                  child: Text(
-                                    'گرید کل صفحه · ${gridMm.toStringAsFixed(0)}mm${snapEnabled ? ' · Snap' : ''}',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.labelSmall,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
+                PositionedDirectional(
+                  start: 12,
+                  bottom: 12,
+                  child: _zoomControls(context),
+                ),
+              ],
             ),
           ),
         );
@@ -1417,6 +1578,453 @@ class _ReportTemplateStudioV3BuilderState
     );
   }
 
+  Map<String, dynamic> _anchorConstraints(Map<String, dynamic> block) {
+    final style = (block['style'] as Map?)?.cast<String, dynamic>() ?? const {};
+    return (style['anchor_constraints'] as Map?)?.cast<String, dynamic>() ??
+        const {};
+  }
+
+  List<Map<String, dynamic>> _anchorLinks(Map<String, dynamic> block) {
+    return List<Map<String, dynamic>>.from(
+      (_anchorConstraints(block)['links'] as List?) ?? const [],
+    );
+  }
+
+  double _anchorCoordinate(StudioMmRect rect, String point) => switch (point) {
+    'left' => rect.x,
+    'right' => rect.right,
+    'center_x' => rect.centerX,
+    'top' => rect.y,
+    'bottom' => rect.bottom,
+    _ => rect.centerY,
+  };
+
+  double _activeAnchorOffset(Map<String, dynamic> link) {
+    final offsets = (link['variant_offsets'] as Map?)?.cast<String, dynamic>();
+    final value =
+        offsets?[reportTemplateV4ProfileKey(widget.design)] ??
+        link['offset_mm'];
+    return (value as num?)?.toDouble() ?? double.tryParse('$value') ?? 0;
+  }
+
+  void _resolveProjectionAnchors(
+    Map<String, dynamic> design,
+    Map<String, dynamic> regions,
+  ) {
+    final blocks = <Map<String, dynamic>>[
+      for (final region in const ['header', 'body', 'footer'])
+        ...List<Map<String, dynamic>>.from(
+          (regions[region] as List?) ?? const [],
+        ),
+    ];
+    final byId = <String, Map<String, dynamic>>{
+      for (final block in blocks) block['id'].toString(): block,
+    };
+    final media = normalizedReportTemplateMedia(design);
+    final size = reportTemplateMediaSizeMm(media);
+    final margins =
+        (media['margins_mm'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final width =
+        (size.width -
+                ((margins['left'] as num?)?.toDouble() ?? 0) -
+                ((margins['right'] as num?)?.toDouble() ?? 0))
+            .clamp(10, 1000)
+            .toDouble();
+    final height =
+        (size.height -
+                ((margins['top'] as num?)?.toDouble() ?? 0) -
+                ((margins['bottom'] as num?)?.toDouble() ?? 0))
+            .clamp(20, 5000)
+            .toDouble();
+    final profile = reportTemplateV4ProfileKey(design);
+    for (final block in blocks) {
+      final constraints = _anchorConstraints(block);
+      final pins =
+          (constraints['pins'] as Map?)?.cast<String, dynamic>() ?? const {};
+      final baseOffsets =
+          (constraints['pin_offsets_mm'] as Map?)?.cast<String, dynamic>() ??
+          const {};
+      final variantOffsets =
+          ((constraints['variant_pin_offsets'] as Map?)?[profile] as Map?)
+              ?.cast<String, dynamic>();
+      double offset(String edge) =>
+          ((variantOffsets?[edge] ?? baseOffsets[edge]) as num?)?.toDouble() ??
+          0;
+      var rect = _freeformRect(block);
+      if (pins['left'] == true && pins['right'] == true) {
+        rect = StudioMmRect(
+          offset('left'),
+          rect.y,
+          math.max(1, width - offset('left') - offset('right')),
+          rect.height,
+        );
+      } else if (pins['right'] == true) {
+        rect = StudioMmRect(
+          width - offset('right') - rect.width,
+          rect.y,
+          rect.width,
+          rect.height,
+        );
+      } else if (pins['left'] == true) {
+        rect = StudioMmRect(offset('left'), rect.y, rect.width, rect.height);
+      } else if (pins['center_x'] == true) {
+        rect = StudioMmRect(
+          (width - rect.width) / 2 + offset('center_x'),
+          rect.y,
+          rect.width,
+          rect.height,
+        );
+      }
+      if (pins['top'] == true && pins['bottom'] == true) {
+        rect = StudioMmRect(
+          rect.x,
+          offset('top'),
+          rect.width,
+          math.max(1, height - offset('top') - offset('bottom')),
+        );
+      } else if (pins['bottom'] == true) {
+        rect = StudioMmRect(
+          rect.x,
+          height - offset('bottom') - rect.height,
+          rect.width,
+          rect.height,
+        );
+      } else if (pins['top'] == true) {
+        rect = StudioMmRect(rect.x, offset('top'), rect.width, rect.height);
+      } else if (pins['center_y'] == true) {
+        rect = StudioMmRect(
+          rect.x,
+          (height - rect.height) / 2 + offset('center_y'),
+          rect.width,
+          rect.height,
+        );
+      }
+      final style = (block['style'] as Map).cast<String, dynamic>();
+      block['style'] = <String, dynamic>{
+        ...style,
+        'x_mm': rect.x,
+        'y_mm': rect.y,
+        'width_mm': rect.width,
+        'height_mm': rect.height,
+      };
+    }
+    for (var pass = 0; pass < blocks.length; pass++) {
+      var changed = false;
+      for (final block in blocks) {
+        var rect = _freeformRect(block);
+        for (final link in _anchorLinks(block)) {
+          final target = (link['target'] as Map?)?.cast<String, dynamic>();
+          final targetBlock = byId[target?['id']?.toString()];
+          if (targetBlock == null) continue;
+          final sourcePoint = (link['source_anchor'] ?? '').toString();
+          final targetPoint = (target?['anchor'] ?? '').toString();
+          final desired =
+              _anchorCoordinate(_freeformRect(targetBlock), targetPoint) +
+              _activeAnchorOffset(link);
+          final current = _anchorCoordinate(rect, sourcePoint);
+          if ((desired - current).abs() < 0.001) continue;
+          if (link['axis'] == 'horizontal') {
+            rect = StudioMmRect(
+              rect.x + desired - current,
+              rect.y,
+              rect.width,
+              rect.height,
+            ).clampInside(width, height);
+          } else {
+            rect = StudioMmRect(
+              rect.x,
+              rect.y + desired - current,
+              rect.width,
+              rect.height,
+            ).clampInside(width, height);
+          }
+          changed = true;
+        }
+        final style = (block['style'] as Map).cast<String, dynamic>();
+        block['style'] = <String, dynamic>{
+          ...style,
+          'x_mm': rect.x,
+          'y_mm': rect.y,
+        };
+      }
+      if (!changed) break;
+    }
+  }
+
+  String? _anchorAxis(String point) {
+    if (_horizontalAnchorPoints.contains(point)) return 'horizontal';
+    if (_verticalAnchorPoints.contains(point)) return 'vertical';
+    return null;
+  }
+
+  void _onAnchorHandleTap(String blockId, String point) {
+    final pendingId = _pendingAnchorBlockId;
+    final pendingPoint = _pendingAnchorPoint;
+    if (pendingId == null || pendingPoint == null || pendingId == blockId) {
+      setState(() {
+        _selectedBlockId = blockId;
+        _pendingAnchorBlockId = blockId;
+        _pendingAnchorPoint = point;
+      });
+      return;
+    }
+    final axis = _anchorAxis(pendingPoint);
+    if (axis == null || axis != _anchorAxis(point)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('نقطه‌های اتصال باید روی یک محور باشند.')),
+      );
+      return;
+    }
+    final resolvedBlocks = _allPageGridBlocks();
+    Map<String, dynamic>? resolvedBlock(String id) {
+      for (final block in resolvedBlocks) {
+        if (block['id']?.toString() == id) return block;
+      }
+      return null;
+    }
+
+    final source = resolvedBlock(pendingId);
+    final target = resolvedBlock(blockId);
+    if (source == null || target == null) return;
+    if (_wouldCreateAnchorCycle(pendingId, blockId)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('این اتصال یک چرخه ایجاد می‌کند.')),
+      );
+      setState(() {
+        _pendingAnchorBlockId = null;
+        _pendingAnchorPoint = null;
+      });
+      return;
+    }
+    if (axis == 'vertical' && pendingPoint == 'top' && point == 'bottom') {
+      final alreadyFollowed = _allPageGridBlocks().any(
+        (candidate) =>
+            candidate['id']?.toString() != pendingId &&
+            _anchorLinks(candidate).any((link) {
+              final target = (link['target'] as Map?);
+              return link['axis'] == 'vertical' &&
+                  link['source_anchor'] == 'top' &&
+                  target?['anchor'] == 'bottom' &&
+                  target?['id']?.toString() == blockId;
+            }),
+      );
+      if (alreadyFollowed) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'این نقطه یک دنبال‌کننده دارد؛ بلوک جدید را به انتهای همان زنجیره وصل کنید.',
+            ),
+          ),
+        );
+        return;
+      }
+    }
+    final offset =
+        _anchorCoordinate(_freeformRect(source), pendingPoint) -
+        _anchorCoordinate(_freeformRect(target), point);
+    final profile = reportTemplateV4ProfileKey(widget.design);
+    final constraints = _clone(_anchorConstraints(source));
+    final links = List<Map<String, dynamic>>.from(
+      (constraints['links'] as List?) ?? const [],
+    )..removeWhere((link) => link['axis'] == axis);
+    links.add(<String, dynamic>{
+      'id': '$axis-anchor',
+      'axis': axis,
+      'source_anchor': pendingPoint,
+      'target': {'type': 'node', 'id': blockId, 'anchor': point},
+      'offset_mm': double.parse(offset.toStringAsFixed(2)),
+      'variant_offsets': {profile: double.parse(offset.toStringAsFixed(2))},
+    });
+    constraints['links'] = links;
+    final pins =
+        (constraints['pins'] as Map?)?.cast<String, dynamic>() ??
+        <String, dynamic>{};
+    for (final edge
+        in axis == 'horizontal'
+            ? const ['left', 'right', 'center_x']
+            : const ['top', 'bottom', 'center_y']) {
+      pins[edge] = false;
+    }
+    constraints['pins'] = pins;
+    _patchBlockStyle(pendingId, {'anchor_constraints': constraints});
+    setState(() {
+      _selectedBlockId = pendingId;
+      _pendingAnchorBlockId = null;
+      _pendingAnchorPoint = null;
+    });
+  }
+
+  bool _wouldCreateAnchorCycle(String sourceId, String targetId) {
+    final dependencies = <String, List<String>>{};
+    for (final block in _allPageGridBlocks()) {
+      dependencies[block['id'].toString()] = _anchorLinks(block)
+          .map((link) => ((link['target'] as Map?)?['id'] ?? '').toString())
+          .where((id) => id.isNotEmpty)
+          .toList();
+    }
+    dependencies[sourceId] = [
+      ...(dependencies[sourceId] ?? const []),
+      targetId,
+    ];
+    final seen = <String>{};
+    bool reachesSource(String id) {
+      if (id == sourceId) return true;
+      if (!seen.add(id)) return false;
+      return (dependencies[id] ?? const []).any(reachesSource);
+    }
+
+    return reachesSource(targetId);
+  }
+
+  void _removeAnchorAxis(String id, String axis) {
+    final block = _findBlock(id)?.block;
+    if (block == null) return;
+    final constraints = _clone(_anchorConstraints(block));
+    final links = List<Map<String, dynamic>>.from(
+      (constraints['links'] as List?) ?? const [],
+    )..removeWhere((link) => link['axis'] == axis);
+    constraints['links'] = links;
+    _patchBlockStyle(id, {'anchor_constraints': constraints});
+  }
+
+  void _setAnchorGap(String id, Map<String, dynamic> link, double value) {
+    final block = _findBlock(id)?.block;
+    if (block == null) return;
+    final constraints = _clone(_anchorConstraints(block));
+    final links = List<Map<String, dynamic>>.from(
+      (constraints['links'] as List?) ?? const [],
+    );
+    final index = links.indexWhere((item) => item['axis'] == link['axis']);
+    if (index < 0) return;
+    final next = Map<String, dynamic>.from(links[index]);
+    final offsets =
+        (next['variant_offsets'] as Map?)?.cast<String, dynamic>() ??
+        <String, dynamic>{};
+    next['variant_offsets'] = <String, dynamic>{
+      ...offsets,
+      reportTemplateV4ProfileKey(widget.design): value,
+    };
+    links[index] = next;
+    constraints['links'] = links;
+    _patchBlockStyle(id, {'anchor_constraints': constraints});
+  }
+
+  void _togglePagePin(
+    String id,
+    String edge,
+    bool enabled,
+    double canvasWidthMm,
+    double canvasHeightMm,
+  ) {
+    Map<String, dynamic>? block;
+    for (final candidate in _allPageGridBlocks()) {
+      if (candidate['id']?.toString() == id) {
+        block = candidate;
+        break;
+      }
+    }
+    if (block == null) return;
+    final rect = _freeformRect(block);
+    final constraints = _clone(_anchorConstraints(block));
+    final pins =
+        (constraints['pins'] as Map?)?.cast<String, dynamic>() ??
+        <String, dynamic>{};
+    pins[edge] = enabled;
+    if (enabled && edge == 'center_x') {
+      pins['left'] = false;
+      pins['right'] = false;
+    } else if (enabled && const {'left', 'right'}.contains(edge)) {
+      pins['center_x'] = false;
+    }
+    if (enabled && edge == 'center_y') {
+      pins['top'] = false;
+      pins['bottom'] = false;
+    } else if (enabled && const {'top', 'bottom'}.contains(edge)) {
+      pins['center_y'] = false;
+    }
+    if (enabled) {
+      final axis = const {'left', 'right', 'center_x'}.contains(edge)
+          ? 'horizontal'
+          : 'vertical';
+      final links = List<Map<String, dynamic>>.from(
+        (constraints['links'] as List?) ?? const [],
+      )..removeWhere((link) => link['axis'] == axis);
+      constraints['links'] = links;
+    }
+    constraints['pins'] = pins;
+    if (edge == 'bottom' && enabled && constraints['bottom_mode'] == null) {
+      constraints['bottom_mode'] = 'last_page';
+    }
+    final profile = reportTemplateV4ProfileKey(widget.design);
+    final allVariantOffsets =
+        (constraints['variant_pin_offsets'] as Map?)?.cast<String, dynamic>() ??
+        <String, dynamic>{};
+    final offsets =
+        (allVariantOffsets[profile] as Map?)?.cast<String, dynamic>() ??
+        <String, dynamic>{};
+    final edgeOffset = switch (edge) {
+      'left' => rect.x,
+      'right' => canvasWidthMm - rect.right,
+      'top' => rect.y,
+      'bottom' => canvasHeightMm - rect.bottom,
+      'center_x' => rect.centerX - canvasWidthMm / 2,
+      'center_y' => rect.centerY - canvasHeightMm / 2,
+      _ => 0,
+    };
+    offsets[edge] = edgeOffset;
+    final baseOffsets =
+        (constraints['pin_offsets_mm'] as Map?)?.cast<String, dynamic>() ??
+        <String, dynamic>{};
+    baseOffsets.putIfAbsent(edge, () => edgeOffset);
+    constraints['pin_offsets_mm'] = baseOffsets;
+    allVariantOffsets[profile] = offsets;
+    constraints['variant_pin_offsets'] = allVariantOffsets;
+    _patchBlockStyle(id, {'anchor_constraints': constraints});
+  }
+
+  void _setAnchorConstraintValue(String id, String key, dynamic value) {
+    final block = _findBlock(id)?.block;
+    if (block == null) return;
+    final constraints = _clone(_anchorConstraints(block));
+    constraints[key] = value;
+    _patchBlockStyle(id, {'anchor_constraints': constraints});
+  }
+
+  List<_CanvasAnchorSegment> _canvasAnchorSegments(
+    List<Map<String, dynamic>> blocks,
+  ) {
+    final byId = <String, Map<String, dynamic>>{
+      for (final block in blocks) block['id'].toString(): block,
+    };
+    final segments = <_CanvasAnchorSegment>[];
+    for (final block in blocks) {
+      final sourceRect = _freeformRect(block);
+      for (final link in _anchorLinks(block)) {
+        final target = (link['target'] as Map?)?.cast<String, dynamic>();
+        final targetBlock = byId[target?['id']?.toString()];
+        if (targetBlock == null) continue;
+        final targetRect = _freeformRect(targetBlock);
+        final sourcePoint = (link['source_anchor'] ?? '').toString();
+        final targetPoint = (target?['anchor'] ?? '').toString();
+        Offset point(StudioMmRect rect, String anchor) => switch (anchor) {
+          'left' => Offset(rect.x, rect.centerY),
+          'right' => Offset(rect.right, rect.centerY),
+          'top' => Offset(rect.centerX, rect.y),
+          'bottom' => Offset(rect.centerX, rect.bottom),
+          'center_x' => Offset(rect.centerX, rect.centerY),
+          _ => Offset(rect.centerX, rect.centerY),
+        };
+        segments.add(
+          _CanvasAnchorSegment(
+            point(sourceRect, sourcePoint),
+            point(targetRect, targetPoint),
+          ),
+        );
+      }
+    }
+    return segments;
+  }
+
   void _finishFreeformGesture(String id) {
     final rect = _freeformPreviewRect;
     _freeformGestureId = null;
@@ -1689,6 +2297,44 @@ class _ReportTemplateStudioV3BuilderState
                     child: ClipRect(child: _canvasBlockContent(context, block)),
                   ),
                 ),
+                if (selected || _pendingAnchorBlockId != null)
+                  for (final entry in const <String, Alignment>{
+                    'top': Alignment.topCenter,
+                    'right': Alignment.centerRight,
+                    'bottom': Alignment.bottomCenter,
+                    'left': Alignment.centerLeft,
+                  }.entries)
+                    Positioned.fill(
+                      child: Align(
+                        alignment: entry.value,
+                        child: Tooltip(
+                          message: _pendingAnchorBlockId == null
+                              ? 'شروع اتصال از ${_anchorPointLabel(entry.key)}'
+                              : 'اتصال به ${_anchorPointLabel(entry.key)}',
+                          child: GestureDetector(
+                            key: ValueKey('anchor-handle-$id-${entry.key}'),
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => _onAnchorHandleTap(id, entry.key),
+                            child: Container(
+                              width: 13,
+                              height: 13,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color:
+                                    _pendingAnchorBlockId == id &&
+                                        _pendingAnchorPoint == entry.key
+                                    ? Colors.green
+                                    : Theme.of(context).colorScheme.surface,
+                                border: Border.all(
+                                  color: Colors.green.shade700,
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                 if (selected)
                   Positioned(
                     right: 0,
@@ -1764,6 +2410,15 @@ class _ReportTemplateStudioV3BuilderState
       ),
     );
   }
+
+  String _anchorPointLabel(String point) => switch (point) {
+    'top' => 'بالا',
+    'right' => 'راست',
+    'bottom' => 'پایین',
+    'left' => 'چپ',
+    'center_x' => 'مرکز افقی',
+    _ => 'مرکز عمودی',
+  };
 
   bool _canDropOnRegion(_BlockDragData data, String region) {
     final type =
@@ -2737,6 +3392,10 @@ class _ReportTemplateStudioV3BuilderState
         mediaSize.height -
         ((mediaMargins['top'] as num?)?.toDouble() ?? 0) -
         ((mediaMargins['bottom'] as num?)?.toDouble() ?? 0);
+    final defaultCanvasWidth =
+        mediaSize.width -
+        ((mediaMargins['left'] as num?)?.toDouble() ?? 0) -
+        ((mediaMargins['right'] as num?)?.toDouble() ?? 0);
     final freeformHeight =
         ((style[pageGrid ? 'page_height_mm' : 'freeform_height_mm'] as num?)
                     ?.toDouble() ??
@@ -2744,6 +3403,16 @@ class _ReportTemplateStudioV3BuilderState
             .clamp(10, 5000)
             .toDouble();
     final freeformRect = _freeformRect(block);
+    final anchorConstraints = _anchorConstraints(block);
+    final links = _anchorLinks(block);
+    final pins =
+        (anchorConstraints['pins'] as Map?)?.cast<String, dynamic>() ??
+        const {};
+    final rawBottomMode = (anchorConstraints['bottom_mode'] ?? 'last_page')
+        .toString();
+    final bottomMode = const {'last_page', 'every_page'}.contains(rawBottomMode)
+        ? rawBottomMode
+        : 'last_page';
     const alignableTypes = {
       'brand_header',
       'party_info',
@@ -2813,6 +3482,153 @@ class _ReportTemplateStudioV3BuilderState
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 14),
+              const Divider(),
+              Row(
+                children: [
+                  const Icon(Icons.hub_outlined, size: 18),
+                  const SizedBox(width: 6),
+                  const Expanded(
+                    child: Text(
+                      'Anchor و اتصال داینامیک',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  if (_pendingAnchorBlockId == id)
+                    TextButton(
+                      onPressed: () => setState(() {
+                        _pendingAnchorBlockId = null;
+                        _pendingAnchorPoint = null;
+                      }),
+                      child: const Text('لغو'),
+                    ),
+                ],
+              ),
+              Text(
+                _pendingAnchorBlockId == id
+                    ? 'حالا نقطه هم‌محور روی بلوک مقصد را انتخاب کنید.'
+                    : 'یکی از نقطه‌های سبز بلوک را بزنید، سپس نقطهٔ مقصد را انتخاب کنید.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              if (links.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                for (final link in links)
+                  Card(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.link, size: 17),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  '${_anchorPointLabel((link['source_anchor'] ?? '').toString())} ← ${_labelForBlockId((((link['target'] as Map?)?['id']) ?? '').toString())} (${_anchorPointLabel((((link['target'] as Map?)?['anchor']) ?? '').toString())})',
+                                ),
+                              ),
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                tooltip: 'قطع اتصال',
+                                onPressed: () => _removeAnchorAxis(
+                                  id,
+                                  (link['axis'] ?? '').toString(),
+                                ),
+                                icon: const Icon(Icons.link_off, size: 18),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            'فاصله در این اندازه کاغذ: ${_activeAnchorOffset(link).toStringAsFixed(1)} mm',
+                          ),
+                          if (link['axis'] == 'vertical' &&
+                              link['source_anchor'] == 'top' &&
+                              (link['target'] as Map?)?['anchor'] == 'bottom')
+                            Text(
+                              'در چاپ بعد از ارتفاع واقعی محتوای مقصد قرار می‌گیرد.',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          Slider(
+                            min: -20,
+                            max: 40,
+                            divisions: 120,
+                            value: _activeAnchorOffset(link).clamp(-20, 40),
+                            onChanged: (value) =>
+                                _setAnchorGap(id, link, value),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+              const SizedBox(height: 8),
+              const Text('نقاط ثابت نسبت به صفحه'),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final edge in const [
+                    'top',
+                    'right',
+                    'bottom',
+                    'left',
+                    'center_x',
+                    'center_y',
+                  ])
+                    FilterChip(
+                      label: Text(_anchorPointLabel(edge)),
+                      selected: pins[edge] == true,
+                      onSelected: (selected) => _togglePagePin(
+                        id,
+                        edge,
+                        selected,
+                        defaultCanvasWidth,
+                        defaultCanvasHeight,
+                      ),
+                    ),
+                ],
+              ),
+              if (pins['bottom'] == true) ...[
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: bottomMode,
+                  decoration: const InputDecoration(
+                    labelText: 'رفتار اتصال پایین در چاپ',
+                    isDense: true,
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'last_page',
+                      child: Text('پایین صفحه آخر'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'every_page',
+                      child: Text('پایین همه صفحات'),
+                    ),
+                  ],
+                  onChanged: (value) => value == null
+                      ? null
+                      : _setAnchorConstraintValue(id, 'bottom_mode', value),
+                ),
+              ],
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('بلوک هنگام شکست صفحه یکپارچه بماند'),
+                subtitle: const Text('برای پرداخت، جمع‌بندی و امضا مناسب است.'),
+                value:
+                    anchorConstraints['keep_together'] == true ||
+                    (anchorConstraints['keep_together'] == null &&
+                        const {
+                          'invoice_totals',
+                          'payments',
+                          'signatures',
+                        }.contains(type)),
+                onChanged: (value) =>
+                    _setAnchorConstraintValue(id, 'keep_together', value),
+              ),
+              const Divider(),
             ],
             if (layoutType == 'freeform' || pageGrid) ...[
               Text(pageGrid ? 'شبکه کل صفحه و Snap' : 'شبکه و Snap'),
@@ -3279,6 +4095,59 @@ class _ReportTemplateStudioV3BuilderState
       ],
     );
   }
+}
+
+class _CanvasAnchorSegment {
+  final Offset sourceMm;
+  final Offset targetMm;
+
+  const _CanvasAnchorSegment(this.sourceMm, this.targetMm);
+}
+
+class _AnchorLinksPainter extends CustomPainter {
+  final List<_CanvasAnchorSegment> segments;
+  final double pixelsPerMm;
+  final Color color;
+
+  const _AnchorLinksPainter({
+    required this.segments,
+    required this.pixelsPerMm,
+    required this.color,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+    for (final segment in segments) {
+      final source = segment.sourceMm * pixelsPerMm;
+      final target = segment.targetMm * pixelsPerMm;
+      final middle = Offset(source.dx, (source.dy + target.dy) / 2);
+      final second = Offset(target.dx, middle.dy);
+      final path = Path()
+        ..moveTo(source.dx, source.dy)
+        ..lineTo(middle.dx, middle.dy)
+        ..lineTo(second.dx, second.dy)
+        ..lineTo(target.dx, target.dy);
+      canvas.drawPath(path, paint);
+      canvas.drawCircle(source, 3, paint);
+      canvas.drawCircle(target, 3, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _AnchorLinksPainter oldDelegate) =>
+      oldDelegate.pixelsPerMm != pixelsPerMm ||
+      oldDelegate.color != color ||
+      oldDelegate.segments.length != segments.length ||
+      !List.generate(
+        segments.length,
+        (index) =>
+            oldDelegate.segments[index].sourceMm == segments[index].sourceMm &&
+            oldDelegate.segments[index].targetMm == segments[index].targetMm,
+      ).every((same) => same);
 }
 
 class _CanvasTotalRow extends StatelessWidget {
