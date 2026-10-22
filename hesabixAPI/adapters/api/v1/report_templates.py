@@ -23,6 +23,10 @@ from app.services.report_template_v3_service import (
 	migrate_v2_design_to_v3,
 	studio_block_catalog,
 )
+from app.services.report_template_v4_service import (
+	migrate_v3_design_to_v4,
+	studio_v4_contract,
+)
 from app.services.template_design_v3_compiler import compile_template_design_to_jinja_html
 
 router = APIRouter(prefix="/report-templates", tags=["قالب‌های گزارش", "گزارش‌ها"])
@@ -1106,7 +1110,9 @@ async def report_template_gallery(
 	items = list_gallery_items(module_key=module_key, subtype=subtype)
 	for item in items:
 		try:
-			item["studio_design"] = migrate_v2_design_to_v3(item["default_design"])
+			item["studio_design"] = migrate_v3_design_to_v4(
+				migrate_v2_design_to_v3(item["default_design"])
+			)
 		except ValueError:
 			# Scopeهایی که هنوز وارد Studio v3 نشده‌اند، با ویرایشگر v2 باز می‌شوند.
 			pass
@@ -1127,6 +1133,22 @@ async def report_template_studio_blocks(
 	db: Session = Depends(get_db),
 ):
 	return {"items": studio_block_catalog(module_key, subtype)}
+
+
+@router.get(
+	"/business/{business_id}/studio-contract",
+	summary="قرارداد schema، compiler، component و binding استودیو v4",
+)
+@require_business_access("business_id")
+async def report_template_studio_contract(
+	request: Request,
+	business_id: int,
+	module_key: str,
+	subtype: Optional[str] = None,
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+):
+	return studio_v4_contract(module_key, subtype)
 
 
 @router.post(
@@ -1257,6 +1279,31 @@ async def migrate_v2_to_v3_endpoint(
 	except Exception as ex:
 		raise ApiError("MIGRATION_ERROR", str(ex), http_status=400)
 	return {"design": migrated}
+
+
+@router.post(
+	"/business/{business_id}/migrate-v3-to-v4",
+	summary="تبدیل غیرمخرب طراحی Studio v3 به v4",
+	description="فقط یک design جدید برمی‌گرداند و قالب اصلی را تغییر نمی‌دهد.",
+)
+@require_business_access("business_id")
+async def migrate_v3_to_v4_endpoint(
+	request: Request,
+	business_id: int,
+	body: Dict[str, Any] = Body(...),
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+):
+	if not ctx.can_write_section("report_templates"):
+		raise ApiError("FORBIDDEN", "Missing permission: report_templates.write", http_status=403)
+	design = (body or {}).get("design") or {}
+	if not isinstance(design, dict):
+		raise ApiError("VALIDATION_ERROR", "design must be an object", http_status=400)
+	try:
+		migrated = migrate_v3_design_to_v4(design)
+	except Exception as ex:
+		raise ApiError("MIGRATION_ERROR", str(ex), http_status=400)
+	return {"design": migrated, "source_preserved": True}
 
 
 @router.post(

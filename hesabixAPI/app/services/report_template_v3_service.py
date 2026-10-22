@@ -186,7 +186,11 @@ def _block(block_id: str, block_type: str, props: dict[str, Any] | None = None) 
 		"type": block_type,
 		"visible": True,
 		"props": deepcopy(props or {}),
-		"style": {"width_mode": "full"},
+		"style": {
+			"width_mode": "full",
+			"row_id": f"row-{block_id}",
+			"grid_span": 60,
+		},
 	}
 
 
@@ -299,6 +303,7 @@ def validate_v3_design(
 		if not isinstance(blocks, list):
 			errors.append(f"regions.{region_name} must be a list")
 			continue
+		row_spans: dict[str, int] = {}
 		for index, block in enumerate(blocks):
 			if not isinstance(block, dict):
 				errors.append(f"Invalid block in {region_name} at index {index}")
@@ -329,6 +334,30 @@ def validate_v3_design(
 			text_align = str(style.get("text_align") or "").strip().lower()
 			if text_align and text_align not in ("right", "center", "left"):
 				errors.append(f"Invalid text alignment in block '{block_id}'")
+			row_id = str(style.get("row_id") or "").strip()
+			if row_id and not _ID_RE.fullmatch(row_id):
+				errors.append(f"Invalid row id in block '{block_id}'")
+			if style.get("grid_span") not in (None, ""):
+				try:
+					grid_span = int(style.get("grid_span"))
+				except (TypeError, ValueError):
+					errors.append(f"Invalid grid span in block '{block_id}'")
+				else:
+					if grid_span < 1 or grid_span > 60:
+						errors.append(f"Invalid grid span in block '{block_id}'")
+					elif row_id:
+						row_spans[row_id] = row_spans.get(row_id, 0) + grid_span
+			row_height_mode = str(style.get("row_height_mode") or "auto").strip().lower()
+			if row_height_mode not in ("auto", "minimum", "fixed"):
+				errors.append(f"Invalid row height mode in block '{block_id}'")
+			if row_height_mode in ("minimum", "fixed"):
+				try:
+					row_height_mm = float(style.get("row_height_mm"))
+				except (TypeError, ValueError):
+					errors.append(f"Row height is required in block '{block_id}'")
+				else:
+					if row_height_mm < 4 or row_height_mm > 500:
+						errors.append(f"Invalid row height in block '{block_id}'")
 			width_mode = str(style.get("width_mode") or "full").strip().lower()
 			if width_mode not in ("full", "percentage", "fixed", "content"):
 				errors.append(f"Invalid width mode in block '{block_id}'")
@@ -369,6 +398,11 @@ def validate_v3_design(
 						errors.append(f"Invalid totals expression in row {row_index}: {ex.message}")
 			if block_type == "custom_text" and len(str(props.get("text") or "")) > 2000:
 				errors.append(f"Custom text is too long in block '{block_id}'")
+		for row_id, span in row_spans.items():
+			if span > 60:
+				errors.append(
+					f"Grid row '{row_id}' in region '{region_name}' exceeds 60 columns"
+				)
 
 	for block_type, definition in _BLOCKS.items():
 		count = counts.get(block_type, 0)

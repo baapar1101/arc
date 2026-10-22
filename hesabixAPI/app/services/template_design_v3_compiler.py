@@ -259,9 +259,16 @@ def _compile_block(design: dict[str, Any], block: dict[str, Any], *, receipt: bo
 		align = str((block.get("props") or {}).get("align") or "").strip().lower()
 	if align in ("right", "center", "left"):
 		classes.append(f"rt-block-align-{align}")
+	grid_span = style.get("grid_span")
+	try:
+		grid_span = max(1, min(60, int(grid_span))) if grid_span not in (None, "") else None
+	except (TypeError, ValueError):
+		grid_span = None
 	width_mode = str(style.get("width_mode") or "full").strip().lower()
 	width_css = "width:100%;"
-	if width_mode == "percentage":
+	if grid_span is not None:
+		width_css += f"grid-column:span {grid_span};"
+	elif width_mode == "percentage":
 		try:
 			width_css = f"width:{max(10, min(100, float(style.get('width_value') or 100))):g}%;"
 		except (TypeError, ValueError):
@@ -274,6 +281,42 @@ def _compile_block(design: dict[str, Any], block: dict[str, Any], *, receipt: bo
 	elif width_mode == "content":
 		width_css = "width:max-content;"
 	return f'<div class="{" ".join(classes)}" style="{width_css}">{content}</div>'
+
+
+def _row_id(block: dict[str, Any]) -> str:
+	style = block.get("style") or {}
+	return str(style.get("row_id") or f"legacy-{block.get('id') or id(block)}")
+
+
+def _compile_region(design: dict[str, Any], region: str, *, receipt: bool) -> str:
+	rows: list[list[dict[str, Any]]] = []
+	for block in _blocks(design, region):
+		row_id = _row_id(block)
+		if not rows or _row_id(rows[-1][0]) != row_id:
+			rows.append([block])
+		else:
+			rows[-1].append(block)
+
+	compiled_rows: list[str] = []
+	for blocks in rows:
+		style = blocks[0].get("style") or {}
+		has_grid = any(
+			(block.get("style") or {}).get("grid_span") not in (None, "")
+			for block in blocks
+		)
+		row_class = "rt-grid-row" if has_grid else "rt-legacy-row"
+		height_mode = str(style.get("row_height_mode") or "auto").strip().lower()
+		height_css = ""
+		if height_mode in ("minimum", "fixed"):
+			try:
+				height = max(4, min(500, float(style.get("row_height_mm") or 4)))
+			except (TypeError, ValueError):
+				height = 4
+			property_name = "height" if height_mode == "fixed" else "min-height"
+			height_css = f"{property_name}:{height:g}mm;"
+		content = "".join(_compile_block(design, block, receipt=receipt) for block in blocks)
+		compiled_rows.append(f'<div class="{row_class}" style="{height_css}">{content}</div>')
+	return "".join(compiled_rows)
 
 
 def compile_v3_design_to_jinja_html(design: dict[str, Any]) -> tuple[str, str, str, str]:
@@ -302,21 +345,30 @@ def compile_v3_design_to_jinja_html(design: dict[str, Any]) -> tuple[str, str, s
 .rt-layout table { width: 100%; table-layout: auto; }
 .rt-layout img { max-width: 100%; height: auto; }
 .rt-block { max-width: 100%; }
+.rt-grid-row { display:grid;grid-template-columns:repeat(60,minmax(0,1fr));align-items:start;width:100%; }
+.rt-grid-row > .rt-block { min-width:0; }
+.rt-legacy-row { width:100%; }
 .rt-studio-footer-meta { font-size: 10px; color: #64748b; text-align: center; margin-top: 8px; }
 .rt-custom-text { white-space: pre-wrap; margin: 6px 0; }
 .rt-block-align-right, .rt-block-align-right * { text-align: right !important; }
 .rt-block-align-center, .rt-block-align-center * { text-align: center !important; }
 .rt-block-align-left, .rt-block-align-left * { text-align: left !important; }
 """
-	header_html = "".join(_compile_block(design, block, receipt=receipt) for block in _blocks(design, "header"))
-	body = "".join(_compile_block(design, block, receipt=receipt) for block in _blocks(design, "body"))
-	footer_html = "".join(_compile_block(design, block, receipt=receipt) for block in _blocks(design, "footer"))
+	header_html = _compile_region(design, "header", receipt=receipt)
+	body = _compile_region(design, "body", receipt=receipt)
+	footer_html = _compile_region(design, "footer", receipt=receipt)
 	body_html = f'<div class="rt-layout">{body}</div>'
 	html_doc = f'<!doctype html><html dir="{direction}"><head></head><body>{body_html}</body></html>'
 	return html_doc, css.strip(), header_html, footer_html
 
 
 def compile_template_design_to_jinja_html(design: dict[str, Any]) -> tuple[str, str, str, str]:
+	from app.services.report_template_v4_service import is_v4_design
+
+	if is_v4_design(design):
+		from app.services.template_design_v4_compiler import compile_v4_design_to_jinja_html
+
+		return compile_v4_design_to_jinja_html(design)
 	if is_v3_design(design):
 		return compile_v3_design_to_jinja_html(design)
 	return v2.compile_v2_design_to_jinja_html(design)

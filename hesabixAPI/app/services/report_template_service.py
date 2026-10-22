@@ -20,6 +20,7 @@ from app.services.template_design_v3_compiler import compile_template_design_to_
 from app.services.report_template_scope_registry import get_scope_meta, is_known_scope
 from app.services.report_template_v2_service import validate_v2_design
 from app.services.report_template_v3_service import is_v3_design, validate_v3_design
+from app.services.report_template_v4_service import is_v4_design, validate_v4_design
 
 logger = logging.getLogger(__name__)
 
@@ -220,6 +221,8 @@ class ReportTemplateService:
 		subtype: Optional[str],
 		design: Dict[str, Any],
 	) -> Dict[str, List[str]]:
+		if is_v4_design(design):
+			return validate_v4_design(module_key, subtype, design)
 		if is_v3_design(design):
 			return validate_v3_design(module_key, subtype, design)
 		return validate_v2_design(module_key, subtype, design)

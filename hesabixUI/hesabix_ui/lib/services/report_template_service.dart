@@ -347,6 +347,17 @@ class ReportTemplateService {
     return res.data ?? const <String, dynamic>{};
   }
 
+  Future<Map<String, dynamic>> migrateV3ToV4({
+    required int businessId,
+    required Map<String, dynamic> design,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/report-templates/business/$businessId/migrate-v3-to-v4',
+      data: {'design': design},
+    );
+    return res.data ?? const <String, dynamic>{};
+  }
+
   Future<Map<String, dynamic>> validateV2Design({
     required int businessId,
     required String moduleKey,
@@ -408,8 +419,10 @@ class ReportTemplateService {
       query: {
         if (status != null && status.trim().isNotEmpty) 'status': status.trim(),
         if (actorUserId != null) 'actor_user_id': actorUserId,
-        if (fromDate != null && fromDate.trim().isNotEmpty) 'from_date': fromDate.trim(),
-        if (toDate != null && toDate.trim().isNotEmpty) 'to_date': toDate.trim(),
+        if (fromDate != null && fromDate.trim().isNotEmpty)
+          'from_date': fromDate.trim(),
+        if (toDate != null && toDate.trim().isNotEmpty)
+          'to_date': toDate.trim(),
         'offset': offset,
         'sort_by': sortBy,
         'sort_order': sortOrder,

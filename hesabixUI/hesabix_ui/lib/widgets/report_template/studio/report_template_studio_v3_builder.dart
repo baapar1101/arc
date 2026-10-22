@@ -1,9 +1,12 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import 'report_template_media_settings.dart';
+import 'report_template_snap_engine.dart';
+import 'report_template_studio_v4_adapter.dart';
 
 class ReportTemplateStudioV3Builder extends StatefulWidget {
   final Map<String, dynamic> design;
@@ -34,13 +37,42 @@ class _BlockDragData {
   const _BlockDragData.palette(this.blockType) : blockId = null;
 }
 
+class _CanvasRow {
+  final String id;
+  final int startIndex;
+  final List<Map<String, dynamic>> blocks;
+
+  const _CanvasRow({
+    required this.id,
+    required this.startIndex,
+    required this.blocks,
+  });
+}
+
 class _ReportTemplateStudioV3BuilderState
     extends State<ReportTemplateStudioV3Builder> {
+  final GlobalKey _pageGridCanvasKey = GlobalKey();
   final List<Map<String, dynamic>> _history = [];
   int _historyIndex = -1;
   int _idSequence = 0;
   String? _selectedBlockId;
   bool _showLivePreview = false;
+  String? _resizingBlockId;
+  int? _resizeStartSpan;
+  int? _resizePreviewSpan;
+  double _resizeHorizontalDelta = 0;
+  String? _resizingRowId;
+  double? _resizeStartHeightMm;
+  double? _resizePreviewHeightMm;
+  double _resizeVerticalDelta = 0;
+  String? _freeformGestureId;
+  StudioMmRect? _freeformStartRect;
+  StudioMmRect? _freeformPreviewRect;
+  Offset _freeformDelta = Offset.zero;
+  List<StudioSnapGuide> _freeformGuides = const [];
+  int? _freeformResizePointer;
+  String? _freeformResizingId;
+  int? _freeformMovePointer;
 
   @override
   void initState() {
@@ -101,8 +133,26 @@ class _ReportTemplateStudioV3BuilderState
   }
 
   Map<String, dynamic> _regions(Map<String, dynamic> design) {
+    if (isReportTemplateV4(design)) {
+      final projection = reportTemplateV4StudioProjection(design);
+      return (projection['regions'] as Map?)?.cast<String, dynamic>() ??
+          <String, dynamic>{};
+    }
     return (design['regions'] as Map?)?.cast<String, dynamic>() ??
         <String, dynamic>{};
+  }
+
+  void _setRegions(Map<String, dynamic> design, Map<String, dynamic> regions) {
+    if (!isReportTemplateV4(design)) {
+      design['regions'] = regions;
+      return;
+    }
+    final projection = reportTemplateV4StudioProjection(design)
+      ..['regions'] = regions;
+    final updated = applyStudioProjectionToReportTemplateV4(design, projection);
+    design
+      ..clear()
+      ..addAll(updated);
   }
 
   List<Map<String, dynamic>> _regionBlocks(
@@ -143,6 +193,59 @@ class _ReportTemplateStudioV3BuilderState
     return '${type}_${DateTime.now().microsecondsSinceEpoch}_$_idSequence';
   }
 
+  String _newRowId() => _newId('row');
+
+  String _blockRowId(Map<String, dynamic> block, String region) {
+    final style = (block['style'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final configured = (style['row_id'] ?? '').toString().trim();
+    if (configured.isNotEmpty) return configured;
+    return 'legacy-$region-${block['id']}';
+  }
+
+  int _blockSpan(Map<String, dynamic> block) {
+    final style = (block['style'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final configured = (style['grid_span'] as num?)?.round();
+    if (configured != null) return configured.clamp(1, 60).toInt();
+    final mode = (style['width_mode'] ?? 'full').toString();
+    final value = (style['width_value'] as num?)?.toDouble();
+    if (mode == 'percentage') {
+      return ((value ?? 100) * 0.6).round().clamp(1, 60).toInt();
+    }
+    return 60;
+  }
+
+  List<_CanvasRow> _canvasRows(
+    List<Map<String, dynamic>> blocks,
+    String region,
+  ) {
+    final rows = <_CanvasRow>[];
+    for (var index = 0; index < blocks.length; index++) {
+      final block = blocks[index];
+      final rowId = _blockRowId(block, region);
+      if (rows.isEmpty || rows.last.id != rowId) {
+        rows.add(_CanvasRow(id: rowId, startIndex: index, blocks: [block]));
+      } else {
+        rows.last.blocks.add(block);
+      }
+    }
+    return rows;
+  }
+
+  Map<String, dynamic> _newBlock(String type, String rowId, int span) {
+    final definition = _definition(type)!;
+    return <String, dynamic>{
+      'id': _newId(type),
+      'type': type,
+      'visible': true,
+      'props': _cloneMap(definition['default_props']),
+      'style': <String, dynamic>{
+        'width_mode': 'full',
+        'row_id': rowId,
+        'grid_span': span.clamp(1, 60),
+      },
+    };
+  }
+
   void _addBlock(String type, String region, int index) {
     final definition = _definition(type);
     if (definition == null || !_canAdd(definition)) return;
@@ -157,16 +260,10 @@ class _ReportTemplateStudioV3BuilderState
     final blocks = List<Map<String, dynamic>>.from(
       (regions[region] as List?) ?? const [],
     );
-    final block = <String, dynamic>{
-      'id': _newId(type),
-      'type': type,
-      'visible': true,
-      'props': _cloneMap(definition['default_props']),
-      'style': <String, dynamic>{'width_mode': 'full'},
-    };
+    final block = _newBlock(type, _newRowId(), 60);
     blocks.insert(index.clamp(0, blocks.length), block);
     regions[region] = blocks;
-    design['regions'] = regions;
+    _setRegions(design, regions);
     _selectedBlockId = block['id'].toString();
     _commit(design);
   }
@@ -214,6 +311,15 @@ class _ReportTemplateStudioV3BuilderState
       (definition?['allowed_regions'] as List?) ?? const [],
     );
     if (!allowed.contains(targetRegion)) return;
+    final movingStyle =
+        (moving['style'] as Map?)?.cast<String, dynamic>() ??
+        <String, dynamic>{};
+    moving['style'] = {
+      ...movingStyle,
+      'width_mode': 'full',
+      'row_id': _newRowId(),
+      'grid_span': 60,
+    };
     final target = List<Map<String, dynamic>>.from(
       (regions[targetRegion] as List?) ?? const [],
     );
@@ -222,7 +328,7 @@ class _ReportTemplateStudioV3BuilderState
     }
     target.insert(targetIndex.clamp(0, target.length), moving);
     regions[targetRegion] = target;
-    design['regions'] = regions;
+    _setRegions(design, regions);
     _commit(design);
   }
 
@@ -232,6 +338,136 @@ class _ReportTemplateStudioV3BuilderState
     } else if (data.blockId != null) {
       _moveBlock(data.blockId!, region, index);
     }
+  }
+
+  void _handleDropBeside(_BlockDragData data, String region, String rowId) {
+    final type =
+        data.blockType ??
+        _findBlock(data.blockId ?? '')?.block['type']?.toString();
+    final definition = _definition(type ?? '');
+    if (definition == null ||
+        !List<String>.from(
+          (definition['allowed_regions'] as List?) ?? const [],
+        ).contains(region)) {
+      return;
+    }
+    if (data.blockType != null && !_canAdd(definition)) return;
+
+    final design = _clone(widget.design);
+    final regions = _regions(design);
+    Map<String, dynamic>? moving;
+    for (final sourceRegion in const ['header', 'body', 'footer']) {
+      final source = List<Map<String, dynamic>>.from(
+        (regions[sourceRegion] as List?) ?? const [],
+      );
+      final index = source.indexWhere(
+        (block) => block['id']?.toString() == data.blockId,
+      );
+      if (index >= 0) {
+        moving = source.removeAt(index);
+        regions[sourceRegion] = source;
+        break;
+      }
+    }
+    moving ??= _newBlock(type!, rowId, 30);
+
+    final target = List<Map<String, dynamic>>.from(
+      (regions[region] as List?) ?? const [],
+    );
+    final rowIndexes = <int>[];
+    for (var index = 0; index < target.length; index++) {
+      if (_blockRowId(target[index], region) == rowId) rowIndexes.add(index);
+    }
+    if (rowIndexes.isEmpty) {
+      final style =
+          (moving['style'] as Map?)?.cast<String, dynamic>() ??
+          <String, dynamic>{};
+      moving['style'] = {
+        ...style,
+        'width_mode': 'full',
+        'row_id': _newRowId(),
+        'grid_span': 60,
+      };
+      target.add(moving);
+    } else {
+      final targetRowStyle =
+          (target[rowIndexes.first]['style'] as Map?)
+              ?.cast<String, dynamic>() ??
+          const <String, dynamic>{};
+      for (final index in rowIndexes) {
+        final block = Map<String, dynamic>.from(target[index]);
+        final style =
+            (block['style'] as Map?)?.cast<String, dynamic>() ??
+            <String, dynamic>{};
+        block['style'] = {
+          ...style,
+          'width_mode': 'full',
+          'row_id': rowId,
+          'grid_span': _blockSpan(block),
+        };
+        target[index] = block;
+      }
+      final occupied = rowIndexes.fold<int>(
+        0,
+        (sum, index) => sum + _blockSpan(target[index]),
+      );
+      final remaining = 60 - occupied;
+      if (remaining <= 0) {
+        final count = rowIndexes.length + 1;
+        final base = 60 ~/ count;
+        var remainder = 60 % count;
+        for (final index in rowIndexes) {
+          final span = base + (remainder-- > 0 ? 1 : 0);
+          final block = Map<String, dynamic>.from(target[index]);
+          final style =
+              (block['style'] as Map?)?.cast<String, dynamic>() ??
+              <String, dynamic>{};
+          block['style'] = {
+            ...style,
+            'width_mode': 'full',
+            'row_id': rowId,
+            'grid_span': span,
+          };
+          target[index] = block;
+        }
+        final style =
+            (moving['style'] as Map?)?.cast<String, dynamic>() ??
+            <String, dynamic>{};
+        style.remove('row_height_mode');
+        style.remove('row_height_mm');
+        moving['style'] = {
+          ...style,
+          'width_mode': 'full',
+          'row_id': rowId,
+          'grid_span': base + (remainder-- > 0 ? 1 : 0),
+          if (targetRowStyle['row_height_mode'] != null)
+            'row_height_mode': targetRowStyle['row_height_mode'],
+          if (targetRowStyle['row_height_mm'] != null)
+            'row_height_mm': targetRowStyle['row_height_mm'],
+        };
+      } else {
+        final style =
+            (moving['style'] as Map?)?.cast<String, dynamic>() ??
+            <String, dynamic>{};
+        style.remove('row_height_mode');
+        style.remove('row_height_mm');
+        moving['style'] = {
+          ...style,
+          'width_mode': 'full',
+          'row_id': rowId,
+          'grid_span': remaining.clamp(1, 30),
+          if (targetRowStyle['row_height_mode'] != null)
+            'row_height_mode': targetRowStyle['row_height_mode'],
+          if (targetRowStyle['row_height_mm'] != null)
+            'row_height_mm': targetRowStyle['row_height_mm'],
+        };
+      }
+      target.insert(rowIndexes.last + 1, moving);
+    }
+    regions[region] = target;
+    _setRegions(design, regions);
+    _selectedBlockId = moving['id'].toString();
+    _commit(design);
   }
 
   void _selectBlock(String id) {
@@ -255,7 +491,7 @@ class _ReportTemplateStudioV3BuilderState
     );
     blocks.removeAt(found.index);
     regions[found.region] = blocks;
-    design['regions'] = regions;
+    _setRegions(design, regions);
     if (_selectedBlockId == id) _selectedBlockId = null;
     _commit(design);
   }
@@ -272,9 +508,17 @@ class _ReportTemplateStudioV3BuilderState
       (regions[found.region] as List?) ?? const [],
     );
     final copy = _clone(found.block)..['id'] = _newId(type);
+    final style =
+        (copy['style'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
+    copy['style'] = {
+      ...style,
+      'width_mode': 'full',
+      'row_id': _newRowId(),
+      'grid_span': 60,
+    };
     blocks.insert(found.index + 1, copy);
     regions[found.region] = blocks;
-    design['regions'] = regions;
+    _setRegions(design, regions);
     _selectedBlockId = copy['id'].toString();
     _commit(design);
   }
@@ -295,7 +539,7 @@ class _ReportTemplateStudioV3BuilderState
         mutate(block);
         blocks[index] = block;
         regions[region] = blocks;
-        design['regions'] = regions;
+        _setRegions(design, regions);
         _commit(design);
         return;
       }
@@ -305,6 +549,31 @@ class _ReportTemplateStudioV3BuilderState
   void _patchRoot(void Function(Map<String, dynamic> design) mutate) {
     final design = _clone(widget.design);
     mutate(design);
+    syncReportTemplateV4ActiveMedia(design);
+    _commit(design);
+  }
+
+  void _patchRowStyle(String rowId, Map<String, dynamic> patch) {
+    final design = _clone(widget.design);
+    final regions = _regions(design);
+    for (final region in const ['header', 'body', 'footer']) {
+      final blocks = List<Map<String, dynamic>>.from(
+        (regions[region] as List?) ?? const [],
+      );
+      var changed = false;
+      for (var index = 0; index < blocks.length; index++) {
+        if (_blockRowId(blocks[index], region) != rowId) continue;
+        final block = Map<String, dynamic>.from(blocks[index]);
+        final style =
+            (block['style'] as Map?)?.cast<String, dynamic>() ??
+            <String, dynamic>{};
+        block['style'] = {...style, ...patch, 'row_id': rowId};
+        blocks[index] = block;
+        changed = true;
+      }
+      if (changed) regions[region] = blocks;
+    }
+    _setRegions(design, regions);
     _commit(design);
   }
 
@@ -443,7 +712,363 @@ class _ReportTemplateStudioV3BuilderState
     );
   }
 
+  List<Map<String, dynamic>> _allPageGridBlocks() => [
+    for (final region in const ['header', 'body', 'footer'])
+      ..._regionBlocks(widget.design, region),
+  ];
+
+  double _pageGridDefaultWidth(String type, double canvasWidthMm) =>
+      switch (type) {
+        'invoice_lines' || 'brand_header' => canvasWidthMm,
+        'party_info' => canvasWidthMm * 0.48,
+        'invoice_totals' => canvasWidthMm * 0.55,
+        'signatures' => canvasWidthMm * 0.65,
+        'qr' => 34,
+        _ => canvasWidthMm * 0.5,
+      };
+
+  double _pageGridDefaultHeight(String type) => switch (type) {
+    'brand_header' => 30,
+    'party_info' => 24,
+    'invoice_lines' => 72,
+    'invoice_totals' => 38,
+    'payments' => 24,
+    'note' => 22,
+    'signatures' => 38,
+    'qr' => 34,
+    'footer_meta' => 14,
+    'divider' => 4,
+    'spacer' => 10,
+    _ => 20,
+  };
+
+  bool _canDropOnPageGrid(_BlockDragData data) {
+    final type =
+        data.blockType ??
+        _findBlock(data.blockId ?? '')?.block['type']?.toString();
+    return type != null && _definition(type) != null;
+  }
+
+  void _dropOnPageGrid(
+    _BlockDragData data,
+    double xMm,
+    double yMm,
+    double canvasWidthMm,
+    double canvasHeightMm,
+  ) {
+    final design = _clone(widget.design);
+    final regions = _regions(design);
+    Map<String, dynamic>? block;
+    String? region;
+    if (data.blockId != null) {
+      for (final candidateRegion in const ['header', 'body', 'footer']) {
+        final blocks = List<Map<String, dynamic>>.from(
+          (regions[candidateRegion] as List?) ?? const [],
+        );
+        final index = blocks.indexWhere(
+          (candidate) => candidate['id']?.toString() == data.blockId,
+        );
+        if (index >= 0) {
+          block = Map<String, dynamic>.from(blocks[index]);
+          region = candidateRegion;
+          break;
+        }
+      }
+    } else if (data.blockType != null) {
+      final definition = _definition(data.blockType!);
+      if (definition == null || !_canAdd(definition)) return;
+      final allowed = List<String>.from(
+        (definition['allowed_regions'] as List?) ?? const ['body'],
+      );
+      region = allowed.contains('body')
+          ? 'body'
+          : (allowed.isEmpty ? 'body' : allowed.first);
+      block = _newBlock(data.blockType!, _newRowId(), 60);
+      final blocks = List<Map<String, dynamic>>.from(
+        (regions[region] as List?) ?? const [],
+      )..add(block);
+      regions[region] = blocks;
+    }
+    if (block == null || region == null) return;
+    final type = block['type'].toString();
+    final oldStyle =
+        (block['style'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final width = _styleNumber(
+      oldStyle,
+      'width_mm',
+      _pageGridDefaultWidth(type, canvasWidthMm),
+    ).clamp(4, canvasWidthMm).toDouble();
+    final height = _styleNumber(
+      oldStyle,
+      'height_mm',
+      _pageGridDefaultHeight(type),
+    ).clamp(4, canvasHeightMm).toDouble();
+    final rect = StudioMmRect(
+      xMm - width / 2,
+      yMm - 8,
+      width,
+      height,
+    ).clampInside(canvasWidthMm, canvasHeightMm);
+    final blocks = List<Map<String, dynamic>>.from(
+      (regions[region] as List?) ?? const [],
+    );
+    final index = blocks.indexWhere(
+      (candidate) => candidate['id']?.toString() == block!['id']?.toString(),
+    );
+    if (index < 0) return;
+    block['style'] = <String, dynamic>{
+      ...oldStyle,
+      'layout_type': 'page_grid',
+      'x_mm': rect.x,
+      'y_mm': rect.y,
+      'width_mm': rect.width,
+      'height_mm': rect.height,
+    };
+    blocks[index] = block;
+    regions[region] = blocks;
+    _setRegions(design, regions);
+    _selectedBlockId = block['id'].toString();
+    _commit(design);
+  }
+
+  void _patchPageGridSettings(Map<String, dynamic> patch) {
+    final design = _clone(widget.design);
+    final regions = _regions(design);
+    for (final region in const ['header', 'body', 'footer']) {
+      final blocks = List<Map<String, dynamic>>.from(
+        (regions[region] as List?) ?? const [],
+      );
+      for (var index = 0; index < blocks.length; index++) {
+        final block = Map<String, dynamic>.from(blocks[index]);
+        final style =
+            (block['style'] as Map?)?.cast<String, dynamic>() ?? const {};
+        block['style'] = <String, dynamic>{
+          ...style,
+          'layout_type': 'page_grid',
+          ...patch,
+        };
+        blocks[index] = block;
+      }
+      regions[region] = blocks;
+    }
+    _setRegions(design, regions);
+    _commit(design);
+  }
+
+  Widget _pageGridCanvas(BuildContext context) {
+    final media = normalizedReportTemplateMedia(
+      widget.design,
+      preferRoll: widget.design['layout'] == 'invoice_receipt',
+    );
+    final mediaSize = reportTemplateMediaSizeMm(media);
+    final isRoll = media['type'] == 'roll';
+    final margins =
+        (media['margins_mm'] as Map?)?.cast<String, dynamic>() ?? const {};
+    double marginMm(String side, double fallback) =>
+        (margins[side] as num?)?.toDouble() ?? fallback;
+    final leftMm = marginMm('left', isRoll ? 2 : 10);
+    final rightMm = marginMm('right', isRoll ? 2 : 10);
+    final topMm = marginMm('top', isRoll ? 3 : 10);
+    final bottomMm = marginMm('bottom', isRoll ? 4 : 10);
+    final canvasWidthMm = (mediaSize.width - leftMm - rightMm)
+        .clamp(10, 1000)
+        .toDouble();
+    final blocks = _allPageGridBlocks();
+    final firstStyle = blocks.isEmpty
+        ? const <String, dynamic>{}
+        : (blocks.first['style'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final gridMm = _styleNumber(
+      firstStyle,
+      'page_grid_mm',
+      1,
+    ).clamp(1, 5).toDouble();
+    final snapEnabled = firstStyle['page_snap'] != false;
+    final requiredBottom = blocks.fold<double>(
+      0,
+      (value, block) => math.max(value, _freeformRect(block).bottom + 10),
+    );
+    final sheetHeight = (mediaSize.height - topMm - bottomMm)
+        .clamp(20, 5000)
+        .toDouble();
+    final configuredHeight = _styleNumber(
+      firstStyle,
+      'page_height_mm',
+      sheetHeight,
+    );
+    final double canvasHeightMm = isRoll
+        ? math.max(120.0, math.max(configuredHeight, requiredBottom))
+        : sheetHeight;
+    final direction = ((widget.design['theme'] as Map?)?['direction'] == 'ltr')
+        ? TextDirection.ltr
+        : TextDirection.rtl;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : 800.0;
+        final pageWidthPx = (availableWidth - 48)
+            .clamp(280.0, 760.0)
+            .toDouble();
+        final pixelsPerMm = pageWidthPx / mediaSize.width;
+        final pageHeightPx = (topMm + canvasHeightMm + bottomMm) * pixelsPerMm;
+        return ColoredBox(
+          color: const Color(0xffe5e7eb),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Center(
+              child: Container(
+                width: pageWidthPx,
+                height: pageHeightPx,
+                padding: EdgeInsets.fromLTRB(
+                  leftMm * pixelsPerMm,
+                  topMm * pixelsPerMm,
+                  rightMm * pixelsPerMm,
+                  bottomMm * pixelsPerMm,
+                ),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Color(0x26000000),
+                      blurRadius: 18,
+                      offset: Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Directionality(
+                  textDirection: direction,
+                  child: Builder(
+                    builder: (canvasContext) => DragTarget<_BlockDragData>(
+                      onWillAcceptWithDetails: (details) =>
+                          _canDropOnPageGrid(details.data),
+                      onAcceptWithDetails: (details) {
+                        final box =
+                            _pageGridCanvasKey.currentContext
+                                    ?.findRenderObject()
+                                as RenderBox?;
+                        if (box == null) return;
+                        final local = box.globalToLocal(details.offset);
+                        _dropOnPageGrid(
+                          details.data,
+                          local.dx / pixelsPerMm,
+                          local.dy / pixelsPerMm,
+                          canvasWidthMm,
+                          canvasHeightMm,
+                        );
+                      },
+                      builder: (context, candidates, rejected) => Container(
+                        key: _pageGridCanvasKey,
+                        width: canvasWidthMm * pixelsPerMm,
+                        height: canvasHeightMm * pixelsPerMm,
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: candidates.isNotEmpty
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context).colorScheme.outlineVariant,
+                          ),
+                        ),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Positioned.fill(
+                              child: CustomPaint(
+                                painter: _MillimeterGridPainter(
+                                  pixelsPerMm: pixelsPerMm,
+                                  gridMm: gridMm,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .outlineVariant
+                                      .withValues(alpha: 0.5),
+                                ),
+                              ),
+                            ),
+                            for (final block in blocks)
+                              _freeformCanvasBlock(
+                                context,
+                                block,
+                                siblings: blocks
+                                    .where(
+                                      (candidate) =>
+                                          candidate['id']?.toString() !=
+                                          block['id']?.toString(),
+                                    )
+                                    .map(_freeformRect)
+                                    .toList(),
+                                widthMm: canvasWidthMm,
+                                heightMm: canvasHeightMm,
+                                pixelsPerMm: pixelsPerMm,
+                                gridMm: gridMm,
+                                snapEnabled: snapEnabled,
+                              ),
+                            for (final guide in _freeformGuides)
+                              if (guide.vertical)
+                                Positioned(
+                                  left: guide.positionMm * pixelsPerMm,
+                                  top: 0,
+                                  bottom: 0,
+                                  child: Container(
+                                    width: 1,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.tertiary,
+                                  ),
+                                )
+                              else
+                                Positioned(
+                                  top: guide.positionMm * pixelsPerMm,
+                                  left: 0,
+                                  right: 0,
+                                  child: Container(
+                                    height: 1,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.tertiary,
+                                  ),
+                                ),
+                            PositionedDirectional(
+                              top: 4,
+                              end: 4,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .surfaceContainerHighest
+                                      .withValues(alpha: 0.9),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  child: Text(
+                                    'گرید کل صفحه · ${gridMm.toStringAsFixed(0)}mm${snapEnabled ? ' · Snap' : ''}',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.labelSmall,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _visualCanvas(BuildContext context) {
+    if (isReportTemplateV4(widget.design)) {
+      return _pageGridCanvas(context);
+    }
     final media = normalizedReportTemplateMedia(
       widget.design,
       preferRoll: widget.design['layout'] == 'invoice_receipt',
@@ -549,6 +1174,7 @@ class _ReportTemplateStudioV3BuilderState
 
   Widget _canvasRegion(BuildContext context, String region, String title) {
     final blocks = _regionBlocks(widget.design, region);
+    final rows = _canvasRows(blocks, region);
     return DragTarget<_BlockDragData>(
       onWillAcceptWithDetails: (details) =>
           _canDropOnRegion(details.data, region),
@@ -576,16 +1202,566 @@ class _ReportTemplateStudioV3BuilderState
             children: [
               if (blocks.isEmpty)
                 _canvasEmptyRegion(context, region, title)
-              else
-                for (var index = 0; index < blocks.length; index++) ...[
-                  _canvasDropLine(region, index),
-                  _canvasBlock(context, blocks[index]),
+              else ...[
+                for (final row in rows) ...[
+                  _canvasDropLine(region, row.startIndex),
+                  _canvasRow(context, region, row),
                 ],
+              ],
               _canvasDropLine(region, blocks.length, expanded: active),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _canvasRow(BuildContext context, String region, _CanvasRow row) {
+    final firstStyle =
+        (row.blocks.first['style'] as Map?)?.cast<String, dynamic>() ??
+        const <String, dynamic>{};
+    if (isReportTemplateV4(widget.design) &&
+        firstStyle['layout_type'] == 'freeform') {
+      return _freeformCanvasRow(context, region, row, firstStyle);
+    }
+    final heightMode = (firstStyle['row_height_mode'] ?? 'auto').toString();
+    final configuredHeight =
+        (firstStyle['row_height_mm'] as num?)?.toDouble() ?? 20;
+    final previewHeight = _resizingRowId == row.id
+        ? _resizePreviewHeightMm
+        : null;
+    final heightMm = previewHeight ?? configuredHeight;
+    final selectedInRow = row.blocks.any(
+      (block) => block['id']?.toString() == _selectedBlockId,
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final rowWidth = constraints.maxWidth;
+        final media = normalizedReportTemplateMedia(widget.design);
+        final mediaWidth = (media['width_mm'] as num?)?.toDouble() ?? 210;
+        final margins =
+            (media['margins_mm'] as Map?)?.cast<String, dynamic>() ?? const {};
+        final printableMm =
+            mediaWidth -
+            ((margins['left'] as num?)?.toDouble() ?? 0) -
+            ((margins['right'] as num?)?.toDouble() ?? 0);
+        final pixelsPerMm = rowWidth / printableMm.clamp(10, 500);
+        final minHeight = (heightMode != 'auto' || previewHeight != null)
+            ? heightMm.clamp(4, 500) * pixelsPerMm
+            : 0.0;
+        final totalSpan = row.blocks.fold<int>(
+          0,
+          (sum, block) => sum + _blockSpan(block),
+        );
+
+        Widget rowContent = Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final block in row.blocks)
+              SizedBox(
+                width:
+                    rowWidth *
+                    ((_resizingBlockId == block['id']?.toString()
+                            ? _resizePreviewSpan
+                            : null) ??
+                        _blockSpan(block)) /
+                    60,
+                child: DragTarget<_BlockDragData>(
+                  key: ValueKey('canvas-row-drop-${row.id}-${block['id']}'),
+                  onWillAcceptWithDetails: (details) =>
+                      details.data.blockId != block['id']?.toString() &&
+                      _canDropOnRegion(details.data, region),
+                  onAcceptWithDetails: (details) =>
+                      _handleDropBeside(details.data, region, row.id),
+                  builder: (context, candidates, rejected) => DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: candidates.isNotEmpty
+                          ? Theme.of(context).colorScheme.primaryContainer
+                                .withValues(alpha: 0.45)
+                          : Colors.transparent,
+                      border: candidates.isNotEmpty
+                          ? Border.all(
+                              color: Theme.of(context).colorScheme.primary,
+                            )
+                          : null,
+                    ),
+                    child: _canvasBlock(
+                      context,
+                      block,
+                      rowWidth: rowWidth,
+                      maxSpan: (60 - (totalSpan - _blockSpan(block)))
+                          .clamp(1, 60)
+                          .toInt(),
+                    ),
+                  ),
+                ),
+              ),
+            if (totalSpan < 60)
+              Expanded(
+                child: DragTarget<_BlockDragData>(
+                  onWillAcceptWithDetails: (details) =>
+                      _canDropOnRegion(details.data, region),
+                  onAcceptWithDetails: (details) =>
+                      _handleDropBeside(details.data, region, row.id),
+                  builder: (context, candidates, rejected) => AnimatedContainer(
+                    duration: const Duration(milliseconds: 100),
+                    constraints: const BoxConstraints(minHeight: 38),
+                    decoration: BoxDecoration(
+                      color: candidates.isNotEmpty
+                          ? Theme.of(context).colorScheme.primaryContainer
+                                .withValues(alpha: 0.45)
+                          : Colors.transparent,
+                      border: candidates.isNotEmpty
+                          ? Border.all(
+                              color: Theme.of(context).colorScheme.primary,
+                            )
+                          : null,
+                    ),
+                    alignment: Alignment.center,
+                    child: candidates.isNotEmpty
+                        ? const Icon(Icons.add, size: 18)
+                        : null,
+                  ),
+                ),
+              ),
+          ],
+        );
+        if (minHeight > 0) {
+          rowContent = ConstrainedBox(
+            constraints: BoxConstraints(minHeight: minHeight),
+            child: rowContent,
+          );
+        }
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            rowContent,
+            if (selectedInRow)
+              PositionedDirectional(
+                start: 0,
+                end: 0,
+                bottom: 0,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.resizeUpDown,
+                  child: GestureDetector(
+                    key: ValueKey('row-height-handle-${row.id}'),
+                    behavior: HitTestBehavior.opaque,
+                    onDoubleTap: () => _patchRowStyle(row.id, {
+                      'row_height_mode': 'auto',
+                      'row_height_mm': null,
+                    }),
+                    onVerticalDragStart: (_) {
+                      _resizingRowId = row.id;
+                      _resizeStartHeightMm = heightMode == 'auto'
+                          ? 20
+                          : configuredHeight;
+                      _resizePreviewHeightMm = _resizeStartHeightMm;
+                      _resizeVerticalDelta = 0;
+                      setState(() {});
+                    },
+                    onVerticalDragUpdate: (details) {
+                      _resizeVerticalDelta += details.delta.dy;
+                      setState(() {
+                        _resizePreviewHeightMm =
+                            ((_resizeStartHeightMm ?? 20) +
+                                    _resizeVerticalDelta / pixelsPerMm)
+                                .clamp(4, 500);
+                      });
+                    },
+                    onVerticalDragEnd: (_) {
+                      final value = _resizePreviewHeightMm ?? configuredHeight;
+                      _resizingRowId = null;
+                      _resizeStartHeightMm = null;
+                      _resizePreviewHeightMm = null;
+                      _resizeVerticalDelta = 0;
+                      _patchRowStyle(row.id, {
+                        'row_height_mode': 'minimum',
+                        'row_height_mm': double.parse(value.toStringAsFixed(1)),
+                      });
+                    },
+                    child: Container(
+                      height: 10,
+                      alignment: Alignment.center,
+                      child: Container(
+                        width: 54,
+                        height: 3,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  double _styleNumber(
+    Map<String, dynamic> style,
+    String key,
+    double fallback,
+  ) => (style[key] as num?)?.toDouble() ?? fallback;
+
+  StudioMmRect _freeformRect(Map<String, dynamic> block) {
+    final style = (block['style'] as Map?)?.cast<String, dynamic>() ?? const {};
+    return StudioMmRect(
+      _styleNumber(style, 'x_mm', 0),
+      _styleNumber(style, 'y_mm', 0),
+      _styleNumber(style, 'width_mm', 30),
+      _styleNumber(style, 'height_mm', 15),
+    );
+  }
+
+  void _finishFreeformGesture(String id) {
+    final rect = _freeformPreviewRect;
+    _freeformGestureId = null;
+    _freeformStartRect = null;
+    _freeformPreviewRect = null;
+    _freeformDelta = Offset.zero;
+    _freeformGuides = const [];
+    if (rect == null) {
+      setState(() {});
+      return;
+    }
+    _patchBlockStyle(id, {
+      'x_mm': double.parse(rect.x.toStringAsFixed(2)),
+      'y_mm': double.parse(rect.y.toStringAsFixed(2)),
+      'width_mm': double.parse(rect.width.toStringAsFixed(2)),
+      'height_mm': double.parse(rect.height.toStringAsFixed(2)),
+    });
+  }
+
+  void _patchFreeformGeometryField(
+    Map<String, dynamic> block,
+    String field,
+    double value,
+    double containerHeightMm,
+  ) {
+    final media = normalizedReportTemplateMedia(widget.design);
+    final margins =
+        (media['margins_mm'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final containerWidthMm =
+        ((media['width_mm'] as num?)?.toDouble() ?? 210) -
+        ((margins['left'] as num?)?.toDouble() ?? 0) -
+        ((margins['right'] as num?)?.toDouble() ?? 0);
+    final current = _freeformRect(block);
+    final proposed = StudioMmRect(
+      field == 'x_mm' ? value : current.x,
+      field == 'y_mm' ? value : current.y,
+      field == 'width_mm' ? value.clamp(1, containerWidthMm) : current.width,
+      field == 'height_mm' ? value.clamp(1, containerHeightMm) : current.height,
+    ).clampInside(containerWidthMm, containerHeightMm);
+    _patchBlockStyle(block['id'].toString(), {
+      'x_mm': proposed.x,
+      'y_mm': proposed.y,
+      'width_mm': proposed.width,
+      'height_mm': proposed.height,
+    });
+  }
+
+  Widget _freeformCanvasRow(
+    BuildContext context,
+    String region,
+    _CanvasRow row,
+    Map<String, dynamic> rowStyle,
+  ) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final media = normalizedReportTemplateMedia(widget.design);
+        final mediaWidth = (media['width_mm'] as num?)?.toDouble() ?? 210;
+        final margins =
+            (media['margins_mm'] as Map?)?.cast<String, dynamic>() ?? const {};
+        final printableWidth =
+            mediaWidth -
+            ((margins['left'] as num?)?.toDouble() ?? 0) -
+            ((margins['right'] as num?)?.toDouble() ?? 0);
+        final widthMm = printableWidth.clamp(10, 500).toDouble();
+        final pixelsPerMm = constraints.maxWidth / widthMm;
+        final heightMm = _styleNumber(
+          rowStyle,
+          'freeform_height_mm',
+          40,
+        ).clamp(4, 500).toDouble();
+        final gridMm = _styleNumber(
+          rowStyle,
+          'freeform_grid_mm',
+          1,
+        ).clamp(1, 5).toDouble();
+        final snapEnabled = rowStyle['freeform_snap'] != false;
+
+        return Container(
+          key: ValueKey('freeform-row-${row.id}'),
+          height: heightMm * pixelsPerMm,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+          ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: _MillimeterGridPainter(
+                    pixelsPerMm: pixelsPerMm,
+                    gridMm: gridMm,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.outlineVariant.withValues(alpha: 0.45),
+                  ),
+                ),
+              ),
+              for (final block in row.blocks)
+                _freeformCanvasBlock(
+                  context,
+                  block,
+                  siblings: row.blocks
+                      .where(
+                        (candidate) =>
+                            candidate['id']?.toString() !=
+                            block['id']?.toString(),
+                      )
+                      .map(_freeformRect)
+                      .toList(),
+                  widthMm: widthMm,
+                  heightMm: heightMm,
+                  pixelsPerMm: pixelsPerMm,
+                  gridMm: gridMm,
+                  snapEnabled: snapEnabled,
+                ),
+              for (final guide in _freeformGuides)
+                if (guide.vertical)
+                  Positioned(
+                    left: guide.positionMm * pixelsPerMm,
+                    top: 0,
+                    bottom: 0,
+                    child: Container(
+                      key: const ValueKey('freeform-guide-vertical'),
+                      width: 1,
+                      color: Theme.of(context).colorScheme.tertiary,
+                    ),
+                  )
+                else
+                  Positioned(
+                    top: guide.positionMm * pixelsPerMm,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      key: const ValueKey('freeform-guide-horizontal'),
+                      height: 1,
+                      color: Theme.of(context).colorScheme.tertiary,
+                    ),
+                  ),
+              PositionedDirectional(
+                top: 4,
+                end: 4,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 3,
+                    ),
+                    child: Text(
+                      'آزاد · شبکه ${gridMm.toStringAsFixed(0)}mm${snapEnabled ? ' · Snap' : ''}',
+                      style: Theme.of(context).textTheme.labelSmall,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _freeformCanvasBlock(
+    BuildContext context,
+    Map<String, dynamic> block, {
+    required List<StudioMmRect> siblings,
+    required double widthMm,
+    required double heightMm,
+    required double pixelsPerMm,
+    required double gridMm,
+    required bool snapEnabled,
+  }) {
+    final id = block['id'].toString();
+    final selected = id == _selectedBlockId;
+    final stored = _freeformRect(block);
+    final rect = _freeformGestureId == id
+        ? (_freeformPreviewRect ?? stored)
+        : stored;
+    return Positioned(
+      key: ValueKey('freeform-block-$id'),
+      left: rect.x * pixelsPerMm,
+      top: rect.y * pixelsPerMm,
+      width: rect.width * pixelsPerMm,
+      height: rect.height * pixelsPerMm,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _selectBlock(id),
+        // Claim the gesture against the surrounding scroll view. Geometry is
+        // driven by raw pointer deltas below so both axes remain available.
+        onPanStart: (_) {},
+        onPanUpdate: (_) {},
+        child: Listener(
+          behavior: HitTestBehavior.opaque,
+          onPointerDown: (event) {
+            if (_freeformResizingId == id) return;
+            _freeformMovePointer = event.pointer;
+            _selectBlock(id);
+            _freeformGestureId = id;
+            _freeformStartRect = stored;
+            _freeformPreviewRect = stored;
+            _freeformDelta = Offset.zero;
+          },
+          onPointerMove: (event) {
+            if (_freeformMovePointer != event.pointer ||
+                _freeformResizingId == id) {
+              return;
+            }
+            _freeformDelta += event.delta;
+            final start = _freeformStartRect ?? stored;
+            final proposed = StudioMmRect(
+              start.x + _freeformDelta.dx / pixelsPerMm,
+              start.y + _freeformDelta.dy / pixelsPerMm,
+              start.width,
+              start.height,
+            );
+            final result = snapStudioMove(
+              proposed: proposed,
+              siblings: siblings,
+              containerWidthMm: widthMm,
+              containerHeightMm: heightMm,
+              gridMm: gridMm,
+              thresholdMm: 6 / pixelsPerMm,
+              enabled: snapEnabled,
+            );
+            setState(() {
+              _freeformPreviewRect = result.rect;
+              _freeformGuides = result.guides;
+            });
+          },
+          onPointerUp: (event) {
+            if (_freeformMovePointer != event.pointer) return;
+            _freeformMovePointer = null;
+            _finishFreeformGesture(id);
+          },
+          onPointerCancel: (event) {
+            if (_freeformMovePointer != event.pointer) return;
+            _freeformMovePointer = null;
+            _finishFreeformGesture(id);
+          },
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: selected
+                  ? Theme.of(
+                      context,
+                    ).colorScheme.primaryContainer.withValues(alpha: 0.65)
+                  : Theme.of(
+                      context,
+                    ).colorScheme.surface.withValues(alpha: 0.92),
+              border: Border.all(
+                color: selected
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).colorScheme.outlineVariant,
+                width: selected ? 2 : 1,
+              ),
+            ),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Positioned.fill(
+                  child: Padding(
+                    padding: const EdgeInsets.all(5),
+                    child: ClipRect(child: _canvasBlockContent(context, block)),
+                  ),
+                ),
+                if (selected)
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.resizeDownRight,
+                      child: Listener(
+                        key: ValueKey('freeform-resize-handle-$id'),
+                        behavior: HitTestBehavior.opaque,
+                        onPointerDown: (event) {
+                          _freeformMovePointer = null;
+                          _freeformResizePointer = event.pointer;
+                          _freeformResizingId = id;
+                          _freeformGestureId = id;
+                          _freeformStartRect = stored;
+                          _freeformPreviewRect = stored;
+                          _freeformDelta = Offset.zero;
+                        },
+                        onPointerMove: (event) {
+                          if (_freeformResizePointer != event.pointer) return;
+                          _freeformDelta += event.delta;
+                          final start = _freeformStartRect ?? stored;
+                          final proposed = StudioMmRect(
+                            start.x,
+                            start.y,
+                            (start.width + _freeformDelta.dx / pixelsPerMm)
+                                .clamp(4, widthMm),
+                            (start.height + _freeformDelta.dy / pixelsPerMm)
+                                .clamp(4, heightMm),
+                          );
+                          final result = snapStudioResize(
+                            proposed: proposed,
+                            siblings: siblings,
+                            containerWidthMm: widthMm,
+                            containerHeightMm: heightMm,
+                            gridMm: gridMm,
+                            thresholdMm: 6 / pixelsPerMm,
+                            enabled: snapEnabled,
+                          );
+                          setState(() {
+                            _freeformPreviewRect = result.rect;
+                            _freeformGuides = result.guides;
+                          });
+                        },
+                        onPointerUp: (event) {
+                          if (_freeformResizePointer != event.pointer) return;
+                          _freeformResizePointer = null;
+                          _freeformResizingId = null;
+                          _finishFreeformGesture(id);
+                        },
+                        onPointerCancel: (event) {
+                          if (_freeformResizePointer != event.pointer) return;
+                          _freeformResizePointer = null;
+                          _freeformResizingId = null;
+                          _finishFreeformGesture(id);
+                        },
+                        child: Container(
+                          width: 16,
+                          height: 16,
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary,
+                            border: Border.all(color: Colors.white, width: 2),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -663,27 +1839,23 @@ class _ReportTemplateStudioV3BuilderState
     );
   }
 
-  Widget _canvasBlock(BuildContext context, Map<String, dynamic> block) {
+  Widget _canvasBlock(
+    BuildContext context,
+    Map<String, dynamic> block, {
+    required double rowWidth,
+    required int maxSpan,
+  }) {
     final id = block['id'].toString();
     final type = block['type'].toString();
     final selected = id == _selectedBlockId;
     final style = (block['style'] as Map?)?.cast<String, dynamic>() ?? const {};
-    final widthMode = (style['width_mode'] ?? 'full').toString();
-    final media = normalizedReportTemplateMedia(widget.design);
-    final pageWidthMm = (media['width_mm'] as num?)?.toDouble() ?? 210;
-    final widthValue = (style['width_value'] as num?)?.toDouble();
-    final widthFactor = switch (widthMode) {
-      'percentage' => ((widthValue ?? 100) / 100).clamp(0.1, 1.0),
-      'fixed' => ((widthValue ?? 80) / pageWidthMm).clamp(0.1, 1.0),
-      'content' => 0.62,
-      _ => 1.0,
-    }.toDouble();
     final alignment = switch (style['text_align']) {
       'left' => Alignment.centerLeft,
       'center' => Alignment.center,
       _ => Alignment.centerRight,
     };
     final blockCard = GestureDetector(
+      key: ValueKey('canvas-block-$id'),
       behavior: HitTestBehavior.opaque,
       onTap: () => _selectBlock(id),
       child: AnimatedContainer(
@@ -743,44 +1915,93 @@ class _ReportTemplateStudioV3BuilderState
                   ),
                 ),
               ),
+            if (selected)
+              PositionedDirectional(
+                top: 0,
+                bottom: 0,
+                end: -6,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.resizeLeftRight,
+                  child: GestureDetector(
+                    key: ValueKey('block-width-handle-$id'),
+                    behavior: HitTestBehavior.opaque,
+                    onHorizontalDragStart: (_) {
+                      _resizingBlockId = id;
+                      _resizeStartSpan = _blockSpan(block);
+                      _resizePreviewSpan = _resizeStartSpan;
+                      _resizeHorizontalDelta = 0;
+                      setState(() {});
+                    },
+                    onHorizontalDragUpdate: (details) {
+                      _resizeHorizontalDelta += details.delta.dx;
+                      final rtl =
+                          Directionality.of(context) == TextDirection.rtl;
+                      final deltaColumns =
+                          _resizeHorizontalDelta /
+                          (rowWidth / 60) *
+                          (rtl ? -1 : 1);
+                      setState(() {
+                        _resizePreviewSpan =
+                            ((_resizeStartSpan ?? 60) + deltaColumns.round())
+                                .clamp(1, maxSpan)
+                                .toInt();
+                      });
+                    },
+                    onHorizontalDragEnd: (_) {
+                      final span = _resizePreviewSpan ?? _blockSpan(block);
+                      _resizingBlockId = null;
+                      _resizeStartSpan = null;
+                      _resizePreviewSpan = null;
+                      _resizeHorizontalDelta = 0;
+                      _patchBlockStyle(id, {
+                        'width_mode': 'full',
+                        'grid_span': span,
+                      });
+                    },
+                    child: Container(
+                      width: 12,
+                      alignment: Alignment.center,
+                      child: Container(
+                        width: 4,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
     );
 
-    return Align(
-      alignment: alignment,
-      child: FractionallySizedBox(
-        widthFactor: widthFactor,
-        child: Opacity(
-          opacity: block['visible'] == false ? 0.42 : 1,
-          child: Draggable<_BlockDragData>(
-            data: _BlockDragData.existing(id),
-            onDragStarted: () => _selectBlock(id),
-            feedback: Material(
-              elevation: 8,
-              borderRadius: BorderRadius.circular(8),
-              child: SizedBox(
-                width: 280,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    children: [
-                      Icon(_iconForType(type), size: 18),
-                      const SizedBox(width: 8),
-                      Text(_labelForType(type)),
-                    ],
-                  ),
-                ),
+    return Opacity(
+      opacity: block['visible'] == false ? 0.42 : 1,
+      child: Draggable<_BlockDragData>(
+        data: _BlockDragData.existing(id),
+        onDragStarted: () => _selectBlock(id),
+        feedback: Material(
+          elevation: 8,
+          borderRadius: BorderRadius.circular(8),
+          child: SizedBox(
+            width: 280,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  Icon(_iconForType(type), size: 18),
+                  const SizedBox(width: 8),
+                  Text(_labelForType(type)),
+                ],
               ),
-            ),
-            childWhenDragging: Opacity(opacity: 0.25, child: blockCard),
-            child: MouseRegion(
-              cursor: SystemMouseCursors.grab,
-              child: blockCard,
             ),
           ),
         ),
+        childWhenDragging: Opacity(opacity: 0.25, child: blockCard),
+        child: MouseRegion(cursor: SystemMouseCursors.grab, child: blockCard),
       ),
     );
   }
@@ -967,7 +2188,9 @@ class _ReportTemplateStudioV3BuilderState
         Row(
           children: [
             Text(
-              'طراح بلوکی',
+              isReportTemplateV4(widget.design)
+                  ? 'طراح گرید تمام‌صفحه'
+                  : 'طراح بلوکی',
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
@@ -986,7 +2209,9 @@ class _ReportTemplateStudioV3BuilderState
           ],
         ),
         Text(
-          'قطعه را بکشید و در محل دلخواه رها کنید؛ برای موبایل می‌توانید روی قطعه بزنید.',
+          isReportTemplateV4(widget.design)
+              ? 'قطعه را از فهرست روی هر نقطهٔ صفحه رها کنید؛ سپس آن را آزادانه جابه‌جا یا تغییر اندازه دهید.'
+              : 'برای ساخت ردیف جدید، قطعه را بین ردیف‌ها رها کنید؛ برای چیدن چند قطعه کنار هم، آن را روی یک قطعهٔ دیگر رها کنید.',
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 12),
@@ -1042,6 +2267,20 @@ class _ReportTemplateStudioV3BuilderState
                 design['media'] = media;
               }),
             ),
+            if (isReportTemplateV4(widget.design))
+              Card(
+                margin: const EdgeInsets.only(top: 10),
+                child: ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.devices_fold_outlined),
+                  title: Text(
+                    'Variant فعال: ${reportTemplateV4ProfileKey(widget.design)}',
+                  ),
+                  subtitle: const Text(
+                    'چیدمان هر کاغذ مستقل است؛ با تغییر اندازه کاغذ، variant همان کاغذ ویرایش می‌شود.',
+                  ),
+                ),
+              ),
             const SizedBox(height: 12),
           ],
         ),
@@ -1463,19 +2702,48 @@ class _ReportTemplateStudioV3BuilderState
                 (type == 'custom_text' ? props['align'] : null) ??
                 defaultAlignment)
             .toString();
-    final widthMode =
-        const {
-          'full',
-          'percentage',
-          'fixed',
-          'content',
-        }.contains(style['width_mode'])
-        ? style['width_mode'].toString()
-        : 'full';
-    final widthValue =
-        ((style['width_value'] as num?)?.toDouble() ??
-                (widthMode == 'percentage' ? 100 : 80))
-            .clamp(10.0, widthMode == 'percentage' ? 100.0 : 500.0);
+    final found = _findBlock(id);
+    final rowId = found == null
+        ? (style['row_id'] ?? '').toString()
+        : _blockRowId(block, found.region);
+    final gridSpan = _blockSpan(block);
+    final rowBlocks = found == null
+        ? <Map<String, dynamic>>[block]
+        : _regionBlocks(widget.design, found.region)
+              .where(
+                (candidate) => _blockRowId(candidate, found.region) == rowId,
+              )
+              .toList();
+    final otherSpans = rowBlocks
+        .where((candidate) => candidate['id']?.toString() != id)
+        .fold<int>(0, (sum, candidate) => sum + _blockSpan(candidate));
+    final maxGridSpan = (60 - otherSpans).clamp(1, 60).toInt();
+    final rowHeightMode = (style['row_height_mode'] ?? 'auto').toString();
+    final rowHeightMm = ((style['row_height_mm'] as num?)?.toDouble() ?? 20)
+        .clamp(4, 500)
+        .toDouble();
+    final layoutType = (style['layout_type'] ?? 'grid').toString();
+    final pageGrid = isReportTemplateV4(widget.design);
+    final freeformGrid =
+        ((style[pageGrid ? 'page_grid_mm' : 'freeform_grid_mm'] as num?)
+                    ?.toInt() ??
+                1)
+            .clamp(1, 5);
+    final media = normalizedReportTemplateMedia(widget.design);
+    final mediaSize = reportTemplateMediaSizeMm(media);
+    final mediaMargins =
+        (media['margins_mm'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final defaultCanvasHeight =
+        mediaSize.height -
+        ((mediaMargins['top'] as num?)?.toDouble() ?? 0) -
+        ((mediaMargins['bottom'] as num?)?.toDouble() ?? 0);
+    final freeformHeight =
+        ((style[pageGrid ? 'page_height_mm' : 'freeform_height_mm'] as num?)
+                    ?.toDouble() ??
+                (pageGrid ? defaultCanvasHeight : 40))
+            .clamp(10, 5000)
+            .toDouble();
+    final freeformRect = _freeformRect(block);
     const alignableTypes = {
       'brand_header',
       'party_info',
@@ -1538,57 +2806,204 @@ class _ReportTemplateStudioV3BuilderState
               ),
               const SizedBox(height: 12),
             ],
-            const Text('عرض بلوک'),
-            const SizedBox(height: 6),
-            DropdownButtonFormField<String>(
-              key: ValueKey('$id-width-mode-$widthMode'),
-              isExpanded: true,
-              initialValue: widthMode,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                isDense: true,
+            if (pageGrid) ...[
+              const Text('جای‌گذاری روی گرید کل صفحه'),
+              Text(
+                'همه اجزا روی یک بوم مشترک حرکت و تغییر اندازه می‌دهند.',
+                style: Theme.of(context).textTheme.bodySmall,
               ),
-              items: const [
-                DropdownMenuItem(value: 'full', child: Text('تمام عرض')),
-                DropdownMenuItem(
-                  value: 'percentage',
-                  child: Text('درصدی از صفحه'),
+              const SizedBox(height: 14),
+            ],
+            if (layoutType == 'freeform' || pageGrid) ...[
+              Text(pageGrid ? 'شبکه کل صفحه و Snap' : 'شبکه و Snap'),
+              const SizedBox(height: 6),
+              SegmentedButton<int>(
+                segments: const [
+                  ButtonSegment(value: 1, label: Text('۱ mm')),
+                  ButtonSegment(value: 3, label: Text('۳ mm')),
+                  ButtonSegment(value: 5, label: Text('۵ mm')),
+                ],
+                selected: {
+                  const {1, 3, 5}.contains(freeformGrid) ? freeformGrid : 1,
+                },
+                onSelectionChanged: (values) => pageGrid
+                    ? _patchPageGridSettings({'page_grid_mm': values.first})
+                    : _patchRowStyle(rowId, {
+                        'freeform_grid_mm': values.first,
+                        'layout_type': 'freeform',
+                      }),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Snap هوشمند'),
+                subtitle: const Text('گرید، حاشیه، لبه و مرکز عناصر'),
+                value: style[pageGrid ? 'page_snap' : 'freeform_snap'] != false,
+                onChanged: (value) => pageGrid
+                    ? _patchPageGridSettings({'page_snap': value})
+                    : _patchRowStyle(rowId, {
+                        'freeform_snap': value,
+                        'layout_type': 'freeform',
+                      }),
+              ),
+              if (!pageGrid || media['type'] == 'roll') ...[
+                Text(
+                  '${pageGrid ? 'طول بوم رول' : 'ارتفاع محدوده'}: ${freeformHeight.toStringAsFixed(0)} mm',
                 ),
-                DropdownMenuItem(
-                  value: 'fixed',
-                  child: Text('عرض ثابت (میلی‌متر)'),
-                ),
-                DropdownMenuItem(
-                  value: 'content',
-                  child: Text('متناسب با محتوا'),
+                Slider(
+                  min: pageGrid ? 120 : 10,
+                  max: pageGrid ? 1500 : 300,
+                  divisions: pageGrid ? 138 : 290,
+                  value: freeformHeight.clamp(
+                    pageGrid ? 120 : 10,
+                    pageGrid ? 1500 : 300,
+                  ),
+                  onChanged: (value) => pageGrid
+                      ? _patchPageGridSettings({
+                          'page_height_mm': value.round(),
+                        })
+                      : _patchRowStyle(rowId, {
+                          'freeform_height_mm': value.round(),
+                          'layout_type': 'freeform',
+                        }),
                 ),
               ],
-              onChanged: (value) {
-                if (value == null) return;
-                _patchBlockStyle(id, {
-                  'width_mode': value,
-                  if (value == 'percentage') 'width_value': 100,
-                  if (value == 'fixed') 'width_value': 80,
-                });
-              },
-            ),
-            if (widthMode == 'percentage' || widthMode == 'fixed') ...[
+              Text(
+                'X ${freeformRect.x.toStringAsFixed(1)} · Y ${freeformRect.y.toStringAsFixed(1)} · W ${freeformRect.width.toStringAsFixed(1)} · H ${freeformRect.height.toStringAsFixed(1)} mm',
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  for (final field in <(String, String, double)>[
+                    ('x_mm', 'X', freeformRect.x),
+                    ('y_mm', 'Y', freeformRect.y),
+                    ('width_mm', 'W', freeformRect.width),
+                    ('height_mm', 'H', freeformRect.height),
+                  ]) ...[
+                    Expanded(
+                      child: TextFormField(
+                        key: ValueKey('$id-${field.$1}-${field.$3}'),
+                        initialValue: field.$3.toStringAsFixed(1),
+                        decoration: InputDecoration(
+                          labelText: field.$2,
+                          suffixText: 'mm',
+                          isDense: true,
+                          border: const OutlineInputBorder(),
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        onFieldSubmitted: (raw) {
+                          final value = double.tryParse(raw);
+                          if (value != null && value >= 0) {
+                            _patchFreeformGeometryField(
+                              block,
+                              field.$1,
+                              value,
+                              freeformHeight,
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                    if (field.$1 != 'height_mm') const SizedBox(width: 5),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'عنصر را در کل صفحه بکشید؛ برای تغییر اندازه از دستگیرهٔ گوشه استفاده کنید.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ] else ...[
+              const Text('عرض بلوک'),
+              Text(
+                'شبکهٔ دقیق ۶۰ ستونه',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children:
+                    const <(String, int)>[
+                      ('تمام عرض', 60),
+                      ('نصف', 30),
+                      ('یک‌سوم', 20),
+                      ('یک‌چهارم', 15),
+                      ('یک‌پنجم', 12),
+                      ('یک‌ششم', 10),
+                    ].map((preset) {
+                      return ChoiceChip(
+                        label: Text(preset.$1),
+                        selected: gridSpan == preset.$2,
+                        onSelected: preset.$2 > maxGridSpan
+                            ? null
+                            : (_) => _patchBlockStyle(id, {
+                                'width_mode': 'full',
+                                'grid_span': preset.$2,
+                              }),
+                      );
+                    }).toList(),
+              ),
               const SizedBox(height: 8),
               Text(
-                widthMode == 'percentage'
-                    ? 'عرض: ${widthValue.round()}٪'
-                    : 'عرض: ${widthValue.toStringAsFixed(0)} میلی‌متر',
+                '$gridSpan از ۶۰ ستون (${(gridSpan * 100 / 60).toStringAsFixed(1)}٪)',
               ),
               Slider(
-                min: 10,
-                max: widthMode == 'percentage' ? 100 : 300,
-                divisions: widthMode == 'percentage' ? 18 : 29,
-                value: widthValue.clamp(
-                  10.0,
-                  widthMode == 'percentage' ? 100.0 : 300.0,
+                min: 1,
+                max: maxGridSpan.toDouble(),
+                divisions: maxGridSpan > 1 ? maxGridSpan - 1 : null,
+                value: gridSpan.clamp(1, maxGridSpan).toDouble(),
+                onChanged: (value) => _patchBlockStyle(id, {
+                  'width_mode': 'full',
+                  'grid_span': value.round(),
+                }),
+              ),
+              Text(
+                'دستگیرهٔ عمودی کنار بلوک را هم می‌توانید با ماوس بکشید.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 16),
+              const Text('ارتفاع ردیف'),
+              const SizedBox(height: 6),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'auto', label: Text('خودکار')),
+                  ButtonSegment(value: 'minimum', label: Text('حداقل')),
+                  ButtonSegment(value: 'fixed', label: Text('ثابت')),
+                ],
+                selected: {
+                  const {'auto', 'minimum', 'fixed'}.contains(rowHeightMode)
+                      ? rowHeightMode
+                      : 'auto',
+                },
+                onSelectionChanged: rowId.isEmpty
+                    ? null
+                    : (values) => _patchRowStyle(rowId, {
+                        'row_height_mode': values.first,
+                        if (values.first != 'auto')
+                          'row_height_mm': rowHeightMm,
+                      }),
+              ),
+              if (rowHeightMode != 'auto') ...[
+                const SizedBox(height: 8),
+                Text('ارتفاع: ${rowHeightMm.toStringAsFixed(0)} میلی‌متر'),
+                Slider(
+                  min: 4,
+                  max: 200,
+                  divisions: 196,
+                  value: rowHeightMm.clamp(4, 200),
+                  onChanged: rowId.isEmpty
+                      ? null
+                      : (value) => _patchRowStyle(rowId, {
+                          'row_height_mode': rowHeightMode,
+                          'row_height_mm': value.round(),
+                        }),
                 ),
-                onChanged: (value) =>
-                    _patchBlockStyle(id, {'width_value': value.round()}),
+              ],
+              Text(
+                'دستگیرهٔ افقی پایین ردیف را بکشید؛ دوبار کلیک، ارتفاع را خودکار می‌کند.',
+                style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
             const SizedBox(height: 12),
@@ -1916,4 +3331,37 @@ class _CanvasSignature extends StatelessWidget {
       ],
     );
   }
+}
+
+class _MillimeterGridPainter extends CustomPainter {
+  final double pixelsPerMm;
+  final double gridMm;
+  final Color color;
+
+  const _MillimeterGridPainter({
+    required this.pixelsPerMm,
+    required this.gridMm,
+    required this.color,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final step = pixelsPerMm * gridMm;
+    if (step < 2) return;
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 0.5;
+    for (var x = step; x < size.width; x += step) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
+    for (var y = step; y < size.height; y += step) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _MillimeterGridPainter oldDelegate) =>
+      oldDelegate.pixelsPerMm != pixelsPerMm ||
+      oldDelegate.gridMm != gridMm ||
+      oldDelegate.color != color;
 }
