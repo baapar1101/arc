@@ -104,6 +104,7 @@ from adapters.api.v1.ping_pong import router as ping_pong_router
 from adapters.api.v1.integrations.telegram import router as telegram_integration_router
 from adapters.api.v1.integrations.bale import router as bale_integration_router
 from adapters.api.v1.basalam_integration import router as basalam_integration_router
+from adapters.api.v1.sepidar_import import router as sepidar_import_router
 from adapters.api.v1.telephony import router as telephony_router
 from adapters.api.v1.telephony_softphone_ws import router as telephony_softphone_ws_router
 from adapters.api.v1.woocommerce_integration import router as woocommerce_integration_router
@@ -125,6 +126,7 @@ from adapters.api.v1.admin.activity_logs_admin import router as admin_activity_l
 from adapters.api.v1.admin.hscript_admin import router as admin_hscript_router
 from app.services.notification_processor import background_loop as notifications_background_loop
 from app.services.task_notification_service import task_notification_background_loop
+from app.services.sepidar_import_service import sepidar_import_background_loop
 from app.services.storage_background_jobs import storage_cleanup_loop, storage_subscription_check_loop
 from app.services.document_monetization_background_jobs import document_monetization_finalize_periods_loop
 from app.services.document_monetization_jobs import document_monetization_loop
@@ -1098,6 +1100,7 @@ def create_app() -> FastAPI:
     application.include_router(telegram_integration_router, prefix=settings.api_v1_prefix)
     application.include_router(bale_integration_router, prefix=settings.api_v1_prefix)
     application.include_router(basalam_integration_router, prefix=settings.api_v1_prefix)
+    application.include_router(sepidar_import_router, prefix=settings.api_v1_prefix)
     application.include_router(woocommerce_integration_router, prefix=settings.api_v1_prefix)
     application.include_router(telephony_router, prefix=settings.api_v1_prefix)
     application.include_router(telephony_softphone_ws_router)
@@ -1256,6 +1259,7 @@ def create_app() -> FastAPI:
         asyncio.create_task(notifications_background_loop(30))
         # Task reminders / due-soon / overdue: every 5 minutes
         asyncio.create_task(task_notification_background_loop(300))
+        asyncio.create_task(sepidar_import_background_loop())
         # Durable quick-sale invoice outbox. The DB lease allows recovery after
         # process restarts and ensures only one worker claims a queued sale.
         from app.services.quick_sale_invoice_job_service import quick_sale_invoice_outbox_loop

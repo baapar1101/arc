@@ -201,6 +201,7 @@ from .task_management import (  # noqa: F401
 from .bale import BaleLinkToken  # noqa: F401
 from .messenger_operator_session import MessengerOperatorSession  # noqa: F401
 from .business_ftp_backup_setting import BusinessFtpBackupSetting  # noqa: F401
+from .sepidar_live_import import SepidarImportSetting, SepidarImportRow, SepidarImportRun  # noqa: F401
 from .business_crm_settings import BusinessCrmSettings  # noqa: F401
 # CRM
 from .crm import (  # noqa: F401

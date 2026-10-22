@@ -172,6 +172,7 @@ import 'pages/business/barcode_labels/label_studio_page.dart';
 import 'pages/business/barcode_labels/label_printers_page.dart';
 import 'pages/business/basalam/basalam_integration_page.dart';
 import 'pages/business/basalam/basalam_settings_page.dart';
+import 'pages/business/sepidar_import_settings_page.dart';
 import 'pages/business/woocommerce/woocommerce_integration_page.dart';
 import 'pages/business/woocommerce/woocommerce_opening_inventory_bridge_page.dart';
 import 'pages/business/woocommerce/woocommerce_settings_page.dart';
@@ -4779,6 +4780,20 @@ class _MyAppState extends State<MyApp> {
                                   businessId: businessId,
                                   authStore: _authStore!,
                                 ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'settings/sepidar',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(state.pathParameters['business_id']!);
+                              if (!_authStore!.hasBusinessPermission('settings', 'join') &&
+                                  _authStore!.currentBusiness?.isOwner != true) {
+                                return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage());
+                              }
+                              return hesabixNoTransitionPage(
+                                state,
+                                SepidarImportSettingsPage(businessId: businessId),
                               );
                             },
                           ),

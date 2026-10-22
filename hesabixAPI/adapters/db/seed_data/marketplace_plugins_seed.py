@@ -54,6 +54,19 @@ class _PluginSeed:
 
 _DEFAULT_PLUGINS: Tuple[_PluginSeed, ...] = (
 	_PluginSeed(
+		code="sepidar_live_import",
+		name="ورود لایو اطلاعات از سپیدار",
+		description=(
+			"اتصال فقط‌خواندنی به SQL Server سپیدار، کشف ساختار و ورود امن و تکرارپذیر "
+			"تمام جدول‌های انتخاب‌شده به حسابیکس همراه با تاریخچه اجرا و کنترل همگام‌سازی."
+		),
+		category="integration",
+		icon_url=None,
+		trial_days=14,
+		trial_allowed=True,
+		plans=(("monthly", 350_000), ("yearly", 3_500_000)),
+	),
+	_PluginSeed(
 		code="basalam_connector",
 		name="اتصال باسلام",
 		description=(

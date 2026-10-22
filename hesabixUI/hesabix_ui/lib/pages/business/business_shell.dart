@@ -1315,6 +1315,8 @@ class _BusinessShellState extends State<BusinessShell> {
     }
   }
 
+  bool _isSepidarPluginActive() => _isPluginCodeLicensed('sepidar_live_import');
+
   bool _isMoadianPluginActive() {
     try {
       final plug = _businessPlugins.firstWhere(
@@ -1741,6 +1743,15 @@ class _BusinessShellState extends State<BusinessShell> {
         icon: Icons.storefront_outlined,
         selectedIcon: Icons.storefront,
         path: _bu('basalam'),
+        type: _MenuItemType.simple,
+        hasAddButton: false,
+      ),
+      _MenuItem(
+        key: 'sepidar-import',
+        label: 'ورود لایو اطلاعات از سپیدار',
+        icon: Icons.storage_outlined,
+        selectedIcon: Icons.storage,
+        path: _bu('settings/sepidar'),
         type: _MenuItemType.simple,
         hasAddButton: false,
       ),
@@ -3804,6 +3815,10 @@ class _BusinessShellState extends State<BusinessShell> {
       }
     }
 
+    if (section == 'sepidar') {
+      if (!_showPluginGatedMenu(_isSepidarPluginActive())) return false;
+    }
+
     // سامانه مودیان
     if (section == 'moadian') {
       if (!_showPluginGatedMenu(_isMoadianPluginActive())) {
@@ -3903,6 +3918,8 @@ class _BusinessShellState extends State<BusinessShell> {
         return 'moadian';
       case 'plugin-marketplace':
         return 'marketplace';
+      case 'sepidar-import':
+        return 'sepidar';
     }
     final path = item.path;
     if (path != null) {
