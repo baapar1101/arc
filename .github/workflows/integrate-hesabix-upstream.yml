@@ -74,7 +74,7 @@ jobs:
 
           for file in "${CONFLICTS[@]}"; do
             case "$file" in
-              hesabixUI/hesabix_ui/lib/pages/business/quick_sales_page.dart|              hesabixUI/hesabix_ui/pubspec.yaml)
+              hesabixAPI/app/main.py|hesabixUI/hesabix_ui/lib/pages/business/quick_sales_page.dart|hesabixUI/hesabix_ui/lib/pages/business/report_template_html_editor_page.dart|hesabixUI/hesabix_ui/lib/pages/business/report_template_studio_page.dart|hesabixUI/hesabix_ui/pubspec.yaml)
                 ;;
               *)
                 echo "::error::Unexpected upstream conflict: $file"
@@ -82,6 +82,34 @@ jobs:
                 ;;
             esac
           done
+
+          # Keep the fork's task-management startup hooks, then add upstream's
+          # durable Quick Sales outbox worker beside the existing background jobs.
+          git checkout "$BASE" -- hesabixAPI/app/main.py
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("hesabixAPI/app/main.py")
+          source = path.read_text(encoding="utf-8")
+          marker = "        asyncio.create_task(task_notification_background_loop(300))\n"
+          addition = (
+              "        # Durable quick-sale invoice outbox. The DB lease allows recovery after\n"
+              "        # process restarts and ensures only one worker claims a queued sale.\n"
+              "        from app.services.quick_sale_invoice_job_service import quick_sale_invoice_outbox_loop\n"
+              "        asyncio.create_task(quick_sale_invoice_outbox_loop(0.5))\n"
+          )
+          if "quick_sale_invoice_outbox_loop" not in source:
+              if marker not in source:
+                  raise SystemExit("Task notification startup marker not found")
+              source = source.replace(marker, marker + addition, 1)
+              path.write_text(source, encoding="utf-8")
+          PY
+
+          # The fork changed these report editors only to apply Glass dialogs.
+          # Take upstream's new responsive/media features; Glass is re-applied below.
+          git checkout "$UPSTREAM" -- \
+            hesabixUI/hesabix_ui/lib/pages/business/report_template_html_editor_page.dart \
+            hesabixUI/hesabix_ui/lib/pages/business/report_template_studio_page.dart
 
           # The fork changed quick_sales_page only to apply the glass dialog wrappers.
           # Take all upstream Quick Sales functionality, then re-apply Glass below.
@@ -92,6 +120,10 @@ jobs:
           git checkout "$BASE" --             hesabixUI/hesabix_ui/pubspec.yaml             hesabixUI/hesabix_ui/pubspec.lock
 
           git add             hesabixUI/hesabix_ui/lib/pages/business/quick_sales_page.dart             hesabixUI/hesabix_ui/pubspec.yaml             hesabixUI/hesabix_ui/pubspec.lock
+          git add \
+            hesabixAPI/app/main.py \
+            hesabixUI/hesabix_ui/lib/pages/business/report_template_html_editor_page.dart \
+            hesabixUI/hesabix_ui/lib/pages/business/report_template_studio_page.dart
 
           if git diff --name-only --diff-filter=U | grep -q .; then
             echo "::error::Unresolved conflicts remain"
