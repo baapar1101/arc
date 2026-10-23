@@ -68,3 +68,45 @@ class AdvancedPluginAudit(Base):
     action: Mapped[str] = mapped_column(String(40))
     details: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class AdvancedPluginPostingConfig(Base):
+    __tablename__ = 'advanced_plugin_posting_configs'
+    __table_args__ = (UniqueConstraint('business_id','plugin_code',name='uq_advanced_posting_config'),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    business_id: Mapped[int] = mapped_column(ForeignKey('businesses.id',ondelete='CASCADE'),index=True)
+    plugin_code: Mapped[str] = mapped_column(String(100))
+    enabled: Mapped[bool] = mapped_column(Boolean,default=False,nullable=False)
+    accounts: Mapped[dict] = mapped_column(JSON,default=dict,nullable=False)
+    contract_side: Mapped[str] = mapped_column(String(30),default='require_review',nullable=False)
+    revision: Mapped[int] = mapped_column(Integer,default=1,nullable=False)
+    updated_by_user_id: Mapped[int | None] = mapped_column(ForeignKey('users.id',ondelete='RESTRICT'))
+    updated_at: Mapped[datetime] = mapped_column(DateTime,default=datetime.utcnow,onupdate=datetime.utcnow)
+
+
+class AdvancedPluginPosting(Base):
+    __tablename__ = 'advanced_plugin_postings'
+    __table_args__ = (
+        UniqueConstraint('business_id','plugin_code','event_key',name='uq_advanced_posting_event'),
+        UniqueConstraint('record_id',name='uq_advanced_posting_record'),
+        UniqueConstraint('document_id',name='uq_advanced_posting_document'),
+        UniqueConstraint('reversal_document_id',name='uq_advanced_posting_reversal'),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    business_id: Mapped[int] = mapped_column(ForeignKey('businesses.id',ondelete='RESTRICT'),index=True)
+    plugin_code: Mapped[str] = mapped_column(String(100),index=True)
+    record_id: Mapped[int] = mapped_column(ForeignKey('advanced_plugin_records.id',ondelete='RESTRICT'),index=True)
+    event_key: Mapped[str] = mapped_column(String(64))
+    state: Mapped[str] = mapped_column(String(20),default='draft',nullable=False)
+    revision: Mapped[int] = mapped_column(Integer,default=1,nullable=False)
+    input_hash: Mapped[str] = mapped_column(String(64))
+    proposal: Mapped[dict] = mapped_column(JSON,nullable=False)
+    document_id: Mapped[int | None] = mapped_column(ForeignKey('documents.id',ondelete='RESTRICT'))
+    reversal_document_id: Mapped[int | None] = mapped_column(ForeignKey('documents.id',ondelete='RESTRICT'))
+    created_by_user_id: Mapped[int] = mapped_column(ForeignKey('users.id',ondelete='RESTRICT'))
+    approved_by_user_id: Mapped[int | None] = mapped_column(ForeignKey('users.id',ondelete='RESTRICT'))
+    reversed_by_user_id: Mapped[int | None] = mapped_column(ForeignKey('users.id',ondelete='RESTRICT'))
+    decision_reason: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime,default=datetime.utcnow)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime)
+    reversed_at: Mapped[datetime | None] = mapped_column(DateTime)

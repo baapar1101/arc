@@ -27,6 +27,7 @@ def overview(request:Request,business_id:int,db:Session=Depends(get_db),ctx:Auth
         item['can_view']=has_business_permission_for_business(ctx,db,business_id,item['code'],'view')
         item['can_write']=has_business_permission_for_business(ctx,db,business_id,item['code'],'write')
         item['can_settings']=has_business_permission_for_business(ctx,db,business_id,item['code'],'settings')
+        item['can_approve']=has_business_permission_for_business(ctx,db,business_id,item['code'],'approve')
         item['operations']=OPERATIONS[item['code']]
         if not item['can_view']:item['counts']={}
         if not item['can_settings']:item['settings']=None
@@ -88,3 +89,34 @@ def audit(request:Request,business_id:int,code:str,db:Session=Depends(get_db),ct
     authorize(db,business_id,code,ctx,'settings')
     rows=db.scalars(select(AdvancedPluginAudit).where(AdvancedPluginAudit.business_id==business_id,AdvancedPluginAudit.plugin_code==code).order_by(AdvancedPluginAudit.id.desc()).limit(50))
     return success_response({'items':[{'id':r.id,'record_id':r.record_id,'actor_user_id':r.actor_user_id,'action':r.action,'details':r.details,'created_at':r.created_at.isoformat()} for r in rows]},request)
+
+
+@router.get('/business/{business_id}/{code}/finance')
+def finance(request:Request,business_id:int,code:str,db:Session=Depends(get_db),ctx:AuthContext=Depends(get_current_user)):
+    authorize(db,business_id,code,ctx)
+    from app.services.advanced_plugin_posting_service import workspace
+    return success_response(workspace(db,business_id,code),request)
+
+
+@router.put('/business/{business_id}/{code}/finance/config')
+def finance_config(request:Request,business_id:int,code:str,payload:dict[str,Any]=Body(...),db:Session=Depends(get_db),ctx:AuthContext=Depends(get_current_user)):
+    authorize(db,business_id,code,ctx,'approve')
+    from app.services.advanced_plugin_posting_service import save_config
+    return success_response(save_config(db,business_id,code,payload,ctx.get_user_id()),request)
+
+
+@router.post('/business/{business_id}/{code}/finance/drafts')
+def finance_draft(request:Request,business_id:int,code:str,payload:dict[str,Any]=Body(...),db:Session=Depends(get_db),ctx:AuthContext=Depends(get_current_user)):
+    authorize(db,business_id,code,ctx,'write')
+    if set(payload)!={'record_id'} or type(payload['record_id']) is not int or payload['record_id']<=0:svc.fail('شناسه رویداد مالی را مشخص کنید.')
+    from app.services.advanced_plugin_posting_service import prepare
+    return success_response(prepare(db,business_id,code,payload['record_id'],ctx.get_user_id()),request)
+
+
+@router.post('/business/{business_id}/{code}/finance/{posting_id}/{action}')
+def finance_decision(request:Request,business_id:int,code:str,posting_id:int,action:str,payload:dict[str,Any]=Body(...),db:Session=Depends(get_db),ctx:AuthContext=Depends(get_current_user)):
+    if action not in {'approve','reject','reverse','refresh'}:svc.fail('عملیات مالی ناشناخته است.')
+    authorize(db,business_id,code,ctx,'write' if action=='refresh' else 'approve')
+    from app.services.advanced_plugin_posting_service import decide,refresh
+    data=refresh(db,business_id,code,posting_id,payload,ctx.get_user_id()) if action=='refresh' else decide(db,business_id,code,posting_id,action,payload,ctx.get_user_id())
+    return success_response(data,request)

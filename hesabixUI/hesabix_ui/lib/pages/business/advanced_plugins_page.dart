@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../core/business_nav.dart';
 import '../../services/advanced_plugins_service.dart';
 
+part 'advanced_plugin_finance.dart';
+
 Map<String, dynamic> _map(dynamic x) =>
     Map<String, dynamic>.from(x as Map? ?? {});
 String _error(Object e) => e.toString().replaceFirst('Exception: ', '');
@@ -18,6 +20,10 @@ const _choices = {
   'require_review': 'تا بررسی مدیر، تعدیل مبدأ اعمال نشود',
   'discount_then_addition': 'ابتدا تخفیف، سپس افزوده',
   'parallel_on_base': 'تخفیف و افزوده هر دو روی قیمت پایه',
+  'increase': 'افزایش',
+  'decrease': 'کاهش',
+  'customer': 'پیمان فروش به مشتری',
+  'supplier': 'پیمان خرید از پیمانکار',
 };
 
 class AdvancedPluginsPage extends StatefulWidget {
@@ -159,7 +165,7 @@ class _AdvancedPluginsPageState extends State<AdvancedPluginsPage> {
             Expanded(
               child: DefaultTabController(
                 key: ValueKey(selected),
-                length: 4,
+                length: 5,
                 child: Column(
                   children: [
                     const TabBar(
@@ -169,6 +175,7 @@ class _AdvancedPluginsPageState extends State<AdvancedPluginsPage> {
                         Tab(text: 'عملیات و محاسبات'),
                         Tab(text: 'تنظیمات و اتصال'),
                         Tab(text: 'ردپای تغییرات'),
+                        Tab(text: 'ثبت مالی و تأیید مدیر'),
                       ],
                     ),
                     Expanded(
@@ -211,6 +218,16 @@ class _AdvancedPluginsPageState extends State<AdvancedPluginsPage> {
                             api: api,
                             module: current,
                           ),
+                          if (current['can_view'] == true)
+                            _Finance(
+                              key: ValueKey('finance-$selected'),
+                              api: api,
+                              module: current,
+                            )
+                          else
+                            const Center(
+                              child: Text('مجوز مشاهده افزونه لازم است.'),
+                            ),
                         ],
                       ),
                     ),
@@ -630,6 +647,7 @@ class _FieldsState extends State<_Fields> {
       'person',
       'warehouse',
       'currency',
+      'account',
     ].contains(type);
     return TextFormField(
       controller: c,
@@ -711,10 +729,16 @@ class _FieldsState extends State<_Fields> {
         const SizedBox(height: 12),
         ExpansionTile(
           title: const Text('مبالغ، تاریخ‌ها و پیوندهای بومی'),
-          initiallyExpanded: [
-            'conditional_pricing',
-            'inventory_trace_cost',
-          ].contains(widget.code),
+          initiallyExpanded:
+              [
+                'conditional_pricing',
+                'inventory_trace_cost',
+              ].contains(widget.code) ||
+              widget.definitions.entries.any(
+                (e) =>
+                    advanced.contains(e.key) &&
+                    _map(e.value)['required'] == true,
+              ),
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),

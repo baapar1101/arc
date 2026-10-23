@@ -143,6 +143,20 @@ PARENTS = {
 
 ADVANCED_TABLES = {t for module in SOURCE.values() for t in module} | {'INV.InventoryReceipt','INV.InventoryDelivery','GNR.Currency'}
 
+# Explicit local delta events; importing a rule/calendar/FIFO report is not a
+# financial event and never creates these records or journals automatically.
+for _code,_kind,_label,_fields in [
+ ('payroll_calendar_tax','tax_adjustment','تعدیل مستقل مالیات (نه صدور مجدد حقوق)',{'reference':field('شناسه یکتای مبنای تعدیل','text',True)}),
+ ('conditional_pricing','price_adjustment','تعدیل مستقل قیمت فاکتور فروش بومی',{'invoice_document_id':field('شناسه سند فاکتور فروش بومی','integer',True,min=1),'tax_amount':field('مالیات تعدیل تأییدشده؛ خالی یعنی صفر','decimal',min='0')}),
+ ('inventory_trace_cost','cost_adjustment','تعدیل مستقل بهای خروج بومی',{'warehouse_document_line_id':field('شناسه ردیف خروج بومی','integer',True,min=1)}),
+]:
+    MODULES[_code]['kinds'][_kind]=entity(_label,{
+        **_fields,'direction':field('جهت تعدیل','choice',True,choices=['increase','decrease']),
+        'reason':field('شرح و مستند مبنای تعدیل','text',True),
+        'amount':field('مبلغ خالص تعدیل (نه مبلغ کل عملیات)','decimal',True,min='0.01'),
+        'start_date':field('تاریخ ثبت تعدیل','date',True),
+    })
+
 
 def default_options(code):
     return {key:value['default'] for key,value in MODULES[code]['options'].items() if 'default' in value}

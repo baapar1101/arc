@@ -52,6 +52,8 @@ def native_db():
               MarketplacePlugin,MarketplacePluginPlan,BusinessPlugin,PayrollSettings,DistributionTerritory,DistributionRoute,PriceList,PriceItem,SystemSetting,
               CustomerClubSettings,CustomerClubBalance,CustomerClubLedger,CustomerClubInvoiceSnapshot,CustomerClubTier,CustomerClubRfmSnapshot,
               AdvancedPluginSetting,AdvancedPluginRecord,AdvancedPluginAudit)
+    from adapters.db.models.advanced_plugins import AdvancedPluginPosting,AdvancedPluginPostingConfig
+    models=(*models,AdvancedPluginPostingConfig,AdvancedPluginPosting)
     for model in models:
         model.__table__.to_metadata(metadata)
     # Unrelated optional FKs (CRM, tax, banking, attachments) are not part of this fixture.

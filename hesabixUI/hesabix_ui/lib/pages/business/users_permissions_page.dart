@@ -1337,7 +1337,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'approve': t.payrollPermissionApprove,
       },
       for (final specialist in ['fixed_assets','contracting','payroll_calendar_tax','conditional_pricing','inventory_trace_cost'])
-        specialist: {'view':'مشاهده','write':'ثبت و ویرایش و عملیات','settings':'تنظیمات و ردپای تغییرات'},
+        specialist: {'view':'مشاهده','write':'ثبت و ویرایش و پیش‌نویس مالی','settings':'تنظیمات و ردپای تغییرات','approve':'تأیید مدیر، صدور و برگشت سند مالی'},
       'telephony': {
         'view': t.localeName.startsWith('fa') ? 'مشاهده مرکز تماس' : 'View telephony center',
         'manage': t.localeName.startsWith('fa') ? 'مدیریت اتصال و داخلی‌ها' : 'Manage PBX & extensions',

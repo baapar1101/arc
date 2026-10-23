@@ -57,6 +57,9 @@ def _save_result(db,bid,code,kind,parent,start,end,value,output,identity_parts,a
     row=db.scalars(select(Record).where(Record.business_id==bid,Record.plugin_code==code,Record.identity==identity).with_for_update()).first()
     if row and row.data.get('input_hash')==output['input_hash']:
         return {**output,'saved_record_id':row.id,'unchanged':True}
+    if row:
+        from app.services.advanced_plugin_posting_service import assert_event_editable
+        assert_event_editable(db,bid,row.id)
     if row is None:
         row=Record(business_id=bid,plugin_code=code,kind=kind,identity=identity,title=output['title'],parent_id=parent,status='active',data={})
         db.add(row)
@@ -308,6 +311,9 @@ def fifo_report(db,bid,payload):
 
 
 def run_operation(db,bid,code,action,payload,actor=None):
+    if action.endswith('_save') or action=='approve_tax_table':
+        from app.services.advanced_plugin_posting_service import posting_lock
+        posting_lock(db,bid)
     from app.services.advanced_plugin_service import validate_fields
     require_license(db,bid,code)
     spec=OPERATIONS.get(code,{}).get(action)

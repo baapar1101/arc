@@ -280,4 +280,6 @@ from .advanced_plugins import (  # noqa: F401
 	AdvancedPluginSetting,
 	AdvancedPluginRecord,
 	AdvancedPluginAudit,
+	AdvancedPluginPostingConfig,
+	AdvancedPluginPosting,
 )

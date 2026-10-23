@@ -132,6 +132,8 @@ def validate_fields(db,bid,code,definitions,payload,*,partial=False):
 
 
 def save_settings(db,bid,code,payload,actor):
+    from app.services.advanced_plugin_posting_service import posting_lock
+    posting_lock(db,bid)
     require_license(db,bid,code)
     if set(payload)-{'revision','enabled','sync_enabled','options'}:fail('تنظیم ناشناخته است.')
     row=settings_row(db,bid,code,create=True,lock=True)
@@ -231,12 +233,17 @@ def _validate_domain(db,bid,code,kind,values):
 
 
 def save_record(db,bid,code,kind,payload,actor,rid=None):
+    from app.services.advanced_plugin_posting_service import posting_lock
+    posting_lock(db,bid)
     require_license(db,bid,code)
     cfg=settings_row(db,bid,code)
     if cfg and not cfg.enabled:fail('افزونه در تنظیمات غیرفعال است.')
     spec=module(code)['kinds'].get(kind)
     if not spec or not spec.get('local'):fail('این نوع رکورد فقط توسط عملیات یا همگام‌سازی ساخته می‌شود.')
     row=get_record(db,bid,code,rid,lock=True) if rid else None
+    if row:
+        from app.services.advanced_plugin_posting_service import assert_event_editable
+        assert_event_editable(db,bid,row.id)
     if row and row.kind!=kind:fail('نوع رکورد قابل تغییر نیست.')
     if row and row.source_table:fail('رکورد تحت مدیریت سپیدار است؛ تغییر را در مبدأ انجام دهید.','SEPIDAR_SOURCE_MANAGED',409)
     if row and payload.get('revision')!=row.revision:fail('نسخه رکورد تغییر کرده؛ دوباره بارگذاری کنید.','ADVANCED_PLUGIN_CONFLICT',409)
@@ -279,16 +286,18 @@ def references(db,bid,code,typ,q=''):
     if typ=='parent':
         rows=db.scalars(select(Record).where(Record.business_id==bid,Record.plugin_code==code,Record.status!='archived',Record.source_deleted.is_(False),Record.title.ilike('%'+q[:100]+'%')).order_by(Record.id.desc()).limit(60))
         return [{'id':r.id,'label':f'{module(code)["kinds"].get(r.kind,{}).get("label",r.kind)} — {r.title}','kind':r.kind} for r in rows]
-    model={'product':Product,'person':Person,'warehouse':Warehouse,'currency':Currency}.get(typ)
+    from adapters.db.models.account import Account
+    model={'product':Product,'person':Person,'warehouse':Warehouse,'currency':Currency,'account':Account}.get(typ)
     if not model:fail('نوع مرجع معتبر نیست.')
     query=select(model)
     if typ=='currency':
         business=db.get(Business,bid)
         ids=list(db.scalars(select(BusinessCurrency.currency_id).where(BusinessCurrency.business_id==bid)))+[business.default_currency_id]
         query=query.where(Currency.id.in_(ids))
+    elif typ=='account':query=query.where(or_(Account.business_id==bid,Account.business_id.is_(None)))
     else:query=query.where(model.business_id==bid)
     if q:
         if typ=='person':query=query.where(or_(Person.first_name.ilike('%'+q[:100]+'%'),Person.last_name.ilike('%'+q[:100]+'%')))
         else:query=query.where((Currency.title if typ=='currency' else model.name).ilike('%'+q[:100]+'%'))
     rows=db.scalars(query.order_by(model.id).limit(60))
-    return [{'id':r.id,'label':(' '.join(filter(None,[r.first_name,r.last_name])) if typ=='person' else getattr(r,'name',None) or getattr(r,'title',None) or str(r.id))} for r in rows]
+    return [{'id':r.id,'label':(' '.join(filter(None,[r.first_name,r.last_name])) if typ=='person' else f'{r.code} — {r.name}' if typ=='account' else getattr(r,'name',None) or getattr(r,'title',None) or str(r.id))} for r in rows]

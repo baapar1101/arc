@@ -89,4 +89,26 @@ class AdvancedPluginsService {
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
   }
+
+  Future<Map<String, dynamic>> finance(String code) async =>
+      data((await _api.get<Map<String, dynamic>>('$base/$code/finance')).data);
+  Future<Map<String, dynamic>> financeConfig(
+    String code,
+    Map<String, dynamic> values,
+  ) async => data(
+    (await _api.put<Map<String, dynamic>>(
+      '$base/$code/finance/config',
+      data: values,
+    )).data,
+  );
+  Future<Map<String, dynamic>> financeAction(
+    String code,
+    String path,
+    Map<String, dynamic> values,
+  ) async => data(
+    (await _api.post<Map<String, dynamic>>(
+      '$base/$code/finance/$path',
+      data: values,
+    )).data,
+  );
 }
