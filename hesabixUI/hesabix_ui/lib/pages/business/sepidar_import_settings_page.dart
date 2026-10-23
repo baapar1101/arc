@@ -14,7 +14,7 @@ class _State extends State<SepidarImportSettingsPage> {
   final _database = TextEditingController(), _username = TextEditingController(), _password = TextEditingController();
   final _interval = TextEditingController(text: '15'), _batch = TextEditingController(text: '500');
   final _schemas = TextEditingController(), _tables = TextEditingController();
-  bool _enabled = false, _busy = false, _hidePassword = true, _nativeEnabled = false;
+  bool _enabled = false, _busy = false, _hidePassword = true, _nativeEnabled = false, _operationsEnabled = false;
   Map<String, dynamic>? _nativeSummary;
   String? _nativeError;
   String? _status;
@@ -32,6 +32,7 @@ class _State extends State<SepidarImportSettingsPage> {
       _schemas.text = (s['included_schemas'] as List? ?? const []).join(', '); _tables.text = (s['included_tables'] as List? ?? const []).join(', ');
       _enabled = s['enabled'] == true; _runs = await _service.runs(widget.businessId);
       _nativeEnabled = s['native_enabled'] == true;
+      _operationsEnabled = s['operations_enabled'] == true;
       _nativeSummary = s['native_summary'] is Map ? Map<String,dynamic>.from(s['native_summary'] as Map) : null;
       _nativeError = s['native_last_error'] as String?;
     } catch (e) { _status = 'خطا در دریافت تنظیمات: $e'; }
@@ -45,6 +46,7 @@ class _State extends State<SepidarImportSettingsPage> {
       await _service.save(widget.businessId, {'host':_host.text.trim(),'port':int.tryParse(_port.text)??1433,'database_name':_database.text.trim(),
         'username':_username.text.trim(),if(_password.text.isNotEmpty)'password':_password.text,'enabled':_enabled,
         'native_enabled':_nativeEnabled,
+        'operations_enabled':_operationsEnabled,
         'sync_interval_minutes':int.tryParse(_interval.text)??15,'batch_size':int.tryParse(_batch.text)??500,
         'included_schemas':_csv(_schemas.text),'included_tables':_csv(_tables.text)});
       _password.clear(); _status = 'تنظیمات با رمزنگاری امن ذخیره شد.';
@@ -76,6 +78,8 @@ class _State extends State<SepidarImportSettingsPage> {
       SwitchListTile(value:_enabled,onChanged:_busy?null:(v)=>setState(()=>_enabled=v),title:const Text('همگام‌سازی لایو فعال باشد')),
       SwitchListTile(value:_nativeEnabled,onChanged:_busy?null:(v)=>setState(()=>_nativeEnabled=v),title:const Text('تبدیل خودکار به اطلاعات قابل استفاده حسابیکس'),
         subtitle:const Text('اشخاص، کالاها، سال‌های مالی، حساب‌ها، فاکتورها و اسناد؛ هر بار پس از دریافت اطلاعات سپیدار به‌روز می‌شوند.')),
+      SwitchListTile(value:_operationsEnabled,onChanged:_busy?null:(v)=>setState(()=>_operationsEnabled=v),title:const Text('همگام‌سازی انبار، بهای تمام‌شده و دریافت/پرداخت'),
+        subtitle:const Text('نیازمند تبدیل خودکار؛ موجودی بین سال‌ها دوباره جمع نمی‌شود. هزینه نامشخص صفر فرض نمی‌شود و فقط تسویه صریح سپیدار به فاکتور تخصیص می‌یابد.')),
       const Padding(padding:EdgeInsets.symmetric(vertical:8),child:Text('اسناد مالی واردشده از سپیدار مدیریت می‌شوند. ویرایش مالی آن‌ها را در سپیدار انجام دهید. صدور فاکتور جدید در حسابیکس مستقل است.')),
       if(_nativeSummary!=null) Card(child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         Text('آخرین تبدیل موفق: ${_nativeSummary!['completed_at'] ?? ''}'),
@@ -85,6 +89,8 @@ class _State extends State<SepidarImportSettingsPage> {
           Text('${_entityLabel(entry.key.toString())}: ${_entityCount(entry.value)}'),
       ]))),
       if(_nativeError!=null) Text('خطای تبدیل: $_nativeError',style:TextStyle(color:Theme.of(context).colorScheme.error)),
+      if(_nativeSummary?['operations'] is Map) Padding(padding:const EdgeInsets.all(8),child:Text('کنترل انبار: ${(_nativeSummary!['operations'] as Map)['priced_lines']} ردیف قیمت‌گذاری‌شده؛ ${(_nativeSummary!['operations'] as Map)['unpriced_lines']} ردیف بدون قیمت قطعی مبدأ.')),
+      if((_nativeSummary?['warnings'] as List? ?? const []).isNotEmpty) const Padding(padding:EdgeInsets.all(8),child:Text('توجه: اقلام بدون قیمت قطعی و اختلاف‌های خلاصه موجودی مبدأ در حواله‌ها مشخص شده‌اند. ارزش نامشخص به‌عنوان صفر گزارش نمی‌شود.')),
       Wrap(spacing:12,children:[FilledButton.icon(onPressed:_busy?null:_save,icon:const Icon(Icons.save),label:const Text('ذخیره تنظیمات')),
         OutlinedButton.icon(onPressed:_busy?null:()=>_action(false),icon:const Icon(Icons.cable),label:const Text('تست اتصال')),
         FilledButton.tonalIcon(onPressed:_busy?null:()=>_action(true),icon:const Icon(Icons.sync),label:const Text('همگام‌سازی الآن'))]),
@@ -96,7 +102,9 @@ class _State extends State<SepidarImportSettingsPage> {
 
   String _entityLabel(String key) => const {'GNR.Party':'اشخاص','INV.Item':'کالاها','ACC.Voucher':'اسناد حسابداری',
     'SLS.Invoice':'فروش','SLS.ReturnedInvoice':'برگشت فروش','INV.InventoryPurchaseInvoice':'خرید','SLS.Quotation':'پیش‌فاکتور',
-    'FMK.FiscalYear':'سال مالی','ACC.Account':'حساب‌ها','INV.Stock':'انبارها'}[key] ?? key;
+    'FMK.FiscalYear':'سال مالی','ACC.Account':'حساب‌ها','INV.Stock':'انبارها',
+    'INV.InventoryReceipt':'رسیدهای انبار','INV.InventoryDelivery':'خروج و برگشت انبار','INV.NativeStockBridge':'تطبیق موجودی بین سال‌ها',
+    'RPA.ReceiptHeader':'دریافت‌ها','RPA.PaymentHeader':'پرداخت‌ها','RPA.BankAccount':'حساب‌های بانکی','RPA.Cash':'صندوق‌ها'}[key] ?? key;
   String _entityCount(dynamic value) {
     final m = value is Map ? value : const {};
     final total = (m['created'] as num? ?? 0) + (m['updated'] as num? ?? 0) + (m['unchanged'] as num? ?? 0);

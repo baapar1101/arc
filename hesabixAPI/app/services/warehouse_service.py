@@ -1911,6 +1911,8 @@ def update_warehouse_document(
 		raise ApiError("NOT_FOUND", "Warehouse document not found", http_status=404)
 	
 	# حواله‌های draft و posted قابل ویرایش هستند
+	from app.services.sepidar_native_service import assert_document_editable
+	assert_document_editable(wh)
 	# حواله‌های cancelled قابل ویرایش نیستند
 	if wh.status == "cancelled":
 		raise ApiError("NOT_EDITABLE", "حواله‌های لغو شده قابل ویرایش نیستند", http_status=400)
@@ -2700,6 +2702,8 @@ def update_warehouse_document_line(
 	
 	if wh.status != "draft":
 		raise ApiError("NOT_EDITABLE", "فقط حواله‌های draft قابل ویرایش هستند", http_status=400)
+	from app.services.sepidar_native_service import assert_document_editable
+	assert_document_editable(wh)
 	
 	wline = db.query(WarehouseDocumentLine).filter(
 		and_(
@@ -2782,6 +2786,8 @@ def post_warehouse_document(
 	wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == wh_id).first()
 	if not wh:
 		raise ApiError("NOT_FOUND", "Warehouse document not found", http_status=404)
+	from app.services.sepidar_native_service import assert_document_editable
+	assert_document_editable(wh)
 	if wh.status == "posted":
 		return {"id": wh.id, "status": wh.status}
 	if (wh.status or "").strip().lower() == "cancelled":
@@ -3671,6 +3677,8 @@ def delete_warehouse_document(db: Session, business_id: int, wh_id: int) -> bool
 	wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == wh_id).first()
 	if not wh or wh.business_id != business_id:
 		raise ApiError("NOT_FOUND", "Warehouse document not found", http_status=404)
+	from app.services.sepidar_native_service import assert_document_editable
+	assert_document_editable(wh)
 	
 	if wh.status != "draft":
 		raise ApiError("NOT_DELETABLE", "فقط حواله‌های draft قابل حذف هستند", http_status=400)
@@ -3760,6 +3768,8 @@ def cancel_warehouse_document(
 	wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == wh_id).first()
 	if not wh or wh.business_id != business_id:
 		raise ApiError("NOT_FOUND", "Warehouse document not found", http_status=404)
+	from app.services.sepidar_native_service import assert_document_editable
+	assert_document_editable(wh)
 	
 	if wh.status != "posted":
 		raise ApiError("NOT_CANCELLABLE", "فقط حواله‌های posted قابل لغو هستند", http_status=400)

@@ -880,12 +880,14 @@ def get_inventory_valuation_report(
     
     items = []
     total_value = Decimal(0)
-    
+    from app.services.sepidar_operations_service import report_available_stock
+    stock_by_warehouse = {wid:report_available_stock(db,business_id,[p.id for p in products],as_of_date_obj,wid)
+                          for wid in ([w.id for w in warehouses] or [None])}
     for product in products:
         # محاسبه موجودی و ارزش
         if warehouses:
             for warehouse in warehouses:
-                stock = _compute_available_stock(db, business_id, product.id, warehouse.id, as_of_date_obj)
+                stock = stock_by_warehouse[warehouse.id].get(product.id,Decimal(0))
                 if stock > 0:
                     cost_price, source_cost_price, cost_currency_id, cost_source = _cost_in_base(product)
                     value = Decimal(str(stock)) * cost_price
@@ -912,7 +914,7 @@ def get_inventory_valuation_report(
                         "amounts_in_base": True,
                     })
         else:
-            stock = _compute_available_stock(db, business_id, product.id, None, as_of_date_obj)
+            stock = stock_by_warehouse[None].get(product.id,Decimal(0))
             if stock > 0:
                 cost_price, source_cost_price, cost_currency_id, cost_source = _cost_in_base(product)
                 value = Decimal(str(stock)) * cost_price
@@ -939,16 +941,36 @@ def get_inventory_valuation_report(
                     "amounts_in_base": True,
                 })
     
+    # Source import carries actual historical prices, not an assumed current
+    # purchase price. Unpriced source stock must remain explicitly unknown.
+    from app.services.sepidar_operations_service import source_stock_values
+    source_values = source_stock_values(db,business_id,as_of_date_obj)
+    unpriced_source_items = 0
+    for item in items:
+        source_key = (item['product_id'],item['warehouse_id'])
+        if source_key in source_values:
+            source_value, complete = source_values[source_key]
+            item['valuation_complete'] = complete
+            item['cost_source'] = 'sepidar_priced_movements' if complete else 'sepidar_unpriced'
+            item['known_source_value'] = float(source_value)
+            item['value'] = float(source_value) if complete else None
+            item['cost_price'] = float(source_value / Decimal(str(item['quantity']))) if complete else None
+            item['source_cost_price'] = item['cost_price']
+            unpriced_source_items += not complete
+    total_value = sum((Decimal(str(item['value'])) for item in items if item['value'] is not None),Decimal(0))
     # مرتب‌سازی بر اساس ارزش
-    items.sort(key=lambda x: x["value"], reverse=True)
+    items.sort(key=lambda x: x["value"] or 0, reverse=True)
     
     return {
         "items": items[skip:skip + take],
         "total": len(items),
-        "total_value": float(total_value),
+        "total_value": None if unpriced_source_items else float(total_value),
+        "known_total_value": float(total_value),
         "as_of_date": as_of_date_obj.isoformat(),
         "meta": {
             **meta,
+            "valuation_complete": unpriced_source_items == 0,
+            "unpriced_source_items": unpriced_source_items,
             "products_with_missing_fx_rate": sorted(set(missing_fx_rate_product_ids)),
         },
     }

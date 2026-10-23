@@ -23,6 +23,7 @@ class SepidarImportSetting(Base):
     password_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     native_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+    operations_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     native_summary: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     native_last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     sync_interval_minutes: Mapped[int] = mapped_column(Integer, default=15, nullable=False)

@@ -19,6 +19,10 @@ from adapters.db.models.document_line import DocumentLine
 from adapters.db.models.fiscal_year import FiscalYear
 from adapters.db.models.invoice_item_line import InvoiceItemLine
 from adapters.db.models.warehouse import Warehouse
+from adapters.db.models.warehouse_document import WarehouseDocument
+from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
+from adapters.db.models.bank_account import BankAccount
+from adapters.db.models.cash_register import CashRegister
 from adapters.db.models.sepidar_live_import import SepidarImportSetting, SepidarImportRow, SepidarImportRun, SepidarNativeMap
 from app.services.sepidar_native_service import NativeConversionError, fingerprint, project_native, assert_document_editable
 from app.services.sepidar_native_service import account_report_prefix
@@ -36,7 +40,8 @@ def native_db():
     engine = create_engine(dsn)
     metadata = MetaData()
     models = (User, Currency, Business, BusinessCurrency, Person, Product, Account, Document, DocumentLine,
-              FiscalYear, InvoiceItemLine, Warehouse, SepidarImportSetting, SepidarImportRow, SepidarImportRun, SepidarNativeMap)
+              FiscalYear, InvoiceItemLine, Warehouse, WarehouseDocument, WarehouseDocumentLine, BankAccount, CashRegister,
+              SepidarImportSetting, SepidarImportRow, SepidarImportRun, SepidarNativeMap)
     for model in models:
         model.__table__.to_metadata(metadata)
     # Unrelated optional FKs (CRM, tax, banking, attachments) are not part of this fixture.
@@ -51,7 +56,7 @@ def native_db():
                 constraint.name=f"test_fk_{table.name[:24]}_{index}"
     metadata.create_all(engine)
     try:
-        with Session(engine, expire_on_commit=False) as db:
+        with Session(engine, expire_on_commit=False, autoflush=False) as db:
             db.add(User(id=1, password_hash="test", referral_code="native-test", first_name="Test"))
             db.add(Currency(id=1,name="rial",title="ریال",symbol="ریال",code="IRR"))
             db.flush()
@@ -152,6 +157,16 @@ def test_live_update_changes_same_targets_without_duplicate_postings(native_db):
     assert db.scalar(select(func.sum(DocumentLine.debit)))==Decimal('120')
     assert db.scalar(select(func.sum(DocumentLine.credit)))==Decimal('120')
     assert db.scalars(select(InvoiceItemLine)).one().extra_info['unit_price']==60
+
+
+def test_source_additions_are_not_added_twice_to_native_payable(native_db):
+    from app.services.invoice_service import _invoice_total_amount_for_document
+    db=native_db;seed(db)
+    edit(db,'SLS.Invoice',0,Price='98',NetPrice='100',Addition='2')
+    project_native(db,1)
+    doc=db.scalars(select(Document)).one()
+    assert _invoice_total_amount_for_document(doc)==100
+    assert doc.extra_info['sepidar']['source_additions_net']=='2'
 
 
 def test_failed_financial_validation_rolls_back_all_native_changes(native_db):

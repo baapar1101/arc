@@ -22,6 +22,7 @@ class SettingsPayload(BaseModel):
     password: str | None = Field(default=None, max_length=2048)
     enabled: bool = False
     native_enabled: bool = False
+    operations_enabled: bool = False
     sync_interval_minutes: int = Field(default=15, ge=1, le=1440)
     batch_size: int = Field(default=500, ge=50, le=5000)
     included_schemas: list[str] = Field(default_factory=list, max_length=1000)

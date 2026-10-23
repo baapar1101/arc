@@ -1651,6 +1651,8 @@ def delete_receipt_payment(db: Session, document_id: int, *, commit: bool = True
     
     if not document:
         return False
+    from app.services.sepidar_native_service import assert_document_editable
+    assert_document_editable(document)
     
     if document.document_type not in (DOCUMENT_TYPE_RECEIPT, DOCUMENT_TYPE_PAYMENT):
         return False
@@ -1799,6 +1801,8 @@ def update_receipt_payment(
     document = db.query(Document).filter(Document.id == document_id).first()
     if document is None:
         raise ApiError("DOCUMENT_NOT_FOUND", "Document not found", http_status=404)
+    from app.services.sepidar_native_service import assert_document_editable
+    assert_document_editable(document)
     logger.info(f"[UPDATE_RECEIPT_PAYMENT] document.extra_info قبل از تغییر: {document.extra_info}")
 
     if document.document_type not in (DOCUMENT_TYPE_RECEIPT, DOCUMENT_TYPE_PAYMENT):
@@ -2659,6 +2663,14 @@ def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
     """تبدیل سند به دیکشنری"""
     # دریافت خطوط سند
     lines = db.query(DocumentLine).filter(DocumentLine.document_id == document.id).all()
+    source_metadata = (document.extra_info or {}).get('sepidar') or {}
+    if source_metadata.get('managed') and source_metadata.get('operational_table') and source_metadata.get('ledger_document_id') != document.id:
+        # Different source payment/accounting dates need separate native headers,
+        # but their accounting lines remain posted once in the original voucher.
+        lines = db.query(DocumentLine).join(Document).filter(
+            DocumentLine.document_id == source_metadata.get('ledger_document_id'),
+            Document.business_id == document.business_id,
+        ).all()
     
     # جداسازی خطوط اشخاص و حساب‌ها
     person_lines = []
@@ -2787,6 +2799,9 @@ def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
     
     # محاسبه مبلغ کل و تعداد خطوط
     total_amount = sum(line.get("amount", 0) for line in person_lines)
+    source = (document.extra_info or {}).get('sepidar') or {}
+    if source.get('managed') and source.get('operational_table'):
+        total_amount = float(Decimal(source['source_total_amount']))
     person_lines_count = len(person_lines)
     account_lines_count = len(account_lines)
     

@@ -170,13 +170,13 @@ class _InventoryValuationReportPageState
           'cost_price',
           'قیمت تمام شده (پایه)',
           formatter: (row) =>
-              _formatNumber((row as Map<String, dynamic>)['cost_price']),
+              (row as Map<String, dynamic>)['valuation_complete'] == false ? 'قیمت‌گذاری نشده' : _formatNumber(row['cost_price']),
         ),
         NumberColumn(
           'value',
           'ارزش (پایه)',
           formatter: (row) =>
-              _formatNumber((row as Map<String, dynamic>)['value']),
+              (row as Map<String, dynamic>)['valuation_complete'] == false ? 'نامشخص' : _formatNumber(row['value']),
         ),
       ],
       defaultPageSize: 50,

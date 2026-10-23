@@ -92,6 +92,9 @@ def apply_recognized_profit_to_invoice_lines(
     doc = db.query(Document).filter(Document.id == int(document_id)).first()
     if not doc or doc.business_id != int(business_id):
         return False
+    if (doc.extra_info or {}).get('sepidar',{}).get('managed'):
+        # Only source pricing is authoritative for imported warehouse costs.
+        return False
     if doc.is_proforma:
         return False
     if doc.document_type not in PROFIT_RECOGNITION_DOCUMENT_TYPES:

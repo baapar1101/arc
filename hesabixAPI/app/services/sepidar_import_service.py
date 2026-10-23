@@ -83,6 +83,7 @@ def public_setting(row: SepidarImportSetting | None) -> dict[str, Any]:
     return {
         "configured": True, "host": row.host, "port": row.port, "database_name": row.database_name,
         "native_enabled": row.native_enabled, "native_summary": row.native_summary, "native_last_error": row.native_last_error,
+        "operations_enabled": row.operations_enabled,
         "username": row.username, "password_configured": bool(row.password_encrypted), "enabled": row.enabled,
         "sync_interval_minutes": row.sync_interval_minutes, "batch_size": row.batch_size,
         "included_schemas": row.included_schemas or [], "included_tables": row.included_tables or [],
@@ -103,6 +104,10 @@ def save_setting(db: Session, business_id: int, payload: dict[str, Any]) -> Sepi
     row.enabled = bool(payload.get("enabled", row.enabled))
     if "native_enabled" in payload:
         row.native_enabled = bool(payload["native_enabled"])
+    if "operations_enabled" in payload:
+        row.operations_enabled = bool(payload['operations_enabled'])
+    if row.operations_enabled and not row.native_enabled:
+        raise ValueError('برای همگام‌سازی انبار و پرداخت‌ها، تبدیل بومی را هم فعال کنید.')
     row.sync_interval_minutes = max(1, min(1440, int(payload.get("sync_interval_minutes", row.sync_interval_minutes or 15))))
     row.batch_size = max(50, min(5000, int(payload.get("batch_size", row.batch_size or 500))))
     if "included_schemas" in payload:

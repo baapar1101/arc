@@ -27,6 +27,9 @@ from adapters.db.models.person import Person
 from adapters.db.models.product import Product, ProductItemType
 from adapters.db.models.sepidar_live_import import SepidarImportRow, SepidarImportSetting, SepidarNativeMap
 from adapters.db.models.warehouse import Warehouse
+from adapters.db.models.warehouse_document import WarehouseDocument
+from adapters.db.models.bank_account import BankAccount
+from adapters.db.models.cash_register import CashRegister
 from app.core.responses import ApiError
 
 
@@ -45,6 +48,12 @@ SOURCE_IDS = {
     "INV.Item": "ItemID", "INV.Stock": "StockID", "ACC.Account": "AccountId", "ACC.Voucher": "VoucherId",
     **{spec[0]: spec[1] for spec in INVOICES},
 }
+OPERATION_IDS = {'INV.InventoryReceipt':'InventoryReceiptID','INV.InventoryDelivery':'InventoryDeliveryID',
+                 'RPA.ReceiptHeader':'ReceiptHeaderId','RPA.PaymentHeader':'PaymentHeaderId',
+                 'RPA.BankAccount':'BankAccountId','RPA.Cash':'CashId'}
+OPERATION_TABLES = set(OPERATION_IDS) | {'INV.InventoryReceiptItem','INV.InventoryDeliveryItem','INV.ItemStockSummary',
+    'RPA.PartyAccountSettlement','RPA.PartyAccountSettlementItem','RPA.ReceiptDraft','RPA.PaymentDraft',
+    'RPA.ReceiptCheque','RPA.PaymentCheque','RPA.PaymentChequeOther','GNR.Shred'}
 
 
 def decimal(value: Any) -> Decimal:
@@ -134,6 +143,8 @@ class Projector:
         self.bid = setting.business_id
         self.data: dict[str, list[dict]] = defaultdict(list)
         required = set(SOURCE_IDS) | {"ACC.VoucherItem", "ACC.DL", "GNR.PartyAddress", "GNR.PartyPhone", "INV.Unit"} | {s[2] for s in INVOICES}
+        if setting.operations_enabled:
+            required |= OPERATION_TABLES
         for schema, table, payload in db.execute(select(SepidarImportRow.source_schema, SepidarImportRow.source_table, SepidarImportRow.payload).where(
             SepidarImportRow.business_id == self.bid, SepidarImportRow.is_deleted.is_(False),
             tuple_(SepidarImportRow.source_schema, SepidarImportRow.source_table).in_([tuple(t.split('.')) for t in required]))):
@@ -149,16 +160,17 @@ class Projector:
         self.maps = {(m.source_table, m.source_id): m for m in db.scalars(select(SepidarNativeMap).where(
             SepidarNativeMap.business_id == self.bid, SepidarNativeMap.database_name == setting.database_name))}
         self.targets = {model.__tablename__: {obj.id: obj for obj in db.scalars(select(model).where(model.business_id == self.bid))}
-                        for model in (Person, Product, Account, FiscalYear, Warehouse, Document)}
+                        for model in (Person, Product, Account, FiscalYear, Warehouse, Document, WarehouseDocument, BankAccount, CashRegister)}
         self.stats: dict[str, dict[str, int]] = defaultdict(lambda: {"created": 0, "updated": 0, "unchanged": 0})
         self.warnings: list[str] = []
         self.currency_ids: dict[int, int] = {}
         # Physical source deletes cannot silently leave active native postings.
         # Full snapshots retain raw history; reconciliation of financial removals
         # requires an explicit correction in Sepidar rather than deleting ledgers here.
-        source_id_sets = {table: {str(r[key]) for r in self.data[table]} for table, key in SOURCE_IDS.items()}
+        source_ids = {**SOURCE_IDS, **(OPERATION_IDS if setting.operations_enabled else {})}
+        source_id_sets = {table: {str(r[key]) for r in self.data[table]} for table, key in source_ids.items()}
         for (table, source_id), mapping in self.maps.items():
-            if table in SOURCE_IDS and source_id not in source_id_sets[table]:
+            if table in source_ids and source_id not in source_id_sets[table]:
                 raise NativeConversionError(f"Source identity missing; reconciliation required: {table}/{source_id}")
 
     def target(self, table: str, source_id: Any, *, optional: bool = False):
@@ -342,8 +354,8 @@ class Projector:
             self.voucher_hashes[sid] = fingerprint(original)
             fields = {"business_id": self.bid, "fiscal_year_id": year.id, "currency_id": self.base_currency,
                 "created_by_user_id": self.business.owner_id, "document_date": day,
-                "code": existing.code if existing and extra["sepidar"].get("invoice_table") else f"SPD-V-{row['FiscalYearRef']}-{row['Number']}-{sid}",
-                "document_type": existing.document_type if existing and extra["sepidar"].get("invoice_table") else "manual",
+                "code": existing.code if existing and (extra["sepidar"].get("invoice_table") or extra['sepidar'].get('operational_table')) else f"SPD-V-{row['FiscalYearRef']}-{row['Number']}-{sid}",
+                "document_type": existing.document_type if existing and (extra["sepidar"].get("invoice_table") or extra['sepidar'].get('operational_table')) else "manual",
                 "description": row.get("Description"), "is_proforma": False, "extra_info": extra}
             document, changed = self.upsert("ACC.Voucher", sid, Document, original, fields)
             if changed:
@@ -391,9 +403,15 @@ class Projector:
                 net = decimal(row[net_key])
                 extra.update({"person_id": person_id, "post_inventory": False, "auto_post_warehouse": False,
                     "accounting_source": "sepidar_voucher", "accounting_posted": bool(ledger_doc),
-                    "totals": {"gross": float(gross), "discount": float(discount), "tax": float(tax), "net": float(net),
-                               "adjustments_net": float(net - gross + discount - tax), "adjustments_tax": 0.0}})
-                aggregate = {"header": row, "lines": lines, "voucher_hash": self.voucher_hashes.get(voucher_id)}
+                    # Sepidar NetPrice already contains source additions/freight.
+                    # Native payable = net + header adjustments; adding them a
+                    # second time changes balances. Keep the original breakdown
+                    # separately, with a native row-total-compatible gross.
+                    "totals": {"gross": float(net + discount - tax), "discount": float(discount), "tax": float(tax), "net": float(net),
+                               "adjustments_net": 0.0, "adjustments_tax": 0.0}})
+                extra['sepidar']['source_gross'] = str(gross)
+                extra['sepidar']['source_additions_net'] = str(net - gross + discount - tax)
+                aggregate = {"version": 2, "header": row, "lines": lines, "voucher_hash": self.voucher_hashes.get(voucher_id)}
                 document, changed = self.upsert(table, sid, Document, aggregate, {"business_id": self.bid,
                     "code": f"SPD-{prefix}-{row['FiscalYearRef']}-{row['Number']}-{sid}", "fiscal_year_id": year.id,
                     "currency_id": currency_id, "created_by_user_id": self.business.owner_id, "document_date": day,
@@ -420,10 +438,20 @@ class Projector:
         self.accounts()
         self.ledger()
         self.invoices()
+        operation_summary = None
+        if self.setting.operations_enabled:
+            # Production sessions disable autoflush. Inventory links/costs must
+            # see the freshly replaced invoice rows, not their deleted versions.
+            self.db.flush()
+            from app.services.sepidar_operations_service import OperationsProjector
+            operations = OperationsProjector(self)
+            operations.run()
+            operation_summary = {'priced_lines':operations.priced,'unpriced_lines':operations.unpriced}
         self.db.flush()
         return {"completed_at": datetime.now(timezone.utc).isoformat(), "database": self.setting.database_name,
                 "entities": dict(self.stats), "warnings": self.warnings,
-                "policy": "source_managed; original voucher lines posted once; inventory posting is separate"}
+                "operations": operation_summary,
+                "policy": "source_managed; original voucher lines posted once; source-only costing; explicit fiscal carry reset"}
 
 
 def project_native(db: Session, business_id: int) -> dict:

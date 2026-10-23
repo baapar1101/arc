@@ -1411,14 +1411,14 @@ def _compute_available_stock(
             _wh_src_doc.business_id == business_id,
         ),
     ).filter(
-        ~or_(
+        or_(cast(WarehouseDocument.extra_info, JSONB)['sepidar']['managed'].astext == 'true', ~or_(
             func.lower(func.coalesce(WarehouseDocument.source_type, "")).in_(("invoice", "opening_balance")),
             and_(
                 WarehouseDocument.source_document_id.isnot(None),
                 _wh_src_doc.id.isnot(None),
                 _wh_src_doc.document_type.in_((*SUPPORTED_INVOICE_TYPES, "opening_balance")),
             ),
-        )
+        ))
     )
 
     if exclude_warehouse_document_ids:
@@ -1501,6 +1501,11 @@ def get_financial_stock_bulk(
         elif mv["movement"] == "out":
             stock_dict[pid] -= qty
     
+    # Sepidar has separate original GL and warehouse movements; its invoice
+    # item rows intentionally do not post stock. Include only that source here.
+    from app.services.sepidar_operations_service import source_warehouse_stock
+    for pid, qty in source_warehouse_stock(db,business_id,product_ids,as_of_date,warehouse_id).items():
+        stock_dict[pid] = stock_dict.get(pid,Decimal(0)) + qty
     # برای کالاهایی که حرکتی نداشتند، مقدار 0 برگردان
     for pid in product_ids:
         if pid not in stock_dict:
@@ -5136,6 +5141,8 @@ def _calculate_invoice_profit(
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document or not document.document_type.startswith("invoice"):
         return _empty_profit_response()
+    if isinstance(document.extra_info,dict) and document.extra_info.get('sepidar',{}).get('managed'):
+        return {}  # imported cost/profit comes exclusively from source pricing
     
     # فقط برای فاکتورهای فروش و تولید محاسبه می‌شود
     if document.document_type not in ["invoice_sales", "invoice_sales_return", "invoice_production"]:
@@ -8347,6 +8354,14 @@ def invoice_document_to_dict(
     # Imported Sepidar invoices have original GL but not native stock costing.
     # Never present missing cost as zero and manufacture a 100% invoice margin.
     source_managed = (document.extra_info or {}).get("sepidar", {}).get("managed", False)
+    if source_managed and item_rows and document.document_type == 'invoice_sales' and not document.is_proforma and all(it.ledger_line_cogs is not None for it, _ in item_rows):
+        source_profit = sum((it.ledger_line_gross_profit for it, _ in item_rows), Decimal(0))
+        source_cost = sum((it.ledger_line_cogs for it, _ in item_rows), Decimal(0))
+        source_sales = source_profit + source_cost
+        profit_data = {'gross_profit':float(source_profit),'total_profit':float(source_profit),
+            'gross_profit_percent':float(source_profit / source_sales * 100) if source_sales else 0.0,
+            'total_profit_percent':float(source_profit / source_sales * 100) if source_sales else 0.0,
+            'total_cost':float(source_cost),'total_sales':float(source_sales)}
     if business and business.invoice_profit_calculation_method != "disabled" and not source_managed:
         try:
             profit_data = _calculate_invoice_profit(
@@ -8423,7 +8438,7 @@ def invoice_document_to_dict(
 
     # سود و بهای تمام‌شده شناسایی‌شده در دفتر (پس از ذخیره روی خطوط)
     if source_managed:
-        result["profit_calculation_context"] = "source_cost_not_imported"
+        result["profit_calculation_context"] = "sepidar_priced" if profit_data else "source_cost_not_imported"
     if business and business.invoice_profit_calculation_method != "disabled" and not source_managed:
         try:
             from app.services.invoice_profit_ledger_service import build_recognized_profit_summary
@@ -10991,6 +11006,12 @@ def _sum_receipt_doc_payments_for_invoice(doc: Document, invoice_id: int, *, via
     """مبلغ پرداخت‌شدهٔ سند دریافت/پرداخت نسبت به یک فاکتور (به ارز فاکتور)."""
     inv_id = int(invoice_id)
     doc_extra = doc.extra_info if isinstance(doc.extra_info, dict) else {}
+    source = doc_extra.get('sepidar') or {}
+    if source.get('managed') and 'settlement_allocations' in source:
+        # A receipt may cover several invoices and leave an unallocated balance.
+        # Never apply its entire bank movement to every linked invoice.
+        return sum((Decimal(str(row['amount'])) for row in source['settlement_allocations']
+                    if int(row['invoice_id']) == inv_id), Decimal(0))
     doc_inv = doc_extra.get("invoice_id")
     try:
         doc_matches = doc_inv is not None and int(doc_inv) == inv_id
