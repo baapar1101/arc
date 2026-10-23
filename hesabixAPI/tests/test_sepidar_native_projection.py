@@ -21,6 +21,9 @@ from adapters.db.models.invoice_item_line import InvoiceItemLine
 from adapters.db.models.warehouse import Warehouse
 from adapters.db.models.sepidar_live_import import SepidarImportSetting, SepidarImportRow, SepidarImportRun, SepidarNativeMap
 from app.services.sepidar_native_service import NativeConversionError, fingerprint, project_native, assert_document_editable
+from app.services.sepidar_native_service import account_report_prefix
+from app.services.balance_sheet_account_classification import balance_sheet_subsection
+from app.services.pnl_account_classification import pnl_account_section
 from app.core.responses import ApiError
 
 
@@ -106,6 +109,9 @@ def test_native_entities_reuse_original_ledger_once_and_repeat_is_idempotent(nat
     project_native(db,1)
     assert count(db,Person)==count(db,Product)==count(db,Document)==1
     assert count(db,DocumentLine)==2 and count(db,InvoiceItemLine)==1
+    account=db.scalars(select(Account).where(Account.code.like('101.SPD.%'))).one()
+    assert account.account_type=='accounting_document' and account.parent_id is None
+    assert balance_sheet_subsection(account.code)=='current_assets'
     doc=db.scalars(select(Document)).one()
     assert doc.document_type=='invoice_sales' and doc.extra_info['totals']['net']==100
     assert doc.extra_info['person_id']==db.scalars(select(Person)).one().id
@@ -114,6 +120,20 @@ def test_native_entities_reuse_original_ledger_once_and_repeat_is_idempotent(nat
     assert all(s['created']==s['updated']==0 for s in summary['entities'].values())
     assert ids=={m.id:(m.target_table,m.target_id) for m in db.scalars(select(SepidarNativeMap))}
     assert count(db,DocumentLine)==2 and count(db,InvoiceItemLine)==1
+
+
+@pytest.mark.parametrize('group,child,side,expected',[
+    ('11','10',1,'current_assets'),('12','11',2,'non_current_assets'),
+    ('21','10',2,'current_liabilities'),('22','10',2,'non_current_liabilities'),
+    ('31','13',2,'equity'),('41','10',2,'sales'),('51','10',1,'cogs'),
+    ('61','10',1,'operating_expense'),('41','12',2,'other_income'),
+    ('62','11',2,'non_operating_income'),('62','11',1,'non_operating_expense'),
+])
+def test_source_chart_is_classified_by_native_financial_reports(group,child,side,expected):
+    prefix=account_report_prefix([{'Code':'0','Type':0},{'Code':group,'Type':1},
+                                  {'Code':child,'Type':2,'BalanceType':side}])
+    code=f'{prefix}.SPD.0.{group}.{child}'
+    assert (balance_sheet_subsection(code) or pnl_account_section(code))==expected
 
 
 def test_live_update_changes_same_targets_without_duplicate_postings(native_db):

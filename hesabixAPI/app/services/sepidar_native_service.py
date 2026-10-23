@@ -71,6 +71,36 @@ def fingerprint(value: Any) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False, default=str, separators=(",", ":")).encode()).hexdigest()
 
 
+def account_report_prefix(path: list[dict]) -> str:
+    """Translate the standard Sepidar chart, retaining its original path after SPD.
+
+    Hesabix reports classify by code, not the source account's hierarchy Type.
+    Mixed income/expense groups use the source's declared normal balance (1/2),
+    never the current signed balance, so classification is stable across polls.
+    """
+    codes = [str(row['Code']) for row in path if row.get('Type') != 0]
+    if not codes:
+        return '9'
+    group = codes[0]
+    prefixes = {'11': '101', '12': '106', '21': '201', '22': '205',
+                '31': '301', '41': '5', '51': '4', '61': '701', '62': '9', '91': '9'}
+    if group not in prefixes:
+        raise NativeConversionError(f"Unmapped source account group: {group}")
+    if group == '12' and len(codes) > 1 and codes[1] == '11':
+        return '108'  # accumulated depreciation
+    if group == '31' and len(codes) > 1:
+        if codes[1] == '13':
+            return '30106'  # retained earnings
+        if codes[1] == '14':
+            return '30105'  # current-year profit
+    if len(codes) > 1 and (group == '62' or group == '41' and codes[1] == '12'):
+        normal_side = path[-1].get('BalanceType')
+        if normal_side not in (1, 2):
+            raise NativeConversionError("Mixed source income/expense account needs a declared normal balance")
+        return ('708' if normal_side == 1 else '602') if group == '62' else ('701' if normal_side == 1 else '601')
+    return prefixes[group]
+
+
 def assert_document_editable(document: Document) -> None:
     if (document.extra_info or {}).get("sepidar", {}).get("managed"):
         raise ApiError("SEPIDAR_SOURCE_MANAGED", "این سند با سپیدار همگام می‌شود؛ ویرایش و حذف مالی را در سپیدار انجام دهید.", http_status=409)
@@ -274,13 +304,20 @@ class Projector:
                 raise NativeConversionError("Invalid source account hierarchy")
             row = source[sid]
             parent = visit(row["ParentAccountRef"], path | {sid}) if row.get("ParentAccountRef") else None
-            code = f"{parent.code}.{row['Code']}" if parent else f"SPD.{row['Code']}"
+            ancestors = [row]
+            while ancestors[0].get('ParentAccountRef'):
+                ancestors.insert(0, source[ancestors[0]['ParentAccountRef']])
+            source_path = '.'.join(str(r['Code']) for r in ancestors)
+            code = f"{account_report_prefix(ancestors)}.SPD.{source_path}"
+            # The source's universal root is not a report section. Financial
+            # group roots must be discoverable by native balance-sheet reports.
+            native_parent = parent if parent and source[row['ParentAccountRef']].get('Type') != 0 else None
             if len(code) > 50:
                 raise NativeConversionError("Source account path exceeds native code length")
-            obj, _ = self.upsert("ACC.Account", sid, Account, {"row": row, "code": code}, {
+            obj, _ = self.upsert("ACC.Account", sid, Account, {"row": row, "code": code, "version": 2}, {
                 "business_id": self.bid, "name": row["Title"], "code": code,
-                "account_type": {0: "root", 1: "group", 2: "general", 3: "detail"}.get(row.get("Type"), "detail"),
-                "parent_id": parent.id if parent else None})
+                "account_type": "accounting_document",
+                "parent_id": native_parent.id if native_parent else None})
             resolved.add(sid)
             return obj
         for sid in source:
