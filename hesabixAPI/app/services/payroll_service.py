@@ -296,6 +296,24 @@ def update_settings(
 	_ensure_plugin(db, business_id)
 	row = _get_or_create_settings(db, business_id)
 	old = _settings_to_dict(row)
+	if isinstance(row.extra_settings,dict) and (row.extra_settings.get('sepidar') or {}).get('managed'):
+		for name in ('wages_payable_account_id','insurance_payable_account_id'):
+			if name in payload and payload[name]!=getattr(row,name):
+				raise ApiError('SEPIDAR_SOURCE_MANAGED','حساب مرجع همگام از سپیدار است؛ در مبدأ ویرایش کنید.',http_status=409)
+		if 'extra_settings' in payload:
+			from copy import deepcopy
+			payload=dict(payload)
+			extra=deepcopy(payload['extra_settings'] or {})
+			previous=(row.extra_settings.get('statutory_rules') or {}).get('insurance',{})
+			owned={key:previous[key] for key in ('employee_rate_percent','employer_rate_percent','unemployment_employer_rate_percent') if key in previous}
+			rules=extra.setdefault('statutory_rules',{})
+			incoming=rules.get('insurance',{})
+			for name,value in owned.items():
+				if name in incoming and Decimal(str(incoming[name]))!=Decimal(str(value)):
+					raise ApiError('SEPIDAR_SOURCE_MANAGED','نرخ بیمه همگام از سپیدار است؛ مالیات محلی مستقل است.',http_status=409)
+			rules['insurance']={**previous,**incoming,**owned}
+			extra['sepidar']=deepcopy(row.extra_settings['sepidar'])
+			payload['extra_settings']=extra
 
 	for field in (
 		"enabled",

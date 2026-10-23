@@ -4,6 +4,7 @@ from typing import Optional, Tuple, Union
 from app.core.settings import get_settings
 from app.services.providers.behin_sms_provider import BehinSmsProvider
 from app.services.providers.sunway_sms_provider import SunwaySmsProvider
+from app.services.providers.payamresan_sms_provider import PayamResanSmsProvider
 from app.utils.phone_utils import normalize_phone_number
 
 _SMS_PANEL_PROVIDERS = frozenset({"behinsms", "behin_sms", "sunwaysms", "sunway_sms"})
@@ -29,7 +30,9 @@ class SmsProvider:
 		self.is_flash = is_flash
 		
 		# مقداردهی Provider واقعی
-		self._provider: Optional[Union[BehinSmsProvider, SunwaySmsProvider]] = None
+		self._provider: Optional[Union[BehinSmsProvider, SunwaySmsProvider, PayamResanSmsProvider]] = None
+		if self.provider_name in ("payamresan", "payam_resan") and self.api_key and self.sender:
+			self._provider = PayamResanSmsProvider(self.api_key, self.sender)
 		if self.provider_name in ("behinsms", "behin_sms"):
 			if self.username and self.password and self.sender:
 				try:

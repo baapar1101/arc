@@ -9,6 +9,7 @@ from adapters.db.repositories.price_list_repository import PriceListRepository, 
 from adapters.db.models.price_list import PriceList, PriceItem
 from adapters.api.v1.schema_models.price_list import PriceListCreateRequest, PriceListUpdateRequest, PriceItemUpsertRequest
 from adapters.db.models.product import Product
+from app.services.sepidar_plugin_service import assert_plugin_entity_editable
 
 
 def create_price_list(db: Session, business_id: int, payload: PriceListCreateRequest) -> Dict[str, Any]:
@@ -52,6 +53,7 @@ def get_price_list(db: Session, business_id: int, id: int) -> Optional[Dict[str,
 
 
 def update_price_list(db: Session, business_id: int, id: int, payload: PriceListUpdateRequest) -> Optional[Dict[str, Any]]:
+    assert_plugin_entity_editable(db,business_id,'price_lists',id)
     repo = PriceListRepository(db)
     obj = db.get(PriceList, id)
     if not obj or obj.business_id != business_id:
@@ -67,6 +69,7 @@ def update_price_list(db: Session, business_id: int, id: int, payload: PriceList
 
 
 def delete_price_list(db: Session, business_id: int, id: int) -> bool:
+    assert_plugin_entity_editable(db,business_id,'price_lists',id)
     repo = PriceListRepository(db)
     obj = db.get(PriceList, id)
     if not obj or obj.business_id != business_id:
@@ -84,6 +87,7 @@ def list_price_items(db: Session, business_id: int, price_list_id: int, take: in
 
 
 def upsert_price_item(db: Session, business_id: int, price_list_id: int, payload: PriceItemUpsertRequest) -> Dict[str, Any]:
+    assert_plugin_entity_editable(db,business_id,'price_lists',price_list_id)
     pl = db.get(PriceList, price_list_id)
     if not pl or pl.business_id != business_id:
         raise ApiError("NOT_FOUND", "لیست قیمت یافت نشد", http_status=404)
@@ -109,6 +113,7 @@ def upsert_price_item(db: Session, business_id: int, price_list_id: int, payload
 
 
 def delete_price_item(db: Session, business_id: int, id: int) -> bool:
+    assert_plugin_entity_editable(db,business_id,'price_items',id)
     repo = PriceItemRepository(db)
     pi = db.get(PriceItem, id)
     if not pi:

@@ -49,6 +49,7 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/admin/system-settings", tags=["مدیریت سیستم"])
 
 _NOTIFICATION_SECRET_KEYS = (
+	"sms_payamresan_api_key",
 	"telegram_bot_token",
 	"telegram_webhook_secret",
 	"telegram_secret_header",
@@ -135,6 +136,8 @@ def set_wallet_settings_endpoint(
 	return success_response(data, request, message="WALLET_BASE_CURRENCY_UPDATED")
 
 class NotificationsConfigPayload(BaseModel):
+	sms_payamresan_api_key: str | None = Field(default=None, max_length=2048)
+	sms_payamresan_sender: str | None = Field(default=None, max_length=20)
 	telegram_bot_token: str | None = None
 	telegram_bot_username: str | None = None
 	telegram_webhook_secret: str | None = None
@@ -277,6 +280,8 @@ def put_notifications_settings_endpoint(
 	fields = _unwrap_notifications_payload(payload)
 	data = set_notifications_settings(
 		db,
+		sms_payamresan_api_key=fields.get('sms_payamresan_api_key'),
+		sms_payamresan_sender=fields.get('sms_payamresan_sender'),
 		telegram_bot_token=fields.get("telegram_bot_token"),
 		telegram_bot_username=fields.get("telegram_bot_username"),
 		telegram_webhook_secret=fields.get("telegram_webhook_secret"),

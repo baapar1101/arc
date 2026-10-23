@@ -145,6 +145,9 @@ class Projector:
         required = set(SOURCE_IDS) | {"ACC.VoucherItem", "ACC.DL", "GNR.PartyAddress", "GNR.PartyPhone", "INV.Unit"} | {s[2] for s in INVOICES}
         if setting.operations_enabled:
             required |= OPERATION_TABLES
+        if setting.plugins_enabled:
+            from app.services.sepidar_plugin_service import PLUGIN_TABLES
+            required |= PLUGIN_TABLES
         for schema, table, payload in db.execute(select(SepidarImportRow.source_schema, SepidarImportRow.source_table, SepidarImportRow.payload).where(
             SepidarImportRow.business_id == self.bid, SepidarImportRow.is_deleted.is_(False),
             tuple_(SepidarImportRow.source_schema, SepidarImportRow.source_table).in_([tuple(t.split('.')) for t in required]))):
@@ -447,10 +450,16 @@ class Projector:
             operations = OperationsProjector(self)
             operations.run()
             operation_summary = {'priced_lines':operations.priced,'unpriced_lines':operations.unpriced}
+        plugin_summary = None
+        if self.setting.plugins_enabled:
+            self.db.flush()
+            from app.services.sepidar_plugin_service import PluginProjector
+            plugin_summary = PluginProjector(self).run()
         self.db.flush()
         return {"completed_at": datetime.now(timezone.utc).isoformat(), "database": self.setting.database_name,
                 "entities": dict(self.stats), "warnings": self.warnings,
                 "operations": operation_summary,
+                "plugins": plugin_summary,
                 "policy": "source_managed; original voucher lines posted once; source-only costing; explicit fiscal carry reset"}
 
 

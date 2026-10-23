@@ -84,6 +84,7 @@ def public_setting(row: SepidarImportSetting | None) -> dict[str, Any]:
         "configured": True, "host": row.host, "port": row.port, "database_name": row.database_name,
         "native_enabled": row.native_enabled, "native_summary": row.native_summary, "native_last_error": row.native_last_error,
         "operations_enabled": row.operations_enabled,
+        "plugins_enabled": row.plugins_enabled,
         "username": row.username, "password_configured": bool(row.password_encrypted), "enabled": row.enabled,
         "sync_interval_minutes": row.sync_interval_minutes, "batch_size": row.batch_size,
         "included_schemas": row.included_schemas or [], "included_tables": row.included_tables or [],
@@ -108,12 +109,18 @@ def save_setting(db: Session, business_id: int, payload: dict[str, Any]) -> Sepi
         row.operations_enabled = bool(payload['operations_enabled'])
     if row.operations_enabled and not row.native_enabled:
         raise ValueError('برای همگام‌سازی انبار و پرداخت‌ها، تبدیل بومی را هم فعال کنید.')
+    if 'plugins_enabled' in payload:
+        row.plugins_enabled = bool(payload['plugins_enabled'])
+    if row.plugins_enabled and not row.native_enabled:
+        raise ValueError('برای همگام‌سازی افزونه‌ها، تبدیل بومی را هم فعال کنید.')
     row.sync_interval_minutes = max(1, min(1440, int(payload.get("sync_interval_minutes", row.sync_interval_minutes or 15))))
     row.batch_size = max(50, min(5000, int(payload.get("batch_size", row.batch_size or 500))))
     if "included_schemas" in payload:
         row.included_schemas = [str(v) for v in payload["included_schemas"] if str(v).strip()]
     if "included_tables" in payload:
         row.included_tables = [str(v) for v in payload["included_tables"] if str(v).strip()]
+    if row.plugins_enabled and (row.included_schemas or row.included_tables):
+        raise ValueError('پل افزونه‌ها به Snapshot کامل نیاز دارد؛ فیلتر جدول/Schema را خالی بگذارید.')
     if payload.get("password"):
         row.password_encrypted = EncryptionService().encrypt(str(payload["password"]))
     if not all((row.host, row.database_name, row.username, row.password_encrypted)):

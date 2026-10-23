@@ -13,6 +13,20 @@ from adapters.db.models.currency import Currency
 from app.core.responses import ApiError
 from app.core.settings import get_settings
 from app.core.cache import get_cache
+from app.services.encryption_service import EncryptionService
+
+
+def _payamresan_key(db):
+	row = _get_setting(db, "sms_payamresan_api_key")
+	if not row:
+		return None
+	try:
+		ciphertext=json.loads(row.value_json)['ciphertext'] if row.value_json else row.value_string
+		if not ciphertext:return None
+		value=EncryptionService().decrypt(ciphertext)
+		return value if value!=ciphertext else None
+	except (ValueError,KeyError,TypeError):
+		return None
 
 
 WALLET_BASE_CURRENCY_KEY = "wallet_base_currency_code"
@@ -332,6 +346,8 @@ def get_notifications_settings(db: Session) -> Dict[str, Any]:
 		"telegram_webhook_secret": (tg_webhook.value_string if tg_webhook and tg_webhook.value_string else None),
 		"telegram_secret_header": (tg_header.value_string if tg_header and tg_header.value_string else None),
 		"sms_provider_name": (sms_provider.value_string if sms_provider and sms_provider.value_string else None),
+		"sms_payamresan_api_key": _payamresan_key(db),
+		"sms_payamresan_sender": ((_get_setting(db, "sms_payamresan_sender").value_string) if _get_setting(db, "sms_payamresan_sender") else None),
 		"sms_api_key": (sms_api_key.value_string if sms_api_key and sms_api_key.value_string else None),
 		"sms_sender": (sms_sender.value_string if sms_sender and sms_sender.value_string else None),
 		"sms_provider_username": (sms_username.value_string if sms_username and sms_username.value_string else None),
@@ -354,7 +370,7 @@ def get_effective_notifications_settings(db: Session) -> Dict[str, Any]:
 	"""
 	env = get_settings()
 	db_values = get_notifications_settings(db)
-	return {
+	config = {
 		"telegram_bot_token": db_values.get("telegram_bot_token") or env.telegram_bot_token,
 		"telegram_bot_username": db_values.get("telegram_bot_username") or env.telegram_bot_username,
 		"telegram_webhook_secret": db_values.get("telegram_webhook_secret") or env.telegram_webhook_secret,
@@ -378,6 +394,10 @@ def get_effective_notifications_settings(db: Session) -> Dict[str, Any]:
 		"bale_bot_username": db_values.get("bale_bot_username") or getattr(env, "bale_bot_username", None),
 		"bale_webhook_secret": db_values.get("bale_webhook_secret") or getattr(env, "bale_webhook_secret", None),
 	}
+	if config['sms_provider_name'] in {'payamresan', 'payam_resan'}:
+		config['sms_api_key'] = db_values.get('sms_payamresan_api_key') or config['sms_api_key']
+		config['sms_sender'] = db_values.get('sms_payamresan_sender') or config['sms_sender']
+	return config
 
 def set_notifications_settings(
 	db: Session,
@@ -394,12 +414,28 @@ def set_notifications_settings(
 	sms_provider_username: str | None = None,
 	sms_provider_password: str | None = None,
 	sms_is_flash: bool | None = None,
+	sms_payamresan_api_key: str | None = None,
+	sms_payamresan_sender: str | None = None,
 	telegram_proxy_enabled: bool | None = None,
 	telegram_proxy_base_url: str | None = None,
 	telegram_proxy_api_key: str | None = None,
 	inapp_read_retention_enabled: bool | None = None,
 	inapp_read_retention_days: int | None = None,
 ) -> Dict[str, Any]:
+	if sms_payamresan_api_key is not None:
+		value = sms_payamresan_api_key.strip()
+		if value:
+			secret=_get_setting(db,'sms_payamresan_api_key')
+			if secret is None:
+				secret=SystemSetting(key='sms_payamresan_api_key');db.add(secret)
+			secret.value_string=None
+			secret.value_json=json.dumps({'ciphertext':EncryptionService().encrypt(value)})
+			db.flush()
+	if sms_payamresan_sender is not None:
+		value = sms_payamresan_sender.strip()
+		if value and (not value.isascii() or not value.isdigit() or len(value) > 20):
+			raise ApiError('INVALID_SENDER', 'شماره فرستنده پیام‌رسان معتبر نیست.', http_status=400)
+		_upsert_setting_string(db, 'sms_payamresan_sender', value)
 	if telegram_bot_token is not None:
 		_upsert_setting_string(db, NOTIFY_TG_BOT_TOKEN, telegram_bot_token)
 	if telegram_bot_username is not None:

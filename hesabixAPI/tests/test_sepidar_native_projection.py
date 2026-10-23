@@ -23,6 +23,12 @@ from adapters.db.models.warehouse_document import WarehouseDocument
 from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
 from adapters.db.models.bank_account import BankAccount
 from adapters.db.models.cash_register import CashRegister
+from adapters.db.models.marketplace import MarketplacePlugin,MarketplacePluginPlan,BusinessPlugin
+from adapters.db.models.payroll import PayrollSettings
+from adapters.db.models.distribution import DistributionTerritory,DistributionRoute
+from adapters.db.models.price_list import PriceList,PriceItem
+from adapters.db.models.system_setting import SystemSetting
+from adapters.db.models.customer_club import CustomerClubSettings,CustomerClubBalance,CustomerClubLedger,CustomerClubInvoiceSnapshot,CustomerClubTier,CustomerClubRfmSnapshot
 from adapters.db.models.sepidar_live_import import SepidarImportSetting, SepidarImportRow, SepidarImportRun, SepidarNativeMap
 from app.services.sepidar_native_service import NativeConversionError, fingerprint, project_native, assert_document_editable, Projector
 from app.services.sepidar_native_service import account_report_prefix
@@ -41,7 +47,9 @@ def native_db():
     metadata = MetaData()
     models = (User, Currency, Business, BusinessCurrency, Person, Product, Account, Document, DocumentLine,
               FiscalYear, InvoiceItemLine, Warehouse, WarehouseDocument, WarehouseDocumentLine, BankAccount, CashRegister,
-              SepidarImportSetting, SepidarImportRow, SepidarImportRun, SepidarNativeMap)
+              SepidarImportSetting, SepidarImportRow, SepidarImportRun, SepidarNativeMap,
+              MarketplacePlugin,MarketplacePluginPlan,BusinessPlugin,PayrollSettings,DistributionTerritory,DistributionRoute,PriceList,PriceItem,SystemSetting,
+              CustomerClubSettings,CustomerClubBalance,CustomerClubLedger,CustomerClubInvoiceSnapshot,CustomerClubTier,CustomerClubRfmSnapshot)
     for model in models:
         model.__table__.to_metadata(metadata)
     # Unrelated optional FKs (CRM, tax, banking, attachments) are not part of this fixture.

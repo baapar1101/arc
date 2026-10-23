@@ -407,6 +407,8 @@ def create_territory(db: Session, business_id: int, payload: Dict[str, Any]) -> 
 
 
 def update_territory(db: Session, business_id: int, territory_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+	from app.services.sepidar_plugin_service import assert_plugin_entity_editable
+	assert_plugin_entity_editable(db,business_id,'distribution_territories',territory_id)
 	_ensure_plugin(db, business_id)
 	row = (
 		db.query(DistributionTerritory)
@@ -428,6 +430,8 @@ def update_territory(db: Session, business_id: int, territory_id: int, payload: 
 
 
 def delete_territory(db: Session, business_id: int, territory_id: int) -> None:
+	from app.services.sepidar_plugin_service import assert_plugin_entity_editable
+	assert_plugin_entity_editable(db,business_id,'distribution_territories',territory_id)
 	_ensure_plugin(db, business_id)
 	row = (
 		db.query(DistributionTerritory)
@@ -501,6 +505,8 @@ def create_route(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict
 
 
 def delete_route(db: Session, business_id: int, route_id: int) -> None:
+	from app.services.sepidar_plugin_service import assert_plugin_entity_editable
+	assert_plugin_entity_editable(db,business_id,'distribution_routes',route_id)
 	_ensure_plugin(db, business_id)
 	row = db.query(DistributionRoute).filter(DistributionRoute.id == route_id, DistributionRoute.business_id == business_id).first()
 	if not row:
@@ -521,6 +527,8 @@ def delete_route(db: Session, business_id: int, route_id: int) -> None:
 
 
 def update_route(db: Session, business_id: int, route_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+	from app.services.sepidar_plugin_service import assert_plugin_entity_editable
+	assert_plugin_entity_editable(db,business_id,'distribution_routes',route_id)
 	_ensure_plugin(db, business_id)
 	row = db.query(DistributionRoute).filter(DistributionRoute.id == route_id, DistributionRoute.business_id == business_id).first()
 	if not row:

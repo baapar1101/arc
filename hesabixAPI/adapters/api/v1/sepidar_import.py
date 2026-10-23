@@ -23,6 +23,7 @@ class SettingsPayload(BaseModel):
     enabled: bool = False
     native_enabled: bool = False
     operations_enabled: bool = False
+    plugins_enabled: bool = False
     sync_interval_minutes: int = Field(default=15, ge=1, le=1440)
     batch_size: int = Field(default=500, ge=50, le=5000)
     included_schemas: list[str] = Field(default_factory=list, max_length=1000)
@@ -32,6 +33,14 @@ class SettingsPayload(BaseModel):
 def _ensure_plugin(db: Session, business_id: int) -> None:
     if not service.plugin_active(db, business_id):
         raise ApiError("SEPIDAR_PLUGIN_NOT_ACTIVE", "افزونه ورود لایو سپیدار فعال نیست.", http_status=403)
+
+
+@router.get('/business/{business_id}/plugin-coverage')
+def plugin_coverage(request: Request, business_id: int = Path(..., gt=0), db: Session = Depends(get_db),
+                    _: AuthContext = Depends(get_current_user), __: None = Depends(require_business_access_dep)):
+    _ensure_plugin(db,business_id)
+    from app.services.sepidar_plugin_service import coverage
+    return success_response(coverage(db,business_id),request)
 
 
 @router.get("/business/{business_id}/settings")
