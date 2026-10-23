@@ -457,6 +457,7 @@ class _BomExplosionWidgetState extends State<BomExplosionWidget> {
     final productCosts = <int, double>{};
     final consumedOrderMaterialIds = <int>{};
     final orderMaterialIds = <int?>[];
+    final linkedMaterials = <dynamic>[];
 
     for (final item in result.items) {
       final linkedCandidates =
@@ -493,10 +494,12 @@ class _BomExplosionWidgetState extends State<BomExplosionWidget> {
           consumedOrderMaterialIds.add(linkedMaterial!.id!);
         }
         orderMaterialIds.add(linkedMaterial?.id);
+        linkedMaterials.add(linkedMaterial);
       } catch (e) {
         // در صورت خطا، از 0 استفاده می‌کنیم
         productCosts[item.componentProductId] = 0.0;
         orderMaterialIds.add(linkedMaterial?.id);
+        linkedMaterials.add(linkedMaterial);
       }
     }
 
@@ -510,6 +513,9 @@ class _BomExplosionWidgetState extends State<BomExplosionWidget> {
     for (var itemIndex = 0; itemIndex < result.items.length; itemIndex++) {
       final item = result.items[itemIndex];
       final costPrice = productCosts[item.componentProductId] ?? 0.0;
+      final linkedMaterial = itemIndex < linkedMaterials.length
+          ? linkedMaterials[itemIndex]
+          : null;
 
       lineItems.add(
         InvoiceLineItem(
@@ -522,8 +528,7 @@ class _BomExplosionWidgetState extends State<BomExplosionWidget> {
           mainUnit: item.mainUnit ?? item.componentProductMainUnit,
           selectedUnit:
               item.mainUnit ?? item.componentProductMainUnit ?? item.uom,
-          warehouseId:
-              linkedMaterial?.warehouseId ?? item.suggestedWarehouseId,
+          warehouseId: linkedMaterial?.warehouseId ?? item.suggestedWarehouseId,
           trackInventory: true,
           extraInfo: {
             'movement': 'out',
