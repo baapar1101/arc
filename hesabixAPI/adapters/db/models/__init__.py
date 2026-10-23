@@ -276,3 +276,8 @@ from .telephony import (  # noqa: F401
 	TelephonyEventDeadLetter,
 	TelephonyMetricCounter,
 )
+from .advanced_plugins import (  # noqa: F401
+	AdvancedPluginSetting,
+	AdvancedPluginRecord,
+	AdvancedPluginAudit,
+)

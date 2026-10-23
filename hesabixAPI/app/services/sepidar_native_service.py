@@ -455,6 +455,8 @@ class Projector:
             self.db.flush()
             from app.services.sepidar_plugin_service import PluginProjector
             plugin_summary = PluginProjector(self).run()
+            from app.services.sepidar_advanced_service import AdvancedProjector
+            plugin_summary['specialist_addons'] = AdvancedProjector(self).run()
         self.db.flush()
         return {"completed_at": datetime.now(timezone.utc).isoformat(), "database": self.setting.database_name,
                 "entities": dict(self.stats), "warnings": self.warnings,

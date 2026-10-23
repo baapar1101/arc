@@ -131,7 +131,7 @@ def test_source_managed_price_cannot_be_locally_edited(native_db):
     with pytest.raises(ApiError):assert_plugin_entity_editable(db,1,'price_lists',price_list.id)
     assert_plugin_entity_editable(db,2,'price_lists',price_list.id)
     report=coverage(db,1)
-    assert len(report['plugins'])==3 and len(report['missing_features'])>=4
+    assert len(report['plugins'])==3 and len(report['specialist_features'])==5
 
 
 def test_cancelled_source_invoice_reverses_loyalty_only_once(native_db):

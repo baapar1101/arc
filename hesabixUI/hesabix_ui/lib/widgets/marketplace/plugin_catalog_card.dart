@@ -13,6 +13,7 @@ class PluginCatalogCard extends StatelessWidget {
   final int? trialDays;
   final bool trialAllowed;
   final VoidCallback onOpen;
+  final String? openLabel;
 
   const PluginCatalogCard({
     super.key,
@@ -22,6 +23,7 @@ class PluginCatalogCard extends StatelessWidget {
     required this.trialAllowed,
     this.trialDays,
     required this.onOpen,
+    this.openLabel,
   });
 
   @override
@@ -153,7 +155,7 @@ class PluginCatalogCard extends StatelessWidget {
                           ),
                         FilledButton.tonal(
                           onPressed: onOpen,
-                          child: Text(t.pluginMarketplaceViewAndBuy),
+                          child: Text(openLabel ?? t.pluginMarketplaceViewAndBuy),
                         ),
                       ],
                     ),

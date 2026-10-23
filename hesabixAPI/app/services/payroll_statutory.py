@@ -154,6 +154,9 @@ def apply_statutory_rules(
 
 	out: List[Tuple[PayrollItemDefinition, Decimal, bool]] = []
 	for item_def, amount, computed in pending:
+		if rules.get('_advanced_tax_only') and item_def.code!='tax':
+			out.append((item_def, amount, computed))
+			continue
 		if item_def.id in explicit_by_id and explicit_by_id[item_def.id] not in (None, ""):
 			out.append((item_def, amount, computed))
 			continue

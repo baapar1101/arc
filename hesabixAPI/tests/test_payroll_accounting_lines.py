@@ -17,5 +17,7 @@ def test_accrual_balance_equation():
 	net = gross - deductions
 
 	debits = gross + employer
-	credits = deductions + net
+	# Employer expense has its own matching liability credit (production
+	# _build_accrual_lines emits both sides); it is not employee deduction.
+	credits = deductions + net + employer
 	assert debits == credits

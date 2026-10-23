@@ -174,6 +174,7 @@ import 'pages/business/barcode_labels/label_printers_page.dart';
 import 'pages/business/basalam/basalam_integration_page.dart';
 import 'pages/business/basalam/basalam_settings_page.dart';
 import 'pages/business/sepidar_import_settings_page.dart';
+import 'pages/business/advanced_plugins_page.dart';
 import 'pages/business/woocommerce/woocommerce_integration_page.dart';
 import 'pages/business/woocommerce/woocommerce_opening_inventory_bridge_page.dart';
 import 'pages/business/woocommerce/woocommerce_settings_page.dart';
@@ -4805,6 +4806,36 @@ class _MyAppState extends State<MyApp> {
                                 SepidarImportSettingsPage(businessId: businessId),
                               );
                             },
+                          ),
+                          GoRoute(
+                            path: 'advanced-plugins',
+                            name: 'business_advanced_plugins',
+                            pageBuilder: (context, state) => hesabixNoTransitionPage(state, AdvancedPluginsPage(businessId: int.parse(state.pathParameters['business_id']!))),
+                          ),
+                          GoRoute(
+                            path: 'fixed-assets',
+                            name: 'business_fixed_assets',
+                            pageBuilder: (context, state) => hesabixNoTransitionPage(state, AdvancedPluginsPage(businessId: int.parse(state.pathParameters['business_id']!), initialCode: 'fixed_assets')),
+                          ),
+                          GoRoute(
+                            path: 'contracting',
+                            name: 'business_contracting',
+                            pageBuilder: (context, state) => hesabixNoTransitionPage(state, AdvancedPluginsPage(businessId: int.parse(state.pathParameters['business_id']!), initialCode: 'contracting')),
+                          ),
+                          GoRoute(
+                            path: 'payroll-calendar-tax',
+                            name: 'business_payroll_calendar_tax',
+                            pageBuilder: (context, state) => hesabixNoTransitionPage(state, AdvancedPluginsPage(businessId: int.parse(state.pathParameters['business_id']!), initialCode: 'payroll_calendar_tax')),
+                          ),
+                          GoRoute(
+                            path: 'conditional-pricing',
+                            name: 'business_conditional_pricing',
+                            pageBuilder: (context, state) => hesabixNoTransitionPage(state, AdvancedPluginsPage(businessId: int.parse(state.pathParameters['business_id']!), initialCode: 'conditional_pricing')),
+                          ),
+                          GoRoute(
+                            path: 'inventory-trace-cost',
+                            name: 'business_inventory_trace_cost',
+                            pageBuilder: (context, state) => hesabixNoTransitionPage(state, AdvancedPluginsPage(businessId: int.parse(state.pathParameters['business_id']!), initialCode: 'inventory_trace_cost')),
                           ),
                           GoRoute(
                             path: 'settings/woocommerce',

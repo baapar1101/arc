@@ -44,6 +44,10 @@ SPECS={
  'barcode_label_studio':(['INV.Item'],'shared_native','کد و بارکد کالا بومی است؛ قالب چاپ سپیدار همان قالب استودیوی حسابیکس نیست.'),
  'sepidar_live_import':(['ACC.Voucher','INV.Item','GNR.Party'],'native_bridge','Snapshot فقط‌خواندنی، تبدیل بومی و پل افزونه‌ها با هویت پایدار.'),
 }
+from app.services.advanced_plugin_catalog import MODULES as SPECIALISTS,SOURCE as SPECIALIST_SOURCE
+SPECS.update({code:(list(SPECIALIST_SOURCE[code]),'specialist_native',
+    spec['description']+' تنظیمات همگام‌سازی هر افزونه مستقل است؛ بدون ثبت مالی مجدد.')
+    for code,spec in SPECIALISTS.items()})
 
 def coverage(db,bid):
     counts={f'{s}.{t}':n for s,t,n in db.execute(select(SepidarImportRow.source_schema,SepidarImportRow.source_table,func.count()).where(
@@ -57,13 +61,8 @@ def coverage(db,bid):
             'source_rows':{table:counts.get(table,0) for table in tables},'note':note})
     return {'database':setting.database_name if setting else None,'enabled':bool(setting and setting.plugins_enabled),
         'plugins':rows,'latest':(setting.native_summary or {}).get('plugins') if setting else None,
-        'missing_features':[
-            {'feature':'دارایی ثابت و استهلاک تخصصی','source':'AST.*','note':'قواعد استهلاک موجود است، اما دارایی عملیاتی در snapshot فعلی نیست؛ دفتر معادل زیرسیستم دارایی نیست.'},
-            {'feature':'پیمانکاری، صورت‌وضعیت و ضمانت‌نامه قرارداد','source':'CNT.*','note':'ضرایب/هزینه/نوع ضمانت‌نامه موجودند؛ گارانتی کالا جایگزین این زیرسیستم نیست.'},
-            {'feature':'تقویم حقوق، مرخصی و جداول مالیات تاریخ‌دار/چندگروهی','source':'PAY.PayrollCalendar / PAY.TaxTable','note':'حسابیکس قواعد عمومی حقوق دارد؛ معادل کامل آرشیو گروهی/تاریخی و مرخصی سپیدار ندارد.'},
-            {'feature':'شرایط چندبعدی اعلامیه قیمت','source':'SLS.PriceNoteItem','note':'قیمت پایه قابل انتقال است؛ شرط ردیابی/گروه مشتری/افزوده غیرصفر بدون معادل روشن اعمال نمی‌شود.'},
-            {'feature':'ردیابی و قیمت‌گذاری بچ/محموله','source':'INV.Tracing / INV.InventoryPricing','note':'سریال/بارکد حسابیکس معادل کامل ردیابی و لایه‌های قیمت‌گذاری سپیدار نیست.'},
-        ]}
+        'specialist_features':[{'plugin_code':code,'feature':spec['name'],'source':', '.join(SPECIALIST_SOURCE[code]),
+            'note':spec['description'],'licensed':code in licensed} for code,spec in SPECIALISTS.items()]}
 
 
 class PluginProjector:

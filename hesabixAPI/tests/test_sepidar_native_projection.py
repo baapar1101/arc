@@ -25,6 +25,7 @@ from adapters.db.models.bank_account import BankAccount
 from adapters.db.models.cash_register import CashRegister
 from adapters.db.models.marketplace import MarketplacePlugin,MarketplacePluginPlan,BusinessPlugin
 from adapters.db.models.payroll import PayrollSettings
+from adapters.db.models.advanced_plugins import AdvancedPluginSetting,AdvancedPluginRecord,AdvancedPluginAudit
 from adapters.db.models.distribution import DistributionTerritory,DistributionRoute
 from adapters.db.models.price_list import PriceList,PriceItem
 from adapters.db.models.system_setting import SystemSetting
@@ -49,7 +50,8 @@ def native_db():
               FiscalYear, InvoiceItemLine, Warehouse, WarehouseDocument, WarehouseDocumentLine, BankAccount, CashRegister,
               SepidarImportSetting, SepidarImportRow, SepidarImportRun, SepidarNativeMap,
               MarketplacePlugin,MarketplacePluginPlan,BusinessPlugin,PayrollSettings,DistributionTerritory,DistributionRoute,PriceList,PriceItem,SystemSetting,
-              CustomerClubSettings,CustomerClubBalance,CustomerClubLedger,CustomerClubInvoiceSnapshot,CustomerClubTier,CustomerClubRfmSnapshot)
+              CustomerClubSettings,CustomerClubBalance,CustomerClubLedger,CustomerClubInvoiceSnapshot,CustomerClubTier,CustomerClubRfmSnapshot,
+              AdvancedPluginSetting,AdvancedPluginRecord,AdvancedPluginAudit)
     for model in models:
         model.__table__.to_metadata(metadata)
     # Unrelated optional FKs (CRM, tax, banking, attachments) are not part of this fixture.

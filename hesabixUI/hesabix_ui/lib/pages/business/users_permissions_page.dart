@@ -1336,6 +1336,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'post': t.payrollPermissionPost,
         'approve': t.payrollPermissionApprove,
       },
+      for (final specialist in ['fixed_assets','contracting','payroll_calendar_tax','conditional_pricing','inventory_trace_cost'])
+        specialist: {'view':'مشاهده','write':'ثبت و ویرایش و عملیات','settings':'تنظیمات و ردپای تغییرات'},
       'telephony': {
         'view': t.localeName.startsWith('fa') ? 'مشاهده مرکز تماس' : 'View telephony center',
         'manage': t.localeName.startsWith('fa') ? 'مدیریت اتصال و داخلی‌ها' : 'Manage PBX & extensions',
@@ -1941,6 +1943,11 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'sections': ['payroll'],
       },
       {
+        'title': 'افزونه‌های تخصصی',
+        'icon': Icons.extension_outlined,
+        'sections': ['fixed_assets','contracting','payroll_calendar_tax','conditional_pricing','inventory_trace_cost'],
+      },
+      {
         'title': t.localeName.startsWith('fa') ? 'مرکز تماس' : 'Telephony',
         'icon': Icons.phone_in_talk_outlined,
         'sections': ['telephony'],
@@ -2111,6 +2118,11 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.distributionMenu;
       case 'payroll':
         return t.payrollMenu;
+      case 'fixed_assets': return 'دارایی ثابت و استهلاک';
+      case 'contracting': return 'پیمانکاری و صورت‌وضعیت';
+      case 'payroll_calendar_tax': return 'تقویم حقوق و مالیات تاریخ‌دار';
+      case 'conditional_pricing': return 'قیمت‌گذاری شرطی';
+      case 'inventory_trace_cost': return 'ردیابی بچ و بهای لایه‌ای';
       case 'telephony':
         return t.localeName.startsWith('fa') ? 'مرکز تماس' : 'Telephony';
       case 'basalam':

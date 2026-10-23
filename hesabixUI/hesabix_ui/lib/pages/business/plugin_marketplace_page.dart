@@ -608,13 +608,18 @@ class _PluginMarketplacePageState extends State<PluginMarketplacePage> with Sing
   Widget _cardFor(Map<String, dynamic> plugin) {
     final pluginId = (plugin['id'] as num?)?.toInt() ?? 0;
     final status = businessPluginForId(_businessPlugins, pluginId);
+    const specialistPaths = {'fixed_assets':'fixed-assets','contracting':'contracting',
+      'payroll_calendar_tax':'payroll-calendar-tax','conditional_pricing':'conditional-pricing','inventory_trace_cost':'inventory-trace-cost'};
+    final specialistPath=specialistPaths[plugin['code']];
+    final openSpecialist=specialistPath!=null&&status?['status']=='active';
     return PluginCatalogCard(
       plugin: plugin,
       pluginStatus: status,
       walletCurrency: _walletCurrency,
       trialAllowed: plugin['trial_allowed'] == true,
       trialDays: plugin['trial_days'] as int?,
-      onOpen: () => _openPluginDetail(plugin),
+      openLabel: openSpecialist?'مدیریت افزونه':null,
+      onOpen: () => openSpecialist?context.go(context.businessPanelUrl(widget.businessId,specialistPath)):_openPluginDetail(plugin),
     );
   }
 }

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../core/business_nav.dart';
 
 import '../../services/sepidar_import_service.dart';
 
@@ -257,13 +259,15 @@ class _State extends State<SepidarImportSettingsPage> {
           ],
         ),
         ExpansionTile(
-          title: const Text('قابلیت‌های مهم فاقد معادل کامل در پلتفرم'),
+          title: const Text('پنج افزونهٔ تخصصی متصل به سپیدار'),
           children: [
-            for (final item in (_coverage['missing_features'] as List? ?? []))
+            for (final item in (_coverage['specialist_features'] as List? ?? []))
               ListTile(
                 title: Text('${item['feature']}'),
                 subtitle: Text('${item['source']}\n${item['note']}'),
               ),
+            TextButton.icon(onPressed:()=>context.go(context.businessPanelUrl(widget.businessId,'advanced-plugins')),
+              icon:const Icon(Icons.extension_outlined),label:const Text('ورود به فضای کاری افزونه‌های تخصصی')),
           ],
         ),
         const Padding(

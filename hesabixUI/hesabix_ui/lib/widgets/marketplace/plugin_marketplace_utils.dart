@@ -14,6 +14,11 @@ const Map<String, String> pluginSetupRouteByCode = {
   'woocommerce_hesabix': 'business_woocommerce',
   'customer_club': 'business_customer_club',
   'payroll': 'business_payroll',
+  'fixed_assets': 'business_fixed_assets',
+  'contracting': 'business_contracting',
+  'payroll_calendar_tax': 'business_payroll_calendar_tax',
+  'conditional_pricing': 'business_conditional_pricing',
+  'inventory_trace_cost': 'business_inventory_trace_cost',
   'hscript_custom_reports': 'business_hscript_reports',
 };
 

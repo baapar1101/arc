@@ -1315,6 +1315,15 @@ def _persist_run_lines(
 	items_map = _get_active_items_map(db, business_id)
 	if not items_map:
 		raise ApiError("NO_PAYROLL_ITEMS", "هیچ آیتم حقوق فعالی تعریف نشده است.", http_status=400)
+	from app.services.advanced_plugin_operations import effective_payroll_settings
+	settings = effective_payroll_settings(db,business_id,run.run_date,settings)
+	if (settings.extra_settings or {}).get('advanced_tax_applied'):
+		from copy import deepcopy
+		run.extra_info={**(run.extra_info or {}),'advanced_tax_applied':{
+			**settings.extra_settings['advanced_tax_applied'],
+			'rules':deepcopy(settings.extra_settings['statutory_rules']['tax'])}}
+	elif (run.extra_info or {}).get('advanced_tax_applied'):
+		run.extra_info={k:v for k,v in run.extra_info.items() if k!='advanced_tax_applied'}
 
 	# حذف ردیف‌های قبلی
 	db.query(PayrollRunLine).filter(PayrollRunLine.run_id == run.id).delete(synchronize_session=False)
@@ -1523,6 +1532,12 @@ def update_run(
 	run = _get_run_row(db, business_id, run_id)
 	_ensure_run_editable(run)
 	old = _run_to_dict(run)
+
+	if payload.get('run_date') and date.fromisoformat(payload['run_date'])!=run.run_date and 'lines' not in payload:
+		from app.services.advanced_plugin_service import settings_row
+		advanced=settings_row(db,business_id,'payroll_calendar_tax')
+		if (run.extra_info or {}).get('advanced_tax_applied') or (advanced and advanced.enabled and (advanced.options or {}).get('auto_apply_tax')):
+			raise ApiError('PAYROLL_RECALCULATION_REQUIRED','با تغییر تاریخ، ردیف‌های حقوق را برای محاسبه مجدد مالیات تاریخ‌دار ارسال کنید.',http_status=400)
 
 	for field in ("title", "description"):
 		if field in payload:

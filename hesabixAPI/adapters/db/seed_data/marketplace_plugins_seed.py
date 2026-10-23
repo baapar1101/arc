@@ -210,6 +210,14 @@ _DEFAULT_PLUGINS: Tuple[_PluginSeed, ...] = (
 )
 
 
+# No public tariff is invented for newly introduced specialist add-ons.
+# Administrators configure plans explicitly; existing prices remain untouched.
+from app.services.advanced_plugin_catalog import MODULES as _SPECIALIST_MODULES
+_DEFAULT_PLUGINS += tuple(_PluginSeed(code=code,name=spec['name'],description=spec['description'],
+    category=spec['category'],icon_url=None,trial_days=None,trial_allowed=False,plans=())
+    for code,spec in _SPECIALIST_MODULES.items())
+
+
 def _resolve_currency_id(db: Session) -> Optional[int]:
 	cur = db.query(Currency).filter(Currency.code == "IRR").first()
 	if cur:
