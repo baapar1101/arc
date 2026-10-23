@@ -5,3 +5,5 @@ backup/
 .eyeban/debug/
 .eyeban/tool-output/
 .eyeban/generated/
+.vscode
+.eyeban
