@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
@@ -99,7 +98,7 @@ class _InventoryValuationReportPageState
       if (_asOfDate != null)
         'as_of_date': _asOfDate!.toIso8601String().split('T').first,
       if (_selectedWarehouseId != null) 'warehouse_ids': [_selectedWarehouseId],
-      if (categoryIds != null) 'category_ids': categoryIds,
+      'category_ids': ?categoryIds,
     };
   }
 
@@ -208,7 +207,7 @@ class _InventoryValuationReportPageState
                 color: theme.colorScheme.surface,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
