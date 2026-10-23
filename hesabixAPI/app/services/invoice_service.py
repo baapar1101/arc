@@ -8044,6 +8044,11 @@ def update_invoice(
                 document.extra_info = _normalize_document_extra_info_for_storage(extra)
                 flag_modified(document, "extra_info")
 
+    # SessionLocal uses autoflush=False. Persist the replacement invoice lines before
+    # _remove_old_invoice_warehouse_documents queries them to distinguish unchanged
+    # receipts from actual quantity reductions.
+    db.flush()
+
     try:
         _old_posted_warehouse_types = _remove_old_invoice_warehouse_documents(
             db,
