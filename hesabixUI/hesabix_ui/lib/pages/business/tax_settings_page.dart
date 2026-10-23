@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -622,7 +623,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
           children: [
             Text(t.motamedAsaLinkCopyHint),
             const SizedBox(height: 8),
-            SelectableText(url, textDirection: TextDirection.LTR),
+            SelectableText(url, textDirection: ui.TextDirection.ltr),
           ],
         ),
         actions: [
@@ -726,7 +727,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: clientId,
-                        textDirection: TextDirection.LTR,
+                        textDirection: ui.TextDirection.ltr,
                         decoration: InputDecoration(
                           labelText: t.motamedAsaClientId,
                           hintText: 'v2-customer-12345',
@@ -743,7 +744,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
                       TextFormField(
                         controller: clientSecret,
                         obscureText: true,
-                        textDirection: TextDirection.LTR,
+                        textDirection: ui.TextDirection.ltr,
                         decoration: InputDecoration(
                           labelText: t.motamedAsaClientSecret,
                           border: const OutlineInputBorder(),
