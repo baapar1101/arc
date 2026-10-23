@@ -82,6 +82,8 @@ class LocalizationHelper {
         return t.settingsTaxProductCodes;
       case 'settingsTaxProviders':
         return t.settingsTaxProviders;
+      case 'settingsMotamedAsa':
+        return t.settingsMotamedAsa;
       case 'settingsSystemMonitoring':
         return t.settingsSystemMonitoring;
       case 'settingsServiceLogs':
@@ -172,6 +174,8 @@ class LocalizationHelper {
         return t.settingsTaxProductCodesDescription;
       case 'settingsTaxProvidersDescription':
         return t.settingsTaxProvidersDescription;
+      case 'settingsMotamedAsaDescription':
+        return t.settingsMotamedAsaDescription;
       case 'settingsSystemMonitoringDescription':
         return t.settingsSystemMonitoringDescription;
       case 'settingsServiceLogsDescription':

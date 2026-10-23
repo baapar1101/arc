@@ -28,6 +28,7 @@ from app.services.tax_reference_service import (
     get_document_extra,
 )
 from app.core.moadian_plugin_dependency import ensure_moadian_plugin_active
+from app.services.motamed_asa_provider_service import MOTAMED_ASA_PROVIDER
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +140,23 @@ def normalize_stored_tax_status(extra: dict | None) -> str:
     return status
 
 
+def _resolve_submission_provider(document: Document, tax_setting: TaxSetting) -> str:
+    # Keep each invoice bound to its original provider. Older direct invoices
+    # predate this field, so infer their provider from a prior send attempt.
+    extra = document.extra_info or {}
+    stored_provider = str(extra.get("tax_submission_provider") or "").strip().lower()
+    has_legacy_send = bool(
+        extra.get("tax_last_send_at")
+        or extra.get("tax_tracking_code")
+        or extra.get("tax_provider_last_response")
+    )
+    return stored_provider or (
+        "moadian_direct"
+        if has_legacy_send
+        else str(getattr(tax_setting, "submission_provider", "moadian_direct") or "moadian_direct").strip().lower()
+    )
+
+
 def _resolve_submission_mode(document: Document, submission_mode: str | None) -> str:
     mode = (submission_mode or "").strip().lower()
     doc_type = (document.document_type or "").lower()
@@ -185,7 +203,16 @@ def send_document_to_tax_system(
             http_status=400,
         )
 
-    if not (
+    provider_code = _resolve_submission_provider(document, tax_setting)
+    if provider_code == MOTAMED_ASA_PROVIDER:
+        # The trusted company signs with its own key and memory; only the seller's economic code is needed.
+        if not tax_setting.economic_code:
+            raise ApiError(
+                "TAX_SETTINGS_INCOMPLETE",
+                "کد اقتصادی کسب‌وکار در تنظیمات سامانه مودیان ثبت نشده است.",
+                http_status=400,
+            )
+    elif not (
         tax_setting.tax_memory_id
         and tax_setting.private_key
         and tax_setting.economic_code
@@ -228,7 +255,8 @@ def send_document_to_tax_system(
         irtaxid=irtaxid,
     )
 
-    if mode == "normal":
+    if mode == "normal" and provider_code != MOTAMED_ASA_PROVIDER:
+        # «معتمد آسا» issues the tax id itself; it is stored from its answer.
         taxid = compute_taxid_for_document(document, tax_setting)
         persist_taxid_on_document(document, taxid, db)
 
@@ -250,26 +278,19 @@ def send_document_to_tax_system(
             details=rate_info,
         )
 
-    # Keep each invoice bound to its original provider. Older direct invoices
-    # predate this field, so infer their provider from a prior send attempt.
     extra = dict(document.extra_info or {})
-    stored_provider = str(extra.get("tax_submission_provider") or "").strip().lower()
-    has_legacy_send = bool(
-        extra.get("tax_last_send_at")
-        or extra.get("tax_tracking_code")
-        or extra.get("tax_provider_last_response")
-    )
-    provider_code = stored_provider or (
-        "moadian_direct"
-        if has_legacy_send
-        else str(getattr(tax_setting, "submission_provider", "moadian_direct") or "moadian_direct").strip().lower()
-    )
-    if provider_code not in {"moadian_direct", "fanava"}:
+    if provider_code not in {"moadian_direct", "fanava", MOTAMED_ASA_PROVIDER}:
         raise ApiError("TAX_PROVIDER_UNSUPPORTED", "روش ارسال مالیاتی این کسب‌وکار پشتیبانی نمی‌شود.", http_status=400)
     if provider_code == "fanava" and bool(getattr(tax_setting, "sandbox_mode", False)):
         raise ApiError(
             "FANAVA_SANDBOX_UNAVAILABLE",
             "فن‌آوا محیط آزمایشی ندارد؛ حالت آزمایشی را خاموش کنید یا روش ارسال مستقیم را انتخاب کنید.",
+            http_status=400,
+        )
+    if provider_code == MOTAMED_ASA_PROVIDER and bool(getattr(tax_setting, "sandbox_mode", False)):
+        raise ApiError(
+            "MOTAMED_ASA_SANDBOX_UNAVAILABLE",
+            "ارسال از طریق معتمد آسا فقط در محیط اصلی سامانهٔ مؤدیان انجام می‌شود؛ حالت آزمایشی را خاموش کنید.",
             http_status=400,
         )
     extra["tax_submission_provider"] = provider_code
@@ -295,8 +316,8 @@ def send_document_to_tax_system(
     max_retries = settings.tax_system_retry_max_attempts
     initial_retry_delay = settings.tax_system_retry_initial_delay_seconds
     # Provider save/send operations can have committed remotely even when the response timed out.
-    # Fanava reconciles by taxId/status and must never be blindly retried here.
-    retry_count = 1 if provider_code == "fanava" else max_retries
+    # Fanava reconciles by taxId/status and «معتمد آسا» by internalId; neither is blindly retried here.
+    retry_count = 1 if provider_code in ("fanava", MOTAMED_ASA_PROVIDER) else max_retries
     
     try:
         if provider_code == "moadian_direct":
@@ -308,6 +329,11 @@ def send_document_to_tax_system(
                 if provider_code == "fanava":
                     from app.services.fanava_tax_submission_service import send_document_via_fanava
                     submission = send_document_via_fanava(
+                        db, document, tax_setting, invoice_dto, submission_mode=mode
+                    )
+                elif provider_code == MOTAMED_ASA_PROVIDER:
+                    from app.services.motamed_asa_tax_submission_service import send_document_via_motamed_asa
+                    submission = send_document_via_motamed_asa(
                         db, document, tax_setting, invoice_dto, submission_mode=mode
                     )
                 else:
@@ -377,6 +403,19 @@ def send_document_to_tax_system(
                         "tax_id": extra.get("tax_moadian_taxid"),
                         "error_message": e.message,
                         "raw_response": {"provider": "fanava", "state": "result_unknown"},
+                        "sent_at": datetime.datetime.utcnow().isoformat(),
+                    }
+                    _apply_submission_result(document, submission, db, submission_mode=mode)
+                    return submission
+                if provider_code == MOTAMED_ASA_PROVIDER and getattr(e, "code", None) == "MOTAMED_ASA_RESULT_UNKNOWN":
+                    extra = dict(document.extra_info or {})
+                    submission = {
+                        "mode": MOTAMED_ASA_PROVIDER,
+                        "provider": MOTAMED_ASA_PROVIDER,
+                        "status": "pending",
+                        "tracking_code": extra.get("tax_tracking_code"),
+                        "error_message": e.message,
+                        "raw_response": {"provider": MOTAMED_ASA_PROVIDER, "state": "result_unknown"},
                         "sent_at": datetime.datetime.utcnow().isoformat(),
                     }
                     _apply_submission_result(document, submission, db, submission_mode=mode)
@@ -536,7 +575,15 @@ def inquire_tax_status(
     if merged_codes:
         doc_by_tracking.update(_documents_by_tracking_codes(db, business_id, sorted(merged_codes)))
 
-    if not merged_codes:
+    # «معتمد آسا» is inquired by the document's internalId, so a send whose
+    # answer was lost (no tracking code yet) can still be inquired.
+    asa_documents: Dict[int, Document] = {
+        int(doc.id): doc
+        for doc in [*documents_by_id.values(), *doc_by_tracking.values()]
+        if (doc.extra_info or {}).get("tax_submission_provider") == MOTAMED_ASA_PROVIDER
+    }
+
+    if not merged_codes and not asa_documents:
         raise ApiError("TAX_TRACKING_CODE_MISSING", "هیچ کد رهگیری معتبری یافت نشد.", http_status=400)
 
     tax_setting = (
@@ -560,6 +607,10 @@ def inquire_tax_status(
         if extra.get("tax_submission_provider") == "fanava":
             direct_codes.discard(code)
             fanava_documents[int(doc.id)] = doc
+        elif extra.get("tax_submission_provider") == MOTAMED_ASA_PROVIDER:
+            direct_codes.discard(code)
+
+    asa_results = _inquire_motamed_asa_documents(db, business_id, list(asa_documents.values()), now=now)
 
     if fanava_documents:
         from app.services.fanava_tax_submission_service import fanava_status_for_document, map_fanava_inquiry
@@ -646,12 +697,68 @@ def inquire_tax_status(
     else:
         direct_results = []
 
-    results = direct_results + fanava_results
+    results = direct_results + fanava_results + asa_results
 
+    provider_modes = [code for code, found in (("fanava", fanava_results), (MOTAMED_ASA_PROVIDER, asa_results)) if found]
+    if (direct_codes and provider_modes) or len(provider_modes) > 1:
+        mode = "mixed"
+    elif not direct_codes and provider_modes:
+        mode = provider_modes[0]
+    else:
+        mode = direct_response.get("mode", "fanava")
     return {
-        "mode": "mixed" if direct_codes and fanava_results else direct_response.get("mode", "fanava"),
+        "mode": mode,
         "results": results,
     }
+
+
+def _inquire_motamed_asa_documents(
+    db: Session,
+    business_id: int,
+    documents: List[Document],
+    *,
+    now: str,
+) -> List[Dict[str, Any]]:
+    if not documents:
+        return []
+    from app.services.motamed_asa_tax_submission_service import motamed_asa_inquire_documents
+
+    try:
+        answers = motamed_asa_inquire_documents(db, business_id, documents)
+    except ApiError as exc:
+        return [
+            {
+                "reference_number": str((doc.extra_info or {}).get("tax_tracking_code") or ""),
+                "status": "unknown",
+                "error_message": exc.message,
+                "provider": MOTAMED_ASA_PROVIDER,
+            }
+            for doc in documents
+        ]
+
+    results: List[Dict[str, Any]] = []
+    for doc, answer in answers:
+        extra = doc.extra_info or {}
+        tracking = str(extra.get("tax_tracking_code") or "")
+        item = {
+            "reference_number": tracking,
+            "tracking_code": tracking,
+            "status": answer["status"],
+            "error_message": answer["error_message"],
+            "raw_data": answer["raw"],
+            "inquiry_at": now,
+            "provider": MOTAMED_ASA_PROVIDER,
+        }
+        _apply_inquiry_result_to_document(doc, item, now=now)
+        if answer["updates"]:
+            updated_extra = dict(doc.extra_info or {})
+            updated_extra.update(answer["updates"])
+            if updated_extra.get("tax_cancelled_in_modian") and not extra.get("tax_cancelled_at"):
+                updated_extra["tax_cancelled_at"] = now
+            doc.extra_info = updated_extra
+        db.add(doc)
+        results.append(item)
+    return results
 
 
 def enrich_tax_timeline_event(event: Dict[str, Any], extra: dict | None) -> Dict[str, Any]:
@@ -704,7 +811,7 @@ def _apply_submission_result(
     extra["tax_last_send_at"] = submission.get("sent_at") or datetime.datetime.utcnow().isoformat()
     extra["tax_last_submission_mode"] = submission_mode
     provider_code = submission.get("provider") or submission.get("mode")
-    if provider_code in ("moadian_direct", "fanava"):
+    if provider_code in ("moadian_direct", "fanava", MOTAMED_ASA_PROVIDER):
         extra["tax_submission_provider"] = provider_code
     if submission.get("fanava_invoice_id"):
         extra["fanava_latest_invoice_id"] = int(submission["fanava_invoice_id"])
@@ -712,7 +819,8 @@ def _apply_submission_result(
         extra["tax_moadian_taxid"] = submission["tax_id"]
     if submission.get("raw_response"):
         extra["tax_provider_last_response"] = submission["raw_response"]
-    if submission_mode == "cancel" and provider_code != "fanava":
+    # Brokers report a cancellation only once the tax system accepts it (see inquire_tax_status).
+    if submission_mode == "cancel" and provider_code not in ("fanava", MOTAMED_ASA_PROVIDER):
         extra["tax_cancelled_in_modian"] = True
         extra["tax_cancelled_at"] = extra["tax_last_send_at"]
     if submission_mode == "corrective":
@@ -792,6 +900,10 @@ def build_tax_status_fields_for_api(extra: dict | None) -> Dict[str, Any]:
         "tax_corrective_sent_at": extra.get("tax_corrective_sent_at"),
         "reference_invoice_id": extra.get("reference_invoice_id"),
         "reference_tax_id": extra.get("reference_tax_id"),
+        "tax_submission_provider": extra.get("tax_submission_provider"),
+        # کارپوشه status (buyer reaction) and Article 6 status, as last inquired through a provider.
+        "tax_workspace_status": extra.get("tax_provider_invoice_status"),
+        "tax_article6_status": extra.get("tax_article6_status"),
     }
     moadian_errors = extract_moadian_errors_from_extra(extra)
     if moadian_errors:

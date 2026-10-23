@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Request, Body
 from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
+from adapters.db.models.document import Document
 from adapters.api.v1.schema_models.tax_settings import (
     TaxSettingsSaveRequest,
     TaxSettingsTestConnectionRequest,
@@ -35,6 +36,16 @@ from app.services.tax_provider_service import (
     select_business_provider,
     fanava_business_call,
     sync_business_fanava_account,
+)
+from app.services.motamed_asa_provider_service import (
+    MOTAMED_ASA_PROVIDER,
+    renew_motamed_asa_link,
+    save_motamed_asa_business_credentials,
+    sync_motamed_asa_account,
+)
+from app.services.motamed_asa_tax_submission_service import (
+    motamed_asa_invoice_payments,
+    register_motamed_asa_payments,
 )
 
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -84,21 +95,123 @@ def select_tax_provider_endpoint(
     ensure_moadian_plugin_active(db, business_id)
     provider_code = str(payload.get("provider_code") or "").strip().lower()
     consented_by_user_id = ctx.get_user_id()
-    if provider_code == "fanava" and not consented_by_user_id:
+    if provider_code in ("fanava", MOTAMED_ASA_PROVIDER) and not consented_by_user_id:
         raise ApiError("UNAUTHORIZED", "برای ثبت رضایت باید کاربر وارد شده باشد.", http_status=401)
-    select_business_provider(
+    enrollment = payload.get("enrollment") if isinstance(payload.get("enrollment"), dict) else {}
+    if provider_code == MOTAMED_ASA_PROVIDER and payload.get("economic_code"):
+        enrollment = {**enrollment, "economic_code": str(payload.get("economic_code"))}
+    result = select_business_provider(
         db,
         business_id=business_id,
         provider_code=provider_code,
         consent=bool(payload.get("consent")),
         consented_by_user_id=consented_by_user_id,
-        enrollment=payload.get("enrollment") if isinstance(payload.get("enrollment"), dict) else {},
+        enrollment=enrollment,
     )
     # Keep the response shape identical to GET /tax-settings/business/{id};
     # the client model also owns the existing key material and memory settings.
     setting = get_tax_setting(db, business_id)
     data = serialize_tax_setting(setting, business_id=business_id, db=db)
+    if isinstance(result, dict) and result.get("motamed_asa_onboarding"):
+        # The sign-up link is returned once and never stored.
+        data["motamed_asa_onboarding"] = result["motamed_asa_onboarding"]
     return success_response(data, request, "TAX_PROVIDER_UPDATED")
+
+
+@router.post("/business/{business_id}/motamed-asa/sync")
+@require_business_access("business_id")
+def sync_motamed_asa_account_endpoint(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("moadian", "manage_settings")),
+):
+    ensure_moadian_plugin_active(db, business_id)
+    return success_response(sync_motamed_asa_account(db, business_id), request, "MOTAMED_ASA_ACCOUNT_SYNCED")
+
+
+@router.post("/business/{business_id}/motamed-asa/link")
+@require_business_access("business_id")
+def renew_motamed_asa_link_endpoint(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("moadian", "manage_settings")),
+):
+    ensure_moadian_plugin_active(db, business_id)
+    return success_response(renew_motamed_asa_link(db, business_id), request, "MOTAMED_ASA_LINK_ISSUED")
+
+
+@router.post("/business/{business_id}/motamed-asa/credentials")
+@require_business_access("business_id")
+def save_motamed_asa_credentials_endpoint(
+    request: Request,
+    business_id: int,
+    payload: Dict[str, Any] = Body(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("moadian", "manage_settings")),
+):
+    ensure_moadian_plugin_active(db, business_id)
+    consented_by_user_id = ctx.get_user_id()
+    if not consented_by_user_id:
+        raise ApiError("UNAUTHORIZED", "برای ثبت رضایت باید کاربر وارد شده باشد.", http_status=401)
+    state = save_motamed_asa_business_credentials(
+        db,
+        business_id=business_id,
+        client_id=str(payload.get("client_id") or ""),
+        client_secret=str(payload.get("client_secret") or ""),
+        consent=payload.get("consent") is True,
+        consented_by_user_id=consented_by_user_id,
+        economic_code=str(payload.get("economic_code") or "") or None,
+    )
+    return success_response(state, request, "MOTAMED_ASA_ACCOUNT_CONNECTED")
+
+
+def _motamed_asa_document(db: Session, business_id: int, invoice_id: int) -> Document:
+    document = (
+        db.query(Document)
+        .filter(Document.id == int(invoice_id), Document.business_id == int(business_id))
+        .first()
+    )
+    if document is None:
+        raise ApiError("INVOICE_NOT_FOUND", "فاکتور پیدا نشد.", http_status=404)
+    return document
+
+
+@router.get("/business/{business_id}/motamed-asa/invoices/{invoice_id}/payments")
+@require_business_access("business_id")
+def get_motamed_asa_payments_endpoint(
+    request: Request,
+    business_id: int,
+    invoice_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("moadian", "operate")),
+):
+    ensure_moadian_plugin_active(db, business_id)
+    document = _motamed_asa_document(db, business_id, invoice_id)
+    return success_response(motamed_asa_invoice_payments(db, business_id, document), request, "MOTAMED_ASA_PAYMENTS_FETCHED")
+
+
+@router.post("/business/{business_id}/motamed-asa/invoices/{invoice_id}/payments")
+@require_business_access("business_id")
+def register_motamed_asa_payments_endpoint(
+    request: Request,
+    business_id: int,
+    invoice_id: int,
+    payload: Dict[str, Any] = Body(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("moadian", "operate")),
+):
+    ensure_moadian_plugin_active(db, business_id)
+    document = _motamed_asa_document(db, business_id, invoice_id)
+    result = register_motamed_asa_payments(db, business_id, document, payload.get("payments"))
+    db.commit()
+    return success_response(result, request, "MOTAMED_ASA_PAYMENTS_REGISTERED")
 
 
 @router.post("/business/{business_id}/fanava/sync")
@@ -266,6 +379,12 @@ def save_tax_settings_endpoint(
         raise ApiError(
             "FANAVA_SANDBOX_UNAVAILABLE",
             "فن‌آوا محیط آزمایشی ندارد؛ ابتدا روش ارسال مستقیم را انتخاب کنید.",
+            http_status=400,
+        )
+    if current_setting and current_setting.submission_provider == MOTAMED_ASA_PROVIDER and payload.sandbox_mode:
+        raise ApiError(
+            "MOTAMED_ASA_SANDBOX_UNAVAILABLE",
+            "ارسال از طریق معتمد آسا فقط در محیط اصلی سامانهٔ مؤدیان انجام می‌شود؛ ابتدا روش ارسال مستقیم را انتخاب کنید.",
             http_status=400,
         )
 
