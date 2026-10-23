@@ -2772,6 +2772,14 @@ def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
         if is_commission_line:
             # خط کارمزد - در account_lines قرار می‌گیرد
             account_lines.append(line_dict)
+        elif source_metadata.get('managed') and source_metadata.get('operational_table'):
+            role=(line.extra_info or {}).get('sepidar_payment_role')
+            if role is None:
+                direction=line.credit>0 if document.document_type=='receipt' else line.debit>0
+                role='person' if line.person_id and line.person_id==(document.extra_info or {}).get('person_id') and direction else 'account'
+            # A cheque asset may carry its drawer's person_id. It is not a
+            # second counterparty/payment; otherwise the UI sums it twice.
+            (person_lines if role=='person' else account_lines).append(line_dict)
         elif (
             not (
                 line.extra_info

@@ -205,11 +205,15 @@ class OperationsProjector:
                     if invoice.extra_info.get('person_id')!=extra['person_id']:
                         raise NativeConversionError('Receipt/invoice party mismatch')
                     invoice_links[invoice.id].append(doc.id)
-                if reuse:
-                    for line in self.db.scalars(select(DocumentLine).where(DocumentLine.document_id==doc.id)):
+                if ledger:
+                    person_account=self.p.target('ACC.Account',row['AccountSlRef']).id if row.get('AccountSlRef') else None
+                    for line in self.db.scalars(select(DocumentLine).where(DocumentLine.document_id==ledger.id)):
                         info=dict(line.extra_info or {})
                         if line.person_id:
                             info['person_id']=line.person_id
+                        direction = line.credit > 0 if doctype=='receipt' else line.debit > 0
+                        is_counterparty=bool(line.person_id and line.person_id==extra['person_id'] and direction and (person_account is None or person_account==line.account_id))
+                        info['sepidar_payment_role']='person' if is_counterparty else 'account'
                         detail=self.detail_by_dl.get(info.get('sepidar_dl_ref'))
                         if detail:
                             setattr(line,detail[0],detail[1])

@@ -278,7 +278,7 @@ class Projector:
             roles = [label for key, label in (("IsCustomer", "مشتری"), ("IsVendor", "تامین‌کننده"), ("IsBroker", "بازاریاب"), ("IsEmployee", "کارمند")) if row.get(key)] or ["همکار"]
             code = str(dls.get(row.get("DLRef"), {}).get("Code") or sid)
             code = int(code) if code.isdigit() and int(code) <= 2147483647 else int(sid)
-            person, _ = self.upsert("GNR.Party", sid, Person, {"row": row, "addresses": addresses[sid], "phones": phones[sid]}, {
+            person, _ = self.upsert("GNR.Party", sid, Person, {"row": row, "addresses": addr, "phones": phone_rows}, {
                 "business_id": self.bid, "code": code, "alias_name": full_name,
                 "first_name": row.get("Name"), "last_name": row.get("LastName"),
                 "company_name": full_name if row.get("Type") == 2 else None,

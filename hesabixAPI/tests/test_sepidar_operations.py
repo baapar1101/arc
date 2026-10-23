@@ -139,6 +139,19 @@ def test_payment_header_date_does_not_move_original_voucher_date(native_db):
     assert count(db,DocumentLine)==4
 
 
+def test_cheque_drawer_detail_is_not_a_second_receipt_counterparty(native_db):
+    from app.services.receipt_payment_service import document_to_dict
+    db=native_db;operations(db)
+    debit=db.scalars(select(SepidarImportRow).where(SepidarImportRow.source_table=='VoucherItem',SepidarImportRow.source_key=='op:2')).one()
+    debit.payload={**debit.payload,'DLRef':7}
+    db.commit();project_native(db,1)
+    response=document_to_dict(db,receipt(db))
+    assert response['total_amount']==100
+    assert len(response['person_lines'])==len(response['account_lines'])==1
+    assert sum(line['amount'] for line in response['person_lines'])==100
+    assert count(db,DocumentLine)==4
+
+
 def test_fiscal_opening_carry_is_not_counted_twice(native_db):
     db=native_db;operations(db)
     add(db,'FMK.FiscalYear',[{'FiscalYearId':1,'Title':'1404','StartDate':'2025-03-21','EndDate':'2026-03-20'}])

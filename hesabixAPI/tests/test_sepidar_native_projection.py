@@ -24,7 +24,7 @@ from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
 from adapters.db.models.bank_account import BankAccount
 from adapters.db.models.cash_register import CashRegister
 from adapters.db.models.sepidar_live_import import SepidarImportSetting, SepidarImportRow, SepidarImportRun, SepidarNativeMap
-from app.services.sepidar_native_service import NativeConversionError, fingerprint, project_native, assert_document_editable
+from app.services.sepidar_native_service import NativeConversionError, fingerprint, project_native, assert_document_editable, Projector
 from app.services.sepidar_native_service import account_report_prefix
 from app.services.balance_sheet_account_classification import balance_sheet_subsection
 from app.services.pnl_account_classification import pnl_account_section
@@ -167,6 +167,18 @@ def test_source_additions_are_not_added_twice_to_native_payable(native_db):
     doc=db.scalars(select(Document)).one()
     assert _invoice_total_amount_for_document(doc)==100
     assert doc.extra_info['sepidar']['source_additions_net']=='2'
+
+
+def test_contact_snapshot_row_order_does_not_report_false_updates(native_db):
+    db=native_db;seed(db)
+    for i in (1,2):
+        payload={'PartyPhoneId':i,'PartyRef':3,'Phone':f'0912000000{i}','IsMain':i==1}
+        db.add(SepidarImportRow(business_id=1,source_schema='GNR',source_table='PartyPhone',source_key=str(i),payload=payload,content_hash=fingerprint(payload)))
+    db.commit();project_native(db,1)
+    projector=Projector(db,db.scalars(select(SepidarImportSetting)).one())
+    projector.data['GNR.PartyPhone'].reverse()
+    summary=projector.run()
+    assert summary['entities']['GNR.Party']['updated']==0
 
 
 def test_failed_financial_validation_rolls_back_all_native_changes(native_db):
