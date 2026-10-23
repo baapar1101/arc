@@ -68,6 +68,7 @@ import 'pages/business/bank_accounts_page.dart';
 import 'pages/business/wallet_page.dart';
 import 'pages/business/wallet_payment_result_page.dart';
 import 'pages/admin/wallet_settings_page.dart';
+import 'pages/admin/platform_management_page.dart';
 import 'pages/admin/currencies_admin_page.dart';
 import 'pages/admin/fx_providers_admin_page.dart';
 import 'pages/admin/payment_gateways_page.dart';
@@ -386,6 +387,7 @@ class _MyAppState extends State<MyApp> {
     super.initState();
     _loadStartTime = DateTime.now();
     _loadControllers();
+    unawaited(BrandConfig.refresh());
   }
 
   Future<void> _loadControllers() async {
@@ -1518,6 +1520,13 @@ class _MyAppState extends State<MyApp> {
                   calendarController: _calendarController,
                 );
               },
+            ),
+            GoRoute(
+              path: '/user/profile/platform-management',
+              name: 'platform_management',
+              builder: (context, state) => _authStore?.isSuperAdmin == true
+                  ? const PlatformManagementPage()
+                  : PermissionGuard.buildAccessDeniedPage(),
             ),
             GoRoute(
               path: '/user/profile/system-settings',
@@ -5905,7 +5914,7 @@ class _MyAppState extends State<MyApp> {
     );
 
     return AnimatedBuilder(
-      animation: Listenable.merge([controller, themeController]),
+      animation: Listenable.merge([controller, themeController, BrandConfig.changes]),
       builder: (context, _) {
         return UrlTracker(
           authStore: _authStore!,

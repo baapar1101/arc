@@ -62,6 +62,7 @@ from adapters.api.v1.admin.fx_providers import router as admin_fx_providers_rout
 from adapters.api.v1.admin.monitoring import router as admin_monitoring_router
 from adapters.api.v1.admin.system_services import router as admin_system_services_router
 from adapters.api.v1.admin.wallet_admin import router as admin_wallet_router
+from adapters.api.v1.admin.platform import router as platform_admin_router, public_router as platform_public_router
 from adapters.api.v1.admin.storage_plans import router as admin_storage_plans_router
 from adapters.api.v1.admin.support_billing import router as admin_support_billing_router
 from adapters.api.v1.admin.businesses_admin import router as admin_businesses_router
@@ -1161,6 +1162,8 @@ def create_app() -> FastAPI:
     application.include_router(admin_monitoring_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_system_services_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_wallet_router, prefix=settings.api_v1_prefix)
+    application.include_router(platform_admin_router, prefix=settings.api_v1_prefix)
+    application.include_router(platform_public_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_storage_plans_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_support_billing_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_businesses_router, prefix=settings.api_v1_prefix)

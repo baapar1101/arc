@@ -20,6 +20,18 @@ class SettingsCategorizationService {
         order: 1,
         items: [
           SettingsItem(
+            id: 'platform_management',
+            title: 'مدیریت پلتفرم',
+            description: 'کیف پول کسب‌وکارها، هویت برند، تنظیمات پیشرفته و تاریخچه تغییرات',
+            icon: Icons.hub_outlined,
+            color: const Color(0xFF1565C0),
+            route: '/user/profile/platform-management',
+            categoryId: 'core_configuration',
+            order: 0,
+            requiresSuperAdmin: true,
+            tags: ['advanced', 'new'],
+          ),
+          SettingsItem(
             id: 'system_configuration',
             title: 'systemConfiguration',
             description: 'systemConfigurationDescription',

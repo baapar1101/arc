@@ -25,6 +25,11 @@ from datetime import datetime, date
 logger = structlog.get_logger()
 
 
+def assert_wallet_spend_allowed(account: WalletAccount) -> None:
+	if account.status != "active":
+		raise ApiError("WALLET_SUSPENDED", "برداشت و خرید از این کیف پول توسط مدیر پلتفرم تعلیق شده است.", http_status=403)
+
+
 def _ensure_wallet_account(db: Session, business_id: int) -> WalletAccount:
 	obj = db.execute(
 		select(WalletAccount).where(WalletAccount.business_id == int(business_id))
@@ -93,6 +98,7 @@ def charge_wallet_for_service(
 	if not allow_negative_balance and available < amount:
 		raise ApiError("INSUFFICIENT_FUNDS", "موجودی کیف پول کافی نیست", http_status=400)
 
+	assert_wallet_spend_allowed(account)
 	account.available_balance = available - amount
 	db.flush()
 
@@ -283,6 +289,8 @@ def create_payout_request(
 		raise ApiError("BANK_ACCOUNT_NOT_FOUND", "حساب بانکی یافت نشد", http_status=404)
 	if not bank_acc.is_active:
 		raise ApiError("BANK_ACCOUNT_INACTIVE", "حساب بانکی غیرفعال است", http_status=400)
+	if bank_acc.business_id != int(business_id):
+		raise ApiError("BANK_ACCOUNT_NOT_FOUND", "حساب بانکی متعلق به این کسب‌وکار نیست", http_status=404)
 
 	account = _get_wallet_account_for_update(db, business_id)
 	available = Decimal(str(account.available_balance or 0))
@@ -291,6 +299,7 @@ def create_payout_request(
 		raise ApiError("INSUFFICIENT_FUNDS", "موجودی کافی نیست", http_status=400)
 
 	# قفل مبلغ: کسر از مانده قابل برداشت
+	assert_wallet_spend_allowed(account)
 	account.available_balance = available - amount
 	account.pending_balance = pending_balance + amount
 	db.flush()
@@ -923,10 +932,13 @@ def refund_transaction(db: Session, tx_id: int, amount: Decimal | None = None, r
 	src = db.query(WalletTransaction).filter(WalletTransaction.id == int(tx_id)).first()
 	if not src or src.status != "succeeded":
 		raise ApiError("TX_NOT_REFUNDABLE", "تراکنش موفق برای استرداد پیدا نشد", http_status=400)
+	if src.type in {"admin_credit", "admin_debit"}:
+		raise ApiError("TX_NOT_REFUNDABLE", "اصلاح مدیریتی فقط با اصلاح معکوس و ثبت دلیل در مدیریت پلتفرم برگردانده می‌شود.", http_status=400)
 	refund_amount = Decimal(str(amount if amount is not None else src.amount or 0))
 	if refund_amount <= 0 or refund_amount > Decimal(str(src.amount or 0)):
 		raise ApiError("INVALID_REFUND_AMOUNT", "مبلغ استرداد نامعتبر است", http_status=400)
-	account = _ensure_wallet_account(db, src.business_id)
+	account = _get_wallet_account_for_update(db, src.business_id)
+	assert_wallet_spend_allowed(account)
 	available = Decimal(str(account.available_balance or 0))
 	if refund_amount > available:
 		raise ApiError("INSUFFICIENT_FUNDS", "موجودی کافی برای استرداد نیست", http_status=400)
@@ -1226,6 +1238,7 @@ def charge_wallet_for_zohal_service(
 	
 	# بررسی موجودی
 	account = _get_wallet_account_for_update(db, business_id)
+	assert_wallet_spend_allowed(account)
 	available = Decimal(str(account.available_balance or 0))
 	
 	if available < amount:
@@ -1374,6 +1387,7 @@ def charge_wallet_for_notification(
 	
 	# بررسی موجودی
 	account = _get_wallet_account_for_update(db, business_id)
+	assert_wallet_spend_allowed(account)
 	available = Decimal(str(account.available_balance or 0))
 	
 	if available < amount:
@@ -1647,6 +1661,7 @@ def check_document_has_wallet_transactions(db: Session, document_id: int) -> Dic
 	
 	# انواع تراکنش‌های سیستمی که نباید حذف شوند
 	protected_types = [
+		"admin_credit", "admin_debit",
 		"top_up",                    # واریز
 		"payout_request",           # درخواست برداشت
 		"payout_settlement",        # تسویه برداشت

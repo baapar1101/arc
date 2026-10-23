@@ -34,7 +34,25 @@ class BrandLogo extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ValueListenableBuilder<int>(
+    valueListenable: BrandConfig.changes,
+    builder: (context, _, child) => _buildLogo(context),
+  );
+
+  Widget _buildLogo(BuildContext context) {
+    if (BrandConfig.logoUrl.isNotEmpty) {
+      return Image.network(
+        BrandConfig.logoUrl,
+        width: width,
+        height: height,
+        fit: fit,
+        errorBuilder: (_, error, stack) => _buildAsset(context),
+      );
+    }
+    return _buildAsset(context);
+  }
+
+  Widget _buildAsset(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primary = primaryOverride ?? scheme.primary;

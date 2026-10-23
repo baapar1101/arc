@@ -69,6 +69,10 @@ class _WalletPageState extends State<WalletPage> {
         return 'پرداخت ذخیره‌سازی';
       case 'gift_credit':
         return 'اعتبار هدیه';
+      case 'admin_credit':
+        return 'افزایش اعتبار توسط مدیر پلتفرم';
+      case 'admin_debit':
+        return 'کاهش اعتبار توسط مدیر پلتفرم';
       default:
         return l.unknown;
     }

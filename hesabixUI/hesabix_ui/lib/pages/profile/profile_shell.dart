@@ -43,6 +43,7 @@ class _ProfileShellState extends State<ProfileShell> with WidgetsBindingObserver
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    BrandConfig.changes.addListener(_brandChanged);
     widget.authStore.addListener(() {
       if (mounted) {
         setState(() {});
@@ -54,9 +55,12 @@ class _ProfileShellState extends State<ProfileShell> with WidgetsBindingObserver
 
   @override
   void dispose() {
+    BrandConfig.changes.removeListener(_brandChanged);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
+
+  void _brandChanged() { if (mounted) setState(() {}); }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -115,6 +119,8 @@ class _ProfileShellState extends State<ProfileShell> with WidgetsBindingObserver
       ...destinations,
       if (widget.authStore.canAccessSupportOperator) ...operatorDestinations,
       if (widget.authStore.isSuperAdmin || widget.authStore.hasAppPermission('system_settings')) ...adminDestinations,
+      if (widget.authStore.isSuperAdmin)
+        _Dest('مدیریت پلتفرم', Icons.hub_outlined, Icons.hub, '/user/profile/platform-management'),
     ];
 
     int selectedIndex = 0;

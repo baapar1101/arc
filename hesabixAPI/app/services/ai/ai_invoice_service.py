@@ -146,6 +146,8 @@ def pay_ai_invoice_from_wallet(
         raise ApiError("INSUFFICIENT_FUNDS", "موجودی کیف پول کافی نیست", http_status=400)
     
     # کسر از کیف پول
+    from app.services.wallet_service import assert_wallet_spend_allowed
+    assert_wallet_spend_allowed(account)
     account.available_balance = float(available - total_price)
     db.flush()
     

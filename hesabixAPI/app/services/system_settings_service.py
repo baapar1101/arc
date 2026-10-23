@@ -1069,6 +1069,7 @@ def get_system_configuration(db: Session) -> Dict[str, Any]:
 def set_system_configuration(
 	db: Session,
 	*,
+	commit: bool = True,
 	app_name: str | None = None,
 	app_version: str | None = None,
 	default_language: str | None = None,
@@ -1374,7 +1375,10 @@ def set_system_configuration(
 			)
 		_upsert_setting_int(db, SYSTEM_CONFIG_FIREWALL_AUTO_BAN_DURATION_SEC, firewall_auto_ban_duration_sec)
 	
-	db.commit()
+	if commit:
+		db.commit()
+	else:
+		db.flush()
 	return get_system_configuration(db)
 
 

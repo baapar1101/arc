@@ -215,6 +215,8 @@ def purchase_plugin(
 			}
 
 		# کسر موجودی و ثبت تراکنش
+		from app.services.wallet_service import assert_wallet_spend_allowed
+		assert_wallet_spend_allowed(account)
 		account.available_balance = available - total_price
 		db.flush()
 

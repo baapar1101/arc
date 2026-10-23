@@ -460,6 +460,8 @@ def pay_storage_invoice_from_wallet(
 	
 	# کسر موجودی (فقط برای صورتحساب‌های غیررایگان)
 	if not is_free_invoice:
+		from app.services.wallet_service import assert_wallet_spend_allowed
+		assert_wallet_spend_allowed(account)
 		logger.debug(f"کسر موجودی کیف پول: {available} -> {available - total_price}")
 		account.available_balance = available - total_price
 		db.flush()
