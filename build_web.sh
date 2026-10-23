@@ -433,6 +433,9 @@ fi
 printf '{"build":"%s","generated_at":"%s"}\n' "$BUILD_ID" "$GEN_AT" > "$BUILD_DIR/version.json"
 echo "✓ version.json → build=\"$BUILD_ID\""
 
+# Ensure a new deploy cannot reuse a cached older Dart entrypoint.
+bash "$REPO_ROOT/scripts/stamp_web_entrypoints.sh" "$BUILD_DIR"
+
 # Check icon files
 echo ""
 echo "Checking icon files..."

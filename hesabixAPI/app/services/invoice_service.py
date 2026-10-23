@@ -8344,7 +8344,10 @@ def invoice_document_to_dict(
     # محاسبه سود فاکتور (در صورت فعال بودن)
     profit_data = {}
     business = db.query(Business).filter(Business.id == document.business_id).first()
-    if business and business.invoice_profit_calculation_method != "disabled":
+    # Imported Sepidar invoices have original GL but not native stock costing.
+    # Never present missing cost as zero and manufacture a 100% invoice margin.
+    source_managed = (document.extra_info or {}).get("sepidar", {}).get("managed", False)
+    if business and business.invoice_profit_calculation_method != "disabled" and not source_managed:
         try:
             profit_data = _calculate_invoice_profit(
                 db,
@@ -8419,7 +8422,9 @@ def invoice_document_to_dict(
         result["profit_calculation_context"] = "analytical_live"
 
     # سود و بهای تمام‌شده شناسایی‌شده در دفتر (پس از ذخیره روی خطوط)
-    if business and business.invoice_profit_calculation_method != "disabled":
+    if source_managed:
+        result["profit_calculation_context"] = "source_cost_not_imported"
+    if business and business.invoice_profit_calculation_method != "disabled" and not source_managed:
         try:
             from app.services.invoice_profit_ledger_service import build_recognized_profit_summary
 

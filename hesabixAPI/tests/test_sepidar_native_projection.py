@@ -187,6 +187,18 @@ def test_source_managed_financial_documents_reject_local_mutations(native_db):
         delete_invoice(db,document.id)
 
 
+def test_imported_invoice_does_not_invent_profit_from_missing_stock_cost(native_db,monkeypatch):
+    from app.services import invoice_service
+    db=native_db; seed(db); project_native(db,1)
+    def forbidden(*args,**kwargs):
+        pytest.fail('Missing source cost must not be treated as zero')
+    monkeypatch.setattr(invoice_service,'_calculate_invoice_profit',forbidden)
+    result=invoice_service.invoice_document_to_dict(db,db.scalars(select(Document)).one(),include_tags=False,persist_link_cleanup=False)
+    assert result['profit_calculation_context']=='source_cost_not_imported'
+    assert 'gross_profit' not in result and 'total_profit' not in result
+    assert len(result['product_lines'])==1 and len(result['account_lines'])==2
+
+
 def test_raw_sync_pipeline_updates_native_entities_on_each_poll(native_db, monkeypatch):
     from app.services import sepidar_import_service as sync
     db=native_db; seed(db)
