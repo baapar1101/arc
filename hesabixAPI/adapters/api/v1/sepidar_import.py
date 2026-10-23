@@ -21,6 +21,7 @@ class SettingsPayload(BaseModel):
     username: str = Field(min_length=1, max_length=255)
     password: str | None = Field(default=None, max_length=2048)
     enabled: bool = False
+    native_enabled: bool = False
     sync_interval_minutes: int = Field(default=15, ge=1, le=1440)
     batch_size: int = Field(default=500, ge=50, le=5000)
     included_schemas: list[str] = Field(default_factory=list, max_length=1000)
@@ -84,3 +85,18 @@ def runs(request: Request, business_id: int = Path(..., gt=0), db: Session = Dep
          _: AuthContext = Depends(get_current_user), __: None = Depends(require_business_access_dep)):
     _ensure_plugin(db, business_id)
     return success_response({"items": service.recent_runs(db, business_id)}, request)
+
+
+@router.post("/business/{business_id}/convert-native")
+def convert_native(request: Request, business_id: int = Path(..., gt=0), db: Session = Depends(get_db),
+                   _: AuthContext = Depends(get_current_user), __: None = Depends(require_business_access_dep)):
+    _ensure_plugin(db, business_id)
+    from app.services.sepidar_native_service import project_native
+    try:
+        with service._sync_lock(db, business_id):
+            result = project_native(db, business_id)
+    except service.SyncAlreadyRunning as exc:
+        raise ApiError("SEPIDAR_SYNC_RUNNING", service.error_message(exc), http_status=409)
+    except Exception as exc:
+        raise ApiError("SEPIDAR_NATIVE_FAILED", service.error_message(exc), http_status=422)
+    return success_response(result, request)

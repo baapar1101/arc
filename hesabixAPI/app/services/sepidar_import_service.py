@@ -10,7 +10,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import or_, text
+from sqlalchemy import or_, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -40,6 +40,9 @@ def error_message(exc: Exception) -> str:
     # Persist only a safe category, never SQL parameters or provider credentials.
     if isinstance(exc, SyncAlreadyRunning):
         return "یک همگام‌سازی برای این کسب‌وکار در حال اجراست."
+    from app.services.sepidar_native_service import NativeConversionError
+    if isinstance(exc, NativeConversionError):
+        return str(exc)[:500]
     if "18456" in str(exc):
         return "ورود به SQL Server رد شد (18456). نام کاربری، رمز و دسترسی دیتابیس را بررسی کنید."
     return f"همگام‌سازی یا اتصال ناموفق بود ({type(exc).__name__}). تنظیمات اتصال و دسترسی خواندن را بررسی کنید."
@@ -79,6 +82,7 @@ def public_setting(row: SepidarImportSetting | None) -> dict[str, Any]:
         return {"configured": False, "enabled": False, "port": 1433, "sync_interval_minutes": 15, "batch_size": 500}
     return {
         "configured": True, "host": row.host, "port": row.port, "database_name": row.database_name,
+        "native_enabled": row.native_enabled, "native_summary": row.native_summary, "native_last_error": row.native_last_error,
         "username": row.username, "password_configured": bool(row.password_encrypted), "enabled": row.enabled,
         "sync_interval_minutes": row.sync_interval_minutes, "batch_size": row.batch_size,
         "included_schemas": row.included_schemas or [], "included_tables": row.included_tables or [],
@@ -97,6 +101,8 @@ def save_setting(db: Session, business_id: int, payload: dict[str, Any]) -> Sepi
             setattr(row, key, str(payload[key]).strip())
     row.port = max(1, min(65535, int(payload.get("port", row.port or 1433))))
     row.enabled = bool(payload.get("enabled", row.enabled))
+    if "native_enabled" in payload:
+        row.native_enabled = bool(payload["native_enabled"])
     row.sync_interval_minutes = max(1, min(1440, int(payload.get("sync_interval_minutes", row.sync_interval_minutes or 15))))
     row.batch_size = max(50, min(5000, int(payload.get("batch_size", row.batch_size or 500))))
     if "included_schemas" in payload:
@@ -199,15 +205,27 @@ def _run_sync(db: Session, business_id: int, *, scheduled: bool = False) -> dict
                         values.append({"business_id": business_id, "source_schema": schema, "source_table": table,
                                        "source_key": source_key, "payload": payload,
                                        "content_hash": content_hash,
+                                       "is_deleted": False,
                                        "first_seen_at": now, "last_seen_at": now})
                     stmt = insert(SepidarImportRow).values(values)
                     stmt = stmt.on_conflict_do_update(
                         constraint="uq_sepidar_import_row_source",
-                        set_={"payload": stmt.excluded.payload, "content_hash": stmt.excluded.content_hash, "last_seen_at": now},
-                        where=SepidarImportRow.content_hash != stmt.excluded.content_hash)
+                        set_={"payload": stmt.excluded.payload, "content_hash": stmt.excluded.content_hash, "last_seen_at": now, "is_deleted": False},
+                        where=or_(SepidarImportRow.content_hash != stmt.excluded.content_hash, SepidarImportRow.is_deleted.is_(True)))
                     result = db.execute(stmt); db.commit()
+                    db.execute(update(SepidarImportRow).where(
+                        SepidarImportRow.business_id == business_id, SepidarImportRow.source_schema == schema,
+                        SepidarImportRow.source_table == table, SepidarImportRow.source_key.in_([v["source_key"] for v in values]),
+                    ).values(last_seen_at=now))
                     run.rows_seen += len(values); run.rows_changed += max(0, result.rowcount or 0); db.commit()
+                db.execute(update(SepidarImportRow).where(
+                    SepidarImportRow.business_id == business_id, SepidarImportRow.source_schema == schema,
+                    SepidarImportRow.source_table == table, SepidarImportRow.last_seen_at < now,
+                ).values(is_deleted=True))
                 run.tables_completed += 1; db.commit()
+        if setting.native_enabled:
+            from app.services.sepidar_native_service import project_native
+            project_native(db, business_id)
         run.status = "success"; run.finished_at = datetime.utcnow(); setting.last_success_at = run.finished_at; setting.last_error = None; db.commit()
         return {"run_id": run.id, "status": run.status, "tables": run.tables_completed, "rows_seen": run.rows_seen, "rows_changed": run.rows_changed}
     except Exception as exc:

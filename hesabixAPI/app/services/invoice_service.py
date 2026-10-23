@@ -6648,6 +6648,8 @@ def update_invoice(
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document or document.document_type not in SUPPORTED_INVOICE_TYPES:
         raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
+    from app.services.sepidar_native_service import assert_document_editable
+    assert_document_editable(document)
 
     _pre_links_wh = (document.extra_info or {}).get("links") or {}
     _old_warehouse_document_ids = list(_pre_links_wh.get("warehouse_document_ids") or [])
@@ -7821,6 +7823,8 @@ def delete_invoice(db: Session, document_id: int, *, commit: bool = True) -> boo
         if not document:
             logger.error(f"[DELETE_INVOICE] Invoice {document_id} not found")
             raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
+        from app.services.sepidar_native_service import assert_document_editable
+        assert_document_editable(document)
         
         logger.info(f"[DELETE_INVOICE] Invoice {document_id}: Found document - code={document.code}, type={document.document_type}, business_id={document.business_id}")
         

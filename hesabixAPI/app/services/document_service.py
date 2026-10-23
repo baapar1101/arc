@@ -34,6 +34,8 @@ def _is_received_loan_facility_manual_document(document: Any) -> bool:
 
 
 def _assert_not_received_loan_facility_document(document: Any, *, action: str) -> None:
+    from app.services.sepidar_native_service import assert_document_editable
+    assert_document_editable(document)
     if not _is_received_loan_facility_manual_document(document):
         return
     verb = "حذف" if action == "delete" else "ویرایش"
