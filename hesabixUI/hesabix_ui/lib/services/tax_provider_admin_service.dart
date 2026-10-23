@@ -26,4 +26,24 @@ class TaxProviderAdminService {
     );
     return Map<String, dynamic>.from(response.data?['data'] as Map? ?? const {});
   }
+
+  Future<Map<String, dynamic>> getMotamedAsaSettings() async {
+    final response = await _api.get<Map<String, dynamic>>('/api/v1/admin/tax-providers/motamed-asa');
+    return Map<String, dynamic>.from(response.data?['data'] as Map? ?? const {});
+  }
+
+  Future<Map<String, dynamic>> saveMotamedAsaSettings(Map<String, dynamic> data) async {
+    final response = await _api.put<Map<String, dynamic>>(
+      '/api/v1/admin/tax-providers/motamed-asa',
+      data: data,
+    );
+    return Map<String, dynamic>.from(response.data?['data'] as Map? ?? const {});
+  }
+
+  Future<Map<String, dynamic>> testMotamedAsaConnection() async {
+    final response = await _api.post<Map<String, dynamic>>(
+      '/api/v1/admin/tax-providers/motamed-asa/test-connection',
+    );
+    return Map<String, dynamic>.from(response.data?['data'] as Map? ?? const {});
+  }
 }

@@ -276,6 +276,7 @@ import 'pages/admin/ai_marketplace_settings_page.dart';
 import 'pages/admin/ai_eval_admin_page.dart';
 import 'pages/admin/tax_product_codes_page.dart';
 import 'pages/admin/tax_provider_admin_page.dart';
+import 'pages/admin/motamed_asa_provider_admin_page.dart';
 import 'pages/admin/zohal_settings_page.dart';
 import 'pages/admin/zohal_services_admin_page.dart';
 import 'pages/admin/zohal_statistics_page.dart';
@@ -2040,6 +2041,22 @@ class _MyAppState extends State<MyApp> {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const TaxProviderAdminPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'tax-provider-motamed-asa',
+                  name: 'system_settings_tax_provider_motamed_asa',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed =
+                        _authStore!.isSuperAdmin ||
+                        _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const MotamedAsaProviderAdminPage();
                   },
                 ),
                 GoRoute(

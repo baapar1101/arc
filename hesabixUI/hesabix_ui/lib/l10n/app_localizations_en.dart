@@ -20463,4 +20463,334 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get taxProviderSaveBeforeTest =>
       'Save the new broker credentials before testing the connection.';
+
+  @override
+  String get taxSubmissionMotamedAsa => 'Send through Motamed ASA';
+
+  @override
+  String get taxSubmissionMotamedAsaDescription =>
+      'Sign up on the Motamed ASA page; the trusted company signs and sends the invoices, so the business private key and memory ID are not needed here.';
+
+  @override
+  String get motamedAsaUnavailable =>
+      'The Motamed ASA connection has not been set up by the system administrator yet.';
+
+  @override
+  String get motamedAsaSandboxUnavailable =>
+      'Motamed ASA sends to the production tax system only. Turn off sandbox mode to select it.';
+
+  @override
+  String get motamedAsaEconomicCodeRequired =>
+      'Enter the 11 or 14 digit economic code of the business first.';
+
+  @override
+  String get motamedAsaConsentTitle => 'Send invoices through Motamed ASA';
+
+  @override
+  String get motamedAsaConsentDescription =>
+      'Motamed ASA is a trusted tax service provider. If you continue, the Motamed ASA sign-up page opens. There the business owner signs in with the one-time code of the tax system, accepts the Motamed ASA terms and allows the API key of this business to be handed to Hesabix.';
+
+  @override
+  String get motamedAsaSharedDataTitle =>
+      'What Hesabix shares with Motamed ASA';
+
+  @override
+  String get motamedAsaSharedDataSignup =>
+      'For sign-up: the economic code, the business name and the mobile number of the owner, to fill in the sign-up form.';
+
+  @override
+  String get motamedAsaSharedDataInvoices =>
+      'For every invoice you send: the data the tax system requires, including the buyer identifiers, items, amounts and payments.';
+
+  @override
+  String get motamedAsaSharedDataPurpose =>
+      'Motamed ASA uses this data to issue, send and follow up your invoices in the tax system, under its terms and privacy policy. Your choice is not limited: you can change the sending method at any time.';
+
+  @override
+  String get motamedAsaTermsLink => 'Motamed ASA terms';
+
+  @override
+  String get motamedAsaPrivacyLink => 'Motamed ASA privacy policy';
+
+  @override
+  String get motamedAsaConsentCheckbox =>
+      'I have read the above and agree that the data of this business is shared with Motamed ASA for sending invoices.';
+
+  @override
+  String get motamedAsaContinueButton => 'Continue on Motamed ASA';
+
+  @override
+  String get motamedAsaConnected =>
+      'This business is connected to Motamed ASA.';
+
+  @override
+  String get motamedAsaOnboarding =>
+      'Sign-up on Motamed ASA is in progress. When it is finished there, check the connection.';
+
+  @override
+  String get motamedAsaCredentialsRequired =>
+      'The API key of this business was not received. Enter the client ID and secret from the Motamed ASA panel.';
+
+  @override
+  String get motamedAsaNotConnected =>
+      'This business is not connected to Motamed ASA.';
+
+  @override
+  String get motamedAsaMemoryId => 'Fiscal memory ID';
+
+  @override
+  String get motamedAsaOpenSignup => 'Open the sign-up page';
+
+  @override
+  String get motamedAsaEnterCredentials => 'Enter API key';
+
+  @override
+  String get motamedAsaCheckConnection => 'Check connection';
+
+  @override
+  String get motamedAsaConnectedSuccess =>
+      'The business is connected to Motamed ASA and its invoices are sent through it.';
+
+  @override
+  String get motamedAsaSignupOpened =>
+      'The Motamed ASA sign-up page was opened. After finishing there, select Check connection.';
+
+  @override
+  String get motamedAsaLinkCopyHint =>
+      'The page did not open. Open this link in your browser:';
+
+  @override
+  String get motamedAsaSyncSuccess =>
+      'The Motamed ASA connection status was updated.';
+
+  @override
+  String get motamedAsaCredentialsTitle => 'Motamed ASA API key';
+
+  @override
+  String get motamedAsaCredentialsDescription =>
+      'In the Motamed ASA panel, open Business settings › API v2 and copy the client ID and client secret of this business.';
+
+  @override
+  String get motamedAsaClientId => 'Client ID';
+
+  @override
+  String get motamedAsaClientSecret => 'Client secret';
+
+  @override
+  String get motamedAsaClientIdInvalid =>
+      'The client ID looks like v2-customer-12345.';
+
+  @override
+  String get motamedAsaSaveCredentials => 'Connect';
+
+  @override
+  String get motamedAsaAdminTitle => 'Motamed ASA connection';
+
+  @override
+  String get motamedAsaAdminDescription =>
+      'Enter the partner client ID and secret that Motamed ASA issued for Hesabix in its API partners section. Businesses then sign up on the Motamed ASA page, and their API key is handed to Hesabix after the owner agrees.';
+
+  @override
+  String get motamedAsaBaseUrl => 'Motamed ASA API address';
+
+  @override
+  String get motamedAsaPartnerClientId => 'Partner client ID';
+
+  @override
+  String get motamedAsaPartnerClientIdInvalid =>
+      'The partner client ID starts with v2-partner-.';
+
+  @override
+  String get motamedAsaPartnerClientSecret => 'Partner client secret';
+
+  @override
+  String get motamedAsaKeepSecretHint => 'Leave empty to keep the saved value.';
+
+  @override
+  String get motamedAsaActivate => 'Allow sending through Motamed ASA';
+
+  @override
+  String get motamedAsaEnabledHint =>
+      'Businesses can select Motamed ASA as their sending method.';
+
+  @override
+  String get motamedAsaDisabledHint => 'Businesses cannot select Motamed ASA.';
+
+  @override
+  String get motamedAsaSave => 'Save Motamed ASA settings';
+
+  @override
+  String get motamedAsaSaved => 'Motamed ASA settings were saved.';
+
+  @override
+  String get motamedAsaNotConfigured =>
+      'The partner client ID and secret are not saved yet.';
+
+  @override
+  String get motamedAsaTestSuccess =>
+      'Hesabix signed in to Motamed ASA. No business or invoice was created.';
+
+  @override
+  String get motamedAsaHostedOnboarding => 'Sign-up link';
+
+  @override
+  String get motamedAsaCredentialHandover => 'API key handover';
+
+  @override
+  String get settingsMotamedAsa => 'Motamed ASA connection';
+
+  @override
+  String get settingsMotamedAsaDescription =>
+      'Partner credentials for the Motamed ASA trusted tax company';
+
+  @override
+  String get taxWorkspaceStatusColumn => 'Workspace status';
+
+  @override
+  String get taxWorkspaceStatusNoNeedReaction => 'No reaction needed';
+
+  @override
+  String get taxWorkspaceStatusAwaitingReaction => 'Awaiting buyer reaction';
+
+  @override
+  String get taxWorkspaceStatusApproved => 'Approved by buyer';
+
+  @override
+  String get taxWorkspaceStatusSystemicApproved => 'Systemically approved';
+
+  @override
+  String get taxWorkspaceStatusImpossibleReaction => 'Reaction not possible';
+
+  @override
+  String get taxWorkspaceStatusRejected => 'Rejected by buyer';
+
+  @override
+  String get taxWorkspaceStatusSystemicRejected => 'Systemically rejected';
+
+  @override
+  String get taxWorkspaceStatusCanceled => 'Cancelled';
+
+  @override
+  String get taxArticle6Column => 'Article 6';
+
+  @override
+  String get taxArticle6Violated => 'Limit exceeded';
+
+  @override
+  String get taxArticle6NotViolated => 'Within the limit';
+
+  @override
+  String get motamedAsaPaymentsAction => 'Payments in the tax workspace';
+
+  @override
+  String get motamedAsaPaymentsTitle => 'Payment table of invoice';
+
+  @override
+  String get motamedAsaPaymentsDescription =>
+      'Payments made after the invoice was sent are registered in the tax workspace through Motamed ASA. Enter the amount the buyer paid, including VAT; the tax workspace keeps the share without VAT. Rows held by the tax system cannot be edited or deleted.';
+
+  @override
+  String get motamedAsaPaymentsNotEligible =>
+      'New payments cannot be registered on this invoice.';
+
+  @override
+  String get motamedAsaPaymentsEmpty => 'No payment row yet.';
+
+  @override
+  String get motamedAsaPaymentsAddRow => 'Add payment';
+
+  @override
+  String get motamedAsaPaymentsRegister => 'Register in tax workspace';
+
+  @override
+  String get motamedAsaPaymentsRegistered =>
+      'The payments were sent for registration in the tax workspace.';
+
+  @override
+  String get motamedAsaPaymentsResultUnknown =>
+      'The answer did not arrive. The rows below are what Motamed ASA holds now; check them before sending anything again.';
+
+  @override
+  String get motamedAsaPaymentType => 'Payment method';
+
+  @override
+  String get motamedAsaPaymentDate => 'Payment date';
+
+  @override
+  String get motamedAsaPaymentAmount => 'Amount paid (rial, including VAT)';
+
+  @override
+  String get motamedAsaPaymentTraceNo => 'Trace number';
+
+  @override
+  String get motamedAsaPaymentTerminal => 'Terminal number';
+
+  @override
+  String get motamedAsaPaymentDescription => 'Description';
+
+  @override
+  String get motamedAsaPaymentRegisteredAmount => 'Registered amount';
+
+  @override
+  String get motamedAsaPaymentRemoveRow => 'Remove row';
+
+  @override
+  String get motamedAsaPaymentAmountInvalid =>
+      'Enter a whole rial amount greater than zero.';
+
+  @override
+  String get motamedAsaPaymentDigitsInvalid =>
+      'Digits only, within the allowed length.';
+
+  @override
+  String get motamedAsaPaymentDateRequired =>
+      'Choose the payment date of every row.';
+
+  @override
+  String get motamedAsaPaymentTypeCheque => 'Cheque';
+
+  @override
+  String get motamedAsaPaymentTypeBarter => 'Offset';
+
+  @override
+  String get motamedAsaPaymentTypeCash => 'Cash';
+
+  @override
+  String get motamedAsaPaymentTypePos => 'Card reader (POS)';
+
+  @override
+  String get motamedAsaPaymentTypeInternet => 'Payment gateway';
+
+  @override
+  String get motamedAsaPaymentTypeCard => 'Card to card';
+
+  @override
+  String get motamedAsaPaymentTypeTransfer => 'Bank transfer';
+
+  @override
+  String get motamedAsaPaymentTypeOther => 'Other';
+
+  @override
+  String get motamedAsaPaymentStatusRegistered => 'Registered';
+
+  @override
+  String get motamedAsaPaymentStatusSentWithInvoice => 'Sent with the invoice';
+
+  @override
+  String get motamedAsaPaymentStatusQueued => 'Queued for registration';
+
+  @override
+  String get motamedAsaPaymentStatusNotRegistered => 'Goes with the invoice';
+
+  @override
+  String get motamedAsaPaymentStatusUnknown => 'Result unknown';
+
+  @override
+  String get motamedAsaPaymentStatusRejected => 'Rejected';
+
+  @override
+  String get motamedAsaPaymentStatusFailed => 'Failed';
+
+  @override
+  String get motamedAsaPaymentStatusNotApplicable => 'Not sent';
 }
