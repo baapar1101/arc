@@ -116,6 +116,283 @@ def register_phase5_business_functions(registry: "AIFunctionRegistry") -> None:
         )
     )
 
+    # --- Tax workspace (Moadian) ---
+    def _get_tax_invoice(context: Dict[str, Any], invoice_id: Any):
+        from adapters.db.models.document import Document
+        from app.core.moadian_plugin_dependency import ensure_moadian_plugin_active
+
+        business_id = int(context["business_id"])
+        ensure_moadian_plugin_active(context["db"], business_id)
+        try:
+            document_id = int(invoice_id)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("invoice_id باید شناسهٔ عددی باشد") from exc
+        doc = context["db"].query(Document).filter(
+            Document.id == document_id,
+            Document.business_id == business_id,
+        ).with_for_update().first()
+        if not doc or doc.document_type not in {"invoice_sales", "invoice_sales_return"}:
+            raise ValueError("فاکتور فروش در کسب‌وکار متصل پیدا نشد")
+        if bool(getattr(doc, "is_proforma", False)):
+            raise ValueError("پیش‌فاکتور را نمی‌توان به کارپوشهٔ مالیاتی افزود")
+        return doc
+
+    def add_invoice_to_tax_workspace_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from app.services.tax_reference_service import link_reference_invoice
+
+        db = context["db"]
+        business_id = int(context["business_id"])
+        doc = _get_tax_invoice(context, args["invoice_id"])
+        extra = dict(doc.extra_info or {})
+        reference_id = args.get("reference_invoice_id")
+        if doc.document_type == "invoice_sales_return" and not reference_id:
+            raise ValueError("برای برگشت از فروش reference_invoice_id الزامی است")
+        if reference_id is not None:
+            linked = link_reference_invoice(db, business_id, doc, int(reference_id))
+            extra = dict(doc.extra_info or {})
+        else:
+            linked = None
+        extra["tax_workspace"] = True
+        if not isinstance(extra.get("tax_status"), str) or not extra["tax_status"].strip():
+            extra["tax_status"] = "not_sent"
+        doc.extra_info = extra
+        db.add(doc)
+        db.flush()
+        return {
+            "invoice_id": doc.id,
+            "tax_workspace": True,
+            "tax_status": extra.get("tax_status"),
+            "reference_invoice_id": extra.get("reference_invoice_id"),
+            "reference_invoice_code": getattr(linked, "code", None),
+        }
+
+    registry.register(AIFunction(
+        name="add_invoice_to_tax_workspace",
+        description="افزودن فاکتور فروش یا برگشت فروش به کارپوشهٔ مالیاتی. برای برگشت، فاکتور فروش مرجع را با شناسهٔ جستجو‌شده مشخص کن.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "invoice_id": {"type": "integer", "minimum": 1},
+                "reference_invoice_id": {"type": "integer", "minimum": 1},
+            },
+            "required": ["invoice_id"],
+        },
+        handler=add_invoice_to_tax_workspace_handler,
+        allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+        required_permissions=["invoices.write"], category="tax",
+        requires_approval=True, risk_level="medium", is_readonly=False,
+    ))
+
+    def remove_invoice_from_tax_workspace_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        doc = _get_tax_invoice(context, args["invoice_id"])
+        extra = dict(doc.extra_info or {})
+        status = extra.get("tax_status")
+        if status in {"sent", "finalized"}:
+            raise ValueError("فاکتور ارسال‌شده یا نهایی‌شده را نمی‌توان از کارپوشه حذف کرد")
+        extra["tax_workspace"] = False
+        extra["tax_status"] = status or "not_in_workspace"
+        doc.extra_info = extra
+        context["db"].add(doc)
+        context["db"].flush()
+        return {"invoice_id": doc.id, "tax_workspace": False, "tax_status": extra["tax_status"]}
+
+    registry.register(AIFunction(
+        name="remove_invoice_from_tax_workspace",
+        description="حذف فاکتور فروش از کارپوشهٔ مالیاتی؛ فاکتور ارسال‌شده یا نهایی‌شده قابل حذف نیست. نیازمند تأیید است.",
+        parameters_schema={"type": "object", "properties": {"invoice_id": {"type": "integer", "minimum": 1}}, "required": ["invoice_id"]},
+        handler=remove_invoice_from_tax_workspace_handler,
+        allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+        required_permissions=["invoices.write"], category="tax",
+        requires_approval=True, risk_level="medium", is_readonly=False,
+    ))
+
+    def send_invoice_to_tax_system_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from app.services.tax_submission_service import send_document_to_tax_system, normalize_stored_tax_status, build_tax_failure_details
+
+        db = context["db"]
+        doc = _get_tax_invoice(context, args["invoice_id"])
+        extra = dict(doc.extra_info or {})
+        if not extra.get("tax_workspace"):
+            raise ValueError("فاکتور ابتدا باید به کارپوشهٔ مالیاتی افزوده شود")
+        status = extra.get("tax_status")
+        if status in {"sent", "finalized"} or (
+            normalize_stored_tax_status(extra) in {"sent", "finalized", "pending"} and extra.get("tax_tracking_code")
+        ):
+            raise ValueError("این فاکتور قبلاً ارسال شده است")
+        if extra.get("tax_cancelled_in_modian"):
+            raise ValueError("فاکتور در سامانهٔ مالیاتی ابطال شده و ارسال مجدد مجاز نیست")
+        result = send_document_to_tax_system(db, doc)
+        db.flush()
+        after = dict(doc.extra_info or {})
+        failed = after.get("tax_status") == "failed" or result.get("status") == "failed"
+        return {
+            "invoice_id": doc.id,
+            "tax_status": after.get("tax_status"),
+            "tax_tracking_code": after.get("tax_tracking_code"),
+            "accepted": not failed,
+            "error_message": result.get("error_message") or after.get("tax_error_message") if failed else None,
+            "failure_details": build_tax_failure_details(after, result) if failed else None,
+        }
+
+    registry.register(AIFunction(
+        name="send_invoice_to_tax_system",
+        description="ارسال فاکتورِ موجود در کارپوشه به سامانهٔ مالیاتی. ارسال خارجی است، تکرار ارسال کنترل می‌شود و نتیجهٔ پذیرش/خطا برمی‌گردد؛ نیازمند تأیید صریح است.",
+        parameters_schema={"type": "object", "properties": {"invoice_id": {"type": "integer", "minimum": 1}}, "required": ["invoice_id"]},
+        handler=send_invoice_to_tax_system_handler,
+        allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+        required_permissions=["invoices.write"], category="tax",
+        requires_approval=True, risk_level="high", is_readonly=False,
+    ))
+
+    def cancel_invoice_in_tax_system_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from app.services.tax_reference_service import can_cancel_in_modian
+        from app.services.tax_submission_service import cancel_document_in_tax_system, build_tax_status_fields_for_api
+
+        db = context["db"]
+        doc = _get_tax_invoice(context, args["invoice_id"])
+        allowed, reason = can_cancel_in_modian(doc)
+        if not allowed:
+            raise ValueError(reason or "ابطال در وضعیت فعلی مجاز نیست")
+        result = cancel_document_in_tax_system(db, doc)
+        db.flush()
+        extra = dict(doc.extra_info or {})
+        return {
+            "invoice_id": doc.id,
+            "tax_status": extra.get("tax_status"),
+            "tax_tracking_code": extra.get("tax_tracking_code"),
+            "tax_cancelled_in_modian": bool(extra.get("tax_cancelled_in_modian")),
+            "accepted": result.get("status") != "failed",
+            "error_message": result.get("error_message"),
+            **build_tax_status_fields_for_api(extra),
+        }
+
+    registry.register(AIFunction(
+        name="cancel_invoice_in_tax_system",
+        description="ارسال ابطال برای فاکتور ارسال‌شده به سامانهٔ مالیاتی. اثر بیرونی و برگشت‌ناپذیر؛ ابتدا جزئیات و وضعیت را بررسی و تأیید بگیر.",
+        parameters_schema={"type": "object", "properties": {"invoice_id": {"type": "integer", "minimum": 1}}, "required": ["invoice_id"]},
+        handler=cancel_invoice_in_tax_system_handler,
+        allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+        required_permissions=["invoices.write"], category="tax",
+        requires_approval=True, risk_level="high", is_readonly=False,
+    ))
+
+    def send_corrective_invoice_to_tax_system_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from app.services.tax_reference_service import can_send_corrective
+        from app.services.tax_submission_service import send_corrective_to_tax_system, build_tax_status_fields_for_api
+
+        db = context["db"]
+        doc = _get_tax_invoice(context, args["invoice_id"])
+        allowed, reason = can_send_corrective(doc)
+        if not allowed:
+            raise ValueError(reason or "ارسال اصلاحی در وضعیت فعلی مجاز نیست")
+        result = send_corrective_to_tax_system(db, doc)
+        db.flush()
+        extra = dict(doc.extra_info or {})
+        return {
+            "invoice_id": doc.id,
+            "tax_status": extra.get("tax_status"),
+            "tax_tracking_code": extra.get("tax_tracking_code"),
+            "accepted": result.get("status") != "failed",
+            "error_message": result.get("error_message"),
+            **build_tax_status_fields_for_api(extra),
+        }
+
+    registry.register(AIFunction(
+        name="send_corrective_invoice_to_tax_system",
+        description="ارسال صورتحساب اصلاحی برای فاکتور مالیاتی مجاز. اثر بیرونی؛ قبل از اجرا داده و فاکتور مرجع را بررسی و تأیید بگیر.",
+        parameters_schema={"type": "object", "properties": {"invoice_id": {"type": "integer", "minimum": 1}}, "required": ["invoice_id"]},
+        handler=send_corrective_invoice_to_tax_system_handler,
+        allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+        required_permissions=["invoices.write"], category="tax",
+        requires_approval=True, risk_level="high", is_readonly=False,
+    ))
+
+    def get_invoice_tax_status_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from app.services.tax_submission_service import build_tax_status_fields_for_api
+        doc = _get_tax_invoice(context, args["invoice_id"])
+        extra = dict(doc.extra_info or {})
+        return {
+            "invoice_id": doc.id,
+            "invoice_code": doc.code,
+            "document_type": doc.document_type,
+            "tax_workspace": bool(extra.get("tax_workspace")),
+            "tax_status": extra.get("tax_status"),
+            "tax_tracking_code": extra.get("tax_tracking_code"),
+            "tax_last_send_at": extra.get("tax_last_send_at"),
+            "tax_last_inquiry_at": extra.get("tax_last_inquiry_at"),
+            "tax_error_message": extra.get("tax_error_message"),
+            "tax_cancelled_in_modian": bool(extra.get("tax_cancelled_in_modian")),
+            **build_tax_status_fields_for_api(extra),
+        }
+
+    registry.register(AIFunction(
+        name="get_invoice_tax_status",
+        description="وضعیت فعلی فاکتور در کارپوشه و اطلاعات رهگیری مالیاتی را بخوان؛ این ابزار استعلام زنده انجام نمی‌دهد.",
+        parameters_schema={"type": "object", "properties": {"invoice_id": {"type": "integer", "minimum": 1}}, "required": ["invoice_id"]},
+        handler=get_invoice_tax_status_handler,
+        allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+        required_permissions=["invoices.read"], category="tax",
+    ))
+
+    def validate_invoice_for_tax_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from adapters.db.models.tax_setting import TaxSetting
+        from app.services.tax_validation_service import validate_document_for_tax, validate_tax_submission_scenario
+
+        db = context["db"]
+        business_id = int(context["business_id"])
+        doc = _get_tax_invoice(context, args["invoice_id"])
+        setting = db.query(TaxSetting).filter(TaxSetting.business_id == business_id).first()
+        if not setting:
+            raise ValueError("تنظیمات مالیاتی کسب‌وکار ثبت نشده است")
+        basic = validate_document_for_tax(db, doc)
+        scenario = validate_tax_submission_scenario(
+            db, doc, setting, "return" if doc.document_type == "invoice_sales_return" else "normal"
+        )
+        issues = list(basic.get("issues") or []) + list(scenario.get("issues") or [])
+        return {"invoice_id": doc.id, "valid": bool(basic.get("valid")) and bool(scenario.get("valid")), "issues": issues}
+
+    registry.register(AIFunction(
+        name="validate_invoice_for_tax",
+        description="اعتبارسنجی داده و سناریوی فروش/برگشت پیش از ارسال مالیاتی؛ هیچ ارسال یا تغییری انجام نمی‌دهد.",
+        parameters_schema={"type": "object", "properties": {"invoice_id": {"type": "integer", "minimum": 1}}, "required": ["invoice_id"]},
+        handler=validate_invoice_for_tax_handler,
+        allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+        required_permissions=["invoices.read"], category="tax",
+    ))
+
+    def inquire_invoice_tax_status_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from adapters.db.models.document import Document
+        from app.services.tax_submission_service import inquire_tax_status
+
+        db = context["db"]
+        business_id = int(context["business_id"])
+        raw_ids = args["invoice_ids"]
+        if len(raw_ids) > 50:
+            raise ValueError("در هر استعلام حداکثر ۵۰ فاکتور بفرست")
+        ids = list(dict.fromkeys(int(value) for value in raw_ids))
+        documents = db.query(Document).filter(
+            Document.business_id == business_id,
+            Document.id.in_(ids),
+            Document.document_type.in_(["invoice_sales", "invoice_sales_return"]),
+        ).all()
+        if len(documents) != len(ids):
+            raise ValueError("یک یا چند فاکتور فروش در کسب‌وکار متصل پیدا نشد")
+        result = inquire_tax_status(db, business_id, invoice_ids=ids)
+        return result
+
+    registry.register(AIFunction(
+        name="inquire_invoice_tax_status",
+        description="استعلام زندهٔ وضعیت مالیاتی حداکثر ۵۰ فاکتور متعلق به همین کسب‌وکار؛ دادهٔ رهگیری را در سامانه به‌روز می‌کند. نیازمند مجوز عملیات مالیاتی و تأیید است.",
+        parameters_schema={
+            "type": "object", "properties": {"invoice_ids": {"type": "array", "minItems": 1, "maxItems": 50, "items": {"type": "integer", "minimum": 1}}},
+            "required": ["invoice_ids"],
+        },
+        handler=inquire_invoice_tax_status_handler,
+        allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+        required_permissions=["moadian.operate"], category="tax",
+        requires_approval=True, risk_level="medium", is_readonly=False,
+    ))
+
     # --- CRM lead ---
     def create_lead_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
         from datetime import date as date_cls

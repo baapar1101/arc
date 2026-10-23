@@ -174,7 +174,7 @@ _EXACT: Dict[str, str] = {
     "list_currency_rates": "financial.currency",
     "list_customer_club_ledger": "customer_club.loyalty",
     "list_customer_club_tiers": "customer_club.loyalty",
-    "list_distribution_routes": "misc.general",
+    "list_distribution_routes": "distribution.route",
     "list_fiscal_years": "financial.fiscal",
     "list_frequent_descriptions": "financial.document",
     "list_loan_facilities": "financial.loan",

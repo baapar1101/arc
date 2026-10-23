@@ -90,6 +90,7 @@ def create_person(
     person_data: PersonCreateRequest,
     *,
     defer_cache_invalidation: bool = False,
+    commit: bool = True,
 ) -> Dict[str, Any]:
     """ایجاد شخص جدید"""
     person_data = merge_person_create_with_group_defaults(db, business_id, person_data)
@@ -223,33 +224,35 @@ def create_person(
             )
         )
     
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise ApiError("DUPLICATE_PERSON_CODE", "کد شخص تکراری است", http_status=400)
+    if commit:
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            raise ApiError("DUPLICATE_PERSON_CODE", "کد شخص تکراری است", http_status=400)
     db.refresh(person)
 
     # Invalidate کش لیست اشخاص (در bulk با defer از بیرون یک‌بار invalidate می‌شود)
-    if not defer_cache_invalidation:
+    if commit and not defer_cache_invalidation:
         invalidate_persons_cache(business_id, fiscal_year_id=None)
 
     # فراخوانی workflow triggers
-    try:
-        from app.services.workflow.workflow_trigger_service import trigger_person_created
-        person_types_list = json.loads(person.person_types) if person.person_types else []
-        trigger_person_created(
-            db=db,
-            business_id=business_id,
-            person_id=person.id,
-            person_types=person_types_list,
-            user_id=None  # می‌توان user_id را از context دریافت کرد
-        )
-    except Exception as e:
-        # عدم موفقیت در trigger نباید مانع بازگشت شخص شود
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.warning(f"Failed to trigger workflows for person {person.id}: {e}")
+    if commit:
+        try:
+            from app.services.workflow.workflow_trigger_service import trigger_person_created
+            person_types_list = json.loads(person.person_types) if person.person_types else []
+            trigger_person_created(
+                db=db,
+                business_id=business_id,
+                person_id=person.id,
+                person_types=person_types_list,
+                user_id=None  # می‌توان user_id را از context دریافت کرد
+            )
+        except Exception as e:
+            # عدم موفقیت در trigger نباید مانع بازگشت شخص شود
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to trigger workflows for person {person.id}: {e}")
     
     return success_response(
         message="شخص با موفقیت ایجاد شد",

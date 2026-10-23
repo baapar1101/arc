@@ -429,6 +429,62 @@ def register_phase4_business_functions(registry: "AIFunctionRegistry") -> None:
         )
     )
 
+    def check_product_usage_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from adapters.db.models.product import Product
+        from app.services.product_service import check_product_has_related_documents
+
+        db = context["db"]
+        business_id = int(context["business_id"])
+        product_id = int(args["product_id"])
+        product = db.query(Product).filter(
+            Product.id == product_id, Product.business_id == business_id
+        ).first()
+        if not product:
+            raise ValueError("کالا در کسب‌وکار متصل پیدا نشد")
+        has_documents, document_types = check_product_has_related_documents(db, product_id)
+        return {
+            "product_id": product_id,
+            "can_delete": not has_documents,
+            "has_related_documents": has_documents,
+            "related_document_types": document_types,
+        }
+
+    registry.register(AIFunction(
+        name="check_product_usage",
+        description="پیش‌بررسی وابستگی‌های کالا در اسناد، BOM و گردش‌های دیگر؛ بدون تغییر داده. پیش از حذف این ابزار را اجرا کن.",
+        parameters_schema={
+            "type": "object", "properties": {"product_id": {"type": "integer", "minimum": 1}},
+            "required": ["product_id"],
+        },
+        handler=create_handler(check_product_usage_handler),
+        allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+        required_permissions=["products.read"], category="products",
+    ))
+
+    def delete_product_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from app.services.product_service import delete_product
+
+        db = context["db"]
+        business_id = int(context["business_id"])
+        product_id = int(args["product_id"])
+        deleted, error = delete_product(db, product_id, business_id)
+        if not deleted:
+            raise ValueError(error or "حذف کالا انجام نشد")
+        return {"product_id": product_id, "deleted": True}
+
+    registry.register(AIFunction(
+        name="delete_product",
+        description="حذف کالا از سرویس دامنه؛ کالاهای دارای وابستگی حذف نمی‌شوند. ابتدا check_product_usage را اجرا کن. حذف غیرقابل بازگشت و نیازمند تأیید است.",
+        parameters_schema={
+            "type": "object", "properties": {"product_id": {"type": "integer", "minimum": 1}},
+            "required": ["product_id"],
+        },
+        handler=create_handler(delete_product_handler),
+        allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+        required_permissions=["products.delete"], category="products",
+        requires_approval=True, risk_level="high", is_readonly=False,
+    ))
+
     # --- Write: check ---
     def create_check_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
         from app.services.ai.ai_tool_payloads import build_create_check_payload

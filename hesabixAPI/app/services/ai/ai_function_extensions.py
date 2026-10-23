@@ -200,6 +200,126 @@ def register_extended_business_functions(registry: "AIFunctionRegistry") -> None
         )
     )
 
+    # Complete the common warehouse-document lifecycle via the domain service.
+    # Resolve each document inside the authenticated tenant before calling services
+    # whose legacy signatures do not all accept a business_id.
+    def _get_tenant_warehouse_document(db, business_id: int, document_id: int):
+        from adapters.db.models.warehouse_document import WarehouseDocument
+
+        document = (
+            db.query(WarehouseDocument)
+            .filter(
+                WarehouseDocument.id == int(document_id),
+                WarehouseDocument.business_id == int(business_id),
+            )
+            .first()
+        )
+        if not document:
+            raise ValueError("حوالهٔ انبار در کسب‌وکار متصل پیدا نشد")
+        return document
+
+    def update_warehouse_document_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from app.services.warehouse_service import update_warehouse_document, warehouse_document_to_dict
+
+        db = context["db"]
+        business_id = int(context["business_id"])
+        document_id = int(args["warehouse_document_id"])
+        _get_tenant_warehouse_document(db, business_id, document_id)
+        document = update_warehouse_document(
+            db, business_id, document_id, context["user_context"].get_user_id(), args.get("data") or {}
+        )
+        return warehouse_document_to_dict(db, document)
+
+    registry.register(AIFunction(
+        name="update_warehouse_document",
+        description=(
+            "ویرایش حوالهٔ انبار. data فقط فیلدهای تغییرکرده را بگیرد؛ lines در صورت ارسال جایگزین/ویرایش می‌شوند. "
+            "حوالهٔ قطعی فقط محدودیت‌های سرویس دامنه را می‌پذیرد. نیازمند تأیید کاربر است."
+        ),
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "warehouse_document_id": {"type": "integer", "minimum": 1},
+                "data": {"type": "object", "description": "فیلدهای قابل ویرایش مانند document_date، توضیحات و lines"},
+            },
+            "required": ["warehouse_document_id", "data"],
+        },
+        handler=create_handler(update_warehouse_document_handler),
+        allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+        required_permissions=["warehouses.write"], category="warehouse",
+        requires_approval=True, risk_level="medium", is_readonly=False,
+    ))
+
+    def post_warehouse_document_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from app.services.warehouse_service import post_warehouse_document
+
+        db = context["db"]
+        business_id = int(context["business_id"])
+        document_id = int(args["warehouse_document_id"])
+        _get_tenant_warehouse_document(db, business_id, document_id)
+        return post_warehouse_document(db, document_id)
+
+    registry.register(AIFunction(
+        name="post_warehouse_document",
+        description="قطعی‌سازی حوالهٔ انبار و اعمال اثر موجودی پس از کنترل‌های سرویس. وضعیت و نتیجه را بررسی کن. نیازمند تأیید صریح است.",
+        parameters_schema={
+            "type": "object", "properties": {"warehouse_document_id": {"type": "integer", "minimum": 1}},
+            "required": ["warehouse_document_id"],
+        },
+        handler=create_handler(post_warehouse_document_handler),
+        allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+        required_permissions=["warehouses.write"], category="warehouse",
+        requires_approval=True, risk_level="high", is_readonly=False,
+    ))
+
+    def delete_warehouse_document_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from app.services.warehouse_service import delete_warehouse_document
+
+        db = context["db"]
+        business_id = int(context["business_id"])
+        document_id = int(args["warehouse_document_id"])
+        _get_tenant_warehouse_document(db, business_id, document_id)
+        deleted = delete_warehouse_document(db, business_id, document_id)
+        return {"deleted": bool(deleted), "warehouse_document_id": document_id}
+
+    registry.register(AIFunction(
+        name="delete_warehouse_document",
+        description="حذف حوالهٔ پیش‌نویس انبار. اسناد قطعی یا لغوشده قابل حذف نیستند. عملیات حذف نیازمند تأیید است.",
+        parameters_schema={
+            "type": "object", "properties": {"warehouse_document_id": {"type": "integer", "minimum": 1}},
+            "required": ["warehouse_document_id"],
+        },
+        handler=create_handler(delete_warehouse_document_handler),
+        allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+        required_permissions=["warehouses.delete"], category="warehouse",
+        requires_approval=True, risk_level="high", is_readonly=False,
+    ))
+
+    def cancel_warehouse_document_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from app.services.warehouse_service import cancel_warehouse_document, warehouse_document_to_dict
+
+        db = context["db"]
+        business_id = int(context["business_id"])
+        document_id = int(args["warehouse_document_id"])
+        _get_tenant_warehouse_document(db, business_id, document_id)
+        document = cancel_warehouse_document(
+            db, business_id, document_id, context["user_context"].get_user_id()
+        )
+        return warehouse_document_to_dict(db, document)
+
+    registry.register(AIFunction(
+        name="cancel_warehouse_document",
+        description="لغو حوالهٔ قطعی انبار از مسیر دامنه؛ ممکن است سند معکوس و اصلاح موجودی ایجاد شود. نیازمند تأیید صریح است.",
+        parameters_schema={
+            "type": "object", "properties": {"warehouse_document_id": {"type": "integer", "minimum": 1}},
+            "required": ["warehouse_document_id"],
+        },
+        handler=create_handler(cancel_warehouse_document_handler),
+        allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+        required_permissions=["warehouses.write"], category="warehouse",
+        requires_approval=True, risk_level="high", is_readonly=False,
+    ))
+
     # --- چک ---
     registry.register(
         AIFunction(

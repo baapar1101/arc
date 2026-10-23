@@ -158,6 +158,49 @@ class AIFunctionRegistry:
         )
 
         register_phase11_business_functions(self)
+
+        from app.services.ai.ai_function_extensions_mcp_crm import register_mcp_crm_functions
+
+        register_mcp_crm_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_crm_meta import register_mcp_crm_meta_functions
+
+        register_mcp_crm_meta_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_invoice_extra import register_mcp_invoice_extra_functions
+
+        register_mcp_invoice_extra_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_checks import register_mcp_check_action_functions
+
+        register_mcp_check_action_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_stock_count import register_mcp_stock_count_functions
+
+        register_mcp_stock_count_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_bulk_financial import register_mcp_bulk_financial_functions
+
+        register_mcp_bulk_financial_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_payroll import register_mcp_payroll_functions
+
+        register_mcp_payroll_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_products_batch import register_mcp_products_batch_functions
+
+        register_mcp_products_batch_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_warehouse_reports import register_mcp_warehouse_report_functions
+
+        register_mcp_warehouse_report_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_repair import register_mcp_repair_functions
+
+        register_mcp_repair_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_warranty import register_mcp_warranty_functions
+
+        register_mcp_warranty_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_production import register_mcp_production_functions
+
+        register_mcp_production_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_distribution import register_mcp_distribution_functions
+
+        register_mcp_distribution_functions(self)
+        from app.services.ai.ai_function_extensions_tax_extra import register_tax_extra_functions
+
+        register_tax_extra_functions(self)
         from app.services.ai.ai_function_extensions_memory import register_memory_functions
 
         register_memory_functions(self)

@@ -123,14 +123,21 @@ def register_phase2_business_functions(registry: "AIFunctionRegistry") -> None:
                 "type": "object",
                 "properties": {
                     **_COMMON,
-                    "status": {"type": "string", "description": "received, in_progress, ready, ..."},
-                    "customer_person_id": {"type": "integer"},
+                    "status": {"type": "string", "enum": ["received", "assigned", "in_progress", "waiting_parts", "testing", "completed_fixed", "completed_unfixable", "ready_for_pickup", "delivered", "cancelled"]},
+                    "customer_person_id": {"type": "integer", "minimum": 1},
+                    "assigned_technician_id": {"type": "integer", "minimum": 1},
+                    "warranty_code_id": {"type": "integer", "minimum": 1},
+                    "search": {"type": "string", "maxLength": 200},
+                    "from_date": {"type": "string", "format": "date"},
+                    "to_date": {"type": "string", "format": "date"},
+                    "skip": {"type": "integer", "minimum": 0},
+                    "take": {"type": "integer", "minimum": 1, "maximum": 200},
                 },
                 "required": [],
             },
             handler=h(_search_repair_orders),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
-            required_permissions=["invoices.read"],
+            required_permissions=["repair_shop.read"],
             category="repair",
         )
     )
@@ -146,7 +153,7 @@ def register_phase2_business_functions(registry: "AIFunctionRegistry") -> None:
             },
             handler=h(_get_repair_order),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
-            required_permissions=["invoices.read"],
+            required_permissions=["repair_shop.read"],
             category="repair",
         )
     )
@@ -255,10 +262,10 @@ def register_phase2_business_functions(registry: "AIFunctionRegistry") -> None:
             parameters_schema={
                 "type": "object",
                 "properties": {
-                    "status": {"type": "string"},
-                    "product_id": {"type": "integer"},
-                    "take": {"type": "integer"},
-                    "skip": {"type": "integer"},
+                    "status": {"type": "string", "enum": ["generated", "activated", "expired", "used", "revoked"]},
+                    "product_id": {"type": "integer", "minimum": 1},
+                    "take": {"type": "integer", "minimum": 1, "maximum": 100},
+                    "skip": {"type": "integer", "minimum": 0},
                 },
                 "required": [],
             },
@@ -324,11 +331,19 @@ def _search_production(db, business_id, user_id, **kwargs):
 
 
 def _search_repair_orders(db, business_id, user_id, **kwargs):
+    from datetime import datetime, time
     from app.services.repair_shop_service import list_repair_orders
     from app.services.ai.ai_query_service import _clamp_pagination
 
     q = _clamp_pagination(kwargs)
-    flt = {k: kwargs[k] for k in ("status", "customer_person_id", "search") if kwargs.get(k) is not None}
+    flt = {k: kwargs[k] for k in ("status", "customer_person_id", "assigned_technician_id", "warranty_code_id", "search") if kwargs.get(k) is not None}
+    for key, boundary in (("from_date", time.min), ("to_date", time.max)):
+        if kwargs.get(key):
+            try:
+                parsed = datetime.fromisoformat(str(kwargs[key])).date()
+            except ValueError as exc:
+                raise ValueError(f"{key} باید تاریخ ISO به شکل YYYY-MM-DD باشد") from exc
+            flt[key] = datetime.combine(parsed, boundary)
     return list_repair_orders(db, business_id, flt, offset=q["skip"], limit=q["take"])
 
 
@@ -363,7 +378,7 @@ def _search_warranty(db, business_id, user_id, **kwargs):
     from app.services.ai.ai_query_service import _clamp_pagination
 
     q = _clamp_pagination(kwargs)
-    return list_warranty_codes(
+    result = list_warranty_codes(
         db,
         business_id,
         status=kwargs.get("status"),
@@ -371,6 +386,12 @@ def _search_warranty(db, business_id, user_id, **kwargs):
         limit=q["take"],
         skip=q["skip"],
     )
+    # Customer contact payloads and tracking codes are sensitive; expose them
+    # only through a future dedicated, explicitly authorized workflow.
+    for item in result.get("items", []):
+        item["activated_by_customer_info"] = None
+        item["tracking_link_code"] = None
+    return result
 
 
 def _list_petty(db, business_id, user_id, **kwargs):
