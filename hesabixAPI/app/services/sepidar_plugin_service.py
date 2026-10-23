@@ -154,11 +154,13 @@ class PluginProjector:
                 value=money(item['Fee'])
                 if value<0:raise NativeConversionError('Negative source price')
                 sid=item['PriceNoteItemID'];allowed.add(str(sid))
-                tier=f'SPD-{item["SaleTypeRef"]} {sale_types.get(item["SaleTypeRef"],{}).get("Title", "")}'[:64]
+                sale_type=sale_types.get(item['SaleTypeRef'])
+                if not sale_type:raise NativeConversionError('Source sale type unavailable')
+                tier=f'SPD-{item["SaleTypeRef"]} {sale_type["Title"]}'[:64]
                 identity=(price_list.id,product.id,currency,tier)
                 if identity in identities:raise NativeConversionError('Ambiguous duplicate source price tier')
                 identities.add(identity)
-                p.upsert('SLS.PriceNoteItem',sid,PriceItem,{'item':item,'list':row}, {'price_list_id':price_list.id,'product_id':product.id,
+                p.upsert('SLS.PriceNoteItem',sid,PriceItem,{'item':item,'list':row,'sale_type':sale_type}, {'price_list_id':price_list.id,'product_id':product.id,
                     'unit_id':None,'currency_id':currency,'tier_name':tier, 'min_qty':Decimal('0'),'price':value})
                 self.result['price_items']+=1
         for (table,sid),mapping in list(p.maps.items()):
@@ -181,13 +183,17 @@ class PluginProjector:
             from adapters.db.models.customer_club import CustomerClubInvoiceSnapshot
             snapshot=self.db.scalars(select(CustomerClubInvoiceSnapshot).where(CustomerClubInvoiceSnapshot.document_id==document.id)).first()
             person_id=(document.extra_info or {}).get('person_id')
-            if snapshot and (document.is_proforma or snapshot.person_id != person_id):
+            # Sepidar's SLS Invoice_Lookups defines State=2 as Revoked.
+            # ReturnedInvoice has no State column; do not invent one for it.
+            revoked=table=='SLS.Invoice' and (document.extra_info or {}).get('sepidar',{}).get('invoice_state')==2
+            if snapshot and (revoked or document.is_proforma or snapshot.person_id != person_id):
                 from app.services.customer_club_service import reverse_customer_club_on_invoice_delete
                 reverse_customer_club_on_invoice_delete(self.db,document.id,self.bid)
                 snapshot.accrued_points=Decimal('0')
                 if hasattr(snapshot,'redeemed_points'):snapshot.redeemed_points=Decimal('0')
                 snapshot.person_id=person_id
                 self.db.flush()
+            if revoked:continue
             sync_customer_club_for_invoice(self.db,mapping.target_id)
             self.result['loyalty_invoices']+=1
 

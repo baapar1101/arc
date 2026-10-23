@@ -714,13 +714,17 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
                       ),
                     ),
                   ),
-                  // تنظیمات پیشرفته ادمین
-                  if (_isAdmin) ...[
-                    const SizedBox(height: 24),
-                    _buildSmsAdvancedSection(t, theme, colorScheme),
-                  ],
                 ],
               ),
+            ),
+          ],
+          // Platform provider configuration is independent of the operator's
+          // personal SMS notification preference.
+          if (_isAdmin) ...[
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: _buildSmsAdvancedSection(t, theme, colorScheme),
             ),
           ],
         ],

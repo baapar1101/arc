@@ -88,6 +88,23 @@ def test_missing_license_does_not_create_paid_plugin_rows(native_db):
     assert summary['plugins']['price_items']==1  # Native catalog, not a paid plugin.
 
 
+def test_sale_type_title_live_update_keeps_price_identity(native_db):
+    db=native_db;source(db);project_native(db,1)
+    pid=db.scalars(select(PriceItem.id)).one()
+    edit(db,'SLS.SaleType',{'Title':'Wholesale'});db.commit()
+    project_native(db,1)
+    assert db.get(PriceItem,pid).tier_name=='SPD-1 Wholesale'
+    repeat=project_native(db,1)
+    assert repeat['entities']['SLS.PriceNoteItem']['updated']==0
+
+
+def test_unresolved_sale_type_fails_without_inventing_tier(native_db):
+    db=native_db;source(db)
+    edit(db,'SLS.PriceNoteItem',{'SaleTypeRef':999});db.commit()
+    with pytest.raises(NativeConversionError):project_native(db,1)
+    assert db.scalar(select(func.count()).select_from(PriceItem))==0
+
+
 def test_unsupported_price_rule_removes_stale_price_and_deletes_are_idempotent(native_db):
     db=native_db;source(db);project_native(db,1)
     edit(db,'SLS.PriceNoteItem',{'Discount':'10'});db.commit()
@@ -119,12 +136,10 @@ def test_source_managed_price_cannot_be_locally_edited(native_db):
 
 def test_cancelled_source_invoice_reverses_loyalty_only_once(native_db):
     db=native_db;source(db);project_native(db,1)
-    invoice=db.scalars(select(Document).where(Document.document_type=='invoice_sales')).one()
-    invoice.is_proforma=True;db.flush()
-    projector=Projector(db,db.scalars(select(SepidarImportSetting)).one())
-    bridge=PluginProjector(projector);bridge.loyalty();db.commit()
+    edit(db,'SLS.Invoice',{'State':2});db.commit()
+    project_native(db,1)
     assert db.scalars(select(CustomerClubBalance)).one().balance_points==0
     assert db.scalars(select(CustomerClubInvoiceSnapshot)).one().accrued_points==0
     count=db.scalar(select(func.count()).select_from(CustomerClubLedger))
-    bridge.loyalty();db.commit()
+    project_native(db,1)
     assert db.scalar(select(func.count()).select_from(CustomerClubLedger))==count
