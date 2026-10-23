@@ -127,6 +127,7 @@ def list_mcp_connections(
                 "name": row.name,
                 "business_id": row.business_id,
                 "scopes": sorted(_scopes(row)),
+                "tool_permissions": list(row.mcp_tool_permissions) if row.mcp_tool_permissions is not None else None,
                 "created_at": row.created_at.isoformat() + "Z",
                 "expires_at": row.expires_at.isoformat() + "Z" if row.expires_at else None,
                 "last_used_at": row.last_used_at.isoformat() + "Z" if row.last_used_at else None,
@@ -232,6 +233,12 @@ def get_mcp_context(request: Request, db: Session = Depends(get_db)) -> AuthCont
             headers={"WWW-Authenticate": f'Bearer error="invalid_token", resource_metadata="{resource_metadata}"'},
         )
     ctx.mcp_scopes = scopes
+    # None means a legacy/manual credential; an empty list is an explicit deny-all grant.
+    ctx.mcp_tool_permissions = (
+        set(row.mcp_tool_permissions)
+        if row.mcp_tool_permissions is not None
+        else None
+    )
     ctx.mcp_connection_id = row.id
     origin = request.headers.get("origin")
     if origin:

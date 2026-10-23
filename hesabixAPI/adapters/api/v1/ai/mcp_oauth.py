@@ -213,6 +213,25 @@ def _has_explicit_business_access(db: Session, user_id: int, business_id: int) -
     return permissions.get("join") is True and membership_is_active(permission)
 
 
+def _consent_tool_catalog(db: Session, ctx: AuthContext, business_id: int) -> list[dict]:
+    """Return only tools the signed-in member can already use in this business."""
+    from app.services.ai.ai_mcp_service import _get_tools, _mcp_readonly, _openai_tool_to_mcp
+
+    registry, definitions = _get_tools(db, ctx, business_id)
+    catalog = []
+    for definition in definitions:
+        tool = _openai_tool_to_mcp(definition, registry)
+        func = registry.get_function(tool["name"])
+        readonly = _mcp_readonly(tool["name"], registry)
+        catalog.append({
+            "name": tool["name"],
+            "description": tool["description"],
+            "category": getattr(func, "category", None) or "other",
+            "read_only": readonly,
+        })
+    return sorted(catalog, key=lambda item: (item["category"], item["name"]))
+
+
 def _append_query(uri: str, values: dict[str, str]) -> str:
     p = urlsplit(uri)
     query = parse_qsl(p.query, keep_blank_values=True)
@@ -333,8 +352,7 @@ async def authorize(
     ))
     db.commit()
     html_body = _authorization_html(
-        raw_request_id, client.client_name, WRITE_SCOPE in requested_scopes,
-        "offline_access" in requested_scopes,
+        raw_request_id, client.client_name, "offline_access" in requested_scopes,
     )
     return HTMLResponse(html_body, headers={
         "Cache-Control": "no-store", "Pragma": "no-cache",
@@ -365,15 +383,10 @@ def oauth_font(font_name: str) -> FileResponse:
     )
 
 
-def _authorization_html(request_id: str, client_name: str, write_requested: bool, offline_requested: bool) -> str:
+def _authorization_html(request_id: str, client_name: str, offline_requested: bool) -> str:
     safe_name = html.escape(client_name)
     api_json = json.dumps(get_settings().api_v1_prefix)
     request_json = json.dumps(request_id)
-    write_option = (
-        '<label class="permission permission--optional"><input type="checkbox" id="write">'
-        '<span><strong>ابزارهای ویرایشی</strong><small>امکان ثبت یا تغییر اطلاعات کسب‌وکار (ویژهٔ مالک)</small></span></label>'
-        if write_requested else ""
-    )
     offline_option = (
         '<label class="permission permission--optional"><input type="checkbox" id="offline">'
         '<span><strong>تداوم اتصال بدون ورود دوباره</strong><small>تمدید اتصال در بازهٔ زمانی تعیین‌شده در تنظیمات حسابیکس</small></span></label>'
@@ -514,7 +527,8 @@ def _authorization_html(request_id: str, client_name: str, write_requested: bool
           <div class="divider"></div><h2 class="section-heading" id="consent-heading">اتصال را بررسی و تایید کنید</h2>
           <p class="section-hint">کسب‌وکار و سطح دسترسی را انتخاب کنید. فقط موارد انتخاب‌شده در اختیار این اتصال قرار می‌گیرد.</p>
           <label class="field"><span class="field-label business-label" for="business">کسب‌وکار موردنظر</span><select class="control" id="business" required><option value="" selected disabled>یک کسب‌وکار را انتخاب کنید</option></select></label>
-          <div class="permission-list"><label class="permission"><input type="checkbox" checked disabled><span><strong>مشاهدهٔ اطلاعات و گزارش‌ها</strong><small>دسترسی پایه برای استفاده از ابزارهای حسابیکس</small></span></label>{write_option}{offline_option}</div>
+          <div id="toolPermissionSection" hidden><h3 class="section-heading">انتخاب ابزارها</h3><p class="section-hint">فقط ابزارهای مجاز برای حساب شما نمایش داده می‌شوند. ابزارهای تغییردهنده نیز مطابق سطح دسترسی شما قابل انتخاب‌اند.</p><button class="text-button" id="grantAll" type="button">فعال‌سازی همهٔ دسترسی‌های مجاز</button><div id="toolPermissions" class="permission-list"></div></div>
+          <div class="permission-list">{offline_option}</div>
           <div class="button-row"><button class="primary" id="approve" type="button">تایید و اتصال</button><button class="secondary" id="deny" type="button">رد درخواست</button></div>
           <p class="status" id="consentStatus" role="status" aria-live="polite"></p>
         </section>
@@ -548,12 +562,34 @@ $('send').addEventListener('click',async()=>{{const button=$('send');let request
 $('otp').addEventListener('input',()=>{{const value=asciiDigits($('otp').value).replace(/\\D/g,'').slice(0,6);if($('otp').value!==value)$('otp').value=value}});
 $('changeLogin').addEventListener('click',()=>{{status('otpStatus','','');$('otpSection').hidden=true;$('loginSection').hidden=false;$('stepLogin').classList.add('active');$('stepConsent').classList.remove('active');$('captchaCode').value='';loadCaptcha();$('identifier').focus()}});
 $('verify').addEventListener('click',async()=>{{const button=$('verify');setBusy(button,true,'در حال بررسی کد…');status('otpStatus','');try{{const otp=asciiDigits($('otp').value.trim());if(otp.length!==6)throw Error('کد تایید باید ۶ رقم باشد.');const login=await request('/auth/login/verify-otp?session_id='+encodeURIComponent(loginSession)+'&otp_code='+encodeURIComponent(otp),{{method:'POST'}});const consent=await request('/ai/mcp/oauth/authorize/session',{{method:'POST',headers:{{'Content-Type':'application/json',Authorization:'ApiKey '+login.api_key}},body:JSON.stringify({{request_id:rid}})}});sessionKey=consent.consent_token;$('business').replaceChildren();const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='یک کسب‌وکار را انتخاب کنید';placeholder.disabled=true;placeholder.selected=true;$('business').append(placeholder);for(const item of consent.items){{const option=document.createElement('option');option.value=item.id;option.textContent=item.name;option.dataset.owner=item.owner?'1':'0';$('business').append(option)}}$('business').addEventListener('change',()=>{{const write=$('write');if(write){{write.disabled=$('business').selectedOptions[0]?.dataset.owner!=='1';if(write.disabled)write.checked=false}}}});$('business').dispatchEvent(new Event('change'));$('loginSection').hidden=true;$('otpSection').hidden=true;$('consent').hidden=false;$('stepLogin').classList.remove('active');$('stepConsent').classList.add('active');status('consentStatus','ورود موفق بود. دسترسی‌های درخواستی را بررسی کنید.','success')}}catch(error){{status('otpStatus',error.message,'error')}}finally{{setBusy(button,false)}}}});
-async function decide(approved){{const button=approved?$('approve'):$('deny');setBusy(button,true,approved?'در حال اتصال…':'در حال ثبت…');status('consentStatus','');try{{const scopes=['ai:tools:read'];if($('write')?.checked)scopes.push('ai:tools:write');if($('offline')?.checked)scopes.push('offline_access');const result=await request('/ai/mcp/oauth/authorize/consent',{{method:'POST',headers:{{'Content-Type':'application/json',Authorization:'Bearer '+sessionKey}},body:JSON.stringify({{request_id:rid,business_id:Number($('business').value),approved,scopes}})}});location.assign(result.redirect_to)}}catch(error){{status('consentStatus',error.message,'error');setBusy(button,false)}}}}
+async function decide(approved){{const button=approved?$('approve'):$('deny');setBusy(button,true,approved?'در حال اتصال…':'در حال ثبت…');status('consentStatus','');try{{const selected=[...document.querySelectorAll('[data-tool-name]:checked')].map(el=>el.dataset.toolName);const hasWrite=selected.some(name=>consentCatalog.some(tool=>tool.name===name&&!tool.read_only));const scopes=['ai:tools:read'];if(hasWrite)scopes.push('ai:tools:write');if($('offline')?.checked)scopes.push('offline_access');const result=await request('/ai/mcp/oauth/authorize/consent',{{method:'POST',headers:{{'Content-Type':'application/json',Authorization:'Bearer '+sessionKey}},body:JSON.stringify({{request_id:rid,business_id:Number($('business').value),approved,scopes,tool_permissions:selected}})}});location.assign(result.redirect_to)}}catch(error){{status('consentStatus',error.message,'error');setBusy(button,false)}}}}
+let consentCatalog=[];
+const categoryLabels={{invoices:'فاکتورها',products:'کالاها',inventory:'انبار',people:'اشخاص',financial:'مالی',crm:'CRM',reports:'گزارش‌ها',workflow:'گردش‌کار',export:'خروجی‌ها',integration:'یکپارچه‌سازی',other:'سایر'}};
+async function loadConsentCatalog(){{
+  const host=$('toolPermissions');host.replaceChildren();$('toolPermissionSection').hidden=true;
+  if(!$('business').value)return;
+  try{{
+    const result=await request('/ai/mcp/oauth/authorize/catalog',{{method:'POST',headers:{{'Content-Type':'application/json',Authorization:'Bearer '+sessionKey}},body:JSON.stringify({{request_id:rid,business_id:Number($('business').value)}})}});
+    consentCatalog=result.tools||[];const groups=new Map();
+    for(const tool of consentCatalog){{const category=tool.category||'other';if(!groups.has(category))groups.set(category,[]);groups.get(category).push(tool)}}
+    for(const [category,tools] of groups){{
+      const heading=document.createElement('h4');heading.textContent=categoryLabels[category]||category;host.append(heading);
+      for(const tool of tools){{
+        const label=document.createElement('label');label.className='permission';const input=document.createElement('input');input.type='checkbox';input.dataset.toolName=tool.name;
+        const isWrite=!tool.read_only;const writeAllowed=__WRITE_ALLOWED__;input.checked=false;input.disabled=isWrite&&!writeAllowed;
+        const content=document.createElement('span');const title=document.createElement('strong');title.textContent=tool.name+(isWrite?' · تغییردهنده':' · فقط‌خواندنی');const description=document.createElement('small');description.textContent=tool.description||'';content.append(title,description);label.append(input,content);host.append(label)
+      }}
+    }}
+    $('toolPermissionSection').hidden=false
+  }}catch(error){{status('consentStatus',error.message,'error')}}
+}}
+$('business').addEventListener('change',loadConsentCatalog);
+$('grantAll').addEventListener('click',()=>{{document.querySelectorAll('#toolPermissions input[type="checkbox"]:not(:disabled)').forEach(input=>input.checked=true)}});
 $('approve').addEventListener('click',()=>{{if(!$('business').value){{status('consentStatus','ابتدا کسب‌وکار موردنظر را انتخاب کنید.','error');return}}decide(true)}});$('deny').addEventListener('click',()=>decide(false));
 $('identifier').addEventListener('keydown',event=>{{if(event.key==='Enter'){{event.preventDefault();$('send').click()}}}});$('captchaCode').addEventListener('keydown',event=>{{if(event.key==='Enter'){{event.preventDefault();$('send').click()}}}});$('otp').addEventListener('keydown',event=>{{if(event.key==='Enter'){{event.preventDefault();$('verify').click()}}}});
 </script>
 </body>
-</html>'''
+</html>'''.replace("__WRITE_ALLOWED__", "true")
 
 
 @oauth_router.post("/authorize/session")
@@ -602,6 +638,36 @@ def create_consent_session(payload: dict, db: Session = Depends(get_db), ctx: Au
     return {"consent_token": consent_token, "expires_in": 300, "items": result}
 
 
+@oauth_router.post("/authorize/catalog")
+@rate_limit(max_requests=60, window_seconds=600, error_message="درخواست‌های فهرست ابزار بیش از حد مجاز است.")
+def consent_catalog(payload: dict, request: Request, db: Session = Depends(get_db)) -> dict:
+    auth_header = request.headers.get("authorization", "")
+    scheme, _, raw_token = auth_header.partition(" ")
+    raw_request_id = payload.get("request_id")
+    row = db.query(McpOAuthAuthorizationRequest).filter(
+        McpOAuthAuthorizationRequest.request_hash == _hash(str(raw_request_id or "")),
+        McpOAuthAuthorizationRequest.expires_at > datetime.utcnow(),
+        McpOAuthAuthorizationRequest.user_id.is_not(None),
+        McpOAuthAuthorizationRequest.consent_expires_at > datetime.utcnow(),
+    ).first()
+    if (scheme.lower() != "bearer" or not raw_token.startswith("mcp_consent_") or not row
+            or not row.consent_token_hash
+            or not secrets.compare_digest(row.consent_token_hash, _hash(raw_token))):
+        raise HTTPException(401, "A valid one-time OAuth consent token is required")
+    user = db.get(User, row.user_id)
+    if not user or not user.is_active:
+        raise HTTPException(401, "The authenticated user is no longer active")
+    try:
+        business_id = int(payload.get("business_id"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "A business must be selected")
+    ctx = AuthContext(user=user, api_key_id=0, business_id=business_id, db=db)
+    if not _has_explicit_business_access(db, user.id, business_id):
+        raise HTTPException(403, "Business access is no longer active")
+    catalog = _consent_tool_catalog(db, ctx, business_id)
+    return {"tools": catalog}
+
+
 @oauth_router.post("/authorize/consent")
 @rate_limit(max_requests=30, window_seconds=600, error_message="تاییدهای OAuth بیش از حد مجاز است.")
 def consent(payload: dict, request: Request, db: Session = Depends(get_db)) -> dict:
@@ -642,20 +708,35 @@ def consent(payload: dict, request: Request, db: Session = Depends(get_db)) -> d
     if (not ctx.is_user_active() or
             not _has_explicit_business_access(db, ctx.get_user_id(), business_id)):
         raise HTTPException(403, "Business access is no longer active")
+    raw_tool_permissions = payload.get("tool_permissions")
+    if (not isinstance(raw_tool_permissions, list)
+            or not all(isinstance(name, str) for name in raw_tool_permissions)
+            or len(raw_tool_permissions) != len(set(raw_tool_permissions))):
+        raise HTTPException(400, "Invalid tool permissions")
+    tool_catalog = _consent_tool_catalog(db, ctx, business_id)
+    available_tools = {tool["name"]: tool for tool in tool_catalog}
+    selected_tools = set(raw_tool_permissions)
+    if not selected_tools <= set(available_tools):
+        raise HTTPException(400, "A selected tool is unavailable for this business member")
+    selected_write = any(not available_tools[name]["read_only"] for name in selected_tools)
     requested = set(row.scopes or [])
     raw_scopes = payload.get("scopes")
     if not isinstance(raw_scopes, list) or not all(isinstance(scope, str) for scope in raw_scopes):
         raise HTTPException(400, "Invalid consent scopes")
     scopes = set(raw_scopes)
-    if not scopes or not scopes <= requested or READ_SCOPE not in scopes or not scopes <= AUTH_SCOPES:
+    # The consent UI is the authority for optional write access. Allow it to
+    # grant the server-advertised write scope even when the client requested
+    # only the required read scope; all selected tools are still user-filtered.
+    if (not scopes or not scopes <= (requested | {WRITE_SCOPE})
+            or READ_SCOPE not in scopes or not scopes <= AUTH_SCOPES):
         raise HTTPException(400, "Invalid consent scopes")
-    if WRITE_SCOPE in scopes and not ctx.is_business_owner(business_id):
-        raise HTTPException(403, "Only the business owner can grant write tools")
+    if (selected_write != (WRITE_SCOPE in scopes)):
+        raise HTTPException(400, "Write scope must match the selected tools")
     raw_code = "mcp_code_" + secrets.token_urlsafe(40)
     db.add(McpOAuthAuthorizationCode(
         code_hash=_hash(raw_code), client_id=row.client_id, redirect_uri=row.redirect_uri,
         resource=row.resource, user_id=ctx.get_user_id(), business_id=business_id,
-        scopes=sorted(scopes), code_challenge=row.code_challenge,
+        scopes=sorted(scopes), tool_permissions=sorted(selected_tools), code_challenge=row.code_challenge,
         expires_at=datetime.utcnow() + CODE_TTL,
     ))
     response_params = {"code": raw_code, "iss": _issuer(request)}
@@ -704,6 +785,7 @@ async def token(request: Request, db: Session = Depends(get_db)) -> JSONResponse
             return _json_error("invalid_grant", "PKCE verification failed")
         code_row.consumed_at = datetime.utcnow()
         user_id, business_id, scopes = code_row.user_id, code_row.business_id, list(code_row.scopes or [])
+        tool_permissions = list(code_row.tool_permissions or [])
         resource = code_row.resource
         db.add(code_row)
         db.flush()
@@ -746,6 +828,7 @@ async def token(request: Request, db: Session = Depends(get_db)) -> JSONResponse
             )
         refresh_row.revoked_at = datetime.utcnow()
         user_id, business_id, scopes = refresh_row.user_id, refresh_row.business_id, list(refresh_row.scopes or [])
+        tool_permissions = list(refresh_row.tool_permissions or [])
         oauth_grant_id = refresh_row.grant_id
         db.add(refresh_row)
     else:
@@ -777,7 +860,8 @@ async def token(request: Request, db: Session = Depends(get_db)) -> JSONResponse
         user_id=user_id, key_hash=access_hash, key_type="mcp", business_id=business_id,
         mcp_resource=resource, oauth_client_id=client_id, oauth_grant_id=oauth_grant_id,
         name=f"OAuth: {client.client_name}"[:100],
-        scopes=json.dumps(access_scopes), expires_at=datetime.utcnow() + session_ttl,
+        scopes=json.dumps(access_scopes), mcp_tool_permissions=tool_permissions,
+        expires_at=datetime.utcnow() + session_ttl,
     )
     db.add(access_row)
     returned = {"access_token": access_token, "token_type": "Bearer", "expires_in": int(session_ttl.total_seconds()), "scope": " ".join(access_scopes)}
@@ -785,7 +869,8 @@ async def token(request: Request, db: Session = Depends(get_db)) -> JSONResponse
         refresh_token, refresh_hash = generate_api_key(prefix="mcp_refresh_")
         refresh_row = McpOAuthRefreshToken(
             token_hash=refresh_hash, client_id=client_id, user_id=user_id, business_id=business_id,
-            grant_id=oauth_grant_id, resource=resource, scopes=scopes, expires_at=datetime.utcnow() + session_ttl,
+            grant_id=oauth_grant_id, resource=resource, scopes=scopes,
+            tool_permissions=tool_permissions, expires_at=datetime.utcnow() + session_ttl,
         )
         db.add(refresh_row)
         db.flush()

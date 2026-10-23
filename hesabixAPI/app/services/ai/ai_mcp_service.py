@@ -96,6 +96,12 @@ def _get_tools(db: Session, ctx: AuthContext, business_id: int) -> tuple[Any, li
         and function.business_context_required
         and bool(function.allowed_roles & business_roles)
     ]
+    allowed_tools = getattr(ctx, "mcp_tool_permissions", None)
+    if allowed_tools is not None:
+        definitions = [
+            item for item in definitions
+            if str((item.get("function") or {}).get("name", "")) in allowed_tools
+        ]
     return registry, definitions
 
 
@@ -241,19 +247,22 @@ async def handle_mcp_request(
             tool = _openai_tool_to_mcp(definition, registry)
             if tool["annotations"]["readOnlyHint"] or WRITE_SCOPE in getattr(ctx, "mcp_scopes", set()):
                 tools.append(tool)
-        tools.append(
-            {
-                "name": AGENT_TOOL_NAME,
-                "description": "پرسش چندمرحله‌ای از ایجنت حسابیکس؛ ایجنت ابزارهای مجاز و فقط‌خواندنی همین کسب‌وکار را انتخاب و ترکیب می‌کند.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {"query": {"type": "string", "description": "درخواست یا پرسش درباره همین کسب‌وکار"}},
-                    "required": ["query"],
-                    "additionalProperties": False,
-                },
-                "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": False, "openWorldHint": False},
-            }
-        )
+        # The internal agent discovers tools independently. Hide it for scoped
+        # OAuth grants so it cannot bypass the per-tool allowlist.
+        if getattr(ctx, "mcp_tool_permissions", None) is None:
+            tools.append(
+                {
+                    "name": AGENT_TOOL_NAME,
+                    "description": "پرسش چندمرحله‌ای از ایجنت حسابیکس؛ ایجنت ابزارهای مجاز و فقط‌خواندنی همین کسب‌وکار را انتخاب و ترکیب می‌کند.",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {"query": {"type": "string", "description": "درخواست یا پرسش درباره همین کسب‌وکار"}},
+                        "required": ["query"],
+                        "additionalProperties": False,
+                    },
+                    "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": False, "openWorldHint": False},
+                }
+            )
         tools.sort(key=lambda item: item["name"])
         cursor = params.get("cursor")
         try:
@@ -277,7 +286,7 @@ async def handle_mcp_request(
 
         registry, definitions = _get_tools(db, ctx, eff_business)
         available = {str((item.get("function") or {}).get("name")): item for item in definitions}
-        if name == AGENT_TOOL_NAME:
+        if name == AGENT_TOOL_NAME and getattr(ctx, "mcp_tool_permissions", None) is None:
             available[name] = {"function": {"name": name}}
         if name not in available:
             return _jsonrpc_error(req_id, -32602, "Tool not found or not permitted")
