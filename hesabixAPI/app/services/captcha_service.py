@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import io
+import os
 import secrets
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from sqlalchemy.orm import Session
@@ -12,11 +15,44 @@ from adapters.db.models.captcha import Captcha
 from app.core.settings import get_settings
 from app.services.auth_security_event_service import log_auth_security_event
 from app.services.system_settings_service import get_captcha_auth_security_effective
-import hashlib
+
 
 
 _ALPHANUM_CHARSET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
 
+_API_ROOT = Path(__file__).resolve().parents[2]
+_BUNDLED_CAPTCHA_FONT = _API_ROOT / "assets" / "fonts" / "Vazirmatn-Bold.ttf"
+
+
+def _captcha_font_candidates() -> tuple[Path, ...]:
+	candidates = [
+		Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+		Path("/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf"),
+	]
+
+	windows_dir = os.environ.get("WINDIR")
+	if windows_dir:
+		windows_fonts = Path(windows_dir) / "Fonts"
+		candidates.extend(
+			[
+				windows_fonts / "arialbd.ttf",
+				windows_fonts / "segoeuib.ttf",
+			]
+		)
+
+	candidates.append(_BUNDLED_CAPTCHA_FONT)
+	return tuple(candidates)
+
+
+def _load_captcha_font(size: int):
+	for font_path in _captcha_font_candidates():
+		try:
+			if font_path.is_file():
+				return ImageFont.truetype(str(font_path), size)
+		except (OSError, ValueError):
+			continue
+
+	return ImageFont.load_default()
 
 def _generate_numeric_code(length: int) -> str:
 	return "".join(str(secrets.randbelow(10)) for _ in range(length))
@@ -46,10 +82,7 @@ def _render_image(code: str, strong: bool) -> Image.Image:
 	bg2 = 242 + secrets.randbelow(8)
 	img = Image.new("RGB", (width, height), (bg0, bg1, bg2))
 	draw = ImageDraw.Draw(img)
-	try:
-		font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-		font = ImageFont.truetype(font_path, 26)
-	except Exception:
+	font = _load_captcha_font(26)
 		font = ImageFont.load_default()
 	for _ in range(8 if strong else 3):
 		xy = [(secrets.randbelow(width), secrets.randbelow(height)) for _ in range(2)]
