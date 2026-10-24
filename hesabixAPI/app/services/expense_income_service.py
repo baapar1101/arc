@@ -1356,10 +1356,9 @@ def export_expense_income_excel(db: Session, business_id: int, query: Dict[str, 
 
 def export_expense_income_pdf(db: Session, business_id: int, query: Dict[str, Any]) -> bytes:
     """خروجی PDF اسناد هزینه/درآمد با WeasyPrint (بدون وابستگی به reportlab)."""
-    from weasyprint import HTML
-    from weasyprint.text.fonts import FontConfiguration
     from html import escape
     import datetime
+    from app.core.weasyprint_runtime import load_weasyprint
     # دریافت داده‌ها
     result = list_expense_income(db, business_id, query)
     items = result.get("items", [])
@@ -1409,14 +1408,16 @@ def export_expense_income_pdf(db: Session, business_id: int, query: Dict[str, An
   </body>
 </html>
 """
-    return HTML(string=html).write_pdf(font_config=FontConfiguration())
+    weasyprint = load_weasyprint()
+    return weasyprint.HTML(string=html).write_pdf(
+        font_config=weasyprint.FontConfiguration()
+    )
 
 
 def generate_expense_income_pdf(db: Session, document_id: int) -> bytes:
     """تولید PDF یک سند هزینه/درآمد با WeasyPrint (بدون reportlab)."""
-    from weasyprint import HTML
-    from weasyprint.text.fonts import FontConfiguration
     from html import escape
+    from app.core.weasyprint_runtime import load_weasyprint
     # دریافت داکیومنت به‌صورت دیکشنری قابل استفاده
     doc = get_expense_income(db, document_id)
     if not doc:
@@ -1522,7 +1523,10 @@ def generate_expense_income_pdf(db: Session, document_id: int) -> bytes:
   </body>
 </html>
 """
-    return HTML(string=html).write_pdf(font_config=FontConfiguration())
+    weasyprint = load_weasyprint()
+    return weasyprint.HTML(string=html).write_pdf(
+        font_config=weasyprint.FontConfiguration()
+    )
 
 
 def _get_person_account(
