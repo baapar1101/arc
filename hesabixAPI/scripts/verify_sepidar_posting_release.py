@@ -32,13 +32,27 @@ def require(condition, message):
         raise RuntimeError(message)
 
 
-def verify(bid, expect_no_postings=False):
+def verify(bid, expect_no_postings=False, require_payroll_approval=False):
     with SessionLocal() as db:
         db.execute(text('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY'))
         source = db.scalars(select(SepidarImportSetting).where(SepidarImportSetting.business_id == bid)).one()
         require(source.database_name == 'Sepidar01', 'Unexpected source database')
         require(source.enabled and source.native_enabled and source.operations_enabled and source.plugins_enabled, 'Source integration disabled')
         require(not source.last_error and not source.native_last_error, 'Source integration has an error')
+        payroll = None
+        if require_payroll_approval:
+            from adapters.db.models.payroll import PayrollSettings, PayrollDocumentLink, PayrollRun
+            from app.services.payroll_approval import owner_approval_only
+            from scripts.configure_sepidar_payroll import reviewed_accounts
+            expected, evidence = reviewed_accounts(db, bid)
+            row = db.scalars(select(PayrollSettings).where(PayrollSettings.business_id == bid)).one()
+            require(all(getattr(row, k) == value for k, value in expected.items()), 'Core payroll accounts changed')
+            require(row.require_approval and not row.auto_post_on_finalize and owner_approval_only(row), 'Core payroll approval policy changed')
+            links = db.scalars(select(PayrollDocumentLink).join(PayrollRun).where(PayrollRun.business_id == bid)).all()
+            if expect_no_postings:
+                require(not links, 'Expected no payroll accounting links; investigate, never delete')
+            payroll = {'accounts': evidence, 'require_approval': row.require_approval,
+                       'auto_post_on_finalize': row.auto_post_on_finalize, 'owner_only': True, 'accounting_links': len(links)}
         maps = {int(m.source_id): m.target_id for m in db.scalars(select(SepidarNativeMap).where(
             SepidarNativeMap.business_id == bid, SepidarNativeMap.database_name == 'Sepidar01', SepidarNativeMap.source_table == 'ACC.Account'))}
         settings = {r.plugin_code: r for r in db.scalars(select(AdvancedPluginSetting).where(AdvancedPluginSetting.business_id == bid))}
@@ -64,6 +78,7 @@ def verify(bid, expect_no_postings=False):
         require(run is not None, 'No successful source synchronization')
         return {
             'verified_at': datetime.now(timezone.utc).isoformat(), 'business_id': bid,
+            'core_payroll': payroll,
             'policy': 'Explicit permitted-manager confirmation required; this verifier never issues documents.',
             'settings': {c: {'enabled': settings[c].enabled, 'sync_enabled': settings[c].sync_enabled,
                               'finance_enabled': configs[c].enabled, 'accounts': configs[c].accounts,
@@ -87,5 +102,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--business-id', type=int, required=True)
     parser.add_argument('--expect-no-postings', action='store_true', help='Fail, never mutate, if any real financial posting already exists.')
+    parser.add_argument('--require-payroll-approval', action='store_true', help='Also verify reviewed core payroll accounts and owner-only/manual-post policy.')
     args = parser.parse_args()
-    print(json.dumps(verify(args.business_id, args.expect_no_postings), ensure_ascii=False, default=str), flush=True)
+    print(json.dumps(verify(args.business_id, args.expect_no_postings, args.require_payroll_approval), ensure_ascii=False, default=str), flush=True)

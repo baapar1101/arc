@@ -334,9 +334,10 @@ def import_run_lines_from_excel(
 	user_id: Optional[int] = None,
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
-	run = _get_run_row(db, business_id, run_id)
-	_ensure_run_editable(run)
 	settings = _get_or_create_settings(db, business_id)
+	from app.services.payroll_approval import lock_context
+	settings, run = lock_context(db, business_id, run_id)
+	_ensure_run_editable(run)
 	_validate_xlsx(content)
 
 	items = (

@@ -35,6 +35,7 @@ from adapters.db.models.document import Document
 from app.core.calendar import CalendarConverter, CalendarType
 from app.core.payroll_plugin_dependency import check_payroll_plugin_active
 from app.core.responses import ApiError
+from app.services.payroll_approval import approval_required, owner_approval_only, require_owner, lock_context, require_approved
 
 logger = logging.getLogger(__name__)
 
@@ -295,7 +296,20 @@ def update_settings(
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
 	row = _get_or_create_settings(db, business_id)
+	row = db.query(PayrollSettings).filter(PayrollSettings.id == row.id).with_for_update().populate_existing().one()
 	old = _settings_to_dict(row)
+	policy = (row.extra_settings or {}).get('financial_approval_policy')
+	requested_policy = (payload.get('extra_settings') or {}).get('financial_approval_policy', {})
+	if owner_approval_only(row) or requested_policy.get('owner_only') is True:
+		require_owner(db, business_id, user_id)
+		if payload.get('require_approval', True) is not True or payload.get('auto_post_on_finalize', False) is not False:
+			raise ApiError('PAYROLL_APPROVAL_POLICY_LOCKED', 'تأیید مالک الزامی است و صدور خودکار مجاز نیست.', http_status=409)
+		from copy import deepcopy
+		payload = deepcopy(payload)
+		payload['require_approval'] = True
+		payload['auto_post_on_finalize'] = False
+		if 'extra_settings' in payload and policy:
+			payload['extra_settings'] = {**(payload['extra_settings'] or {}), 'financial_approval_policy': deepcopy(policy)}
 	if isinstance(row.extra_settings,dict) and (row.extra_settings.get('sepidar') or {}).get('managed'):
 		for name in ('wages_payable_account_id','insurance_payable_account_id'):
 			if name in payload and payload[name]!=getattr(row,name):
@@ -1529,7 +1543,7 @@ def update_run(
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
 	settings = _get_or_create_settings(db, business_id)
-	run = _get_run_row(db, business_id, run_id)
+	settings, run = lock_context(db, business_id, run_id)
 	_ensure_run_editable(run)
 	old = _run_to_dict(run)
 
@@ -1575,7 +1589,7 @@ def delete_run(
 	user_id: Optional[int] = None,
 ) -> None:
 	_ensure_plugin(db, business_id)
-	run = _get_run_row(db, business_id, run_id)
+	_, run = lock_context(db, business_id, run_id)
 	_ensure_run_editable(run)
 	old = _run_to_dict(run)
 	db.delete(run)
@@ -1591,7 +1605,7 @@ def finalize_run(
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
 	settings = _get_or_create_settings(db, business_id)
-	run = _get_run_row(db, business_id, run_id)
+	settings, run = lock_context(db, business_id, run_id)
 	if run.status != "draft":
 		raise ApiError("INVALID_STATUS", "فقط پیش‌نویس قابل قطعی‌سازی است.", http_status=400)
 
@@ -1600,7 +1614,7 @@ def finalize_run(
 		raise ApiError("NO_LINES", "سند حقوق بدون ردیف پرسنل قابل قطعی‌سازی نیست.", http_status=400)
 
 	old = _run_to_dict(run)
-	if settings.require_approval:
+	if approval_required(settings):
 		run.status = "pending_approval"
 	else:
 		run.status = "finalized"
@@ -1630,7 +1644,7 @@ def cancel_run(
 	user_id: Optional[int] = None,
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
-	run = _get_run_row(db, business_id, run_id)
+	_, run = lock_context(db, business_id, run_id)
 	if run.status not in ("draft", "pending_approval"):
 		raise ApiError("INVALID_STATUS", "این اجرا در وضعیت فعلی قابل لغو نیست.", http_status=400)
 	if _load_document_links(db, run.id):
@@ -2017,7 +2031,9 @@ def approve_run(
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
 	settings = _get_or_create_settings(db, business_id)
-	run = _get_run_row(db, business_id, run_id)
+	settings, run = lock_context(db, business_id, run_id)
+	if owner_approval_only(settings):
+		require_owner(db, business_id, user_id)
 	if run.status != "pending_approval":
 		raise ApiError("INVALID_STATUS", "فقط اجراهای در انتظار تأیید قابل تأیید هستند.", http_status=400)
 
@@ -2031,7 +2047,7 @@ def approve_run(
 	_audit(db, business_id, "payroll_run", run.id, "approve", user_id, old, _run_to_dict(run))
 	db.flush()
 
-	if settings.auto_post_on_finalize and user_id is not None:
+	if settings.auto_post_on_finalize and user_id is not None and not owner_approval_only(settings):
 		try:
 			post_run_to_accounting(db, business_id, run.id, user_id=user_id, auto=True)
 		except ApiError as exc:
@@ -2053,7 +2069,9 @@ def reject_run(
 	reason: Optional[str] = None,
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
-	run = _get_run_row(db, business_id, run_id)
+	settings, run = lock_context(db, business_id, run_id)
+	if owner_approval_only(settings):
+		require_owner(db, business_id, user_id)
 	if run.status != "pending_approval":
 		raise ApiError("INVALID_STATUS", "فقط اجراهای در انتظار تأیید قابل رد هستند.", http_status=400)
 
@@ -2084,7 +2102,10 @@ def post_run_to_accounting(
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
 	settings = _get_or_create_settings(db, business_id)
-	run = _get_run_row(db, business_id, run_id)
+	settings, run = lock_context(db, business_id, run_id)
+	if auto and owner_approval_only(settings):
+		raise ApiError('PAYROLL_MANUAL_POST_REQUIRED', 'صدور خودکار حقوق مجاز نیست.', http_status=409)
+	require_approved(db, business_id, user_id, run, settings)
 
 	if run.status not in ("finalized", "posted"):
 		raise ApiError(
@@ -2118,7 +2139,8 @@ def post_run_payment(
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
 	settings = _get_or_create_settings(db, business_id)
-	run = _get_run_row(db, business_id, run_id)
+	settings, run = lock_context(db, business_id, run_id)
+	require_approved(db, business_id, user_id, run, settings)
 
 	if run.status not in ("posted",):
 		accrual = (

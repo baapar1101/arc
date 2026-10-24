@@ -34,6 +34,7 @@ from app.services.document_monetization_service import (
 )
 from app.services.document_numbering_service import generate_document_code
 from app.services.document_service import invalidate_documents_cache
+from app.services.payroll_approval import lock_context, require_approved
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,6 @@ CHART_WAGES_PAYABLE = "20305"
 CHART_TAX_PAYABLE = "20303"
 
 _ITEM_DEDUCTION_ACCOUNT_CODES = {
-	"tax": CHART_TAX_PAYABLE,
 	"insurance_employee": None,  # از تنظیمات
 	"loan": CHART_WAGES_PAYABLE,
 }
@@ -424,6 +424,8 @@ def post_payroll_accrual_document(
 	run: PayrollRun,
 	settings: PayrollSettings,
 ) -> Dict[str, Any]:
+	settings, run = lock_context(db, business_id, run.id)
+	require_approved(db, business_id, user_id, run, settings)
 	if _existing_link(db, run.id, LINK_TYPE_ACCRUAL):
 		raise ApiError("ACCRUAL_ALREADY_POSTED", "سند تعهدی این اجرای حقوق قبلاً ثبت شده است.", http_status=409)
 
@@ -471,6 +473,8 @@ def post_payroll_payment_document(
 	settings: PayrollSettings,
 	payment_account_id: int,
 ) -> Dict[str, Any]:
+	settings, run = lock_context(db, business_id, run.id)
+	require_approved(db, business_id, user_id, run, settings)
 	if not _existing_link(db, run.id, LINK_TYPE_ACCRUAL):
 		raise ApiError("ACCRUAL_REQUIRED", "ابتدا سند تعهدی حقوق را ثبت کنید.", http_status=400)
 	if _existing_link(db, run.id, LINK_TYPE_PAYMENT):
