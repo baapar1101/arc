@@ -83,7 +83,7 @@ def _render_image(code: str, strong: bool) -> Image.Image:
 	img = Image.new("RGB", (width, height), (bg0, bg1, bg2))
 	draw = ImageDraw.Draw(img)
 	font = _load_captcha_font(26)
-		font = ImageFont.load_default()
+	
 	for _ in range(8 if strong else 3):
 		xy = [(secrets.randbelow(width), secrets.randbelow(height)) for _ in range(2)]
 		fill = (180 + secrets.randbelow(40), 185 + secrets.randbelow(40), 192 + secrets.randbelow(40))
