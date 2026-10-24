@@ -5,9 +5,9 @@ Does not enable production flags. Adaptive K and Hybrid stay off.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any, Dict, List, Sequence
 
+from app.core.runtime_paths import docs_root
 from app.services.ai.ai_constants import (
     ADAPTIVE_DISCOVERY_K,
     ADAPTIVE_K_ROLLOUT_PERCENT,
@@ -32,7 +32,7 @@ from app.services.ai.ai_tool_discovery_gold import (
 from app.services.ai.ai_tool_intent import query_expects_tool_use, ranking_intent_domains
 from app.services.ai.ai_tool_retrieval_index import ToolRetrievalIndex
 
-PHASE10_DIR = Path("/opt/hesabix/app/docs/ai-agent/evals/phase-10")
+PHASE10_DIR = docs_root() / "ai-agent" / "evals" / "phase-10"
 CANDIDATE_NS = (20, 50, 100, 200)
 FINAL_KS = (10, 15, 20)
 TARGET_CANDIDATE_RECALL = 0.99

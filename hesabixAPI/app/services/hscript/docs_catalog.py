@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
+from app.core.runtime_paths import docs_root
 
-# ریشهٔ docs در ریپو (/opt/hesabix/app/docs/hscript)
-_DOCS_ROOT = Path(__file__).resolve().parents[4] / "docs" / "hscript"
+
+_DOCS_ROOT = docs_root() / "hscript"
 
 
 DOC_ENTRIES: list[dict[str, Any]] = [

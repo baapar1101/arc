@@ -5,9 +5,9 @@ import json
 import time
 import tracemalloc
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path
 from typing import Any, Dict, List
 
+from app.core.runtime_paths import docs_root
 from app.services.ai.ai_embedding_service import cosine_similarity
 from app.services.ai.ai_tool_candidates import retrieve_candidates
 from app.services.ai.ai_tool_embedding import hashed_ngram_vector
@@ -20,7 +20,7 @@ from app.services.ai.ai_tool_schema import (
     reset_schema_cache_for_tests,
 )
 
-BENCH_DIR = Path("/opt/hesabix/app/docs/ai-agent/evals/tool-scale")
+BENCH_DIR = docs_root() / "ai-agent" / "evals" / "tool-scale"
 SIZES = (180, 500, 1200, 5000, 10000)
 LARGE_SIZE = 100000
 QUERY = "فاکتور فروش این ماه را پیدا کن"

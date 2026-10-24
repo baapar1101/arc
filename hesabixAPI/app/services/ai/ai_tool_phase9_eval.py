@@ -6,9 +6,9 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
-from pathlib import Path
 from typing import Any, Dict, List, Sequence
 
+from app.core.runtime_paths import docs_root
 from app.services.ai.ai_constants import (
     ADAPTIVE_DISCOVERY_K,
     ADAPTIVE_K_MIN_LIVE_SAMPLES,
@@ -41,7 +41,7 @@ from app.services.ai.ai_tool_discovery_gold import (
 from app.services.ai.ai_tool_discovery_telemetry import telemetry_snapshot
 from app.services.ai.ai_tool_intent import iterations_for_query
 
-PHASE9_DIR = Path("/opt/hesabix/app/docs/ai-agent/evals/phase-9")
+PHASE9_DIR = docs_root() / "ai-agent" / "evals" / "phase-9"
 HIGH_RISK = {INTENT_WRITE, INTENT_DELETE, INTENT_EXPORT, INTENT_EXECUTE}
 
 
