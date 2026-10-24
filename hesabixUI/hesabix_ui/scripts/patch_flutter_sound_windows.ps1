@@ -16,18 +16,25 @@ function Get-PackageRootFromConfig {
     if (-not (Test-Path -LiteralPath $ConfigPath)) {
         return $null
     }
-    $raw = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8
-    $pattern = '"name"\s*:\s*"' + [regex]::Escape($PackageName) + '"\s*,\s*"rootUri"\s*:\s*"([^"]+)"'
-    $m = [regex]::Match($raw, $pattern)
-    if (-not $m.Success) {
+    $config = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $package = $config.packages | Where-Object { $_.name -eq $PackageName } | Select-Object -First 1
+    if (-not $package -or -not $package.rootUri) {
         return $null
     }
-    $uri = [System.Uri]$m.Groups[1].Value
-    $path = $uri.LocalPath
-    if ($path.StartsWith('/')) {
-        $path = $path.Substring(1)
+
+    $rootUri = [string]$package.rootUri
+    if ([System.Uri]::IsWellFormedUriString($rootUri, [System.UriKind]::Absolute)) {
+        $uri = [System.Uri]$rootUri
+        $path = [System.Uri]::UnescapeDataString($uri.LocalPath)
+        if ($path -match '^/[A-Za-z]:/') {
+            $path = $path.Substring(1)
+        }
+        return $path
     }
-    return $path
+
+    return [System.IO.Path]::GetFullPath(
+        (Join-Path (Split-Path -Parent $ConfigPath) $rootUri)
+    )
 }
 
 function Apply-FlutterSoundWindowsPatch {
@@ -39,12 +46,34 @@ function Apply-FlutterSoundWindowsPatch {
     $cmakePatch = Join-Path $patchRoot "CMakeLists.txt"
     $headerPatch = Join-Path $patchRoot "include\flutter_sound\flutter_sound_plugin_c_api.h"
 
+    foreach ($patchFile in @($cmakePatch, $headerPatch)) {
+        if (-not (Test-Path -LiteralPath $patchFile -PathType Leaf)) {
+            throw "Required flutter_sound patch file is missing: $patchFile"
+        }
+    }
+
     $destWindows = Join-Path $PackageRoot "windows"
     if (-not (Test-Path -LiteralPath $destWindows)) {
         throw "flutter_sound has no windows/ folder at: $destWindows"
     }
 
-    Copy-Item -LiteralPath $cmakePatch -Destination (Join-Path $destWindows "CMakeLists.txt") -Force
+    $destCmake = Join-Path $destWindows "CMakeLists.txt"
+    if (-not (Test-Path -LiteralPath $destCmake -PathType Leaf)) {
+        throw "flutter_sound CMakeLists.txt is missing: $destCmake"
+    }
+
+    $patchHash = (Get-FileHash -LiteralPath $cmakePatch -Algorithm SHA256).Hash
+    $destinationHash = (Get-FileHash -LiteralPath $destCmake -Algorithm SHA256).Hash
+    if ($patchHash -ne $destinationHash) {
+        $destinationText = Get-Content -LiteralPath $destCmake -Raw -Encoding UTF8
+        $knownUpstreamLayout =
+            $destinationText -match 'set\(PLUGIN_NAME\s+"taudio_plugin"\)' -and
+            $destinationText -match 'set\(taudio_bundled_libraries'
+        if (-not $knownUpstreamLayout) {
+            throw "Unsupported flutter_sound Windows CMake layout; refusing to overwrite $destCmake"
+        }
+        Copy-Item -LiteralPath $cmakePatch -Destination $destCmake -Force
+    }
 
     $destHeaderDir = Join-Path $destWindows "include\flutter_sound"
     New-Item -ItemType Directory -Path $destHeaderDir -Force | Out-Null
@@ -72,12 +101,15 @@ if (-not $packageRoot -or -not (Test-Path -LiteralPath $packageRoot)) {
 $lockPath = Join-Path $ProjectRoot "pubspec.lock"
 $lockText = if (Test-Path -LiteralPath $lockPath) { Get-Content -LiteralPath $lockPath -Raw } else { "" }
 if ($lockText -notmatch '(?s)flutter_sound:.*?version:\s*"([^"]+)"') {
-    Write-Host "[warn] Could not read flutter_sound version from pubspec.lock; applying patch anyway." -ForegroundColor Yellow
+    throw "Could not read flutter_sound version from pubspec.lock; refusing an unverified patch."
 } else {
     $ver = $Matches[1]
     if ([version]$ver -lt [version]"9.29.0") {
         Write-Host "[info] flutter_sound $ver (< 9.29): Windows desktop plugin patch not required." -ForegroundColor DarkGray
         exit 0
+    }
+    if ([version]$ver -ge [version]"10.0.0") {
+        throw "flutter_sound $ver is outside the verified patch range (>=9.29.0,<10.0.0)."
     }
 }
 
