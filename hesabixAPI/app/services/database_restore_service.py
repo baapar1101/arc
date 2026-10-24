@@ -2,16 +2,19 @@
 سرویس ریستور کامل دیتابیس PostgreSQL برای مدیر سیستم.
 از فایل بکاپ .sql یا .sql.gz با pg_dump ایجاد شده استفاده می‌کند.
 """
+
 from __future__ import annotations
 
 import gzip
-import io
 import logging
 import os
+import shutil
 import subprocess
 import tempfile
-from typing import Callable
+from collections.abc import Callable
+from pathlib import Path
 
+from app.core.postgres_tools import PostgreSQLToolNotFoundError, resolve_postgres_tool
 from app.core.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -36,7 +39,29 @@ class DatabaseRestoreService:
     def _progress(self, percent: int, message: str) -> None:
         if self._on_progress:
             self._on_progress(percent, message)
-        logger.info("database_restore_progress", percent=percent, message=message)
+        logger.info("database_restore_progress percent=%s message=%s", percent, message)
+
+    @staticmethod
+    def _prepare_sql_file(file_path: str, is_gz: bool) -> tuple[str, Path | None]:
+        """Return a plain SQL path, expanding gzip with Python when needed."""
+        if not is_gz:
+            return file_path, None
+
+        temporary_path: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                prefix="hesabix-restore-",
+                suffix=".sql",
+                delete=False,
+            ) as destination:
+                temporary_path = Path(destination.name)
+                with gzip.open(file_path, "rb") as source:
+                    shutil.copyfileobj(source, destination, length=1024 * 1024)
+            return str(temporary_path), temporary_path
+        except Exception:
+            if temporary_path is not None:
+                temporary_path.unlink(missing_ok=True)
+            raise
 
     def restore(self, file_path: str) -> None:
         """
@@ -52,17 +77,28 @@ class DatabaseRestoreService:
         is_sql = basename.endswith(".sql") or is_gz
 
         if not is_sql:
-            raise DatabaseRestoreError(
-                "فرمت فایل نامعتبر است. فایل باید .sql یا .sql.gz باشد."
-            )
+            raise DatabaseRestoreError("فرمت فایل نامعتبر است. فایل باید .sql یا .sql.gz باشد.")
 
         env = os.environ.copy()
         env["PGPASSWORD"] = self.settings.db_password
 
+        try:
+            psql = resolve_postgres_tool("psql", environment=env)
+        except PostgreSQLToolNotFoundError as e:
+            raise DatabaseRestoreError(
+                "ابزار psql یافت نشد. PostgreSQL client tools را نصب کنید یا "
+                "HESABIX_POSTGRES_BIN_DIR را تنظیم کنید."
+            ) from e
+
+        try:
+            restore_file_path, temporary_sql_path = self._prepare_sql_file(file_path, is_gz)
+        except (OSError, gzip.BadGzipFile, EOFError) as e:
+            raise DatabaseRestoreError(f"فایل فشرده بکاپ قابل خواندن نیست: {e}") from e
+
         def run_psql(db_name: str, sql: str, description: str) -> None:
             result = subprocess.run(
                 [
-                    "psql",
+                    str(psql),
                     "-h",
                     self.settings.db_host,
                     "-p",
@@ -87,86 +123,41 @@ class DatabaseRestoreService:
                     f"{description} ناموفق بود: {stderr or result.stdout or 'خطای نامشخص'}"
                 ) from None
 
-        self._progress(5, "قطع اتصالات به دیتابیس")
-        db_name_safe = self.settings.db_name.replace("'", "''")
         try:
-            run_psql(
-                "postgres",
-                (
-                    f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-                    f"WHERE datname = '{db_name_safe}' AND pid <> pg_backend_pid();"
-                ),
-                "قطع اتصالات",
-            )
-        except DatabaseRestoreError as e:
-            logger.warning("terminate_connections_failed: %s", e)
-            self._progress(10, "ادامه ریستور (قطع اتصالات ناتوان بود)")
+            self._progress(5, "قطع اتصالات به دیتابیس")
+            db_name_safe = self.settings.db_name.replace("'", "''")
+            try:
+                run_psql(
+                    "postgres",
+                    (
+                        f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                        f"WHERE datname = '{db_name_safe}' AND pid <> pg_backend_pid();"
+                    ),
+                    "قطع اتصالات",
+                )
+            except DatabaseRestoreError as e:
+                logger.warning("terminate_connections_failed: %s", e)
+                self._progress(10, "ادامه ریستور (قطع اتصالات ناتوان بود)")
 
-        self._progress(15, "حذف دیتابیس فعلی")
-        db_name_id = self.settings.db_name.replace('"', '""')  # for identifier
-        try:
+            self._progress(15, "حذف دیتابیس فعلی")
+            db_name_id = self.settings.db_name.replace('"', '""')  # for identifier
             run_psql(
                 "postgres",
                 f'DROP DATABASE IF EXISTS "{db_name_id}";',
                 "حذف دیتابیس",
             )
-        except DatabaseRestoreError:
-            raise
 
-        self._progress(25, "ایجاد دیتابیس جدید")
-        try:
+            self._progress(25, "ایجاد دیتابیس جدید")
             run_psql(
                 "postgres",
                 f'CREATE DATABASE "{db_name_id}";',
                 "ایجاد دیتابیس",
             )
-        except DatabaseRestoreError:
-            raise
 
-        self._progress(35, "اجرای فایل بکاپ")
-        if is_gz:
-            proc = subprocess.Popen(
-                ["gunzip", "-c", file_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                env=env,
-            )
-            psql_proc = subprocess.Popen(
-                [
-                    "psql",
-                    "-h",
-                    self.settings.db_host,
-                    "-p",
-                    str(self.settings.db_port),
-                    "-U",
-                    self.settings.db_user,
-                    "-d",
-                    self.settings.db_name,
-                    "-v",
-                    "ON_ERROR_STOP=1",
-                    "-f",
-                    "-",
-                ],
-                stdin=proc.stdout,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                env=env,
-            )
-            proc.stdout.close()
-            out, err = psql_proc.communicate(timeout=7200)
-            if proc.wait(timeout=5) != 0:
-                raise DatabaseRestoreError(
-                    f"فشرده‌سازی ناموفق بود: {(proc.stderr or b'').decode('utf-8', errors='replace')}"
-                )
-            if psql_proc.returncode != 0:
-                err_str = (err or b"").decode("utf-8", errors="replace").strip()
-                raise DatabaseRestoreError(
-                    f"اجرای بکاپ ناموفق بود: {err_str[:500]}"
-                )
-        else:
+            self._progress(35, "اجرای فایل بکاپ")
             result = subprocess.run(
                 [
-                    "psql",
+                    str(psql),
                     "-h",
                     self.settings.db_host,
                     "-p",
@@ -178,7 +169,7 @@ class DatabaseRestoreService:
                     "-v",
                     "ON_ERROR_STOP=1",
                     "-f",
-                    file_path,
+                    restore_file_path,
                 ],
                 env=env,
                 capture_output=True,
@@ -187,8 +178,8 @@ class DatabaseRestoreService:
             )
             if result.returncode != 0:
                 stderr = (result.stderr or result.stdout or "").strip()
-                raise DatabaseRestoreError(
-                    f"اجرای بکاپ ناموفق بود: {stderr[:500]}"
-                )
-
-        self._progress(100, "ریستور با موفقیت انجام شد")
+                raise DatabaseRestoreError(f"اجرای بکاپ ناموفق بود: {stderr[:500]}")
+            self._progress(100, "ریستور با موفقیت انجام شد")
+        finally:
+            if temporary_sql_path is not None:
+                temporary_sql_path.unlink(missing_ok=True)
