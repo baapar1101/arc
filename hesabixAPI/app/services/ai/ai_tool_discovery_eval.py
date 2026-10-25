@@ -7,9 +7,9 @@ from __future__ import annotations
 import json
 import math
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
+from app.core.runtime_paths import docs_root
 from app.services.ai.ai_constants import (
     CONTEXT_INPUT_TOKEN_BUDGET,
     MAX_TOOLS_AUTONOMOUS,
@@ -36,7 +36,7 @@ from app.services.ai.ai_tool_manifest import get_manifest_entry, iter_manifest_n
 
 K_SWEEP: Tuple[int, ...] = (3, 5, 8, 10, 12, 15, 20, 30, 48, 64, 128)
 PRIMARY_KS: Tuple[int, ...] = (5, 10, 15, 20, 48)
-EVAL_DIR = Path("/opt/hesabix/app/docs/ai-agent/evals/tool-discovery")
+EVAL_DIR = docs_root() / "ai-agent" / "evals" / "tool-discovery"
 
 # Floors set after Phase 6 ranking correction. Slightly below observed
 # values so CI catches regressions, not noise.

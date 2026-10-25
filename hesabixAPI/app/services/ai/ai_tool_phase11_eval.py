@@ -6,9 +6,9 @@ from __future__ import annotations
 
 import json
 import time
-from pathlib import Path
 from typing import Any, Dict, List, Sequence
 
+from app.core.runtime_paths import docs_root
 from app.services.ai.ai_constants import (
     ADAPTIVE_DISCOVERY_K,
     ADAPTIVE_K_ROLLOUT_PERCENT,
@@ -44,7 +44,7 @@ from app.services.ai.ai_tool_rank import score_tool_for_query
 from app.services.ai.ai_tool_retrieval_index import ToolRetrievalIndex
 from app.services.ai.ai_tool_scale_bench import QUERY, SIZES, _build_index, _catalog
 
-PHASE11_DIR = Path("/opt/hesabix/app/docs/ai-agent/evals/phase-11")
+PHASE11_DIR = docs_root() / "ai-agent" / "evals" / "phase-11"
 FINAL_KS = (10, 15, 20, 48)
 PHASE6_BASELINE = {
     10: 0.9549,
