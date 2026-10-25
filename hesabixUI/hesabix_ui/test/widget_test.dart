@@ -7,24 +7,30 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:hesabix_ui/main.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/widgets/progress_splash_screen.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets(
+    'progress splash renders without starting network initialization',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: ProgressSplashScreen(
+            message: 'Loading',
+            progress: 0.5,
+            currentStep: 2,
+            totalSteps: 4,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
-  });
+      expect(find.byType(MaterialApp), findsOneWidget);
+      expect(find.byType(ProgressSplashScreen), findsOneWidget);
+      expect(find.text('Loading'), findsOneWidget);
+    },
+  );
 }
