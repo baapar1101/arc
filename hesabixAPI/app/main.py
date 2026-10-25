@@ -6,7 +6,6 @@ from app.openapi_local_docs import get_local_swagger_ui_html
 import logging
 import os
 from pathlib import Path
-from typing import Optional, IO
 
 from app.core.settings import get_settings
 from app.core.logging import configure_logging
@@ -136,12 +135,13 @@ from app.core.i18n import negotiate_locale, Translator
 from app.core.error_handlers import register_error_handlers
 from app.core.smart_normalizer import smart_normalize_json, SmartNormalizerConfig
 from app.core.calendar_middleware import add_calendar_type
+from app.core.process_lock import InterProcessFileLock, default_lock_path
 
 # Import activity log hooks برای ثبت event handlers
 import adapters.db.activity_log_hooks  # noqa: F401
 
 
-_BACKGROUND_JOBS_LOCK_FH: Optional[IO[str]] = None
+_BACKGROUND_JOBS_LOCK: InterProcessFileLock | None = None
 
 
 def _try_acquire_background_jobs_lock() -> bool:
@@ -150,38 +150,43 @@ def _try_acquire_background_jobs_lock() -> bool:
     با uvicorn --workers هر worker جداگانه startup event را اجرا می‌کند؛
     این lock باعث می‌شود فقط یکی از process ها leader شود و jobها را اجرا کند.
     """
-    global _BACKGROUND_JOBS_LOCK_FH
+    global _BACKGROUND_JOBS_LOCK
 
     # امکان خاموش کردن کامل background jobs از طریق env
     enabled = os.getenv("HESABIX_BACKGROUND_JOBS_ENABLED", "true").strip().lower()
     if enabled in {"0", "false", "no", "off"}:
         return False
 
-    lock_path = os.getenv("HESABIX_BACKGROUND_JOBS_LOCKFILE", "/tmp/hesabix-background-jobs.lock")
-
-    try:
-        import fcntl  # Linux-only
-    except Exception:
-        # در محیط‌هایی که fcntl ندارند (مثلاً Windows) همان رفتار قبلی را نگه می‌داریم
+    if _BACKGROUND_JOBS_LOCK is not None and _BACKGROUND_JOBS_LOCK.acquired:
         return True
 
+    lock_path = os.getenv(
+        "HESABIX_BACKGROUND_JOBS_LOCKFILE",
+        str(default_lock_path("hesabix-background-jobs.lock")),
+    )
+
     try:
-        fh = open(lock_path, "a+", encoding="utf-8")
-        fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        fh.seek(0)
-        fh.truncate()
-        fh.write(f"pid={os.getpid()}\n")
-        fh.flush()
-        _BACKGROUND_JOBS_LOCK_FH = fh  # نگه داشتن handle برای حفظ lock
+        lock = InterProcessFileLock(lock_path)
+        if not lock.acquire():
+            return False
+        lock.write_owner_pid()
+        _BACKGROUND_JOBS_LOCK = lock
         return True
-    except Exception:
-        try:
-            if _BACKGROUND_JOBS_LOCK_FH:
-                _BACKGROUND_JOBS_LOCK_FH.close()
-        except Exception:
-            pass
-        _BACKGROUND_JOBS_LOCK_FH = None
+    except Exception as exc:
+        logging.getLogger(__name__).warning(
+            "Unable to acquire background-jobs process lock at %s: %s",
+            lock_path,
+            exc,
+        )
+        _BACKGROUND_JOBS_LOCK = None
         return False
+
+
+def _release_background_jobs_lock() -> None:
+    global _BACKGROUND_JOBS_LOCK
+    if _BACKGROUND_JOBS_LOCK is not None:
+        _BACKGROUND_JOBS_LOCK.release()
+        _BACKGROUND_JOBS_LOCK = None
 
 
 def _openapi_query_filter_section() -> str:
@@ -1338,6 +1343,10 @@ def create_app() -> FastAPI:
         from app.services.hscript_schedule_background_jobs import hscript_schedule_loop
 
         asyncio.create_task(hscript_schedule_loop(60))
+
+    @application.on_event("shutdown")
+    async def _release_process_locks():
+        _release_background_jobs_lock()
 
     @application.middleware("http")
     async def global_rate_limit_middleware(request: Request, call_next):

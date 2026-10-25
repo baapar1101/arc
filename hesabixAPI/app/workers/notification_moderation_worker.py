@@ -6,10 +6,8 @@ Worker برای پردازش خودکار صف بررسی قالب‌های نو
 import asyncio
 import logging
 import os
-import fcntl
 from datetime import datetime
 from typing import Optional
-from pathlib import Path
 
 from sqlalchemy.orm import Session
 
@@ -23,30 +21,33 @@ from adapters.db.models.business_notification import (
     BusinessNotificationTemplate
 )
 from app.services.ai_moderation_service import AIContentModerationService
+from app.core.process_lock import InterProcessFileLock, default_lock_path
 
 logger = logging.getLogger(__name__)
 
 # File lock برای جلوگیری از اجرای همزمان worker در چندین process
-_lock_file_path = Path("/tmp/hesabix_notification_moderation_worker.lock")
-_worker_lock = None
+_lock_file_path = default_lock_path("hesabix_notification_moderation_worker.lock")
+_worker_lock: InterProcessFileLock | None = None
 
 
 def _acquire_lock():
     """تلاش برای دریافت lock - فقط یک worker می‌تواند در هر زمان اجرا شود"""
     global _worker_lock
+    lock_path = os.getenv(
+        "HESABIX_NOTIFICATION_MODERATION_LOCKFILE",
+        str(_lock_file_path),
+    )
+    lock = InterProcessFileLock(lock_path)
     try:
-        _lock_file_path.parent.mkdir(parents=True, exist_ok=True)
-        _worker_lock = open(_lock_file_path, 'w')
-        fcntl.flock(_worker_lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if not lock.acquire():
+            return False
+        lock.write_owner_pid()
+        _worker_lock = lock
         return True
-    except (IOError, OSError):
-        # Lock در حال استفاده است
-        if _worker_lock:
-            try:
-                _worker_lock.close()
-            except:
-                pass
-            _worker_lock = None
+    except Exception as exc:
+        logger.warning("Unable to acquire moderation-worker lock at %s: %s", lock_path, exc)
+        lock.release()
+        _worker_lock = None
         return False
 
 
@@ -54,11 +55,7 @@ def _release_lock():
     """آزاد کردن lock"""
     global _worker_lock
     if _worker_lock:
-        try:
-            fcntl.flock(_worker_lock.fileno(), fcntl.LOCK_UN)
-            _worker_lock.close()
-        except:
-            pass
+        _worker_lock.release()
         _worker_lock = None
 
 
