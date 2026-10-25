@@ -5,6 +5,7 @@ on:
     branches:
       - master
     paths:
+      - 'hesabixUI/hesabix_ui/pubspec.yaml'
       - '.github/workflows/publish-android-release.yml'
   workflow_dispatch:
 
@@ -131,8 +132,15 @@ jobs:
           The current repository configuration uses the debug signing key when no production keystore is supplied to CI.
           EOF
 
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$TAG"               hesabixUI/hesabix_ui/release-apks/*               --repo "$GITHUB_REPOSITORY"               --clobber
-          else
-            gh release create "$TAG"               hesabixUI/hesabix_ui/release-apks/*               --repo "$GITHUB_REPOSITORY"               --target "$GITHUB_SHA"               --title "MarkStreet $VERSION"               --notes-file "$NOTES"
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "MarkStreet $VERSION" \
+              --notes-file "$NOTES" || true
           fi
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
+          gh release upload "$TAG" \
+            hesabixUI/hesabix_ui/release-apks/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
