@@ -103,7 +103,11 @@ jobs:
 
           gh release view $tag --repo $env:GITHUB_REPOSITORY | Out-Null
           if ($LASTEXITCODE -ne 0) {
-            throw "GitHub Release $tag does not exist."
+            gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "MarkStreet $version" --notes "MarkStreet desktop release $version"
+            if ($LASTEXITCODE -ne 0) {
+              gh release view $tag --repo $env:GITHUB_REPOSITORY | Out-Null
+              if ($LASTEXITCODE -ne 0) { throw "Unable to create or find GitHub Release $tag." }
+            }
           }
 
           gh release upload $tag hesabixUI/hesabix_ui/release-windows/MarkStreet-$version-windows-x64.zip hesabixUI/hesabix_ui/release-windows/SHA256SUMS-Windows.txt --repo $env:GITHUB_REPOSITORY --clobber
