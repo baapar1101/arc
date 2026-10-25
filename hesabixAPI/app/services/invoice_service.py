@@ -294,7 +294,23 @@ def _movement_sort_key(mv: Dict[str, Any]) -> Tuple[Any, Any, int, int]:
     """ترتیب زمانی حرکات؛ در یک روز ابتدا زمان ثبت سند، سپس شناسه سند، سپس خط فاکتور."""
     ra = mv.get("registered_at")
     if ra is None:
-        ra = datetime.min
+        ra = datetime.min.replace(tzinfo=timezone.utc)
+    elif isinstance(ra, datetime):
+        # Documents use timezone-aware timestamps, while warehouse documents
+        # currently use naive UTC timestamps. Normalize both before comparison.
+        if ra.tzinfo is None:
+            ra = ra.replace(tzinfo=timezone.utc)
+        else:
+            ra = ra.astimezone(timezone.utc)
+    else:
+        try:
+            ra = datetime.fromisoformat(str(ra).replace("Z", "+00:00"))
+            if ra.tzinfo is None:
+                ra = ra.replace(tzinfo=timezone.utc)
+            else:
+                ra = ra.astimezone(timezone.utc)
+        except (TypeError, ValueError):
+            ra = datetime.min.replace(tzinfo=timezone.utc)
     return (
         mv["document_date"],
         ra,
@@ -4460,9 +4476,9 @@ def _iter_profit_movements_from_invoice_lines(
                 "invoice_item_line_id": int(line.id),
             }
         )
-    # کالای درآمدشده یک ورود واقعی و قیمت‌دار به انبار است و باید در لایه‌های
-    # FIFO/LIFO دیده شود. حواله‌های فاکتور و افتتاحیه عمداً اینجا اضافه نمی‌شوند
-    # چون حرکت متناظرشان از invoice_item_lines محاسبه شده است.
+    # ورودهای خرید کالای متفرقه و موجودی افتتاحیه فقط در اسناد انبار ثبت می‌شوند؛
+    # آن‌ها را هم به لایه‌های FIFO اضافه می‌کنیم. ورود/خروج‌های خود فاکتور از
+    # invoice_item_lines آمده‌اند و نباید از اسناد انبار دوباره شمرده شوند.
     from adapters.db.models.warehouse_document import WarehouseDocument
     from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
 
@@ -4475,7 +4491,9 @@ def _iter_profit_movements_from_invoice_lines(
         .filter(
             WarehouseDocument.business_id == int(business_id),
             WarehouseDocument.status == "posted",
-            WarehouseDocument.source_type == "goods_expense_income",
+            WarehouseDocument.source_type.in_(
+                ["goods_expense_income", "opening_balance"]
+            ),
             WarehouseDocument.document_date <= as_of_date,
             WarehouseDocumentLine.product_id == int(product_id),
             WarehouseDocumentLine.movement == "in",
@@ -11653,8 +11671,10 @@ def _invoice_total_amount_for_document(
 def invoice_documents_to_list_dicts(
     db: Session,
     documents: List[Document],
+    *,
+    include_profit: bool = False,
 ) -> List[Dict[str, Any]]:
-    """سریال‌سازی سبک فاکتورها برای لیست (بدون بارگذاری خطوط و محاسبه سود)."""
+    """سریال‌سازی فاکتورها برای لیست؛ محاسبه سود در صورت درخواست اختیاری است."""
     if not documents:
         return []
 
@@ -11717,6 +11737,53 @@ def invoice_documents_to_list_dicts(
                 "updated_at": doc.updated_at.isoformat(),
             }
         )
+
+    if include_profit:
+        business_id = int(documents[0].business_id)
+        business = db.query(Business).filter(Business.id == business_id).first()
+        if business and business.invoice_profit_calculation_method != "disabled":
+            for document, item in zip(documents, results):
+                if document.document_type not in {
+                    "invoice_sales",
+                    "invoice_sales_return",
+                    "invoice_production",
+                }:
+                    continue
+                try:
+                    profit_data = _calculate_invoice_profit(
+                        db,
+                        business_id,
+                        int(document.id),
+                        business.invoice_profit_calculation_method or "automatic",
+                        business.invoice_profit_calculation_basis or "purchase_price",
+                        business.invoice_profit_include_overhead or False,
+                        business.invoice_profit_overhead_type or "none",
+                        Decimal(str(business.invoice_profit_overhead_percent or 0))
+                        if business.invoice_profit_overhead_percent
+                        else None,
+                        business.invoice_profit_calculation_type or "gross",
+                        fifo_shortage_mode=getattr(
+                            business, "invoice_profit_fifo_shortage_mode", None
+                        ),
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Error calculating list profit for invoice %s: %s",
+                        document.id,
+                        e,
+                    )
+                    continue
+
+                if "gross_profit" in profit_data:
+                    item["gross_profit"] = profit_data["gross_profit"]
+                    item["gross_profit_percent"] = profit_data["gross_profit_percent"]
+                if "net_profit" in profit_data:
+                    item["net_profit"] = profit_data["net_profit"]
+                    item["net_profit_percent"] = profit_data["net_profit_percent"]
+                if "total_profit" in profit_data:
+                    item["total_profit"] = profit_data["total_profit"]
+                    item["total_profit_percent"] = profit_data["total_profit_percent"]
+
     return results
 
 

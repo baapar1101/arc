@@ -2865,6 +2865,8 @@ async def search_invoices_endpoint(
 		
 		key_payload = {
 			"business_id": business_id,
+			# Bump this when list fields change so old cached rows cannot hide new fields.
+			"profit_fields_version": 1,
 			"take": query_info.take,
 			"skip": query_info.skip,
 			"sort_by": query_info.sort_by,
@@ -3047,7 +3049,7 @@ async def search_invoices_endpoint(
 
 	data_items: List[Dict[str, Any]] = []
 	_log = logging.getLogger(__name__)
-	list_dicts = invoice_documents_to_list_dicts(db, items)
+	list_dicts = invoice_documents_to_list_dicts(db, items, include_profit=True)
 	remaining_by_id = batch_calculate_invoices_remaining(db, business_id, items)
 	for item in list_dicts:
 		d_id = int(item.get("id") or 0)
