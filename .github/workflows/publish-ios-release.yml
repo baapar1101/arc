@@ -5,6 +5,7 @@ on:
     branches:
       - master
     paths:
+      - 'hesabixUI/hesabix_ui/pubspec.yaml'
       - '.github/workflows/publish-ios-release.yml'
   workflow_dispatch:
 
@@ -99,7 +100,14 @@ jobs:
           cd "$GITHUB_WORKSPACE"
 
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release create "$TAG"               --repo "$GITHUB_REPOSITORY"               --target "$GITHUB_SHA"               --title "MarkStreet $VERSION"               --notes "MarkStreet mobile release $VERSION"
+            gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "MarkStreet $VERSION" \
+              --notes "MarkStreet mobile release $VERSION" || true
           fi
-
-          gh release upload "$TAG"             hesabixUI/hesabix_ui/release-ios/*             --repo "$GITHUB_REPOSITORY"             --clobber
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
+          gh release upload "$TAG" \
+            hesabixUI/hesabix_ui/release-ios/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
