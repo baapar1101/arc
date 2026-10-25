@@ -2,6 +2,7 @@
 سرویس بکاپ دیتابیس PostgreSQL برای مدیر سیستم.
 پشتیبانی از سه روش تحویل: دانلود مستقیم، ایمیل، FTP.
 """
+
 from __future__ import annotations
 
 import gzip
@@ -9,14 +10,14 @@ import io
 import logging
 import os
 import subprocess
-import tempfile
 from datetime import datetime
 from typing import Literal
 
 from sqlalchemy.orm import Session
 
-from app.core.settings import get_settings
 from adapters.db.models.file_storage import StorageConfig
+from app.core.postgres_tools import PostgreSQLToolNotFoundError, resolve_postgres_tool
+from app.core.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -43,11 +44,18 @@ class DatabaseBackupService:
         """
         env = os.environ.copy()
         env["PGPASSWORD"] = self.settings.db_password
-        # سرویس با PATH محدود (فقط .venv/bin) اجرا می‌شود؛ pg_dump در /usr/bin است
-        env["PATH"] = "/usr/bin:/usr/local/bin:" + env.get("PATH", "")
+
+        try:
+            pg_dump = resolve_postgres_tool("pg_dump", environment=env)
+        except PostgreSQLToolNotFoundError as e:
+            logger.error("database_backup_pg_dump_not_found: %s", e)
+            raise DatabaseBackupError(
+                "ابزار pg_dump یافت نشد. PostgreSQL client tools را نصب کنید یا "
+                "HESABIX_POSTGRES_BIN_DIR را تنظیم کنید."
+            ) from e
 
         cmd = [
-            "pg_dump",
+            str(pg_dump),
             "-h",
             self.settings.db_host,
             "-p",
@@ -90,7 +98,8 @@ class DatabaseBackupService:
         except FileNotFoundError as e:
             logger.error("database_backup_pg_dump_not_found: %s", e)
             raise DatabaseBackupError(
-                "ابزار pg_dump یافت نشد. لطفاً PostgreSQL client tools را نصب کنید."
+                "ابزار pg_dump اجرا نشد. PostgreSQL client tools و مقدار "
+                "HESABIX_POSTGRES_BIN_DIR را بررسی کنید."
             ) from e
         except Exception as e:
             logger.exception("database_backup_unexpected_error error=%s", str(e))
