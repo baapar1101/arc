@@ -7,6 +7,8 @@ val hesabixGradleMirror: String =
 // مخازن: اول آینهٔ داخلی (upstream: Maven مایکت)؛ در صورت خطای شبکه، Maven Central و google به‌عنوان fallback.
 allprojects {
     repositories {
+        // Independent Google Maven mirror for CI environments where dl.google.com is unavailable.
+        maven { url = uri("https://maven.aliyun.com/repository/google") }
         // Myket: androidx/* و com/* بدون پیشوند android/maven2
         maven { url = uri("https://maven.myket.ir/") }
         maven { url = uri("${hesabixGradleMirror}/android/maven2/") }
@@ -30,6 +32,7 @@ subprojects {
     afterEvaluate {
         if (project.hasProperty("android")) {
             repositories {
+                maven { url = uri("https://maven.aliyun.com/repository/google") }
                 maven { url = uri("https://maven.myket.ir/") }
                 maven { url = uri("${hesabixGradleMirror}/") }
                 maven { url = uri("${hesabixGradleMirror}/android/maven2/") }
@@ -46,6 +49,7 @@ subprojects {
 
     buildscript {
         repositories {
+            maven { url = uri("https://maven.aliyun.com/repository/google") }
             maven { url = uri("https://maven.myket.ir/") }
             maven { url = uri("${hesabixGradleMirror}/") }
             maven { url = uri("${hesabixGradleMirror}/android/maven2/") }
