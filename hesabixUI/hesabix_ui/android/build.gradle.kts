@@ -9,6 +9,7 @@ allprojects {
     repositories {
         // Independent Google Maven mirror for CI environments where dl.google.com is unavailable.
         maven { url = uri("https://maven.aliyun.com/repository/google") }
+        maven { url = uri("https://maven.aliyun.com/repository/public") }
         // Myket: androidx/* و com/* بدون پیشوند android/maven2
         maven { url = uri("https://maven.myket.ir/") }
         maven { url = uri("${hesabixGradleMirror}/android/maven2/") }
@@ -33,6 +34,7 @@ subprojects {
         if (project.hasProperty("android")) {
             repositories {
                 maven { url = uri("https://maven.aliyun.com/repository/google") }
+        maven { url = uri("https://maven.aliyun.com/repository/public") }
                 maven { url = uri("https://maven.myket.ir/") }
                 maven { url = uri("${hesabixGradleMirror}/") }
                 maven { url = uri("${hesabixGradleMirror}/android/maven2/") }
@@ -50,6 +52,7 @@ subprojects {
     buildscript {
         repositories {
             maven { url = uri("https://maven.aliyun.com/repository/google") }
+        maven { url = uri("https://maven.aliyun.com/repository/public") }
             maven { url = uri("https://maven.myket.ir/") }
             maven { url = uri("${hesabixGradleMirror}/") }
             maven { url = uri("${hesabixGradleMirror}/android/maven2/") }
