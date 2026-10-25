@@ -10,12 +10,11 @@ from fastapi.responses import Response
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from sqlalchemy.orm import Session
-from weasyprint import CSS, HTML
-from weasyprint.text.fonts import FontConfiguration
 
 from adapters.db.models.business import Business
 from adapters.db.models.currency import Currency
 from adapters.db.models.fiscal_year import FiscalYear
+from app.core.weasyprint_runtime import load_weasyprint
 
 
 def _slugify(text: str) -> str:
@@ -421,7 +420,8 @@ def build_financial_package_pdf_bytes(
     else:
         document_html = injected + document_html
 
-    css = CSS(string=(font_face_css or "") + f"""
+    weasyprint = load_weasyprint()
+    css = weasyprint.CSS(string=(font_face_css or "") + f"""
       @page {{ size: A4 portrait; margin: 12mm;
         @bottom-{'left' if is_fa else 'right'} {{
           content: "{page_label_left}" counter(page) "{page_label_of}" counter(pages);
@@ -463,8 +463,8 @@ def build_financial_package_pdf_bytes(
       tr.grand-total.loss td {{ background: #fff7ed; color: {brand_negative}; }}
     """)
 
-    font_config = FontConfiguration()
-    return HTML(string=document_html).write_pdf(stylesheets=[css], font_config=font_config)
+    font_config = weasyprint.FontConfiguration()
+    return weasyprint.HTML(string=document_html).write_pdf(stylesheets=[css], font_config=font_config)
 
 
 def build_financial_package_excel_bytes(package: Dict[str, Any], *, is_fa: bool, column_mode: int) -> bytes:

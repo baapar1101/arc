@@ -223,9 +223,9 @@ def _chart_html(block: dict[str, Any], *, num_opts: dict[str, str] | None = None
 
 def render_spec_pdf(spec: dict[str, Any], *, business_name: str | None = None) -> bytes:
 	"""HTML امن → PDF با WeasyPrint."""
-	from weasyprint import HTML
-	from weasyprint.text.fonts import FontConfiguration
+	from app.core.weasyprint_runtime import load_weasyprint
 
 	html_content = spec_to_html(spec, business_name=business_name)
-	font_config = FontConfiguration()
-	return HTML(string=html_content).write_pdf(font_config=font_config)
+	weasyprint = load_weasyprint()
+	font_config = weasyprint.FontConfiguration()
+	return weasyprint.HTML(string=html_content).write_pdf(font_config=font_config)

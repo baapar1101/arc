@@ -389,9 +389,13 @@ class MarketingPDFModule(BasePDFModule):
         html_content = self.render_template(self.template_name, context)
         
         # Generate PDF from HTML
-        from weasyprint import HTML
         from pathlib import Path
-        pdf_file = HTML(string=html_content, base_url=str(Path(__file__).parent / "templates")).write_pdf(font_config=self.font_config)
+        from app.core.weasyprint_runtime import load_weasyprint
+
+        pdf_file = load_weasyprint().HTML(
+            string=html_content,
+            base_url=str(Path(__file__).parent / "templates"),
+        ).write_pdf(font_config=self.font_config)
         return pdf_file
     
     def generate_excel_content(
