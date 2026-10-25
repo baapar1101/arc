@@ -219,6 +219,13 @@ from .customer_club import (  # noqa: F401
 	CustomerClubInvoiceSnapshot,
 	CustomerClubTier,
 	CustomerClubRfmSnapshot,
+	CustomerClubPointLot,
+	CustomerClubReward,
+	CustomerClubVoucher,
+	CustomerClubCampaign,
+	CustomerClubCampaignMember,
+	CustomerClubMember,
+	CustomerClubSurveyResponse,
 )
 from .distribution import (  # noqa: F401
 	DistributionBusinessSettings,

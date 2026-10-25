@@ -14,6 +14,7 @@ from app.core.permissions import require_business_access_dep, require_business_p
 from app.core.responses import ApiError, format_datetime_fields, success_response
 from app.services import customer_club_analytics_service as analytics_svc
 from app.services import customer_club_service as svc
+from app.services import customer_club_program_service as program_svc
 
 router = APIRouter(prefix="/customer-club", tags=["customer-club"])
 
@@ -286,3 +287,148 @@ def rfm_recalculate_endpoint(
 	except ApiError:
 		raise
 	return success_response(data, request)
+
+
+@router.get("/business/{business_id}/rewards")
+def list_rewards_endpoint(request: Request, business_id: int,
+	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("customer_club", "view")),
+	db: Session = Depends(get_db), _ctx: AuthContext = Depends(get_current_user)) -> dict:
+	_ensure_plugin(db, business_id)
+	return success_response({"items": program_svc.list_rewards(db, business_id)}, request)
+
+
+@router.post("/business/{business_id}/rewards")
+def create_reward_endpoint(request: Request, business_id: int, payload: Dict[str, Any] = Body(...),
+	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("customer_club", "manage")),
+	db: Session = Depends(get_db), _ctx: AuthContext = Depends(get_current_user)) -> dict:
+	_ensure_plugin(db, business_id)
+	return success_response(program_svc.save_reward(db, business_id, payload), request)
+
+
+@router.put("/business/{business_id}/rewards/{reward_id}")
+def update_reward_endpoint(request: Request, business_id: int, reward_id: int, payload: Dict[str, Any] = Body(...),
+	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("customer_club", "manage")),
+	db: Session = Depends(get_db), _ctx: AuthContext = Depends(get_current_user)) -> dict:
+	_ensure_plugin(db, business_id)
+	return success_response(program_svc.save_reward(db, business_id, payload, reward_id), request)
+
+
+@router.post("/business/{business_id}/persons/{person_id}/rewards/{reward_id}/redeem")
+def redeem_reward_endpoint(request: Request, business_id: int, person_id: int, reward_id: int,
+	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("customer_club", "redeem")),
+	db: Session = Depends(get_db), _ctx: AuthContext = Depends(get_current_user)) -> dict:
+	_ensure_plugin(db, business_id)
+	return success_response(program_svc.redeem_reward(db, business_id, person_id, reward_id), request)
+
+
+@router.get("/business/{business_id}/vouchers")
+def list_vouchers_endpoint(request: Request, business_id: int, person_id: Optional[int] = Query(None),
+	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("customer_club", "view")),
+	db: Session = Depends(get_db), _ctx: AuthContext = Depends(get_current_user)) -> dict:
+	_ensure_plugin(db, business_id)
+	return success_response({"items": program_svc.list_vouchers(db, business_id, person_id)}, request)
+
+
+@router.post("/business/{business_id}/persons/{person_id}/consent")
+def update_member_consent_endpoint(request: Request, business_id: int, person_id: int, payload: Dict[str, Any] = Body(...),
+	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("customer_club", "manage")),
+	db: Session = Depends(get_db), _ctx: AuthContext = Depends(get_current_user)) -> dict:
+	_ensure_plugin(db, business_id)
+	return success_response(program_svc.set_member_consent(db, business_id, person_id, payload), request)
+
+
+@router.post("/business/{business_id}/persons/{person_id}/surveys")
+def survey_response_endpoint(request: Request, business_id: int, person_id: int, payload: Dict[str, Any] = Body(...),
+	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("customer_club", "manage")),
+	db: Session = Depends(get_db), _ctx: AuthContext = Depends(get_current_user)) -> dict:
+	_ensure_plugin(db, business_id)
+	return success_response(program_svc.submit_survey_response(db, business_id, person_id, payload), request)
+
+
+@router.get("/business/{business_id}/persons/{person_id}/profile")
+def member_profile_endpoint(request: Request, business_id: int, person_id: int,
+	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("customer_club", "view")),
+	db: Session = Depends(get_db), _ctx: AuthContext = Depends(get_current_user)) -> dict:
+	_ensure_plugin(db, business_id)
+	return success_response(program_svc.list_member_profile(db, business_id, person_id), request)
+
+
+@router.post("/business/{business_id}/segments/preview")
+def preview_segment_endpoint(request: Request, business_id: int, payload: Dict[str, Any] = Body(...),
+	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("customer_club", "view")),
+	db: Session = Depends(get_db), _ctx: AuthContext = Depends(get_current_user)) -> dict:
+	_ensure_plugin(db, business_id)
+	filters = payload.get("filters") or {}
+	if not isinstance(filters, dict):
+		raise ApiError("CUSTOMER_CLUB_SEGMENT_INVALID", "filters must be an object.", http_status=400)
+	return success_response(program_svc.preview_segment(db, business_id, filters, payload.get("limit", 100)), request)
+
+
+@router.get("/business/{business_id}/segments/export")
+def export_segment_endpoint(request: Request, business_id: int, filters: str = Query("{}"),
+	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("customer_club", "view")),
+	db: Session = Depends(get_db), _ctx: AuthContext = Depends(get_current_user)) -> dict:
+	import json
+	_ensure_plugin(db, business_id)
+	try:
+		data = json.loads(filters)
+	except (TypeError, ValueError):
+		raise ApiError("CUSTOMER_CLUB_SEGMENT_INVALID", "filters must be valid JSON.", http_status=400)
+	if not isinstance(data, dict):
+		raise ApiError("CUSTOMER_CLUB_SEGMENT_INVALID", "filters must be an object.", http_status=400)
+	return success_response(program_svc.preview_segment(db, business_id, data, 10000), request)
+
+
+@router.get("/business/{business_id}/campaigns")
+def list_campaigns_endpoint(request: Request, business_id: int,
+	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("customer_club", "view")),
+	db: Session = Depends(get_db), _ctx: AuthContext = Depends(get_current_user)) -> dict:
+	_ensure_plugin(db, business_id)
+	return success_response({"items": program_svc.list_campaigns(db, business_id)}, request)
+
+
+@router.post("/business/{business_id}/campaigns")
+def create_campaign_endpoint(request: Request, business_id: int, payload: Dict[str, Any] = Body(...),
+	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("customer_club", "manage")),
+	db: Session = Depends(get_db), ctx: AuthContext = Depends(get_current_user)) -> dict:
+	_ensure_plugin(db, business_id)
+	return success_response(program_svc.save_campaign(db, business_id, payload, ctx.get_user_id()), request)
+
+
+@router.put("/business/{business_id}/campaigns/{campaign_id}")
+def update_campaign_endpoint(request: Request, business_id: int, campaign_id: int, payload: Dict[str, Any] = Body(...),
+	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("customer_club", "manage")),
+	db: Session = Depends(get_db), ctx: AuthContext = Depends(get_current_user)) -> dict:
+	_ensure_plugin(db, business_id)
+	return success_response(program_svc.save_campaign(db, business_id, payload, ctx.get_user_id(), campaign_id), request)
+
+
+@router.post("/business/{business_id}/campaigns/{campaign_id}/run")
+def run_campaign_endpoint(request: Request, business_id: int, campaign_id: int,
+	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("customer_club", "manage")),
+	db: Session = Depends(get_db), _ctx: AuthContext = Depends(get_current_user)) -> dict:
+	_ensure_plugin(db, business_id)
+	return success_response(program_svc.run_campaign(db, business_id, campaign_id), request)
+
+
+@router.get("/business/{business_id}/campaigns/{campaign_id}/stats")
+def campaign_stats_endpoint(request: Request, business_id: int, campaign_id: int,
+	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("customer_club", "view")),
+	db: Session = Depends(get_db), _ctx: AuthContext = Depends(get_current_user)) -> dict:
+	_ensure_plugin(db, business_id)
+	return success_response(program_svc.campaign_stats(db, business_id, campaign_id), request)

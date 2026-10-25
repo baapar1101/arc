@@ -82,6 +82,8 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   List<int> _selectedTagIds = [];
   String? _invoiceTitle;
   final TextEditingController _invoiceTitleController = TextEditingController();
+  final TextEditingController _loyaltyPointsController = TextEditingController();
+  final TextEditingController _clubVoucherCodeController = TextEditingController();
   bool _isProforma = false; // وضعیت پیش‌فاکتور (قابل تغییر)
   /// none | draft | posted
   String _invoiceWarehouseReleaseMode = 'draft';
@@ -412,6 +414,8 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     _tabController.dispose();
     _globalDiscountValueController.dispose();
     _invoiceTitleController.dispose();
+    _loyaltyPointsController.dispose();
+    _clubVoucherCodeController.dispose();
     super.dispose();
   }
 
@@ -465,6 +469,11 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
 
       // extra_info
       _originalExtraInfo = Map<String, dynamic>.from(item['extra_info'] ?? const {});
+      final clubInfo = _originalExtraInfo['customer_club'];
+      if (clubInfo is Map) {
+        _loyaltyPointsController.text = (clubInfo['redeem_points_requested'] ?? '').toString();
+        _clubVoucherCodeController.text = (clubInfo['voucher_code'] ?? '').toString();
+      }
       _manualFxRateId = null;
       final fxx0 = _originalExtraInfo['fx'];
       if (fxx0 is Map && fxx0['mode']?.toString() == 'selected') {
@@ -991,6 +1000,8 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                 _invoiceTitle = value.trim().isEmpty ? null : value.trim();
               });
             },
+            loyaltyPointsController: _loyaltyPointsController,
+            voucherCodeController: _clubVoucherCodeController,
           ),
         ),
       ),
@@ -1511,6 +1522,25 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     } else if (isPurchaseOrReturn && _selectedSupplier != null) {
       mergedExtra['person_id'] = _selectedSupplier!.id;
     }
+	final clubInfo = Map<String, dynamic>.from(mergedExtra['customer_club'] is Map ? mergedExtra['customer_club'] as Map : const {});
+	if (_loyaltyPointsController.text.trim().isEmpty) {
+		clubInfo.remove('redeem_points_requested');
+		clubInfo.remove('redeem_discount_amount');
+	} else {
+		clubInfo['redeem_points_requested'] = double.tryParse(_loyaltyPointsController.text.replaceAll(',', '').trim()) ?? 0;
+	}
+	if (_clubVoucherCodeController.text.trim().isEmpty) {
+		clubInfo.remove('voucher_code');
+		clubInfo.remove('voucher_id');
+		clubInfo.remove('voucher_discount_amount');
+	} else {
+		clubInfo['voucher_code'] = _clubVoucherCodeController.text.trim().toUpperCase();
+	}
+	if (clubInfo.isEmpty) {
+		mergedExtra.remove('customer_club');
+	} else {
+		mergedExtra['customer_club'] = clubInfo;
+	}
 
     if (_invoiceTypeSupportsAdjustments) {
       final adjPayload = buildAdjustmentsPayloadList(_adjustmentRows);
@@ -1537,6 +1567,10 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       'tag_ids': _selectedTagIds,
       if (_showInvoiceFxField && _manualFxRateId != null) 'fx_rate_id': _manualFxRateId,
       'lines': _lineItems.map((e) => _serializeLineItem(e)).toList(),
+      if (_loyaltyPointsController.text.trim().isNotEmpty)
+        'loyalty_redemption_points': double.tryParse(_loyaltyPointsController.text.replaceAll(',', '').trim()) ?? 0,
+      if (_clubVoucherCodeController.text.trim().isNotEmpty)
+        'customer_club_voucher_code': _clubVoucherCodeController.text.trim().toUpperCase(),
     };
     
     // تراکنش‌های پرداخت برای فاکتور قطعی؛ همیشه آرایه بفرست تا حذف همهٔ تراکنش‌ها در سرور اعمال شود

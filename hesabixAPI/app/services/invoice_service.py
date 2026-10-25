@@ -5940,6 +5940,7 @@ def create_invoice(
             header_extra,
             data,
             user_id,
+            invoice_lines=lines_input,
         )
     except ApiError:
         raise
@@ -7446,6 +7447,8 @@ def update_invoice(
                 header_extra,
                 data,
                 user_id,
+                invoice_lines=lines_input,
+                document_id=int(document.id),
             )
         except ApiError:
             raise

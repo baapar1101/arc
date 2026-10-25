@@ -143,6 +143,8 @@ class _NewInvoicePageState extends State<NewInvoicePage>
   String _globalDiscountType = 'percent';
   final TextEditingController _globalDiscountValueController =
       TextEditingController();
+  final TextEditingController _loyaltyPointsController = TextEditingController();
+  final TextEditingController _clubVoucherCodeController = TextEditingController();
 
   // تنظیمات چاپ و ارسال
   bool _printAfterSave = false;
@@ -2570,6 +2572,8 @@ class _NewInvoicePageState extends State<NewInvoicePage>
     _adjustmentRows = [];
     _tabController.dispose();
     _globalDiscountValueController.dispose();
+    _loyaltyPointsController.dispose();
+    _clubVoucherCodeController.dispose();
     _invoiceTitleController.dispose();
     // Dispose کردن Controller های اقساطی
     _numInstallmentsController.dispose();
@@ -2893,6 +2897,8 @@ class _NewInvoicePageState extends State<NewInvoicePage>
                 _invoiceTitle = value.trim().isEmpty ? null : value.trim();
               });
             },
+            loyaltyPointsController: _loyaltyPointsController,
+            voucherCodeController: _clubVoucherCodeController,
           ),
         ),
       ),
@@ -3574,6 +3580,10 @@ class _NewInvoicePageState extends State<NewInvoicePage>
       if (_showInvoiceFxField && _manualFxRateId != null)
         'fx_rate_id': _manualFxRateId,
       'lines': _lineItems.map((e) => _serializeLineItem(e)).toList(),
+      if (_loyaltyPointsController.text.trim().isNotEmpty)
+        'loyalty_redemption_points': double.tryParse(_loyaltyPointsController.text.replaceAll(',', '').trim()) ?? 0,
+      if (_clubVoucherCodeController.text.trim().isNotEmpty)
+        'customer_club_voucher_code': _clubVoucherCodeController.text.trim().toUpperCase(),
     };
 
     // تراکنش‌ها فقط برای فاکتور قطعی (هم‌راستا با بک‌اند و edit_invoice_page)

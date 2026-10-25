@@ -39,6 +39,8 @@ class _CustomerClubSettingsPageState extends State<CustomerClubSettingsPage> {
   final TextEditingController _currencyValuePerPointCtl = TextEditingController();
   final TextEditingController _maxRedeemPerInvCtl = TextEditingController();
   final TextEditingController _pointsExpireDaysCtl = TextEditingController();
+  final TextEditingController _referralPointsCtl = TextEditingController(text: '0');
+  final TextEditingController _surveyPointsCtl = TextEditingController(text: '0');
   String _rounding = 'floor';
   bool _requireCustomerType = true;
 
@@ -75,6 +77,8 @@ class _CustomerClubSettingsPageState extends State<CustomerClubSettingsPage> {
     _currencyValuePerPointCtl.dispose();
     _maxRedeemPerInvCtl.dispose();
     _pointsExpireDaysCtl.dispose();
+    _referralPointsCtl.dispose();
+    _surveyPointsCtl.dispose();
     _rfmWindowMonthsCtl.dispose();
     _rfmWeightRCtl.dispose();
     _rfmWeightFCtl.dispose();
@@ -102,6 +106,8 @@ class _CustomerClubSettingsPageState extends State<CustomerClubSettingsPage> {
         _maxRedeemPerInvCtl.text = _fmtNum(data['max_redeem_points_per_invoice']);
         final exp = data['points_expire_after_days'];
         _pointsExpireDaysCtl.text = exp == null ? '' : exp.toString();
+        _referralPointsCtl.text = _fmtNum(data['referral_points'] ?? 0);
+        _surveyPointsCtl.text = _fmtNum(data['survey_points'] ?? 0);
         _rounding = (data['rounding_mode'] ?? 'floor').toString();
         _requireCustomerType = data['require_customer_person_type'] != false;
         _rfmAnalyticsEnabled = data['rfm_analytics_enabled'] == true;
@@ -215,6 +221,8 @@ class _CustomerClubSettingsPageState extends State<CustomerClubSettingsPage> {
         'currency_value_per_point': _parseDoubleOrNull(_currencyValuePerPointCtl.text),
         'max_redeem_points_per_invoice': _parseDoubleOrNull(_maxRedeemPerInvCtl.text),
         'points_expire_after_days': _parseOptionalIntNull(_pointsExpireDaysCtl.text),
+        'referral_points': double.tryParse(_referralPointsCtl.text.trim().replaceAll(',', '')) ?? 0,
+        'survey_points': double.tryParse(_surveyPointsCtl.text.trim().replaceAll(',', '')) ?? 0,
         'rfm_analytics_enabled': _rfmAnalyticsEnabled,
         'clv_analytics_enabled': _clvAnalyticsEnabled,
         'rfm_analysis_window_months': int.tryParse(_rfmWindowMonthsCtl.text.trim().replaceAll(',', '')) ?? 12,
@@ -328,6 +336,24 @@ class _CustomerClubSettingsPageState extends State<CustomerClubSettingsPage> {
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         readOnly: !canManage,
                         onChanged: (_) => setState(() {}),
+                      ),
+                      TextField(
+                        controller: _referralPointsCtl,
+                        decoration: InputDecoration(
+                          labelText: Localizations.localeOf(context).languageCode == 'fa' ? 'امتیاز معرفی دوستان (برای دعوت‌کننده و عضو جدید)' : 'Referral points (inviter and new member)',
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+                        readOnly: !canManage,
+                      ),
+                      TextField(
+                        controller: _surveyPointsCtl,
+                        decoration: InputDecoration(
+                          labelText: Localizations.localeOf(context).languageCode == 'fa' ? 'امتیاز ثبت نظر/نظرسنجی' : 'Points for survey responses',
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+                        readOnly: !canManage,
                       ),
                     ],
                   ),

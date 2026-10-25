@@ -1312,6 +1312,10 @@ def create_app() -> FastAPI:
         from app.services.crm_background_jobs import crm_automation_background_loop
         asyncio.create_task(crm_automation_background_loop(60))
 
+        # Customer club: expire points that reached their configured due date.
+        from app.services.customer_club_background_jobs import customer_club_background_loop
+        asyncio.create_task(customer_club_background_loop(300))
+
         from app.services.support.support_background_jobs import (
             support_sla_breach_check_loop,
             support_subscription_status_loop,

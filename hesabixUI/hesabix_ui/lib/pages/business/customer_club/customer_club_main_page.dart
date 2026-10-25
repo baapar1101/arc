@@ -12,6 +12,7 @@ import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/invoice/person_combobox_widget.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
 import 'customer_club_analytics_tab.dart';
+import 'customer_club_programs_tab.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// صفحهٔ اصلی باشگاه مشتریان (تراکنش‌ها و در صورت مجوز اصلاح دستی). تنظیمات در مسیر جدا است.
@@ -59,7 +60,7 @@ class _CustomerClubMainPageState extends State<CustomerClubMainPage> with Single
   void initState() {
     super.initState();
     _showAdjustTab = _computeCanAdjust();
-    _tabController = TabController(length: 2 + (_showAdjustTab ? 1 : 0), vsync: this);
+    _tabController = TabController(length: 3 + (_showAdjustTab ? 1 : 0), vsync: this);
     _tabController.addListener(() {
       if (mounted) setState(() {});
     });
@@ -117,6 +118,18 @@ class _CustomerClubMainPageState extends State<CustomerClubMainPage> with Single
         return t.customerClubTxnInvoiceDeleteReversal;
       case 'invoice_delete_reversal_redeem':
         return t.customerClubTxnInvoiceDeleteReversalRedeem;
+      case 'point_expiry':
+        return Localizations.localeOf(context).languageCode == 'fa' ? 'انقضای امتیاز' : 'Point expiry';
+      case 'referral_reward':
+        return Localizations.localeOf(context).languageCode == 'fa' ? 'پاداش معرفی' : 'Referral reward';
+      case 'survey_reward':
+        return Localizations.localeOf(context).languageCode == 'fa' ? 'پاداش نظرسنجی' : 'Survey reward';
+      case 'campaign_reward':
+        return Localizations.localeOf(context).languageCode == 'fa' ? 'پاداش کمپین' : 'Campaign reward';
+      case 'reward_redeem':
+        return Localizations.localeOf(context).languageCode == 'fa' ? 'خرید پاداش با امتیاز' : 'Reward redemption';
+      case 'invoice_sync_reassignment':
+        return Localizations.localeOf(context).languageCode == 'fa' ? 'اصلاح مالکیت امتیاز فاکتور' : 'Invoice customer correction';
       default:
         return raw ?? '—';
     }
@@ -271,6 +284,7 @@ class _CustomerClubMainPageState extends State<CustomerClubMainPage> with Single
           tabs: [
             Tab(icon: const Icon(Icons.receipt_long_outlined), text: t.customerClubTabLedger),
             Tab(icon: const Icon(Icons.insights_outlined), text: t.customerClubTabAnalytics),
+            Tab(icon: const Icon(Icons.card_giftcard_outlined), text: _isPersian ? 'پاداش و کمپین' : 'Rewards & campaigns'),
             if (_showAdjustTab) Tab(icon: const Icon(Icons.edit_note_outlined), text: t.customerClubTabAdjust),
           ],
         ),
@@ -283,11 +297,14 @@ class _CustomerClubMainPageState extends State<CustomerClubMainPage> with Single
             businessId: widget.businessId,
             authStore: widget.authStore,
           ),
+          CustomerClubProgramsTab(businessId: widget.businessId, authStore: widget.authStore),
           if (_showAdjustTab) _buildAdjustTab(theme, t),
         ],
       ),
     );
   }
+
+  bool get _isPersian => Localizations.localeOf(context).languageCode == 'fa';
 
   Widget _buildLedgerTab(ThemeData theme, AppLocalizations t) {
     if (_loadingLedger && _ledgerRows.isEmpty) {

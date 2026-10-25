@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../core/api_client.dart';
 
 /// سرویس API باشگاه مشتریان (`/api/v1/customer-club/...`).
@@ -161,5 +163,114 @@ class CustomerClubService {
       return Map<String, dynamic>.from(body['data'] as Map? ?? const {});
     }
     return const {};
+  }
+
+  Future<List<Map<String, dynamic>>> listRewards({required int businessId}) async {
+    final res = await _api.get<Map<String, dynamic>>('/api/v1/customer-club/business/$businessId/rewards');
+    final body = res.data;
+    final data = body is Map ? body['data'] : null;
+    return data is Map && data['items'] is List
+        ? (data['items'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+        : <Map<String, dynamic>>[];
+  }
+
+  Future<Map<String, dynamic>> saveReward({required int businessId, required Map<String, dynamic> payload, int? rewardId}) async {
+    final path = '/api/v1/customer-club/business/$businessId/rewards${rewardId == null ? '' : '/$rewardId'}';
+    final res = rewardId == null
+        ? await _api.post<Map<String, dynamic>>(path, data: payload)
+        : await _api.put<Map<String, dynamic>>(path, data: payload);
+    final body = res.data;
+    return body is Map ? Map<String, dynamic>.from(body['data'] as Map? ?? const {}) : const {};
+  }
+
+  Future<List<Map<String, dynamic>>> listCampaigns({required int businessId}) async {
+    final res = await _api.get<Map<String, dynamic>>('/api/v1/customer-club/business/$businessId/campaigns');
+    final body = res.data;
+    final data = body is Map ? body['data'] : null;
+    return data is Map && data['items'] is List
+        ? (data['items'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+        : <Map<String, dynamic>>[];
+  }
+
+  Future<Map<String, dynamic>> saveCampaign({required int businessId, required Map<String, dynamic> payload, int? campaignId}) async {
+    final path = '/api/v1/customer-club/business/$businessId/campaigns${campaignId == null ? '' : '/$campaignId'}';
+    final res = campaignId == null
+        ? await _api.post<Map<String, dynamic>>(path, data: payload)
+        : await _api.put<Map<String, dynamic>>(path, data: payload);
+    final body = res.data;
+    return body is Map ? Map<String, dynamic>.from(body['data'] as Map? ?? const {}) : const {};
+  }
+
+  Future<Map<String, dynamic>> previewSegment({required int businessId, required Map<String, dynamic> filters}) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/customer-club/business/$businessId/segments/preview',
+      data: <String, dynamic>{'filters': filters, 'limit': 100},
+    );
+    final body = res.data;
+    return body is Map ? Map<String, dynamic>.from(body['data'] as Map? ?? const {}) : const {};
+  }
+
+  Future<Map<String, dynamic>> exportSegment({required int businessId, required Map<String, dynamic> filters}) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/customer-club/business/$businessId/segments/export',
+      query: <String, dynamic>{'filters': jsonEncode(filters)},
+    );
+    final body = res.data;
+    return body is Map ? Map<String, dynamic>.from(body['data'] as Map? ?? const {}) : const {};
+  }
+
+  Future<Map<String, dynamic>> runCampaign({required int businessId, required int campaignId}) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/customer-club/business/$businessId/campaigns/$campaignId/run',
+      data: const <String, dynamic>{},
+    );
+    final body = res.data;
+    return body is Map ? Map<String, dynamic>.from(body['data'] as Map? ?? const {}) : const {};
+  }
+
+  Future<Map<String, dynamic>> getCampaignStats({required int businessId, required int campaignId}) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/customer-club/business/$businessId/campaigns/$campaignId/stats',
+    );
+    final body = res.data;
+    return body is Map ? Map<String, dynamic>.from(body['data'] as Map? ?? const {}) : const {};
+  }
+
+  Future<List<Map<String, dynamic>>> listVouchers({required int businessId, int? personId}) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/customer-club/business/$businessId/vouchers',
+      query: <String, dynamic>{if (personId != null) 'person_id': '$personId'},
+    );
+    final body = res.data;
+    final data = body is Map ? body['data'] : null;
+    return data is Map && data['items'] is List
+        ? (data['items'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+        : <Map<String, dynamic>>[];
+  }
+
+  Future<Map<String, dynamic>> redeemReward({required int businessId, required int personId, required int rewardId}) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/customer-club/business/$businessId/persons/$personId/rewards/$rewardId/redeem',
+      data: const <String, dynamic>{},
+    );
+    final body = res.data;
+    return body is Map ? Map<String, dynamic>.from(body['data'] as Map? ?? const {}) : const {};
+  }
+
+  Future<Map<String, dynamic>> updateMemberConsent({required int businessId, required int personId, required Map<String, dynamic> payload}) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/customer-club/business/$businessId/persons/$personId/consent',
+      data: payload,
+    );
+    final body = res.data;
+    return body is Map ? Map<String, dynamic>.from(body['data'] as Map? ?? const {}) : const {};
+  }
+
+  Future<Map<String, dynamic>> getMemberProfile({required int businessId, required int personId}) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/customer-club/business/$businessId/persons/$personId/profile',
+    );
+    final body = res.data;
+    return body is Map ? Map<String, dynamic>.from(body['data'] as Map? ?? const {}) : const {};
   }
 }

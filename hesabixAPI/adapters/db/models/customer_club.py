@@ -51,6 +51,8 @@ class CustomerClubSettings(Base):
 	)
 	max_redeem_points_per_invoice: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
 	points_expire_after_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+	referral_points: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False, default=Decimal("0"))
+	survey_points: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False, default=Decimal("0"))
 
 	# decoupled: سطح/ضریب از مانده امتیاز | rfm_based_tiers: ضریب از نمره نرمال‌شده RFM
 	loyalty_rfm_integration_mode: Mapped[str] = mapped_column(
@@ -140,6 +142,150 @@ class CustomerClubLedger(Base):
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
 
+class CustomerClubPointLot(Base):
+	"""بخش مستقل امتیازهای کسب‌شده برای مصرف FIFO و انقضای واقعی."""
+
+	__tablename__ = "customer_club_point_lots"
+	__table_args__ = (
+		UniqueConstraint("ledger_id", name="uq_customer_club_point_lot_ledger"),
+	)
+
+	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+	business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False, index=True)
+	person_id: Mapped[int] = mapped_column(Integer, ForeignKey("persons.id", ondelete="CASCADE"), nullable=False, index=True)
+	ledger_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("customer_club_ledger.id", ondelete="SET NULL"), nullable=True)
+	original_points: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+	remaining_points: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+	expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class CustomerClubReward(Base):
+	"""تعریف جایزه‌های قابل‌خرید با امتیاز یا قابل‌اعطا در کمپین."""
+
+	__tablename__ = "customer_club_rewards"
+
+	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+	business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False, index=True)
+	name: Mapped[str] = mapped_column(String(160), nullable=False)
+	description: Mapped[str | None] = mapped_column(Text, nullable=True)
+	reward_type: Mapped[str] = mapped_column(String(32), nullable=False, default="discount_amount")
+	points_cost: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False, default=Decimal("0"))
+	value: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False, default=Decimal("0"))
+	product_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("products.id", ondelete="SET NULL"), nullable=True)
+	valid_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+	max_issuances: Mapped[int | None] = mapped_column(Integer, nullable=True)
+	active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class CustomerClubVoucher(Base):
+	"""جایزهٔ صادرشده برای عضو با وضعیت چرخهٔ عمر قابل‌ردیابی."""
+
+	__tablename__ = "customer_club_vouchers"
+	__table_args__ = (UniqueConstraint("business_id", "code", name="uq_customer_club_voucher_code"),)
+
+	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+	business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False, index=True)
+	person_id: Mapped[int] = mapped_column(Integer, ForeignKey("persons.id", ondelete="CASCADE"), nullable=False, index=True)
+	reward_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("customer_club_rewards.id", ondelete="SET NULL"), nullable=True)
+	product_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("products.id", ondelete="SET NULL"), nullable=True)
+	campaign_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("customer_club_campaigns.id", ondelete="SET NULL"), nullable=True)
+	code: Mapped[str] = mapped_column(String(40), nullable=False)
+	status: Mapped[str] = mapped_column(String(20), nullable=False, default="issued")
+	value: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False, default=Decimal("0"))
+	reward_type: Mapped[str] = mapped_column(String(32), nullable=False)
+	expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+	redeemed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+	redeemed_document_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("documents.id", ondelete="SET NULL"), nullable=True)
+	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class CustomerClubCampaign(Base):
+	"""کمپین امتیاز/جایزه با شرط‌های محدود و امن و امکان بخش‌بندی اعضا."""
+
+	__tablename__ = "customer_club_campaigns"
+
+	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+	business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False, index=True)
+	name: Mapped[str] = mapped_column(String(160), nullable=False)
+	description: Mapped[str | None] = mapped_column(Text, nullable=True)
+	trigger_type: Mapped[str] = mapped_column(String(24), nullable=False, default="manual")
+	segment_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+	reward_type: Mapped[str] = mapped_column(String(32), nullable=False, default="points")
+	reward_value: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False, default=Decimal("0"))
+	min_purchase_amount: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
+	reward_valid_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+	message_template: Mapped[str | None] = mapped_column(Text, nullable=True)
+	channel: Mapped[str] = mapped_column(String(16), nullable=False, default="none")
+	starts_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+	ends_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+	status: Mapped[str] = mapped_column(String(20), nullable=False, default="draft")
+	created_by_user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class CustomerClubCampaignMember(Base):
+	"""ثبت نتیجهٔ هر اجرای کمپین برای جلوگیری از اجرای دوباره و سنجش عملکرد."""
+
+	__tablename__ = "customer_club_campaign_members"
+	__table_args__ = (UniqueConstraint("campaign_id", "person_id", name="uq_customer_club_campaign_member"),)
+
+	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+	campaign_id: Mapped[int] = mapped_column(Integer, ForeignKey("customer_club_campaigns.id", ondelete="CASCADE"), nullable=False, index=True)
+	business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False, index=True)
+	person_id: Mapped[int] = mapped_column(Integer, ForeignKey("persons.id", ondelete="CASCADE"), nullable=False, index=True)
+	status: Mapped[str] = mapped_column(String(20), nullable=False, default="rewarded")
+	reward_value: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False, default=Decimal("0"))
+	voucher_code: Mapped[str | None] = mapped_column(String(40), nullable=True)
+	conversion_document_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("documents.id", ondelete="SET NULL"), nullable=True)
+	conversion_amount: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False, default=Decimal("0"))
+	converted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+	sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+	send_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class CustomerClubMember(Base):
+	"""عضویت، کد معرفی و رضایت ارتباطی مشتری در باشگاه."""
+
+	__tablename__ = "customer_club_members"
+	__table_args__ = (
+		UniqueConstraint("business_id", "person_id", name="uq_customer_club_member_biz_person"),
+		UniqueConstraint("business_id", "referral_code", name="uq_customer_club_member_referral"),
+	)
+
+	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+	business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False, index=True)
+	person_id: Mapped[int] = mapped_column(Integer, ForeignKey("persons.id", ondelete="CASCADE"), nullable=False, index=True)
+	joined_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+	referral_code: Mapped[str | None] = mapped_column(String(24), nullable=True)
+	referrer_person_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("persons.id", ondelete="SET NULL"), nullable=True)
+	referral_rewarded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+	sms_consent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+	sms_consent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+	email_consent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+	email_consent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class CustomerClubSurveyResponse(Base):
+	"""یک پاسخ نظرسنجیِ امتیازپذیر، با کلید idempotency برای جلوگیری از تکرار."""
+
+	__tablename__ = "customer_club_survey_responses"
+	__table_args__ = (UniqueConstraint("business_id", "person_id", "survey_key", name="uq_customer_club_survey_person"),)
+
+	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+	business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False, index=True)
+	person_id: Mapped[int] = mapped_column(Integer, ForeignKey("persons.id", ondelete="CASCADE"), nullable=False, index=True)
+	survey_key: Mapped[str] = mapped_column(String(80), nullable=False)
+	score: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+	comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+	points_awarded: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False, default=Decimal("0"))
+	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 class CustomerClubInvoiceSnapshot(Base):
 	"""آخرین امتیاز ثبت‌شده برای یک سند فاکتور جهت همگام‌سازی و حذف."""
 
@@ -164,6 +310,7 @@ class CustomerClubInvoiceSnapshot(Base):
 	)
 	accrued_points: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False, default=Decimal("0"))
 	redeemed_points: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False, default=Decimal("0"))
+	voucher_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("customer_club_vouchers.id", ondelete="SET NULL"), nullable=True)
 
 	updated_at: Mapped[datetime] = mapped_column(
 		DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
@@ -188,6 +335,7 @@ class CustomerClubTier(Base):
 		Numeric(18, 6), nullable=False, default=Decimal("0")
 	)
 	min_rfm_normalized: Mapped[Decimal | None] = mapped_column(Numeric(10, 6), nullable=True)
+	benefits_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
 	earn_multiplier: Mapped[Decimal] = mapped_column(
 		Numeric(18, 6), nullable=False, default=Decimal("1")
 	)
