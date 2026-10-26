@@ -106,7 +106,7 @@ from app.services.document_list_sort import apply_invoice_search_ordering, apply
 from adapters.db.models.bank_account import BankAccount
 from adapters.db.models.cash_register import CashRegister
 from adapters.db.models.petty_cash import PettyCash
-from sqlalchemy import func
+from sqlalchemy import func, case
 
 
 logger = logging.getLogger(__name__)
@@ -1468,6 +1468,17 @@ async def export_single_invoice_pdf(
 
     # جزئیات کامل فاکتور (به‌صورت دیکشنری قابل ارسال به قالب)
     item = invoice_document_to_dict(db, doc)
+    try:
+        invoice_currency = db.get(Currency, int(doc.currency_id))
+        if invoice_currency is not None:
+            item["currency"] = {
+                "id": invoice_currency.id,
+                "code": invoice_currency.code,
+                "title": invoice_currency.title,
+                "symbol": invoice_currency.symbol,
+            }
+    except Exception:
+        pass
     item = dict(item or {})
 
     # اطلاعات کسب‌وکار (اختیاری) + فایل‌های گرافیکی (لوگو/مهر) و امضای مالک
@@ -1953,43 +1964,51 @@ async def export_single_invoice_pdf(
         except Exception:
             amount_without_tax = None
 
-    # محاسبه وضعیت حساب مشتری (فقط برای فاکتورهای دارای person_id و با همان ارز فاکتور)
+    # تراز شخص در ارز پایه کسب‌وکار جمع می‌شود تا فاکتور ارزی و پرداخت ریالی همدیگر را خنثی کنند.
     customer_balance_info: Dict[str, Any] = {}
     try:
         if person_id is not None:
-            # محاسبه تراز فعلی مشتری (فقط اسناد قطعی و با همان ارز فاکتور)
-            invoice_currency_id = item.get("currency_id")
-            if invoice_currency_id:
-                # محاسبه تراز با فیلتر ارز
-                query = db.query(
-                    func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit'),
-                    func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit')
-                ).join(
-                    Document, DocumentLine.document_id == Document.id
-                ).filter(
-                    DocumentLine.person_id == int(person_id),
-                    Document.is_proforma == False,  # فقط اسناد قطعی
-                    Document.currency_id == int(invoice_currency_id)  # فقط همان ارز فاکتور
-                )
-                result = query.first()
-                if result is not None:
-                    total_credit = float(result.total_credit or 0)
-                    total_debit = float(result.total_debit or 0)
-                    current_balance = total_credit - total_debit
-                    if total_credit == 0 and total_debit == 0:
-                        current_status = "بدون تراکنش"
-                    elif current_balance > 0:
-                        current_status = "بستانکار"
-                    elif current_balance < 0:
-                        current_status = "بدهکار"
-                    else:
-                        current_status = "بالانس"
-                else:
-                    current_balance = 0.0
-                    current_status = "بدون تراکنش"
+            balance_business = db.query(Business).filter(Business.id == business_id).first()
+            base_currency_id = getattr(balance_business, "default_currency_id", None)
+            if not base_currency_id:
+                base_currency_id = item.get("currency_id")
+            base_currency = db.get(Currency, int(base_currency_id)) if base_currency_id else None
+            base_currency_symbol = getattr(base_currency, "symbol", None) or getattr(base_currency, "code", "")
+            debit_in_base = case(
+                (Document.currency_id == base_currency_id, DocumentLine.debit),
+                else_=DocumentLine.debit * func.coalesce(DocumentLine.exchange_rate, 0),
+            )
+            credit_in_base = case(
+                (Document.currency_id == base_currency_id, DocumentLine.credit),
+                else_=DocumentLine.credit * func.coalesce(DocumentLine.exchange_rate, 0),
+            )
+            debit_base = func.coalesce(
+                DocumentLine.debit_base,
+                debit_in_base,
+            )
+            credit_base = func.coalesce(
+                DocumentLine.credit_base,
+                credit_in_base,
+            )
+            result = db.query(
+                func.coalesce(func.sum(credit_base), 0).label("total_credit"),
+                func.coalesce(func.sum(debit_base), 0).label("total_debit"),
+            ).join(Document, DocumentLine.document_id == Document.id).filter(
+                DocumentLine.person_id == int(person_id),
+                Document.business_id == business_id,
+                Document.is_proforma == False,
+            ).first()
+            total_credit = float(result.total_credit or 0) if result else 0.0
+            total_debit = float(result.total_debit or 0) if result else 0.0
+            current_balance = total_credit - total_debit
+            if total_credit == 0 and total_debit == 0:
+                current_status = "بدون تراکنش" if is_fa else "No transactions"
+            elif current_balance > 0:
+                current_status = "بستانکار" if is_fa else "Creditor"
+            elif current_balance < 0:
+                current_status = "بدهکار" if is_fa else "Debtor"
             else:
-                # اگر ارز فاکتور مشخص نبود، از تابع قبلی استفاده می‌کنیم
-                current_balance, current_status = calculate_person_balance(db, int(person_id))
+                current_status = "بالانس" if is_fa else "Balanced"
             
             # اگر فاکتور پیش‌فاکتور است، تراز احتمالی بعد از قطعی شدن را محاسبه می‌کنیم
             if is_proforma:
@@ -1999,12 +2018,19 @@ async def export_single_invoice_pdf(
                 # برای فاکتور خرید: بستانکار می‌شود (credit)
                 # برای فاکتور برگشت از خرید: بدهکار می‌شود (debit)
                 invoice_impact = 0.0
+                invoice_base_total = payable_total or 0
+                fx_totals = item.get("fx_totals") if isinstance(item.get("fx_totals"), dict) else {}
+                fx_base = fx_totals.get("base") if isinstance(fx_totals.get("base"), dict) else {}
+                if fx_base:
+                    invoice_base_total = fx_base.get("payable", fx_base.get("net", invoice_base_total))
+                elif base_currency_id and int(doc.currency_id) != int(base_currency_id):
+                    invoice_base_total = 0
                 if inv_type in ("invoice_sales", "invoice_purchase_return"):
                     # بدهکار می‌شود
-                    invoice_impact = -float(payable_total or 0)
+                    invoice_impact = -float(invoice_base_total or 0)
                 elif inv_type in ("invoice_sales_return", "invoice_purchase"):
                     # بستانکار می‌شود
-                    invoice_impact = float(payable_total or 0)
+                    invoice_impact = float(invoice_base_total or 0)
                 
                 potential_balance = current_balance + invoice_impact
                 
@@ -2022,12 +2048,14 @@ async def export_single_invoice_pdf(
                     "potential_balance": potential_balance,
                     "potential_status": potential_status,
                     "invoice_impact": invoice_impact,
+                    "currency_symbol": base_currency_symbol,
                 }
             else:
                 # فاکتور قطعی است، تراز فعلی شامل این فاکتور است
                 customer_balance_info = {
                     "current_balance": current_balance,
                     "current_status": current_status,
+                    "currency_symbol": base_currency_symbol,
                 }
     except Exception:
         logger.exception("Error calculating customer balance for invoice_id=%s", invoice_id)
@@ -2129,6 +2157,7 @@ async def export_single_invoice_pdf(
 
                 # اطلاعات تسویه بین‌ارزی از person_lines / extra_info سند
                 fx_display = None
+                payment_currency = db.get(Currency, int(rp.get("currency_id"))) if rp.get("currency_id") else None
                 try:
                     fx_src = None
                     for pl in (rp.get("person_lines") or []):
@@ -2188,6 +2217,7 @@ async def export_single_invoice_pdf(
                         "document_type_name": rp.get("document_type_name"),
                         "date": pay_date_display,
                         "total_amount": rp.get("total_amount"),
+                        "currency_symbol": getattr(payment_currency, "symbol", None) or getattr(payment_currency, "code", ""),
                         "methods": ", ".join(methods),
                         "account_details": account_details,
                         "description": rp.get("description") or "",
@@ -2557,6 +2587,7 @@ async def export_single_invoice_pdf(
         "fa_font_url_bold": fa_font_url_bold,
         "invoice_footer_note": invoice_footer_note,
         "customer_balance_info": customer_balance_info,
+        "show_currency_symbol": bool(print_settings.get("show_currency_symbol", False)),
         "show_invoice_verify_qr": show_invoice_verify_qr,
         "invoice_verify_qr_data_uri": invoice_verify_qr_data_uri,
         "show_footer_print_time": bool(print_settings.get("show_footer_print_time", True)),

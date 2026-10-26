@@ -23,6 +23,7 @@ def _row_to_print_settings_dict(row: BusinessPrintSettings) -> Dict[str, Any]:
         "show_footer_preparer": bool(getattr(row, "show_footer_preparer", True)),
         "footer_note": getattr(row, "footer_note", None),
         "show_customer_balance": bool(getattr(row, "show_customer_balance", True)),
+        "show_currency_symbol": bool(getattr(row, "show_currency_symbol", False)),
         "show_seller_signature_area": bool(
             getattr(row, "show_seller_signature_area", True)
         ),
@@ -53,6 +54,7 @@ def default_print_settings_dict() -> Dict[str, Any]:
         "show_footer_preparer": True,
         "footer_note": None,
         "show_customer_balance": True,
+        "show_currency_symbol": False,
         "show_seller_signature_area": True,
         "show_buyer_signature_area": True,
         "stamp_scale_percent": STAMP_SCALE_DEFAULT,

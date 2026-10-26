@@ -59,6 +59,8 @@ class BusinessPrintSettings(Base):
 
     # نمایش تراز/وضعیت حساب شخص در PDF تک‌فاکتور (پیش‌فاکتور: تراز فعلی و احتمالی)
     show_customer_balance: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
+    # نمایش نماد ارز کنار مبالغ در PDF فاکتور
+    show_currency_symbol: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     # بلوک‌های امضا و مهر در پایین PDF (جدا از «بارگذاری تصویر مهر» با show_stamp)
     show_seller_signature_area: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
     show_buyer_signature_area: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")

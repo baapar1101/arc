@@ -1,6 +1,14 @@
 {% extends "pdf/base.html" %}
 {% block content %}
   <style>
+    {% if show_currency_symbol and invoice.currency and invoice.currency.symbol %}
+    .invoice-layout.show-currency-symbol .amount:not(.base-currency-amount):not(.payment-currency-amount)::after {
+      content: " {{ invoice.currency.symbol }}";
+    }
+    .invoice-layout.show-currency-symbol .amount.base-currency-amount::after {
+      content: " {{ (base_currency.symbol if base_currency is mapping else '') }}";
+    }
+    {% endif %}
     /* حاشیه کمتر از پیش‌فرض base (۱cm) فقط برای فاکتور؛ بقیهٔ @page از همان قالب */
     @page {
       margin: 8mm;
@@ -481,7 +489,7 @@
     }
   </style>
 
-  <div class="invoice-layout">
+  <div class="invoice-layout{{ ' show-currency-symbol' if show_currency_symbol else '' }}">
     {% if invoice.is_proforma %}
       <div class="proforma-watermark">
         {{ 'پیش‌فاکتور' if is_fa else 'PROFORMA' }}
@@ -763,7 +771,7 @@
                     —
                     <span>{{ p.code or '-' }}</span>
                     —
-                    <span class="amount" style="font-weight: 700;">{{ (p.total_amount or 0) | format_amount(0) | ltr | safe }}</span>
+                    <span class="amount payment-currency-amount" style="font-weight: 700;">{{ (p.total_amount or 0) | format_amount(0) | ltr | safe }}{% if show_currency_symbol %} {{ p.currency_symbol or '' }}{% endif %}</span>
                     {% if p.fx_display %}
                       <div style="margin-top: 3px; font-size: 9.5px; color: #1a1a1a; font-weight: 600;">
                         {% set fx = p.fx_display %}
@@ -781,7 +789,7 @@
                           {% if acc.display_name %}
                             <span> {{ acc.display_name }}</span>
                           {% endif %}
-                          <span class="amount" style="font-weight: 700;"> {{ (acc.amount or 0) | format_amount(0) | ltr | safe }}</span>
+                          <span class="amount payment-currency-amount" style="font-weight: 700;"> {{ (acc.amount or 0) | format_amount(0) | ltr | safe }}{% if show_currency_symbol %} {{ p.currency_symbol or '' }}{% endif %}</span>
                           {% if acc.description %}
                             <span style="color: #555;"> — {{ acc.description }}</span>
                           {% endif %}
@@ -809,18 +817,18 @@
                 {% if invoice.is_proforma %}
                   <div style="margin-bottom: 4px;">
                     <strong>{{ 'تراز فعلی' if is_fa else 'Current balance' }}:</strong>
-                    <span class="amount" style="margin-inline-start: 4px; font-weight: 700;">{{ customer_balance_info.current_balance | format_amount(0) | ltr | safe }}</span>
+                    <span class="amount base-currency-amount" style="margin-inline-start: 4px; font-weight: 700;">{{ customer_balance_info.current_balance | format_amount(0) | ltr | safe }}</span>
                     <span style="margin-inline-start: 6px; color: #555;">({{ customer_balance_info.current_status }})</span>
                   </div>
                   <div>
                     <strong>{{ 'تراز احتمالی پس از قطعی شدن' if is_fa else 'Potential balance after finalization' }}:</strong>
-                    <span class="amount" style="margin-inline-start: 4px; font-weight: 700;">{{ customer_balance_info.potential_balance | format_amount(0) | ltr | safe }}</span>
+                    <span class="amount base-currency-amount" style="margin-inline-start: 4px; font-weight: 700;">{{ customer_balance_info.potential_balance | format_amount(0) | ltr | safe }}</span>
                     <span style="margin-inline-start: 6px; color: #555;">({{ customer_balance_info.potential_status }})</span>
                   </div>
                 {% else %}
                   <div>
                     <strong>{{ 'تراز حساب' if is_fa else 'Account balance' }}:</strong>
-                    <span class="amount" style="margin-inline-start: 4px; font-weight: 700;">{{ customer_balance_info.current_balance | format_amount(0) | ltr | safe }}</span>
+                    <span class="amount base-currency-amount" style="margin-inline-start: 4px; font-weight: 700;">{{ customer_balance_info.current_balance | format_amount(0) | ltr | safe }}</span>
                     <span style="margin-inline-start: 6px; color: #555;">({{ customer_balance_info.current_status }})</span>
                   </div>
                 {% endif %}
@@ -923,7 +931,7 @@
                     {{ (_fx_foreign.payable | default(_fx_foreign.net, true)) | default(0, true) | format_amount(0) | ltr | safe }}
                     {{ invoice.currency.code if invoice.currency and invoice.currency.code else '' }}
                   </span>
-                  <span class="amount">
+                  <span class="amount base-currency-amount">
                     ≈
                     {{ (_fx_base.payable | default(_fx_base.net, true)) | default(0, true) | format_amount(0) | ltr | safe }}
                     {{ _base_cur.code | default('', true) }}
@@ -932,7 +940,7 @@
                 {% if _fx_base.rate %}
                   <div class="meta" style="margin-top: 2px;">
                     {{ 'نرخ' if is_fa else 'Rate' }}:
-                    {{ _fx_base.rate | format_amount(4) | ltr | safe }}
+                    {{ _fx_base.rate | smart_number(4) | ltr | safe }}
                   </div>
                 {% endif %}
               </div>

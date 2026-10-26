@@ -1351,6 +1351,7 @@ def get_business_print_settings(db: Session, business_id: int) -> Dict[str, Any]
             "show_footer_preparer": bool(getattr(row, "show_footer_preparer", True)),
             "footer_note": getattr(row, "footer_note", None),
             "show_customer_balance": bool(getattr(row, "show_customer_balance", True)),
+            "show_currency_symbol": bool(getattr(row, "show_currency_symbol", False)),
             "show_seller_signature_area": bool(getattr(row, "show_seller_signature_area", True)),
             "show_buyer_signature_area": bool(getattr(row, "show_buyer_signature_area", True)),
             "stamp_scale_percent": clamp_scale_percent(
@@ -1376,6 +1377,7 @@ def get_business_print_settings(db: Session, business_id: int) -> Dict[str, Any]
         "show_footer_preparer": True,
         "footer_note": None,
         "show_customer_balance": True,
+        "show_currency_symbol": False,
         "show_seller_signature_area": True,
         "show_buyer_signature_area": True,
         "stamp_scale_percent": STAMP_SCALE_DEFAULT,
@@ -1451,6 +1453,7 @@ def update_business_print_settings(
         row.show_footer_print_time = _get_bool(cfg, "show_footer_print_time", True)
         row.show_footer_preparer = _get_bool(cfg, "show_footer_preparer", True)
         row.show_customer_balance = _get_bool(cfg, "show_customer_balance", True)
+        row.show_currency_symbol = _get_bool(cfg, "show_currency_symbol", False)
         row.show_seller_signature_area = _get_bool(
             cfg, "show_seller_signature_area", True
         )

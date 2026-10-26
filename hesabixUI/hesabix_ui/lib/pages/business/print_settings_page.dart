@@ -610,6 +610,14 @@ class _BusinessPrintSettingsPageState extends State<BusinessPrintSettingsPage> {
           },
         ),
         SwitchListTile(
+          title: const Text('نمایش نماد ارز کنار مبالغ'),
+          subtitle: const Text('نماد ارز فاکتور کنار مبالغ در PDF نمایش داده شود'),
+          value: cfg.showCurrencySymbol,
+          onChanged: (v) => setState(() {
+            _updateCurrentConfig(cfg.copyWith(showCurrencySymbol: v));
+          }),
+        ),
+        SwitchListTile(
           title: const Text('نمایش تراکنش‌های پرداخت مرتبط'),
           subtitle: const Text('جدول رسیدها / پرداخت‌های متصل به فاکتور در پایین صفحه'),
           value: cfg.showPayments,
@@ -744,6 +752,7 @@ class _PrintConfig {
   final bool showSellerSignatureArea;
   final bool showBuyerSignatureArea;
   final bool showCustomerBalance;
+  final bool showCurrencySymbol;
   final bool showPayments;
   final bool showInstallmentPlan;
   final bool showShareQr;
@@ -768,6 +777,7 @@ class _PrintConfig {
     required this.showSellerSignatureArea,
     required this.showBuyerSignatureArea,
     required this.showCustomerBalance,
+    required this.showCurrencySymbol,
     required this.showPayments,
     required this.showInstallmentPlan,
     required this.showShareQr,
@@ -792,6 +802,7 @@ class _PrintConfig {
       showSellerSignatureArea: true,
       showBuyerSignatureArea: true,
       showCustomerBalance: true,
+      showCurrencySymbol: false,
       showPayments: true,
       showInstallmentPlan: true,
       showShareQr: false,
@@ -837,6 +848,7 @@ class _PrintConfig {
       showSellerSignatureArea: _b('show_seller_signature_area', true),
       showBuyerSignatureArea: _b('show_buyer_signature_area', true),
       showCustomerBalance: _b('show_customer_balance', true),
+      showCurrencySymbol: _b('show_currency_symbol', false),
       showPayments: _b('show_payments', true),
       showInstallmentPlan: _b('show_installment_plan', true),
       showShareQr: _b('show_share_qr', false),
@@ -867,6 +879,7 @@ class _PrintConfig {
       'show_seller_signature_area': showSellerSignatureArea,
       'show_buyer_signature_area': showBuyerSignatureArea,
       'show_customer_balance': showCustomerBalance,
+      'show_currency_symbol': showCurrencySymbol,
       'show_payments': showPayments,
       'show_installment_plan': showInstallmentPlan,
       'show_share_qr': showShareQr,
@@ -891,6 +904,7 @@ class _PrintConfig {
     bool? showSellerSignatureArea,
     bool? showBuyerSignatureArea,
     bool? showCustomerBalance,
+    bool? showCurrencySymbol,
     bool? showPayments,
     bool? showInstallmentPlan,
     bool? showShareQr,
@@ -913,6 +927,7 @@ class _PrintConfig {
       showSellerSignatureArea: showSellerSignatureArea ?? this.showSellerSignatureArea,
       showBuyerSignatureArea: showBuyerSignatureArea ?? this.showBuyerSignatureArea,
       showCustomerBalance: showCustomerBalance ?? this.showCustomerBalance,
+      showCurrencySymbol: showCurrencySymbol ?? this.showCurrencySymbol,
       showPayments: showPayments ?? this.showPayments,
       showInstallmentPlan: showInstallmentPlan ?? this.showInstallmentPlan,
       showShareQr: showShareQr ?? this.showShareQr,
