@@ -62,7 +62,8 @@ class _CustomerClubProgramsTabState extends State<CustomerClubProgramsTab> {
         _campaigns = values[1] as List<Map<String, dynamic>>;
         _vouchers = values[2] as List<Map<String, dynamic>>;
       });
-      if (_person != null) await _loadMember(_person!.id);
+      final personId = _person?.id;
+      if (personId != null) await _loadMember(personId);
     } catch (e) {
       if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     } finally {
@@ -92,12 +93,13 @@ class _CustomerClubProgramsTabState extends State<CustomerClubProgramsTab> {
 
   Future<void> _saveConsent() async {
     final person = _person;
-    if (person == null || _saving) return;
+    final personId = person?.id;
+    if (personId == null || _saving) return;
     setState(() => _saving = true);
     try {
       final member = await _service.updateMemberConsent(
         businessId: widget.businessId,
-        personId: person.id,
+        personId: personId,
         payload: {'sms_consent': _smsConsent, 'email_consent': _emailConsent, if (_referrerCodeCtl.text.trim().isNotEmpty) 'referral_code': _referrerCodeCtl.text.trim()},
       );
       if (!mounted) return;
@@ -113,7 +115,8 @@ class _CustomerClubProgramsTabState extends State<CustomerClubProgramsTab> {
 
   Future<void> _redeemSelectedReward() async {
     final person = _person;
-    if (person == null || _rewards.isEmpty) return;
+    final personId = person?.id;
+    if (personId == null || _rewards.isEmpty) return;
     final selected = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => SimpleDialog(
@@ -131,7 +134,7 @@ class _CustomerClubProgramsTabState extends State<CustomerClubProgramsTab> {
     try {
       final voucher = await _service.redeemReward(
         businessId: widget.businessId,
-        personId: person.id,
+        personId: personId,
         rewardId: int.parse('${selected['id']}'),
       );
       if (!mounted) return;
@@ -319,7 +322,7 @@ class _CustomerClubProgramsTabState extends State<CustomerClubProgramsTab> {
                   if (minRecency.text.trim().isNotEmpty) 'min_recency_days': int.tryParse(minRecency.text),
                   if (channel == 'sms') 'sms_consent': true,
                   if (channel == 'email') 'email_consent': true,
-                }..removeWhere((key, value) => value == null),
+                }..removeWhere((key, value) => value == null)),
                 icon: const Icon(Icons.content_copy_outlined), label: Text(s('کپی خروجی CSV', 'Copy CSV export')),
               ),
             ])),
@@ -444,7 +447,8 @@ class _CustomerClubProgramsTabState extends State<CustomerClubProgramsTab> {
             onChanged: (person) {
               _referrerCodeCtl.clear();
               setState(() => _person = person);
-              if (person != null) _loadMember(person.id);
+              final personId = person?.id;
+              if (personId != null) _loadMember(personId);
             }),
           if (_person != null) ...[
             if (_ownReferralCode.isNotEmpty) SelectableText('${s('کد معرفی مشتری', 'Customer referral code')}: $_ownReferralCode'),

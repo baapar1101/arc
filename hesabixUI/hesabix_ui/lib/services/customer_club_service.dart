@@ -168,7 +168,7 @@ class CustomerClubService {
   Future<List<Map<String, dynamic>>> listRewards({required int businessId}) async {
     final res = await _api.get<Map<String, dynamic>>('/api/v1/customer-club/business/$businessId/rewards');
     final body = res.data;
-    final data = body is Map ? body['data'] : null;
+    final data = body?['data'];
     return data is Map && data['items'] is List
         ? (data['items'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
         : <Map<String, dynamic>>[];
@@ -180,13 +180,13 @@ class CustomerClubService {
         ? await _api.post<Map<String, dynamic>>(path, data: payload)
         : await _api.put<Map<String, dynamic>>(path, data: payload);
     final body = res.data;
-    return body is Map ? Map<String, dynamic>.from(body['data'] as Map? ?? const {}) : const {};
+    return Map<String, dynamic>.from(body?['data'] as Map? ?? const {});
   }
 
   Future<List<Map<String, dynamic>>> listCampaigns({required int businessId}) async {
     final res = await _api.get<Map<String, dynamic>>('/api/v1/customer-club/business/$businessId/campaigns');
     final body = res.data;
-    final data = body is Map ? body['data'] : null;
+    final data = body?['data'];
     return data is Map && data['items'] is List
         ? (data['items'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
         : <Map<String, dynamic>>[];
@@ -198,7 +198,7 @@ class CustomerClubService {
         ? await _api.post<Map<String, dynamic>>(path, data: payload)
         : await _api.put<Map<String, dynamic>>(path, data: payload);
     final body = res.data;
-    return body is Map ? Map<String, dynamic>.from(body['data'] as Map? ?? const {}) : const {};
+    return Map<String, dynamic>.from(body?['data'] as Map? ?? const {});
   }
 
   Future<Map<String, dynamic>> previewSegment({required int businessId, required Map<String, dynamic> filters}) async {
@@ -207,7 +207,7 @@ class CustomerClubService {
       data: <String, dynamic>{'filters': filters, 'limit': 100},
     );
     final body = res.data;
-    return body is Map ? Map<String, dynamic>.from(body['data'] as Map? ?? const {}) : const {};
+    return Map<String, dynamic>.from(body?['data'] as Map? ?? const {});
   }
 
   Future<Map<String, dynamic>> exportSegment({required int businessId, required Map<String, dynamic> filters}) async {
@@ -216,7 +216,7 @@ class CustomerClubService {
       query: <String, dynamic>{'filters': jsonEncode(filters)},
     );
     final body = res.data;
-    return body is Map ? Map<String, dynamic>.from(body['data'] as Map? ?? const {}) : const {};
+    return Map<String, dynamic>.from(body?['data'] as Map? ?? const {});
   }
 
   Future<Map<String, dynamic>> runCampaign({required int businessId, required int campaignId}) async {
@@ -225,7 +225,7 @@ class CustomerClubService {
       data: const <String, dynamic>{},
     );
     final body = res.data;
-    return body is Map ? Map<String, dynamic>.from(body['data'] as Map? ?? const {}) : const {};
+    return Map<String, dynamic>.from(body?['data'] as Map? ?? const {});
   }
 
   Future<Map<String, dynamic>> getCampaignStats({required int businessId, required int campaignId}) async {
@@ -233,7 +233,7 @@ class CustomerClubService {
       '/api/v1/customer-club/business/$businessId/campaigns/$campaignId/stats',
     );
     final body = res.data;
-    return body is Map ? Map<String, dynamic>.from(body['data'] as Map? ?? const {}) : const {};
+    return Map<String, dynamic>.from(body?['data'] as Map? ?? const {});
   }
 
   Future<List<Map<String, dynamic>>> listVouchers({required int businessId, int? personId}) async {
@@ -242,7 +242,7 @@ class CustomerClubService {
       query: <String, dynamic>{if (personId != null) 'person_id': '$personId'},
     );
     final body = res.data;
-    final data = body is Map ? body['data'] : null;
+    final data = body?['data'];
     return data is Map && data['items'] is List
         ? (data['items'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
         : <Map<String, dynamic>>[];
@@ -254,7 +254,7 @@ class CustomerClubService {
       data: const <String, dynamic>{},
     );
     final body = res.data;
-    return body is Map ? Map<String, dynamic>.from(body['data'] as Map? ?? const {}) : const {};
+    return Map<String, dynamic>.from(body?['data'] as Map? ?? const {});
   }
 
   Future<Map<String, dynamic>> updateMemberConsent({required int businessId, required int personId, required Map<String, dynamic> payload}) async {
@@ -263,7 +263,7 @@ class CustomerClubService {
       data: payload,
     );
     final body = res.data;
-    return body is Map ? Map<String, dynamic>.from(body['data'] as Map? ?? const {}) : const {};
+    return Map<String, dynamic>.from(body?['data'] as Map? ?? const {});
   }
 
   Future<Map<String, dynamic>> getMemberProfile({required int businessId, required int personId}) async {
@@ -271,6 +271,6 @@ class CustomerClubService {
       '/api/v1/customer-club/business/$businessId/persons/$personId/profile',
     );
     final body = res.data;
-    return body is Map ? Map<String, dynamic>.from(body['data'] as Map? ?? const {}) : const {};
+    return Map<String, dynamic>.from(body?['data'] as Map? ?? const {});
   }
 }
