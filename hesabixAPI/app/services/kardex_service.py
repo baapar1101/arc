@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
-from datetime import date
+from datetime import date, datetime, time, timezone
+from decimal import Decimal, ROUND_HALF_UP
+from bisect import bisect_right
 
 from sqlalchemy.orm import Session
 import logging
@@ -9,6 +11,9 @@ from sqlalchemy import and_, or_, exists, select, Integer, cast
 
 from adapters.db.models.document import Document
 from adapters.db.models.document_line import DocumentLine
+from adapters.db.models.business import Business
+from adapters.db.models.business_currency_rate import BusinessCurrencyRate
+from adapters.db.models.currency import BusinessCurrency, Currency
 from adapters.db.models.fiscal_year import FiscalYear
 from adapters.db.models.warehouse import Warehouse
 
@@ -31,7 +36,7 @@ def _build_group_condition(column, ids: List[int]) -> Any:
 
 
 KARDEX_SORT_ALLOWED = frozenset(
-    {"document_date", "document_code", "debit", "credit", "quantity", "created_at"}
+    {"document_date", "document_code", "debit", "credit", "debit_base", "credit_base", "quantity", "created_at"}
 )
 
 
@@ -42,6 +47,10 @@ def _kardex_sort_column(sort_key: str):
         return DocumentLine.debit
     if sort_key == "credit":
         return DocumentLine.credit
+    if sort_key == "debit_base":
+        return DocumentLine.debit_base
+    if sort_key == "credit_base":
+        return DocumentLine.credit_base
     if sort_key == "quantity":
         return DocumentLine.quantity
     if sort_key == "created_at":
@@ -93,7 +102,8 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
       - person_ids, product_ids, bank_account_ids, cash_register_ids, petty_cash_ids, account_ids, check_ids: List[int]
       - match_mode: "any" | "same_line" | "document_and" (پیش‌فرض: any)
       - result_scope: "lines_matching" | "lines_of_document" (پیش‌فرض: lines_matching)
-      - sort_by: یکی از: document_date, document_code, debit, credit, quantity, created_at (پیش‌فرض: document_date)
+      - currency_id: اختیاری؛ واحد نمایش مبالغ، در غیر این صورت ارز پایه (همهٔ اسناد نمایش داده می‌شوند)
+      - sort_by: یکی از: document_date, document_code, debit, credit, debit_base, credit_base, quantity, created_at
       - sort_desc: bool
       - skip, take: pagination
     """
@@ -132,19 +142,143 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
         except Exception:
             pass
 
-    # فیلتر ارز سند + حالت نمایش معادل پایه
+    # ارز انتخاب‌شده در کاردکس، واحد نمایش است؛ همهٔ ارزهای سند باید باقی بمانند.
     currency_id = query.get("currency_id")
     try:
         currency_id_int = int(currency_id) if currency_id is not None else None
     except Exception:
         currency_id_int = None
-    amounts_in_base = bool(query.get("amounts_in_base")) or currency_id_int is None
-    # وقتی ارز مشخص است: فیلتر همان ارز؛ وقتی null: همه ارزها (مبالغ می‌توانند معادل پایه شوند)
+    amounts_in_base = currency_id_int is None
+    business = db.get(Business, int(business_id))
+    base_currency_id = int(business.default_currency_id) if business and business.default_currency_id else None
+    multi_currency = False
+    if base_currency_id is not None:
+        try:
+            multi_currency = db.query(BusinessCurrency.id).filter(
+                BusinessCurrency.business_id == int(business_id),
+                BusinessCurrency.currency_id != base_currency_id,
+            ).first() is not None
+        except Exception:
+            multi_currency = False
+    if currency_id_int is not None and currency_id_int != base_currency_id:
+        allowed = db.query(BusinessCurrency.id).filter(
+            BusinessCurrency.business_id == int(business_id),
+            BusinessCurrency.currency_id == currency_id_int,
+        ).first()
+        if allowed is None:
+            currency_id_int = None
+            amounts_in_base = True
+
+    target_currency = db.get(Currency, currency_id_int) if currency_id_int is not None else None
+    base_currency = db.get(Currency, base_currency_id) if base_currency_id is not None else None
+    target_quant, target_round = (Decimal("1"), True)
     if currency_id_int is not None:
-        q = q.filter(Document.currency_id == currency_id_int)
-        # اگر کاربر صراحتاً amounts_in_base نفرستاده، برای ارز مشخص بومی نشان بده
-        if "amounts_in_base" not in query:
-            amounts_in_base = False
+        try:
+            from app.services.currency_quant import get_currency_quant_and_round
+            target_quant, target_round = get_currency_quant_and_round(db, currency_id_int)
+        except Exception:
+            pass
+
+    # Preload target currency rate history once. Each document uses the effective
+    # rate at its own FX valuation timestamp, matching the source document rate.
+    target_rates: List[Tuple[datetime, int, Decimal]] = []
+    target_rate_keys: List[Tuple[datetime, int]] = []
+    if currency_id_int is not None and currency_id_int != base_currency_id:
+        for rate_row in db.query(BusinessCurrencyRate).filter(
+            BusinessCurrencyRate.business_id == int(business_id),
+            BusinessCurrencyRate.currency_id == currency_id_int,
+        ).order_by(BusinessCurrencyRate.effective_at.asc(), BusinessCurrencyRate.id.asc()).all():
+            eff = rate_row.effective_at
+            if eff.tzinfo is None:
+                eff = eff.replace(tzinfo=timezone.utc)
+            else:
+                eff = eff.astimezone(timezone.utc)
+            target_rates.append((eff, int(rate_row.id), Decimal(str(rate_row.rate))))
+            target_rate_keys.append((eff, int(rate_row.id)))
+
+    valuation_time_cache: Dict[int, datetime] = {}
+    source_rate_cache: Dict[int, Optional[Decimal]] = {}
+
+    def _document_fx_valuation_time(doc: Document) -> datetime:
+        cached = valuation_time_cache.get(int(doc.id))
+        if cached is not None:
+            return cached
+        registered_at = getattr(doc, "registered_at", None) or datetime.now(timezone.utc)
+        if registered_at.tzinfo is None:
+            registered_at = registered_at.replace(tzinfo=timezone.utc)
+        else:
+            registered_at = registered_at.astimezone(timezone.utc)
+        try:
+            from app.services.invoice_fx_revaluation import compute_fx_as_of_utc, get_fx_revaluation_policy
+            policy = get_fx_revaluation_policy(business) if business is not None else None
+            as_of = compute_fx_as_of_utc(doc.document_date, registered_at, policy)
+            if as_of.tzinfo is None:
+                as_of = as_of.replace(tzinfo=timezone.utc)
+            else:
+                as_of = as_of.astimezone(timezone.utc)
+        except Exception:
+            as_of = datetime.combine(doc.document_date, time(23, 59, 59, 999999), tzinfo=timezone.utc)
+        valuation_time_cache[int(doc.id)] = as_of
+        return as_of
+
+    def _target_rate_for_document(doc: Document) -> Optional[Decimal]:
+        if currency_id_int is None or currency_id_int == base_currency_id:
+            return Decimal(1)
+        if not target_rates:
+            return None
+        as_of = _document_fx_valuation_time(doc)
+        idx = bisect_right(target_rate_keys, (as_of, 2**63 - 1)) - 1
+        if idx >= 0:
+            return target_rates[idx][2]
+        # Legacy source-rate resolution also permits the last rate on the
+        # document date when the policy timestamp has no matching rate.
+        day_end = datetime.combine(doc.document_date, time(23, 59, 59, 999999), tzinfo=timezone.utc)
+        idx = bisect_right(target_rate_keys, (day_end, 2**63 - 1)) - 1
+        return target_rates[idx][2] if idx >= 0 else None
+
+    def _base_amounts(line: DocumentLine, doc: Document) -> Tuple[Optional[Decimal], Optional[Decimal]]:
+        doc_currency_id = int(getattr(doc, "currency_id", 0) or 0)
+        rate: Optional[Decimal]
+        if doc_currency_id == base_currency_id:
+            rate = Decimal(1)
+        elif getattr(line, "exchange_rate", None) is not None and Decimal(str(line.exchange_rate)) > 0:
+            rate = Decimal(str(line.exchange_rate))
+        else:
+            rate = source_rate_cache.get(int(doc.id))
+            if int(doc.id) not in source_rate_cache:
+                try:
+                    from app.services.document_line_fx_service import resolve_document_fx_rate
+                    rate, _source = resolve_document_fx_rate(
+                        db, doc, business=business, allow_infer=True, fallback_one_on_missing=False
+                    )
+                except Exception:
+                    rate = None
+                source_rate_cache[int(doc.id)] = rate
+
+        def side_amount(native: Any, stored_base: Any) -> Optional[Decimal]:
+            if stored_base is not None:
+                return Decimal(str(stored_base))
+            native_amount = Decimal(str(native or 0))
+            if native_amount == 0:
+                return Decimal(0)
+            if rate is None:
+                return None
+            return native_amount * rate
+
+        return side_amount(line.debit, getattr(line, "debit_base", None)), side_amount(
+            line.credit, getattr(line, "credit_base", None)
+        )
+
+    def _display_amount(base_amount: Optional[Decimal], doc: Document) -> Optional[Decimal]:
+        if base_amount is None:
+            return None
+        rate = _target_rate_for_document(doc)
+        if rate is None or rate <= 0:
+            return None
+        amount = base_amount / rate
+        if target_round:
+            amount = amount.quantize(target_quant, rounding=ROUND_HALF_UP)
+        return amount
 
     # Read selected IDs
     person_ids = _collect_ids(query, "person_ids")
@@ -257,75 +391,156 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
         take = 20
 
     total = q.count()
+    needs_base_recovery = False
+    if base_currency_id is not None:
+        try:
+            needs_base_recovery = q.filter(
+                Document.currency_id != base_currency_id,
+                or_(DocumentLine.debit_base.is_(None), DocumentLine.credit_base.is_(None)),
+            ).first() is not None
+        except Exception:
+            needs_base_recovery = False
 
-    # Aggregated totals across all matching rows (before pagination)
+    # Totals cover every matched row, not only the current page.
     totals = {
-        "debit": 0.0,
-        "credit": 0.0,
+        "debit": Decimal(0),
+        "credit": Decimal(0),
+        "debit_base": Decimal(0),
+        "credit_base": Decimal(0),
         "quantity": None,
+        "conversion_missing_count": 0 if currency_id_int is not None else None,
     }
-    try:
-        from sqlalchemy import func
-        debit_col = (
-            func.coalesce(DocumentLine.debit_base, DocumentLine.debit)
-            if amounts_in_base
-            else DocumentLine.debit
-        )
-        credit_col = (
-            func.coalesce(DocumentLine.credit_base, DocumentLine.credit)
-            if amounts_in_base
-            else DocumentLine.credit
-        )
-        sum_q = q.order_by(None).with_entities(
-            func.coalesce(func.sum(debit_col), 0),
-            func.coalesce(func.sum(credit_col), 0),
-            func.sum(DocumentLine.quantity),
-        ).one()
-        totals["debit"] = float(sum_q[0] or 0)
-        totals["credit"] = float(sum_q[1] or 0)
-        totals["quantity"] = float(sum_q[2]) if sum_q[2] is not None else None
-    except Exception:
-        pass
     try:
         logger.debug("KARDEX query total=%s (after filters)", total)
     except Exception:
         pass
 
-    def _line_amounts(line: DocumentLine) -> Tuple[float, float]:
-        if amounts_in_base:
-            debit = float(
-                line.debit_base if getattr(line, "debit_base", None) is not None else (line.debit or 0)
-            )
-            credit = float(
-                line.credit_base if getattr(line, "credit_base", None) is not None else (line.credit or 0)
-            )
+    def _line_amounts(line: DocumentLine, doc: Document) -> Tuple[Optional[float], Optional[float], Optional[float], Optional[float]]:
+        debit_base, credit_base = _base_amounts(line, doc)
+        if currency_id_int is None:
+            debit, credit = debit_base, credit_base
+        elif int(getattr(doc, "currency_id", 0) or 0) == currency_id_int:
+            # Preserve exact native amounts when a row already uses the display currency.
+            debit, credit = Decimal(str(line.debit or 0)), Decimal(str(line.credit or 0))
         else:
-            debit = float(line.debit or 0)
-            credit = float(line.credit or 0)
-        return debit, credit
+            debit, credit = _display_amount(debit_base, doc), _display_amount(credit_base, doc)
+        return (
+            float(debit) if debit is not None else None,
+            float(credit) if credit is not None else None,
+            float(debit_base) if debit_base is not None else None,
+            float(credit_base) if credit_base is not None else None,
+        )
 
-    # Running balance (optional) — must continue across pages in the same sort order
+    def _sort_rows_in_display_currency(rows_to_sort: List[Tuple[DocumentLine, Document]]) -> None:
+        from functools import cmp_to_key
+        from app.services.sort_resolution import effective_sort_specs, query_info_for_sort
+
+        specs = effective_sort_specs(
+            query_info_for_sort(query, default_sort_desc=True),
+            allowed=KARDEX_SORT_ALLOWED,
+            default_when_empty=("document_date", True),
+        )
+
+        def sort_value(line: DocumentLine, doc: Document, name: str):
+            if name == "document_date":
+                return doc.document_date
+            if name == "document_code":
+                return doc.code
+            if name == "debit":
+                return _line_amounts(line, doc)[0]
+            if name == "credit":
+                return _line_amounts(line, doc)[1]
+            if name == "debit_base":
+                return _line_amounts(line, doc)[2]
+            if name == "credit_base":
+                return _line_amounts(line, doc)[3]
+            if name == "quantity":
+                return line.quantity
+            return line.created_at
+
+        def compare(left: Tuple[DocumentLine, Document], right: Tuple[DocumentLine, Document]) -> int:
+            for name, descending in specs:
+                a = sort_value(left[0], left[1], name)
+                b = sort_value(right[0], right[1], name)
+                if a is None and b is None:
+                    continue
+                if a is None:
+                    return 1
+                if b is None:
+                    return -1
+                if a == b:
+                    continue
+                result = -1 if a < b else 1
+                return -result if descending else result
+            return (int(left[0].id) > int(right[0].id)) - (int(left[0].id) < int(right[0].id))
+
+        rows_to_sort.sort(key=cmp_to_key(compare))
+
     include_running = bool(query.get("include_running_balance", False))
     running_amount: float = 0.0
     running_quantity: float = 0.0
+    running_is_complete = True
+    displayed_by_line_id: Dict[int, Tuple[Optional[float], Optional[float], Optional[float], Optional[float]]] = {}
 
-    if include_running and skip > 0:
-        # Load prefix + current page so مانده on page N continues from page N-1
-        window: List[Tuple[DocumentLine, Document]] = q.limit(skip + take).all()
-        for line, _doc in window[:skip]:
-            debit, credit = _line_amounts(line)
-            try:
-                running_amount += debit - credit
-            except Exception:
-                pass
-            try:
+    if currency_id_int is not None or needs_base_recovery:
+        # Historical conversion and totals require the same per-document rates.
+        all_rows: List[Tuple[DocumentLine, Document]] = q.all()
+        _sort_rows_in_display_currency(all_rows)
+        rows = all_rows[skip : skip + take]
+        for line, doc in all_rows:
+            values = _line_amounts(line, doc)
+            displayed_by_line_id[int(line.id)] = values
+            debit, credit, debit_base, credit_base = values
+            if debit is not None:
+                totals["debit"] += Decimal(str(debit))
+            if credit is not None:
+                totals["credit"] += Decimal(str(credit))
+            if debit_base is not None:
+                totals["debit_base"] += Decimal(str(debit_base))
+            if credit_base is not None:
+                totals["credit_base"] += Decimal(str(credit_base))
+            if debit is None or credit is None or debit_base is None or credit_base is None:
+                totals["conversion_missing_count"] = (totals["conversion_missing_count"] or 0) + 1
+            if line.quantity is not None:
+                totals["quantity"] = (totals["quantity"] or 0.0) + float(line.quantity or 0)
+        if include_running:
+            for line, _doc in all_rows[:skip]:
+                debit, credit, _debit_base, _credit_base = displayed_by_line_id[int(line.id)]
+                if debit is None or credit is None:
+                    running_is_complete = False
+                elif running_is_complete:
+                    running_amount += debit - credit
                 if line.quantity is not None:
                     running_quantity += float(line.quantity or 0)
-            except Exception:
-                pass
-        rows = window[skip:]
     else:
-        rows = q.offset(skip).limit(take).all()
+        # Preserve the efficient aggregate path for the default base-currency view.
+        from sqlalchemy import func
+        try:
+            sum_q = q.order_by(None).with_entities(
+                func.coalesce(func.sum(func.coalesce(DocumentLine.debit_base, DocumentLine.debit)), 0),
+                func.coalesce(func.sum(func.coalesce(DocumentLine.credit_base, DocumentLine.credit)), 0),
+                func.sum(DocumentLine.quantity),
+            ).one()
+            totals["debit"] = Decimal(str(sum_q[0] or 0))
+            totals["credit"] = Decimal(str(sum_q[1] or 0))
+            totals["debit_base"] = totals["debit"]
+            totals["credit_base"] = totals["credit"]
+            totals["quantity"] = float(sum_q[2]) if sum_q[2] is not None else None
+        except Exception:
+            pass
+        if include_running and skip > 0:
+            window: List[Tuple[DocumentLine, Document]] = q.limit(skip + take).all()
+            for line, doc in window[:skip]:
+                debit, credit, _debit_base, _credit_base = _line_amounts(line, doc)
+                if debit is None or credit is None:
+                    running_is_complete = False
+                elif running_is_complete:
+                    running_amount += debit - credit
+                if line.quantity is not None:
+                    running_quantity += float(line.quantity or 0)
+            rows = window[skip:]
+        else:
+            rows = q.offset(skip).limit(take).all()
 
     # گردآوری شناسه‌های انبار جهت نام‌گذاری
     wh_ids_in_page: set[int] = set()
@@ -411,7 +626,10 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
         doc_type = getattr(doc, "document_type", None)
         debit_native = float(line.debit or 0)
         credit_native = float(line.credit or 0)
-        debit, credit = _line_amounts(line)
+        amounts = displayed_by_line_id.get(int(line.id))
+        if amounts is None:
+            amounts = _line_amounts(line, doc)
+        debit, credit, debit_base, credit_base = amounts
         item: Dict[str, Any] = {
             "line_id": line.id,
             "document_id": doc.id,
@@ -422,11 +640,21 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
             "description": line.description,
             "debit": debit,
             "credit": credit,
+            "debit_base": debit_base,
+            "credit_base": credit_base,
             "debit_native": debit_native,
             "credit_native": credit_native,
             "document_currency_id": getattr(doc, "currency_id", None),
             "exchange_rate": float(line.exchange_rate) if getattr(line, "exchange_rate", None) is not None else None,
             "amounts_in_base": amounts_in_base,
+            "display_currency_id": currency_id_int or base_currency_id,
+            "display_currency_code": getattr(target_currency or base_currency, "code", None),
+            "display_currency_decimal_places": getattr(target_currency or base_currency, "decimal_places", 2),
+            "base_currency_id": base_currency_id,
+            "base_currency_code": getattr(base_currency, "code", None),
+            "base_currency_decimal_places": getattr(base_currency, "decimal_places", 2),
+            "currency_conversion_missing": debit is None or credit is None,
+            "base_conversion_missing": debit_base is None or credit_base is None,
             "quantity": float(line.quantity or 0) if line.quantity is not None else None,
             "account_id": line.account_id,
             "person_id": line.person_id,
@@ -459,21 +687,24 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
             pass
 
         if include_running:
-            try:
-                running_amount += float(debit) - float(credit)
-            except Exception:
-                pass
+            if debit is None or credit is None:
+                running_is_complete = False
+            elif running_is_complete:
+                running_amount += debit - credit
             try:
                 if line.quantity is not None:
                     running_quantity += float(line.quantity or 0)
             except Exception:
                 pass
-            item["running_amount"] = running_amount
+            item["running_amount"] = running_amount if running_is_complete else None
             # فقط اگر ستون quantity وجود داشته باشد
             if line.quantity is not None:
                 item["running_quantity"] = running_quantity
 
         items.append(item)
+
+    for total_key in ("debit", "credit", "debit_base", "credit_base"):
+        totals[total_key] = float(totals[total_key])
 
     return {
         "items": items,
@@ -490,6 +721,13 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
         "meta": {
             "currency_id": currency_id_int,
             "amounts_in_base": amounts_in_base,
+            "display_currency_id": currency_id_int or base_currency_id,
+            "display_currency_code": getattr(target_currency or base_currency, "code", None),
+            "display_currency_decimal_places": getattr(target_currency or base_currency, "decimal_places", 2),
+            "base_currency_id": base_currency_id,
+            "base_currency_code": getattr(base_currency, "code", None),
+            "base_currency_decimal_places": getattr(base_currency, "decimal_places", 2),
+            "multi_currency": multi_currency,
         },
     }
 

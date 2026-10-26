@@ -448,7 +448,32 @@ class _KardexPageState extends State<KardexPage> {
     return params;
   }
 
+  Map<String, dynamic>? _currencyForId(int? id) {
+    if (id == null) return null;
+    for (final currency in _currencies) {
+      if (currency['id'] == id) return currency;
+    }
+    return null;
+  }
+
   DataTableConfig<Map<String, dynamic>> _buildTableConfig(AppLocalizations t) {
+    final isFa = Localizations.localeOf(context).languageCode == 'fa';
+    Map<String, dynamic>? baseCurrency;
+    for (final currency in _currencies) {
+      if (currency['is_default'] == true) {
+        baseCurrency = currency;
+        break;
+      }
+    }
+    baseCurrency ??= _currencies.isNotEmpty ? _currencies.first : null;
+    final baseCurrencyCode =
+        (baseCurrency?['code'] ?? (isFa ? 'ارز پایه' : 'base currency'))
+            .toString();
+    final displayCurrency = _selectedCurrencyId == null
+        ? baseCurrency
+        : _currencyForId(_selectedCurrencyId);
+    final displayCurrencyCode =
+        (displayCurrency?['code'] ?? baseCurrencyCode).toString();
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/api/v1/kardex/businesses/${widget.businessId}/lines',
       excelEndpoint:
@@ -549,16 +574,44 @@ class _KardexPageState extends State<KardexPage> {
         ),
         NumberColumn(
           'debit',
-          t.debit,
-          formatter: (item) =>
-              ((item as Map<String, dynamic>)['debit'])?.toString(),
+          '${t.debit} ($displayCurrencyCode)',
+          formatter: (item) {
+            final row = item as Map<String, dynamic>;
+            final value = row['debit'];
+            return value?.toString() ??
+                (row['currency_conversion_missing'] == true ? '—' : null);
+          },
         ),
         NumberColumn(
           'credit',
-          t.credit,
-          formatter: (item) =>
-              ((item as Map<String, dynamic>)['credit'])?.toString(),
+          '${t.credit} ($displayCurrencyCode)',
+          formatter: (item) {
+            final row = item as Map<String, dynamic>;
+            final value = row['credit'];
+            return value?.toString() ??
+                (row['currency_conversion_missing'] == true ? '—' : null);
+          },
         ),
+        if (_currencies.length > 1) ...[
+          NumberColumn(
+            'debit_base',
+            '${t.debit} ($baseCurrencyCode)',
+            formatter: (item) {
+              final row = item as Map<String, dynamic>;
+              return row['debit_base']?.toString() ??
+                  (row['base_conversion_missing'] == true ? '—' : null);
+            },
+          ),
+          NumberColumn(
+            'credit_base',
+            '${t.credit} ($baseCurrencyCode)',
+            formatter: (item) {
+              final row = item as Map<String, dynamic>;
+              return row['credit_base']?.toString() ??
+                  (row['base_conversion_missing'] == true ? '—' : null);
+            },
+          ),
+        ],
         NumberColumn(
           'quantity',
           t.quantity,
@@ -664,8 +717,12 @@ class _KardexPageState extends State<KardexPage> {
       },
       // Footer totals on current page
       footerTotals: {
-        'debit': t.totalsDebit,
-        'credit': t.totalsCredit,
+        'debit': '${t.totalsDebit} ($displayCurrencyCode)',
+        'credit': '${t.totalsCredit} ($displayCurrencyCode)',
+        if (_currencies.length > 1)
+          'debit_base': '${t.totalsDebit} ($baseCurrencyCode)',
+        if (_currencies.length > 1)
+          'credit_base': '${t.totalsCredit} ($baseCurrencyCode)',
         'quantity': t.totalsQuantity,
         'running_amount': t.totalsRunningAmount,
         'running_quantity': t.totalsRunningQuantity,
@@ -1252,14 +1309,14 @@ class _KardexPageState extends State<KardexPage> {
                 value: _selectedCurrencyId,
                 isExpanded: true,
                 decoration: const InputDecoration(
-                  labelText: 'ارز',
+                  labelText: 'ارز نمایش',
                   border: OutlineInputBorder(),
                   isDense: true,
                 ),
                 items: [
                   const DropdownMenuItem<int?>(
                     value: null,
-                    child: Text('همه ارزها (معادل پایه)'),
+                    child: Text('همهٔ تراکنش‌ها (ارز پایه)'),
                   ),
                   ..._currencies.map(
                     (currency) => DropdownMenuItem<int?>(

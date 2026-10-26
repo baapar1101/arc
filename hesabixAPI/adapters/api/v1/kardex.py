@@ -112,6 +112,8 @@ async def export_kardex_excel_endpoint(
         "account_ids": body.get("account_ids"),
         "check_ids": body.get("check_ids"),
         "warehouse_ids": body.get("warehouse_ids"),
+        "currency_id": body.get("currency_id"),
+        "amounts_in_base": body.get("amounts_in_base"),
         "match_mode": body.get("match_mode") or "any",
         "result_scope": body.get("result_scope") or "lines_matching",
         "include_running_balance": bool(body.get("include_running_balance", False)),
@@ -119,6 +121,7 @@ async def export_kardex_excel_endpoint(
 
     result = list_kardex_lines(db, business_id, query_dict)
     items = result.get("items", [])
+    result_meta = result.get("meta") or {}
     items = [format_datetime_fields(it, request) for it in items]
 
     # Build Excel using openpyxl (RTL, thousand separators, safe strings, configurable columns)
@@ -199,6 +202,8 @@ async def export_kardex_excel_endpoint(
         headers = [c.get("label") or c.get("key") for c in export_columns if c.get("key")]
     else:
         # Default columns (labels localized)
+        display_unit = result_meta.get("display_currency_code") or ("ارز پایه" if is_fa else "base currency")
+        base_unit = result_meta.get("base_currency_code") or ("ارز پایه" if is_fa else "base currency")
         headers = [
             ("document_date", "تاریخ سند" if is_fa else "Date"),
             ("document_code", "کد سند" if is_fa else "Code"),
@@ -206,8 +211,12 @@ async def export_kardex_excel_endpoint(
             ("warehouse_name", "انبار" if is_fa else "Warehouse"),
             ("movement", "جهت" if is_fa else "Movement"),
             ("description", "شرح" if is_fa else "Description"),
-            ("debit", "بدهکار" if is_fa else "Debit"),
-            ("credit", "بستانکار" if is_fa else "Credit"),
+            ("debit", f"بدهکار ({display_unit})" if is_fa else f"Debit ({display_unit})"),
+            ("credit", f"بستانکار ({display_unit})" if is_fa else f"Credit ({display_unit})"),
+            *([
+                ("debit_base", f"بدهکار ({base_unit})" if is_fa else f"Debit ({base_unit})"),
+                ("credit_base", f"بستانکار ({base_unit})" if is_fa else f"Credit ({base_unit})"),
+            ] if result_meta.get("multi_currency") else []),
             ("quantity", "تعداد" if is_fa else "Qty"),
         ]
         if bool(query_dict.get("include_running_balance", False)):
@@ -237,8 +246,10 @@ async def export_kardex_excel_endpoint(
         pass
 
     # Column kind for number formatting
-    money_keys = {"debit", "credit", "running_amount"}
+    money_keys = {"debit", "credit", "debit_base", "credit_base", "running_amount"}
     qty_keys = {"quantity", "running_quantity"}
+    display_decimals = max(0, min(8, int(result_meta.get("display_currency_decimal_places") or 2)))
+    base_decimals = max(0, min(8, int(result_meta.get("base_currency_decimal_places") or 2)))
 
     for it in items:
         row_vals = []
@@ -268,7 +279,8 @@ async def export_kardex_excel_endpoint(
             for idx, k in enumerate(keys, start=1):
                 c = ws.cell(row=ws.max_row, column=idx)
                 if k in money_keys:
-                    c.number_format = '#,##0'
+                    places = base_decimals if k in {"debit_base", "credit_base"} else display_decimals
+                    c.number_format = '#,##0' if places == 0 else '#,##0.' + ('0' * places)
                     c.alignment = Alignment(horizontal="right")
                 elif k in qty_keys:
                     c.number_format = '#,##0.00'
@@ -351,6 +363,8 @@ async def export_kardex_pdf_endpoint(
         "account_ids": body.get("account_ids"),
         "check_ids": body.get("check_ids"),
         "warehouse_ids": body.get("warehouse_ids"),
+        "currency_id": body.get("currency_id"),
+        "amounts_in_base": body.get("amounts_in_base"),
         "match_mode": body.get("match_mode") or "any",
         "result_scope": body.get("result_scope") or "lines_matching",
         "include_running_balance": bool(body.get("include_running_balance", False)),
@@ -358,6 +372,7 @@ async def export_kardex_pdf_endpoint(
 
     result = list_kardex_lines(db, business_id, query_dict)
     items = result.get("items", [])
+    result_meta = result.get("meta") or {}
     items = [format_datetime_fields(it, request) for it in items]
     all_totals = result.get("totals") or {}
     all_count = (result.get("pagination") or {}).get("total")
@@ -422,6 +437,12 @@ async def export_kardex_pdf_endpoint(
         _add("از تاریخ", "From", query_dict.get("from_date"))
         _add("تا تاریخ", "To", query_dict.get("to_date"))
         _add("سال مالی", "Fiscal year", query_dict.get("fiscal_year_id"))
+        if result_meta.get("display_currency_code"):
+            _add(
+                "واحد نمایش مبالغ",
+                "Amount display currency",
+                result_meta.get("display_currency_code"),
+            )
 
         def _as_int_list(v: Any) -> list[int]:
             if not isinstance(v, (list, tuple)):
@@ -640,6 +661,8 @@ async def export_kardex_pdf_endpoint(
         page_totals = {
             "debit": page_debit,
             "credit": page_credit,
+            "debit_base": sum(float(it.get("debit_base") or 0) for it in (items or [])),
+            "credit_base": sum(float(it.get("credit_base") or 0) for it in (items or [])),
             "quantity": page_qty_sum if qty_seen else None,
             "count": len(items or []),
         }
@@ -668,23 +691,45 @@ async def export_kardex_pdf_endpoint(
         except Exception:
             return cell(val)
 
-    rows_html = "".join([
-        f"<tr>"
-        f"<td style='text-align:right'>{cell_num(i+1, 0)}</td>"
-        f"<td>{cell(it.get('document_date'))}</td>"
-        f"<td>{cell(it.get('document_code'))}</td>"
-        f"<td>{cell(it.get('document_type_name') or it.get('document_type'))}</td>"
-        f"<td>{cell(it.get('warehouse_name') or it.get('warehouse_id'))}</td>"
-        f"<td>{cell(it.get('movement'))}</td>"
-        f"<td>{cell(it.get('description'))}</td>"
-        f"<td style='text-align:right'>{cell_num(it.get('debit'), 0)}</td>"
-        f"<td style='text-align:right'>{cell_num(it.get('credit'), 0)}</td>"
-        f"<td style='text-align:right'>{cell_num(it.get('quantity'), 2)}</td>"
-        f"<td style='text-align:right'>{cell_num(it.get('running_amount'), 0)}</td>"
-        f"<td style='text-align:right'>{cell_num(it.get('running_quantity'), 2)}</td>"
-        f"</tr>"
-        for i, it in enumerate(items)
-    ])
+    def cell_money(item: Dict[str, Any], key: str, decimals: int) -> str:
+        value = item.get(key)
+        missing_flag = (
+            item.get("base_conversion_missing")
+            if key.endswith("_base")
+            else item.get("currency_conversion_missing")
+        )
+        if value is None and missing_flag:
+            return "—"
+        return cell_num(value, decimals)
+
+    rows_html_parts = []
+    display_decimals = int(result_meta.get("display_currency_decimal_places") or 2)
+    base_decimals = int(result_meta.get("base_currency_decimal_places") or 2)
+    for i, it in enumerate(items):
+        base_cells = ""
+        if result_meta.get("multi_currency"):
+            base_cells = (
+                f"<td style='text-align:right'>{cell_money(it, 'debit_base', base_decimals)}</td>"
+                f"<td style='text-align:right'>{cell_money(it, 'credit_base', base_decimals)}</td>"
+            )
+        rows_html_parts.append(
+            f"<tr>"
+            f"<td style='text-align:right'>{cell_num(i+1, 0)}</td>"
+            f"<td>{cell(it.get('document_date'))}</td>"
+            f"<td>{cell(it.get('document_code'))}</td>"
+            f"<td>{cell(it.get('document_type_name') or it.get('document_type'))}</td>"
+            f"<td>{cell(it.get('warehouse_name') or it.get('warehouse_id'))}</td>"
+            f"<td>{cell(it.get('movement'))}</td>"
+            f"<td>{cell(it.get('description'))}</td>"
+            f"<td style='text-align:right'>{cell_money(it, 'debit', display_decimals)}</td>"
+            f"<td style='text-align:right'>{cell_money(it, 'credit', display_decimals)}</td>"
+            f"{base_cells}"
+            f"<td style='text-align:right'>{cell_num(it.get('quantity'), 2)}</td>"
+            f"<td style='text-align:right'>{cell_num(it.get('running_amount'), display_decimals)}</td>"
+            f"<td style='text-align:right'>{cell_num(it.get('running_quantity'), 2)}</td>"
+            f"</tr>"
+        )
+    rows_html = "".join(rows_html_parts)
 
     # Prepare font URIs for base.html / templates
     fa_font_url_regular = ""
@@ -781,6 +826,8 @@ async def export_kardex_pdf_endpoint(
             "page_totals": page_totals,
             "all_totals": all_totals,
             "all_count": all_count,
+            "meta": result_meta,
+            "multi_currency": bool(result_meta.get("multi_currency")),
             "items": items,
         }
         resolved_html = ReportTemplateService.try_render_resolved(
@@ -859,8 +906,9 @@ async def export_kardex_pdf_endpoint(
               <th>انبار</th>
               <th>جهت حرکت</th>
               <th>شرح</th>
-              <th>بدهکار</th>
-              <th>بستانکار</th>
+              <th>{'بدهکار' if is_fa else 'Debit'} ({escape(str(result_meta.get('display_currency_code') or ''))})</th>
+              <th>{'بستانکار' if is_fa else 'Credit'} ({escape(str(result_meta.get('display_currency_code') or ''))})</th>
+              {((f"<th>بدهکار ({escape(str(result_meta.get('base_currency_code') or 'ارز پایه'))})</th><th>بستانکار ({escape(str(result_meta.get('base_currency_code') or 'ارز پایه'))})</th>") if is_fa else (f"<th>Debit ({escape(str(result_meta.get('base_currency_code') or 'base currency'))})</th><th>Credit ({escape(str(result_meta.get('base_currency_code') or 'base currency'))})</th>")) if result_meta.get('multi_currency') else ''}
               <th>تعداد</th>
               <th>مانده مبلغ</th>
               <th>مانده تعداد</th>
@@ -893,6 +941,8 @@ async def export_kardex_pdf_endpoint(
                 "page_totals": page_totals,
                 "all_totals": all_totals,
                 "all_count": all_count,
+                "meta": result_meta,
+                "multi_currency": bool(result_meta.get("multi_currency")),
                 "items": items,
             })
         except Exception:
@@ -918,21 +968,38 @@ async def export_kardex_pdf_endpoint(
                 _is_fa1 = bool(is_fa)
                 pt = page_totals or {}
                 at = all_totals or {}
+                display_unit = result_meta.get("display_currency_code") or ("ارز پایه" if _is_fa1 else "base currency")
+                base_unit = result_meta.get("base_currency_code") or ("ارز پایه" if _is_fa1 else "base currency")
+                display_decimals = int(result_meta.get("display_currency_decimal_places") or 2)
+                base_decimals = int(result_meta.get("base_currency_decimal_places") or 2)
+                page_base_totals_html = ""
+                overall_base_totals_html = ""
+                if result_meta.get("multi_currency"):
+                    page_base_totals_html = f"""
+                      <div style="display:flex; justify-content:space-between; gap:8px; padding:2px 0; border-bottom:1px dashed #999;"><span>{('جمع بدهکار ' if _is_fa1 else 'Total debit ')}{escape(str(base_unit))}</span><span style="font-weight:700; direction:ltr; unicode-bidi:plaintext;">{escape(_fmt_num(pt.get('debit_base', 0), base_decimals))}</span></div>
+                      <div style="display:flex; justify-content:space-between; gap:8px; padding:2px 0; border-bottom:1px dashed #999;"><span>{('جمع بستانکار ' if _is_fa1 else 'Total credit ')}{escape(str(base_unit))}</span><span style="font-weight:700; direction:ltr; unicode-bidi:plaintext;">{escape(_fmt_num(pt.get('credit_base', 0), base_decimals))}</span></div>
+                    """
+                    overall_base_totals_html = f"""
+                      <div style="display:flex; justify-content:space-between; gap:8px; padding:2px 0; border-bottom:1px dashed #999;"><span>{('جمع بدهکار کل ' if _is_fa1 else 'Overall debit ')}{escape(str(base_unit))}</span><span style="font-weight:700; direction:ltr; unicode-bidi:plaintext;">{escape(_fmt_num(at.get('debit_base', 0), base_decimals))}</span></div>
+                      <div style="display:flex; justify-content:space-between; gap:8px; padding:2px 0; border-bottom:1px dashed #999;"><span>{('جمع بستانکار کل ' if _is_fa1 else 'Overall credit ')}{escape(str(base_unit))}</span><span style="font-weight:700; direction:ltr; unicode-bidi:plaintext;">{escape(_fmt_num(at.get('credit_base', 0), base_decimals))}</span></div>
+                    """
                 totals_html = f"""
                 <div data-kardex-totals="1" style="margin:10px 0 10px 0; padding:8px 10px; border:1px solid #000; border-radius:6px; background:#fff; font-size:10.5px; color:#111; page-break-inside:avoid;">
                   <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start;">
                     <div style="flex:1; min-width:240px; border:1px solid #000; border-radius:6px; padding:8px 10px;">
                       <div style="font-weight:700; margin-bottom:6px;">{('جمع صفحه' if _is_fa1 else 'Page totals')}</div>
                       <div style="display:flex; justify-content:space-between; gap:8px; padding:2px 0; border-bottom:1px dashed #999;"><span>{('تعداد سطر' if _is_fa1 else 'Rows')}</span><span style="font-weight:700; direction:ltr; unicode-bidi:plaintext;">{escape(_fmt_num(pt.get('count', 0), 0))}</span></div>
-                      <div style="display:flex; justify-content:space-between; gap:8px; padding:2px 0; border-bottom:1px dashed #999;"><span>{('جمع بدهکار' if _is_fa1 else 'Total debit')}</span><span style="font-weight:700; direction:ltr; unicode-bidi:plaintext;">{escape(_fmt_num(pt.get('debit', 0), 0))}</span></div>
-                      <div style="display:flex; justify-content:space-between; gap:8px; padding:2px 0; border-bottom:1px dashed #999;"><span>{('جمع بستانکار' if _is_fa1 else 'Total credit')}</span><span style="font-weight:700; direction:ltr; unicode-bidi:plaintext;">{escape(_fmt_num(pt.get('credit', 0), 0))}</span></div>
+                      <div style="display:flex; justify-content:space-between; gap:8px; padding:2px 0; border-bottom:1px dashed #999;"><span>{('جمع بدهکار ' if _is_fa1 else 'Total debit ')}{escape(str(display_unit))}</span><span style="font-weight:700; direction:ltr; unicode-bidi:plaintext;">{escape(_fmt_num(pt.get('debit', 0), display_decimals))}</span></div>
+                      <div style="display:flex; justify-content:space-between; gap:8px; padding:2px 0; border-bottom:1px dashed #999;"><span>{('جمع بستانکار ' if _is_fa1 else 'Total credit ')}{escape(str(display_unit))}</span><span style="font-weight:700; direction:ltr; unicode-bidi:plaintext;">{escape(_fmt_num(pt.get('credit', 0), display_decimals))}</span></div>
+                      {page_base_totals_html}
                       <div style="display:flex; justify-content:space-between; gap:8px; padding:2px 0;"><span>{('جمع تعداد' if _is_fa1 else 'Total qty')}</span><span style="font-weight:700; direction:ltr; unicode-bidi:plaintext;">{escape(_fmt_num(pt.get('quantity', None), 2))}</span></div>
                     </div>
                     <div style="flex:1; min-width:240px; border:1px solid #000; border-radius:6px; padding:8px 10px;">
                       <div style="font-weight:700; margin-bottom:6px;">{('جمع کل' if _is_fa1 else 'Overall totals')}</div>
                       <div style="display:flex; justify-content:space-between; gap:8px; padding:2px 0; border-bottom:1px dashed #999;"><span>{('تعداد کل' if _is_fa1 else 'Total rows')}</span><span style="font-weight:700; direction:ltr; unicode-bidi:plaintext;">{escape(_fmt_num(all_count, 0))}</span></div>
-                      <div style="display:flex; justify-content:space-between; gap:8px; padding:2px 0; border-bottom:1px dashed #999;"><span>{('جمع بدهکار' if _is_fa1 else 'Total debit')}</span><span style="font-weight:700; direction:ltr; unicode-bidi:plaintext;">{escape(_fmt_num(at.get('debit', 0), 0))}</span></div>
-                      <div style="display:flex; justify-content:space-between; gap:8px; padding:2px 0; border-bottom:1px dashed #999;"><span>{('جمع بستانکار' if _is_fa1 else 'Total credit')}</span><span style="font-weight:700; direction:ltr; unicode-bidi:plaintext;">{escape(_fmt_num(at.get('credit', 0), 0))}</span></div>
+                      <div style="display:flex; justify-content:space-between; gap:8px; padding:2px 0; border-bottom:1px dashed #999;"><span>{('جمع بدهکار کل ' if _is_fa1 else 'Overall debit ')}{escape(str(display_unit))}</span><span style="font-weight:700; direction:ltr; unicode-bidi:plaintext;">{escape(_fmt_num(at.get('debit', 0), display_decimals))}</span></div>
+                      <div style="display:flex; justify-content:space-between; gap:8px; padding:2px 0; border-bottom:1px dashed #999;"><span>{('جمع بستانکار کل ' if _is_fa1 else 'Overall credit ')}{escape(str(display_unit))}</span><span style="font-weight:700; direction:ltr; unicode-bidi:plaintext;">{escape(_fmt_num(at.get('credit', 0), display_decimals))}</span></div>
+                      {overall_base_totals_html}
                       <div style="display:flex; justify-content:space-between; gap:8px; padding:2px 0;"><span>{('جمع تعداد' if _is_fa1 else 'Total qty')}</span><span style="font-weight:700; direction:ltr; unicode-bidi:plaintext;">{escape(_fmt_num(at.get('quantity', None), 2))}</span></div>
                     </div>
                   </div>

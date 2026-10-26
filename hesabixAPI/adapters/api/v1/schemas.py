@@ -344,11 +344,11 @@ class KardexListQuery(QueryInfo):
 	include_running_balance: Optional[bool] = False
 	currency_id: Optional[int] = Field(
 		default=None,
-		description="فیلتر ارز سند؛ خالی = همه ارزها (مبالغ می‌توانند معادل پایه باشند)",
+		description="واحد نمایش مبالغ؛ همه اسناد نمایش داده می‌شوند و مقادیر به این ارز تبدیل می‌شوند؛ خالی = ارز پایه",
 	)
 	amounts_in_base: Optional[bool] = Field(
 		default=None,
-		description="اگر true (یا ارز خالی) مبالغ از debit_base/credit_base نمایش داده شوند",
+		description="پارامتر سازگاری؛ وقتی currency_id خالی باشد مبالغ به ارز پایه نمایش داده می‌شوند",
 	)
 
 
