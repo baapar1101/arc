@@ -1679,6 +1679,9 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
         # تنظیمات محاسبه سود فاکتور
         "invoice_profit_calculation_method": getattr(business, "invoice_profit_calculation_method", None),
         "invoice_profit_calculation_basis": getattr(business, "invoice_profit_calculation_basis", None),
+        "invoice_profit_missing_purchase_price_policy": getattr(
+            business, "invoice_profit_missing_purchase_price_policy", "zero_cost"
+        ),
         "invoice_profit_include_overhead": bool(getattr(business, "invoice_profit_include_overhead", False)),
         "invoice_profit_overhead_type": getattr(business, "invoice_profit_overhead_type", None),
         "invoice_profit_overhead_percent": float(business.invoice_profit_overhead_percent) if getattr(business, "invoice_profit_overhead_percent", None) is not None else None,
@@ -1693,6 +1696,9 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
         "invoice_sync_update_purchase_price_enabled": bool(getattr(business, "invoice_sync_update_purchase_price_enabled", False)),
         "invoice_sync_sales_price_basis": getattr(business, "invoice_sync_sales_price_basis", None),
         "invoice_sync_purchase_price_basis": getattr(business, "invoice_sync_purchase_price_basis", None),
+        "invoice_sync_purchase_price_multi_line_policy": getattr(
+            business, "invoice_sync_purchase_price_multi_line_policy", "weighted_average"
+        ),
         "invoice_warehouse_release_mode": _normalize_invoice_warehouse_release_mode(
             getattr(business, "invoice_warehouse_release_mode", None),
         ),

@@ -4406,6 +4406,9 @@ def _iter_profit_movements_from_invoice_lines(
     product_id: int,
     as_of_date: date,
     warehouse_id: Optional[int] = None,
+    *,
+    include_untracked: bool = False,
+    normalize_quantity_to_main: bool = False,
 ) -> List[Dict[str, Any]]:
     """
     حرکات کالا برای محاسبه هزینه سود (FIFO/LIFO) از روی اقلام فاکتور.
@@ -4433,7 +4436,7 @@ def _iter_profit_movements_from_invoice_lines(
     movements: List[Dict[str, Any]] = []
     for line, doc in rows:
         info = line.extra_info or {}
-        if info.get("inventory_tracked") is False:
+        if info.get("inventory_tracked") is False and not include_untracked:
             continue
         movement = (info.get("movement") or None)
         if movement is None:
@@ -4441,6 +4444,12 @@ def _iter_profit_movements_from_invoice_lines(
         if movement not in ("in", "out"):
             continue
         qty = Decimal(str(line.quantity or 0))
+        if normalize_quantity_to_main:
+            from app.services.invoice_unit_conversion_service import quantity_line_to_main
+
+            movement_product = db.get(Product, int(product_id))
+            if movement_product is not None:
+                qty = quantity_line_to_main(qty, movement_product, info.get("unit"))
         if qty <= 0:
             continue
         wh_id_raw = info.get("warehouse_id")
@@ -4563,10 +4572,28 @@ def _historical_sale_line_unit_cost(
     qty = Decimal(str(ln.quantity or 0))
 
     if nb == "purchase_price":
-        base_cost = product.base_purchase_price or 0
-        if base_cost == 0 and extra_info.get("cost_price") is not None:
-            base_cost = extra_info.get("cost_price")
-        return Decimal(str(base_cost))
+        from app.services.invoice_purchase_price_snapshot_service import (
+            purchase_price_unit_cost_base_from_snapshot,
+        )
+
+        biz = db.get(Business, int(business_id))
+        policy = getattr(biz, "invoice_profit_missing_purchase_price_policy", "zero_cost") if biz else "zero_cost"
+        unit_cost_line = purchase_price_unit_cost_base_from_snapshot(
+            ln,
+            missing_policy=policy,
+            allow_legacy_ledger=True,
+            expected_base_currency_id=(
+                int(biz.default_currency_id)
+                if biz and biz.default_currency_id is not None
+                else None
+            ),
+        )
+        snapshot_factor = getattr(ln, "purchase_price_snapshot_factor", None)
+        if snapshot_factor is not None:
+            return unit_cost_line * Decimal(str(snapshot_factor))
+        from app.services.invoice_unit_conversion_service import price_line_to_main
+
+        return price_line_to_main(unit_cost_line, product, extra_info.get("unit"))
 
     if nb == "cost_price":
         if extra_info.get("cost_price") is not None:
@@ -4700,6 +4727,8 @@ def _restoration_unit_cost_sales_return_match_prior_sales(
     return_mv_idx: int,
     return_document_as_of_date: date,
     prior_adjust_end_idx_exclusive: Optional[int],
+    fallback_line: Optional[Any] = None,
+    missing_purchase_price_policy: str = "zero_cost",
 ) -> Decimal:
     """
     واحد بازگشت جریمهٔ COGS برای برگشت از فروش: تخصیص LIFO نسبت به مقادیر باقی‌ماندهٔ
@@ -4776,8 +4805,33 @@ def _restoration_unit_cost_sales_return_match_prior_sales(
         j -= 1
 
     if qty_left > 0:
-        avg_fallback = _calculate_average_purchase_cost(db, business_id, product_id, return_document_as_of_date)
-        sum_cost += qty_left * avg_fallback
+        if _normalize_invoice_profit_basis(normalized_basis) == "purchase_price":
+            from app.services.invoice_purchase_price_snapshot_service import (
+                resolve_missing_purchase_price_unit_cost,
+            )
+
+            fallback_line_unit = resolve_missing_purchase_price_unit_cost(
+                fallback_line,
+                missing_purchase_price_policy,
+            )
+            from app.services.invoice_unit_conversion_service import price_line_to_main
+
+            fallback_product = db.get(Product, int(product_id))
+            fallback_info = dict(getattr(fallback_line, "extra_info", None) or {})
+            fallback = (
+                price_line_to_main(
+                    fallback_line_unit,
+                    fallback_product,
+                    fallback_info.get("unit"),
+                )
+                if fallback_product is not None
+                else fallback_line_unit
+            )
+        else:
+            fallback = _calculate_average_purchase_cost(
+                db, business_id, product_id, return_document_as_of_date
+            )
+        sum_cost += qty_left * fallback
         qty_left = Decimal(0)
 
     return sum_cost / qty_need if qty_need > 0 else Decimal(0)
@@ -5112,7 +5166,22 @@ def _get_cost_per_unit_by_basis(
     sm = _normalize_invoice_profit_fifo_shortage_mode(fifo_shortage_mode)
     
     if normalized_basis == "purchase_price":
-        return Decimal(str(product.base_purchase_price or 0))
+        from app.services.invoice_purchase_price_snapshot_service import (
+            purchase_price_unit_cost_base_from_snapshot,
+        )
+
+        biz = db.get(Business, int(business_id))
+        policy = getattr(biz, "invoice_profit_missing_purchase_price_policy", "zero_cost") if biz else "zero_cost"
+        return purchase_price_unit_cost_base_from_snapshot(
+            line,
+            missing_policy=policy,
+            allow_legacy_ledger=True,
+            expected_base_currency_id=(
+                int(biz.default_currency_id)
+                if biz and biz.default_currency_id is not None
+                else None
+            ),
+        )
     
     elif normalized_basis == "cost_price":
         if extra_info.get("cost_price") is not None:
@@ -5242,15 +5311,32 @@ def _invoice_profit_line_sale_cost_per_unit(
     warehouse_id: Any,
     document_id_hdr: int,
     fifo_sm: str,
+    *,
+    missing_purchase_price_policy: str = "zero_cost",
+    allow_current_purchase_price_preview: bool = False,
+    expected_base_currency_id: int | None = None,
 ) -> Decimal:
     """بهای هر واحد در ردیف فاکتور فروش یا خدمت (مسیر عمومی)، بدون منطق خاص بازگشت کالای ورودی."""
     extra_info = item_line.extra_info or {}
 
     if normalized_basis == "purchase_price":
-        base_cost = product.base_purchase_price or 0
-        if base_cost == 0 and extra_info.get("cost_price") is not None:
-            base_cost = extra_info.get("cost_price")
-        return Decimal(str(base_cost))
+        from app.services.invoice_purchase_price_snapshot_service import (
+            preview_purchase_price_unit_cost_base,
+            purchase_price_unit_cost_base_from_snapshot,
+        )
+
+        if allow_current_purchase_price_preview:
+            return preview_purchase_price_unit_cost_base(
+                product,
+                item_line,
+                missing_policy=missing_purchase_price_policy,
+            )
+        return purchase_price_unit_cost_base_from_snapshot(
+            item_line,
+            missing_policy=missing_purchase_price_policy,
+            allow_legacy_ledger=True,
+            expected_base_currency_id=expected_base_currency_id,
+        )
 
     if normalized_basis == "cost_price":
         if extra_info.get("cost_price") is not None:
@@ -5470,6 +5556,32 @@ def _calculate_invoice_profit(
     # فقط برای فاکتورهای فروش و تولید محاسبه می‌شود
     if document.document_type not in ["invoice_sales", "invoice_sales_return", "invoice_production"]:
         return _empty_profit_response()
+
+    business = db.get(Business, int(business_id))
+    if not business or business.default_currency_id is None:
+        raise ApiError(
+            "BASE_CURRENCY_REQUIRED",
+            "برای محاسبه سود، ارز پایه کسب‌وکار باید تعیین شده باشد",
+            http_status=409,
+        )
+    from app.services.document_line_fx_service import resolve_document_fx_rate
+
+    profit_fx_rate, _profit_fx_source = resolve_document_fx_rate(
+        db,
+        document,
+        business=business,
+        allow_infer=True,
+        fallback_one_on_missing=False,
+    )
+    if profit_fx_rate is None or profit_fx_rate <= 0:
+        raise ApiError(
+            "INVOICE_FX_RATE_REQUIRED_FOR_PROFIT",
+            "نرخ تبدیل ارز سند به ارز پایه برای محاسبه سود موجود نیست",
+            http_status=409,
+        )
+    missing_purchase_price_policy = getattr(
+        business, "invoice_profit_missing_purchase_price_policy", "zero_cost"
+    )
     
     total_gross_profit = Decimal(0)
     total_net_profit = Decimal(0)
@@ -5517,8 +5629,10 @@ def _calculate_invoice_profit(
             if line.product_id:
                 product = db.query(Product).filter(Product.id == line.product_id).first()
             if unit_price <= 0 and product is not None:
-                unit_price = Decimal(str(product.base_sales_price or 0))
-            sales_amt = qty * unit_price
+                # base_sales_price در ارز پایه است؛ unit_price پاسخ باید در ارز سند بماند.
+                unit_price = Decimal(str(product.base_sales_price or 0)) / profit_fx_rate
+            sales_amt_document = qty * unit_price
+            sales_amt = sales_amt_document * profit_fx_rate
             pname = (product.name if product else None) or (line.description or "").strip() or "—"
             pcode = product.code if product else None
             pid_i = int(product.id) if product else (int(line.product_id) if line.product_id else None)
@@ -5526,6 +5640,8 @@ def _calculate_invoice_profit(
                 "line": line,
                 "qty": qty,
                 "unit_price": unit_price,
+                "unit_price_base": unit_price * profit_fx_rate,
+                "sales_amount_document": sales_amt_document,
                 "sales_amount": sales_amt,
                 "product_code": pcode,
                 "product_name": pname,
@@ -5562,6 +5678,8 @@ def _calculate_invoice_profit(
                 "product_name": spec["product_name"],
                 "quantity": float(qty),
                 "unit_price": float(unit_price),
+                "unit_price_base": float(spec["unit_price_base"]),
+                "sales_amount_document": float(spec["sales_amount_document"]),
                 "cost_per_unit": float(line_cost / qty) if qty > 0 else 0,
                 "sales_amount": float(sales_amount),
                 "total_cost": float(line_cost),
@@ -5601,12 +5719,14 @@ def _calculate_invoice_profit(
                     int(pid_v),
                     document.document_date,
                     warehouse_id=wh_key,
+                    include_untracked=(normalized_basis == "purchase_price"),
+                    normalize_quantity_to_main=(normalized_basis == "purchase_price"),
                 )
             return mv_cache[cache_k]
 
         gd_amt = _document_global_discount_amount_for_profit(document, item_lines)
         gd_alloc = _allocate_global_discount_to_lines(item_lines, gd_amt, is_sales_return=is_sales_return)
-        adjustments_net_total = _document_adjustments_net_for_profit(document)
+        adjustments_net_total = _document_adjustments_net_for_profit(document) * profit_fx_rate
 
         profit_rows: List[Dict[str, Any]] = []
 
@@ -5629,11 +5749,12 @@ def _calculate_invoice_profit(
 
             if is_sales_return:
                 if raw_after_global > 0:
-                    sales_amount = -raw_after_global
+                    sales_amount_document = -raw_after_global
                 else:
-                    sales_amount = raw_after_global
+                    sales_amount_document = raw_after_global
             else:
-                sales_amount = raw_after_global
+                sales_amount_document = raw_after_global
+            sales_amount = sales_amount_document * profit_fx_rate
 
             product = None
             if item_line.product_id:
@@ -5654,17 +5775,28 @@ def _calculate_invoice_profit(
 
             if product:
                 inbound_return_goods = (
-                    bool(is_sales_return) and (effective_move == "in") and inv_tracked_ok is not False
+                    bool(is_sales_return)
+                    and (effective_move == "in")
+                    and (inv_tracked_ok is not False or normalized_basis == "purchase_price")
                 )
 
                 if inbound_return_goods:
                     cp_raw = extra_info.get("cost_price")
-                    if cp_raw is not None:
+                    if cp_raw is not None and normalized_basis != "purchase_price":
                         cost_per_unit = Decimal(str(cp_raw))
                     else:
                         mvl = _mv_list_pid_wh(product.id, wh_iter)
                         idx_ln = _find_profit_movement_index_for_line(mvl, int(item_line.id))
                         if idx_ln is not None:
+                            restoration_qty_for_match = qty
+                            if normalized_basis == "purchase_price":
+                                from app.services.invoice_unit_conversion_service import quantity_line_to_main
+
+                                restoration_qty_for_match = quantity_line_to_main(
+                                    qty,
+                                    product,
+                                    extra_info.get("unit"),
+                                )
                             cost_per_unit = _restoration_unit_cost_sales_return_match_prior_sales(
                                 db,
                                 business_id,
@@ -5672,16 +5804,36 @@ def _calculate_invoice_profit(
                                 wh_iter,
                                 normalized_basis=normalized_basis,
                                 fifo_sm=fifo_sm,
-                                restoration_qty=qty,
+                                restoration_qty=restoration_qty_for_match,
                                 movements=mvl,
                                 return_mv_idx=int(idx_ln),
                                 return_document_as_of_date=document.document_date,
                                 prior_adjust_end_idx_exclusive=int(idx_ln),
+                                fallback_line=item_line,
+                                missing_purchase_price_policy=missing_purchase_price_policy,
                             )
+                            if normalized_basis == "purchase_price":
+                                from app.services.invoice_unit_conversion_service import price_main_to_line
+
+                                cost_per_unit = price_main_to_line(
+                                    cost_per_unit,
+                                    product,
+                                    extra_info.get("unit"),
+                                )
                         else:
-                            cost_per_unit = _calculate_average_purchase_cost(
-                                db, business_id, product.id, document.document_date
-                            )
+                            if normalized_basis == "purchase_price":
+                                from app.services.invoice_purchase_price_snapshot_service import (
+                                    resolve_missing_purchase_price_unit_cost,
+                                )
+
+                                cost_per_unit = resolve_missing_purchase_price_unit_cost(
+                                    item_line,
+                                    missing_purchase_price_policy,
+                                )
+                            else:
+                                cost_per_unit = _calculate_average_purchase_cost(
+                                    db, business_id, product.id, document.document_date
+                                )
                     total_line_cost = qty * cost_per_unit
                     line_gross_profit = sales_amount + total_line_cost
                 else:
@@ -5696,6 +5848,9 @@ def _calculate_invoice_profit(
                         warehouse_id,
                         int(document.id),
                         fifo_sm,
+                        missing_purchase_price_policy=missing_purchase_price_policy,
+                        allow_current_purchase_price_preview=bool(document.is_proforma),
+                        expected_base_currency_id=int(business.default_currency_id),
                     )
                     total_line_cost = qty * cost_per_unit
                     line_gross_profit = sales_amount - total_line_cost
@@ -5722,6 +5877,8 @@ def _calculate_invoice_profit(
                 "product_name": pname,
                 "quantity": float(qty),
                 "unit_price": float(unit_price),
+                "unit_price_base": float(unit_price * profit_fx_rate),
+                "sales_amount_document": float(sales_amount_document),
                 "cost_per_unit": float(cost_per_unit),
                 "sales_amount": sales_amount,
                 "total_line_cost": total_line_cost,
@@ -5769,6 +5926,8 @@ def _calculate_invoice_profit(
                 "product_name": pr["product_name"],
                 "quantity": pr["quantity"],
                 "unit_price": pr["unit_price"],
+                "unit_price_base": pr["unit_price_base"],
+                "sales_amount_document": pr["sales_amount_document"],
                 "cost_per_unit": pr["cost_per_unit"],
                 "sales_amount": float(pr["sales_amount"]),
                 "total_cost": float(tlc),
@@ -5802,6 +5961,9 @@ def _calculate_invoice_profit(
         "total_cost": float(total_cost),
         "total_sales": float(total_sales),
         "line_profits": line_profits,
+        "profit_currency_id": int(business.default_currency_id),
+        "document_currency_id": int(document.currency_id) if document.currency_id else None,
+        "document_to_base_rate": float(profit_fx_rate),
     }
     
     if normalized_type in ["gross", "both"]:
@@ -6742,6 +6904,15 @@ def create_invoice(
                         credit=commission_amount,
                         description="تعدیل هزینه پورسانت",
                     ))
+
+    # snapshot قیمت خرید فروش/مصرف تولید قبل از هر محاسبه ledger یا تغییر بعدی قیمت کالا
+    if not document.is_proforma:
+        db.flush()
+        from app.services.invoice_purchase_price_snapshot_service import (
+            stamp_document_purchase_price_snapshots,
+        )
+
+        stamp_document_purchase_price_snapshots(db, document, overwrite=False)
 
     # همگام‌سازی قیمت پایه کالا (ارز پیش‌فرض کسب‌وکار) از فاکتور قطعی
     # Session با autoflush=False است؛ بدون flush، کوئری invoice_item_lines خالی می‌ماند.
@@ -8142,6 +8313,14 @@ def update_invoice(
 
     if not document.is_proforma:
         db.flush()
+        from app.services.invoice_purchase_price_snapshot_service import (
+            stamp_document_purchase_price_snapshots,
+        )
+
+        stamp_document_purchase_price_snapshots(db, document, overwrite=False)
+
+    if not document.is_proforma:
+        db.flush()
         from adapters.db.models.business import Business as _BizForPriceSyncU
         _biz_ps_u = db.query(_BizForPriceSyncU).filter(_BizForPriceSyncU.id == document.business_id).first()
         if _biz_ps_u:
@@ -8340,6 +8519,10 @@ def delete_invoice(db: Session, document_id: int, *, commit: bool = True) -> boo
         if document.document_type not in SUPPORTED_INVOICE_TYPES:
             logger.error(f"[DELETE_INVOICE] Invoice {document_id}: Invalid document type {document.document_type}")
             raise ApiError("INVALID_DOCUMENT_TYPE", "Document is not an invoice", http_status=400)
+
+        _deleted_invoice_product_ids = _distinct_product_ids_for_invoice(
+            db, int(document.id)
+        )
 
         _deleted_production_order_id: Optional[int] = None
         if document.document_type == INVOICE_PRODUCTION:
@@ -8573,6 +8756,18 @@ def delete_invoice(db: Session, document_id: int, *, commit: bool = True) -> boo
         fiscal_year_id = document.fiscal_year_id
         document_type = document.document_type
         project_id = document.project_id
+
+        if document_type == INVOICE_PURCHASE and _deleted_invoice_product_ids:
+            from app.services.invoice_product_price_sync_service import (
+                mark_deleted_purchase_price_source,
+            )
+
+            mark_deleted_purchase_price_source(
+                db,
+                business_id=int(business_id),
+                document_id=int(document_id),
+                product_ids=_deleted_invoice_product_ids,
+            )
         
         # برگشت امتیاز باشگاه مشتریان (قبل از حذف سند)
         try:
@@ -8851,6 +9046,23 @@ def invoice_document_to_dict(
             row_dict["ledger_recognized_at"] = it.ledger_recognized_at.isoformat()
         if getattr(it, "ledger_recognition_event", None):
             row_dict["ledger_recognition_event"] = it.ledger_recognition_event
+        if getattr(it, "purchase_price_snapshot_unit_cost_base", None) is not None:
+            row_dict["purchase_price_snapshot"] = {
+                "unit_cost_base": float(it.purchase_price_snapshot_unit_cost_base),
+                "currency_id": it.purchase_price_snapshot_currency_id,
+                "unit": it.purchase_price_snapshot_unit,
+                "unit_conversion_factor": (
+                    float(it.purchase_price_snapshot_factor)
+                    if it.purchase_price_snapshot_factor is not None
+                    else None
+                ),
+                "source": it.purchase_price_snapshot_source,
+                "captured_at": (
+                    it.purchase_price_snapshot_at.isoformat()
+                    if it.purchase_price_snapshot_at is not None
+                    else None
+                ),
+            }
         product_lines.append(row_dict)
 
     # سطرهای حسابداری از document_lines خوانده می‌شوند
@@ -8960,6 +9172,8 @@ def invoice_document_to_dict(
         result["total_cost"] = profit_data.get("total_cost", 0.0)
         result["total_sales"] = profit_data.get("total_sales", 0.0)
         result["line_profits"] = profit_data.get("line_profits", [])
+        result["profit_currency_id"] = profit_data.get("profit_currency_id")
+        result["document_to_base_rate"] = profit_data.get("document_to_base_rate")
         # پس‌زمینه: gross_profit / line_profits = محاسبه تحلیلی زنده (تنظیمات جاری)
         result["profit_calculation_context"] = "analytical_live"
 
@@ -11783,6 +11997,8 @@ def invoice_documents_to_list_dicts(
                 if "total_profit" in profit_data:
                     item["total_profit"] = profit_data["total_profit"]
                     item["total_profit_percent"] = profit_data["total_profit_percent"]
+                item["profit_currency_id"] = profit_data.get("profit_currency_id")
+                item["document_to_base_rate"] = profit_data.get("document_to_base_rate")
 
     return results
 

@@ -64,6 +64,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
   // تنظیمات محاسبه سود فاکتور
   String? _invoiceProfitCalculationMethod;
   String? _invoiceProfitCalculationBasis;
+  String _invoiceProfitMissingPurchasePricePolicy = 'zero_cost';
   bool _invoiceProfitIncludeOverhead = false;
   String? _invoiceProfitOverheadType;
   final _invoiceProfitOverheadPercentController = TextEditingController();
@@ -79,6 +80,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
   bool _invoiceSyncUpdatePurchasePriceEnabled = false;
   String? _invoiceSyncSalesPriceBasis;
   String? _invoiceSyncPurchasePriceBasis;
+  String _invoiceSyncPurchasePriceMultiLinePolicy = 'weighted_average';
   /// none | draft | posted
   String _invoiceWarehouseReleaseMode = 'draft';
   /// direct_inventory | grni_two_step | grni_legacy
@@ -203,6 +205,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       // تنظیمات محاسبه سود
       _invoiceProfitCalculationMethod = resp.invoiceProfitCalculationMethod ?? 'automatic';
       _invoiceProfitCalculationBasis = resp.invoiceProfitCalculationBasis ?? 'purchase_price';
+      _invoiceProfitMissingPurchasePricePolicy = resp.invoiceProfitMissingPurchasePricePolicy;
       _invoiceProfitIncludeOverhead = resp.invoiceProfitIncludeOverhead;
       _invoiceProfitOverheadType = resp.invoiceProfitOverheadType ?? 'none';
       _invoiceProfitOverheadPercentController.text = (resp.invoiceProfitOverheadPercent ?? 0).toStringAsFixed(2);
@@ -214,6 +217,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       _invoiceSyncUpdatePurchasePriceEnabled = resp.invoiceSyncUpdatePurchasePriceEnabled;
       _invoiceSyncSalesPriceBasis = resp.invoiceSyncSalesPriceBasis ?? 'net_after_line_discount';
       _invoiceSyncPurchasePriceBasis = resp.invoiceSyncPurchasePriceBasis ?? 'net_after_line_discount';
+      _invoiceSyncPurchasePriceMultiLinePolicy = resp.invoiceSyncPurchasePriceMultiLinePolicy;
       _invoiceWarehouseReleaseMode = resp.invoiceWarehouseReleaseMode;
       _invoicePurchaseAccountingMode = resp.invoicePurchaseAccountingMode;
       _invoiceGlobalDiscountPercentBasis = resp.invoiceGlobalDiscountPercentBasis;
@@ -361,6 +365,9 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     if (_invoiceProfitCalculationBasis != null && _invoiceProfitCalculationBasis != orig.invoiceProfitCalculationBasis) {
       payload['invoice_profit_calculation_basis'] = _invoiceProfitCalculationBasis;
     }
+    if (_invoiceProfitMissingPurchasePricePolicy != orig.invoiceProfitMissingPurchasePricePolicy) {
+      payload['invoice_profit_missing_purchase_price_policy'] = _invoiceProfitMissingPurchasePricePolicy;
+    }
     if (_invoiceProfitIncludeOverhead != orig.invoiceProfitIncludeOverhead) {
       payload['invoice_profit_include_overhead'] = _invoiceProfitIncludeOverhead;
     }
@@ -395,6 +402,9 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     }
     if (_invoiceSyncPurchasePriceBasis != null && _invoiceSyncPurchasePriceBasis != orig.invoiceSyncPurchasePriceBasis) {
       payload['invoice_sync_purchase_price_basis'] = _invoiceSyncPurchasePriceBasis;
+    }
+    if (_invoiceSyncPurchasePriceMultiLinePolicy != orig.invoiceSyncPurchasePriceMultiLinePolicy) {
+      payload['invoice_sync_purchase_price_multi_line_policy'] = _invoiceSyncPurchasePriceMultiLinePolicy;
     }
     if (_invoiceWarehouseReleaseMode != orig.invoiceWarehouseReleaseMode) {
       payload['invoice_warehouse_release_mode'] = _invoiceWarehouseReleaseMode;
@@ -1413,6 +1423,35 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
                   },
                 ),
               ],
+              if (_invoiceProfitCalculationBasis == 'purchase_price') ...[
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  initialValue: _invoiceProfitMissingPurchasePricePolicy,
+                  decoration: const InputDecoration(
+                    labelText: 'رفتار قیمت خرید نامشخص',
+                    helperText: 'اگر هنگام ثبت فروش، قیمت خرید محصول تعریف نشده باشد چه رفتاری انجام شود؟',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'block_calculation',
+                      child: Text('جلوگیری از ثبت/محاسبه تا تعیین قیمت خرید'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'use_line_cost_price',
+                      child: Text('استفاده از بهای پایه ثبت‌شده روی ردیف؛ در نبود آن توقف'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'zero_cost',
+                      child: Text('محاسبه با هزینه صفر (رفتار سازگار قبلی)'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() => _invoiceProfitMissingPurchasePricePolicy = value);
+                  },
+                ),
+              ],
               const SizedBox(height: 16),
               // نوع محاسبه سود
               DropdownButtonFormField<String>(
@@ -2062,6 +2101,37 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
                 ),
                 items: _invoiceSyncBasisItems,
                 onChanged: (value) => setState(() => _invoiceSyncPurchasePriceBasis = value),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _invoiceSyncPurchasePriceMultiLinePolicy,
+                decoration: const InputDecoration(
+                  labelText: 'سیاست چند ردیف یک محصول در فاکتور خرید',
+                  helperText: 'اگر یک محصول با چند قیمت در یک فاکتور باشد، قیمت پایه چگونه تعیین شود؟',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'weighted_average',
+                    child: Text('میانگین وزنی بر اساس مقدار'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'last_line',
+                    child: Text('آخرین ردیف واردشده'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'highest_price',
+                    child: Text('بیشترین قیمت'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'lowest_price',
+                    child: Text('کمترین قیمت'),
+                  ),
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() => _invoiceSyncPurchasePriceMultiLinePolicy = value);
+                },
               ),
             ],
           ],

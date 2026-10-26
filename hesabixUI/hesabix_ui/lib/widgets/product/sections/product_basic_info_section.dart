@@ -407,7 +407,10 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
               SizedBox(height: spacing),
               TextFormField(
                 initialValue: widget.formData.unitConversionFactor.toString(),
-                decoration: InputDecoration(labelText: t.unitConversionFactor),
+                decoration: InputDecoration(
+                  labelText: t.unitConversionFactor,
+                  helperText: '۱ واحد اصلی = ضریب × واحد فرعی؛ مثال: ۱ کارتن = ۲۰ عدد، ضریب ۲۰',
+                ),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [
                   const EnglishDigitsFormatter(),
@@ -455,7 +458,10 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
               Expanded(
                 child: TextFormField(
                   initialValue: widget.formData.unitConversionFactor.toString(),
-                  decoration: InputDecoration(labelText: t.unitConversionFactor),
+                  decoration: InputDecoration(
+                    labelText: t.unitConversionFactor,
+                    helperText: '۱ واحد اصلی = ضریب × واحد فرعی؛ مثال: ۱ کارتن = ۲۰ عدد، ضریب ۲۰',
+                  ),
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [
                     const EnglishDigitsFormatter(),

@@ -315,6 +315,7 @@ def apply_bulk_price_update(db: Session, business_id: int, request: BulkPriceUpd
                     product.base_purchase_price = calculate_new_price(
                         product.base_purchase_price, request.update_type, request.direction, request.value
                     )
+                    product.base_purchase_price_sync_meta = None
 
             if _affects_price_list_items(request):
                 q = (

@@ -364,6 +364,7 @@ class ProductRepository(BaseRepository[Product]):
             "default_warehouse_id",
             "base_sales_price",
             "base_purchase_price",
+            "base_purchase_price_sync_meta",
             "general_barcodes",
             "sales_tax_rate",
             "purchase_tax_rate",
