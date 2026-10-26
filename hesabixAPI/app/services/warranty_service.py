@@ -101,9 +101,17 @@ def _check_warranty_plugin_active(db: Session, business_id: int) -> bool:
     if not license:
         return False
     
-    # بررسی انقضا
-    if license.ends_at and license.ends_at < datetime.utcnow():
-        return False
+    # ends_at is stored as a date in some production databases and as a
+    # datetime in others. Compare both as UTC calendar dates to avoid a
+    # datetime/date TypeError and keep license expiry inclusive through its end date.
+    if license.ends_at:
+        ends_at = (
+            license.ends_at.date()
+            if isinstance(license.ends_at, datetime)
+            else license.ends_at
+        )
+        if ends_at < datetime.utcnow().date():
+            return False
     
     return True
 
