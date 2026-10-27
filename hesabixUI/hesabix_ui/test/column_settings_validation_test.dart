@@ -87,7 +87,7 @@ void main() {
       expect(merged.columnWidths, equals({'name': 150.0}));
     });
 
-    test('should maintain column order when adding missing columns', () {
+    test('should keep explicitly hidden columns hidden and preserve their order', () {
       final defaultKeys = ['id', 'name', 'email', 'createdAt'];
       final userSettings = ColumnSettings(
         visibleColumns: ['name', 'email'],
@@ -95,8 +95,8 @@ void main() {
           'name',
           'email',
           'id',
-        ], // 'id' is not in visible but in order
-        columnWidths: {},
+        ],
+        columnWidths: {'id': 120.0},
       );
 
       final merged = ColumnSettingsService.mergeWithDefaults(
@@ -104,8 +104,9 @@ void main() {
         defaultKeys,
       );
 
-      expect(merged.visibleColumns, equals(defaultKeys));
+      expect(merged.visibleColumns, equals(['name', 'email', 'createdAt']));
       expect(merged.columnOrder, equals(['name', 'email', 'id', 'createdAt']));
+      expect(merged.columnWidths, equals({'id': 120.0}));
     });
   });
 }

@@ -22,7 +22,7 @@ class DataTableUserColumnSettings(Base):
 	)
 	user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
 	table_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-	# همان ساختار JSON فرانت: visibleColumns, columnOrder, columnWidths, pinnedLeft, pinnedRight
+	# JSON فرانت: visibleColumns, columnOrder, columnWidths, pinnedLeft, pinnedRight, sortBy, sortDesc, sorts
 	settings: Mapped[dict] = mapped_column(JSON, nullable=False)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(

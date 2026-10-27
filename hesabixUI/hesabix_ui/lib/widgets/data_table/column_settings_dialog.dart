@@ -33,9 +33,16 @@ class _ColumnSettingsDialogState extends State<ColumnSettingsDialog> {
   void initState() {
     super.initState();
     _visibleColumns = List.from(widget.currentSettings.visibleColumns);
-    _columnOrder = List.from(widget.currentSettings.columnOrder);
     _columnWidths = Map.from(widget.currentSettings.columnWidths);
-    _columns = List.from(widget.columns); // Create local copy
+    final byKey = {for (final c in widget.columns) c.key: c};
+    final ordered = <DataTableColumn>[];
+    for (final key in widget.currentSettings.columnOrder) {
+      final column = byKey.remove(key);
+      if (column != null) ordered.add(column);
+    }
+    ordered.addAll(byKey.values);
+    _columns = ordered;
+    _columnOrder = _columns.map((c) => c.key).toList();
     _pinnedLeft = Set<String>.from(widget.currentSettings.pinnedLeft);
     _pinnedRight = Set<String>.from(widget.currentSettings.pinnedRight);
   }
@@ -358,17 +365,20 @@ class _ColumnSettingsDialogState extends State<ColumnSettingsDialog> {
 
   void _resetToDefaults() {
     setState(() {
+      _columns = List.from(widget.columns);
       _visibleColumns = _columns.map((col) => col.key).toList();
       _columnOrder = _columns.map((col) => col.key).toList();
       _columnWidths.clear();
+      _pinnedLeft.clear();
+      _pinnedRight.clear();
     });
   }
 
   void _saveSettings() {
-    final newSettings = ColumnSettings(
-      visibleColumns: _visibleColumns,
-      columnOrder: _columnOrder,
-      columnWidths: _columnWidths,
+    final newSettings = widget.currentSettings.copyWith(
+      visibleColumns: List<String>.from(_visibleColumns),
+      columnOrder: List<String>.from(_columnOrder),
+      columnWidths: Map<String, double>.from(_columnWidths),
       pinnedLeft: _pinnedLeft.toList(),
       pinnedRight: _pinnedRight.toList(),
     );

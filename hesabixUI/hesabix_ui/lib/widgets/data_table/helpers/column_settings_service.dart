@@ -4,6 +4,23 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/api_client.dart';
 
+/// One persisted sort key (supports multi-sort).
+class ColumnSortSpec {
+  final String by;
+  final bool desc;
+
+  const ColumnSortSpec({required this.by, required this.desc});
+
+  Map<String, dynamic> toJson() => {'by': by, 'desc': desc};
+
+  factory ColumnSortSpec.fromJson(Map<dynamic, dynamic> json) {
+    return ColumnSortSpec(
+      by: json['by']?.toString() ?? '',
+      desc: json['desc'] == true,
+    );
+  }
+}
+
 /// Column settings for a specific table
 class ColumnSettings {
   final List<String> visibleColumns;
@@ -11,6 +28,12 @@ class ColumnSettings {
   final Map<String, double> columnWidths;
   final List<String> pinnedLeft;
   final List<String> pinnedRight;
+  final String? sortBy;
+  final bool sortDesc;
+  final List<ColumnSortSpec> sorts;
+  /// If true, [sortBy]/[sorts] were saved by the user (or a previous session)
+  /// and should override [DataTableConfig.defaultSortBy].
+  final bool hasSortPreference;
 
   const ColumnSettings({
     required this.visibleColumns,
@@ -18,6 +41,10 @@ class ColumnSettings {
     this.columnWidths = const {},
     this.pinnedLeft = const [],
     this.pinnedRight = const [],
+    this.sortBy,
+    this.sortDesc = false,
+    this.sorts = const [],
+    this.hasSortPreference = false,
   });
 
   Map<String, dynamic> toJson() {
@@ -27,6 +54,11 @@ class ColumnSettings {
       'columnWidths': columnWidths,
       'pinnedLeft': pinnedLeft,
       'pinnedRight': pinnedRight,
+      if (hasSortPreference) ...{
+        'sortBy': sortBy,
+        'sortDesc': sortDesc,
+        'sorts': sorts.map((s) => s.toJson()).toList(),
+      },
     };
   }
 
@@ -40,12 +72,28 @@ class ColumnSettings {
         }
       });
     }
+    final rawSorts = json['sorts'];
+    final sorts = <ColumnSortSpec>[];
+    if (rawSorts is List) {
+      for (final item in rawSorts) {
+        if (item is Map) {
+          final spec = ColumnSortSpec.fromJson(item);
+          if (spec.by.isNotEmpty) sorts.add(spec);
+        }
+      }
+    }
+    final hasSortPreference =
+        json.containsKey('sortBy') || json.containsKey('sorts');
     return ColumnSettings(
       visibleColumns: List<String>.from(json['visibleColumns'] ?? []),
       columnOrder: List<String>.from(json['columnOrder'] ?? []),
       columnWidths: widths,
       pinnedLeft: List<String>.from(json['pinnedLeft'] ?? []),
       pinnedRight: List<String>.from(json['pinnedRight'] ?? []),
+      sortBy: json['sortBy']?.toString(),
+      sortDesc: json['sortDesc'] == true,
+      sorts: sorts,
+      hasSortPreference: hasSortPreference,
     );
   }
 
@@ -55,6 +103,11 @@ class ColumnSettings {
     Map<String, double>? columnWidths,
     List<String>? pinnedLeft,
     List<String>? pinnedRight,
+    String? sortBy,
+    bool? sortDesc,
+    List<ColumnSortSpec>? sorts,
+    bool? hasSortPreference,
+    bool clearSortBy = false,
   }) {
     return ColumnSettings(
       visibleColumns: visibleColumns ?? this.visibleColumns,
@@ -62,6 +115,10 @@ class ColumnSettings {
       columnWidths: columnWidths ?? this.columnWidths,
       pinnedLeft: pinnedLeft ?? this.pinnedLeft,
       pinnedRight: pinnedRight ?? this.pinnedRight,
+      sortBy: clearSortBy ? null : (sortBy ?? this.sortBy),
+      sortDesc: sortDesc ?? this.sortDesc,
+      sorts: sorts ?? this.sorts,
+      hasSortPreference: hasSortPreference ?? this.hasSortPreference,
     );
   }
 }
@@ -184,7 +241,12 @@ class ColumnSettingsService {
     );
   }
 
-  /// Merge user settings with default settings
+  /// Merge user settings with current column definitions.
+  ///
+  /// A key present in [ColumnSettings.columnOrder] or [ColumnSettings.visibleColumns]
+  /// is a **known** column: visibility follows the saved visible set.
+  /// A key in [defaultColumnKeys] that the user has never seen is treated as new
+  /// and shown by default (appended at the end of the order).
   static ColumnSettings mergeWithDefaults(
     ColumnSettings? userSettings,
     List<String> defaultColumnKeys,
@@ -193,52 +255,66 @@ class ColumnSettingsService {
       return getDefaultSettings(defaultColumnKeys);
     }
 
-    // Ensure all default columns are present in visible columns
-    // If new columns are added (not in user settings), include them by default
+    final defaultKeySet = defaultColumnKeys.toSet();
+    final userVisible = userSettings.visibleColumns
+        .where(defaultKeySet.contains)
+        .toSet();
+    final knownKeys = <String>{
+      ...userSettings.columnOrder.where(defaultKeySet.contains),
+      ...userVisible,
+    };
+
     final visibleColumns = <String>[];
-    final userVisible = Set<String>.from(userSettings.visibleColumns);
     for (final key in defaultColumnKeys) {
-      if (userVisible.contains(key)) {
+      if (!knownKeys.contains(key)) {
+        // New column introduced after this user last saved → show by default
         visibleColumns.add(key);
-      } else {
-        // New column introduced → show by default
+      } else if (userVisible.contains(key)) {
         visibleColumns.add(key);
       }
     }
 
-    // Ensure at least one column is visible
     if (visibleColumns.isEmpty && defaultColumnKeys.isNotEmpty) {
       visibleColumns.add(defaultColumnKeys.first);
     }
 
-    // Build columnOrder: keep user's order for known columns, append new ones at the end
     final columnOrder = <String>[];
     for (final key in userSettings.columnOrder) {
-      if (visibleColumns.contains(key)) {
+      if (defaultKeySet.contains(key) && !columnOrder.contains(key)) {
         columnOrder.add(key);
       }
     }
-    for (final key in visibleColumns) {
+    for (final key in defaultColumnKeys) {
       if (!columnOrder.contains(key)) {
         columnOrder.add(key);
       }
     }
 
-    // Filter column widths to only include valid columns
     final validColumnWidths = <String, double>{};
     for (final entry in userSettings.columnWidths.entries) {
-      if (visibleColumns.contains(entry.key)) {
+      if (defaultKeySet.contains(entry.key)) {
         validColumnWidths[entry.key] = entry.value;
       }
     }
-    // Sanitize pins to only include visible columns
+    final visibleSet = visibleColumns.toSet();
     final leftPins = <String>[];
     for (final key in userSettings.pinnedLeft) {
-      if (visibleColumns.contains(key)) leftPins.add(key);
+      if (visibleSet.contains(key)) leftPins.add(key);
     }
     final rightPins = <String>[];
     for (final key in userSettings.pinnedRight) {
-      if (visibleColumns.contains(key)) rightPins.add(key);
+      if (visibleSet.contains(key)) rightPins.add(key);
+    }
+
+    final allowedSorts = <ColumnSortSpec>[];
+    for (final spec in userSettings.sorts) {
+      if (defaultKeySet.contains(spec.by)) {
+        allowedSorts.add(spec);
+      }
+    }
+    String? sortBy = userSettings.sortBy;
+    if (sortBy != null && !defaultKeySet.contains(sortBy)) {
+      sortBy = allowedSorts.isNotEmpty ? allowedSorts.first.by : null;
     }
 
     return userSettings.copyWith(
@@ -247,6 +323,9 @@ class ColumnSettingsService {
       columnWidths: validColumnWidths,
       pinnedLeft: leftPins,
       pinnedRight: rightPins,
+      sortBy: sortBy,
+      clearSortBy: sortBy == null,
+      sorts: allowedSorts,
     );
   }
 }

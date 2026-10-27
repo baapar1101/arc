@@ -36,6 +36,22 @@ void main() {
       expect(merged.columnWidths, equals({'name': 200.0}));
     });
 
+    test('should not treat a hidden known column as a newly introduced column', () {
+      final defaultKeys = ['id', 'name', 'email'];
+      final userSettings = ColumnSettings(
+        visibleColumns: ['id', 'name'],
+        columnOrder: ['name', 'id', 'email'],
+      );
+
+      final merged = ColumnSettingsService.mergeWithDefaults(
+        userSettings,
+        defaultKeys,
+      );
+
+      expect(merged.visibleColumns, equals(['id', 'name']));
+      expect(merged.columnOrder, equals(['name', 'id', 'email']));
+    });
+
     test('should handle null user settings', () {
       final defaultKeys = ['id', 'name', 'email'];
       final merged = ColumnSettingsService.mergeWithDefaults(null, defaultKeys);
@@ -95,6 +111,38 @@ void main() {
       expect(copied.visibleColumns, equals(['id', 'name', 'email']));
       expect(copied.columnOrder, equals(['name', 'id'])); // unchanged
       expect(copied.columnWidths, equals({'name': 250.0, 'email': 150.0}));
+    });
+
+    test('should round-trip sort preference', () {
+      final original = ColumnSettings(
+        visibleColumns: ['id', 'name'],
+        columnOrder: ['name', 'id'],
+        sortBy: 'name',
+        sortDesc: true,
+        sorts: const [
+          ColumnSortSpec(by: 'name', desc: true),
+          ColumnSortSpec(by: 'id', desc: false),
+        ],
+        hasSortPreference: true,
+      );
+
+      final restored = ColumnSettings.fromJson(original.toJson());
+      expect(restored.hasSortPreference, isTrue);
+      expect(restored.sortBy, 'name');
+      expect(restored.sortDesc, isTrue);
+      expect(restored.sorts, hasLength(2));
+      expect(restored.sorts.first.by, 'name');
+      expect(restored.sorts.first.desc, isTrue);
+      expect(restored.sorts.last.by, 'id');
+    });
+
+    test('legacy json without sort does not override table default sort', () {
+      final restored = ColumnSettings.fromJson({
+        'visibleColumns': ['id'],
+        'columnOrder': ['id'],
+      });
+      expect(restored.hasSortPreference, isFalse);
+      expect(restored.sorts, isEmpty);
     });
   });
 }
