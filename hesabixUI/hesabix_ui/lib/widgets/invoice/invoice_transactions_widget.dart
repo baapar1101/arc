@@ -34,6 +34,19 @@ import '../../utils/invoice_transaction_preferences.dart';
 import '../../widgets/money/amount_field_words_tooltip.dart';
 import '../../utils/currency_display_utils.dart';
 
+int _moneyDecimalPlacesForCurrency(
+  Map<int, Map<String, dynamic>> currencies,
+  int? currencyId, {
+  int fallback = 2,
+}) {
+  final currency = currencyId == null ? null : currencies[currencyId];
+  if (currency == null) return fallback;
+  final places = ((currency['decimal_places'] as num?)?.toInt() ?? fallback)
+      .clamp(0, 8)
+      .toInt();
+  return currency['round_monetary_amounts'] == false ? 8 : places;
+}
+
 class InvoiceTransactionsWidget extends StatefulWidget {
   final List<InvoiceTransaction> transactions;
   final ValueChanged<List<InvoiceTransaction>> onChanged;
@@ -46,8 +59,10 @@ class InvoiceTransactionsWidget extends StatefulWidget {
   final num? invoiceTotal; // مبلغ کل فاکتور
   /// نرخ تسعیر فاکتور (پیش‌فرض فیلد fx_rate در پرداخت بین‌ارزی).
   final num? invoiceFxRate;
+
   /// داخل [SingleChildScrollView] یا محور عمودی بدون ارتفاع محدود؛ لیست به‌اندازهٔ محتوا بلند می‌شود و اسکرول به والد سپرده می‌شود.
   final bool shrinkWrapBody;
+
   /// حالت فشرده برای دیالوگ‌های پرتراکم (مثلاً دریافت/پرداخت).
   final bool compactMode;
 
@@ -68,20 +83,31 @@ class InvoiceTransactionsWidget extends StatefulWidget {
   });
 
   @override
-  State<InvoiceTransactionsWidget> createState() => _InvoiceTransactionsWidgetState();
+  State<InvoiceTransactionsWidget> createState() =>
+      _InvoiceTransactionsWidgetState();
 }
 
 class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
   final CurrencyService _currencyService = CurrencyService(ApiClient());
   String? _currencySymbol;
   Map<int, Map<String, dynamic>> _currencyById = {};
-  
+
+  int _decimalPlacesForCurrency(int? currencyId, {int fallback = 2}) =>
+      _moneyDecimalPlacesForCurrency(
+        _currencyById,
+        currencyId,
+        fallback: fallback,
+      );
+
+  int get _invoiceDecimalPlaces =>
+      _decimalPlacesForCurrency(widget.selectedCurrencyId);
+
   @override
   void initState() {
     super.initState();
     _loadCurrencyInfo();
   }
-  
+
   @override
   void didUpdateWidget(InvoiceTransactionsWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -89,7 +115,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
       _loadCurrencyInfo();
     }
   }
-  
+
   Future<void> _loadCurrencyInfo() async {
     try {
       final currencies = await _currencyService.listBusinessCurrencies(
@@ -101,9 +127,13 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
         if (id != null) byId[id] = Map<String, dynamic>.from(c);
       }
       String? symbol;
-      if (widget.selectedCurrencyId != null && byId.containsKey(widget.selectedCurrencyId)) {
+      if (widget.selectedCurrencyId != null &&
+          byId.containsKey(widget.selectedCurrencyId)) {
         final currency = byId[widget.selectedCurrencyId]!;
-        symbol = currency['symbol']?.toString() ?? currency['code']?.toString() ?? 'ریال';
+        symbol =
+            currency['symbol']?.toString() ??
+            currency['code']?.toString() ??
+            'ریال';
       }
       if (!mounted) return;
       setState(() {
@@ -124,30 +154,33 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
     if (c == null) return fallback;
     return currencyUnitLabelFromBusinessCurrencyMap(c, fallback: fallback);
   }
-  
+
   // مجموع مبالغ تسویه به ارز فاکتور (پرداخت بین‌ارزی از settles_amount استفاده می‌کند)
   num get _totalPaid {
-    return widget.transactions.fold<num>(0, (sum, t) => sum + t.settlesAgainstInvoice);
+    return widget.transactions.fold<num>(
+      0,
+      (sum, t) => sum + t.settlesAgainstInvoice,
+    );
   }
-  
+
   // محاسبه مانده فاکتور
   num get _remainingBalance {
     if (widget.invoiceTotal == null) return 0;
     return widget.invoiceTotal! - _totalPaid;
   }
-  
+
   // محاسبه درصد پرداخت شده
   double get _paidPercentage {
     if (widget.invoiceTotal == null || widget.invoiceTotal == 0) return 0;
     return (_totalPaid / widget.invoiceTotal!) * 100;
   }
-  
+
   // محاسبه درصد مانده
   double get _remainingPercentage {
     if (widget.invoiceTotal == null || widget.invoiceTotal == 0) return 0;
     return (_remainingBalance / widget.invoiceTotal!) * 100;
   }
-  
+
   // تعیین رنگ مانده
   Color _getRemainingBalanceColor(ThemeData theme) {
     if (widget.invoiceTotal == null) return theme.colorScheme.onSurface;
@@ -165,7 +198,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
     final width = MediaQuery.of(context).size.width;
     return width >= 900; // از 900 پیکسل به بالا دو ستونه
   }
-  
+
   // بررسی اینکه آیا می‌توان تراکنش اضافه کرد
   // اگر invoiceTotal null باشد (مثل حالت دریافت و پرداخت)، همیشه فعال است
   // در غیر این صورت، باید invoiceTotal بیشتر از صفر باشد
@@ -191,16 +224,21 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
       if (remainder < 0) {
         SnackBarHelper.showError(
           context,
-          message: 'مجموع تراکنش‌ها از مبلغ فاکتور بیشتر است؛ ابتدا مبالغ را اصلاح کنید.',
+          message:
+              'مجموع تراکنش‌ها از مبلغ فاکتور بیشتر است؛ ابتدا مبالغ را اصلاح کنید.',
         );
       } else {
-        SnackBarHelper.showError(context, message: 'مانده‌ای برای پر کردن وجود ندارد.');
+        SnackBarHelper.showError(
+          context,
+          message: 'مانده‌ای برای پر کردن وجود ندارد.',
+        );
       }
       return;
     }
 
-    final zeroIdx =
-        widget.transactions.indexWhere((t) => t.settlesAgainstInvoice == 0);
+    final zeroIdx = widget.transactions.indexWhere(
+      (t) => t.settlesAgainstInvoice == 0,
+    );
     if (zeroIdx >= 0) {
       final t = widget.transactions[zeroIdx];
       final newList = List<InvoiceTransaction>.from(widget.transactions);
@@ -230,8 +268,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
             ? 'پر کردن ماندهٔ باقی‌مانده در تراکنش (ردیف با مبلغ صفر یا تراکنش جدید)'
             : 'ماندهٔ مثبت برای پر کردن وجود ندارد',
         style: IconButton.styleFrom(
-          visualDensity:
-              widget.compactMode ? VisualDensity.compact : null,
+          visualDensity: widget.compactMode ? VisualDensity.compact : null,
           foregroundColor: enabled
               ? theme.colorScheme.secondary
               : theme.colorScheme.onSurfaceVariant,
@@ -275,8 +312,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
                 ? 'افزودن تراکنش'
                 : 'ابتدا باید ردیف‌های کالا را اضافه کنید',
             style: IconButton.styleFrom(
-              visualDensity:
-                  widget.compactMode ? VisualDensity.compact : null,
+              visualDensity: widget.compactMode ? VisualDensity.compact : null,
               backgroundColor: _canAddTransaction
                   ? theme.colorScheme.primary
                   : theme.colorScheme.surfaceContainerHighest,
@@ -322,7 +358,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
       ],
     );
   }
-  
+
   // چیدمان موبایل: یک ستون
   Widget _buildMobileLayout(ThemeData theme, {bool shrinkWrap = false}) {
     final separatorGap = widget.compactMode ? 8.0 : 12.0;
@@ -333,7 +369,8 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
             shrinkWrap: shrinkWrap,
             physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
             itemCount: widget.transactions.length,
-            separatorBuilder: (context, index) => SizedBox(height: separatorGap),
+            separatorBuilder: (context, index) =>
+                SizedBox(height: separatorGap),
             itemBuilder: (context, index) {
               final transaction = widget.transactions[index];
               return _buildTransactionCard(transaction, index);
@@ -348,20 +385,18 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
         if (widget.invoiceTotal != null && widget.invoiceTotal! > 0) ...[
           _buildBalanceCard(theme),
           SizedBox(height: sectionGap),
-        ] else if (widget.invoiceTotal != null && widget.invoiceTotal! == 0) ...[
+        ] else if (widget.invoiceTotal != null &&
+            widget.invoiceTotal! == 0) ...[
           _buildNoItemsMessage(theme),
           SizedBox(height: sectionGap),
         ],
 
         // لیست تراکنش‌ها
-        if (shrinkWrap)
-          listSection
-        else
-          Expanded(child: listSection),
+        if (shrinkWrap) listSection else Expanded(child: listSection),
       ],
     );
   }
-  
+
   // چیدمان دسکتاپ: دو ستون
   Widget _buildDesktopLayout(ThemeData theme) {
     final separatorGap = widget.compactMode ? 8.0 : 12.0;
@@ -381,10 +416,11 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
                 children: [
                   Text(
                     'لیست تراکنش‌ها',
-                    style: (widget.compactMode
-                            ? theme.textTheme.titleSmall
-                            : theme.textTheme.titleMedium)
-                        ?.copyWith(fontWeight: FontWeight.bold),
+                    style:
+                        (widget.compactMode
+                                ? theme.textTheme.titleSmall
+                                : theme.textTheme.titleMedium)
+                            ?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   const Spacer(),
                   Text(
@@ -413,9 +449,9 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
             ],
           ),
         ),
-        
+
         SizedBox(width: colGap),
-        
+
         // ستون سمت چپ: کارت مانده فاکتور یا پیام عدم وجود ردیف کالا
         if (widget.invoiceTotal != null && widget.invoiceTotal! > 0)
           Expanded(
@@ -426,17 +462,16 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
                 // هدر کارت مانده
                 Text(
                   'خلاصه مالی',
-                  style: (widget.compactMode
-                          ? theme.textTheme.titleSmall
-                          : theme.textTheme.titleMedium)
-                      ?.copyWith(fontWeight: FontWeight.bold),
+                  style:
+                      (widget.compactMode
+                              ? theme.textTheme.titleSmall
+                              : theme.textTheme.titleMedium)
+                          ?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 SizedBox(height: sectionGap),
                 // کارت مانده (sticky در بالای صفحه)
                 Flexible(
-                  child: SingleChildScrollView(
-                    child: _buildBalanceCard(theme),
-                  ),
+                  child: SingleChildScrollView(child: _buildBalanceCard(theme)),
                 ),
               ],
             ),
@@ -450,10 +485,11 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
                 // هدر
                 Text(
                   'خلاصه مالی',
-                  style: (widget.compactMode
-                          ? theme.textTheme.titleSmall
-                          : theme.textTheme.titleMedium)
-                      ?.copyWith(fontWeight: FontWeight.bold),
+                  style:
+                      (widget.compactMode
+                              ? theme.textTheme.titleSmall
+                              : theme.textTheme.titleMedium)
+                          ?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 SizedBox(height: sectionGap),
                 // پیام عدم وجود ردیف کالا
@@ -468,7 +504,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
       ],
     );
   }
-  
+
   // حالت خالی (بدون تراکنش)
   Widget _buildEmptyState(ThemeData theme) {
     return Card(
@@ -509,7 +545,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
     final cardPad = widget.compactMode ? 10.0 : 16.0;
     final headerGap = widget.compactMode ? 8.0 : 12.0;
     final iconSize = widget.compactMode ? 18.0 : 20.0;
-    
+
     return Card(
       child: Padding(
         padding: EdgeInsets.all(cardPad),
@@ -533,7 +569,13 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
                 ),
                 const Spacer(),
                 Text(
-                  formatWithThousands(transaction.amount, decimalPlaces: 0),
+                  formatWithThousands(
+                    transaction.amount,
+                    decimalPlaces: _decimalPlacesForCurrency(
+                      transaction.paymentCurrencyId ??
+                          widget.selectedCurrencyId,
+                    ),
+                  ),
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: theme.colorScheme.primary,
@@ -544,21 +586,23 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
                   onPressed: () => _editTransaction(index),
                   icon: const Icon(Icons.edit),
                   tooltip: 'ویرایش',
-                  visualDensity:
-                      widget.compactMode ? VisualDensity.compact : null,
+                  visualDensity: widget.compactMode
+                      ? VisualDensity.compact
+                      : null,
                 ),
                 IconButton(
                   onPressed: () => _removeTransaction(index),
                   icon: const Icon(Icons.delete),
                   tooltip: 'حذف',
                   color: theme.colorScheme.error,
-                  visualDensity:
-                      widget.compactMode ? VisualDensity.compact : null,
+                  visualDensity: widget.compactMode
+                      ? VisualDensity.compact
+                      : null,
                 ),
               ],
             ),
             SizedBox(height: headerGap),
-            
+
             // جزئیات تراکنش
             _buildTransactionDetails(transaction),
           ],
@@ -584,9 +628,9 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
           _buildDetailRow('شخص:', transaction.personName!),
         if (transaction.accountName != null)
           _buildDetailRow('حساب:', transaction.accountName!),
-        
+
         const SizedBox(height: 8),
-        
+
         // تاریخ، مبلغ و کارمزد
         Row(
           children: [
@@ -609,16 +653,29 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
                           transaction.paymentCurrencyId,
                           fallback: '',
                         ),
-                        decimalPlaces: 0,
+                        decimalPlaces: _decimalPlacesForCurrency(
+                          transaction.paymentCurrencyId,
+                        ),
                       )
-                    : formatWithThousands(transaction.amount, decimalPlaces: 0),
+                    : formatWithThousands(
+                        transaction.amount,
+                        decimalPlaces: _decimalPlacesForCurrency(
+                          widget.selectedCurrencyId,
+                        ),
+                      ),
               ),
             ),
             if (transaction.commission != null)
               Expanded(
                 child: _buildDetailRow(
                   'کارمزد بانکی:',
-                  formatWithThousands(transaction.commission!, decimalPlaces: 0),
+                  formatWithThousands(
+                    transaction.commission!,
+                    decimalPlaces: _decimalPlacesForCurrency(
+                      transaction.paymentCurrencyId ??
+                          widget.selectedCurrencyId,
+                    ),
+                  ),
                 ),
               ),
           ],
@@ -627,10 +684,9 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
           const SizedBox(height: 6),
           DecoratedBox(
             decoration: BoxDecoration(
-              color: Theme.of(context)
-                  .colorScheme
-                  .secondaryContainer
-                  .withValues(alpha: 0.4),
+              color: Theme.of(
+                context,
+              ).colorScheme.secondaryContainer.withValues(alpha: 0.4),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Padding(
@@ -641,8 +697,8 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
                   Text(
                     'تسویه بین‌ارزی',
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -655,26 +711,34 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
                         fallback: 'ارز پرداخت',
                       ),
                       fxRate: transaction.fxRate,
-                      settlesDecimalPlaces: 2,
-                      paymentDecimalPlaces: 0,
-                      rateDisplayUnit: widget.authStore?.currentBusiness
+                      settlesDecimalPlaces: _invoiceDecimalPlaces,
+                      paymentDecimalPlaces: _decimalPlacesForCurrency(
+                        transaction.paymentCurrencyId,
+                      ),
+                      rateDisplayUnit: widget
+                          .authStore
+                          ?.currentBusiness
                           ?.fxRevaluationPolicy?['rate_display_unit']
                           ?.toString(),
                       baseCurrencyCode: widget
-                          .authStore?.currentBusiness?.defaultCurrency?.code,
+                          .authStore
+                          ?.currentBusiness
+                          ?.defaultCurrency
+                          ?.code,
                     ),
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
             ),
           ),
         ],
-        
+
         // توضیحات
-        if (transaction.description != null && transaction.description!.isNotEmpty) ...[
+        if (transaction.description != null &&
+            transaction.description!.isNotEmpty) ...[
           const SizedBox(height: 8),
           _buildDetailRow('توضیحات:', transaction.description!),
         ],
@@ -684,7 +748,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
 
   Widget _buildDetailRow(String label, String value) {
     final theme = Theme.of(context);
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
@@ -700,12 +764,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
               ),
             ),
           ),
-          Expanded(
-            child: Text(
-              value,
-              style: theme.textTheme.bodyMedium,
-            ),
-          ),
+          Expanded(child: Text(value, style: theme.textTheme.bodyMedium)),
         ],
       ),
     );
@@ -735,7 +794,10 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
   }
 
   void _editTransaction(int index) {
-    _showTransactionDialog(transaction: widget.transactions[index], index: index);
+    _showTransactionDialog(
+      transaction: widget.transactions[index],
+      index: index,
+    );
   }
 
   void _removeTransaction(int index) {
@@ -768,7 +830,8 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
   }
 
   List<TransactionType> _availableTransactionTypesForInvoice() {
-    final showCheckExpense = widget.invoiceType == InvoiceType.purchase ||
+    final showCheckExpense =
+        widget.invoiceType == InvoiceType.purchase ||
         widget.invoiceType == InvoiceType.salesReturn;
     final all = TransactionType.allTypes;
     if (showCheckExpense) return all;
@@ -784,9 +847,9 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
     if (transaction == null) {
       initialTransactionType =
           await InvoiceTransactionPreferences.resolveInitialTransactionType(
-        widget.businessId,
-        _availableTransactionTypesForInvoice(),
-      );
+            widget.businessId,
+            _availableTransactionTypesForInvoice(),
+          );
       if (!mounted) return;
     }
 
@@ -807,12 +870,16 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
         onSave: (newTransaction) {
           if (index != null) {
             // ویرایش تراکنش موجود
-            final newTransactions = List<InvoiceTransaction>.from(widget.transactions);
+            final newTransactions = List<InvoiceTransaction>.from(
+              widget.transactions,
+            );
             newTransactions[index] = newTransaction;
             widget.onChanged(newTransactions);
           } else {
             // افزودن تراکنش جدید
-            final newTransactions = List<InvoiceTransaction>.from(widget.transactions);
+            final newTransactions = List<InvoiceTransaction>.from(
+              widget.transactions,
+            );
             newTransactions.add(newTransaction);
             widget.onChanged(newTransactions);
           }
@@ -820,20 +887,20 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
       ),
     );
   }
-  
+
   Widget _buildBalanceCard(ThemeData theme) {
     final remainingColor = _getRemainingBalanceColor(theme);
     final isFullyPaid = _remainingBalance == 0;
     final isOverPaid = _remainingBalance < 0;
     final hasRemaining = _remainingBalance > 0;
     final isDesktop = _isDesktop(context);
-    
+
     return Card(
-      color: hasRemaining 
+      color: hasRemaining
           ? theme.colorScheme.errorContainer.withOpacity(0.3)
           : isOverPaid
-              ? theme.colorScheme.tertiaryContainer.withOpacity(0.3)
-              : theme.colorScheme.primaryContainer.withOpacity(0.3),
+          ? theme.colorScheme.tertiaryContainer.withOpacity(0.3)
+          : theme.colorScheme.primaryContainer.withOpacity(0.3),
       child: Padding(
         padding: EdgeInsets.all(isDesktop ? 20 : 16),
         child: Column(
@@ -843,11 +910,11 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
             Row(
               children: [
                 Icon(
-                  hasRemaining 
+                  hasRemaining
                       ? Icons.warning_amber_rounded
                       : isOverPaid
-                          ? Icons.info_outline
-                          : Icons.check_circle_outline,
+                      ? Icons.info_outline
+                      : Icons.check_circle_outline,
                   color: remainingColor,
                   size: isDesktop ? 28 : 24,
                 ),
@@ -855,7 +922,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
                 Expanded(
                   child: Text(
                     'مانده فاکتور',
-                    style: isDesktop 
+                    style: isDesktop
                         ? theme.textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
                           )
@@ -871,7 +938,10 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
             _buildBalanceRow(
               theme,
               'مبلغ کل فاکتور:',
-              formatWithThousands(widget.invoiceTotal!, decimalPlaces: 0),
+              formatWithThousands(
+                widget.invoiceTotal!,
+                decimalPlaces: _invoiceDecimalPlaces,
+              ),
               theme.colorScheme.onSurface,
               isDesktop: isDesktop,
             ),
@@ -879,7 +949,10 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
             _buildBalanceRow(
               theme,
               'مجموع تراکنش‌ها:',
-              formatWithThousands(_totalPaid, decimalPlaces: 0),
+              formatWithThousands(
+                _totalPaid,
+                decimalPlaces: _invoiceDecimalPlaces,
+              ),
               theme.colorScheme.onSurface,
               isDesktop: isDesktop,
             ),
@@ -889,7 +962,10 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
             _buildBalanceRow(
               theme,
               'مانده فاکتور:',
-              formatWithThousands(_remainingBalance, decimalPlaces: 0),
+              formatWithThousands(
+                _remainingBalance,
+                decimalPlaces: _invoiceDecimalPlaces,
+              ),
               remainingColor,
               isBold: true,
               isDesktop: isDesktop,
@@ -921,10 +997,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
                 decoration: BoxDecoration(
                   color: theme.colorScheme.errorContainer.withOpacity(0.5),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: theme.colorScheme.error,
-                    width: 1,
-                  ),
+                  border: Border.all(color: theme.colorScheme.error, width: 1),
                 ),
                 child: Row(
                   children: [
@@ -936,7 +1009,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'فاکتور هنوز تسویه نشده است. مانده باقی‌مانده: ${formatWithThousands(_remainingBalance, decimalPlaces: 0)} ${_currencySymbol ?? 'ریال'}',
+                        'فاکتور هنوز تسویه نشده است. مانده باقی‌مانده: ${formatWithThousands(_remainingBalance, decimalPlaces: _invoiceDecimalPlaces)} ${_currencySymbol ?? 'ریال'}',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.error,
                           fontWeight: FontWeight.w500,
@@ -970,7 +1043,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'مبلغ پرداخت شده بیشتر از مبلغ فاکتور است. مبلغ اضافی: ${formatWithThousands(-_remainingBalance, decimalPlaces: 0)} ${_currencySymbol ?? 'ریال'}',
+                        'مبلغ پرداخت شده بیشتر از مبلغ فاکتور است. مبلغ اضافی: ${formatWithThousands(-_remainingBalance, decimalPlaces: _invoiceDecimalPlaces)} ${_currencySymbol ?? 'ریال'}',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.tertiary,
                           fontWeight: FontWeight.w500,
@@ -1020,7 +1093,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
       ),
     );
   }
-  
+
   Widget _buildBalanceRow(
     ThemeData theme,
     String label,
@@ -1033,7 +1106,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
     final displayValue = showCurrency && _currencySymbol != null
         ? '$value $_currencySymbol'
         : value;
-    
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1041,35 +1114,39 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
           width: isDesktop ? 150 : 130,
           child: Text(
             label,
-            style: (isDesktop 
-                ? theme.textTheme.bodyLarge 
-                : theme.textTheme.bodyMedium)?.copyWith(
-              fontWeight: FontWeight.w500,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+            style:
+                (isDesktop
+                        ? theme.textTheme.bodyLarge
+                        : theme.textTheme.bodyMedium)
+                    ?.copyWith(
+                      fontWeight: FontWeight.w500,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
           ),
         ),
         Expanded(
           child: Text(
             displayValue,
-            style: (isDesktop 
-                ? theme.textTheme.bodyLarge 
-                : theme.textTheme.bodyMedium)?.copyWith(
-              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-              color: valueColor,
-              fontSize: isDesktop && isBold ? 18 : null,
-            ),
+            style:
+                (isDesktop
+                        ? theme.textTheme.bodyLarge
+                        : theme.textTheme.bodyMedium)
+                    ?.copyWith(
+                      fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+                      color: valueColor,
+                      fontSize: isDesktop && isBold ? 18 : null,
+                    ),
             textAlign: TextAlign.start,
           ),
         ),
       ],
     );
   }
-  
+
   // پیام عدم وجود ردیف کالا یا مبلغ صفر
   Widget _buildNoItemsMessage(ThemeData theme) {
     final isDesktop = _isDesktop(context);
-    
+
     return Card(
       color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
       child: Padding(
@@ -1085,12 +1162,14 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
             const SizedBox(height: 16),
             Text(
               'فاکتور بدون ردیف کالا',
-              style: (isDesktop 
-                  ? theme.textTheme.titleLarge 
-                  : theme.textTheme.titleMedium)?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.onSurface,
-              ),
+              style:
+                  (isDesktop
+                          ? theme.textTheme.titleLarge
+                          : theme.textTheme.titleMedium)
+                      ?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
@@ -1142,8 +1221,10 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
 
 class TransactionDialog extends StatefulWidget {
   final InvoiceTransaction? transaction;
+
   /// هنگام افزودن تراکنش جدید، مقدار اولیهٔ فیلد مبلغ (مثلاً ماندهٔ فاکتور).
   final num? initialAmount;
+
   /// نوع تراکنش پیش‌فرض (قبل از باز شدن دیالوگ resolve شده تا setState میانی فوکوس را نگیرد).
   final TransactionType? initialTransactionType;
   final int businessId;
@@ -1151,10 +1232,12 @@ class TransactionDialog extends StatefulWidget {
   final ValueChanged<InvoiceTransaction> onSave;
   final InvoiceType invoiceType;
   final int? selectedCurrencyId;
+
   /// واحد پول برای suffix فیلد مبلغ و متن tooltip (مثلاً ریال یا نماد ارز).
   final String currencyUnit;
   final CheckPickerMode checkPickerMode;
   final AuthStore? authStore;
+
   /// نرخ تسعیر فاکتور برای پیش‌فرض fx_rate.
   final num? invoiceFxRate;
 
@@ -1181,7 +1264,7 @@ class TransactionDialog extends StatefulWidget {
 class _TransactionDialogState extends State<TransactionDialog> {
   final _formKey = GlobalKey<FormState>();
   final _uuid = const Uuid();
-  
+
   late TransactionType _selectedType;
   DateTime _transactionDate = DateTime.now();
   final _amountController = TextEditingController();
@@ -1189,19 +1272,23 @@ class _TransactionDialogState extends State<TransactionDialog> {
   final _descriptionController = TextEditingController();
   final _settlesAmountController = TextEditingController();
   final _fxRateController = TextEditingController();
+
   /// اگر کاربر مبلغ پرداخت را دستی عوض کرده، همگام خودکار بازنویسی نکند.
   bool _paymentAmountManuallyEdited = false;
   bool _syncingPaymentAmount = false;
+  bool _syncingSettlesAmount = false;
+
   /// کاربر نرخ را دستی عوض کرده؛ resolve خودکار بازنویسی نکند.
   bool _fxRateManuallyEdited = false;
   bool _syncingFxRate = false;
   bool _fxRateLoading = false;
   bool _fxRateRefreshing = false;
   String? _fxRateSourceHint;
+
   /// نرخ‌های resolve‌شده به پایه (برای محاسبه صحیح فرعی↔فرعی).
   double? _resolvedSettleRateToBase;
   double? _resolvedPayRateToBase;
-  
+
   // سرویس‌ها
   final BankAccountService _bankService = BankAccountService();
   final CashRegisterService _cashRegisterService = CashRegisterService();
@@ -1214,7 +1301,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
       BusinessCurrencyRateService(_apiClient);
   late final BusinessFxGlobalRateService _globalFxService =
       BusinessFxGlobalRateService(_apiClient);
-  
+
   // فیلدهای خاص هر نوع تراکنش
   String? _selectedBankId;
   String? _selectedCashRegisterId;
@@ -1227,7 +1314,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
   Map<String, dynamic>? _selectedDetail;
   int? _selectedPaymentCurrencyId;
   String? _paymentCurrencyUnit;
-  
+
   // لیست‌های داده
   List<Map<String, dynamic>> _banks = [];
   List<Map<String, dynamic>> _cashRegisters = [];
@@ -1237,7 +1324,8 @@ class _TransactionDialogState extends State<TransactionDialog> {
 
   bool get _isMultiCurrency => widget.authStore?.isMultiCurrency ?? false;
 
-  int? get _baseCurrencyId => widget.authStore?.currentBusiness?.defaultCurrency?.id;
+  int? get _baseCurrencyId =>
+      widget.authStore?.currentBusiness?.defaultCurrency?.id;
 
   bool get _isCrossCurrencyPayment {
     final inv = widget.selectedCurrencyId;
@@ -1246,35 +1334,96 @@ class _TransactionDialogState extends State<TransactionDialog> {
     return inv != pay;
   }
 
+  int _decimalPlacesForCurrency(int? currencyId, {int fallback = 8}) =>
+      _moneyDecimalPlacesForCurrency(
+        _currencyById,
+        currencyId,
+        fallback: fallback,
+      );
+
+  int get _invoiceDecimalPlaces =>
+      _decimalPlacesForCurrency(widget.selectedCurrencyId);
+
+  int get _paymentDecimalPlaces => _decimalPlacesForCurrency(
+    _selectedPaymentCurrencyId ?? widget.selectedCurrencyId,
+  );
+
+  void _formatLoadedAmountFields() {
+    final transaction = widget.transaction;
+    _syncingPaymentAmount = true;
+    _syncingSettlesAmount = true;
+    if (transaction != null) {
+      _amountController.text = formatWithThousands(
+        transaction.amount,
+        decimalPlaces: _decimalPlacesForCurrency(
+          transaction.paymentCurrencyId ?? widget.selectedCurrencyId,
+        ),
+      );
+      if (transaction.commission != null) {
+        _commissionController.text = formatWithThousands(
+          transaction.commission!,
+          decimalPlaces: _decimalPlacesForCurrency(
+            transaction.paymentCurrencyId ?? widget.selectedCurrencyId,
+          ),
+        );
+      }
+      if (transaction.settlesAmount != null) {
+        _settlesAmountController.text = formatWithThousands(
+          transaction.settlesAmount!,
+          decimalPlaces: _invoiceDecimalPlaces,
+        );
+      }
+    } else if (widget.initialAmount != null) {
+      if (_amountController.text.trim().isNotEmpty &&
+          !_paymentAmountManuallyEdited) {
+        _amountController.text = formatWithThousands(
+          widget.initialAmount!,
+          decimalPlaces: _paymentDecimalPlaces,
+        );
+      }
+      if (_settlesAmountController.text.trim().isNotEmpty) {
+        _settlesAmountController.text = formatWithThousands(
+          widget.initialAmount!,
+          decimalPlaces: _invoiceDecimalPlaces,
+        );
+      }
+    }
+    _syncingSettlesAmount = false;
+    _syncingPaymentAmount = false;
+  }
+
   @override
   void initState() {
     super.initState();
-    _selectedType = widget.transaction?.type ??
+    _selectedType =
+        widget.transaction?.type ??
         widget.initialTransactionType ??
         TransactionType.bank;
     _transactionDate = widget.transaction?.transactionDate ?? DateTime.now();
     if (widget.transaction != null) {
-      _amountController.text =
-          formatWithThousands(widget.transaction!.amount, decimalPlaces: 0);
+      // Until currency precision loads, preserve the full value in the edit field.
+      _amountController.text = widget.transaction!.amount.toString();
       _paymentAmountManuallyEdited = true;
     } else {
       _amountController.text = '';
     }
     _commissionController.text = widget.transaction?.commission != null
-        ? formatWithThousands(widget.transaction!.commission!, decimalPlaces: 0)
+        ? widget.transaction!.commission!.toString()
         : '';
     _descriptionController.text = widget.transaction?.description ?? '';
     if (widget.transaction?.settlesAmount != null) {
       _settlesAmountController.text = formatWithThousands(
         widget.transaction!.settlesAmount!,
-        decimalPlaces: 2,
+        decimalPlaces: 8,
       );
     }
     if (widget.initialAmount != null && widget.transaction == null) {
       _applyInitialAmountPrefill();
     }
     if (widget.transaction?.fxRate != null) {
-      _fxRateController.text = formatFxRateForDisplay(widget.transaction!.fxRate);
+      _fxRateController.text = formatFxRateForDisplay(
+        widget.transaction!.fxRate,
+      );
       _fxRateManuallyEdited = true;
       _fxRateSourceHint = 'نرخ ثبت‌شده روی تراکنش';
     } else if (widget.invoiceFxRate != null) {
@@ -1285,7 +1434,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
     _settlesAmountController.addListener(_onSettlesOrRateChanged);
     _fxRateController.addListener(_onFxRateEdited);
     _amountController.addListener(_onAmountEdited);
-    
+
     // تنظیم فیلدهای خاص
     _selectedBankId = widget.transaction?.bankId;
     _selectedCashRegisterId = widget.transaction?.cashRegisterId;
@@ -1294,32 +1443,43 @@ class _TransactionDialogState extends State<TransactionDialog> {
     _selectedCheckNumber = widget.transaction?.checkNumber;
     _selectedPersonId = widget.transaction?.personId;
     _selectedPaymentCurrencyId = widget.transaction?.paymentCurrencyId;
-    if (widget.transaction?.detailId != null && widget.transaction?.detailType != null) {
+    if (widget.transaction?.detailId != null &&
+        widget.transaction?.detailType != null) {
       final key = _detailIdKey(widget.transaction!.detailType!);
       if (key != null) {
         _selectedDetail = {
-          key: int.tryParse(widget.transaction!.detailId!) ?? widget.transaction!.detailId,
-          if (widget.transaction!.detailName != null) 'detail_name': widget.transaction!.detailName,
+          key:
+              int.tryParse(widget.transaction!.detailId!) ??
+              widget.transaction!.detailId,
+          if (widget.transaction!.detailName != null)
+            'detail_name': widget.transaction!.detailName,
         };
       }
     }
-    
+
     // اگر حساب انتخاب شده است، باید آن را از API دریافت کنیم
     if (widget.transaction?.accountId != null) {
       _loadSelectedAccount();
     }
-    
+
     // لود کردن داده‌ها از دیتابیس
     _loadData();
   }
 
   Future<void> _loadSelectedAccount() async {
     try {
-      final response = await _accountService.getAccountsTree(businessId: widget.businessId);
-      final items = (response['items'] as List<dynamic>?)
-          ?.map((item) => AccountTreeNode.fromJson(item as Map<String, dynamic>))
-          .toList() ?? [];
-      
+      final response = await _accountService.getAccountsTree(
+        businessId: widget.businessId,
+      );
+      final items =
+          (response['items'] as List<dynamic>?)
+              ?.map(
+                (item) =>
+                    AccountTreeNode.fromJson(item as Map<String, dynamic>),
+              )
+              .toList() ??
+          [];
+
       // جستجو برای پیدا کردن حساب انتخاب شده
       final accountId = int.tryParse(widget.transaction?.accountId ?? '');
       if (accountId != null) {
@@ -1356,6 +1516,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
           if (id != null) map[id] = c;
         }
         _currencyById = map;
+        _formatLoadedAmountFields();
       } catch (_) {}
 
       // لود کردن بانک‌ها
@@ -1363,28 +1524,40 @@ class _TransactionDialogState extends State<TransactionDialog> {
         businessId: widget.businessId,
         queryInfo: {'take': 100, 'skip': 0},
       );
-      _banks = (bankResponse['items'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
-      
+      _banks =
+          (bankResponse['items'] as List<dynamic>?)
+              ?.cast<Map<String, dynamic>>() ??
+          [];
+
       // لود کردن صندوق‌ها
       final cashRegisterResponse = await _cashRegisterService.list(
         businessId: widget.businessId,
         queryInfo: {'take': 100, 'skip': 0},
       );
-      _cashRegisters = (cashRegisterResponse['items'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
-      
+      _cashRegisters =
+          (cashRegisterResponse['items'] as List<dynamic>?)
+              ?.cast<Map<String, dynamic>>() ??
+          [];
+
       // لود کردن تنخواهگردان‌ها
       final pettyCashResponse = await _pettyCashService.list(
         businessId: widget.businessId,
         queryInfo: {'take': 100, 'skip': 0},
       );
-      _pettyCashList = (pettyCashResponse['items'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
-      
+      _pettyCashList =
+          (pettyCashResponse['items'] as List<dynamic>?)
+              ?.cast<Map<String, dynamic>>() ??
+          [];
+
       // لود کردن اشخاص
       final personResponse = await _personService.getPersons(
         businessId: widget.businessId,
         limit: 100,
       );
-      _persons = (personResponse['items'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+      _persons =
+          (personResponse['items'] as List<dynamic>?)
+              ?.cast<Map<String, dynamic>>() ??
+          [];
 
       if (mounted) {
         setState(() {
@@ -1402,14 +1575,18 @@ class _TransactionDialogState extends State<TransactionDialog> {
     if (initial == null || widget.transaction != null) return;
 
     if (_settlesAmountController.text.trim().isEmpty) {
-      _settlesAmountController.text =
-          formatWithThousands(initial, decimalPlaces: 2);
+      _settlesAmountController.text = formatWithThousands(
+        initial,
+        decimalPlaces: _invoiceDecimalPlaces,
+      );
     }
 
     if (!_isMultiCurrency) {
       if (_amountController.text.trim().isEmpty) {
-        _amountController.text =
-            formatWithThousands(initial, decimalPlaces: 0);
+        _amountController.text = formatWithThousands(
+          initial,
+          decimalPlaces: _paymentDecimalPlaces,
+        );
       }
       return;
     }
@@ -1417,8 +1594,10 @@ class _TransactionDialogState extends State<TransactionDialog> {
     if (!_isCrossCurrencyPayment) {
       if (_amountController.text.trim().isEmpty &&
           !_paymentAmountManuallyEdited) {
-        _amountController.text =
-            formatWithThousands(initial, decimalPlaces: 0);
+        _amountController.text = formatWithThousands(
+          initial,
+          decimalPlaces: _paymentDecimalPlaces,
+        );
       }
       return;
     }
@@ -1437,6 +1616,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
   }
 
   void _onSettlesOrRateChanged() {
+    if (_syncingSettlesAmount) return;
     if (!_isCrossCurrencyPayment) return;
     if (_paymentAmountManuallyEdited) return;
     _recalcPaymentAmountFromSettles(force: false);
@@ -1497,7 +1677,10 @@ class _TransactionDialogState extends State<TransactionDialog> {
     final expected = _expectedPaymentAmount();
     if (expected == null) return;
     _syncingPaymentAmount = true;
-    _amountController.text = formatWithThousands(expected, decimalPlaces: 0);
+    _amountController.text = formatWithThousands(
+      expected,
+      decimalPlaces: _paymentDecimalPlaces,
+    );
     _syncingPaymentAmount = false;
     if (force) _paymentAmountManuallyEdited = false;
     if (mounted) setState(() {});
@@ -1528,7 +1711,9 @@ class _TransactionDialogState extends State<TransactionDialog> {
   /// پر کردن نرخ از آخرین سند تسعیر (resolve دفتر نرخ).
   Future<void> _loadFxRateFromLedger({bool force = false}) async {
     if (!_isCrossCurrencyPayment) return;
-    if (!force && _fxRateManuallyEdited && _fxRateController.text.trim().isNotEmpty) {
+    if (!force &&
+        _fxRateManuallyEdited &&
+        _fxRateController.text.trim().isNotEmpty) {
       return;
     }
     if (!force &&
@@ -1575,7 +1760,8 @@ class _TransactionDialogState extends State<TransactionDialog> {
         if (force) _fxRateManuallyEdited = false;
         _fxRateSourceHint = hint;
       } else if (_fxRateController.text.trim().isEmpty) {
-        _fxRateSourceHint = 'نرخی در دفتر تسعیر یافت نشد — دستی وارد کنید یا از اسنپ‌شات بگیرید';
+        _fxRateSourceHint =
+            'نرخی در دفتر تسعیر یافت نشد — دستی وارد کنید یا از اسنپ‌شات بگیرید';
       }
 
       _recalcPaymentAmountFromSettles(
@@ -1590,14 +1776,14 @@ class _TransactionDialogState extends State<TransactionDialog> {
   Future<void> _refreshFxRateFromGlobal() async {
     if (!_isCrossCurrencyPayment) return;
     final canAdd =
-        widget.authStore?.hasBusinessPermission('currency_revaluation', 'add') ??
-            false;
+        widget.authStore?.hasBusinessPermission(
+          'currency_revaluation',
+          'add',
+        ) ??
+        false;
     if (!canAdd) {
       if (mounted) {
-        SnackBarHelper.showError(
-          context,
-          message: 'مجوز ثبت نرخ تسعیر ندارید',
-        );
+        SnackBarHelper.showError(context, message: 'مجوز ثبت نرخ تسعیر ندارید');
       }
       return;
     }
@@ -1614,8 +1800,9 @@ class _TransactionDialogState extends State<TransactionDialog> {
 
     if (mounted) setState(() => _fxRateRefreshing = true);
     try {
-      final latest =
-          await _globalFxService.latest(businessId: widget.businessId);
+      final latest = await _globalFxService.latest(
+        businessId: widget.businessId,
+      );
       final globalItems = (latest['items'] as List? ?? const [])
           .map((e) => Map<String, dynamic>.from(e as Map))
           .toList();
@@ -1657,10 +1844,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
       for (final g in globalItems) {
         final cid = (g['business_currency_id'] as num?)?.toInt();
         if (cid == null || !foreignIds.contains(cid)) continue;
-        applyItems.add({
-          'currency_id': cid,
-          'symbol': g['symbol'],
-        });
+        applyItems.add({'currency_id': cid, 'symbol': g['symbol']});
       }
       if (applyItems.isEmpty) {
         if (!mounted) return;
@@ -1702,16 +1886,17 @@ class _TransactionDialogState extends State<TransactionDialog> {
     if (currencyId != null && _currencyById.containsKey(currencyId)) {
       final c = _currencyById[currencyId]!;
       _paymentCurrencyUnit =
-          c['symbol']?.toString() ?? c['code']?.toString() ?? widget.currencyUnit;
+          c['symbol']?.toString() ??
+          c['code']?.toString() ??
+          widget.currencyUnit;
     } else {
       _paymentCurrencyUnit = null;
     }
     if (_isCrossCurrencyPayment) {
       _applyInitialAmountPrefill();
       // ورود به حالت بین‌ارزی یا تغییر ارز حساب → مبلغ پرداخت را از تسویه×نرخ بساز
-      final shouldForce = !wasCross ||
-          prevPay != currencyId ||
-          !_paymentAmountManuallyEdited;
+      final shouldForce =
+          !wasCross || prevPay != currencyId || !_paymentAmountManuallyEdited;
       final enteredCross = !wasCross || prevPay != currencyId;
       if (enteredCross) {
         // نرخ را از دفتر تسعیر بگیر (مگر ویرایش دستی قبلی روی همین تراکنش)
@@ -1790,7 +1975,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Dialog(
       child: Container(
         width: 600,
@@ -1817,7 +2002,9 @@ class _TransactionDialogState extends State<TransactionDialog> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    widget.transaction != null ? 'ویرایش تراکنش' : 'افزودن تراکنش',
+                    widget.transaction != null
+                        ? 'ویرایش تراکنش'
+                        : 'افزودن تراکنش',
                     style: theme.textTheme.titleLarge?.copyWith(
                       color: theme.colorScheme.onPrimary,
                       fontWeight: FontWeight.bold,
@@ -1832,7 +2019,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
                 ],
               ),
             ),
-            
+
             // فرم
             Expanded(
               child: SingleChildScrollView(
@@ -1864,11 +2051,11 @@ class _TransactionDialogState extends State<TransactionDialog> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // فیلدهای خاص بر اساس نوع تراکنش
                       _buildTypeSpecificFields(),
                       const SizedBox(height: 16),
-                      
+
                       // تاریخ تراکنش
                       DateInputField(
                         value: _transactionDate,
@@ -1892,7 +2079,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // مبلغ و کارمزد — در حالت بین‌ارزی مبلغ پرداخت داخل باکس پایین است
                       if (!(_isMultiCurrency && _isCrossCurrencyPayment))
                         Row(
@@ -1903,16 +2090,20 @@ class _TransactionDialogState extends State<TransactionDialog> {
                                 controller: _amountController,
                                 label: 'مبلغ *',
                                 currencyUnit: widget.currencyUnit,
+                                decimalPlaces: _paymentDecimalPlaces,
                                 isRequired: true,
                               ),
                             ),
                             const SizedBox(width: 16),
                             Expanded(
                               child: _TransactionDialogMoneyField(
-                                key: const ValueKey('transaction_commission_field'),
+                                key: const ValueKey(
+                                  'transaction_commission_field',
+                                ),
                                 controller: _commissionController,
                                 label: 'کارمزد',
                                 currencyUnit: widget.currencyUnit,
+                                decimalPlaces: _paymentDecimalPlaces,
                                 isRequired: false,
                               ),
                             ),
@@ -1922,7 +2113,8 @@ class _TransactionDialogState extends State<TransactionDialog> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.35),
+                            color: theme.colorScheme.secondaryContainer
+                                .withValues(alpha: 0.35),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
                               color: theme.colorScheme.outlineVariant,
@@ -1946,10 +2138,13 @@ class _TransactionDialogState extends State<TransactionDialog> {
                               ),
                               const SizedBox(height: 12),
                               _TransactionDialogMoneyField(
-                                key: const ValueKey('transaction_settles_field'),
+                                key: const ValueKey(
+                                  'transaction_settles_field',
+                                ),
                                 controller: _settlesAmountController,
                                 label: 'مبلغ تسویه (ارز فاکتور) *',
                                 currencyUnit: widget.currencyUnit,
+                                decimalPlaces: _invoiceDecimalPlaces,
                                 isRequired: true,
                               ),
                               const SizedBox(height: 12),
@@ -1962,7 +2157,8 @@ class _TransactionDialogState extends State<TransactionDialog> {
                                       ? '$_fxRateHelperText\n$_fxRateSourceHint'
                                       : _fxRateHelperText,
                                   helperMaxLines: 3,
-                                  suffixIcon: (_fxRateLoading || _fxRateRefreshing)
+                                  suffixIcon:
+                                      (_fxRateLoading || _fxRateRefreshing)
                                       ? const Padding(
                                           padding: EdgeInsets.all(12),
                                           child: SizedBox(
@@ -1975,9 +2171,10 @@ class _TransactionDialogState extends State<TransactionDialog> {
                                         )
                                       : null,
                                 ),
-                                keyboardType: const TextInputType.numberWithOptions(
-                                  decimal: true,
-                                ),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
                                 inputFormatters: [
                                   FilteringTextInputFormatter.allow(
                                     RegExp(r'[0-9.,]'),
@@ -1985,7 +2182,10 @@ class _TransactionDialogState extends State<TransactionDialog> {
                                 ],
                                 validator: (v) {
                                   if (!_isCrossCurrencyPayment) return null;
-                                  final t = (v ?? '').trim().replaceAll(',', '');
+                                  final t = (v ?? '').trim().replaceAll(
+                                    ',',
+                                    '',
+                                  );
                                   if (t.isEmpty) return 'نرخ تبدیل الزامی است';
                                   final n = double.tryParse(t);
                                   if (n == null || n <= 0) {
@@ -2000,18 +2200,18 @@ class _TransactionDialogState extends State<TransactionDialog> {
                                 runSpacing: 4,
                                 children: [
                                   OutlinedButton.icon(
-                                    onPressed: (_fxRateLoading ||
-                                            _fxRateRefreshing)
+                                    onPressed:
+                                        (_fxRateLoading || _fxRateRefreshing)
                                         ? null
                                         : () => _loadFxRateFromLedger(
-                                              force: true,
-                                            ),
+                                            force: true,
+                                          ),
                                     icon: const Icon(Icons.history, size: 18),
                                     label: const Text('آخرین تسعیر'),
                                   ),
                                   FilledButton.tonalIcon(
-                                    onPressed: (_fxRateLoading ||
-                                            _fxRateRefreshing)
+                                    onPressed:
+                                        (_fxRateLoading || _fxRateRefreshing)
                                         ? null
                                         : _refreshFxRateFromGlobal,
                                     icon: const Icon(
@@ -2036,7 +2236,8 @@ class _TransactionDialogState extends State<TransactionDialog> {
                                           : 'مبلغ پرداخت (محاسبه‌شده) *',
                                       currencyUnit:
                                           _paymentCurrencyUnit ??
-                                              widget.currencyUnit,
+                                          widget.currencyUnit,
+                                      decimalPlaces: _paymentDecimalPlaces,
                                       isRequired: true,
                                     ),
                                   ),
@@ -2048,17 +2249,20 @@ class _TransactionDialogState extends State<TransactionDialog> {
                                             'بازنشانی مبلغ پرداخت از تسویه × نرخ',
                                         onPressed: () =>
                                             _recalcPaymentAmountFromSettles(
-                                          force: true,
+                                              force: true,
+                                            ),
+                                        icon: const Icon(
+                                          Icons.calculate_outlined,
                                         ),
-                                        icon: const Icon(Icons.calculate_outlined),
                                       ),
                                       if (_paymentAmountManuallyEdited)
                                         Text(
                                           'دستی',
                                           style: theme.textTheme.labelSmall
                                               ?.copyWith(
-                                            color: theme.colorScheme.tertiary,
-                                          ),
+                                                color:
+                                                    theme.colorScheme.tertiary,
+                                              ),
                                         ),
                                     ],
                                   ),
@@ -2069,7 +2273,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
                                 const SizedBox(height: 8),
                                 Text(
                                   'معادل نرخ‌دار: '
-                                  '${formatWithThousands(_expectedPaymentAmount(), decimalPlaces: 0)}'
+                                  '${formatWithThousands(_expectedPaymentAmount(), decimalPlaces: _paymentDecimalPlaces)}'
                                   ' ${_paymentCurrencyUnit ?? ''}',
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: theme.colorScheme.onSurfaceVariant,
@@ -2083,7 +2287,9 @@ class _TransactionDialogState extends State<TransactionDialog> {
                                 ),
                                 controller: _commissionController,
                                 label: 'کارمزد',
-                                currencyUnit: widget.currencyUnit,
+                                currencyUnit:
+                                    _paymentCurrencyUnit ?? widget.currencyUnit,
+                                decimalPlaces: _paymentDecimalPlaces,
                                 isRequired: false,
                               ),
                             ],
@@ -2091,7 +2297,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
                         ),
                       ],
                       const SizedBox(height: 16),
-                      
+
                       // توضیحات
                       TextFormField(
                         controller: _descriptionController,
@@ -2106,7 +2312,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
                 ),
               ),
             ),
-            
+
             // دکمه‌ها
             Container(
               padding: const EdgeInsets.all(16),
@@ -2127,7 +2333,9 @@ class _TransactionDialogState extends State<TransactionDialog> {
                   const SizedBox(width: 8),
                   ElevatedButton(
                     onPressed: _saveTransaction,
-                    child: Text(widget.transaction != null ? 'ذخیره' : 'افزودن'),
+                    child: Text(
+                      widget.transaction != null ? 'ذخیره' : 'افزودن',
+                    ),
                   ),
                 ],
               ),
@@ -2159,7 +2367,9 @@ class _TransactionDialogState extends State<TransactionDialog> {
 
   List<TransactionType> _availableTransactionTypes() {
     // خرج چک فقط برای خرید یا برگشت از فروش نمایش داده شود
-    final showCheckExpense = widget.invoiceType == InvoiceType.purchase || widget.invoiceType == InvoiceType.salesReturn;
+    final showCheckExpense =
+        widget.invoiceType == InvoiceType.purchase ||
+        widget.invoiceType == InvoiceType.salesReturn;
     final all = TransactionType.allTypes;
     if (showCheckExpense) return all;
     return all.where((t) => t != TransactionType.checkExpense).toList();
@@ -2289,34 +2499,36 @@ class _TransactionDialogState extends State<TransactionDialog> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         AccountTreeComboboxWidget(
-      businessId: widget.businessId,
-      selectedAccount: _selectedAccount?.toAccount(),
-      onChanged: (account) {
-        setState(() {
-          // تبدیل Account به AccountTreeNode - فقط id را نگه می‌داریم
-          // برای استفاده کامل، باید از tree اصلی پیدا شود
-          if (account != null) {
-            _selectedAccount = AccountTreeNode(
-              id: account.id!,
-              code: account.code,
-              name: account.name,
-              accountType: account.accountType,
-              parentId: account.parentId,
-            );
-          } else {
-            _selectedAccount = null;
-          }
-          _selectedDetail = null;
-        });
-      },
-      label: 'حساب *',
-      hintText: 'انتخاب حساب',
-      isRequired: true,
+          businessId: widget.businessId,
+          selectedAccount: _selectedAccount?.toAccount(),
+          onChanged: (account) {
+            setState(() {
+              // تبدیل Account به AccountTreeNode - فقط id را نگه می‌داریم
+              // برای استفاده کامل، باید از tree اصلی پیدا شود
+              if (account != null) {
+                _selectedAccount = AccountTreeNode(
+                  id: account.id!,
+                  code: account.code,
+                  name: account.name,
+                  accountType: account.accountType,
+                  parentId: account.parentId,
+                );
+              } else {
+                _selectedAccount = null;
+              }
+              _selectedDetail = null;
+            });
+          },
+          label: 'حساب *',
+          hintText: 'انتخاب حساب',
+          isRequired: true,
         ),
         if (detailType != null && detailIdKey != null) ...[
           const SizedBox(height: 12),
           DetailSelectorWidget(
-            key: ValueKey('invoice-account-detail-${_selectedAccount?.id}-$detailType'),
+            key: ValueKey(
+              'invoice-account-detail-${_selectedAccount?.id}-$detailType',
+            ),
             businessId: widget.businessId,
             selectedAccount: _selectedAccount?.toAccount(),
             detailType: detailType,
@@ -2333,30 +2545,38 @@ class _TransactionDialogState extends State<TransactionDialog> {
   }
 
   String? _detailIdKey(String type) => switch (type) {
-        'person' => 'person_id',
-        'product' => 'product_id',
-        'bank_account' => 'bank_account_id',
-        'cash_register' => 'cash_register_id',
-        'petty_cash' => 'petty_cash_id',
-        'check' => 'check_id',
-        _ => null,
-      };
+    'person' => 'person_id',
+    'product' => 'product_id',
+    'bank_account' => 'bank_account_id',
+    'cash_register' => 'cash_register_id',
+    'petty_cash' => 'petty_cash_id',
+    'check' => 'check_id',
+    _ => null,
+  };
 
   String? _accountDetailType(Account? account) {
     if (account == null) return null;
     if (account.accountType == 'product') return 'product';
     final name = account.name.toLowerCase();
-    if (name.contains('دریافتنی') || name.contains('پرداختنی') ||
-        name.contains('مشتری') || name.contains('تامین')) return 'person';
-    if (name.contains('موجودی') || name.contains('کالا') || name.contains('انبار')) return 'product';
-    if (account.accountType == 'bank' || name.contains('بانک')) return 'bank_account';
-    if (account.accountType == 'cash_register' || name.contains('صندوق')) return 'cash_register';
-    if (account.accountType == 'petty_cash' || name.contains('تنخواه')) return 'petty_cash';
+    if (name.contains('دریافتنی') ||
+        name.contains('پرداختنی') ||
+        name.contains('مشتری') ||
+        name.contains('تامین'))
+      return 'person';
+    if (name.contains('موجودی') ||
+        name.contains('کالا') ||
+        name.contains('انبار'))
+      return 'product';
+    if (account.accountType == 'bank' || name.contains('بانک'))
+      return 'bank_account';
+    if (account.accountType == 'cash_register' || name.contains('صندوق'))
+      return 'cash_register';
+    if (account.accountType == 'petty_cash' || name.contains('تنخواه'))
+      return 'petty_cash';
     if (account.accountType == 'check' || name.contains('چک')) return 'check';
     if (account.accountType == 'person') return 'person';
     return null;
   }
-
 
   Future<void> _saveTransaction() async {
     // قبل از validate: مبلغ پرداخت را از تسویه×نرخ همگام کن تا فیلد خالی نماند
@@ -2364,7 +2584,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
       _recalcPaymentAmountFromSettles(force: true);
     }
     if (!_formKey.currentState!.validate()) return;
-    
+
     // اعتبارسنجی انتخاب فیلدهای خاص هر نوع تراکنش
     switch (_selectedType) {
       case TransactionType.person:
@@ -2380,14 +2600,18 @@ class _TransactionDialogState extends State<TransactionDialog> {
         }
         break;
       case TransactionType.cashRegister:
-        if (_selectedCashRegisterId == null || _selectedCashRegisterId!.isEmpty) {
+        if (_selectedCashRegisterId == null ||
+            _selectedCashRegisterId!.isEmpty) {
           SnackBarHelper.showError(context, message: 'انتخاب صندوق الزامی است');
           return;
         }
         break;
       case TransactionType.pettyCash:
         if (_selectedPettyCashId == null || _selectedPettyCashId!.isEmpty) {
-          SnackBarHelper.showError(context, message: 'انتخاب تنخواه‌گردان الزامی است');
+          SnackBarHelper.showError(
+            context,
+            message: 'انتخاب تنخواه‌گردان الزامی است',
+          );
           return;
         }
         break;
@@ -2406,20 +2630,23 @@ class _TransactionDialogState extends State<TransactionDialog> {
         final detailType = _accountDetailType(_selectedAccount!.toAccount());
         final detailKey = detailType == null ? null : _detailIdKey(detailType);
         if (detailKey != null && _selectedDetail?[detailKey] == null) {
-          SnackBarHelper.showError(context, message: 'انتخاب تفصیل حساب الزامی است');
+          SnackBarHelper.showError(
+            context,
+            message: 'انتخاب تفصیل حساب الزامی است',
+          );
           return;
         }
         break;
     }
-    
+
     final amountRaw = _amountController.text.replaceAll(',', '').trim();
     var amount = amountRaw.isEmpty ? 0.0 : (double.tryParse(amountRaw) ?? 0.0);
     if (amountRaw.isEmpty && !(_isMultiCurrency && _isCrossCurrencyPayment)) {
       SnackBarHelper.showError(context, message: 'مبلغ الزامی است');
       return;
     }
-    final commission = _commissionController.text.isNotEmpty 
-        ? double.parse(_commissionController.text.replaceAll(',', '')) 
+    final commission = _commissionController.text.isNotEmpty
+        ? double.parse(_commissionController.text.replaceAll(',', ''))
         : null;
     // اعتبارسنجی هم‌خوانی ارز با ارز فاکتور
     final invoiceCurrencyId = widget.selectedCurrencyId;
@@ -2431,8 +2658,9 @@ class _TransactionDialogState extends State<TransactionDialog> {
           (b) => b['id']?.toString() == _selectedBankId,
           orElse: () => <String, dynamic>{},
         );
-        accountCurrencyId =
-            int.tryParse('${bank['currency_id'] ?? bank['currencyId'] ?? ''}');
+        accountCurrencyId = int.tryParse(
+          '${bank['currency_id'] ?? bank['currencyId'] ?? ''}',
+        );
         mismatchMsg = 'ارز بانک انتخابی با ارز فاکتور هم‌خوانی ندارد';
       } else if (_selectedType == TransactionType.cashRegister &&
           _selectedCashRegisterId != null) {
@@ -2440,8 +2668,9 @@ class _TransactionDialogState extends State<TransactionDialog> {
           (c) => c['id']?.toString() == _selectedCashRegisterId,
           orElse: () => <String, dynamic>{},
         );
-        accountCurrencyId =
-            int.tryParse('${cr['currency_id'] ?? cr['currencyId'] ?? ''}');
+        accountCurrencyId = int.tryParse(
+          '${cr['currency_id'] ?? cr['currencyId'] ?? ''}',
+        );
         mismatchMsg = 'ارز صندوق انتخابی با ارز فاکتور هم‌خوانی ندارد';
       } else if (_selectedType == TransactionType.pettyCash &&
           _selectedPettyCashId != null) {
@@ -2449,8 +2678,9 @@ class _TransactionDialogState extends State<TransactionDialog> {
           (p) => p['id']?.toString() == _selectedPettyCashId,
           orElse: () => <String, dynamic>{},
         );
-        accountCurrencyId =
-            int.tryParse('${pc['currency_id'] ?? pc['currencyId'] ?? ''}');
+        accountCurrencyId = int.tryParse(
+          '${pc['currency_id'] ?? pc['currencyId'] ?? ''}',
+        );
         mismatchMsg = 'ارز تنخواه‌گردان انتخابی با ارز فاکتور هم‌خوانی ندارد';
       } else if ((_selectedType == TransactionType.check ||
               _selectedType == TransactionType.checkExpense) &&
@@ -2461,11 +2691,15 @@ class _TransactionDialogState extends State<TransactionDialog> {
 
       if (accountCurrencyId != null && accountCurrencyId != invoiceCurrencyId) {
         if (!_isMultiCurrency) {
-          SnackBarHelper.showError(context, message: mismatchMsg ?? 'عدم تطابق ارز');
+          SnackBarHelper.showError(
+            context,
+            message: mismatchMsg ?? 'عدم تطابق ارز',
+          );
           return;
         }
         // بین‌ارزی: نرخ و مبلغ تسویه الزامی است (فرعی↔فرعی با دو نرخ به پایه پشتیبانی می‌شود)
-        if (_fxRateController.text.trim().isEmpty && widget.invoiceFxRate != null) {
+        if (_fxRateController.text.trim().isEmpty &&
+            widget.invoiceFxRate != null) {
           _fxRateController.text = widget.invoiceFxRate.toString();
         }
         _setPaymentCurrency(accountCurrencyId);
@@ -2485,20 +2719,23 @@ class _TransactionDialogState extends State<TransactionDialog> {
     final invCur = widget.selectedCurrencyId;
     final isCross = invCur != null && payCur != null && invCur != payCur;
     // فاکتور ارزی با ارز حساب نامشخص: settles را بفرست تا بک‌اند تبدیل کند
-    final foreignInvoiceNeedsSettles = !isCross &&
+    final foreignInvoiceNeedsSettles =
+        !isCross &&
         invCur != null &&
         _baseCurrencyId != null &&
         invCur != _baseCurrencyId;
 
     if (isCross || foreignInvoiceNeedsSettles) {
       // اگر فیلد تسویه خالی است، مبلغ واردشده را تسویهٔ ارزی فاکتور بگیر
-      var settlesText = _settlesAmountController.text.replaceAll(',', '').trim();
+      var settlesText = _settlesAmountController.text
+          .replaceAll(',', '')
+          .trim();
       if (settlesText.isEmpty) {
         settlesText = amountRaw.isNotEmpty ? amountRaw : '';
         if (settlesText.isNotEmpty) {
           _settlesAmountController.text = formatWithThousands(
             double.tryParse(settlesText) ?? 0,
-            decimalPlaces: 2,
+            decimalPlaces: _invoiceDecimalPlaces,
           );
         }
       }
@@ -2506,7 +2743,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
         settlesText = widget.initialAmount!.toString();
         _settlesAmountController.text = formatWithThousands(
           widget.initialAmount!,
-          decimalPlaces: 2,
+          decimalPlaces: _invoiceDecimalPlaces,
         );
       }
       if (settlesText.isEmpty) {
@@ -2521,7 +2758,8 @@ class _TransactionDialogState extends State<TransactionDialog> {
         SnackBarHelper.showError(context, message: 'مبلغ تسویه نامعتبر است');
         return;
       }
-      if (_fxRateController.text.trim().isEmpty && widget.invoiceFxRate != null) {
+      if (_fxRateController.text.trim().isEmpty &&
+          widget.invoiceFxRate != null) {
         _fxRateController.text = formatFxRateForDisplay(widget.invoiceFxRate);
       }
       final rateText = _fxRateController.text.replaceAll(',', '').trim();
@@ -2531,25 +2769,30 @@ class _TransactionDialogState extends State<TransactionDialog> {
       if (isCross && fxRate != null && fxRate > 0) {
         // اگر مبلغ پرداخت هنوز خالی یا برابر عدد تسویه (بدون تبدیل) است، اصلاح کن
         final expected = _expectedPaymentAmount() ?? (settlesAmount * fxRate);
-        final looksUnconverted = amount > 0 &&
+        final looksUnconverted =
+            amount > 0 &&
             (amount - settlesAmount).abs() < 0.0001 &&
             (expected - amount).abs() > 0.01;
         if (amount <= 0 || looksUnconverted) {
           amount = expected.toDouble();
           _syncingPaymentAmount = true;
-          _amountController.text = formatWithThousands(expected, decimalPlaces: 0);
+          _amountController.text = formatWithThousands(
+            expected,
+            decimalPlaces: _paymentDecimalPlaces,
+          );
           _syncingPaymentAmount = false;
         } else {
-          final fxDiffRatio =
-              expected == 0 ? 0.0 : (expected - amount).abs() / expected;
+          final fxDiffRatio = expected == 0
+              ? 0.0
+              : (expected - amount).abs() / expected;
           if (fxDiffRatio > 0.25) {
             final cont = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
                 title: const Text('اختلاف تسعیر غیرعادی'),
                 content: Text(
-                  'مبلغ پرداخت (${formatWithThousands(amount, decimalPlaces: 0)}) '
-                  'با معادل نرخ‌دار تسویه (${formatWithThousands(expected, decimalPlaces: 0)}) '
+                  'مبلغ پرداخت (${formatWithThousands(amount, decimalPlaces: _paymentDecimalPlaces)}) '
+                  'با معادل نرخ‌دار تسویه (${formatWithThousands(expected, decimalPlaces: _paymentDecimalPlaces)}) '
                   'بیش از ۲۵٪ اختلاف دارد.\n'
                   'آیا عمداً همین مبلغ را ثبت می‌کنید؟',
                 ),
@@ -2579,7 +2822,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
         return;
       }
     }
-    
+
     final transaction = InvoiceTransaction(
       id: widget.transaction?.id ?? _uuid.v4(),
       type: _selectedType,
@@ -2601,7 +2844,8 @@ class _TransactionDialogState extends State<TransactionDialog> {
         final key = type == null ? null : _detailIdKey(type);
         return key == null ? null : _selectedDetail?[key]?.toString();
       })(),
-      detailName: _selectedDetail?['detail_name']?.toString() ??
+      detailName:
+          _selectedDetail?['detail_name']?.toString() ??
           _selectedDetail?['person_name']?.toString() ??
           _selectedDetail?['product_name']?.toString() ??
           _selectedDetail?['bank_account_name']?.toString() ??
@@ -2611,15 +2855,15 @@ class _TransactionDialogState extends State<TransactionDialog> {
       transactionDate: _transactionDate,
       amount: amount,
       commission: commission,
-      description: _descriptionController.text.trim().isEmpty 
-          ? null 
+      description: _descriptionController.text.trim().isEmpty
+          ? null
           : _descriptionController.text.trim(),
       settlesAmount: settlesAmount,
       fxRate: fxRate,
       paymentCurrencyId: isCross ? payCur : null,
       allowLargeFxDiff: allowLargeFxDiff,
     );
-    
+
     widget.onSave(transaction);
     await InvoiceTransactionPreferences.setLastUsedTransactionType(
       widget.businessId,
@@ -2663,7 +2907,6 @@ class _TransactionDialogState extends State<TransactionDialog> {
     );
     return person['alias_name']?.toString() ?? person['name']?.toString();
   }
-
 }
 
 /// فیلد مبلغ/کارمزد با State جدا تا بازسازی فرم دیالوگ فوکوس را نگیرد.
@@ -2671,6 +2914,7 @@ class _TransactionDialogMoneyField extends StatefulWidget {
   final TextEditingController controller;
   final String label;
   final String currencyUnit;
+  final int decimalPlaces;
   final bool isRequired;
 
   const _TransactionDialogMoneyField({
@@ -2678,6 +2922,7 @@ class _TransactionDialogMoneyField extends StatefulWidget {
     required this.controller,
     required this.label,
     required this.currencyUnit,
+    required this.decimalPlaces,
     this.isRequired = true,
   });
 
@@ -2686,7 +2931,8 @@ class _TransactionDialogMoneyField extends StatefulWidget {
       _TransactionDialogMoneyFieldState();
 }
 
-class _TransactionDialogMoneyFieldState extends State<_TransactionDialogMoneyField> {
+class _TransactionDialogMoneyFieldState
+    extends State<_TransactionDialogMoneyField> {
   @override
   Widget build(BuildContext context) {
     return AmountFieldWordsTooltip(
@@ -2699,11 +2945,16 @@ class _TransactionDialogMoneyFieldState extends State<_TransactionDialogMoneyFie
           border: const OutlineInputBorder(),
           suffixText: widget.currencyUnit,
         ),
-        keyboardType: TextInputType.number,
+        keyboardType: TextInputType.numberWithOptions(
+          decimal: widget.decimalPlaces > 0,
+        ),
         inputFormatters: [
           EnglishDigitsFormatter(),
           FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-          ThousandsSeparatorInputFormatter(allowDecimal: false),
+          ThousandsSeparatorInputFormatter(
+            allowDecimal: true,
+            maxDecimalPlaces: widget.decimalPlaces,
+          ),
         ],
         validator: widget.isRequired
             ? (value) {

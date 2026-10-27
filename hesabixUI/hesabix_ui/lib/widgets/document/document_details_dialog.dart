@@ -8,7 +8,8 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/widgets/invoice/invoice_fx_dual_totals_banner.dart';
 import 'package:hesabix_ui/utils/invoice_payable_total.dart';
-import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
+import 'package:hesabix_ui/utils/number_formatters.dart'
+    show formatWithThousands;
 import 'package:hesabix_ui/services/warehouse_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/report_template_service.dart';
@@ -39,17 +40,22 @@ import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/models/account_tree_node.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart'
-    show EnglishDigitsFormatter, ThousandsSeparatorInputFormatter, parseJsonDoubleOrNull;
+    show
+        EnglishDigitsFormatter,
+        ThousandsSeparatorInputFormatter,
+        parseJsonDoubleOrNull;
 import 'package:hesabix_ui/widgets/money/amount_field_words_tooltip.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/services/invoice_service.dart';
 import 'package:hesabix_ui/services/payment_gateway_service.dart';
 import 'package:hesabix_ui/services/business_api_service.dart';
+import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/widgets/invoice/invoice_print_options_bottom_sheet.dart';
 import 'package:hesabix_ui/widgets/invoice/invoice_pdf_print_flow.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
 import 'package:hesabix_ui/utils/invoice_transaction_preferences.dart';
-import 'package:hesabix_ui/models/invoice_transaction.dart' show TransactionType;
+import 'package:hesabix_ui/models/invoice_transaction.dart'
+    show TransactionType;
 import 'package:share_plus/share_plus.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
@@ -121,17 +127,21 @@ class DocumentDetailsDialog extends StatefulWidget {
   State<DocumentDetailsDialog> createState() => _DocumentDetailsDialogState();
 }
 
-class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with SingleTickerProviderStateMixin {
+class _DocumentDetailsDialogState extends State<DocumentDetailsDialog>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late DocumentService _service;
   DocumentModel? _document;
-  Map<String, dynamic>? _rawDocumentData; // داده‌های خام برای دسترسی به product_lines و account_lines
+  Map<String, dynamic>?
+  _rawDocumentData; // داده‌های خام برای دسترسی به product_lines و account_lines
   bool _isLoading = true;
   String? _errorMessage;
   bool _isGeneratingPdf = false;
   final _warehouseService = WarehouseService();
   List<dynamic> _relatedWhDocs = const [];
-  final ReportTemplateService _templateService = ReportTemplateService(ApiClient());
+  final ReportTemplateService _templateService = ReportTemplateService(
+    ApiClient(),
+  );
   List<Map<String, dynamic>> _invoiceTemplates = const [];
   List<Map<String, dynamic>> _invoiceReceiptTemplates = const [];
   bool _loadingInvoiceTemplates = false;
@@ -139,27 +149,32 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   String _invoicePrintOrientation = 'landscape';
   bool _invoicePrintShowStamp = true;
   bool _invoicePrintShowShareQr = false;
+
   /// اگر در تنظیمات چاپ کسب‌وکار برای این نوع سند فعال باشد، سوییچ QR در چاپ نمایش داده می‌شود
   bool _businessPrintAllowsShareQr = false;
   int? _invoicePrintTemplateId;
   Map<String, dynamic>? _invoicePublicShareLink;
   bool _loadingInvoiceShareLink = false;
   bool _revokingInvoiceShareLink = false;
+
   /// مقدار `hours` برای ایجاد لینک: 168، 336، 720 یا null = پیش‌فرض سرور
   int? _invoiceShareExpiryChoiceHours = 168;
-  final TextEditingController _invoiceShareMaxViewsController = TextEditingController();
-  final PaymentGatewayService _paymentGatewayService = PaymentGatewayService(ApiClient());
+  final TextEditingController _invoiceShareMaxViewsController =
+      TextEditingController();
+  final PaymentGatewayService _paymentGatewayService = PaymentGatewayService(
+    ApiClient(),
+  );
   List<Map<String, dynamic>> _invoiceShareGateways = const [];
   bool _loadingInvoiceShareGateways = false;
   bool _invoiceOnlinePayEnabled = false;
   int? _invoiceOnlinePayGatewayId;
   bool _savingInvoiceOnlinePayment = false;
-  
+
   // تراکنش‌های پرداخت
   final _receiptPaymentService = ReceiptPaymentService(ApiClient());
   List<ReceiptPaymentDocument> _paymentDocuments = [];
   bool _loadingPayments = false;
-  
+
   // سرویس ذخیره‌سازی
   late final BusinessStorageService _storageService;
   bool _uploadingFile = false;
@@ -167,8 +182,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
 
   final InvoiceService _invoiceService = InvoiceService();
   final PersonService _personService = PersonService();
+
   /// در صورت موفقیت، جزئیات کامل طرف حساب از API اشخاص (مکمل فیلدهای ناقص سند).
   Person? _counterpartyPerson;
+
   /// فقط وقتی روی فاکتور `extra_info.installment_plan` وجود دارد.
   bool _showInstallmentsTab = false;
   Map<String, dynamic>? _installmentPlanPayload;
@@ -184,23 +201,23 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     _tabController = TabController(length: 3, vsync: this);
     _loadDocument();
   }
-  
+
   Future<void> _attachFile() async {
     if (_document == null) return;
-    
+
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.any,
         withData: true,
       );
-      
+
       if (result == null || result.files.isEmpty) return;
-      
+
       final file = result.files.first;
       if (file.bytes == null) return;
-      
+
       setState(() => _uploadingFile = true);
-      
+
       try {
         await _storageService.uploadFile(
           businessId: _document!.businessId,
@@ -209,9 +226,12 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           moduleContext: 'accounting',
           contextId: _document!.id.toString(),
         );
-        
+
         if (mounted) {
-          SnackBarHelper.showSuccess(context, message: 'فایل با موفقیت الصاق شد');
+          SnackBarHelper.showSuccess(
+            context,
+            message: 'فایل با موفقیت الصاق شد',
+          );
           // رفرش لیست فایل‌ها
           _attachedFilesKey.refresh();
         }
@@ -223,7 +243,8 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         if (mounted) {
           SnackBarHelper.showError(
             context,
-            message: 'خطا در آپلود فایل: ${ErrorExtractor.forContext(e, context)}',
+            message:
+                'خطا در آپلود فایل: ${ErrorExtractor.forContext(e, context)}',
           );
         }
       } finally {
@@ -234,27 +255,27 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(
-        context,
-        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
-      );
+          context,
+          message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+        );
         setState(() => _uploadingFile = false);
       }
     }
   }
-  
+
   Future<void> _handleUploadError(DioException e) async {
     final response = e.response;
     if (response != null && response.data is Map) {
       final data = response.data as Map<String, dynamic>;
       final error = data['error'];
-      
+
       if (error is Map && error['code'] == 'STORAGE_LIMIT_EXCEEDED') {
         // نمایش دیالوگ با جزئیات خطا
         await _showStorageLimitDialog(Map<String, dynamic>.from(error));
         return;
       }
     }
-    
+
     // خطای عمومی
     String errorMessage = 'خطا در آپلود فایل';
     if (response?.data is Map) {
@@ -268,25 +289,29 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         }
       }
     }
-    
+
     SnackBarHelper.showError(context, message: errorMessage);
   }
-  
+
   Future<void> _showStorageLimitDialog(Map<String, dynamic> error) async {
     final totalLimit = (error['total_limit_gb'] as num?)?.toDouble() ?? 0.0;
     final currentUsage = (error['current_usage_gb'] as num?)?.toDouble() ?? 0.0;
     final available = (error['available_gb'] as num?)?.toDouble() ?? 0.0;
     final overUsage = (error['over_usage_gb'] as num?)?.toDouble() ?? 0.0;
     final required = (error['required_gb'] as num?)?.toDouble() ?? 0.0;
-    
+
     final theme = Theme.of(context);
-    
+
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: SemanticColorResolver.warning(context), size: 28),
+            Icon(
+              Icons.warning_amber_rounded,
+              color: SemanticColorResolver.warning(context),
+              size: 28,
+            ),
             const SizedBox(width: 12),
             const Expanded(
               child: Text(
@@ -302,7 +327,8 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                error['message'] as String? ?? 'حجم فایل از محدودیت ذخیره‌سازی تجاوز می‌کند',
+                error['message'] as String? ??
+                    'حجم فایل از محدودیت ذخیره‌سازی تجاوز می‌کند',
                 style: theme.textTheme.bodyLarge,
               ),
               const SizedBox(height: 20),
@@ -315,12 +341,35 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildStorageInfoRow('محدودیت کل:', '${totalLimit.toStringAsFixed(3)} GB', theme),
-                    _buildStorageInfoRow('استفاده شده:', '${currentUsage.toStringAsFixed(3)} GB', theme),
-                    _buildStorageInfoRow('موجود:', '${available.toStringAsFixed(3)} GB', theme),
+                    _buildStorageInfoRow(
+                      'محدودیت کل:',
+                      '${totalLimit.toStringAsFixed(3)} GB',
+                      theme,
+                    ),
+                    _buildStorageInfoRow(
+                      'استفاده شده:',
+                      '${currentUsage.toStringAsFixed(3)} GB',
+                      theme,
+                    ),
+                    _buildStorageInfoRow(
+                      'موجود:',
+                      '${available.toStringAsFixed(3)} GB',
+                      theme,
+                    ),
                     const Divider(height: 24),
-                    _buildStorageInfoRow('حجم مورد نیاز:', '${required.toStringAsFixed(3)} GB', theme, isHighlight: true),
-                    _buildStorageInfoRow('حجم اضافی:', '${overUsage.toStringAsFixed(3)} GB', theme, isHighlight: true, isError: true),
+                    _buildStorageInfoRow(
+                      'حجم مورد نیاز:',
+                      '${required.toStringAsFixed(3)} GB',
+                      theme,
+                      isHighlight: true,
+                    ),
+                    _buildStorageInfoRow(
+                      'حجم اضافی:',
+                      '${overUsage.toStringAsFixed(3)} GB',
+                      theme,
+                      isHighlight: true,
+                      isError: true,
+                    ),
                   ],
                 ),
               ),
@@ -351,8 +400,14 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       ),
     );
   }
-  
-  Widget _buildStorageInfoRow(String label, String value, ThemeData theme, {bool isHighlight = false, bool isError = false}) {
+
+  Widget _buildStorageInfoRow(
+    String label,
+    String value,
+    ThemeData theme, {
+    bool isHighlight = false,
+    bool isError = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -368,11 +423,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             value,
             style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal,
-              color: isError 
-                  ? SemanticColorResolver.negative(context) 
-                  : isHighlight 
-                      ? theme.colorScheme.primary 
-                      : theme.colorScheme.onSurface,
+              color: isError
+                  ? SemanticColorResolver.negative(context)
+                  : isHighlight
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurface,
             ),
           ),
         ],
@@ -383,7 +438,8 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   Future<void> _loadInvoicePrintStampDefault(DocumentModel doc) async {
     try {
       final data = await BusinessApiService.getPrintSettings(doc.businessId);
-      final defaultSettings = (data['default'] as Map?)?.cast<String, dynamic>();
+      final defaultSettings = (data['default'] as Map?)
+          ?.cast<String, dynamic>();
       final perType = (data['per_type'] as Map?)?.cast<String, dynamic>();
       Map<String, dynamic>? target = perType?[doc.documentType];
       target ??= defaultSettings;
@@ -481,7 +537,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   Future<void> _loadInvoiceShareGateways(int businessId) async {
     setState(() => _loadingInvoiceShareGateways = true);
     try {
-      final list = await _paymentGatewayService.listBusinessGateways(businessId);
+      final list = await _paymentGatewayService.listBusinessGateways(
+        businessId,
+      );
       if (!mounted) return;
       setState(() {
         _invoiceShareGateways = list;
@@ -508,13 +566,17 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         if (!mounted) return;
         SnackBarHelper.showError(
           context,
-          message: 'برای این کسب‌وکار درگاه پرداخت فعالی وجود ندارد. از مسیر کیف‌پول یا مدیر سیستم درگاه اضافه کنید.',
+          message:
+              'برای این کسب‌وکار درگاه پرداخت فعالی وجود ندارد. از مسیر کیف‌پول یا مدیر سیستم درگاه اضافه کنید.',
         );
         return;
       }
       if (_invoiceOnlinePayGatewayId == null) {
         if (!mounted) return;
-        SnackBarHelper.showError(context, message: 'انتخاب درگاه پرداخت الزامی است.');
+        SnackBarHelper.showError(
+          context,
+          message: 'انتخاب درگاه پرداخت الزامی است.',
+        );
         return;
       }
     }
@@ -523,7 +585,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     try {
       final patch = <String, dynamic>{
         'online_payment_enabled': _invoiceOnlinePayEnabled,
-        'online_payment_gateway_id': _invoiceOnlinePayEnabled ? _invoiceOnlinePayGatewayId : null,
+        'online_payment_gateway_id': _invoiceOnlinePayEnabled
+            ? _invoiceOnlinePayGatewayId
+            : null,
       };
       final updated = await _invoiceService.patchInvoiceShareLinkPayment(
         businessId: d.businessId,
@@ -536,7 +600,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         _savingInvoiceOnlinePayment = false;
         _applyInvoiceShareOnlinePaymentFromLink(updated);
       });
-      SnackBarHelper.showSuccess(context, message: 'تنظیمات پرداخت آنلاین ذخیره شد');
+      SnackBarHelper.showSuccess(
+        context,
+        message: 'تنظیمات پرداخت آنلاین ذخیره شد',
+      );
     } catch (e) {
       if (mounted) {
         setState(() => _savingInvoiceOnlinePayment = false);
@@ -572,7 +639,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
               expiresInHours: _invoiceShareExpiryChoiceHours,
               maxViewCount: maxV,
               onlinePaymentEnabled: _invoiceOnlinePayEnabled,
-              onlinePaymentGatewayId: _invoiceOnlinePayEnabled ? _invoiceOnlinePayGatewayId : null,
+              onlinePaymentGatewayId: _invoiceOnlinePayEnabled
+                  ? _invoiceOnlinePayGatewayId
+                  : null,
             )
           : await _invoiceService.createInvoiceShareLink(
               businessId: d.businessId,
@@ -585,13 +654,17 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         _invoicePublicShareLink = created;
         _applyInvoiceShareOnlinePaymentFromLink(created);
       });
-      SnackBarHelper.showSuccess(context, message: 'لینک نمایش عمومی فاکتور ایجاد شد');
+      SnackBarHelper.showSuccess(
+        context,
+        message: 'لینک نمایش عمومی فاکتور ایجاد شد',
+      );
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(
-        context,
-        message: 'خطا در ایجاد لینک: ${ErrorExtractor.forContext(e, context)}',
-      );
+          context,
+          message:
+              'خطا در ایجاد لینک: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -617,9 +690,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       if (mounted) {
         setState(() => _revokingInvoiceShareLink = false);
         SnackBarHelper.showError(
-        context,
-        message: 'خطا در لغو لینک: ${ErrorExtractor.forContext(e, context)}',
-      );
+          context,
+          message: 'خطا در لغو لینک: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -630,7 +703,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     await Clipboard.setData(ClipboardData(text: u));
     await Share.share(u);
     if (!mounted) return;
-    SnackBarHelper.showSuccess(context, message: 'لینک کپی و آمادهٔ اشتراک‌گذاری است');
+    SnackBarHelper.showSuccess(
+      context,
+      message: 'لینک کپی و آمادهٔ اشتراک‌گذاری است',
+    );
   }
 
   Future<void> _onInvoicePrintPdfTapped() async {
@@ -711,13 +787,16 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       // دریافت داده‌های خام برای دسترسی به product_lines و account_lines
       final api = ApiClient();
       Map<String, dynamic>? rawData;
-      
+
       // برای فاکتورها از endpoint مخصوص فاکتور استفاده کن که product_lines را برمی‌گرداند
       if (doc.documentType.startsWith('invoice')) {
         try {
-          final invoiceResponse = await api.get('/invoices/business/${doc.businessId}/${widget.documentId}');
+          final invoiceResponse = await api.get(
+            '/invoices/business/${doc.businessId}/${widget.documentId}',
+          );
           if (invoiceResponse.data['success'] == true) {
-            final item = invoiceResponse.data['data']?['item'] as Map<String, dynamic>?;
+            final item =
+                invoiceResponse.data['data']?['item'] as Map<String, dynamic>?;
             if (item != null) {
               rawData = item;
             }
@@ -744,7 +823,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         mergedExtra = doc.extraInfo;
       }
       final hasInstallmentPlan =
-          isInvoice && mergedExtra != null && mergedExtra['installment_plan'] is Map<String, dynamic>;
+          isInvoice &&
+          mergedExtra != null &&
+          mergedExtra['installment_plan'] is Map<String, dynamic>;
 
       if (mounted) {
         setState(() {
@@ -797,14 +878,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           });
         }
       } catch (_) {}
-      
+
       // بارگذاری تراکنش‌های پرداخت برای فاکتورها
       // extra_info از endpoint فاکتور مرجع قطعی است (شامل links.receipt_payment_document_ids)
       if (doc.documentType.startsWith('invoice')) {
-        await _loadPaymentDocuments(
-          doc,
-          extraInfoOverride: mergedExtra,
-        );
+        await _loadPaymentDocuments(doc, extraInfoOverride: mergedExtra);
         await _loadCounterpartyPersonDetails(doc);
       }
     } catch (e) {
@@ -895,11 +973,12 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     try {
       final links = effectiveExtra['links'];
       final invoiceLinks = links is Map<String, dynamic> ? links : null;
-      final documents = await _receiptPaymentService.listPaymentDocumentsForInvoice(
-        businessId: doc.businessId,
-        invoiceId: doc.id,
-        invoiceLinks: invoiceLinks,
-      );
+      final documents = await _receiptPaymentService
+          .listPaymentDocumentsForInvoice(
+            businessId: doc.businessId,
+            invoiceId: doc.id,
+            invoiceLinks: invoiceLinks,
+          );
 
       if (mounted) {
         setState(() {
@@ -945,8 +1024,12 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           final mq = MediaQuery.sizeOf(context);
           final boxConstraints = isMobile
               ? BoxConstraints(
-                  maxWidth: constraints.maxWidth.isFinite ? constraints.maxWidth : mq.width,
-                  maxHeight: constraints.maxHeight.isFinite ? constraints.maxHeight : mq.height,
+                  maxWidth: constraints.maxWidth.isFinite
+                      ? constraints.maxWidth
+                      : mq.width,
+                  maxHeight: constraints.maxHeight.isFinite
+                      ? constraints.maxHeight
+                      : mq.height,
                 )
               : const BoxConstraints(maxWidth: 1100, maxHeight: 820);
           return ConstrainedBox(
@@ -963,25 +1046,28 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                   child: _isLoading
                       ? const Center(child: CircularProgressIndicator())
                       : _errorMessage != null
-                          ? _buildError()
-                          : TabBarView(
-                              controller: _tabController,
-                              children: _document != null && _document!.documentType.startsWith('invoice')
-                                  ? [
-                                      _buildInfoTab(context, theme),
-                                      _buildProductsTab(context, theme),
-                                      _buildAccountsTab(context, theme),
-                                      _buildTransactionsTab(context, theme),
-                                      if (_showInstallmentsTab) _buildInstallmentsTab(theme, t),
-                                      _buildInvoiceShareTab(context, theme),
-                                      _buildAttachmentsTab(context, theme),
-                                    ]
-                                  : [
-                                      _buildInfoTab(context, theme),
-                                      _buildAccountsTab(context, theme),
-                                      _buildAttachmentsTab(context, theme),
-                                    ],
-                            ),
+                      ? _buildError()
+                      : TabBarView(
+                          controller: _tabController,
+                          children:
+                              _document != null &&
+                                  _document!.documentType.startsWith('invoice')
+                              ? [
+                                  _buildInfoTab(context, theme),
+                                  _buildProductsTab(context, theme),
+                                  _buildAccountsTab(context, theme),
+                                  _buildTransactionsTab(context, theme),
+                                  if (_showInstallmentsTab)
+                                    _buildInstallmentsTab(theme, t),
+                                  _buildInvoiceShareTab(context, theme),
+                                  _buildAttachmentsTab(context, theme),
+                                ]
+                              : [
+                                  _buildInfoTab(context, theme),
+                                  _buildAccountsTab(context, theme),
+                                  _buildAttachmentsTab(context, theme),
+                                ],
+                        ),
                 ),
                 _buildFooter(dense: isMobile),
               ],
@@ -992,25 +1078,42 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     );
   }
 
-  Tab _detailTab({required bool compact, required IconData icon, required String label}) {
+  Tab _detailTab({
+    required bool compact,
+    required IconData icon,
+    required String label,
+  }) {
     if (compact) {
       return Tab(
         height: 44,
-        child: Tooltip(
-          message: label,
-          child: Icon(icon, size: 22),
-        ),
+        child: Tooltip(message: label, child: Icon(icon, size: 22)),
       );
     }
     return Tab(icon: Icon(icon), text: label);
   }
 
-  Widget _buildDocumentTabBar(ThemeData theme, AppLocalizations t, {required bool compact}) {
+  Widget _buildDocumentTabBar(
+    ThemeData theme,
+    AppLocalizations t, {
+    required bool compact,
+  }) {
     final tabs = <Tab>[
-      _detailTab(compact: compact, icon: Icons.info_outline, label: 'اطلاعات سند'),
+      _detailTab(
+        compact: compact,
+        icon: Icons.info_outline,
+        label: 'اطلاعات سند',
+      ),
       if (_document != null && _document!.documentType.startsWith('invoice'))
-        _detailTab(compact: compact, icon: Icons.shopping_cart, label: 'کالاها'),
-      _detailTab(compact: compact, icon: Icons.account_balance, label: 'حساب‌ها'),
+        _detailTab(
+          compact: compact,
+          icon: Icons.shopping_cart,
+          label: 'کالاها',
+        ),
+      _detailTab(
+        compact: compact,
+        icon: Icons.account_balance,
+        label: 'حساب‌ها',
+      ),
       if (_document != null && _document!.documentType.startsWith('invoice'))
         _detailTab(compact: compact, icon: Icons.payment, label: 'تراکنش‌ها'),
       if (_document != null &&
@@ -1051,28 +1154,28 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   Widget _buildHeader(ThemeData theme, {bool dense = false}) {
     final formatter = NumberFormat('#,##0');
     final isInvoice = _document?.documentType.startsWith('invoice') ?? false;
-    final balance = (_document?.totalCredit ?? 0) - (_document?.totalDebit ?? 0);
+    final balance =
+        (_document?.totalCredit ?? 0) - (_document?.totalDebit ?? 0);
     final balanceColor = balance > 0
         ? SemanticColorResolver.positive(context)
         : balance < 0
-            ? SemanticColorResolver.negative(context)
-            : theme.colorScheme.onSurfaceVariant;
+        ? SemanticColorResolver.negative(context)
+        : theme.colorScheme.onSurfaceVariant;
 
     // رنگ نشانگر «پیش‌نویس / قطعی» در چیپ وضعیت (مستقل از تراز سند)
     Color documentStatusChipColor(ThemeData t) {
       final doc = _document;
       if (doc == null) return t.colorScheme.onSurfaceVariant;
       return doc.isProforma
-          ? (t.brightness == Brightness.dark ? Colors.amberAccent : Colors.deepOrange.shade700)
+          ? (t.brightness == Brightness.dark
+                ? Colors.amberAccent
+                : Colors.deepOrange.shade700)
           : SemanticColorResolver.positive(context);
     }
 
     final headerChips = <Widget>[
       if (_document != null)
-        _buildHeaderChip(
-          _document!.getDocumentTypeName(),
-          theme,
-        ),
+        _buildHeaderChip(_document!.getDocumentTypeName(), theme),
       if (_document?.documentDateDisplay != null)
         _buildHeaderChip(
           'تاریخ: ${_document!.documentDateDisplay}',
@@ -1124,20 +1227,17 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         ),
       );
     } else {
-      chipsArea = Wrap(
-        spacing: 12,
-        runSpacing: 4,
-        children: headerChips,
-      );
+      chipsArea = Wrap(spacing: 12, runSpacing: 4, children: headerChips);
     }
 
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: dense ? 8 : 24, vertical: dense ? 8 : 16),
+      padding: EdgeInsets.symmetric(
+        horizontal: dense ? 8 : 24,
+        vertical: dense ? 8 : 16,
+      ),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest,
-        border: Border(
-          bottom: BorderSide(color: theme.dividerColor),
-        ),
+        border: Border(bottom: BorderSide(color: theme.dividerColor)),
       ),
       child: Row(
         children: [
@@ -1145,7 +1245,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             radius: dense ? 20 : 24,
             backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
             child: Text(
-              (_document?.code ?? '?').isNotEmpty ? (_document?.code ?? '?')[0] : '?',
+              (_document?.code ?? '?').isNotEmpty
+                  ? (_document?.code ?? '?')[0]
+                  : '?',
               style: theme.textTheme.titleMedium?.copyWith(
                 color: theme.colorScheme.primary,
                 fontSize: dense ? 14 : null,
@@ -1178,7 +1280,12 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     );
   }
 
-  Widget _buildHeaderChip(String text, ThemeData theme, {IconData? icon, Color? iconColor}) {
+  Widget _buildHeaderChip(
+    String text,
+    ThemeData theme, {
+    IconData? icon,
+    Color? iconColor,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
@@ -1190,13 +1297,14 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 16, color: iconColor ?? theme.colorScheme.onSurfaceVariant),
+            Icon(
+              icon,
+              size: 16,
+              color: iconColor ?? theme.colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(width: 6),
           ],
-          Text(
-            text,
-            style: theme.textTheme.bodySmall,
-          ),
+          Text(text, style: theme.textTheme.bodySmall),
         ],
       ),
     );
@@ -1208,7 +1316,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline, size: 64, color: SemanticColorResolver.negative(context)),
+          Icon(
+            Icons.error_outline,
+            size: 64,
+            color: SemanticColorResolver.negative(context),
+          ),
           const SizedBox(height: 16),
           Text(
             'خطا در بارگذاری سند',
@@ -1231,7 +1343,12 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     );
   }
 
-  Widget _invoiceShareStatChip(ThemeData theme, String label, String value, Color color) {
+  Widget _invoiceShareStatChip(
+    ThemeData theme,
+    String label,
+    String value,
+    Color color,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
@@ -1243,10 +1360,18 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
           Text(
             value,
-            style: theme.textTheme.titleSmall?.copyWith(color: color, fontWeight: FontWeight.w700),
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),
@@ -1267,7 +1392,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         padding: const EdgeInsets.only(top: 8),
         child: Text(
           'پرداخت آنلاین از لینک پس از قطعی شدن فاکتور فعال می‌شود.',
-          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.outline,
+          ),
         ),
       );
     }
@@ -1277,9 +1404,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         .whereType<int>()
         .toSet();
     final dropdownValue =
-        _invoiceOnlinePayGatewayId != null && gatewayIds.contains(_invoiceOnlinePayGatewayId)
-            ? _invoiceOnlinePayGatewayId
-            : null;
+        _invoiceOnlinePayGatewayId != null &&
+            gatewayIds.contains(_invoiceOnlinePayGatewayId)
+        ? _invoiceOnlinePayGatewayId
+        : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1287,13 +1415,17 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         const Divider(height: 28),
         Text(
           'پرداخت آنلاین (صفحهٔ عمومی فاکتور)',
-          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
         ),
         const SizedBox(height: 8),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('امکان پرداخت آنلاین برای مشتری'),
-          subtitle: const Text('مشتری از صفحهٔ عمومی به درگاه پرداخت کسب‌وکار هدایت می‌شود.'),
+          subtitle: const Text(
+            'مشتری از صفحهٔ عمومی به درگاه پرداخت کسب‌وکار هدایت می‌شود.',
+          ),
           value: _invoiceOnlinePayEnabled,
           onChanged: canEdit && !_savingInvoiceOnlinePayment
               ? (v) {
@@ -1314,7 +1446,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         else if (_invoiceShareGateways.isEmpty)
           Text(
             'درگاه پرداختی برای این کسب‌وکار تعریف نشده است.',
-            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.error,
+            ),
           )
         else ...[
           const SizedBox(height: 4),
@@ -1335,7 +1469,8 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                   ),
                 ),
             ],
-            onChanged: canEdit &&
+            onChanged:
+                canEdit &&
                     !_savingInvoiceOnlinePayment &&
                     _invoiceOnlinePayEnabled &&
                     !_loadingInvoiceShareGateways
@@ -1346,11 +1481,21 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         if (showSaveButton) ...[
           const SizedBox(height: 12),
           FilledButton.tonalIcon(
-            onPressed: canEdit && !_savingInvoiceOnlinePayment ? _saveInvoiceOnlinePaymentSettings : null,
+            onPressed: canEdit && !_savingInvoiceOnlinePayment
+                ? _saveInvoiceOnlinePaymentSettings
+                : null,
             icon: _savingInvoiceOnlinePayment
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : const Icon(Icons.save_outlined),
-            label: Text(_savingInvoiceOnlinePayment ? 'در حال ذخیره…' : 'ذخیره تنظیمات پرداخت'),
+            label: Text(
+              _savingInvoiceOnlinePayment
+                  ? 'در حال ذخیره…'
+                  : 'ذخیره تنظیمات پرداخت',
+            ),
           ),
         ],
       ],
@@ -1358,7 +1503,8 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   }
 
   Widget _buildInvoiceShareTab(BuildContext context, ThemeData theme) {
-    final canEditInvoices = ApiClient.getAuthStore()?.canWriteSection('invoices') ?? false;
+    final canEditInvoices =
+        ApiClient.getAuthStore()?.canWriteSection('invoices') ?? false;
     final cardPad = _documentDetailsCardInnerPadding(context);
     final isJalali = widget.calendarController.isJalali;
     if (_loadingInvoiceShareLink) {
@@ -1457,10 +1603,30 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                       spacing: 10,
                       runSpacing: 10,
                       children: [
-                        _invoiceShareStatChip(theme, 'وضعیت', status, statusColor),
-                        _invoiceShareStatChip(theme, 'انقضا', expiryText, theme.colorScheme.onSurface),
-                        _invoiceShareStatChip(theme, 'بازدید', viewCount, theme.colorScheme.primary),
-                        _invoiceShareStatChip(theme, 'آخرین بازدید', lastViewText, theme.colorScheme.onSurface),
+                        _invoiceShareStatChip(
+                          theme,
+                          'وضعیت',
+                          status,
+                          statusColor,
+                        ),
+                        _invoiceShareStatChip(
+                          theme,
+                          'انقضا',
+                          expiryText,
+                          theme.colorScheme.onSurface,
+                        ),
+                        _invoiceShareStatChip(
+                          theme,
+                          'بازدید',
+                          viewCount,
+                          theme.colorScheme.primary,
+                        ),
+                        _invoiceShareStatChip(
+                          theme,
+                          'آخرین بازدید',
+                          lastViewText,
+                          theme.colorScheme.onSurface,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -1474,20 +1640,41 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                           label: const Text('کپی و اشتراک'),
                         ),
                         OutlinedButton.icon(
-                          onPressed: canEditInvoices && !_revokingInvoiceShareLink ? _revokeInvoicePublicShareLink : null,
+                          onPressed:
+                              canEditInvoices && !_revokingInvoiceShareLink
+                              ? _revokeInvoicePublicShareLink
+                              : null,
                           icon: _revokingInvoiceShareLink
-                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
                               : const Icon(Icons.link_off),
-                          label: Text(_revokingInvoiceShareLink ? 'در حال لغو…' : 'لغو لینک'),
+                          label: Text(
+                            _revokingInvoiceShareLink
+                                ? 'در حال لغو…'
+                                : 'لغو لینک',
+                          ),
                         ),
                         TextButton.icon(
-                          onPressed: _loadingInvoiceShareLink ? null : () => _document != null ? _loadInvoiceShareLinkInfo(_document!) : null,
+                          onPressed: _loadingInvoiceShareLink
+                              ? null
+                              : () => _document != null
+                                    ? _loadInvoiceShareLinkInfo(_document!)
+                                    : null,
                           icon: const Icon(Icons.refresh),
                           label: const Text('بروزرسانی وضعیت'),
                         ),
                       ],
                     ),
-                    _invoiceOnlinePaymentSection(theme, canEditInvoices, showSaveButton: true),
+                    _invoiceOnlinePaymentSection(
+                      theme,
+                      canEditInvoices,
+                      showSaveButton: true,
+                    ),
                   ],
                 ),
               ),
@@ -1516,7 +1703,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                   const SizedBox(height: 8),
                   Text(
                     'با این لینک، بدون ورود به حساب، نسخهٔ ثبت‌شدهٔ این فاکتور قابل مشاهده است. در صورت وجود لینک فعال، ابتدا لغو و لینک تازه ایجاد می‌شود.',
-                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<int?>(
@@ -1535,7 +1724,8 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                         )
                         .toList(),
                     onChanged: canEditInvoices
-                        ? (v) => setState(() => _invoiceShareExpiryChoiceHours = v)
+                        ? (v) =>
+                              setState(() => _invoiceShareExpiryChoiceHours = v)
                         : null,
                   ),
                   const SizedBox(height: 12),
@@ -1550,12 +1740,20 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                     keyboardType: TextInputType.number,
                     enabled: canEditInvoices,
                   ),
-                  _invoiceOnlinePaymentSection(theme, canEditInvoices, showSaveButton: false),
+                  _invoiceOnlinePaymentSection(
+                    theme,
+                    canEditInvoices,
+                    showSaveButton: false,
+                  ),
                   const SizedBox(height: 16),
                   FilledButton.icon(
-                    onPressed: canEditInvoices ? _createOrRefreshInvoicePublicLink : null,
+                    onPressed: canEditInvoices
+                        ? _createOrRefreshInvoicePublicLink
+                        : null,
                     icon: const Icon(Icons.add_link),
-                    label: Text(link == null ? 'ایجاد لینک' : 'ایجاد لینک جدید'),
+                    label: Text(
+                      link == null ? 'ایجاد لینک' : 'ایجاد لینک جدید',
+                    ),
                   ),
                 ],
               ),
@@ -1564,7 +1762,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           const SizedBox(height: 12),
           Text(
             'آدرس کوتاه مشابه کارت حساب اشخاص است: دامنهٔ شما /i/کد — پس از باز کردن، به صفحهٔ عمومی فاکتور هدایت می‌شوید.',
-            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -1578,11 +1778,18 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline, color: SemanticColorResolver.negative(context), size: 48),
+            Icon(
+              Icons.error_outline,
+              color: SemanticColorResolver.negative(context),
+              size: 48,
+            ),
             const SizedBox(height: 12),
             Text(_errorMessage!),
             const SizedBox(height: 12),
-            FilledButton(onPressed: _loadDocument, child: const Text('تلاش مجدد')),
+            FilledButton(
+              onPressed: _loadDocument,
+              child: const Text('تلاش مجدد'),
+            ),
           ],
         ),
       );
@@ -1607,9 +1814,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             SizedBox(height: _documentDetailsSectionGap(context)),
           ],
           // نمایش سود (فقط برای فاکتورهای فروش و تولید)
-          if (isInvoice && (document.documentType == 'invoice_sales' || 
-              document.documentType == 'invoice_sales_return' || 
-              document.documentType == 'invoice_production')) ...[
+          if (isInvoice &&
+              (document.documentType == 'invoice_sales' ||
+                  document.documentType == 'invoice_sales_return' ||
+                  document.documentType == 'invoice_production')) ...[
             _buildProfitSection(theme),
             SizedBox(height: _documentDetailsSectionGap(context)),
           ],
@@ -1622,14 +1830,21 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             _InfoRow('ارز', document.currencyCode ?? '-'),
             _InfoRow('وضعیت', document.statusText),
             _InfoRow('ایجادکننده', document.createdByName ?? '-'),
-            if (document.description != null && document.description!.isNotEmpty)
+            if (document.description != null &&
+                document.description!.isNotEmpty)
               _InfoRow('توضیحات', document.description!),
           ]),
           if (isInvoice) ...[
             SizedBox(height: _documentDetailsSectionGap(context)),
             _buildCounterpartyInfoCard(theme, document),
           ],
-          if (_relatedWhDocs.isNotEmpty) ..._buildRelatedWarehouseDocumentsSection(context, theme, t, document),
+          if (_relatedWhDocs.isNotEmpty)
+            ..._buildRelatedWarehouseDocumentsSection(
+              context,
+              theme,
+              t,
+              document,
+            ),
         ],
       ),
     );
@@ -1642,7 +1857,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     if (s.isEmpty) return '-';
     try {
       final d = DateTime.parse(s.split('T').first);
-      return HesabixDateUtils.formatForDisplay(d, widget.calendarController.isJalali == true);
+      return HesabixDateUtils.formatForDisplay(
+        d,
+        widget.calendarController.isJalali == true,
+      );
     } catch (_) {
       return s;
     }
@@ -1651,7 +1869,14 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   /// ترتیب نمایش گروه‌ها در لیست حواله‌های مرتبط (ورود، خروج، …).
   int _warehouseDocTypeSortOrder(String? type) {
     if (type == null || type.isEmpty) return 100;
-    const order = ['receipt', 'issue', 'transfer', 'adjustment', 'production_in', 'production_out'];
+    const order = [
+      'receipt',
+      'issue',
+      'transfer',
+      'adjustment',
+      'production_in',
+      'production_out',
+    ];
     final i = order.indexOf(type);
     return i >= 0 ? i : 99;
   }
@@ -1719,7 +1944,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     }
   }
 
-  void _openRelatedWarehouseDocument(BuildContext context, DocumentModel document, int docId) {
+  void _openRelatedWarehouseDocument(
+    BuildContext context,
+    DocumentModel document,
+    int docId,
+  ) {
     showDialog<void>(
       context: context,
       builder: (_) => WarehouseDocumentDetailsDialog(
@@ -1741,7 +1970,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     sorted.sort((a, b) {
       final ta = a['doc_type'] as String?;
       final tb = b['doc_type'] as String?;
-      final c = _warehouseDocTypeSortOrder(ta).compareTo(_warehouseDocTypeSortOrder(tb));
+      final c = _warehouseDocTypeSortOrder(
+        ta,
+      ).compareTo(_warehouseDocTypeSortOrder(tb));
       if (c != 0) return c;
       final da = a['document_date']?.toString() ?? '';
       final db = b['document_date']?.toString() ?? '';
@@ -1753,7 +1984,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       groups.putIfAbsent(key, () => []).add(it);
     }
     final keys = groups.keys.toList()
-      ..sort((a, b) => _warehouseDocTypeSortOrder(a.isEmpty ? null : a).compareTo(_warehouseDocTypeSortOrder(b.isEmpty ? null : b)));
+      ..sort(
+        (a, b) => _warehouseDocTypeSortOrder(
+          a.isEmpty ? null : a,
+        ).compareTo(_warehouseDocTypeSortOrder(b.isEmpty ? null : b)),
+      );
 
     final children = <Widget>[];
     for (var gi = 0; gi < keys.length; gi++) {
@@ -1761,16 +1996,24 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       final items = groups[key]!;
       final typeForLabel = key.isEmpty ? null : key;
       if (gi > 0) {
-        children.add(Divider(height: 1, color: theme.dividerColor.withValues(alpha: 0.5)));
+        children.add(
+          Divider(height: 1, color: theme.dividerColor.withValues(alpha: 0.5)),
+        );
       }
       children.add(
         Material(
-          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.35,
+          ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
               children: [
-                Icon(_warehouseDocTypeIcon(typeForLabel), size: 20, color: theme.colorScheme.primary),
+                Icon(
+                  _warehouseDocTypeIcon(typeForLabel),
+                  size: 20,
+                  color: theme.colorScheme.primary,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -1783,7 +2026,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                 ),
                 Text(
                   '${items.length}',
-                  style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -1802,7 +2047,8 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         final docId = it['id'] as int;
         children.add(
           InkWell(
-            onTap: () => _openRelatedWarehouseDocument(context, document, docId),
+            onTap: () =>
+                _openRelatedWarehouseDocument(context, document, docId),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
               child: Row(
@@ -1816,7 +2062,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                         const SizedBox(height: 2),
                         Text(
                           '${t.warehouseDocumentDate}: ${_formatRelatedWarehouseDocumentDate(it['document_date'])}',
-                          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ],
                     ),
@@ -1832,10 +2080,18 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                         ),
                       ),
                       padding: EdgeInsets.zero,
-                      labelPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                      labelPadding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 0,
+                      ),
                       visualDensity: VisualDensity.compact,
-                      backgroundColor: Color.alphaBlend(statusColor.withValues(alpha: 0.14), theme.colorScheme.surface),
-                      side: BorderSide(color: statusColor.withValues(alpha: 0.35)),
+                      backgroundColor: Color.alphaBlend(
+                        statusColor.withValues(alpha: 0.14),
+                        theme.colorScheme.surface,
+                      ),
+                      side: BorderSide(
+                        color: statusColor.withValues(alpha: 0.35),
+                      ),
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
                   ),
@@ -1849,13 +2105,18 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                             docId: it['id'],
                           );
                           if (!context.mounted) return;
-                          SnackBarHelper.show(context, message: t.warehouseDocumentPostSuccess);
+                          SnackBarHelper.show(
+                            context,
+                            message: t.warehouseDocumentPostSuccess,
+                          );
                           _loadDocument();
                         } catch (e) {
                           if (!context.mounted) return;
                           SnackBarHelper.show(
                             context,
-                            message: t.warehouseDocumentPostFailed(ErrorExtractor.forContext(e, context)),
+                            message: t.warehouseDocumentPostFailed(
+                              ErrorExtractor.forContext(e, context),
+                            ),
                           );
                         }
                       },
@@ -1863,7 +2124,8 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                     ),
                   IconButton(
                     icon: const Icon(Icons.visibility),
-                    onPressed: () => _openRelatedWarehouseDocument(context, document, docId),
+                    onPressed: () =>
+                        _openRelatedWarehouseDocument(context, document, docId),
                     tooltip: t.viewWarehouseDocument,
                   ),
                 ],
@@ -1945,7 +2207,8 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   }
 
   void _openPersonKardex(DocumentModel document) {
-    final id = _counterpartyPerson?.id ?? _resolvedCounterpartyPersonId(document);
+    final id =
+        _counterpartyPerson?.id ?? _resolvedCounterpartyPersonId(document);
     if (id == null) return;
     final bid = document.businessId;
     Navigator.of(context).pop();
@@ -1990,9 +2253,12 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
 
     void mergeExtra(Map<String, dynamic>? m) {
       if (m == null) return;
-      personNationalId ??= pickStr(m['national_id']) ?? pickStr(m['person_national_id']);
-      personCompanyName ??= pickStr(m['company_name']) ?? pickStr(m['person_company_name']);
-      personAliasName ??= pickStr(m['alias_name']) ?? pickStr(m['person_alias_name']);
+      personNationalId ??=
+          pickStr(m['national_id']) ?? pickStr(m['person_national_id']);
+      personCompanyName ??=
+          pickStr(m['company_name']) ?? pickStr(m['person_company_name']);
+      personAliasName ??=
+          pickStr(m['alias_name']) ?? pickStr(m['person_alias_name']);
       personPhone ??= pickStr(m['phone']) ?? pickStr(m['person_phone']);
       personAddress ??= pickStr(m['address']) ?? pickStr(m['person_address']);
       personProvince ??= pickStr(m['province']);
@@ -2073,7 +2339,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     };
   }
 
-  List<_InfoRow> _counterpartyDetailRows(Map<String, String?> extracted, Person? loaded) {
+  List<_InfoRow> _counterpartyDetailRows(
+    Map<String, String?> extracted,
+    Person? loaded,
+  ) {
     final rows = <_InfoRow>[];
     final p = loaded;
     if (p != null) {
@@ -2088,7 +2357,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         rows.add(_InfoRow('گروه اشخاص', p.personGroupName!));
       }
       if (p.personTypes.isNotEmpty) {
-        rows.add(_InfoRow('نوع', p.personTypes.map((e) => e.persianName).join('، ')));
+        rows.add(
+          _InfoRow('نوع', p.personTypes.map((e) => e.persianName).join('، ')),
+        );
       }
       if (p.companyName != null && p.companyName!.trim().isNotEmpty) {
         rows.add(_InfoRow('شرکت', p.companyName!));
@@ -2099,7 +2370,8 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       if (p.economicId != null && p.economicId!.trim().isNotEmpty) {
         rows.add(_InfoRow('شماره اقتصادی', p.economicId!));
       }
-      if (p.registrationNumber != null && p.registrationNumber!.trim().isNotEmpty) {
+      if (p.registrationNumber != null &&
+          p.registrationNumber!.trim().isNotEmpty) {
         rows.add(_InfoRow('شماره ثبت', p.registrationNumber!));
       }
       if (p.phone != null && p.phone!.trim().isNotEmpty) {
@@ -2115,9 +2387,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         rows.add(_InfoRow('ایمیل', p.email!));
       }
       final addrParts = <String>[];
-      if (p.province != null && p.province!.trim().isNotEmpty) addrParts.add(p.province!);
+      if (p.province != null && p.province!.trim().isNotEmpty)
+        addrParts.add(p.province!);
       if (p.city != null && p.city!.trim().isNotEmpty) addrParts.add(p.city!);
-      if (p.address != null && p.address!.trim().isNotEmpty) addrParts.add(p.address!);
+      if (p.address != null && p.address!.trim().isNotEmpty)
+        addrParts.add(p.address!);
       if (p.postalCode != null && p.postalCode!.trim().isNotEmpty) {
         addrParts.add('کدپستی: ${p.postalCode}');
       }
@@ -2125,10 +2399,15 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         rows.add(_InfoRow('آدرس', addrParts.join('، ')));
       }
       if (p.balance != null) {
-        rows.add(_InfoRow(
-          'مانده حساب',
-          formatWithThousands(p.balance!, decimalPlaces: (p.balance! % 1 == 0) ? 0 : 2),
-        ));
+        rows.add(
+          _InfoRow(
+            'مانده حساب',
+            formatWithThousands(
+              p.balance!,
+              decimalPlaces: (p.balance! % 1 == 0) ? 0 : 2,
+            ),
+          ),
+        );
       }
       if (p.status != null && p.status!.trim().isNotEmpty) {
         rows.add(_InfoRow('وضعیت مالی', p.status!));
@@ -2169,8 +2448,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   /// ساخت کارت اطلاعات طرف حساب
   Widget _buildCounterpartyInfoCard(ThemeData theme, DocumentModel document) {
     final counterpartyInfo = _extractCounterpartyInfo(document);
-    final personIdNav = _counterpartyPerson?.id ?? _resolvedCounterpartyPersonId(document);
-    final hasName = counterpartyInfo['name'] != null && counterpartyInfo['name']!.trim().isNotEmpty;
+    final personIdNav =
+        _counterpartyPerson?.id ?? _resolvedCounterpartyPersonId(document);
+    final hasName =
+        counterpartyInfo['name'] != null &&
+        counterpartyInfo['name']!.trim().isNotEmpty;
     if (!hasName && personIdNav == null) {
       return const SizedBox.shrink();
     }
@@ -2178,7 +2460,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     // تعیین نوع طرف حساب بر اساس نوع فاکتور
     final isSales = document.documentType.contains('sales');
     final counterpartyType = isSales ? 'مشتری' : 'فروشنده';
-    final detailRows = _counterpartyDetailRows(counterpartyInfo, _counterpartyPerson);
+    final detailRows = _counterpartyDetailRows(
+      counterpartyInfo,
+      _counterpartyPerson,
+    );
 
     return Card(
       margin: EdgeInsets.zero,
@@ -2220,7 +2505,14 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   }
 
   Widget _buildInfoGrid(List<_InfoRow> rows) {
-    final visibleRows = rows.where((row) => row.value != null && row.value!.trim().isNotEmpty && row.value != '-').toList();
+    final visibleRows = rows
+        .where(
+          (row) =>
+              row.value != null &&
+              row.value!.trim().isNotEmpty &&
+              row.value != '-',
+        )
+        .toList();
     if (visibleRows.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -2235,26 +2527,29 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     if (_rawDocumentData == null) {
       return const SizedBox.shrink();
     }
-    
+
     // استفاده از total_profit (که می‌تواند gross یا net باشد) یا fallback به gross_profit
     final totalProfit = _rawDocumentData!['total_profit'] as num?;
-    final totalProfitPercent = _rawDocumentData!['gross_profit_percent'] as num?;
+    final totalProfitPercent =
+        _rawDocumentData!['gross_profit_percent'] as num?;
     final grossProfit = _rawDocumentData!['gross_profit'] as num?;
-    final grossProfitPercent = _rawDocumentData!['gross_profit_percent'] as num?;
+    final grossProfitPercent =
+        _rawDocumentData!['gross_profit_percent'] as num?;
     final netProfit = _rawDocumentData!['net_profit'] as num?;
     final netProfitPercent = _rawDocumentData!['net_profit_percent'] as num?;
     final totalOverhead = _rawDocumentData!['total_overhead'] as num?;
-    
+
     // اگر سود محاسبه نشده باشد، چیزی نمایش نده
     final profit = totalProfit ?? grossProfit;
     if (profit == null) {
       return const SizedBox.shrink();
     }
-    
+
     final profitValue = profit.toDouble();
-    final profitPercentValue = (totalProfitPercent ?? grossProfitPercent)?.toDouble() ?? 0.0;
+    final profitPercentValue =
+        (totalProfitPercent ?? grossProfitPercent)?.toDouble() ?? 0.0;
     final isPositive = profitValue >= 0;
-    
+
     return Card(
       margin: EdgeInsets.zero,
       child: Padding(
@@ -2266,7 +2561,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
               children: [
                 Icon(
                   isPositive ? Icons.trending_up : Icons.trending_down,
-                  color: isPositive ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
+                  color: isPositive
+                      ? SemanticColorResolver.positive(context)
+                      : SemanticColorResolver.negative(context),
                   size: 24,
                 ),
                 SizedBox(width: 8),
@@ -2282,10 +2579,22 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: isPositive ? SemanticColorResolver.positive(context).withValues(alpha: 0.12) : SemanticColorResolver.negative(context).withValues(alpha: 0.12),
+                color: isPositive
+                    ? SemanticColorResolver.positive(
+                        context,
+                      ).withValues(alpha: 0.12)
+                    : SemanticColorResolver.negative(
+                        context,
+                      ).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: isPositive ? SemanticColorResolver.positive(context).withValues(alpha: 0.35) : SemanticColorResolver.negative(context).withValues(alpha: 0.35),
+                  color: isPositive
+                      ? SemanticColorResolver.positive(
+                          context,
+                        ).withValues(alpha: 0.35)
+                      : SemanticColorResolver.negative(
+                          context,
+                        ).withValues(alpha: 0.35),
                 ),
               ),
               child: Row(
@@ -2295,7 +2604,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'سود ${totalProfit != null && netProfit != null ? 'کل' : grossProfit != null ? 'ناخالص' : 'خالص'}:',
+                        'سود ${totalProfit != null && netProfit != null
+                            ? 'کل'
+                            : grossProfit != null
+                            ? 'ناخالص'
+                            : 'خالص'}:',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w500,
                         ),
@@ -2317,7 +2630,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: isPositive ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
+                          color: isPositive
+                              ? SemanticColorResolver.positive(context)
+                              : SemanticColorResolver.negative(context),
                         ),
                       ),
                       if (profitPercentValue != 0)
@@ -2325,7 +2640,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                           '${profitPercentValue.toStringAsFixed(2)}%',
                           style: TextStyle(
                             fontSize: 14,
-                            color: isPositive ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
+                            color: isPositive
+                                ? SemanticColorResolver.positive(context)
+                                : SemanticColorResolver.negative(context),
                           ),
                         ),
                       if (totalOverhead != null && totalOverhead.toDouble() > 0)
@@ -2341,7 +2658,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
               ),
             ),
             // نمایش سود ناخالص و خالص (اگر هر دو موجود باشند)
-            if (grossProfit != null && netProfit != null && grossProfit != netProfit) ...[
+            if (grossProfit != null &&
+                netProfit != null &&
+                grossProfit != netProfit) ...[
               SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -2350,16 +2669,19 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: SemanticColorResolver.info(context).withValues(alpha: 0.12),
+                        color: SemanticColorResolver.info(
+                          context,
+                        ).withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: SemanticColorResolver.info(context).withValues(alpha: 0.35)),
+                        border: Border.all(
+                          color: SemanticColorResolver.info(
+                            context,
+                          ).withValues(alpha: 0.35),
+                        ),
                       ),
                       child: Column(
                         children: [
-                          Text(
-                            'سود ناخالص',
-                            style: theme.textTheme.bodySmall,
-                          ),
+                          Text('سود ناخالص', style: theme.textTheme.bodySmall),
                           SizedBox(height: 4),
                           Text(
                             formatWithThousands(grossProfit.toDouble()),
@@ -2368,7 +2690,8 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                               color: SemanticColorResolver.info(context),
                             ),
                           ),
-                          if (grossProfitPercent != null && grossProfitPercent.toDouble() != 0)
+                          if (grossProfitPercent != null &&
+                              grossProfitPercent.toDouble() != 0)
                             Text(
                               '${grossProfitPercent.toStringAsFixed(1)}%',
                               style: TextStyle(
@@ -2391,10 +2714,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                       ),
                       child: Column(
                         children: [
-                          Text(
-                            'سود خالص',
-                            style: theme.textTheme.bodySmall,
-                          ),
+                          Text('سود خالص', style: theme.textTheme.bodySmall),
                           const SizedBox(height: 4),
                           Text(
                             formatWithThousands(netProfit.toDouble()),
@@ -2403,7 +2723,8 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                               color: Colors.purple.shade700,
                             ),
                           ),
-                          if (netProfitPercent != null && netProfitPercent.toDouble() != 0)
+                          if (netProfitPercent != null &&
+                              netProfitPercent.toDouble() != 0)
                             Text(
                               '${netProfitPercent.toStringAsFixed(1)}%',
                               style: TextStyle(
@@ -2424,7 +2745,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     );
   }
 
-  Widget _buildFinancialSummaryCard(ThemeData theme, Map<String, dynamic> totals) {
+  Widget _buildFinancialSummaryCard(
+    ThemeData theme,
+    Map<String, dynamic> totals,
+  ) {
     final formatter = NumberFormat('#,##0');
     final gross = (totals['gross'] as num?)?.toDouble() ?? 0.0;
     final discount = (totals['discount'] as num?)?.toDouble() ?? 0.0;
@@ -2443,7 +2767,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           children: [
             Text(
               'خلاصه مالی فاکتور',
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
             ),
             SizedBox(height: 12),
             Wrap(
@@ -2553,13 +2879,17 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     }
 
     final productLines = _rawDocumentData?['product_lines'] as List<dynamic>?;
-    
+
     if (productLines == null || productLines.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.shopping_cart_outlined, size: 64, color: theme.colorScheme.onSurfaceVariant),
+            Icon(
+              Icons.shopping_cart_outlined,
+              size: 64,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(height: 16),
             Text(
               'هیچ کالایی در این فاکتور ثبت نشده است',
@@ -2628,13 +2958,12 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             ],
           ),
           const SizedBox(height: 16),
-          
+
           // نمایش خلاصه مالی
-          if (_canShowBalanceSummary())
-            _buildBalanceSummaryCard(theme),
-          
+          if (_canShowBalanceSummary()) _buildBalanceSummaryCard(theme),
+
           const SizedBox(height: 16),
-          
+
           // لیست تراکنش‌ها
           if (_loadingPayments)
             _buildPaymentTransactions(theme)
@@ -2643,7 +2972,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.payment_outlined, size: 64, color: theme.colorScheme.onSurfaceVariant),
+                  Icon(
+                    Icons.payment_outlined,
+                    size: 64,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     'هیچ تراکنش پرداختی ثبت نشده است',
@@ -2680,7 +3013,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           child: SelectableText(
             _installmentPlanError!,
             textAlign: TextAlign.center,
-            style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.error),
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: theme.colorScheme.error,
+            ),
           ),
         ),
       );
@@ -2695,8 +3030,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     }
     final plan = planRaw;
     final scheduleRaw = plan['schedule'];
-    final List<dynamic> rows = scheduleRaw is List<dynamic> ? scheduleRaw : const <dynamic>[];
-    final currencySuffix = (_document?.currencySymbol ?? _document?.currencyCode ?? '').trim();
+    final List<dynamic> rows = scheduleRaw is List<dynamic>
+        ? scheduleRaw
+        : const <dynamic>[];
+    final currencySuffix =
+        (_document?.currencySymbol ?? _document?.currencyCode ?? '').trim();
 
     String suffixAmount(String s) {
       if (currencySuffix.isEmpty) return s;
@@ -2801,7 +3139,8 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     }
 
     final narrowLayout =
-        ResponsiveHelper.isMobile(context) || MediaQuery.sizeOf(context).width < 560;
+        ResponsiveHelper.isMobile(context) ||
+        MediaQuery.sizeOf(context).width < 560;
     final stackDueAndStatus = MediaQuery.sizeOf(context).width < 480;
 
     Widget summaryTile(String title, String value, double width) {
@@ -2817,12 +3156,16 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             children: [
               Text(
                 title,
-                style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.outline),
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.outline,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
                 value,
-                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
           ),
@@ -2841,7 +3184,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                 flex: 2,
                 child: Text(
                   k,
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.outline,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -2850,7 +3195,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                 child: Text(
                   v,
                   textAlign: TextAlign.end,
-                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ],
@@ -2866,13 +3213,17 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
               width: 88,
               child: Text(
                 k,
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.outline,
+                ),
               ),
             ),
             Expanded(
               child: Text(
                 v,
-                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
           ],
@@ -2890,40 +3241,54 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                 Card(
                   margin: EdgeInsets.zero,
                   elevation: 0,
-                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.5,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                     side: BorderSide(color: theme.dividerColor),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
                           t.documentDetailsInstallmentDocCodeColumn,
-                          style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.outline,
+                          ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           () {
                             final pm = Map<String, dynamic>.from(raw);
                             final codeRaw = pm['document_code'];
-                            if (codeRaw is String && codeRaw.trim().isNotEmpty) {
+                            if (codeRaw is String &&
+                                codeRaw.trim().isNotEmpty) {
                               return codeRaw.trim();
                             }
                             return pm['document_id']?.toString() ?? '-';
                           }(),
-                          style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           t.documentDetailsInstallmentPaymentDateColumn,
-                          style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.outline,
+                          ),
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          fmtDue(Map<String, dynamic>.from(raw)['document_date']),
+                          fmtDue(
+                            Map<String, dynamic>.from(raw)['document_date'],
+                          ),
                           style: theme.textTheme.bodySmall,
                         ),
                         const SizedBox(height: 8),
@@ -2932,12 +3297,16 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                             Expanded(
                               child: Text(
                                 t.installmentsTablePaid,
-                                style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline),
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: theme.colorScheme.outline,
+                                ),
                               ),
                             ),
                             Text(
                               fmtNum(Map<String, dynamic>.from(raw)['amount']),
-                              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ],
                         ),
@@ -2965,12 +3334,24 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           children: [
             TableRow(
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.7,
+                ),
               ),
               children: [
-                _tableHeaderCell(theme, t.documentDetailsInstallmentDocCodeColumn),
-                _tableHeaderCell(theme, t.documentDetailsInstallmentPaymentDateColumn),
-                _tableHeaderCell(theme, t.installmentsTablePaid, alignEnd: true),
+                _tableHeaderCell(
+                  theme,
+                  t.documentDetailsInstallmentDocCodeColumn,
+                ),
+                _tableHeaderCell(
+                  theme,
+                  t.documentDetailsInstallmentPaymentDateColumn,
+                ),
+                _tableHeaderCell(
+                  theme,
+                  t.installmentsTablePaid,
+                  alignEnd: true,
+                ),
               ],
             ),
             ...() {
@@ -2991,14 +3372,19 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                       ),
                       _tableDataCell(
                         theme,
-                        Text(fmtDue(pm['document_date']), style: theme.textTheme.bodySmall),
+                        Text(
+                          fmtDue(pm['document_date']),
+                          style: theme.textTheme.bodySmall,
+                        ),
                       ),
                       _tableDataCell(
                         theme,
                         Text(
                           fmtNum(pm['amount']),
                           textAlign: TextAlign.end,
-                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         alignEnd: true,
                       ),
@@ -3017,16 +3403,25 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         _canAddTransaction() && _determineTransactionType() == 'receipt';
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(narrowLayout ? 8 : 12, 8, narrowLayout ? 8 : 12, 12),
+      padding: EdgeInsets.fromLTRB(
+        narrowLayout ? 8 : 12,
+        8,
+        narrowLayout ? 8 : 12,
+        12,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Card(
             elevation: 0,
-            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.6,
+            ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+              side: BorderSide(
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+              ),
             ),
             child: Padding(
               padding: EdgeInsets.fromLTRB(
@@ -3040,20 +3435,26 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                 children: [
                   Text(
                     t.installmentsDetailTitle,
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   if (_document?.code != null) ...[
                     const SizedBox(height: 4),
                     Text(
                       '${t.installmentsTableInvoice}: ${_document!.code}',
-                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.outline,
+                      ),
                     ),
                   ],
                   if (currencySuffix.isNotEmpty) ...[
                     const SizedBox(height: 2),
                     Text(
                       t.documentDetailsInstallmentsAmountsNote(currencySuffix),
-                      style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.outline,
+                      ),
                     ),
                   ],
                   const Divider(height: 20),
@@ -3064,14 +3465,41 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                       final cols = narrowLayout
                           ? (w >= 400 ? 2 : 1)
                           : (w >= 900 ? 4 : (w >= 620 ? 3 : 2));
-                      final tileW = (w - spacing * (cols - 1)).clamp(0, double.infinity) / cols;
+                      final tileW =
+                          (w - spacing * (cols - 1)).clamp(0, double.infinity) /
+                          cols;
                       final tiles = <Widget>[
-                        if (numInst != null) summaryTile(t.installmentsCount, numInst.toString(), tileW),
-                        if (down != null && down > 0) summaryTile(t.downPayment, fmtNum(down), tileW),
-                        if (principalT != null) summaryTile(t.installmentsSummaryPrincipal, fmtNum(principalT), tileW),
-                        if (interestT != null) summaryTile(t.installmentsSummaryInterest, fmtNum(interestT), tileW),
-                        summaryTile(t.installmentsSummaryPaid, fmtNum(paidSum), tileW),
-                        if (remainingT != null) summaryTile(t.installmentsSummaryRemaining, fmtNum(remainingT), tileW),
+                        if (numInst != null)
+                          summaryTile(
+                            t.installmentsCount,
+                            numInst.toString(),
+                            tileW,
+                          ),
+                        if (down != null && down > 0)
+                          summaryTile(t.downPayment, fmtNum(down), tileW),
+                        if (principalT != null)
+                          summaryTile(
+                            t.installmentsSummaryPrincipal,
+                            fmtNum(principalT),
+                            tileW,
+                          ),
+                        if (interestT != null)
+                          summaryTile(
+                            t.installmentsSummaryInterest,
+                            fmtNum(interestT),
+                            tileW,
+                          ),
+                        summaryTile(
+                          t.installmentsSummaryPaid,
+                          fmtNum(paidSum),
+                          tileW,
+                        ),
+                        if (remainingT != null)
+                          summaryTile(
+                            t.installmentsSummaryRemaining,
+                            fmtNum(remainingT),
+                            tileW,
+                          ),
                       ];
                       return Wrap(
                         spacing: spacing,
@@ -3087,7 +3515,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           const SizedBox(height: 12),
           Expanded(
             child: rows.isEmpty
-                ? Center(child: Text(t.documentDetailsInstallmentsEmptySchedule))
+                ? Center(
+                    child: Text(t.documentDetailsInstallmentsEmptySchedule),
+                  )
                 : Scrollbar(
                     child: ListView.separated(
                       padding: const EdgeInsets.only(bottom: 8),
@@ -3095,30 +3525,41 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                       separatorBuilder: (_, __) => const SizedBox(height: 10),
                       itemBuilder: (context, index) {
                         final raw = rows[index];
-                        final r = raw is Map<String, dynamic> ? raw : <String, dynamic>{};
+                        final r = raw is Map<String, dynamic>
+                            ? raw
+                            : <String, dynamic>{};
                         final st = r['status']?.toString();
                         final seq = _scheduleSeq(r['seq']);
                         final remaining = rowRemaining(r);
-                        final pays = (r['payments'] as List?) ?? const <dynamic>[];
+                        final pays =
+                            (r['payments'] as List?) ?? const <dynamic>[];
                         final paidAmt = _scheduleMoney(r['paid_amount']);
                         final installmentPaidEvidence =
                             paidAmt > 0.009 || st == 'partial' || st == 'paid';
                         final overdue = st == 'overdue';
-                        final showReceive = canReceiveForInstallment &&
+                        final showReceive =
+                            canReceiveForInstallment &&
                             st != 'paid' &&
                             remaining > 0.009;
 
                         return Card(
                           elevation: 0,
                           color: overdue
-                              ? theme.colorScheme.errorContainer.withValues(alpha: 0.22)
-                              : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+                              ? theme.colorScheme.errorContainer.withValues(
+                                  alpha: 0.22,
+                                )
+                              : theme.colorScheme.surfaceContainerHighest
+                                    .withValues(alpha: 0.45),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                             side: BorderSide(
                               color: overdue
-                                  ? theme.colorScheme.error.withValues(alpha: 0.35)
-                                  : theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+                                  ? theme.colorScheme.error.withValues(
+                                      alpha: 0.35,
+                                    )
+                                  : theme.colorScheme.outlineVariant.withValues(
+                                      alpha: 0.6,
+                                    ),
                             ),
                           ),
                           child: ExpansionTile(
@@ -3136,7 +3577,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                             ),
                             leading: CircleAvatar(
                               radius: narrowLayout ? 16 : 18,
-                              backgroundColor: theme.colorScheme.primaryContainer.withValues(alpha: 0.9),
+                              backgroundColor: theme
+                                  .colorScheme
+                                  .primaryContainer
+                                  .withValues(alpha: 0.9),
                               child: Text(
                                 '$seq',
                                 style: theme.textTheme.titleSmall?.copyWith(
@@ -3150,22 +3594,32 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                               builder: (context) {
                                 Widget statusChip() {
                                   return Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: statusColor(st).withValues(alpha: 0.14),
+                                      color: statusColor(
+                                        st,
+                                      ).withValues(alpha: 0.14),
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Icon(statusIcon(st), size: 16, color: statusColor(st)),
+                                        Icon(
+                                          statusIcon(st),
+                                          size: 16,
+                                          color: statusColor(st),
+                                        ),
                                         const SizedBox(width: 4),
                                         Text(
                                           statusLabel(st),
-                                          style: theme.textTheme.labelMedium?.copyWith(
-                                            color: statusColor(st),
-                                            fontWeight: FontWeight.w600,
-                                          ),
+                                          style: theme.textTheme.labelMedium
+                                              ?.copyWith(
+                                                color: statusColor(st),
+                                                fontWeight: FontWeight.w600,
+                                              ),
                                         ),
                                       ],
                                     ),
@@ -3181,7 +3635,8 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                                 );
                                 if (stackDueAndStatus) {
                                   return Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       dueText,
                                       const SizedBox(height: 8),
@@ -3203,11 +3658,26 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  kvLine(t.installmentsTablePrincipal, fmtNum(r['principal'])),
-                                  kvLine(t.installmentsTableInterest, fmtNum(r['interest'])),
-                                  kvLine(t.installmentsTableTotal, fmtNum(r['total'])),
-                                  kvLine(t.installmentsTablePaid, fmtNum(r['paid_amount'])),
-                                  kvLine(t.installmentsTableRemaining, fmtNum(remaining)),
+                                  kvLine(
+                                    t.installmentsTablePrincipal,
+                                    fmtNum(r['principal']),
+                                  ),
+                                  kvLine(
+                                    t.installmentsTableInterest,
+                                    fmtNum(r['interest']),
+                                  ),
+                                  kvLine(
+                                    t.installmentsTableTotal,
+                                    fmtNum(r['total']),
+                                  ),
+                                  kvLine(
+                                    t.installmentsTablePaid,
+                                    fmtNum(r['paid_amount']),
+                                  ),
+                                  kvLine(
+                                    t.installmentsTableRemaining,
+                                    fmtNum(remaining),
+                                  ),
                                 ],
                               ),
                             ),
@@ -3223,12 +3693,18 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                                               remainingAmount: remaining,
                                             );
                                           },
-                                          icon: const Icon(Icons.add_card_rounded, size: 20),
-                                          label: Text(t.documentDetailsInstallmentReceive),
+                                          icon: const Icon(
+                                            Icons.add_card_rounded,
+                                            size: 20,
+                                          ),
+                                          label: Text(
+                                            t.documentDetailsInstallmentReceive,
+                                          ),
                                         ),
                                       )
                                     : Align(
-                                        alignment: AlignmentDirectional.centerStart,
+                                        alignment:
+                                            AlignmentDirectional.centerStart,
                                         child: FilledButton.icon(
                                           onPressed: () {
                                             _openReceiptDialogForInstallment(
@@ -3236,8 +3712,13 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                                               remainingAmount: remaining,
                                             );
                                           },
-                                          icon: const Icon(Icons.add_card_rounded, size: 20),
-                                          label: Text(t.documentDetailsInstallmentReceive),
+                                          icon: const Icon(
+                                            Icons.add_card_rounded,
+                                            size: 20,
+                                          ),
+                                          label: Text(
+                                            t.documentDetailsInstallmentReceive,
+                                          ),
                                         ),
                                       ),
                               if (showReceive) const SizedBox(height: 12),
@@ -3245,24 +3726,35 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                                 alignment: AlignmentDirectional.centerStart,
                                 child: Text(
                                   t.installmentsPaymentsColumn,
-                                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                               const SizedBox(height: 8),
                               if (pays.isEmpty && installmentPaidEvidence)
                                 Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
                                   child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      Icon(Icons.info_outline_rounded, color: theme.colorScheme.outline, size: 28),
+                                      Icon(
+                                        Icons.info_outline_rounded,
+                                        color: theme.colorScheme.outline,
+                                        size: 28,
+                                      ),
                                       const SizedBox(width: 12),
                                       Expanded(
                                         child: Text(
                                           t.installmentsPaymentsDetailMissing,
-                                          style: theme.textTheme.bodyMedium?.copyWith(
-                                            color: theme.colorScheme.outline,
-                                          ),
+                                          style: theme.textTheme.bodyMedium
+                                              ?.copyWith(
+                                                color:
+                                                    theme.colorScheme.outline,
+                                              ),
                                         ),
                                       ),
                                     ],
@@ -3270,17 +3762,25 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                                 )
                               else if (pays.isEmpty)
                                 Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
                                   child: Row(
                                     children: [
-                                      Icon(Icons.payments_outlined, color: theme.colorScheme.outline, size: 28),
+                                      Icon(
+                                        Icons.payments_outlined,
+                                        color: theme.colorScheme.outline,
+                                        size: 28,
+                                      ),
                                       const SizedBox(width: 12),
                                       Expanded(
                                         child: Text(
                                           t.installmentsNoPaymentsYet,
-                                          style: theme.textTheme.bodyMedium?.copyWith(
-                                            color: theme.colorScheme.outline,
-                                          ),
+                                          style: theme.textTheme.bodyMedium
+                                              ?.copyWith(
+                                                color:
+                                                    theme.colorScheme.outline,
+                                              ),
                                         ),
                                       ),
                                     ],
@@ -3300,28 +3800,42 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     );
   }
 
-  Widget _tableHeaderCell(ThemeData theme, String text, {bool alignEnd = false}) {
+  Widget _tableHeaderCell(
+    ThemeData theme,
+    String text, {
+    bool alignEnd = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       child: Text(
         text,
         textAlign: alignEnd ? TextAlign.end : TextAlign.start,
-        style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+        style: theme.textTheme.labelLarge?.copyWith(
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
 
-  Widget _tableDataCell(ThemeData theme, Widget child, {bool alignEnd = false}) {
+  Widget _tableDataCell(
+    ThemeData theme,
+    Widget child, {
+    bool alignEnd = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      child: alignEnd ? Align(alignment: AlignmentDirectional.centerEnd, child: child) : child,
+      child: alignEnd
+          ? Align(alignment: AlignmentDirectional.centerEnd, child: child)
+          : child,
     );
   }
 
   /// ساخت تب فایل‌ها
   Widget _buildAttachmentsTab(BuildContext context, ThemeData theme) {
     if (_document == null) {
-      return const Center(child: Text('برای الصاق فایل نیاز به شناسه معتبر سند است.'));
+      return const Center(
+        child: Text('برای الصاق فایل نیاز به شناسه معتبر سند است.'),
+      );
     }
 
     return Padding(
@@ -3344,7 +3858,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           FilledButton.icon(
             onPressed: _uploadingFile ? null : _attachFile,
             icon: _uploadingFile
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : const Icon(Icons.attach_file),
             label: Text(_uploadingFile ? 'در حال آپلود...' : 'افزودن فایل'),
           ),
@@ -3352,8 +3870,6 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       ),
     );
   }
-  
-
 
   DataColumn _productLineColumnLabel(String label) {
     return DataColumn(
@@ -3378,7 +3894,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     );
     final tableHMargin = isMobile ? 8.0 : 16.0;
     final tableColSpacing = isMobile ? 12.0 : 24.0;
-    
+
     if (productLines == null || productLines.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -3412,7 +3928,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                       horizontalMargin: tableHMargin,
                       columnSpacing: tableColSpacing,
                       headingRowColor: WidgetStateProperty.all(
-                        theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                        theme.colorScheme.primaryContainer.withValues(
+                          alpha: 0.3,
+                        ),
                       ),
                       dataRowMinHeight: 48,
                       dataRowMaxHeight: 200,
@@ -3425,207 +3943,295 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                         _productLineColumnLabel('تخفیف'),
                         _productLineColumnLabel('مالیات'),
                         _productLineColumnLabel('قیمت'),
-                        if (_rawDocumentData?['line_profits'] != null) _productLineColumnLabel('سود'),
+                        if (_rawDocumentData?['line_profits'] != null)
+                          _productLineColumnLabel('سود'),
                         _productLineColumnLabel('توضیحات'),
                       ],
-                    rows: productLines.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final line = entry.value as Map<String, dynamic>;
-                      final productName = line['product_name'] as String? ?? '-';
-                      final extraInfo = line['extra_info'] as Map<String, dynamic>?;
-                      final quantity = (line['quantity'] as num?)?.toDouble() ?? 0.0;
-                      final unitPrice = (extraInfo?['unit_price'] as num?)?.toDouble() ?? 0.0;
-                      final discount = (extraInfo?['line_discount'] as num?)?.toDouble() ?? 0.0;
-                      final discountType = (extraInfo?['discount_type'] as String?)?.toLowerCase();
-                      final discountValue = (extraInfo?['discount_value'] as num?)?.toDouble();
-                      String discountText = '-';
-                      if (discount > 0) {
-                        final amountText = formatWithThousands(
-                          discount,
-                          decimalPlaces: discount % 1 == 0 ? 0 : 2,
-                        );
-                        if (discountType == 'percent' && discountValue != null && discountValue != 0) {
-                          final pctText = formatWithThousands(
-                            discountValue,
-                            decimalPlaces: discountValue % 1 == 0 ? 0 : 2,
+                      rows: productLines.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final line = entry.value as Map<String, dynamic>;
+                        final productName =
+                            line['product_name'] as String? ?? '-';
+                        final extraInfo =
+                            line['extra_info'] as Map<String, dynamic>?;
+                        final quantity =
+                            (line['quantity'] as num?)?.toDouble() ?? 0.0;
+                        final unitPrice =
+                            (extraInfo?['unit_price'] as num?)?.toDouble() ??
+                            0.0;
+                        final discount =
+                            (extraInfo?['line_discount'] as num?)?.toDouble() ??
+                            0.0;
+                        final discountType =
+                            (extraInfo?['discount_type'] as String?)
+                                ?.toLowerCase();
+                        final discountValue =
+                            (extraInfo?['discount_value'] as num?)?.toDouble();
+                        String discountText = '-';
+                        if (discount > 0) {
+                          final amountText = formatWithThousands(
+                            discount,
+                            decimalPlaces: discount % 1 == 0 ? 0 : 2,
                           );
-                          discountText = '$pctText٪ ($amountText)';
-                        } else {
-                          discountText = amountText;
+                          if (discountType == 'percent' &&
+                              discountValue != null &&
+                              discountValue != 0) {
+                            final pctText = formatWithThousands(
+                              discountValue,
+                              decimalPlaces: discountValue % 1 == 0 ? 0 : 2,
+                            );
+                            discountText = '$pctText٪ ($amountText)';
+                          } else {
+                            discountText = amountText;
+                          }
                         }
-                      }
-                      final tax = (extraInfo?['tax_amount'] as num?)?.toDouble() ?? 0.0;
-                      final lineTotal = (extraInfo?['line_total'] as num?)?.toDouble() ?? 0.0;
-                      final unit = extraInfo?['unit'] as String? ?? '-';
-                      final lineDesc = (line['description'] as String? ?? '-').trim();
-                      final descText = lineDesc.isEmpty ? '-' : lineDesc;
-                      
-                      // دریافت سود این ردیف از line_profits
-                      Map<String, dynamic>? lineProfitData;
-                      if (_rawDocumentData?['line_profits'] != null) {
-                        final lineProfits = _rawDocumentData!['line_profits'] as List<dynamic>;
-                        final lineId = line['id'] as int?;
-                        if (lineId != null) {
-                          lineProfitData = lineProfits.firstWhere(
-                            (lp) => (lp as Map<String, dynamic>)['line_id'] == lineId,
-                            orElse: () => null,
-                          ) as Map<String, dynamic>?;
+                        final tax =
+                            (extraInfo?['tax_amount'] as num?)?.toDouble() ??
+                            0.0;
+                        final lineTotal =
+                            (extraInfo?['line_total'] as num?)?.toDouble() ??
+                            0.0;
+                        final unit = extraInfo?['unit'] as String? ?? '-';
+                        final lineDesc = (line['description'] as String? ?? '-')
+                            .trim();
+                        final descText = lineDesc.isEmpty ? '-' : lineDesc;
+
+                        // دریافت سود این ردیف از line_profits
+                        Map<String, dynamic>? lineProfitData;
+                        if (_rawDocumentData?['line_profits'] != null) {
+                          final lineProfits =
+                              _rawDocumentData!['line_profits']
+                                  as List<dynamic>;
+                          final lineId = line['id'] as int?;
+                          if (lineId != null) {
+                            lineProfitData =
+                                lineProfits.firstWhere(
+                                      (lp) =>
+                                          (lp
+                                              as Map<
+                                                String,
+                                                dynamic
+                                              >)['line_id'] ==
+                                          lineId,
+                                      orElse: () => null,
+                                    )
+                                    as Map<String, dynamic>?;
+                          }
                         }
-                      }
-                      
-                      // استایل پایه برای اعداد - استفاده از theme و tabular figures
-                      final baseNumberStyle = theme.textTheme.bodyMedium?.copyWith(
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ) ?? const TextStyle(fontFeatures: [FontFeature.tabularFigures()]);
-                      
-                      return DataRow(
-                        cells: [
-                          DataCell(
-                            Center(
-                              child: Text(
-                                '${index + 1}',
-                                textAlign: TextAlign.center,
-                                textDirection: ui.TextDirection.ltr,
-                                style: baseNumberStyle,
+
+                        // استایل پایه برای اعداد - استفاده از theme و tabular figures
+                        final baseNumberStyle =
+                            theme.textTheme.bodyMedium?.copyWith(
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ) ??
+                            const TextStyle(
+                              fontFeatures: [FontFeature.tabularFigures()],
+                            );
+
+                        return DataRow(
+                          cells: [
+                            DataCell(
+                              Center(
+                                child: Text(
+                                  '${index + 1}',
+                                  textAlign: TextAlign.center,
+                                  textDirection: ui.TextDirection.ltr,
+                                  style: baseNumberStyle,
+                                ),
                               ),
                             ),
-                          ),
-                          DataCell(
-                            Center(
-                              child: Tooltip(
-                                message: productName,
-                                child: ConstrainedBox(
-                                  constraints: const BoxConstraints(minWidth: 100),
-                                  child: Text(
-                                    productName,
-                                    textAlign: TextAlign.center,
-                                    softWrap: true,
+                            DataCell(
+                              Center(
+                                child: Tooltip(
+                                  message: productName,
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      minWidth: 100,
+                                    ),
+                                    child: Text(
+                                      productName,
+                                      textAlign: TextAlign.center,
+                                      softWrap: true,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                        DataCell(
-                          Center(
-                            child: Text(
-                              formatWithThousands(quantity, decimalPlaces: quantity % 1 == 0 ? 0 : 2),
-                              textAlign: TextAlign.center,
-                              textDirection: ui.TextDirection.ltr,
-                              style: baseNumberStyle,
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          Center(
-                            child: Text(unit, textAlign: TextAlign.center),
-                          ),
-                        ),
-                        DataCell(
-                          Center(
-                            child: Text(
-                              formatWithThousands(unitPrice, decimalPlaces: unitPrice % 1 == 0 ? 0 : 2),
-                              textAlign: TextAlign.center,
-                              textDirection: ui.TextDirection.ltr,
-                              style: baseNumberStyle,
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          Center(
-                            child: Text(
-                              discountText,
-                              textAlign: TextAlign.center,
-                              textDirection: ui.TextDirection.ltr,
-                              style: baseNumberStyle.copyWith(color: SemanticColorResolver.warning(context)),
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          Center(
-                            child: Text(
-                              tax > 0 ? formatWithThousands(tax, decimalPlaces: tax % 1 == 0 ? 0 : 2) : '-',
-                              textAlign: TextAlign.center,
-                              textDirection: ui.TextDirection.ltr,
-                              style: baseNumberStyle.copyWith(color: SemanticColorResolver.info(context)),
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          Center(
-                            child: Text(
-                              formatWithThousands(lineTotal, decimalPlaces: lineTotal % 1 == 0 ? 0 : 2),
-                              textAlign: TextAlign.center,
-                              textDirection: ui.TextDirection.ltr,
-                              style: baseNumberStyle.copyWith(
-                                color: SemanticColorResolver.positive(context),
-                                fontWeight: FontWeight.bold,
+                            DataCell(
+                              Center(
+                                child: Text(
+                                  formatWithThousands(
+                                    quantity,
+                                    decimalPlaces: quantity % 1 == 0 ? 0 : 2,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  textDirection: ui.TextDirection.ltr,
+                                  style: baseNumberStyle,
+                                ),
                               ),
                             ),
-                          ),
-                        ),
-                        if (_rawDocumentData?['line_profits'] != null)
-                          DataCell(
-                            Center(
-                              child: Builder(
-                                builder: (context) {
-                                  if (lineProfitData == null) {
-                                    return const Text('-', textAlign: TextAlign.center);
-                                  }
-                                  final profit = (lineProfitData['profit'] ?? lineProfitData['gross_profit']) as num?;
-                                  final profitPercent = (lineProfitData['profit_percent'] ?? lineProfitData['gross_profit_percent']) as num?;
-                                  if (profit == null) {
-                                    return const Text('-', textAlign: TextAlign.center);
-                                  }
-                                  final profitValue = profit.toDouble();
-                                  final profitPercentValue = profitPercent?.toDouble() ?? 0.0;
-                                  return Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment: CrossAxisAlignment.center,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        formatWithThousands(profitValue),
-                                        textAlign: TextAlign.center,
-                                        textDirection: ui.TextDirection.ltr,
-                                        style: baseNumberStyle.copyWith(
-                                          color: profitValue >= 0 ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      if (profitPercentValue != 0)
-                                        Text(
-                                          '${profitPercentValue.toStringAsFixed(1)}%',
+                            DataCell(
+                              Center(
+                                child: Text(unit, textAlign: TextAlign.center),
+                              ),
+                            ),
+                            DataCell(
+                              Center(
+                                child: Text(
+                                  formatWithThousands(
+                                    unitPrice,
+                                    decimalPlaces: unitPrice % 1 == 0 ? 0 : 2,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  textDirection: ui.TextDirection.ltr,
+                                  style: baseNumberStyle,
+                                ),
+                              ),
+                            ),
+                            DataCell(
+                              Center(
+                                child: Text(
+                                  discountText,
+                                  textAlign: TextAlign.center,
+                                  textDirection: ui.TextDirection.ltr,
+                                  style: baseNumberStyle.copyWith(
+                                    color: SemanticColorResolver.warning(
+                                      context,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            DataCell(
+                              Center(
+                                child: Text(
+                                  tax > 0
+                                      ? formatWithThousands(
+                                          tax,
+                                          decimalPlaces: tax % 1 == 0 ? 0 : 2,
+                                        )
+                                      : '-',
+                                  textAlign: TextAlign.center,
+                                  textDirection: ui.TextDirection.ltr,
+                                  style: baseNumberStyle.copyWith(
+                                    color: SemanticColorResolver.info(context),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            DataCell(
+                              Center(
+                                child: Text(
+                                  formatWithThousands(
+                                    lineTotal,
+                                    decimalPlaces: lineTotal % 1 == 0 ? 0 : 2,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  textDirection: ui.TextDirection.ltr,
+                                  style: baseNumberStyle.copyWith(
+                                    color: SemanticColorResolver.positive(
+                                      context,
+                                    ),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (_rawDocumentData?['line_profits'] != null)
+                              DataCell(
+                                Center(
+                                  child: Builder(
+                                    builder: (context) {
+                                      if (lineProfitData == null) {
+                                        return const Text(
+                                          '-',
                                           textAlign: TextAlign.center,
-                                          textDirection: ui.TextDirection.ltr,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: profitValue >= 0 ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
+                                        );
+                                      }
+                                      final profit =
+                                          (lineProfitData['profit'] ??
+                                                  lineProfitData['gross_profit'])
+                                              as num?;
+                                      final profitPercent =
+                                          (lineProfitData['profit_percent'] ??
+                                                  lineProfitData['gross_profit_percent'])
+                                              as num?;
+                                      if (profit == null) {
+                                        return const Text(
+                                          '-',
+                                          textAlign: TextAlign.center,
+                                        );
+                                      }
+                                      final profitValue = profit.toDouble();
+                                      final profitPercentValue =
+                                          profitPercent?.toDouble() ?? 0.0;
+                                      return Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            formatWithThousands(profitValue),
+                                            textAlign: TextAlign.center,
+                                            textDirection: ui.TextDirection.ltr,
+                                            style: baseNumberStyle.copyWith(
+                                              color: profitValue >= 0
+                                                  ? SemanticColorResolver.positive(
+                                                      context,
+                                                    )
+                                                  : SemanticColorResolver.negative(
+                                                      context,
+                                                    ),
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
-                                        ),
-                                    ],
-                                  );
-                                },
+                                          if (profitPercentValue != 0)
+                                            Text(
+                                              '${profitPercentValue.toStringAsFixed(1)}%',
+                                              textAlign: TextAlign.center,
+                                              textDirection:
+                                                  ui.TextDirection.ltr,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: profitValue >= 0
+                                                    ? SemanticColorResolver.positive(
+                                                        context,
+                                                      )
+                                                    : SemanticColorResolver.negative(
+                                                        context,
+                                                      ),
+                                              ),
+                                            ),
+                                        ],
+                                      );
+                                    },
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                          DataCell(
-                            Center(
-                              child: Tooltip(
-                                message: descText,
-                                child: ConstrainedBox(
-                                  constraints: const BoxConstraints(minWidth: 100),
-                                  child: Text(
-                                    descText,
-                                    textAlign: TextAlign.center,
-                                    softWrap: true,
+                            DataCell(
+                              Center(
+                                child: Tooltip(
+                                  message: descText,
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      minWidth: 100,
+                                    ),
+                                    child: Text(
+                                      descText,
+                                      textAlign: TextAlign.center,
+                                      softWrap: true,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
-                      );
-                    }).toList(),
+                          ],
+                        );
+                      }).toList(),
                     ),
                   ),
                 ),
@@ -3680,29 +4286,59 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           const Divider(height: 1),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            child:             DataTable(
+            child: DataTable(
               headingRowColor: WidgetStateProperty.all(
                 theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
               ),
               columns: const [
-                DataColumn(label: Text('ردیف', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('حساب', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('طرف‌حساب', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('بدهکار', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('بستانکار', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('توضیحات', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(
+                  label: Text(
+                    'ردیف',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'حساب',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'طرف‌حساب',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'بدهکار',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'بستانکار',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'توضیحات',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
               ],
               rows: lines.asMap().entries.map((entry) {
                 final index = entry.key;
                 final line = entry.value;
-                
+
                 // پشتیبانی از هر دو نوع DocumentLineModel و Map
                 String accountName;
                 String? counterpartyName;
                 double debit;
                 double credit;
                 String? description;
-                
+
                 if (line is DocumentLineModel) {
                   accountName = line.fullAccountName;
                   counterpartyName = line.counterpartyName;
@@ -3710,7 +4346,8 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                   credit = line.credit;
                   description = line.description;
                 } else if (line is Map<String, dynamic>) {
-                  accountName = '${line['account_code'] ?? ''} - ${line['account_name'] ?? '-'}';
+                  accountName =
+                      '${line['account_code'] ?? ''} - ${line['account_name'] ?? '-'}';
                   counterpartyName = line['person_name'] as String?;
                   debit = (line['debit'] as num?)?.toDouble() ?? 0.0;
                   credit = (line['credit'] as num?)?.toDouble() ?? 0.0;
@@ -3722,7 +4359,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                   credit = 0.0;
                   description = null;
                 }
-                
+
                 return DataRow(
                   cells: [
                     DataCell(Text('${index + 1}')),
@@ -3746,28 +4383,36 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                     ),
                     DataCell(
                       Text(
-                        debit > 0 ? formatWithThousands(debit.toInt()) : '-',
+                        debit > 0 ? formatWithThousands(debit) : '-',
                         textDirection: ui.TextDirection.ltr,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                          color: SemanticColorResolver.negative(context),
-                        ) ?? TextStyle(
-                          fontFeatures: [FontFeature.tabularFigures()],
-                          color: SemanticColorResolver.negative(context),
-                        ),
+                        style:
+                            theme.textTheme.bodyMedium?.copyWith(
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                              color: SemanticColorResolver.negative(context),
+                            ) ??
+                            TextStyle(
+                              fontFeatures: [FontFeature.tabularFigures()],
+                              color: SemanticColorResolver.negative(context),
+                            ),
                       ),
                     ),
                     DataCell(
                       Text(
-                        credit > 0 ? formatWithThousands(credit.toInt()) : '-',
+                        credit > 0 ? formatWithThousands(credit) : '-',
                         textDirection: ui.TextDirection.ltr,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                          color: SemanticColorResolver.positive(context),
-                        ) ?? TextStyle(
-                          fontFeatures: [FontFeature.tabularFigures()],
-                          color: SemanticColorResolver.positive(context),
-                        ),
+                        style:
+                            theme.textTheme.bodyMedium?.copyWith(
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                              color: SemanticColorResolver.positive(context),
+                            ) ??
+                            TextStyle(
+                              fontFeatures: [FontFeature.tabularFigures()],
+                              color: SemanticColorResolver.positive(context),
+                            ),
                       ),
                     ),
                     DataCell(
@@ -3794,7 +4439,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   Widget _buildTotals(ThemeData theme) {
     final isInvoice = _document?.documentType.startsWith('invoice') ?? false;
     final totals = _document?.extraInfo?['totals'] as Map<String, dynamic>?;
-    
+
     if (isInvoice && totals != null) {
       // برای فاکتورها: نمایش خلاصه مالی کامل
       final gross = (totals['gross'] as num?)?.toDouble() ?? 0.0;
@@ -3807,7 +4452,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
 
       final globalDiscount = _document?.extraInfo?['global_discount'];
       String discountLabel = 'تخفیف';
-      String discountDisplay = formatWithThousands(discount.toInt());
+      String discountDisplay = formatWithThousands(discount);
       if (globalDiscount is Map) {
         final gdType = (globalDiscount['type'] as String?)?.toLowerCase();
         final gdValue = (globalDiscount['value'] as num?)?.toDouble();
@@ -3824,14 +4469,14 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           }
         }
         if (gdAmount > 0 || (gdType == 'percent' && (gdValue ?? 0) > 0)) {
-          final amountText = formatWithThousands(gdAmount.toInt());
+          final amountText = formatWithThousands(gdAmount);
           final globalText = (gdType == 'percent' && gdValue != null)
               ? '${formatWithThousands(gdValue, decimalPlaces: gdValue % 1 == 0 ? 0 : 2)}٪ ($amountText)'
               : amountText;
           if (lineDiscSum > 0) {
             discountLabel = 'تخفیف (سطری + کلی)';
             discountDisplay =
-                '${formatWithThousands(lineDiscSum.toInt())} + $globalText';
+                '${formatWithThousands(lineDiscSum)} + $globalText';
           } else {
             discountLabel = 'تخفیف کلی';
             discountDisplay = globalText;
@@ -3851,31 +4496,54 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildTotalItem('جمع کل (قبل از تخفیف)', formatWithThousands(gross.toInt()), theme.colorScheme.primary),
+                  _buildTotalItem(
+                    'جمع کل (قبل از تخفیف)',
+                    formatWithThousands(gross),
+                    theme.colorScheme.primary,
+                  ),
                   Container(width: 2, height: 40, color: theme.dividerColor),
-                  _buildTotalItem(discountLabel, discountDisplay, SemanticColorResolver.warning(context)),
+                  _buildTotalItem(
+                    discountLabel,
+                    discountDisplay,
+                    SemanticColorResolver.warning(context),
+                  ),
                   Container(width: 2, height: 40, color: theme.dividerColor),
-                  _buildTotalItem('مالیات', formatWithThousands(tax.toInt()), SemanticColorResolver.info(context)),
+                  _buildTotalItem(
+                    'مالیات',
+                    formatWithThousands(tax),
+                    SemanticColorResolver.info(context),
+                  ),
                   Container(width: 2, height: 40, color: theme.dividerColor),
-                  _buildTotalItem('خالص ردیف‌ها', formatWithThousands(net.toInt()), SemanticColorResolver.positive(context)),
+                  _buildTotalItem(
+                    'خالص ردیف‌ها',
+                    formatWithThousands(net),
+                    SemanticColorResolver.positive(context),
+                  ),
                   if (adjNet != 0 || adjTax != 0) ...[
                     Container(width: 2, height: 40, color: theme.dividerColor),
                     _buildTotalItem(
                       'اضافات/کسورات',
-                      formatWithThousands((adjNet + adjTax).toInt()),
+                      formatWithThousands(adjNet + adjTax),
                       theme.colorScheme.tertiary,
                     ),
                   ],
                   Container(width: 2, height: 40, color: theme.dividerColor),
-                  _buildTotalItem('قابل پرداخت', formatWithThousands(payable.toInt()), theme.colorScheme.primary),
+                  _buildTotalItem(
+                    'قابل پرداخت',
+                    formatWithThousands(payable),
+                    theme.colorScheme.primary,
+                  ),
                 ],
               ),
               Builder(
                 builder: (context) {
                   final auth = ApiClient.getAuthStore();
                   final isMc = auth?.isMultiCurrency ?? false;
-                  final fxTotals = _rawDocumentData?['fx_totals'] as Map<String, dynamic>?;
-                  final baseCur = _rawDocumentData?['base_currency'] as Map<String, dynamic>?;
+                  final fxTotals =
+                      _rawDocumentData?['fx_totals'] as Map<String, dynamic>?;
+                  final baseCur =
+                      _rawDocumentData?['base_currency']
+                          as Map<String, dynamic>?;
                   final banner = InvoiceFxDualTotalsBanner.fromInvoicePayload(
                     isMultiCurrency: isMc,
                     fxTotals: fxTotals,
@@ -3895,11 +4563,23 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildTotalItem('جمع بدهکار', formatWithThousands(_document!.totalDebit.toInt()), SemanticColorResolver.negative(context)),
+                  _buildTotalItem(
+                    'جمع بدهکار',
+                    formatWithThousands(_document!.totalDebit),
+                    SemanticColorResolver.negative(context),
+                  ),
                   Container(width: 2, height: 40, color: theme.dividerColor),
-                  _buildTotalItem('جمع بستانکار', formatWithThousands(_document!.totalCredit.toInt()), SemanticColorResolver.positive(context)),
+                  _buildTotalItem(
+                    'جمع بستانکار',
+                    formatWithThousands(_document!.totalCredit),
+                    SemanticColorResolver.positive(context),
+                  ),
                   Container(width: 2, height: 40, color: theme.dividerColor),
-                  _buildTotalItem('تعداد سطرها', '${_document!.linesCount}', theme.colorScheme.secondary),
+                  _buildTotalItem(
+                    'تعداد سطرها',
+                    '${_document!.linesCount}',
+                    theme.colorScheme.secondary,
+                  ),
                 ],
               ),
             ],
@@ -3907,7 +4587,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         ),
       );
     }
-    
+
     // برای سایر اسناد: نمایش ساده
     return Card(
       elevation: 2,
@@ -3919,24 +4599,16 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           children: [
             _buildTotalItem(
               'جمع بدهکار',
-              formatWithThousands(_document!.totalDebit.toInt()),
+              formatWithThousands(_document!.totalDebit),
               SemanticColorResolver.negative(context),
             ),
-            Container(
-              width: 2,
-              height: 40,
-              color: theme.dividerColor,
-            ),
+            Container(width: 2, height: 40, color: theme.dividerColor),
             _buildTotalItem(
               'جمع بستانکار',
-              formatWithThousands(_document!.totalCredit.toInt()),
+              formatWithThousands(_document!.totalCredit),
               SemanticColorResolver.positive(context),
             ),
-            Container(
-              width: 2,
-              height: 40,
-              color: theme.dividerColor,
-            ),
+            Container(width: 2, height: 40, color: theme.dividerColor),
             _buildTotalItem(
               'تعداد سطرها',
               '${_document!.linesCount}',
@@ -3964,17 +4636,19 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         Text(
           value,
           textDirection: ui.TextDirection.ltr,
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-            color: color,
-            fontFeatures: const [FontFeature.tabularFigures()],
-          ) ?? TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-            color: color,
-            fontFeatures: const [FontFeature.tabularFigures()],
-          ),
+          style:
+              theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: color,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ) ??
+              TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: color,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
         ),
       ],
     );
@@ -3984,16 +4658,23 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     final entries = <_InvoicePaymentDisplayEntry>[];
     for (final doc in _paymentDocuments) {
       // فقط خطوط پرداخت مشتری؛ خطوط کارمزد داخلی (کسر بانک + ۷۰۹۰۲) نمایش داده نمی‌شوند.
-      final paymentLines = doc.accountLines.where((l) => !l.isCommissionLine).toList();
+      final paymentLines = doc.accountLines
+          .where((l) => !l.isCommissionLine)
+          .toList();
       if (paymentLines.isEmpty) {
         entries.add(_InvoicePaymentDisplayEntry(document: doc));
         continue;
       }
       for (final line in paymentLines) {
-        entries.add(_InvoicePaymentDisplayEntry(document: doc, accountLine: line));
+        entries.add(
+          _InvoicePaymentDisplayEntry(document: doc, accountLine: line),
+        );
       }
     }
-    entries.sort((a, b) => _paymentEntryDisplayDate(a).compareTo(_paymentEntryDisplayDate(b)));
+    entries.sort(
+      (a, b) =>
+          _paymentEntryDisplayDate(a).compareTo(_paymentEntryDisplayDate(b)),
+    );
     return entries;
   }
 
@@ -4040,11 +4721,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                Icon(
-                  Icons.payment,
-                  color: theme.colorScheme.primary,
-                  size: 24,
-                ),
+                Icon(Icons.payment, color: theme.colorScheme.primary, size: 24),
                 const SizedBox(width: 8),
                 Text(
                   'تراکنش‌های پرداخت',
@@ -4086,7 +4763,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     final isReceipt = doc.documentType == 'receipt';
     final displayAmount = _paymentEntryDisplayAmount(entry);
     final displayDate = _paymentEntryDisplayDate(entry);
-    
+
     // جمع‌آوری اطلاعات روش پرداخت
     final transactionMethods = <String>[];
     String? eiStr(AccountLine accountLine, String key) {
@@ -4106,24 +4783,31 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       String methodName;
       switch (accountLine.transactionType) {
         case 'bank':
-          final detail = eiStr(accountLine, 'bank_name') ?? accountTitle(accountLine);
+          final detail =
+              eiStr(accountLine, 'bank_name') ?? accountTitle(accountLine);
           methodName = detail != null ? 'بانک ($detail)' : 'بانک';
           break;
         case 'cash_register':
-          final detail = eiStr(accountLine, 'cash_register_name') ?? accountTitle(accountLine);
+          final detail =
+              eiStr(accountLine, 'cash_register_name') ??
+              accountTitle(accountLine);
           methodName = detail != null ? 'صندوق ($detail)' : 'صندوق';
           break;
         case 'petty_cash':
-          final detail = eiStr(accountLine, 'petty_cash_name') ?? accountTitle(accountLine);
+          final detail =
+              eiStr(accountLine, 'petty_cash_name') ??
+              accountTitle(accountLine);
           methodName = detail != null ? 'تنخواهگردان ($detail)' : 'تنخواهگردان';
           break;
         case 'check':
         case 'check_expense':
-          final detail = eiStr(accountLine, 'check_number') ?? accountTitle(accountLine);
+          final detail =
+              eiStr(accountLine, 'check_number') ?? accountTitle(accountLine);
           methodName = detail != null ? 'چک ($detail)' : 'چک';
           break;
         case 'person':
-          final detail = eiStr(accountLine, 'person_name') ?? accountTitle(accountLine);
+          final detail =
+              eiStr(accountLine, 'person_name') ?? accountTitle(accountLine);
           methodName = detail != null ? 'شخص ($detail)' : 'شخص';
           break;
         case 'wallet':
@@ -4131,7 +4815,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           methodName = detail != null ? 'کیف پول ($detail)' : 'کیف پول';
           break;
         case 'account':
-          methodName = accountLine.accountName.trim().isNotEmpty ? accountLine.accountName : 'حساب';
+          methodName = accountLine.accountName.trim().isNotEmpty
+              ? accountLine.accountName
+              : 'حساب';
           break;
         default:
           methodName = accountLine.transactionType ?? 'نامشخص';
@@ -4144,13 +4830,16 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     if (line != null) {
       addMethodFromLine(line);
     } else {
-      for (final accountLine in doc.accountLines.where((l) => !l.isCommissionLine)) {
+      for (final accountLine in doc.accountLines.where(
+        (l) => !l.isCommissionLine,
+      )) {
         addMethodFromLine(accountLine);
       }
     }
 
     final lineDescription = line?.description?.trim();
-    final displayDescription = (lineDescription != null && lineDescription.isNotEmpty)
+    final displayDescription =
+        (lineDescription != null && lineDescription.isNotEmpty)
         ? lineDescription
         : doc.description;
 
@@ -4166,7 +4855,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
               children: [
                 Icon(
                   isReceipt ? Icons.arrow_downward : Icons.arrow_upward,
-                  color: isReceipt ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
+                  color: isReceipt
+                      ? SemanticColorResolver.positive(context)
+                      : SemanticColorResolver.negative(context),
                   size: 20,
                 ),
                 SizedBox(width: 8),
@@ -4179,17 +4870,26 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
-                    color: isReceipt 
-                        ? SemanticColorResolver.positive(context).withValues(alpha: 0.1)
-                        : SemanticColorResolver.negative(context).withValues(alpha: 0.1),
+                    color: isReceipt
+                        ? SemanticColorResolver.positive(
+                            context,
+                          ).withValues(alpha: 0.1)
+                        : SemanticColorResolver.negative(
+                            context,
+                          ).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     isReceipt ? 'دریافت' : 'پرداخت',
                     style: TextStyle(
-                      color: isReceipt ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
+                      color: isReceipt
+                          ? SemanticColorResolver.positive(context)
+                          : SemanticColorResolver.negative(context),
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
                     ),
@@ -4228,17 +4928,19 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                 Expanded(
                   child: _buildPaymentInfoRow(
                     'مبلغ:',
-                    formatWithThousands(displayAmount.toInt()),
+                    formatWithThousands(displayAmount),
                     isAmount: true,
                   ),
                 ),
               ],
             ),
-            if (line != null && line.commission != null && line.commission! > 0) ...[
+            if (line != null &&
+                line.commission != null &&
+                line.commission! > 0) ...[
               const SizedBox(height: 8),
               _buildPaymentInfoRow(
                 'کارمزد بانکی:',
-                formatWithThousands(line.commission!.toInt()),
+                formatWithThousands(line.commission!),
                 isAmount: true,
               ),
             ],
@@ -4249,12 +4951,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                 transactionMethods.join('، '),
               ),
             ],
-            if (displayDescription != null && displayDescription.isNotEmpty) ...[
+            if (displayDescription != null &&
+                displayDescription.isNotEmpty) ...[
               const SizedBox(height: 8),
-              _buildPaymentInfoRow(
-                'توضیحات:',
-                displayDescription,
-              ),
+              _buildPaymentInfoRow('توضیحات:', displayDescription),
             ],
           ],
         ),
@@ -4263,7 +4963,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   }
 
   /// ساخت یک ردیف اطلاعات در کارت پرداخت
-  Widget _buildPaymentInfoRow(String label, String value, {bool isAmount = false}) {
+  Widget _buildPaymentInfoRow(
+    String label,
+    String value, {
+    bool isAmount = false,
+  }) {
     final theme = Theme.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -4285,18 +4989,16 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             textDirection: isAmount ? ui.TextDirection.ltr : null,
             style: isAmount
                 ? (theme.textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ) ?? const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                    fontFeatures: [FontFeature.tabularFigures()],
-                  ))
-                : TextStyle(
-                    fontWeight: FontWeight.normal,
-                    fontSize: 12,
-                  ),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ) ??
+                      const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ))
+                : TextStyle(fontWeight: FontWeight.normal, fontSize: 12),
           ),
         ),
       ],
@@ -4304,7 +5006,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   }
 
   // ==================== متدهای کمکی تراکنش‌ها ====================
-  
+
   /// تعیین نوع تراکنش بر اساس نوع فاکتور
   String _determineTransactionType() {
     final docType = _document?.documentType ?? '';
@@ -4318,7 +5020,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   /// محاسبه مانده قابل پرداخت
   num _calculateRemainingBalance() {
     final invoiceTotal = _invoicePayableTotal(_document?.extraInfo);
-    final currentTotal = _paymentDocuments.fold<num>(0, (sum, doc) => sum + doc.totalAmount);
+    final currentTotal = _paymentDocuments.fold<num>(
+      0,
+      (sum, doc) => sum + doc.totalAmount,
+    );
     return invoiceTotal - currentTotal;
   }
 
@@ -4338,8 +5043,8 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     // بررسی اینکه نوع فاکتور مجاز است
     final docType = _document!.documentType;
     if (!docType.startsWith('invoice')) return false;
-    if (docType == 'invoice_production' || 
-        docType == 'invoice_waste' || 
+    if (docType == 'invoice_production' ||
+        docType == 'invoice_waste' ||
         docType == 'invoice_direct_consumption') {
       return false;
     }
@@ -4366,22 +5071,26 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     final invoiceTotal = _invoicePayableTotal(_document?.extraInfo);
     final totalPaid = _calculateTotalPaid();
     final remaining = _calculateRemainingBalance();
-    final paidPercentage = invoiceTotal > 0 ? (totalPaid / invoiceTotal) * 100 : 0;
-    final remainingPercentage = invoiceTotal > 0 ? (remaining / invoiceTotal) * 100 : 0;
-    
-    final remainingColor = remaining > 0 
-        ? theme.colorScheme.error 
-        : remaining < 0 
-            ? theme.colorScheme.tertiary 
-            : theme.colorScheme.primary;
+    final paidPercentage = invoiceTotal > 0
+        ? (totalPaid / invoiceTotal) * 100
+        : 0;
+    final remainingPercentage = invoiceTotal > 0
+        ? (remaining / invoiceTotal) * 100
+        : 0;
+
+    final remainingColor = remaining > 0
+        ? theme.colorScheme.error
+        : remaining < 0
+        ? theme.colorScheme.tertiary
+        : theme.colorScheme.primary;
 
     return Card(
       elevation: 2,
-      color: remaining > 0 
+      color: remaining > 0
           ? theme.colorScheme.errorContainer.withValues(alpha: 0.3)
           : remaining < 0
-              ? theme.colorScheme.tertiaryContainer.withValues(alpha: 0.3)
-              : theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+          ? theme.colorScheme.tertiaryContainer.withValues(alpha: 0.3)
+          : theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -4390,11 +5099,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             Row(
               children: [
                 Icon(
-                  remaining > 0 
+                  remaining > 0
                       ? Icons.warning_amber_rounded
                       : remaining < 0
-                          ? Icons.info_outline
-                          : Icons.check_circle_outline,
+                      ? Icons.info_outline
+                      : Icons.check_circle_outline,
                   color: remainingColor,
                   size: 24,
                 ),
@@ -4414,7 +5123,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                   child: _buildBalanceRow(
                     theme,
                     'مبلغ کل فاکتور:',
-                    formatWithThousands(invoiceTotal.toInt()),
+                    formatWithThousands(invoiceTotal),
                     theme.colorScheme.onSurface,
                   ),
                 ),
@@ -4422,7 +5131,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                   child: _buildBalanceRow(
                     theme,
                     'مجموع تراکنش‌ها:',
-                    formatWithThousands(totalPaid.toInt()),
+                    formatWithThousands(totalPaid),
                     theme.colorScheme.onSurface,
                   ),
                 ),
@@ -4435,7 +5144,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                   child: _buildBalanceRow(
                     theme,
                     'مانده فاکتور:',
-                    formatWithThousands(remaining.toInt()),
+                    formatWithThousands(remaining),
                     remainingColor,
                     isBold: true,
                   ),
@@ -4456,12 +5165,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.errorContainer.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: theme.colorScheme.error,
-                    width: 1,
+                  color: theme.colorScheme.errorContainer.withValues(
+                    alpha: 0.5,
                   ),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: theme.colorScheme.error, width: 1),
                 ),
                 child: Row(
                   children: [
@@ -4473,7 +5181,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'فاکتور هنوز تسویه نشده است. مانده باقی‌مانده: ${formatWithThousands(remaining.toInt())} ریال',
+                        'فاکتور هنوز تسویه نشده است. مانده باقی‌مانده: ${formatWithThousands(remaining)} ${_document?.currencySymbol ?? _document?.currencyCode ?? 'ریال'}',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.error,
                           fontWeight: FontWeight.w500,
@@ -4548,10 +5256,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     if (newDocId == null) {
       throw Exception('شناسه سند دریافت/پرداخت از سرور نامعتبر است');
     }
-    await _updateInvoiceLinks(
-      [newDocId],
-      unionWithServerReceiptPaymentIds: true,
-    );
+    await _updateInvoiceLinks([
+      newDocId,
+    ], unionWithServerReceiptPaymentIds: true);
 
     if (mounted) {
       SnackBarHelper.showSuccess(context, message: 'تراکنش با موفقیت اضافه شد');
@@ -4562,11 +5269,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   /// افزودن تراکنش جدید
   Future<void> _addTransaction() async {
     if (!_canAddTransaction()) return;
-    
+
     final transactionType = _determineTransactionType();
     final personId = _document!.extraInfo?['person_id'] as int?;
     final personName = _document!.extraInfo?['person_name'] as String?;
-    
+
     if (personId == null) {
       SnackBarHelper.showError(context, message: 'فاکتور باید دارای شخص باشد');
       return;
@@ -4583,12 +5290,16 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         existingDocuments: _paymentDocuments,
         onSave: (data) async {
           try {
-            return await _createReceiptPaymentFromFormData(data, transactionType);
+            return await _createReceiptPaymentFromFormData(
+              data,
+              transactionType,
+            );
           } catch (e) {
             if (mounted) {
               SnackBarHelper.showError(
                 context,
-                message: 'خطا در افزودن تراکنش: ${ErrorExtractor.forContext(e, context)}',
+                message:
+                    'خطا در افزودن تراکنش: ${ErrorExtractor.forContext(e, context)}',
               );
             }
             rethrow;
@@ -4607,7 +5318,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     final t = AppLocalizations.of(context)!;
     final transactionType = _determineTransactionType();
     if (transactionType != 'receipt') {
-      SnackBarHelper.showError(context, message: t.documentDetailsInstallmentReceiptTypeOnly);
+      SnackBarHelper.showError(
+        context,
+        message: t.documentDetailsInstallmentReceiptTypeOnly,
+      );
       return;
     }
     final personId = _document!.extraInfo?['person_id'] as int?;
@@ -4633,12 +5347,16 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         initialDescription: desc,
         onSave: (data) async {
           try {
-            return await _createReceiptPaymentFromFormData(data, transactionType);
+            return await _createReceiptPaymentFromFormData(
+              data,
+              transactionType,
+            );
           } catch (e) {
             if (mounted) {
               SnackBarHelper.showError(
                 context,
-                message: 'خطا در افزودن تراکنش: ${ErrorExtractor.forContext(e, context)}',
+                message:
+                    'خطا در افزودن تراکنش: ${ErrorExtractor.forContext(e, context)}',
               );
             }
             rethrow;
@@ -4651,11 +5369,15 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   /// ویرایش تراکنش موجود
   Future<void> _editTransaction(ReceiptPaymentDocument doc) async {
     if (!_canAddTransaction()) return;
-    
+
     final transactionType = doc.documentType;
-    final personId = doc.personLines.isNotEmpty ? doc.personLines.first.personId : null;
-    final personName = doc.personLines.isNotEmpty ? doc.personLines.first.personName : null;
-    
+    final personId = doc.personLines.isNotEmpty
+        ? doc.personLines.first.personId
+        : null;
+    final personName = doc.personLines.isNotEmpty
+        ? doc.personLines.first.personName
+        : null;
+
     // باز کردن دیالوگ ویرایش تراکنش
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -4679,23 +5401,27 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
               description: data['description'] as String?,
               extraInfo: data['extra_info'] as Map<String, dynamic>?,
             );
-            
+
             // رفرش لیست تراکنش‌ها
             // دریافت document به‌روزرسانی شده از سرور
             if (mounted) {
               await _loadDocument();
             }
-            
+
             if (mounted) {
-              SnackBarHelper.showSuccess(context, message: 'تراکنش با موفقیت به‌روزرسانی شد');
+              SnackBarHelper.showSuccess(
+                context,
+                message: 'تراکنش با موفقیت به‌روزرسانی شد',
+              );
             }
-            
+
             return updated;
           } catch (e) {
             if (mounted) {
               SnackBarHelper.showError(
                 context,
-                message: 'خطا در به‌روزرسانی تراکنش: ${ErrorExtractor.forContext(e, context)}',
+                message:
+                    'خطا در به‌روزرسانی تراکنش: ${ErrorExtractor.forContext(e, context)}',
               );
             }
             rethrow;
@@ -4735,12 +5461,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       // حذف سند دریافت/پرداخت
       await _receiptPaymentService.deleteReceiptPayment(doc.id);
 
-      await _updateInvoiceLinks(
-        const [],
-        removeReceiptPaymentId: doc.id,
-      );
+      await _updateInvoiceLinks(const [], removeReceiptPaymentId: doc.id);
       // توجه: _updateInvoiceLinks خودش _loadDocument را فراخوانی می‌کند که _loadPaymentDocuments را هم فراخوانی می‌کند
-      
+
       if (mounted) {
         SnackBarHelper.showSuccess(context, message: 'تراکنش با موفقیت حذف شد');
       }
@@ -4748,7 +5471,8 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       if (mounted) {
         SnackBarHelper.showError(
           context,
-          message: 'خطا در حذف تراکنش: ${ErrorExtractor.forContext(e, context)}',
+          message:
+              'خطا در حذف تراکنش: ${ErrorExtractor.forContext(e, context)}',
         );
       }
     }
@@ -4767,17 +5491,22 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
 
     try {
       final api = ApiClient();
-      
+
       // دریافت invoice به‌روزرسانی شده از سرور برای اطمینان از به‌روز بودن extra_info و product_lines
       Map<String, dynamic>? latestExtraInfo;
       Map<String, dynamic>? invoiceItem;
-      
+
       try {
-        final invoiceResponse = await api.get('/invoices/business/${_document!.businessId}/${_document!.id}');
+        final invoiceResponse = await api.get(
+          '/invoices/business/${_document!.businessId}/${_document!.id}',
+        );
         if (invoiceResponse.data['success'] == true) {
-          invoiceItem = invoiceResponse.data['data']?['item'] as Map<String, dynamic>?;
+          invoiceItem =
+              invoiceResponse.data['data']?['item'] as Map<String, dynamic>?;
           if (invoiceItem != null && invoiceItem['extra_info'] != null) {
-            latestExtraInfo = Map<String, dynamic>.from(invoiceItem['extra_info'] as Map<String, dynamic>);
+            latestExtraInfo = Map<String, dynamic>.from(
+              invoiceItem['extra_info'] as Map<String, dynamic>,
+            );
           }
         }
       } catch (e) {
@@ -4788,9 +5517,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           latestExtraInfo = Map<String, dynamic>.from(fallbackExtra);
         }
       }
-      
+
       // استفاده از extra_info به‌روزرسانی شده یا فعلی document
-      final currentExtraInfo = Map<String, dynamic>.from(latestExtraInfo ?? _document!.extraInfo ?? {});
+      final currentExtraInfo = Map<String, dynamic>.from(
+        latestExtraInfo ?? _document!.extraInfo ?? {},
+      );
       final serverLinksRaw = currentExtraInfo['links'];
       final serverLinks = serverLinksRaw is Map<String, dynamic>
           ? Map<String, dynamic>.from(serverLinksRaw)
@@ -4801,8 +5532,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
 
       final List<int> finalRpIds;
       if (removeReceiptPaymentId != null) {
-        finalRpIds =
-            serverRpIds.where((id) => id != removeReceiptPaymentId).toList();
+        finalRpIds = serverRpIds
+            .where((id) => id != removeReceiptPaymentId)
+            .toList();
       } else if (unionWithServerReceiptPaymentIds) {
         finalRpIds = {...serverRpIds, ...receiptPaymentIds}.toList()..sort();
       } else {
@@ -4812,7 +5544,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       final currentLinks = Map<String, dynamic>.from(serverLinks);
       currentLinks['receipt_payment_document_ids'] = finalRpIds;
       currentExtraInfo['links'] = currentLinks;
-      
+
       // دریافت product_lines از invoiceItem (که از API یا _rawDocumentData دریافت کردیم)
       List<Map<String, dynamic>> lines = [];
       if (invoiceItem != null) {
@@ -4829,13 +5561,16 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           }).toList();
         }
       }
-      
+
       // اگر هنوز lines خالی است، یک بار دیگر از API دریافت کن
       if (lines.isEmpty) {
         try {
-          final invoiceResponse = await api.get('/invoices/business/${_document!.businessId}/${_document!.id}');
+          final invoiceResponse = await api.get(
+            '/invoices/business/${_document!.businessId}/${_document!.id}',
+          );
           if (invoiceResponse.data['success'] == true) {
-            final item = invoiceResponse.data['data']?['item'] as Map<String, dynamic>?;
+            final item =
+                invoiceResponse.data['data']?['item'] as Map<String, dynamic>?;
             if (item != null) {
               final productLines = item['product_lines'] as List<dynamic>?;
               if (productLines != null && productLines.isNotEmpty) {
@@ -4858,19 +5593,16 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           );
         }
       }
-      
+
       if (lines.isEmpty) {
         throw Exception('خطا: فاکتور باید حداقل یک ردیف داشته باشد');
       }
-      
+
       await api.put(
         '/invoices/business/${_document!.businessId}/${_document!.id}',
-        data: {
-          'extra_info': currentExtraInfo,
-          'lines': lines,
-        },
+        data: {'extra_info': currentExtraInfo, 'lines': lines},
       );
-      
+
       // دریافت document به‌روزرسانی شده از سرور
       if (mounted) {
         await _loadDocument();
@@ -4879,7 +5611,8 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       if (mounted) {
         SnackBarHelper.showError(
           context,
-          message: 'خطا در به‌روزرسانی لینک‌های فاکتور: ${ErrorExtractor.forContext(e, context)}',
+          message:
+              'خطا در به‌روزرسانی لینک‌های فاکتور: ${ErrorExtractor.forContext(e, context)}',
         );
       }
       rethrow;
@@ -4889,56 +5622,60 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   /// ساخت فوتر دیالوگ
   Widget _buildFooter({bool dense = false}) {
     final t = AppLocalizations.of(context)!;
-    final showEdit = _document != null &&
+    final showEdit =
+        _document != null &&
         _document!.documentType.startsWith('invoice') &&
         (ApiClient.getAuthStore()?.canWriteSection('invoices') ?? false);
 
     Widget pdfButton() => OutlinedButton.icon(
-          onPressed: _isGeneratingPdf
-              ? null
-              : () {
-                  final d = _document;
-                  if (d != null && d.documentType.startsWith('invoice')) {
-                    _onInvoicePrintPdfTapped();
-                  } else {
-                    _generatePdf();
-                  }
-                },
-          icon: _isGeneratingPdf
-              ? const SizedBox(
-                  width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-              : const Icon(Icons.picture_as_pdf),
-          label: Text(_isGeneratingPdf ? t.generating : t.printPdf),
-        );
+      onPressed: _isGeneratingPdf
+          ? null
+          : () {
+              final d = _document;
+              if (d != null && d.documentType.startsWith('invoice')) {
+                _onInvoicePrintPdfTapped();
+              } else {
+                _generatePdf();
+              }
+            },
+      icon: _isGeneratingPdf
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.picture_as_pdf),
+      label: Text(_isGeneratingPdf ? t.generating : t.printPdf),
+    );
 
     Widget editButton() => OutlinedButton.icon(
-          onPressed: () {
-            final doc = _document!;
-            final bid = doc.businessId;
-            final invoiceId = doc.id;
-            Navigator.of(context).pop();
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              final ctx = navigatorKey.currentContext;
-              if (ctx == null || !ctx.mounted) return;
-              BusinessNamedRoutes.pushNamed(
-                ctx,
-                businessId: bid,
-                routeName: 'business_edit_invoice',
-                pathParameters: {
-                  'business_id': bid.toString(),
-                  'invoice_id': invoiceId.toString(),
-                },
-              );
-            });
-          },
-          icon: const Icon(Icons.edit_outlined),
-          label: Text('${t.edit} ${t.invoice}'),
-        );
+      onPressed: () {
+        final doc = _document!;
+        final bid = doc.businessId;
+        final invoiceId = doc.id;
+        Navigator.of(context).pop();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final ctx = navigatorKey.currentContext;
+          if (ctx == null || !ctx.mounted) return;
+          BusinessNamedRoutes.pushNamed(
+            ctx,
+            businessId: bid,
+            routeName: 'business_edit_invoice',
+            pathParameters: {
+              'business_id': bid.toString(),
+              'invoice_id': invoiceId.toString(),
+            },
+          );
+        });
+      },
+      icon: const Icon(Icons.edit_outlined),
+      label: Text('${t.edit} ${t.invoice}'),
+    );
 
     Widget closeButton() => ElevatedButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('بستن'),
-        );
+      onPressed: () => Navigator.pop(context),
+      child: const Text('بستن'),
+    );
 
     final rowChildren = <Widget>[
       pdfButton(),
@@ -4950,10 +5687,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       padding: EdgeInsets.all(dense ? 8 : 16),
       decoration: BoxDecoration(
         border: Border(
-          top: BorderSide(
-            color: Theme.of(context).dividerColor,
-            width: 1,
-          ),
+          top: BorderSide(color: Theme.of(context).dividerColor, width: 1),
         ),
       ),
       child: dense
@@ -5002,7 +5736,9 @@ class _InfoTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final displayValue = (row.value == null || row.value!.trim().isEmpty) ? '-' : row.value!;
+    final displayValue = (row.value == null || row.value!.trim().isEmpty)
+        ? '-'
+        : row.value!;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -5013,11 +5749,18 @@ class _InfoTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(row.label, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          Text(
+            row.label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
           const SizedBox(height: 6),
           Text(
             displayValue,
-            style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+            style: theme.textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -5035,10 +5778,13 @@ class _ReceiptPaymentTransactionDialog extends StatefulWidget {
   final List<ReceiptPaymentDocument> existingDocuments;
   final ReceiptPaymentDocument? existingDocument;
   final Future<Map<String, dynamic>> Function(Map<String, dynamic> data) onSave;
+
   /// در حالت تراکنش جدید: پیش‌تخصیص به این شماره قسط
   final int? initialInstallmentSeq;
+
   /// مبلغ پیش‌فرض تخصیص (معمولاً ماندهٔ همان قسط)
   final double? initialInstallmentAllocationAmount;
+
   /// توضیح پیش‌فرض (مثلاً «قسط N فاکتور CODE»)
   final String? initialDescription;
 
@@ -5057,66 +5803,77 @@ class _ReceiptPaymentTransactionDialog extends StatefulWidget {
   });
 
   @override
-  State<_ReceiptPaymentTransactionDialog> createState() => _ReceiptPaymentTransactionDialogState();
+  State<_ReceiptPaymentTransactionDialog> createState() =>
+      _ReceiptPaymentTransactionDialogState();
 }
 
-class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransactionDialog> {
+class _ReceiptPaymentTransactionDialogState
+    extends State<_ReceiptPaymentTransactionDialog> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _commissionController = TextEditingController();
   final _descriptionController = TextEditingController();
-  
+  final CurrencyService _currencyService = CurrencyService(ApiClient());
+  int _currencyDecimalPlaces = 8;
+  bool _amountManuallyEdited = false;
+  bool _commissionManuallyEdited = false;
+  String get _currencyLabel =>
+      widget.document.currencySymbol ?? widget.document.currencyCode ?? 'ریال';
+
   DateTime _transactionDate = DateTime.now();
-  String? _selectedTransactionMethod; // 'bank', 'cash_register', 'petty_cash', 'check', 'person', 'account'
+  String?
+  _selectedTransactionMethod; // 'bank', 'cash_register', 'petty_cash', 'check', 'person', 'account'
   String? _selectedBankId;
   String? _selectedCashRegisterId;
   String? _selectedPettyCashId;
   String? _selectedCheckId;
   String? _selectedCheckNumber;
   AccountTreeNode? _selectedAccount;
-  
+
   // اقساط
   Map<int, double> _installmentAllocations = {}; // seq -> amount
-  
+
   bool _isLoading = false;
   bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    
+
     // اگر در حال ویرایش هستیم، مقادیر را از سند موجود پر کنیم
     if (widget.existingDocument != null) {
       final doc = widget.existingDocument!;
       _transactionDate = doc.documentDate;
-      _amountController.text = formatWithThousands(doc.totalAmount, decimalPlaces: 0);
+      _amountController.text = doc.totalAmount.toString();
       _descriptionController.text = doc.description ?? '';
-      
+
       // تعیین روش پرداخت از خطوط حساب (بدون خطوط کارمزد داخلی)
-      final paymentLines = doc.accountLines.where((l) => !l.isCommissionLine).toList();
+      final paymentLines = doc.accountLines
+          .where((l) => !l.isCommissionLine)
+          .toList();
       if (paymentLines.isNotEmpty) {
         final firstLine = paymentLines.first;
         _selectedTransactionMethod = firstLine.transactionType;
         if (firstLine.commission != null && firstLine.commission! > 0) {
-          _commissionController.text = formatWithThousands(
-            firstLine.commission!,
-            decimalPlaces: 0,
-          );
+          _commissionController.text = firstLine.commission!.toString();
         }
         if (_selectedTransactionMethod == 'bank') {
           _selectedBankId = firstLine.extraInfo?['bank_id']?.toString();
         } else if (_selectedTransactionMethod == 'cash_register') {
-          _selectedCashRegisterId = firstLine.extraInfo?['cash_register_id']?.toString();
+          _selectedCashRegisterId = firstLine.extraInfo?['cash_register_id']
+              ?.toString();
         } else if (_selectedTransactionMethod == 'petty_cash') {
-          _selectedPettyCashId = firstLine.extraInfo?['petty_cash_id']?.toString();
+          _selectedPettyCashId = firstLine.extraInfo?['petty_cash_id']
+              ?.toString();
         } else if (_selectedTransactionMethod == 'check') {
           _selectedCheckId = firstLine.extraInfo?['check_id']?.toString();
-          _selectedCheckNumber = firstLine.extraInfo?['check_number']?.toString();
+          _selectedCheckNumber = firstLine.extraInfo?['check_number']
+              ?.toString();
         } else if (_selectedTransactionMethod == 'account') {
           // باید account را از account_id پیدا کنیم
         }
       }
-      
+
       // بارگذاری اقساط از extra_info
       if (doc.extraInfo != null) {
         final settlements = doc.extraInfo!['settlements'] as List<dynamic>?;
@@ -5145,21 +5902,82 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
       final alloc = widget.initialInstallmentAllocationAmount;
       if (seq != null && alloc != null && alloc > 0) {
         _installmentAllocations[seq] = alloc;
-        _amountController.text = formatWithThousands(alloc, decimalPlaces: (alloc % 1 == 0) ? 0 : 2);
+        _amountController.text = formatWithThousands(
+          alloc,
+          decimalPlaces: _currencyDecimalPlaces,
+        );
       }
       final presetDesc = widget.initialDescription;
       if (presetDesc != null && presetDesc.trim().isNotEmpty) {
         _descriptionController.text = presetDesc.trim();
       }
     }
+    _loadCurrencyPrecision();
+  }
+
+  Future<void> _loadCurrencyPrecision() async {
+    try {
+      final currencies = await _currencyService.listBusinessCurrencies(
+        businessId: widget.document.businessId,
+      );
+      Map<String, dynamic>? selected;
+      for (final currency in currencies) {
+        if ((currency['id'] as num?)?.toInt() == widget.document.currencyId) {
+          selected = currency;
+          break;
+        }
+      }
+      if (!mounted || selected == null) return;
+      final configuredPlaces =
+          ((selected['decimal_places'] as num?)?.toInt() ?? 2)
+              .clamp(0, 8)
+              .toInt();
+      final places = selected['round_monetary_amounts'] == false
+          ? 8
+          : configuredPlaces;
+      setState(() => _currencyDecimalPlaces = places);
+      final existing = widget.existingDocument;
+      if (existing != null) {
+        if (!_amountManuallyEdited) {
+          _amountController.text = formatWithThousands(
+            existing.totalAmount,
+            decimalPlaces: places,
+          );
+        }
+        double? commission;
+        for (final line in existing.accountLines.where(
+          (line) => !line.isCommissionLine,
+        )) {
+          if (line.commission != null) {
+            commission = line.commission;
+            break;
+          }
+        }
+        if (commission != null && !_commissionManuallyEdited) {
+          _commissionController.text = formatWithThousands(
+            commission,
+            decimalPlaces: places,
+          );
+        }
+      } else if (widget.initialInstallmentAllocationAmount != null &&
+          !_amountManuallyEdited) {
+        _amountController.text = formatWithThousands(
+          widget.initialInstallmentAllocationAmount!,
+          decimalPlaces: places,
+        );
+      }
+    } catch (_) {
+      // Keep the unrounded input text if currency metadata is unavailable.
+    }
   }
 
   Future<void> _applySavedDefaultPaymentMethod() async {
     if (widget.existingDocument != null || !mounted) return;
-    final resolved = await InvoiceTransactionPreferences.resolveInitialTransactionType(
-      widget.document.businessId,
-      InvoiceTransactionPreferences.receiptPaymentDialogTypes,
-    );
+    final resolved =
+        await InvoiceTransactionPreferences.resolveInitialTransactionType(
+          widget.document.businessId,
+          InvoiceTransactionPreferences.receiptPaymentDialogTypes,
+        );
     if (widget.existingDocument != null || !mounted) return;
     setState(() => _selectedTransactionMethod = resolved.value);
   }
@@ -5191,346 +6009,375 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
       mainAxisSize: MainAxisSize.max,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-            // هدر
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary,
-                borderRadius: headerRadius,
+        // هدر
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primary,
+            borderRadius: headerRadius,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.receipt_long_outlined,
+                color: theme.colorScheme.onPrimary,
+                size: 24,
               ),
-              child: Row(
+              SizedBox(width: 8),
+              Text(
+                isEdit ? 'ویرایش تراکنش' : 'افزودن تراکنش',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  color: theme.colorScheme.onPrimary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: Icon(Icons.close),
+                color: theme.colorScheme.onPrimary,
+              ),
+            ],
+          ),
+        ),
+
+        // فرم
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Icon(
-                    Icons.receipt_long_outlined,
-                    color: theme.colorScheme.onPrimary,
-                    size: 24,
-                  ),
-                  SizedBox(width: 8),
-                  Text(
-                    isEdit ? 'ویرایش تراکنش' : 'افزودن تراکنش',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      color: theme.colorScheme.onPrimary,
-                      fontWeight: FontWeight.bold,
+                  // نوع تراکنش (غیرقابل تغییر)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          widget.transactionType == 'receipt'
+                              ? Icons.arrow_downward
+                              : Icons.arrow_upward,
+                          color: widget.transactionType == 'receipt'
+                              ? SemanticColorResolver.positive(context)
+                              : SemanticColorResolver.negative(context),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'نوع تراکنش: ${widget.transactionType == 'receipt' ? 'دریافت' : 'پرداخت'}',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.close),
-                    color: theme.colorScheme.onPrimary,
-                  ),
-                ],
-              ),
-            ),
+                  const SizedBox(height: 16),
 
-            // فرم
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // نوع تراکنش (غیرقابل تغییر)
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              widget.transactionType == 'receipt' 
-                                  ? Icons.arrow_downward 
-                                  : Icons.arrow_upward,
-                              color: widget.transactionType == 'receipt' 
-                                  ? SemanticColorResolver.positive(context) 
-                                  : SemanticColorResolver.negative(context),
+                  // شخص (غیرقابل تغییر)
+                  if (widget.personId != null && widget.personName != null)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.person),
+                          const SizedBox(width: 8),
+                          Text(
+                            'شخص: ${widget.personName}',
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.w600,
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'نوع تراکنش: ${widget.transactionType == 'receipt' ? 'دریافت' : 'پرداخت'}',
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      
-                      // شخص (غیرقابل تغییر)
-                      if (widget.personId != null && widget.personName != null)
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.person),
-                              const SizedBox(width: 8),
-                              Text(
-                                'شخص: ${widget.personName}',
-                                style: theme.textTheme.bodyLarge?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      const SizedBox(height: 16),
-                      
-                      // تاریخ تراکنش
-                      DateInputField(
-                        value: _transactionDate,
-                        onChanged: (date) {
-                          if (date != null) {
-                            setState(() {
-                              _transactionDate = date;
-                            });
-                          }
-                        },
-                        labelText: 'تاریخ تراکنش *',
-                        calendarController: widget.calendarController,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime(2030),
-                      ),
-                      const SizedBox(height: 16),
-                      
-                      // مبلغ
-                      AmountFieldWordsTooltip(
-                        controller: _amountController,
-                        currencyUnit: 'ریال',
-                        child: TextFormField(
-                          controller: _amountController,
-                          decoration: const InputDecoration(
-                            labelText: 'مبلغ *',
-                            border: OutlineInputBorder(),
-                            suffixText: 'ریال',
-                          ),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            EnglishDigitsFormatter(),
-                            FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                            ThousandsSeparatorInputFormatter(allowDecimal: false),
-                          ],
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'مبلغ الزامی است';
-                            }
-                            final cleanValue = value.replaceAll(',', '');
-                            final amount = double.tryParse(cleanValue);
-                            if (amount == null || amount <= 0) {
-                              return 'مبلغ باید عدد مثبت باشد';
-                            }
-                            // اعتبارسنجی محدودیت مبلغ
-                            if (!_validateAmount(amount)) {
-                              return 'مجموع تراکنش‌ها از مبلغ فاکتور بیشتر است';
-                            }
-                            return null;
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      
-                      // روش پرداخت
-                      DropdownButtonFormField<String>(
-                        key: ValueKey(_selectedTransactionMethod),
-                        initialValue: _selectedTransactionMethod,
-                        decoration: const InputDecoration(
-                          labelText: 'روش پرداخت *',
-                          border: OutlineInputBorder(),
-                        ),
-                        items: [
-                          const DropdownMenuItem(value: 'bank', child: Text('بانک')),
-                          const DropdownMenuItem(value: 'cash_register', child: Text('صندوق')),
-                          const DropdownMenuItem(value: 'petty_cash', child: Text('تنخواهگردان')),
-                          const DropdownMenuItem(value: 'check', child: Text('چک')),
-                          const DropdownMenuItem(value: 'person', child: Text('شخص')),
-                          const DropdownMenuItem(value: 'account', child: Text('حساب')),
                         ],
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedTransactionMethod = value;
-                            // پاک کردن انتخاب‌های قبلی
-                            _selectedBankId = null;
-                            _selectedCashRegisterId = null;
-                            _selectedPettyCashId = null;
-                            _selectedCheckId = null;
-                            _selectedAccount = null;
-                          });
-                        },
                       ),
-                      const SizedBox(height: 16),
-                      
-                      // فیلدهای خاص هر روش پرداخت
-                      if (_selectedTransactionMethod == 'bank')
-                        BankAccountComboboxWidget(
-                          businessId: widget.document.businessId,
-                          selectedAccountId: _selectedBankId,
-                          filterCurrencyId: widget.document.currencyId,
-                          onChanged: (opt) {
-                            setState(() {
-                              _selectedBankId = opt?.id;
-                            });
-                          },
-                          label: 'بانک *',
-                          hintText: 'جست‌وجو و انتخاب بانک',
-                          isRequired: true,
-                        ),
-                      if (_selectedTransactionMethod == 'cash_register')
-                        CashRegisterComboboxWidget(
-                          businessId: widget.document.businessId,
-                          selectedRegisterId: _selectedCashRegisterId,
-                          filterCurrencyId: widget.document.currencyId,
-                          onChanged: (opt) {
-                            setState(() {
-                              _selectedCashRegisterId = opt?.id;
-                            });
-                          },
-                          label: 'صندوق *',
-                          hintText: 'جست‌وجو و انتخاب صندوق',
-                          isRequired: true,
-                        ),
-                      if (_selectedTransactionMethod == 'petty_cash')
-                        PettyCashComboboxWidget(
-                          businessId: widget.document.businessId,
-                          selectedPettyCashId: _selectedPettyCashId,
-                          filterCurrencyId: widget.document.currencyId,
-                          onChanged: (opt) {
-                            setState(() {
-                              _selectedPettyCashId = opt?.id;
-                            });
-                          },
-                          label: 'تنخواهگردان *',
-                          hintText: 'جست‌وجو و انتخاب تنخواه‌گردان',
-                          isRequired: true,
-                        ),
-                      if (_selectedTransactionMethod == 'check')
-                        CheckComboboxWidget(
-                          businessId: widget.document.businessId,
-                          selectedCheckId: _selectedCheckId,
-                          selectedCheckNumber: _selectedCheckNumber,
-                          filterCurrencyId: widget.document.currencyId,
-                          mode: widget.transactionType == 'receipt' 
-                              ? CheckPickerMode.receipt 
-                              : CheckPickerMode.payment,
-                          onChanged: (opt) {
-                            setState(() {
-                              _selectedCheckId = opt?.id;
-                              _selectedCheckNumber = opt?.number;
-                            });
-                          },
-                          label: 'چک *',
-                          hintText: 'جست‌وجو و انتخاب چک',
-                          calendarController: widget.calendarController,
-                          authStore: null, // اختیاری است
-                        ),
-                      if (_selectedTransactionMethod == 'account')
-                        AccountTreeComboboxWidget(
-                          businessId: widget.document.businessId,
-                          selectedAccount: _selectedAccount?.toAccount(),
-                          onChanged: (account) {
-                            setState(() {
-                              if (account != null) {
-                                _selectedAccount = AccountTreeNode(
-                                  id: account.id!,
-                                  code: account.code,
-                                  name: account.name,
-                                  accountType: account.accountType,
-                                  parentId: account.parentId,
-                                );
-                              } else {
-                                _selectedAccount = null;
-                              }
-                            });
-                          },
-                          label: 'حساب *',
-                          hintText: 'انتخاب حساب',
-                          isRequired: true,
-                        ),
-                      
-                      if (_selectedTransactionMethod != null) const SizedBox(height: 16),
-                      
-                      // کارمزد
-                      AmountFieldWordsTooltip(
-                        controller: _commissionController,
-                        currencyUnit: 'ریال',
-                        child: TextFormField(
-                          controller: _commissionController,
-                          decoration: const InputDecoration(
-                            labelText: 'کارمزد',
-                            border: OutlineInputBorder(),
-                            suffixText: 'ریال',
-                          ),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            EnglishDigitsFormatter(),
-                            FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                            ThousandsSeparatorInputFormatter(allowDecimal: false),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      
-                      // توضیحات
-                      TextFormField(
-                        controller: _descriptionController,
-                        decoration: const InputDecoration(
-                          labelText: 'توضیحات',
-                          border: OutlineInputBorder(),
-                        ),
-                        maxLines: 3,
-                      ),
-                      
-                      // بخش اقساط (فقط برای دریافت و اگر فاکتور دارای installment_plan باشد)
-                      if (hasInstallmentPlan && widget.transactionType == 'receipt') ...[
-                        const SizedBox(height: 24),
-                        _buildInstallmentsSection(theme),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ),
+                    ),
+                  const SizedBox(height: 16),
 
-            // دکمه‌ها
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(isMobile ? 0 : 12),
-                  bottomRight: Radius.circular(isMobile ? 0 : 12),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: _isSaving ? null : () => Navigator.pop(context),
-                    child: const Text('انصراف'),
+                  // تاریخ تراکنش
+                  DateInputField(
+                    value: _transactionDate,
+                    onChanged: (date) {
+                      if (date != null) {
+                        setState(() {
+                          _transactionDate = date;
+                        });
+                      }
+                    },
+                    labelText: 'تاریخ تراکنش *',
+                    calendarController: widget.calendarController,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2030),
                   ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: _isSaving ? null : _saveTransaction,
-                    child: _isSaving
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(isEdit ? 'ذخیره' : 'افزودن'),
+                  const SizedBox(height: 16),
+
+                  // مبلغ
+                  AmountFieldWordsTooltip(
+                    controller: _amountController,
+                    currencyUnit: _currencyLabel,
+                    child: TextFormField(
+                      controller: _amountController,
+                      decoration: InputDecoration(
+                        labelText: 'مبلغ *',
+                        border: OutlineInputBorder(),
+                        suffixText: _currencyLabel,
+                      ),
+                      keyboardType: TextInputType.numberWithOptions(
+                        decimal: _currencyDecimalPlaces > 0,
+                      ),
+                      inputFormatters: [
+                        EnglishDigitsFormatter(),
+                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                        ThousandsSeparatorInputFormatter(
+                          allowDecimal: true,
+                          maxDecimalPlaces: _currencyDecimalPlaces,
+                        ),
+                      ],
+                      onChanged: (_) => _amountManuallyEdited = true,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'مبلغ الزامی است';
+                        }
+                        final cleanValue = value.replaceAll(',', '');
+                        final amount = double.tryParse(cleanValue);
+                        if (amount == null || amount <= 0) {
+                          return 'مبلغ باید عدد مثبت باشد';
+                        }
+                        // اعتبارسنجی محدودیت مبلغ
+                        if (!_validateAmount(amount)) {
+                          return 'مجموع تراکنش‌ها از مبلغ فاکتور بیشتر است';
+                        }
+                        return null;
+                      },
+                    ),
                   ),
+                  const SizedBox(height: 16),
+
+                  // روش پرداخت
+                  DropdownButtonFormField<String>(
+                    key: ValueKey(_selectedTransactionMethod),
+                    initialValue: _selectedTransactionMethod,
+                    decoration: const InputDecoration(
+                      labelText: 'روش پرداخت *',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: [
+                      const DropdownMenuItem(
+                        value: 'bank',
+                        child: Text('بانک'),
+                      ),
+                      const DropdownMenuItem(
+                        value: 'cash_register',
+                        child: Text('صندوق'),
+                      ),
+                      const DropdownMenuItem(
+                        value: 'petty_cash',
+                        child: Text('تنخواهگردان'),
+                      ),
+                      const DropdownMenuItem(value: 'check', child: Text('چک')),
+                      const DropdownMenuItem(
+                        value: 'person',
+                        child: Text('شخص'),
+                      ),
+                      const DropdownMenuItem(
+                        value: 'account',
+                        child: Text('حساب'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedTransactionMethod = value;
+                        // پاک کردن انتخاب‌های قبلی
+                        _selectedBankId = null;
+                        _selectedCashRegisterId = null;
+                        _selectedPettyCashId = null;
+                        _selectedCheckId = null;
+                        _selectedAccount = null;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // فیلدهای خاص هر روش پرداخت
+                  if (_selectedTransactionMethod == 'bank')
+                    BankAccountComboboxWidget(
+                      businessId: widget.document.businessId,
+                      selectedAccountId: _selectedBankId,
+                      filterCurrencyId: widget.document.currencyId,
+                      onChanged: (opt) {
+                        setState(() {
+                          _selectedBankId = opt?.id;
+                        });
+                      },
+                      label: 'بانک *',
+                      hintText: 'جست‌وجو و انتخاب بانک',
+                      isRequired: true,
+                    ),
+                  if (_selectedTransactionMethod == 'cash_register')
+                    CashRegisterComboboxWidget(
+                      businessId: widget.document.businessId,
+                      selectedRegisterId: _selectedCashRegisterId,
+                      filterCurrencyId: widget.document.currencyId,
+                      onChanged: (opt) {
+                        setState(() {
+                          _selectedCashRegisterId = opt?.id;
+                        });
+                      },
+                      label: 'صندوق *',
+                      hintText: 'جست‌وجو و انتخاب صندوق',
+                      isRequired: true,
+                    ),
+                  if (_selectedTransactionMethod == 'petty_cash')
+                    PettyCashComboboxWidget(
+                      businessId: widget.document.businessId,
+                      selectedPettyCashId: _selectedPettyCashId,
+                      filterCurrencyId: widget.document.currencyId,
+                      onChanged: (opt) {
+                        setState(() {
+                          _selectedPettyCashId = opt?.id;
+                        });
+                      },
+                      label: 'تنخواهگردان *',
+                      hintText: 'جست‌وجو و انتخاب تنخواه‌گردان',
+                      isRequired: true,
+                    ),
+                  if (_selectedTransactionMethod == 'check')
+                    CheckComboboxWidget(
+                      businessId: widget.document.businessId,
+                      selectedCheckId: _selectedCheckId,
+                      selectedCheckNumber: _selectedCheckNumber,
+                      filterCurrencyId: widget.document.currencyId,
+                      mode: widget.transactionType == 'receipt'
+                          ? CheckPickerMode.receipt
+                          : CheckPickerMode.payment,
+                      onChanged: (opt) {
+                        setState(() {
+                          _selectedCheckId = opt?.id;
+                          _selectedCheckNumber = opt?.number;
+                        });
+                      },
+                      label: 'چک *',
+                      hintText: 'جست‌وجو و انتخاب چک',
+                      calendarController: widget.calendarController,
+                      authStore: null, // اختیاری است
+                    ),
+                  if (_selectedTransactionMethod == 'account')
+                    AccountTreeComboboxWidget(
+                      businessId: widget.document.businessId,
+                      selectedAccount: _selectedAccount?.toAccount(),
+                      onChanged: (account) {
+                        setState(() {
+                          if (account != null) {
+                            _selectedAccount = AccountTreeNode(
+                              id: account.id!,
+                              code: account.code,
+                              name: account.name,
+                              accountType: account.accountType,
+                              parentId: account.parentId,
+                            );
+                          } else {
+                            _selectedAccount = null;
+                          }
+                        });
+                      },
+                      label: 'حساب *',
+                      hintText: 'انتخاب حساب',
+                      isRequired: true,
+                    ),
+
+                  if (_selectedTransactionMethod != null)
+                    const SizedBox(height: 16),
+
+                  // کارمزد
+                  AmountFieldWordsTooltip(
+                    controller: _commissionController,
+                    currencyUnit: _currencyLabel,
+                    child: TextFormField(
+                      controller: _commissionController,
+                      decoration: InputDecoration(
+                        labelText: 'کارمزد',
+                        border: OutlineInputBorder(),
+                        suffixText: _currencyLabel,
+                      ),
+                      keyboardType: TextInputType.numberWithOptions(
+                        decimal: _currencyDecimalPlaces > 0,
+                      ),
+                      inputFormatters: [
+                        EnglishDigitsFormatter(),
+                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                        ThousandsSeparatorInputFormatter(
+                          allowDecimal: true,
+                          maxDecimalPlaces: _currencyDecimalPlaces,
+                        ),
+                      ],
+                      onChanged: (_) => _commissionManuallyEdited = true,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // توضیحات
+                  TextFormField(
+                    controller: _descriptionController,
+                    decoration: const InputDecoration(
+                      labelText: 'توضیحات',
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 3,
+                  ),
+
+                  // بخش اقساط (فقط برای دریافت و اگر فاکتور دارای installment_plan باشد)
+                  if (hasInstallmentPlan &&
+                      widget.transactionType == 'receipt') ...[
+                    const SizedBox(height: 24),
+                    _buildInstallmentsSection(theme),
+                  ],
                 ],
               ),
             ),
-          ],
-        );
+          ),
+        ),
+
+        // دکمه‌ها
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(isMobile ? 0 : 12),
+              bottomRight: Radius.circular(isMobile ? 0 : 12),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: _isSaving ? null : () => Navigator.pop(context),
+                child: const Text('انصراف'),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: _isSaving ? null : _saveTransaction,
+                child: _isSaving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(isEdit ? 'ذخیره' : 'افزودن'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
 
     if (isMobile) {
       return Dialog.fullscreen(
@@ -5562,7 +6409,7 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
     final extraInfo = widget.document.extraInfo;
     final plan = extraInfo?['installment_plan'] as Map<String, dynamic>?;
     final schedule = plan?['schedule'] as List<dynamic>?;
-    
+
     if (schedule == null || schedule.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -5595,30 +6442,43 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
               final paid = _scheduleMoney(im['paid_amount']);
               final remaining = total - paid;
               final allocated = _installmentAllocations[seq] ?? 0.0;
-              
+
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Row(
                   children: [
+                    Expanded(child: Text('قسط $seq')),
                     Expanded(
-                      child: Text('قسط $seq'),
-                    ),
-                    Expanded(
-                      child: Text('مانده: ${formatWithThousands(remaining.toInt())}'),
+                      child: Text(
+                        'مانده: ${formatWithThousands(remaining, decimalPlaces: _currencyDecimalPlaces)}',
+                      ),
                     ),
                     Expanded(
                       child: TextFormField(
-                        initialValue: allocated > 0 ? formatWithThousands(allocated.toInt()) : '',
+                        key: ValueKey(
+                          'installment-allocation-$seq-$_currencyDecimalPlaces',
+                        ),
+                        initialValue: allocated > 0
+                            ? formatWithThousands(
+                                allocated,
+                                decimalPlaces: _currencyDecimalPlaces,
+                              )
+                            : '',
                         decoration: InputDecoration(
                           labelText: 'مبلغ تخصیص',
                           border: const OutlineInputBorder(),
                           isDense: true,
                         ),
-                        keyboardType: TextInputType.number,
+                        keyboardType: TextInputType.numberWithOptions(
+                          decimal: _currencyDecimalPlaces > 0,
+                        ),
                         inputFormatters: [
                           EnglishDigitsFormatter(),
                           FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                          ThousandsSeparatorInputFormatter(allowDecimal: false),
+                          ThousandsSeparatorInputFormatter(
+                            allowDecimal: true,
+                            maxDecimalPlaces: _currencyDecimalPlaces,
+                          ),
                         ],
                         onChanged: (value) {
                           final cleanValue = value.replaceAll(',', '');
@@ -5645,7 +6505,8 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
 
   /// اعتبارسنجی مبلغ
   bool _validateAmount(double amount) {
-    final invoiceTotal = invoicePayableTotalFromExtraInfo(widget.document.extraInfo) ?? 0;
+    final invoiceTotal =
+        invoicePayableTotalFromExtraInfo(widget.document.extraInfo) ?? 0;
     final currentTotal = widget.existingDocuments.fold<double>(
       0,
       (sum, doc) => sum + doc.totalAmount,
@@ -5660,24 +6521,32 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
   /// ذخیره تراکنش
   Future<void> _saveTransaction() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     // اعتبارسنجی روش پرداخت
     if (_selectedTransactionMethod == null) {
-      SnackBarHelper.showError(context, message: 'انتخاب روش پرداخت الزامی است');
+      SnackBarHelper.showError(
+        context,
+        message: 'انتخاب روش پرداخت الزامی است',
+      );
       return;
     }
-    
+
     // اعتبارسنجی فیلدهای خاص هر روش
     if (_selectedTransactionMethod == 'bank' && _selectedBankId == null) {
       SnackBarHelper.showError(context, message: 'انتخاب بانک الزامی است');
       return;
     }
-    if (_selectedTransactionMethod == 'cash_register' && _selectedCashRegisterId == null) {
+    if (_selectedTransactionMethod == 'cash_register' &&
+        _selectedCashRegisterId == null) {
       SnackBarHelper.showError(context, message: 'انتخاب صندوق الزامی است');
       return;
     }
-    if (_selectedTransactionMethod == 'petty_cash' && _selectedPettyCashId == null) {
-      SnackBarHelper.showError(context, message: 'انتخاب تنخواه‌گردان الزامی است');
+    if (_selectedTransactionMethod == 'petty_cash' &&
+        _selectedPettyCashId == null) {
+      SnackBarHelper.showError(
+        context,
+        message: 'انتخاب تنخواه‌گردان الزامی است',
+      );
       return;
     }
     if (_selectedTransactionMethod == 'check' && _selectedCheckId == null) {
@@ -5688,13 +6557,21 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
       SnackBarHelper.showError(context, message: 'انتخاب حساب الزامی است');
       return;
     }
-    
+
     // اعتبارسنجی اقساط
     if (_hasInstallmentPlan() && widget.transactionType == 'receipt') {
-      final totalAllocated = _installmentAllocations.values.fold<double>(0, (sum, amount) => sum + amount);
-      final transactionAmount = double.parse(_amountController.text.replaceAll(',', ''));
+      final totalAllocated = _installmentAllocations.values.fold<double>(
+        0,
+        (sum, amount) => sum + amount,
+      );
+      final transactionAmount = double.parse(
+        _amountController.text.replaceAll(',', ''),
+      );
       if (totalAllocated > transactionAmount) {
-        SnackBarHelper.showError(context, message: 'مجموع تخصیص اقساط از مبلغ تراکنش بیشتر است');
+        SnackBarHelper.showError(
+          context,
+          message: 'مجموع تخصیص اقساط از مبلغ تراکنش بیشتر است',
+        );
         return;
       }
     }
@@ -5716,8 +6593,8 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
           'person_id': widget.personId,
           'person_name': widget.personName,
           'amount': amount,
-          'description': _descriptionController.text.trim().isEmpty 
-              ? null 
+          'description': _descriptionController.text.trim().isEmpty
+              ? null
               : _descriptionController.text.trim(),
           'extra_info': {
             'invoice_id': widget.document.id,
@@ -5733,46 +6610,47 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
         'amount': amount,
         'transaction_type': _selectedTransactionMethod,
         'transaction_date': _transactionDate.toIso8601String(),
-        'description': _descriptionController.text.trim().isEmpty 
-            ? null 
+        'description': _descriptionController.text.trim().isEmpty
+            ? null
             : _descriptionController.text.trim(),
       };
-      
+
       if (commission != null && commission > 0) {
         accountLine['commission'] = commission;
       }
-      
+
       // اضافه کردن فیلدهای خاص هر روش
       if (_selectedTransactionMethod == 'bank' && _selectedBankId != null) {
         accountLine['bank_id'] = _selectedBankId;
-      } else if (_selectedTransactionMethod == 'cash_register' && _selectedCashRegisterId != null) {
+      } else if (_selectedTransactionMethod == 'cash_register' &&
+          _selectedCashRegisterId != null) {
         accountLine['cash_register_id'] = _selectedCashRegisterId;
-      } else if (_selectedTransactionMethod == 'petty_cash' && _selectedPettyCashId != null) {
+      } else if (_selectedTransactionMethod == 'petty_cash' &&
+          _selectedPettyCashId != null) {
         accountLine['petty_cash_id'] = _selectedPettyCashId;
-      } else if (_selectedTransactionMethod == 'check' && _selectedCheckId != null) {
+      } else if (_selectedTransactionMethod == 'check' &&
+          _selectedCheckId != null) {
         accountLine['check_id'] = _selectedCheckId;
         if (_selectedCheckNumber != null) {
           accountLine['check_number'] = _selectedCheckNumber;
         }
-      } else if (_selectedTransactionMethod == 'account' && _selectedAccount != null) {
+      } else if (_selectedTransactionMethod == 'account' &&
+          _selectedAccount != null) {
         accountLine['account_id'] = _selectedAccount!.id;
       }
-      
+
       accountLines.add(accountLine);
 
       // ساخت extra_info برای اقساط
       Map<String, dynamic>? extraInfo;
-      if (_hasInstallmentPlan() && 
-          widget.transactionType == 'receipt' && 
+      if (_hasInstallmentPlan() &&
+          widget.transactionType == 'receipt' &&
           _installmentAllocations.isNotEmpty) {
         final allocations = _installmentAllocations.entries
             .where((e) => e.value > 0)
-            .map((e) => {
-              'seq': e.key,
-              'amount': e.value,
-            })
+            .map((e) => {'seq': e.key, 'amount': e.value})
             .toList();
-        
+
         if (allocations.isNotEmpty && widget.personId != null) {
           extraInfo = {
             'settlements': [
@@ -5780,8 +6658,8 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
                 'invoice_id': widget.document.id,
                 'person_id': widget.personId,
                 'allocations': allocations,
-              }
-            ]
+              },
+            ],
           };
         }
       }
@@ -5790,8 +6668,8 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
         'document_date': _transactionDate,
         'person_lines': personLines,
         'account_lines': accountLines,
-        'description': _descriptionController.text.trim().isEmpty 
-            ? null 
+        'description': _descriptionController.text.trim().isEmpty
+            ? null
             : _descriptionController.text.trim(),
         if (extraInfo != null) 'extra_info': extraInfo,
       };
@@ -5800,7 +6678,7 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
 
       final methodType =
           TransactionType.fromValue(_selectedTransactionMethod ?? '') ??
-              TransactionType.bank;
+          TransactionType.bank;
       await InvoiceTransactionPreferences.setLastUsedTransactionType(
         widget.document.businessId,
         methodType,
@@ -5812,9 +6690,9 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(
-        context,
-        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
-      );
+          context,
+          message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     } finally {
       if (mounted) {
@@ -5830,9 +6708,5 @@ class _InvoicePaymentDisplayEntry {
   final ReceiptPaymentDocument document;
   final AccountLine? accountLine;
 
-  const _InvoicePaymentDisplayEntry({
-    required this.document,
-    this.accountLine,
-  });
+  const _InvoicePaymentDisplayEntry({required this.document, this.accountLine});
 }
-
