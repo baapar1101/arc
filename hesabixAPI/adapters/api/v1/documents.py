@@ -11,7 +11,7 @@ from sqlalchemy import and_
 from adapters.db.session import get_db
 from adapters.db.models.document import Document
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_access, require_business_management_dep, require_business_permission_dep, require_business_permission_by_entity_dep
+from app.core.permissions import require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep
 from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.core.datetime_utils import (
 	export_filename_timestamp,
@@ -360,7 +360,7 @@ async def delete_document_endpoint(
     document_id: int,
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_by_entity_dep("accounting_documents", "delete", Document, "document_id")),
 ):
     """
     حذف سند حسابداری
