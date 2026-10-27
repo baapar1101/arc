@@ -31,3 +31,14 @@ def test_pick_print_settings_falls_back_to_all():
     rows = [_FakeRow("all", summary_tax_display=DISPLAY_ALWAYS)]
     merged = pick_print_settings(rows, "invoice_purchase")
     assert merged["summary_tax_display"] == DISPLAY_ALWAYS
+
+
+def test_pick_print_settings_per_type_overrides_currency_symbol_flag():
+    rows = [
+        _FakeRow("all", show_currency_symbol=True),
+        _FakeRow("invoice_sales", show_currency_symbol=False),
+    ]
+    sales = pick_print_settings(rows, "invoice_sales")
+    purchase = pick_print_settings(rows, "invoice_purchase")
+    assert sales["show_currency_symbol"] is False
+    assert purchase["show_currency_symbol"] is True

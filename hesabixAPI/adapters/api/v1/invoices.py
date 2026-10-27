@@ -1475,11 +1475,20 @@ async def export_single_invoice_pdf(
                 "id": invoice_currency.id,
                 "code": invoice_currency.code,
                 "title": invoice_currency.title,
-                "symbol": invoice_currency.symbol,
+                "symbol": invoice_currency.symbol or invoice_currency.code,
             }
     except Exception:
         pass
     item = dict(item or {})
+    if not isinstance(item.get("currency"), dict):
+        item["currency"] = {
+            "id": item.get("currency_id"),
+            "code": item.get("currency_code"),
+            "title": item.get("currency_title") or item.get("currency_name"),
+            "symbol": item.get("currency_code") or "",
+        }
+    elif not item["currency"].get("symbol"):
+        item["currency"]["symbol"] = item["currency"].get("code") or item.get("currency_code") or ""
 
     # اطلاعات کسب‌وکار (اختیاری) + فایل‌های گرافیکی (لوگو/مهر) و امضای مالک
     business_name = ""

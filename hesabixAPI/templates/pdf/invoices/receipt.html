@@ -173,6 +173,16 @@
     }
   </style>
 
+  {% set invoice_currency_symbol = (
+      (invoice.currency.symbol if invoice.currency is mapping else none)
+      or invoice.currency_symbol
+      or invoice.currency_code
+      or ''
+  ) %}
+  {% macro money_suffix() -%}
+    {%- if show_currency_symbol and invoice_currency_symbol %} {{ invoice_currency_symbol }}{%- endif -%}
+  {%- endmacro %}
+
   <div class="receipt">
     {% if business_logo_data_uri %}
       <img class="r-logo" src="{{ business_logo_data_uri }}" alt="" />
@@ -225,11 +235,11 @@
                 <div class="item-meta">{{ line.description }}</div>
               {% endif %}
               {% if line.unit_price %}
-                <div class="item-meta">{{ (line.unit_price or 0) | format_amount(0) | ltr | safe }}{% if line.unit_display %} / {{ line.unit_display }}{% endif %}</div>
+                <div class="item-meta">{{ (line.unit_price or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}{% if line.unit_display %} / {{ line.unit_display }}{% endif %}</div>
               {% endif %}
             </td>
             <td class="c-qty">{{ line.quantity_display | default(line.quantity, true) | ltr | safe }}</td>
-            <td class="c-amt">{{ (line.line_total or 0) | format_amount(0) | ltr | safe }}</td>
+            <td class="c-amt">{{ (line.line_total or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}</td>
           </tr>
         {% endfor %}
       </tbody>
@@ -241,7 +251,7 @@
       {% for r in _adj_rows %}
         <div class="r-adj">
           {{ r.kind_label or r.kind }}{% if r.description %}: {{ r.description }}{% endif %}
-          — {{ (r.total or 0) | format_amount(0) | ltr | safe }}
+          — {{ (r.total or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}
         </div>
       {% endfor %}
     {% endif %}
@@ -251,21 +261,21 @@
     <table class="r-totals">
       <tr>
         <td class="lbl">{{ 'جمع اقلام' if is_fa else 'Subtotal' }}</td>
-        <td class="val">{{ (invoice.amount_before_discount_and_tax or invoice.subtotal or 0) | format_amount(0) | ltr | safe }}</td>
+        <td class="val">{{ (invoice.amount_before_discount_and_tax or invoice.subtotal or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}</td>
       </tr>
       {% if show_summary_discount | default(invoice.discount_total) %}
         {% if invoice.show_discount_breakdown %}
           <tr>
             <td class="lbl">{{ invoice.discount_line_label | default(('تخفیف سطری' if is_fa else 'Line discount')) }}</td>
-            <td class="val">{{ (invoice.line_discount_total or 0) | format_amount(0) | ltr | safe }}</td>
+            <td class="val">{{ (invoice.line_discount_total or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}</td>
           </tr>
           <tr>
             <td class="lbl">{{ invoice.discount_global_label | default(('تخفیف کلی' if is_fa else 'Invoice discount')) }}</td>
             <td class="val">
               {% if invoice.global_discount_display %}
-                {{ invoice.global_discount_display | ltr | safe }}
+                {{ invoice.global_discount_display | ltr | safe }}{{ money_suffix() }}
               {% else %}
-                {{ (invoice.global_discount_amount or 0) | format_amount(0) | ltr | safe }}
+                {{ (invoice.global_discount_amount or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}
               {% endif %}
             </td>
           </tr>
@@ -274,9 +284,9 @@
             <td class="lbl">{{ invoice.discount_summary_label | default(('تخفیف' if is_fa else 'Discount')) }}</td>
             <td class="val">
               {% if invoice.discount_summary_display %}
-                {{ invoice.discount_summary_display | ltr | safe }}
+                {{ invoice.discount_summary_display | ltr | safe }}{{ money_suffix() }}
               {% else %}
-                {{ (invoice.discount_total or 0) | format_amount(0) | ltr | safe }}
+                {{ (invoice.discount_total or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}
               {% endif %}
             </td>
           </tr>
@@ -285,13 +295,13 @@
       {% if show_summary_tax | default(invoice.tax_total) %}
         <tr>
           <td class="lbl">{{ 'مالیات' if is_fa else 'Tax' }}</td>
-          <td class="val">{{ (invoice.tax_total or 0) | format_amount(0) | ltr | safe }}</td>
+          <td class="val">{{ (invoice.tax_total or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}</td>
         </tr>
       {% endif %}
       {% set _final_payable = (invoice.final_payable_total | default(invoice.payable_total, true)) | default(0, true) %}
       <tr class="pay">
         <td class="lbl">{{ 'قابل پرداخت' if is_fa else 'Payable' }}</td>
-        <td class="val">{{ _final_payable | format_amount(0) | ltr | safe }}</td>
+        <td class="val">{{ _final_payable | format_amount(0) | ltr | safe }}{{ money_suffix() }}</td>
       </tr>
     </table>
 
@@ -299,7 +309,7 @@
       <hr class="r-rule" />
       {% for p in payments %}
         <div class="r-line r-muted">
-          {{ p.method_name | default('-') }} — {{ (p.amount or 0) | format_amount(0) | ltr | safe }}
+          {{ p.method_name | default('-') }} — {{ (p.amount or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}
         </div>
       {% endfor %}
     {% endif %}

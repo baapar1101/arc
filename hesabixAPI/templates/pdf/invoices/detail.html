@@ -1,14 +1,20 @@
 {% extends "pdf/base.html" %}
 {% block content %}
+  {% set invoice_currency_symbol = (
+      (invoice.currency.symbol if invoice.currency is mapping else none)
+      or invoice.currency_symbol
+      or invoice.currency_code
+      or ''
+  ) %}
+  {% set base_currency_symbol = (base_currency.symbol if base_currency is mapping else none) or '' %}
+  {% macro money_suffix(symbol=None) -%}
+    {%- if show_currency_symbol -%}
+      {%- if symbol is none and invoice_currency_symbol %} <span class="currency-symbol">{{ invoice_currency_symbol }}</span>
+      {%- elif symbol %} <span class="currency-symbol">{{ symbol }}</span>
+      {%- endif -%}
+    {%- endif -%}
+  {%- endmacro %}
   <style>
-    {% if show_currency_symbol and invoice.currency and invoice.currency.symbol %}
-    .invoice-layout.show-currency-symbol .amount:not(.base-currency-amount):not(.payment-currency-amount)::after {
-      content: " {{ invoice.currency.symbol }}";
-    }
-    .invoice-layout.show-currency-symbol .amount.base-currency-amount::after {
-      content: " {{ (base_currency.symbol if base_currency is mapping else '') }}";
-    }
-    {% endif %}
     /* حاشیه کمتر از پیش‌فرض base (۱cm) فقط برای فاکتور؛ بقیهٔ @page از همان قالب */
     @page {
       margin: 8mm;
@@ -318,6 +324,11 @@
 
     .invoice-layout .amount {
       text-align: center;
+    }
+
+    .invoice-layout .currency-symbol {
+      font-weight: 700;
+      white-space: nowrap;
     }
 
     .invoice-layout tbody tr:nth-child(even) {
@@ -654,30 +665,30 @@
                   </td>
                   <td class="line-numeric-strong">{{ line.quantity_display | default('') | ltr | safe }}</td>
                   <td class="line-numeric-strong">{{ line.unit_display | default('-') }}</td>
-                  <td class="amount line-numeric-strong">{{ (line.unit_price or 0) | format_amount(0) | ltr | safe }}</td>
+                  <td class="amount line-numeric-strong">{{ (line.unit_price or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}</td>
                   {% if show_line_discount_column | default(has_line_discount) %}
                     <td class="amount line-numeric-strong">
                       {% if line.discount_display is defined and line.discount_display %}
-                        {{ line.discount_display | ltr | safe }}
+                        {{ line.discount_display | ltr | safe }}{{ money_suffix() }}
                       {% else %}
-                        {{ (line.discount or 0) | format_amount(0) | ltr | safe }}
+                        {{ (line.discount or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}
                       {% endif %}
                     </td>
                   {% endif %}
                   {% if show_line_amount_before_discount_column | default(true) %}
                   <td class="amount line-numeric-strong">
-                    {{ (line.amount_before_discount if line.amount_before_discount is defined else ((line.line_total or 0) + (line.discount or 0) - (line.tax_amount or 0))) | format_amount(0) | ltr | safe }}
+                    {{ (line.amount_before_discount if line.amount_before_discount is defined else ((line.line_total or 0) + (line.discount or 0) - (line.tax_amount or 0))) | format_amount(0) | ltr | safe }}{{ money_suffix() }}
                   </td>
                   {% endif %}
                   {% if show_line_amount_before_tax_column | default(true) %}
                   <td class="amount line-numeric-strong">
-                    {{ (line.amount_before_tax if line.amount_before_tax is defined else ((line.line_total or 0) - (line.tax_amount or 0))) | format_amount(0) | ltr | safe }}
+                    {{ (line.amount_before_tax if line.amount_before_tax is defined else ((line.line_total or 0) - (line.tax_amount or 0))) | format_amount(0) | ltr | safe }}{{ money_suffix() }}
                   </td>
                   {% endif %}
                   {% if show_line_tax_column | default(has_line_tax) %}
-                    <td class="amount line-numeric-strong">{{ (line.tax_amount or 0) | format_amount(0) | ltr | safe }}</td>
+                    <td class="amount line-numeric-strong">{{ (line.tax_amount or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}</td>
                   {% endif %}
-                  <td class="amount line-numeric-strong">{{ (line.line_total or 0) | format_amount(0) | ltr | safe }}</td>
+                  <td class="amount line-numeric-strong">{{ (line.line_total or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}</td>
                 </tr>
               {% endfor %}
             </tbody>
@@ -718,18 +729,18 @@
                     {% if r.account_code %}{{ r.account_code }} - {% endif %}{{ r.account_name or '-' }}
                   </td>
                   <td style="text-align: start;">{{ r.description or '-' }}</td>
-                  <td class="amount line-numeric-strong">{{ (r.amount or 0) | format_amount(0) | ltr | safe }}</td>
+                  <td class="amount line-numeric-strong">{{ (r.amount or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}</td>
                   <td class="line-numeric-strong">
                     {% if (r.tax_rate or 0) > 0 %}
-                      <span class="amount" style="font-weight: 700;">{{ (r.tax_rate or 0) | smart_number | ltr | safe }}%</span>
+                      <span style="font-weight: 700;">{{ (r.tax_rate or 0) | smart_number | ltr | safe }}%</span>
                     {% else %}
                       -
                     {% endif %}
                   </td>
-                  <td class="amount line-numeric-strong">{{ (r.tax_amount or 0) | format_amount(0) | ltr | safe }}</td>
+                  <td class="amount line-numeric-strong">{{ (r.tax_amount or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}</td>
                   <td class="amount line-numeric-strong">
                     <span class="{{ 'adj-tot-add' if r.kind == 'addition' else 'adj-tot-ded' }}">
-                      {{ '+' if r.kind == 'addition' else '−' }}{{ (r.total or 0) | format_amount(0) | ltr | safe }}
+                      {{ '+' if r.kind == 'addition' else '−' }}{{ (r.total or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}
                     </span>
                   </td>
                 </tr>
@@ -817,18 +828,18 @@
                 {% if invoice.is_proforma %}
                   <div style="margin-bottom: 4px;">
                     <strong>{{ 'تراز فعلی' if is_fa else 'Current balance' }}:</strong>
-                    <span class="amount base-currency-amount" style="margin-inline-start: 4px; font-weight: 700;">{{ customer_balance_info.current_balance | format_amount(0) | ltr | safe }}</span>
+                    <span class="amount base-currency-amount" style="margin-inline-start: 4px; font-weight: 700;">{{ customer_balance_info.current_balance | format_amount(0) | ltr | safe }}{{ money_suffix(base_currency_symbol) }}</span>
                     <span style="margin-inline-start: 6px; color: #555;">({{ customer_balance_info.current_status }})</span>
                   </div>
                   <div>
                     <strong>{{ 'تراز احتمالی پس از قطعی شدن' if is_fa else 'Potential balance after finalization' }}:</strong>
-                    <span class="amount base-currency-amount" style="margin-inline-start: 4px; font-weight: 700;">{{ customer_balance_info.potential_balance | format_amount(0) | ltr | safe }}</span>
+                    <span class="amount base-currency-amount" style="margin-inline-start: 4px; font-weight: 700;">{{ customer_balance_info.potential_balance | format_amount(0) | ltr | safe }}{{ money_suffix(base_currency_symbol) }}</span>
                     <span style="margin-inline-start: 6px; color: #555;">({{ customer_balance_info.potential_status }})</span>
                   </div>
                 {% else %}
                   <div>
                     <strong>{{ 'تراز حساب' if is_fa else 'Account balance' }}:</strong>
-                    <span class="amount base-currency-amount" style="margin-inline-start: 4px; font-weight: 700;">{{ customer_balance_info.current_balance | format_amount(0) | ltr | safe }}</span>
+                    <span class="amount base-currency-amount" style="margin-inline-start: 4px; font-weight: 700;">{{ customer_balance_info.current_balance | format_amount(0) | ltr | safe }}{{ money_suffix(base_currency_symbol) }}</span>
                     <span style="margin-inline-start: 6px; color: #555;">({{ customer_balance_info.current_status }})</span>
                   </div>
                 {% endif %}
@@ -847,21 +858,21 @@
           <div>
             <div style="display:flex; justify-content: space-between;">
               <span class="meta">{{ 'مبلغ قبل از تخفیف و مالیات' if is_fa else 'Amount before discount & tax' }}:</span>
-              <span class="amount">{{ (invoice.amount_before_discount_and_tax or invoice.subtotal or 0) | format_amount(0) | ltr | safe }}</span>
+              <span class="amount">{{ (invoice.amount_before_discount_and_tax or invoice.subtotal or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}</span>
             </div>
             {% if show_summary_discount | default(invoice.discount_total) %}
               {% if invoice.show_discount_breakdown %}
                 <div style="display:flex; justify-content: space-between;">
                   <span class="meta">{{ invoice.discount_line_label | default(('تخفیف سطری' if is_fa else 'Line discount')) }}:</span>
-                  <span class="amount">{{ (invoice.line_discount_total or 0) | format_amount(0) | ltr | safe }}</span>
+                  <span class="amount">{{ (invoice.line_discount_total or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}</span>
                 </div>
                 <div style="display:flex; justify-content: space-between;">
                   <span class="meta">{{ invoice.discount_global_label | default(('تخفیف کلی' if is_fa else 'Invoice discount')) }}:</span>
                   <span class="amount">
                     {% if invoice.global_discount_display %}
-                      {{ invoice.global_discount_display | ltr | safe }}
+                      {{ invoice.global_discount_display | ltr | safe }}{{ money_suffix() }}
                     {% else %}
-                      {{ (invoice.global_discount_amount or 0) | format_amount(0) | ltr | safe }}
+                      {{ (invoice.global_discount_amount or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}
                     {% endif %}
                   </span>
                 </div>
@@ -870,9 +881,9 @@
                   <span class="meta">{{ invoice.discount_summary_label | default(('تخفیف' if is_fa else 'Discount')) }}:</span>
                   <span class="amount">
                     {% if invoice.discount_summary_display %}
-                      {{ invoice.discount_summary_display | ltr | safe }}
+                      {{ invoice.discount_summary_display | ltr | safe }}{{ money_suffix() }}
                     {% else %}
-                      {{ (invoice.discount_total or 0) | format_amount(0) | ltr | safe }}
+                      {{ (invoice.discount_total or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}
                     {% endif %}
                   </span>
                 </div>
@@ -881,13 +892,13 @@
             {% if show_summary_amount_without_tax | default(invoice.amount_without_tax is not none) %}
               <div style="display:flex; justify-content: space-between;">
                 <span class="meta">{{ 'مبلغ بدون مالیات' if is_fa else 'Amount without tax' }}:</span>
-                <span class="amount">{{ (invoice.amount_without_tax or 0) | format_amount(0) | ltr | safe }}</span>
+                <span class="amount">{{ (invoice.amount_without_tax or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}</span>
               </div>
             {% endif %}
             {% if show_summary_tax | default(invoice.tax_total) %}
               <div style="display:flex; justify-content: space-between;">
                 <span class="meta">{{ 'مالیات' if is_fa else 'Tax' }}:</span>
-                <span class="amount">{{ (invoice.tax_total or 0) | format_amount(0) | ltr | safe }}</span>
+                <span class="amount">{{ (invoice.tax_total or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}</span>
               </div>
             {% endif %}
 
@@ -900,13 +911,13 @@
               {% if _adj_add_total %}
                 <div class="adj-row" style="display:flex; justify-content: space-between;">
                   <span class="meta adj-tot-add">{{ 'اضافات (با مالیات)' if is_fa else 'Additions (incl. tax)' }}:</span>
-                  <span class="amount adj-tot-add">+{{ _adj_add_total | format_amount(0) | ltr | safe }}</span>
+                  <span class="amount adj-tot-add">+{{ _adj_add_total | format_amount(0) | ltr | safe }}{{ money_suffix() }}</span>
                 </div>
               {% endif %}
               {% if _adj_ded_total %}
                 <div class="adj-row" style="display:flex; justify-content: space-between;">
                   <span class="meta adj-tot-ded">{{ 'کسورات (با مالیات)' if is_fa else 'Deductions (incl. tax)' }}:</span>
-                  <span class="amount adj-tot-ded">−{{ _adj_ded_total | format_amount(0) | ltr | safe }}</span>
+                  <span class="amount adj-tot-ded">−{{ _adj_ded_total | format_amount(0) | ltr | safe }}{{ money_suffix() }}</span>
                 </div>
               {% endif %}
               <hr class="summary-divider" />
@@ -915,7 +926,7 @@
             {% set _final_payable = (invoice.final_payable_total | default(invoice.payable_total, true)) | default(0, true) %}
             <div style="display:flex; justify-content: space-between; font-weight: bold; margin-top: 6px;">
               <span>{{ 'قابل پرداخت' if is_fa else 'Payable' }}:</span>
-              <span class="amount">{{ _final_payable | format_amount(0) | ltr | safe }}</span>
+              <span class="amount">{{ _final_payable | format_amount(0) | ltr | safe }}{{ money_suffix() }}</span>
             </div>
 
             {% set _fx = invoice.fx_totals if invoice.fx_totals is mapping else none %}
@@ -1018,11 +1029,11 @@
                   <tr>
                     <td>{{ it.seq }}</td>
                     <td>{{ it.due_date_display or it.due_date or '-' }}</td>
-                    <td class="amount">{{ (it.principal or 0) | format_amount(0) | ltr | safe }}</td>
-                    <td class="amount">{{ (it.interest or 0) | format_amount(0) | ltr | safe }}</td>
-                    <td class="amount">{{ (it.total or 0) | format_amount(0) | ltr | safe }}</td>
-                    <td class="amount">{{ (it.paid_amount or 0) | format_amount(0) | ltr | safe }}</td>
-                    <td class="amount">{{ (it.remaining or 0) | format_amount(0) | ltr | safe }}</td>
+                    <td class="amount">{{ (it.principal or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}</td>
+                    <td class="amount">{{ (it.interest or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}</td>
+                    <td class="amount">{{ (it.total or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}</td>
+                    <td class="amount">{{ (it.paid_amount or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}</td>
+                    <td class="amount">{{ (it.remaining or 0) | format_amount(0) | ltr | safe }}{{ money_suffix() }}</td>
                     <td>{{ it.status or '-' }}</td>
                   </tr>
                 {% endfor %}

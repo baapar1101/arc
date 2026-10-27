@@ -176,7 +176,16 @@ class _BusinessPrintSettingsPageState extends State<BusinessPrintSettingsPage> {
 
   void _updateCurrentConfig(_PrintConfig cfg) {
     if (_selectedDocType == 'all') {
+      final previousGeneral = _configs['all'];
       _configs['all'] = cfg;
+      // تنظیمات عمومی باید روی انواعی که هنوز همان مقدار قبلی عمومی را دارند اعمال شود؛
+      // وگرنه فلگ‌های جدید (مثل نماد ارز) فقط روی ردیف all ذخیره می‌شوند و فاکتور فروش چاپ‌شده بدون نماد می‌ماند.
+      if (previousGeneral != null) {
+        for (final key in _configs.keys.toList()) {
+          if (key == 'all') continue;
+          _configs[key] = _configs[key]!.inheritChangedGeneral(previousGeneral, cfg);
+        }
+      }
     } else {
       // اگر برای این نوع تنظیم اختصاصی نداریم، آن را ایجاد می‌کنیم
       _configs[_selectedDocType] = cfg;
@@ -611,7 +620,9 @@ class _BusinessPrintSettingsPageState extends State<BusinessPrintSettingsPage> {
         ),
         SwitchListTile(
           title: const Text('نمایش نماد ارز کنار مبالغ'),
-          subtitle: const Text('نماد ارز فاکتور کنار مبالغ در PDF نمایش داده شود'),
+          subtitle: const Text(
+            'نماد ارز فاکتور کنار مبالغ ردیف‌ها و خلاصه در PDF نمایش داده شود. اگر روی تنظیمات عمومی بزنید، روی انواعی که مقدار اختصاصی جدا ندارند هم اعمال می‌شود.',
+          ),
           value: cfg.showCurrencySymbol,
           onChanged: (v) => setState(() {
             _updateCurrentConfig(cfg.copyWith(showCurrencySymbol: v));
@@ -869,6 +880,66 @@ class _PrintConfig {
       summaryTaxDisplay: _displayMode(json['summary_tax_display'] as String?),
       summaryAmountWithoutTaxDisplay:
           _displayMode(json['summary_amount_without_tax_display'] as String?),
+    );
+  }
+
+  _PrintConfig inheritChangedGeneral(_PrintConfig previousGeneral, _PrintConfig nextGeneral) {
+    return copyWith(
+      showLogo: showLogo == previousGeneral.showLogo ? nextGeneral.showLogo : showLogo,
+      showStamp: showStamp == previousGeneral.showStamp ? nextGeneral.showStamp : showStamp,
+      showSellerSignatureArea: showSellerSignatureArea == previousGeneral.showSellerSignatureArea
+          ? nextGeneral.showSellerSignatureArea
+          : showSellerSignatureArea,
+      showBuyerSignatureArea: showBuyerSignatureArea == previousGeneral.showBuyerSignatureArea
+          ? nextGeneral.showBuyerSignatureArea
+          : showBuyerSignatureArea,
+      showCustomerBalance: showCustomerBalance == previousGeneral.showCustomerBalance
+          ? nextGeneral.showCustomerBalance
+          : showCustomerBalance,
+      showCurrencySymbol: showCurrencySymbol == previousGeneral.showCurrencySymbol
+          ? nextGeneral.showCurrencySymbol
+          : showCurrencySymbol,
+      showPayments: showPayments == previousGeneral.showPayments ? nextGeneral.showPayments : showPayments,
+      showInstallmentPlan: showInstallmentPlan == previousGeneral.showInstallmentPlan
+          ? nextGeneral.showInstallmentPlan
+          : showInstallmentPlan,
+      showShareQr: showShareQr == previousGeneral.showShareQr ? nextGeneral.showShareQr : showShareQr,
+      showFooterPrintTime: showFooterPrintTime == previousGeneral.showFooterPrintTime
+          ? nextGeneral.showFooterPrintTime
+          : showFooterPrintTime,
+      showFooterPreparer: showFooterPreparer == previousGeneral.showFooterPreparer
+          ? nextGeneral.showFooterPreparer
+          : showFooterPreparer,
+      footerNote: footerNote == previousGeneral.footerNote ? nextGeneral.footerNote : footerNote,
+      stampScalePercent: stampScalePercent == previousGeneral.stampScalePercent
+          ? nextGeneral.stampScalePercent
+          : stampScalePercent,
+      signatureScalePercent: signatureScalePercent == previousGeneral.signatureScalePercent
+          ? nextGeneral.signatureScalePercent
+          : signatureScalePercent,
+      lineDiscountDisplay: lineDiscountDisplay == previousGeneral.lineDiscountDisplay
+          ? nextGeneral.lineDiscountDisplay
+          : lineDiscountDisplay,
+      lineTaxDisplay: lineTaxDisplay == previousGeneral.lineTaxDisplay
+          ? nextGeneral.lineTaxDisplay
+          : lineTaxDisplay,
+      lineAmountBeforeDiscountDisplay:
+          lineAmountBeforeDiscountDisplay == previousGeneral.lineAmountBeforeDiscountDisplay
+              ? nextGeneral.lineAmountBeforeDiscountDisplay
+              : lineAmountBeforeDiscountDisplay,
+      lineAmountBeforeTaxDisplay: lineAmountBeforeTaxDisplay == previousGeneral.lineAmountBeforeTaxDisplay
+          ? nextGeneral.lineAmountBeforeTaxDisplay
+          : lineAmountBeforeTaxDisplay,
+      summaryDiscountDisplay: summaryDiscountDisplay == previousGeneral.summaryDiscountDisplay
+          ? nextGeneral.summaryDiscountDisplay
+          : summaryDiscountDisplay,
+      summaryTaxDisplay: summaryTaxDisplay == previousGeneral.summaryTaxDisplay
+          ? nextGeneral.summaryTaxDisplay
+          : summaryTaxDisplay,
+      summaryAmountWithoutTaxDisplay:
+          summaryAmountWithoutTaxDisplay == previousGeneral.summaryAmountWithoutTaxDisplay
+              ? nextGeneral.summaryAmountWithoutTaxDisplay
+              : summaryAmountWithoutTaxDisplay,
     );
   }
 
