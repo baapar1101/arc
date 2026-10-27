@@ -91,7 +91,8 @@ def _evaluate_should_have_cogs_gl(db: Session, document: Document) -> bool:
             return True
         # اگر ثبت انبار از فاکتور غیرفعال است، حواله‌ای برای شناسایی وجود ندارد؛
         # COGS باید هم‌زمان با ثبت فاکتور قطعی در دفتر کل بیاید.
-        extra_info = document.extra_info if isinstance(document.extra_info, dict) else {}
+        raw_extra_info = getattr(document, "extra_info", None)
+        extra_info = raw_extra_info if isinstance(raw_extra_info, dict) else {}
         return not bool(extra_info.get("post_inventory", True))
     return False
 
@@ -190,6 +191,31 @@ def _amounts_close(a: Decimal, b: Decimal, tolerance: Decimal = Decimal("0.01"))
     return abs(a - b) <= tolerance
 
 
+def _base_cogs_to_document_currency(
+    db: Session,
+    document: Document,
+    amount_base: Decimal,
+) -> Decimal:
+    from app.core.responses import ApiError
+    from app.services.currency_quant import get_currency_quant_and_round
+    from app.services.document_line_fx_service import quantize_money, resolve_document_fx_rate
+
+    rate, _source = resolve_document_fx_rate(
+        db,
+        document,
+        allow_infer=True,
+        fallback_one_on_missing=False,
+    )
+    if rate is None or rate <= 0:
+        raise ApiError(
+            "INVOICE_FX_RATE_REQUIRED_FOR_COGS",
+            "نرخ تبدیل ارز سند برای ثبت بهای تمام‌شده موجود نیست",
+            http_status=409,
+        )
+    quant, round_on = get_currency_quant_and_round(db, int(document.currency_id))
+    return quantize_money(amount_base / rate, quant, round_on=round_on)
+
+
 def _post_cogs_gl_lines(
     db: Session,
     document: Document,
@@ -269,14 +295,16 @@ def resync_invoice_cogs_gl_lines(db: Session, document_id: int) -> bool:
             remove_invoice_cogs_gl_lines(db, int(document_id))
         return False
 
-    new_amount = _calculate_invoice_cogs_amount_for_gl(
+    new_amount_base = _calculate_invoice_cogs_amount_for_gl(
         db, int(document.business_id), int(document.id)
     )
 
-    if new_amount <= 0:
+    if new_amount_base <= 0:
         if existing_amount > 0:
             remove_invoice_cogs_gl_lines(db, int(document_id))
         return False
+
+    new_amount = _base_cogs_to_document_currency(db, document, new_amount_base)
 
     if _amounts_close(existing_amount, new_amount):
         return True

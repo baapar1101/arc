@@ -1150,9 +1150,8 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     if (isMainSelected) {
       return priceOnMainUnit;
     }
-    // در حالت انتخاب واحد فرعی: قیمت واحد باید در ضریب تبدیل ضرب شود
-    // تعریف: 1 main = factor * secondary  => price(secondary) = price(main) * factor
-    return priceOnMainUnit * factor;
+    // قرارداد: 1 main = factor × secondary؛ پس قیمت هر secondary برابر main / factor است.
+    return priceOnMainUnit / factor;
   }
 
   num _defaultTaxRateFromProduct(Map<String, dynamic> p) {

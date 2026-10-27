@@ -75,6 +75,11 @@ class Product(Base):
     base_sales_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     base_purchase_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
     base_purchase_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    base_purchase_price_sync_meta: Mapped[dict | None] = mapped_column(
+        JSON,
+        nullable=True,
+        comment="منبع و سیاست آخرین همگام‌سازی قیمت خرید از فاکتور",
+    )
 
     # قیمت ارزی (P6 — فقط کسب‌وکار چندارزی استفاده می‌کند)
     sales_price_fx: Mapped[Decimal | None] = mapped_column(

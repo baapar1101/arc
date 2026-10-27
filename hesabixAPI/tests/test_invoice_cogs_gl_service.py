@@ -9,6 +9,7 @@ from app.services.invoice_cogs_gl_service import (
     COGS_GL_SIDE,
     INVENTORY_COGS_GL_SIDE,
     _amounts_close,
+    _base_cogs_to_document_currency,
     _evaluate_should_have_cogs_gl,
     _existing_cogs_gl_amount,
     _is_cogs_gl_line,
@@ -47,6 +48,24 @@ class TestCogsGlLineHelpers:
     def test_amounts_close_tolerance(self):
         assert _amounts_close(Decimal("100"), Decimal("100.005"))
         assert not _amounts_close(Decimal("100"), Decimal("100.02"))
+
+    @patch(
+        "app.services.document_line_fx_service.resolve_document_fx_rate",
+        return_value=(Decimal("2"), "snapshot"),
+    )
+    @patch(
+        "app.services.currency_quant.get_currency_quant_and_round",
+        return_value=(Decimal("0.01"), True),
+    )
+    def test_base_cogs_is_converted_back_to_document_currency(
+        self,
+        _mock_quant,
+        _mock_rate,
+    ):
+        document = SimpleNamespace(currency_id=2)
+        assert _base_cogs_to_document_currency(
+            MagicMock(), document, Decimal("1000")
+        ) == Decimal("500.00")
 
 
 class TestEvaluateShouldHaveCogsGl:
@@ -106,6 +125,7 @@ class TestEvaluateShouldHaveCogsGl:
 
 
 class TestResyncInvoiceCogsGlLines:
+    @patch("app.services.invoice_cogs_gl_service._base_cogs_to_document_currency")
     @patch("app.services.invoice_cogs_gl_service._post_cogs_gl_lines")
     @patch("app.services.invoice_cogs_gl_service._resolve_cogs_gl_accounts")
     @patch("app.services.invoice_cogs_gl_service._calculate_invoice_cogs_amount_for_gl")
@@ -118,6 +138,7 @@ class TestResyncInvoiceCogsGlLines:
         mock_calc,
         mock_resolve,
         mock_post,
+        mock_convert,
     ):
         db = MagicMock()
         document = SimpleNamespace(
@@ -130,12 +151,16 @@ class TestResyncInvoiceCogsGlLines:
         cogs_line = _line(COGS_GL_SIDE, debit=0)
         db.query.return_value.filter.return_value.all.side_effect = [
             [cogs_line],
-            [],
+            [
+                SimpleNamespace(account_id=1, debit=250000, credit=0),
+                SimpleNamespace(account_id=2, debit=0, credit=250000),
+            ],
         ]
         db.query.return_value.filter.return_value.first.return_value = document
 
         mock_should.return_value = True
         mock_calc.return_value = Decimal("250000")
+        mock_convert.return_value = Decimal("250000")
         mock_resolve.return_value = (
             SimpleNamespace(id=1, code="40001"),
             SimpleNamespace(id=2, code="10102"),
@@ -174,6 +199,7 @@ class TestResyncInvoiceCogsGlLines:
         mock_remove.assert_called_once_with(db, 7)
         mock_calc.assert_not_called()
 
+    @patch("app.services.invoice_cogs_gl_service._base_cogs_to_document_currency")
     @patch("app.services.invoice_cogs_gl_service._post_cogs_gl_lines")
     @patch("app.services.invoice_cogs_gl_service._resolve_cogs_gl_accounts")
     @patch("app.services.invoice_cogs_gl_service._calculate_invoice_cogs_amount_for_gl")
@@ -186,6 +212,7 @@ class TestResyncInvoiceCogsGlLines:
         mock_calc,
         mock_resolve,
         mock_post,
+        mock_convert,
     ):
         db = MagicMock()
         document = SimpleNamespace(
@@ -201,6 +228,7 @@ class TestResyncInvoiceCogsGlLines:
 
         mock_should.return_value = True
         mock_calc.return_value = Decimal("1000")
+        mock_convert.return_value = Decimal("1000")
 
         assert resync_invoice_cogs_gl_lines(db, 99) is True
         mock_remove.assert_not_called()

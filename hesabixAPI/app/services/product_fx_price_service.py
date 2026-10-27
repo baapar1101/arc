@@ -214,6 +214,7 @@ def apply_fx_prices_to_base_for_product(
 		new_purch = quantize_money(purchase_fx * rate, base_quant, round_on=round_on)
 		if product.base_purchase_price != new_purch:
 			product.base_purchase_price = new_purch
+			product.base_purchase_price_sync_meta = None
 			changed = True
 
 	return {

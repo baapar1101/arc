@@ -76,6 +76,13 @@ class Business(Base):
         server_default="purchase_price",
         comment="مبنای محاسبه سود: purchase_price, cost_price, average_cost, fifo, lifo, weighted_average, moving_weighted_average, standard_cost, actual_cost",
     )
+    invoice_profit_missing_purchase_price_policy: Mapped[str] = mapped_column(
+        String(40),
+        nullable=False,
+        default="zero_cost",
+        server_default="zero_cost",
+        comment="رفتار قیمت خرید نامشخص: zero_cost, use_line_cost_price, block_calculation",
+    )
     invoice_profit_include_overhead: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0", comment="آیا هزینه‌های سربار در محاسبه سود لحاظ شود؟")
     invoice_profit_overhead_type: Mapped[str | None] = mapped_column(String(30), nullable=True, default="none", server_default="none", comment="نوع هزینه‌های سربار: none, production_overhead, all_overhead, custom_percent")
     invoice_profit_overhead_percent: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True, default=0, server_default="0", comment="درصد هزینه‌های سربار (در صورت انتخاب custom_percent)")
@@ -115,6 +122,13 @@ class Business(Base):
     invoice_sync_purchase_price_basis: Mapped[str | None] = mapped_column(
         String(40), nullable=True, default="net_after_line_discount", server_default="net_after_line_discount",
         comment="مبنای قیمت خرید: unit_price, net_after_line_discount, net_with_tax, cost_price",
+    )
+    invoice_sync_purchase_price_multi_line_policy: Mapped[str] = mapped_column(
+        String(40),
+        nullable=False,
+        default="weighted_average",
+        server_default="weighted_average",
+        comment="سیاست چند ردیف خرید یک محصول: weighted_average, last_line, highest_price, lowest_price",
     )
     # حواله انبار پس از ثبت فاکتور: none (بدون حواله)، draft (پیش‌نویس)، posted (قطعی فوری)
     invoice_warehouse_release_mode: Mapped[str] = mapped_column(

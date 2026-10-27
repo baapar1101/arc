@@ -86,9 +86,11 @@ def apply_bulk_product_price_sheet(
 
             if row.clear_base_purchase_price:
                 product.base_purchase_price = None
+                product.base_purchase_price_sync_meta = None
                 product_touched = True
             elif row.base_purchase_price is not None:
                 product.base_purchase_price = _quantize_non_negative_integer(Decimal(row.base_purchase_price))
+                product.base_purchase_price_sync_meta = None
                 product_touched = True
 
             for piu in row.price_item_updates:

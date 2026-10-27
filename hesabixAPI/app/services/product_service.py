@@ -907,6 +907,7 @@ def update_product(
         price_update_kwargs["base_sales_note"] = payload.base_sales_note
     if "base_purchase_price" in fields_set:
         price_update_kwargs["base_purchase_price"] = payload.base_purchase_price
+        price_update_kwargs["base_purchase_price_sync_meta"] = None
     if "base_purchase_note" in fields_set:
         price_update_kwargs["base_purchase_note"] = payload.base_purchase_note
     if "sales_price_fx" in fields_set:
@@ -1455,6 +1456,7 @@ def _to_dict(obj: Product, db: Optional[Session] = None) -> Dict[str, Any]:
         "base_sales_price": obj.base_sales_price,
         "base_sales_note": obj.base_sales_note,
         "base_purchase_price": obj.base_purchase_price,
+        "base_purchase_price_sync_meta": getattr(obj, "base_purchase_price_sync_meta", None),
         "base_purchase_note": obj.base_purchase_note,
         "sales_price_fx": getattr(obj, "sales_price_fx", None),
         "purchase_price_fx": getattr(obj, "purchase_price_fx", None),
