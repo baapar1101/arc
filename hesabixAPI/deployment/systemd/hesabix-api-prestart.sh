@@ -52,11 +52,21 @@ run_as_www() {
 }
 
 # همان مسیر import واقعی workerها
-if run_as_www env PYTHONPATH="${API_DIR}" "$VENV_PY" -c "import app.main" 2>/dev/null; then
+set +e
+import_err="$(run_as_www env PYTHONPATH="${API_DIR}" "$VENV_PY" -c "import app.main" 2>&1)"
+import_rc=$?
+set -e
+if [[ "${import_rc}" -eq 0 ]]; then
   exit 0
+fi
+if grep -q "Production security validation failed" <<<"${import_err}"; then
+  log "app.main import failed due to production settings, not missing packages:"
+  log "${import_err}"
+  exit 1
 fi
 
 log "import app.main failed; attempting pip install -e . from Hesabix PyPI mirror..."
+log "${import_err}"
 
 set_pip_env_for_url() {
   local index_url="$1"

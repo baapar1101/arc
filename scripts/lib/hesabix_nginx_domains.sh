@@ -46,6 +46,21 @@ hesabix_apply_nginx_domain_configs() {
     PGADMIN_SSL_BLOCK="$(hesabix_nginx_ssl_block_for_live_dir "${PGADMIN_LETSENCRYPT_LIVE}")"
   fi
 
+  local API_LISTEN_80="  listen 80;" UI_LISTEN_80="  listen 80;" PGADMIN_LISTEN_80="  listen 80;"
+  local API_HTTP_REDIRECT="" UI_HTTP_REDIRECT="" PGADMIN_HTTP_REDIRECT=""
+  if [[ -n "${API_SSL_BLOCK}" ]]; then
+    API_LISTEN_80=""
+    API_HTTP_REDIRECT="$(hesabix_nginx_http_to_https_redirect_server "${API_DOMAIN}")"
+  fi
+  if [[ -n "${UI_SSL_BLOCK}" ]]; then
+    UI_LISTEN_80=""
+    UI_HTTP_REDIRECT="$(hesabix_nginx_http_to_https_redirect_server "${UI_DOMAIN}")"
+  fi
+  if [[ -n "${PGADMIN_SSL_BLOCK}" ]]; then
+    PGADMIN_LISTEN_80=""
+    PGADMIN_HTTP_REDIRECT="$(hesabix_nginx_http_to_https_redirect_server "${PGADMIN4_DOMAIN}")"
+  fi
+
   if [[ "${quiet}" != "1" ]]; then
     echo ">> Updating Nginx: API_DOMAIN=${API_DOMAIN} UI_DOMAIN=${UI_DOMAIN}"
     if [[ -n "${API_SSL_BLOCK}" ]]; then
@@ -82,8 +97,8 @@ fi
 
 cat > /etc/nginx/sites-available/hesabix-api.conf <<NGINX
 # Backend API
-server {
-  listen 80;
+${API_HTTP_REDIRECT}server {
+${API_LISTEN_80}
 ${API_SSL_BLOCK}
   server_name ${API_DOMAIN};
 
@@ -319,8 +334,8 @@ NGINX
 
 cat > /etc/nginx/sites-available/hesabix-ui.conf <<NGINX
 # Frontend (Flutter Web)
-server {
-  listen 80;
+${UI_HTTP_REDIRECT}server {
+${UI_LISTEN_80}
 ${UI_SSL_BLOCK}
   server_name ${UI_DOMAIN};
 
@@ -564,8 +579,8 @@ ln -sf /etc/nginx/sites-available/hesabix-ui.conf /etc/nginx/sites-enabled/
   if [[ -n "${PGADMIN4_DOMAIN:-}" ]] && [[ -f /etc/nginx/sites-available/pgadmin4.conf || "$(systemctl show pgadmin4.service -p LoadState --value 2>/dev/null)" == "loaded" ]]; then
     cat > /etc/nginx/sites-available/pgadmin4.conf <<NGINX
 # pgAdmin4 (reverse proxy to Gunicorn on 127.0.0.1:5050)
-server {
-  listen 80;
+${PGADMIN_HTTP_REDIRECT}server {
+${PGADMIN_LISTEN_80}
 ${PGADMIN_SSL_BLOCK}
   server_name ${PGADMIN4_DOMAIN};
 

@@ -30,12 +30,67 @@ if [[ -r "${UPDATE_SCRIPT_DIR}/scripts/hesabix_python.sh" ]]; then
   source "${UPDATE_SCRIPT_DIR}/scripts/hesabix_python.sh"
 fi
 
+# Persist BRANCH into .deploy_env so the next update does not retry a missing remote branch.
+hesabix_persist_update_branch() {
+  local env_file="${APP_ROOT}/.deploy_env"
+  [[ -f "${env_file}" ]] || return 0
+  python3 - "${env_file}" "${BRANCH}" <<'PY' || true
+import os
+import re
+import sys
+
+path, branch = sys.argv[1], sys.argv[2]
+if not os.path.isfile(path):
+    raise SystemExit(0)
+with open(path, encoding="utf-8", errors="replace") as f:
+    lines = f.readlines()
+out, found = [], False
+for line in lines:
+    if re.match(r"^BRANCH=", line):
+        out.append(f"BRANCH={branch}\n")
+        found = True
+    else:
+        out.append(line)
+if not found:
+    out.append(f"BRANCH={branch}\n")
+with open(path, "w", encoding="utf-8") as f:
+    f.writelines(out)
+PY
+}
+
+# If BRANCH (often default main) is missing on origin, use origin/HEAD (this repo ships master).
+hesabix_resolve_origin_branch() {
+  if git show-ref -q --verify "refs/remotes/origin/${BRANCH}"; then
+    return 0
+  fi
+  local detected=""
+  local head_ref
+  head_ref=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)
+  if [[ -n "${head_ref}" ]]; then
+    detected="${head_ref#origin/}"
+  fi
+  if [[ -z "${detected}" ]] && git show-ref -q --verify refs/remotes/origin/master; then
+    detected="master"
+  fi
+  if [[ -z "${detected}" ]] && git show-ref -q --verify refs/remotes/origin/main; then
+    detected="main"
+  fi
+  if [[ -n "${detected}" ]] && git show-ref -q --verify "refs/remotes/origin/${detected}"; then
+    log_info "origin/${BRANCH} is not on the remote; using origin/${detected} and saving BRANCH=${detected}."
+    BRANCH="${detected}"
+    export BRANCH
+    hesabix_persist_update_branch
+    return 0
+  fi
+  log_err "origin/${BRANCH} is not on the remote. Check BRANCH and REPO_URL in ${APP_ROOT}/.deploy_env"
+  return 1
+}
+
 # If normal checkout/pull fails (local generated file, merge, diverged branch), realign the clone with remote.
 hesabix_force_sync_origin() {
   log_info "Force sync with origin/${BRANCH}: git reset --hard (local changes and commits in this clone will be discarded)."
   git fetch origin --prune
-  if ! git show-ref -q "origin/${BRANCH}"; then
-    log_err "origin/${BRANCH} not found after fetch."
+  if ! hesabix_resolve_origin_branch; then
     return 1
   fi
   if git show-ref -q "refs/heads/${BRANCH}"; then
@@ -167,8 +222,7 @@ if [[ "${current_remote}" != "${REPO_URL}" ]]; then
   git remote set-url origin "${REPO_URL}"
 fi
 git fetch origin --prune
-if ! git show-ref -q "origin/${BRANCH}"; then
-  log_err "origin/${BRANCH} is not on the remote. Check BRANCH and REPO_URL in ${APP_ROOT}/.deploy_env"
+if ! hesabix_resolve_origin_branch; then
   exit 1
 fi
 if git checkout -B "${BRANCH}" "origin/${BRANCH}" && git pull origin "${BRANCH}" --ff-only; then
