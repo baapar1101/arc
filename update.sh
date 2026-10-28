@@ -144,11 +144,12 @@ configure_pip_hesabix_mirror() {
   if ! command -v python3 >/dev/null 2>&1; then
     return 0
   fi
-  python3 -m pip config --user set global.index "https://p.mirror.hesabix.ir/simple" 2>/dev/null || true
-  python3 -m pip config --user set global.index-url "https://p.mirror.hesabix.ir/simple" 2>/dev/null || true
-  python3 -m pip config --user set global.extra-index-url "https://mirrors.aliyun.com/pypi/simple" 2>/dev/null || true
-  python3 -m pip config --user set global.trusted-host "p.mirror.hesabix.ir" 2>/dev/null || true
-  log_info "pip user config: Hesabix PyPI (p.mirror.hesabix.ir/simple) + Aliyun extra-index"
+  python3 -m pip config --user set global.index "https://pypi.org/simple" 2>/dev/null || true
+  python3 -m pip config --user set global.index-url "https://pypi.org/simple" 2>/dev/null || true
+  python3 -m pip config --user unset global.extra-index-url 2>/dev/null || true
+  python3 -m pip config --user unset global.trusted-host 2>/dev/null || true
+  python3 -m pip config --user set global.timeout 15 2>/dev/null || true
+  log_info "pip user config: Official PyPI (pypi.org/simple)"
 }
 
 ensure_api_journalctl_env() {

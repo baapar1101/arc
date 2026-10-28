@@ -211,15 +211,33 @@ hesabix_mirrors_flutter_preset_for_urls() {
 }
 
 hesabix_mirrors_pip_preset_for_url() {
-  local url
+  hesabix_pip_preset_for_index_url "$(hesabix_mirrors_norm_url "${1:-}")"
+}
+
+hesabix_mirrors_http_ok() {
+  local url code
   url="$(hesabix_mirrors_norm_url "${1:-}")"
-  case "$url" in
-    "${HESABIX_PIP_INDEX_URL%/}"|"${HESABIX_PIP_INDEX_URL}") printf '%s' "hesabix" ;;
-    "https://pypi.org/simple") printf '%s' "official" ;;
-    "https://pypi.tuna.tsinghua.edu.cn/simple") printf '%s' "tuna" ;;
-    "https://mirrors.aliyun.com/pypi/simple") printf '%s' "aliyun" ;;
-    *) printf '%s' "custom" ;;
+  [[ -n "$url" ]] || return 1
+  code="${HESABIX_MIRROR_HTTP_CODE[$url]:-000}"
+  case "$code" in
+    2*|301|302|303|307|308) return 0 ;;
+    *) return 1 ;;
   esac
+}
+
+hesabix_mirrors_first_ok_url_from_menu() {
+  local menu="$1"
+  local row n id label url selected
+  while IFS= read -r row; do
+    [[ -n "$row" ]] || continue
+    IFS='|' read -r n id label url selected <<<"$row"
+    [[ "$id" == "custom_input" || -z "$url" ]] && continue
+    if hesabix_mirrors_http_ok "$url"; then
+      printf '%s' "$(hesabix_mirrors_norm_url "$url")"
+      return 0
+    fi
+  done <<<"$menu"
+  return 1
 }
 
 hesabix_mirrors_pick_from_menu() {
@@ -237,6 +255,17 @@ hesabix_mirrors_pick_from_menu() {
   while true; do
     read -rp "${prompt} [Enter = keep current]: " choice
     if [[ -z "$choice" ]]; then
+      if hesabix_mirrors_http_ok "$current_url"; then
+        printf '%s' "$(hesabix_mirrors_norm_url "$current_url")"
+        return 0
+      fi
+      local healed=""
+      healed="$(hesabix_mirrors_first_ok_url_from_menu "$menu")" || true
+      if [[ -n "$healed" ]]; then
+        echo "Saved URL is unreachable; using ${healed}" >&2
+        printf '%s' "$healed"
+        return 0
+      fi
       printf '%s' "$(hesabix_mirrors_norm_url "$current_url")"
       return 0
     fi

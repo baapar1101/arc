@@ -294,48 +294,88 @@ hesabix_pip_append_trusted_host() {
   if [[ -n "${PIP_TRUSTED_HOST:-}" ]]; then export PIP_TRUSTED_HOST="${PIP_TRUSTED_HOST} ${host}"
   else export PIP_TRUSTED_HOST="${host}"; fi
 }
+hesabix_pip_index_is_reachable() {
+  local url="${1%/}" code
+  [[ -n "$url" ]] || return 1
+  code="$(curl -sS -o /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 12 -L --max-redirs 4 "${url}/pip/" 2>/dev/null || true)"
+  case "${code:-000}" in 2*|301|302|303|307|308) return 0 ;; *) return 1 ;; esac
+}
 hesabix_apply_pip_china_fallback() {
-  [[ "${PIP_DISABLE_CHINA_FALLBACK:-0}" == "1" ]] && return 0
-  local china="${HESABIX_PIP_CHINA_INDEX_URL}" primary="${PIP_INDEX_URL:-}"
-  if [[ -z "${PIP_EXTRA_INDEX_URL:-}" ]]; then
-    if [[ "${primary}" == "${china}" ]]; then
-      export PIP_EXTRA_INDEX_URL="${HESABIX_PIP_CHINA_SECONDARY_INDEX_URL}"
-      hesabix_pip_append_trusted_host "mirrors.cloud.tencent.com"
-    else
-      export PIP_EXTRA_INDEX_URL="${china}"
-      hesabix_pip_append_trusted_host "${HESABIX_PIP_CHINA_TRUSTED_HOST}"
-    fi
-  else
-    local extra_host; extra_host="$(hesabix_pip_trusted_host_from_url "${PIP_EXTRA_INDEX_URL%% *}")"
-    [[ -n "${extra_host}" ]] && hesabix_pip_append_trusted_host "${extra_host}"
+  export PIP_DEFAULT_TIMEOUT="${PIP_DEFAULT_TIMEOUT:-15}"
+  if [[ "${PIP_DISABLE_CHINA_FALLBACK:-0}" == "1" ]]; then unset PIP_EXTRA_INDEX_URL; return 0; fi
+  local extra="${PIP_EXTRA_INDEX_URL:-}"; extra="${extra%% *}"; extra="${extra%/}"
+  if [[ -z "${extra}" ]]; then unset PIP_EXTRA_INDEX_URL; return 0; fi
+  if ! hesabix_pip_index_is_reachable "${extra}"; then
+    hesabix_mirror_log_warning "Dropping unreachable PIP_EXTRA_INDEX_URL=${extra}"
+    unset PIP_EXTRA_INDEX_URL; return 0
   fi
-  hesabix_mirror_log_info "PyPI extra index (China fallback): ${PIP_EXTRA_INDEX_URL}"
+  export PIP_EXTRA_INDEX_URL="${extra}"
+  local extra_host; extra_host="$(hesabix_pip_trusted_host_from_url "${extra}")"
+  [[ -n "${extra_host}" ]] && hesabix_pip_append_trusted_host "${extra_host}"
+  hesabix_mirror_log_info "PyPI extra index: ${PIP_EXTRA_INDEX_URL}"
 }
 hesabix_pip_index_fallback_urls() {
   local -a urls=(); local u
   [[ -n "${PIP_INDEX_URL:-}" ]] && urls+=("${PIP_INDEX_URL}")
+  urls+=("https://pypi.org/simple" "https://pypi.tuna.tsinghua.edu.cn/simple" "${HESABIX_PIP_CHINA_SECONDARY_INDEX_URL}" "${HESABIX_PIP_INDEX_URL}" "${HESABIX_PIP_CHINA_INDEX_URL}")
   [[ -n "${PIP_EXTRA_INDEX_URL:-}" ]] && urls+=("${PIP_EXTRA_INDEX_URL%% *}")
-  urls+=("${HESABIX_PIP_CHINA_INDEX_URL}" "${HESABIX_PIP_CHINA_SECONDARY_INDEX_URL}" "${HESABIX_PIP_INDEX_URL}")
   local -A seen=()
   for u in "${urls[@]}"; do
     u="${u%/}"; [[ -n "$u" && -z "${seen[$u]:-}" ]] || continue
     seen[$u]=1; printf '%s\n' "$u"
   done
 }
+hesabix_pip_preset_for_index_url() {
+  local url="${1%/}"
+  case "$url" in
+    "${HESABIX_PIP_INDEX_URL%/}"|"${HESABIX_PIP_INDEX_URL}") printf '%s' "hesabix" ;;
+    "https://pypi.org/simple") printf '%s' "official" ;;
+    "https://pypi.tuna.tsinghua.edu.cn/simple") printf '%s' "tuna" ;;
+    "https://mirrors.aliyun.com/pypi/simple") printf '%s' "aliyun" ;;
+    *) printf '%s' "custom" ;;
+  esac
+}
+hesabix_heal_pip_index_if_unreachable() {
+  local current="${PIP_INDEX_URL:-}"; current="${current%/}"
+  if [[ -n "${current}" ]] && hesabix_pip_index_is_reachable "${current}"; then return 0; fi
+  local url
+  while IFS= read -r url; do
+    [[ -n "$url" && "$url" != "${current}" ]] || continue
+    if hesabix_pip_index_is_reachable "$url"; then
+      hesabix_mirror_log_warning "PyPI index unreachable (${current:-<unset>}); switching to ${url}"
+      hesabix_set_pip_mirror_for_url "$url"
+      PIP_MIRROR="$(hesabix_pip_preset_for_index_url "$url")"; export PIP_MIRROR
+      unset PIP_EXTRA_INDEX_URL
+      HESABIX_PIP_INDEX_HEALED=1; export HESABIX_PIP_INDEX_HEALED
+      return 0
+    fi
+  done < <(hesabix_pip_index_fallback_urls)
+  hesabix_mirror_log_warning "No reachable PyPI index found."; return 1
+}
+hesabix_pip_invoke() {
+  local pip_bin="$1" index_url="$2"; shift 2
+  local timeout="${PIP_DEFAULT_TIMEOUT:-15}" sub="$1"; shift
+  local host
+  local -a cmd=("${pip_bin}" --isolated --disable-pip-version-check --timeout "${timeout}" --retries 2 "${sub}" --index-url "${index_url}")
+  host="$(hesabix_pip_trusted_host_from_url "${index_url}")"
+  [[ -n "${host}" ]] && cmd+=(--trusted-host "${host}")
+  "${cmd[@]}" "$@"
+}
 hesabix_pip_cmd_with_fallback() {
   local pip_bin="$1"; shift
-  if [[ "${PIP_DISABLE_CHINA_FALLBACK:-0}" == "1" ]]; then "${pip_bin}" "$@"; return $?; fi
-  "${pip_bin}" "$@" && return 0
-  local url orig_index orig_extra orig_trust
+  if [[ "${PIP_DISABLE_CHINA_FALLBACK:-0}" == "1" ]]; then
+    hesabix_pip_invoke "${pip_bin}" "${PIP_INDEX_URL:-https://pypi.org/simple}" "$@"; return $?
+  fi
+  local url orig_index orig_extra orig_trust first=1
   orig_index="${PIP_INDEX_URL:-}"; orig_extra="${PIP_EXTRA_INDEX_URL:-}"; orig_trust="${PIP_TRUSTED_HOST:-}"
   while IFS= read -r url; do
-    [[ -n "$url" && "$url" != "${orig_index}" ]] || continue
-    hesabix_mirror_log_warning "pip failed on ${orig_index:-<unset>}; retrying ${url}"
-    hesabix_set_pip_mirror_for_url "$url"
-    if [[ "$url" == "${HESABIX_PIP_CHINA_INDEX_URL}" ]]; then export PIP_EXTRA_INDEX_URL="${HESABIX_PIP_CHINA_SECONDARY_INDEX_URL}"
-    else export PIP_EXTRA_INDEX_URL="${HESABIX_PIP_CHINA_INDEX_URL}"; fi
-    hesabix_pip_append_trusted_host "$(hesabix_pip_trusted_host_from_url "${PIP_EXTRA_INDEX_URL}")"
-    if "${pip_bin}" "$@"; then hesabix_mirror_log_info "pip succeeded from ${url}"; return 0; fi
+    [[ -n "$url" ]] || continue
+    [[ "${first}" -eq 1 ]] && first=0 || hesabix_mirror_log_warning "pip failed on ${PIP_INDEX_URL:-<unset>}; retrying ${url}"
+    hesabix_set_pip_mirror_for_url "$url"; unset PIP_EXTRA_INDEX_URL
+    if hesabix_pip_invoke "${pip_bin}" "$url" "$@"; then
+      [[ "$url" != "${orig_index}" ]] && hesabix_mirror_log_info "pip succeeded from ${url}"
+      return 0
+    fi
   done < <(hesabix_pip_index_fallback_urls)
   export PIP_INDEX_URL="${orig_index}" PIP_EXTRA_INDEX_URL="${orig_extra}" PIP_TRUSTED_HOST="${orig_trust}"
   return 1
@@ -400,12 +440,13 @@ hesabix_apply_pip_mirror_env() {
   if [[ -n "${PIP_INDEX_URL:-}" ]]; then
     hesabix_mirror_log_info "Using PyPI index from environment: PIP_INDEX_URL=${PIP_INDEX_URL}"
     hesabix_set_pip_mirror_for_url "${PIP_INDEX_URL}"
-    hesabix_apply_pip_china_fallback; return 0
+  else
+    PIP_MIRROR="${PIP_MIRROR:-hesabix}"; export PIP_MIRROR
+    hesabix_resolve_pip_mirror_from_preset "${PIP_MIRROR}"
   fi
-  PIP_MIRROR="${PIP_MIRROR:-hesabix}"; export PIP_MIRROR
-  hesabix_resolve_pip_mirror_from_preset "${PIP_MIRROR}"
   hesabix_apply_pip_china_fallback
-  hesabix_mirror_log_info "Using PyPI mirror (${PIP_MIRROR}): ${PIP_INDEX_URL}"
+  hesabix_heal_pip_index_if_unreachable || true
+  hesabix_mirror_log_info "Using PyPI mirror (${PIP_MIRROR:-}): ${PIP_INDEX_URL}"
 }
 hesabix_apply_flutter_mirror_env() {
   if [[ -n "${PUB_HOSTED_URL:-}" && -n "${FLUTTER_STORAGE_BASE_URL:-}" ]]; then
@@ -423,7 +464,12 @@ hesabix_configure_pip_mirror() {
   python3 -m pip config --user set global.index-url "${PIP_INDEX_URL}" 2>/dev/null || true
   local primary_host; primary_host="$(hesabix_pip_trusted_host_from_url "${PIP_INDEX_URL}")"
   [[ -n "${primary_host}" ]] && python3 -m pip config --user set global.trusted-host "${primary_host}" 2>/dev/null || true
-  [[ -n "${PIP_EXTRA_INDEX_URL:-}" ]] && python3 -m pip config --user set global.extra-index-url "${PIP_EXTRA_INDEX_URL%% *}" 2>/dev/null || true
+  if [[ -n "${PIP_EXTRA_INDEX_URL:-}" ]]; then
+    python3 -m pip config --user set global.extra-index-url "${PIP_EXTRA_INDEX_URL%% *}" 2>/dev/null || true
+  else
+    python3 -m pip config --user unset global.extra-index-url 2>/dev/null || true
+  fi
+  python3 -m pip config --user set global.timeout "${PIP_DEFAULT_TIMEOUT:-15}" 2>/dev/null || true
   hesabix_mirror_log_info "pip user config: ${PIP_INDEX_URL}"
 }
 hesabix_prompt_pip_mirror() {

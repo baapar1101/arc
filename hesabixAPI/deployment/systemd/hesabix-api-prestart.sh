@@ -80,16 +80,18 @@ set_pip_env_for_url() {
   fi
 }
 
-# میرور اصلی + آینه‌های چین (بدون تحریم) به‌عنوان fallback.
-CHINA_EXTRA="https://mirrors.aliyun.com/pypi/simple"
+# Sequential indexes only (no extra-index). A dead extra-index stalls every pip lookup.
 MIRRORS=()
 if [[ -n "${PIP_INDEX_URL:-}" ]]; then
   MIRRORS+=("${PIP_INDEX_URL}")
-else
-  MIRRORS+=("https://p.mirror.hesabix.ir/simple")
 fi
-MIRRORS+=("${CHINA_EXTRA}")
-MIRRORS+=("https://mirrors.cloud.tencent.com/pypi/simple")
+MIRRORS+=(
+  "https://pypi.org/simple"
+  "https://pypi.tuna.tsinghua.edu.cn/simple"
+  "https://mirrors.cloud.tencent.com/pypi/simple"
+  "https://p.mirror.hesabix.ir/simple"
+  "https://mirrors.aliyun.com/pypi/simple"
+)
 
 seen_mirrors=" "
 for url in "${MIRRORS[@]}"; do
@@ -98,14 +100,14 @@ for url in "${MIRRORS[@]}"; do
   seen_mirrors+="${url} "
   log "trying PyPI: $url"
   set_pip_env_for_url "$url"
-  extra="${CHINA_EXTRA}"
-  [[ "$url" == "${CHINA_EXTRA}" ]] && extra="https://mirrors.cloud.tencent.com/pypi/simple"
-  pip_env=(env PIP_INDEX_URL="${PIP_INDEX_URL}" PIP_EXTRA_INDEX_URL="${extra}")
+  pip_env=(env -u PIP_EXTRA_INDEX_URL PIP_INDEX_URL="${PIP_INDEX_URL}" PIP_DEFAULT_TIMEOUT=15)
+  pip_args=("$PIP" --isolated --disable-pip-version-check --timeout 15 --retries 2 install --index-url "$url")
   if [[ -n "${PIP_TRUSTED_HOST:-}" ]]; then
     pip_env+=(PIP_TRUSTED_HOST="${PIP_TRUSTED_HOST}")
+    pip_args+=(--trusted-host "${PIP_TRUSTED_HOST}")
   fi
-  if ! run_as_www "${pip_env[@]}" "$PIP" install --upgrade pip setuptools wheel \
-      || ! run_as_www "${pip_env[@]}" "$PIP" install -e "${API_DIR}"; then
+  if ! run_as_www "${pip_env[@]}" "${pip_args[@]}" --upgrade pip setuptools wheel \
+      || ! run_as_www "${pip_env[@]}" "${pip_args[@]}" -e "${API_DIR}"; then
     continue
   fi
   if run_as_www env PYTHONPATH="${API_DIR}" "$VENV_PY" -c "import app.main"; then
