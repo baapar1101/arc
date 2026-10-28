@@ -139,21 +139,42 @@ def _parse_iso_date(dt: str | datetime | date) -> date:
     raise ApiError("INVALID_DATE", f"Invalid date format: {dt}", http_status=400)
 
 
+def _as_plain_date(value: date | datetime) -> date:
+    if isinstance(value, datetime):
+        return value.date()
+    return value
+
+
 def resolve_receipt_document_date_from_account_lines(
     default_date: date,
     account_lines: List[Dict[str, Any]],
 ) -> date:
-    """تاریخ سند دریافت/پرداخت: بیشینهٔ تاریخ پیش‌فرض و transaction_date خطوط حساب."""
-    dates: List[date] = [default_date]
+    """تاریخ سند دریافت/پرداخت برابر تاریخ وقوع وجه نقد است.
+
+    ثبت حسابداری صحیح: ورود/خروج بانک و صندوق باید در همان روز واقعی تراکنش
+    در دفاتر بنشیند. اگر وجه قبل از فاکتور رسیده باشد (پیش‌دریافت)، سند دریافت
+    تاریخ واریز را می‌گیرد و فاکتور تاریخ خودش را نگه می‌دارد.
+
+    تاریخ پیش‌فرض (مثلاً تاریخ فاکتور) فقط وقتی استفاده می‌شود که هیچ خط حسابی
+    ``transaction_date`` نداشته باشد. اگر چند خط تاریخ متفاوت داشته باشند،
+    زودترین تاریخ وجه انتخاب می‌شود تا نقد دیرتر از واقعیت شناسایی نشود.
+    """
+    tx_dates: List[date] = []
     for line in account_lines or []:
+        if not isinstance(line, dict):
+            continue
+        if line.get("is_commission_line"):
+            continue
         raw = line.get("transaction_date")
-        if raw is None:
+        if raw is None or raw == "":
             continue
         try:
-            dates.append(_parse_iso_date(raw))
+            tx_dates.append(_as_plain_date(_parse_iso_date(raw)))
         except ApiError:
             continue
-    return max(dates)
+    if tx_dates:
+        return min(tx_dates)
+    return _as_plain_date(default_date)
 
 
 def _link_receipt_payment_to_invoices(

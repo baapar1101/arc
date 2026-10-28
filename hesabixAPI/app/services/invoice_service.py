@@ -3229,6 +3229,7 @@ def _create_receipt_payment_documents_for_invoice_payments(
         if not account_line:
             continue
 
+        # تاریخ سند دریافت/پرداخت = تاریخ وقوع وجه، نه تاریخ فاکتور
         rp_document_date = resolve_receipt_document_date_from_account_lines(
             document.document_date,
             [account_line],
