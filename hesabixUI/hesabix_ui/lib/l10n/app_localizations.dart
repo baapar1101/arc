@@ -23868,6 +23868,492 @@ abstract class AppLocalizations {
   /// **'The payroll add-on is not active for this business. Activate it from the plugin marketplace.'**
   String get payrollPluginNotActive;
 
+  /// No description provided for @fixedAssetsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed assets'**
+  String get fixedAssetsTitle;
+
+  /// No description provided for @fixedAssetsMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed assets'**
+  String get fixedAssetsMenu;
+
+  /// No description provided for @fixedAssetsPluginNotActive.
+  ///
+  /// In en, this message translates to:
+  /// **'The fixed assets add-on is not active for this business. Activate it from the plugin marketplace.'**
+  String get fixedAssetsPluginNotActive;
+
+  /// No description provided for @fixedAssetsPermissionManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage asset classes, locations, and settings'**
+  String get fixedAssetsPermissionManage;
+
+  /// No description provided for @fixedAssetsPermissionOperate.
+  ///
+  /// In en, this message translates to:
+  /// **'Create asset cards and draft depreciation runs'**
+  String get fixedAssetsPermissionOperate;
+
+  /// No description provided for @fixedAssetsPermissionPost.
+  ///
+  /// In en, this message translates to:
+  /// **'Post acquisition and depreciation journals'**
+  String get fixedAssetsPermissionPost;
+
+  /// No description provided for @fixedAssetsAssetsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Assets'**
+  String get fixedAssetsAssetsTab;
+
+  /// No description provided for @fixedAssetsDepreciationTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Depreciation'**
+  String get fixedAssetsDepreciationTab;
+
+  /// No description provided for @fixedAssetsSettingsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get fixedAssetsSettingsTab;
+
+  /// No description provided for @fixedAssetsNewAsset.
+  ///
+  /// In en, this message translates to:
+  /// **'New asset'**
+  String get fixedAssetsNewAsset;
+
+  /// No description provided for @fixedAssetsAssetName.
+  ///
+  /// In en, this message translates to:
+  /// **'Asset name'**
+  String get fixedAssetsAssetName;
+
+  /// No description provided for @fixedAssetsClass.
+  ///
+  /// In en, this message translates to:
+  /// **'Class'**
+  String get fixedAssetsClass;
+
+  /// No description provided for @fixedAssetsCost.
+  ///
+  /// In en, this message translates to:
+  /// **'Cost'**
+  String get fixedAssetsCost;
+
+  /// No description provided for @fixedAssetsSalvage.
+  ///
+  /// In en, this message translates to:
+  /// **'Salvage value'**
+  String get fixedAssetsSalvage;
+
+  /// No description provided for @fixedAssetsVat.
+  ///
+  /// In en, this message translates to:
+  /// **'Input VAT'**
+  String get fixedAssetsVat;
+
+  /// No description provided for @fixedAssetsUsefulLifeMonths.
+  ///
+  /// In en, this message translates to:
+  /// **'Useful life (months)'**
+  String get fixedAssetsUsefulLifeMonths;
+
+  /// No description provided for @fixedAssetsAcquisitionKind.
+  ///
+  /// In en, this message translates to:
+  /// **'Acquisition type'**
+  String get fixedAssetsAcquisitionKind;
+
+  /// No description provided for @fixedAssetsKindPurchase.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase (not a goods invoice)'**
+  String get fixedAssetsKindPurchase;
+
+  /// No description provided for @fixedAssetsKindOpening.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening balance'**
+  String get fixedAssetsKindOpening;
+
+  /// No description provided for @fixedAssetsAcquisitionDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Acquisition / ready-for-use date'**
+  String get fixedAssetsAcquisitionDate;
+
+  /// No description provided for @fixedAssetsCapitalize.
+  ///
+  /// In en, this message translates to:
+  /// **'Capitalize and post'**
+  String get fixedAssetsCapitalize;
+
+  /// No description provided for @fixedAssetsCapitalizeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This is not a goods purchase invoice. The counterpart is cash, bank, a person, opening equity, or a leaf account.'**
+  String get fixedAssetsCapitalizeHint;
+
+  /// No description provided for @fixedAssetsCounterparty.
+  ///
+  /// In en, this message translates to:
+  /// **'Counterpart'**
+  String get fixedAssetsCounterparty;
+
+  /// No description provided for @fixedAssetsCounterpartyPerson.
+  ///
+  /// In en, this message translates to:
+  /// **'Person (accounts payable)'**
+  String get fixedAssetsCounterpartyPerson;
+
+  /// No description provided for @fixedAssetsCounterpartyBank.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank'**
+  String get fixedAssetsCounterpartyBank;
+
+  /// No description provided for @fixedAssetsCounterpartyCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash register'**
+  String get fixedAssetsCounterpartyCash;
+
+  /// No description provided for @fixedAssetsCounterpartyPetty.
+  ///
+  /// In en, this message translates to:
+  /// **'Petty cash'**
+  String get fixedAssetsCounterpartyPetty;
+
+  /// No description provided for @fixedAssetsCounterpartyAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Leaf account'**
+  String get fixedAssetsCounterpartyAccount;
+
+  /// No description provided for @fixedAssetsCounterpartyId.
+  ///
+  /// In en, this message translates to:
+  /// **'Counterpart id'**
+  String get fixedAssetsCounterpartyId;
+
+  /// No description provided for @fixedAssetsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved.'**
+  String get fixedAssetsSaved;
+
+  /// No description provided for @fixedAssetsCapitalized.
+  ///
+  /// In en, this message translates to:
+  /// **'Acquisition journal posted.'**
+  String get fixedAssetsCapitalized;
+
+  /// No description provided for @fixedAssetsNoAssets.
+  ///
+  /// In en, this message translates to:
+  /// **'No assets yet.'**
+  String get fixedAssetsNoAssets;
+
+  /// No description provided for @fixedAssetsNoClasses.
+  ///
+  /// In en, this message translates to:
+  /// **'No asset class is ready.'**
+  String get fixedAssetsNoClasses;
+
+  /// No description provided for @fixedAssetsNoRuns.
+  ///
+  /// In en, this message translates to:
+  /// **'No depreciation run yet.'**
+  String get fixedAssetsNoRuns;
+
+  /// No description provided for @fixedAssetsNewDepreciationRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Compute monthly depreciation'**
+  String get fixedAssetsNewDepreciationRun;
+
+  /// No description provided for @fixedAssetsDepreciationGregorianHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the Gregorian year and month; the depreciation engine uses Gregorian dates.'**
+  String get fixedAssetsDepreciationGregorianHint;
+
+  /// No description provided for @fixedAssetsPeriodYear.
+  ///
+  /// In en, this message translates to:
+  /// **'Gregorian year'**
+  String get fixedAssetsPeriodYear;
+
+  /// No description provided for @fixedAssetsPeriodMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Month'**
+  String get fixedAssetsPeriodMonth;
+
+  /// No description provided for @fixedAssetsRunCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Depreciation draft created.'**
+  String get fixedAssetsRunCreated;
+
+  /// No description provided for @fixedAssetsPostRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Post depreciation journal'**
+  String get fixedAssetsPostRun;
+
+  /// No description provided for @fixedAssetsRunPosted.
+  ///
+  /// In en, this message translates to:
+  /// **'Depreciation journal posted.'**
+  String get fixedAssetsRunPosted;
+
+  /// No description provided for @fixedAssetsNetBookValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Net book value'**
+  String get fixedAssetsNetBookValue;
+
+  /// No description provided for @fixedAssetsStatusDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft'**
+  String get fixedAssetsStatusDraft;
+
+  /// No description provided for @fixedAssetsStatusCapitalized.
+  ///
+  /// In en, this message translates to:
+  /// **'Capitalized'**
+  String get fixedAssetsStatusCapitalized;
+
+  /// No description provided for @fixedAssetsConventionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Depreciation start: Standard 11 from ready-for-use date (first month prorated) or tax article 149 from the first of the next month.'**
+  String get fixedAssetsConventionHint;
+
+  /// No description provided for @fixedAssetsConventionFromReady.
+  ///
+  /// In en, this message translates to:
+  /// **'From ready-for-use date (Standard 11)'**
+  String get fixedAssetsConventionFromReady;
+
+  /// No description provided for @fixedAssetsConventionNextMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'From the next month (article 149)'**
+  String get fixedAssetsConventionNextMonth;
+
+  /// No description provided for @fixedAssetsClassesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Default class mapping to the chart of accounts'**
+  String get fixedAssetsClassesHint;
+
+  /// No description provided for @fixedAssetsNotDepreciable.
+  ///
+  /// In en, this message translates to:
+  /// **'Not depreciable'**
+  String get fixedAssetsNotDepreciable;
+
+  /// No description provided for @fixedAssetsDispose.
+  ///
+  /// In en, this message translates to:
+  /// **'Sell / scrap'**
+  String get fixedAssetsDispose;
+
+  /// No description provided for @fixedAssetsSale.
+  ///
+  /// In en, this message translates to:
+  /// **'Sale'**
+  String get fixedAssetsSale;
+
+  /// No description provided for @fixedAssetsScrap.
+  ///
+  /// In en, this message translates to:
+  /// **'Scrap (no proceeds)'**
+  String get fixedAssetsScrap;
+
+  /// No description provided for @fixedAssetsProceeds.
+  ///
+  /// In en, this message translates to:
+  /// **'Proceeds (exclusive of VAT)'**
+  String get fixedAssetsProceeds;
+
+  /// No description provided for @fixedAssetsVatOutput.
+  ///
+  /// In en, this message translates to:
+  /// **'Output VAT'**
+  String get fixedAssetsVatOutput;
+
+  /// No description provided for @fixedAssetsDisposalDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Disposal date'**
+  String get fixedAssetsDisposalDate;
+
+  /// No description provided for @fixedAssetsDisposed.
+  ///
+  /// In en, this message translates to:
+  /// **'Disposal journal posted.'**
+  String get fixedAssetsDisposed;
+
+  /// No description provided for @fixedAssetsMarkIdle.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark idle'**
+  String get fixedAssetsMarkIdle;
+
+  /// No description provided for @fixedAssetsIdleFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Idle from'**
+  String get fixedAssetsIdleFrom;
+
+  /// No description provided for @fixedAssetsIdleHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Accounting depreciation continues in full. Tax preview applies a 30% reduction only after more than six idle months. A second tax book is not posted in this phase.'**
+  String get fixedAssetsIdleHint;
+
+  /// No description provided for @fixedAssetsResume.
+  ///
+  /// In en, this message translates to:
+  /// **'Return to use'**
+  String get fixedAssetsResume;
+
+  /// No description provided for @fixedAssetsIdleSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Asset marked idle.'**
+  String get fixedAssetsIdleSaved;
+
+  /// No description provided for @fixedAssetsResumed.
+  ///
+  /// In en, this message translates to:
+  /// **'Asset returned to use.'**
+  String get fixedAssetsResumed;
+
+  /// No description provided for @fixedAssetsSubsequent.
+  ///
+  /// In en, this message translates to:
+  /// **'Repair / subsequent cost'**
+  String get fixedAssetsSubsequent;
+
+  /// No description provided for @fixedAssetsRoutineRepair.
+  ///
+  /// In en, this message translates to:
+  /// **'Period repair (expense)'**
+  String get fixedAssetsRoutineRepair;
+
+  /// No description provided for @fixedAssetsMajorRepair.
+  ///
+  /// In en, this message translates to:
+  /// **'Major repair (add to cost)'**
+  String get fixedAssetsMajorRepair;
+
+  /// No description provided for @fixedAssetsExpenditureAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount (exclusive of VAT)'**
+  String get fixedAssetsExpenditureAmount;
+
+  /// No description provided for @fixedAssetsRemainingLife.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining useful life (months) from effective date'**
+  String get fixedAssetsRemainingLife;
+
+  /// No description provided for @fixedAssetsExpenditurePosted.
+  ///
+  /// In en, this message translates to:
+  /// **'Subsequent expenditure journal posted.'**
+  String get fixedAssetsExpenditurePosted;
+
+  /// No description provided for @fixedAssetsEstimateChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Change method / remaining life'**
+  String get fixedAssetsEstimateChange;
+
+  /// No description provided for @fixedAssetsEstimateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Prospective only: posted accumulated depreciation is not rewritten. Straight-line monthly amount becomes remaining depreciable divided by remaining months.'**
+  String get fixedAssetsEstimateHint;
+
+  /// No description provided for @fixedAssetsEstimateSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimate change saved.'**
+  String get fixedAssetsEstimateSaved;
+
+  /// No description provided for @fixedAssetsStatusIdle.
+  ///
+  /// In en, this message translates to:
+  /// **'Idle'**
+  String get fixedAssetsStatusIdle;
+
+  /// No description provided for @fixedAssetsStatusDisposed.
+  ///
+  /// In en, this message translates to:
+  /// **'Disposed'**
+  String get fixedAssetsStatusDisposed;
+
+  /// No description provided for @fixedAssetsOpeningEquityAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening equity account id'**
+  String get fixedAssetsOpeningEquityAccount;
+
+  /// No description provided for @fixedAssetsGainAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Disposal gain account id (default 60206)'**
+  String get fixedAssetsGainAccount;
+
+  /// No description provided for @fixedAssetsLossAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Disposal loss account id (default 70804)'**
+  String get fixedAssetsLossAccount;
+
+  /// No description provided for @fixedAssetsRepairAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Repair expense account id (default 70404)'**
+  String get fixedAssetsRepairAccount;
+
+  /// No description provided for @fixedAssetsVatOutputAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Output VAT account id (default 20101)'**
+  String get fixedAssetsVatOutputAccount;
+
+  /// No description provided for @fixedAssetsSaveAccounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Save account mapping'**
+  String get fixedAssetsSaveAccounts;
+
+  /// No description provided for @businessSettingsFixedAssets.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed assets'**
+  String get businessSettingsFixedAssets;
+
+  /// No description provided for @businessSettingsFixedAssetsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Asset classes, depreciation convention, and opening equity account'**
+  String get businessSettingsFixedAssetsDescription;
+
   /// No description provided for @businessSettingsPayroll.
   ///
   /// In en, this message translates to:
@@ -38122,6 +38608,192 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Not sent'**
   String get motamedAsaPaymentStatusNotApplicable;
+
+  /// No description provided for @distributionLocationConsentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Location sharing consent'**
+  String get distributionLocationConsentTitle;
+
+  /// No description provided for @distributionLocationConsentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow live location so managers can see you on the team map. It is sent only during an open visit.'**
+  String get distributionLocationConsentHint;
+
+  /// No description provided for @distributionLocationConsentAllow.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow'**
+  String get distributionLocationConsentAllow;
+
+  /// No description provided for @distributionLocationConsentActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Live location is on for the team map.'**
+  String get distributionLocationConsentActive;
+
+  /// No description provided for @distributionLocationConsentRevoke.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke'**
+  String get distributionLocationConsentRevoke;
+
+  /// No description provided for @distributionPlanPublished.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'\'s plan is published'**
+  String get distributionPlanPublished;
+
+  /// No description provided for @distributionPlanUnpublished.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'\'s plan is not published yet'**
+  String get distributionPlanUnpublished;
+
+  /// No description provided for @distributionPlanLockedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop order is locked until a manager unlocks it.'**
+  String get distributionPlanLockedHint;
+
+  /// No description provided for @distributionPlanPublishHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Publishing makes the plan official and can lock route order.'**
+  String get distributionPlanPublishHint;
+
+  /// No description provided for @distributionPlanPublish.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish plan'**
+  String get distributionPlanPublish;
+
+  /// No description provided for @distributionPlanPublishAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish all assigned'**
+  String get distributionPlanPublishAll;
+
+  /// No description provided for @distributionPlanPublishAllHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Publishes this day\'\'s plan for every visitor assigned to a route.'**
+  String get distributionPlanPublishAllHint;
+
+  /// No description provided for @distributionPlanPublishAllDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Assigned visitors\'\' plans were published.'**
+  String get distributionPlanPublishAllDone;
+
+  /// No description provided for @distributionPlanPublishAllEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No assigned visitors for this day.'**
+  String get distributionPlanPublishAllEmpty;
+
+  /// No description provided for @distributionPlanUnlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock'**
+  String get distributionPlanUnlock;
+
+  /// No description provided for @distributionRequireLocationConsent.
+  ///
+  /// In en, this message translates to:
+  /// **'Per-user GPS consent'**
+  String get distributionRequireLocationConsent;
+
+  /// No description provided for @distributionRequireLocationConsentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Live location is stored only after the visitor consents.'**
+  String get distributionRequireLocationConsentHint;
+
+  /// No description provided for @distributionExclusiveAssignments.
+  ///
+  /// In en, this message translates to:
+  /// **'Exclusive route assignment'**
+  String get distributionExclusiveAssignments;
+
+  /// No description provided for @distributionExclusiveAssignmentsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A route can be assigned to only one visitor in a date range.'**
+  String get distributionExclusiveAssignmentsHint;
+
+  /// No description provided for @distributionExclusiveTerritories.
+  ///
+  /// In en, this message translates to:
+  /// **'Exclusive territories'**
+  String get distributionExclusiveTerritories;
+
+  /// No description provided for @distributionExclusiveTerritoriesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Only one active visitor per territory in a date range.'**
+  String get distributionExclusiveTerritoriesHint;
+
+  /// No description provided for @distributionExclusiveCustomerOwnership.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer ownership'**
+  String get distributionExclusiveCustomerOwnership;
+
+  /// No description provided for @distributionExclusiveCustomerOwnershipHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Another visitor cannot visit a customer owned by a colleague.'**
+  String get distributionExclusiveCustomerOwnershipHint;
+
+  /// No description provided for @distributionLockPublishedPlans.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock plan after publish'**
+  String get distributionLockPublishedPlans;
+
+  /// No description provided for @distributionLockPublishedPlansHint.
+  ///
+  /// In en, this message translates to:
+  /// **'After official publish, day-order optimization is locked.'**
+  String get distributionLockPublishedPlansHint;
+
+  /// No description provided for @distributionRequirePublishedPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Require published daily plan'**
+  String get distributionRequirePublishedPlan;
+
+  /// No description provided for @distributionRequirePublishedPlanHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Visits can start only after today\'\'s plan is published.'**
+  String get distributionRequirePublishedPlanHint;
+
+  /// No description provided for @distributionTerritoryParent.
+  ///
+  /// In en, this message translates to:
+  /// **'Parent territory'**
+  String get distributionTerritoryParent;
+
+  /// No description provided for @distributionTerritorySupervisor.
+  ///
+  /// In en, this message translates to:
+  /// **'Territory supervisor'**
+  String get distributionTerritorySupervisor;
+
+  /// No description provided for @distributionWorkspaceSupervisor.
+  ///
+  /// In en, this message translates to:
+  /// **'Distribution — regional supervisor'**
+  String get distributionWorkspaceSupervisor;
+
+  /// No description provided for @distributionWorkspaceOffice.
+  ///
+  /// In en, this message translates to:
+  /// **'Distribution — office'**
+  String get distributionWorkspaceOffice;
 }
 
 class _AppLocalizationsDelegate

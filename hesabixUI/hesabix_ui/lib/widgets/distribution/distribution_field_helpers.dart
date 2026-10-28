@@ -94,6 +94,51 @@ String distributionFailReasonLabel(AppLocalizations t, String code) {
   }
 }
 
+String distributionIsoDate(DateTime d) =>
+    '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+DateTime? distributionParseDt(dynamic s) {
+  if (s == null) return null;
+  try {
+    return DateTime.parse(s.toString());
+  } catch (_) {
+    return null;
+  }
+}
+
+const distributionWeekdayLabelsFa = ['دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه', 'یکشنبه'];
+const distributionWeekdayLabelsEn = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+String distributionWeekdayLabel(AppLocalizations t, int? wd) {
+  if (wd == null) return t.distributionWeekdayAny;
+  final labels = t.localeName.startsWith('fa') ? distributionWeekdayLabelsFa : distributionWeekdayLabelsEn;
+  if (wd >= 0 && wd < labels.length) return labels[wd];
+  return '$wd';
+}
+
+/// وضعیت توقف نسبت به ویزیت‌های همان روز: done | current | pending
+String distributionPlanStopKind({
+  required int? personId,
+  required DateTime planDay,
+  Map<String, dynamic>? activeVisit,
+  List<dynamic> visitItems = const [],
+}) {
+  if (personId == null) return 'pending';
+  final activePid = int.tryParse('${activeVisit?['person_id']}');
+  if (activePid != null && activePid == personId) return 'current';
+  final today = DateTime(planDay.year, planDay.month, planDay.day);
+  for (final raw in visitItems) {
+    final v = Map<String, dynamic>.from(raw as Map);
+    if (v['status'] != 'completed') continue;
+    if (int.tryParse('${v['person_id']}') != personId) continue;
+    final started = distributionParseDt(v['started_at']) ?? distributionParseDt(v['ended_at']);
+    if (started == null) continue;
+    final d = DateTime(started.year, started.month, started.day);
+    if (d == today) return 'done';
+  }
+  return 'pending';
+}
+
 const distributionNoOrderCodes = ['closed', 'no_need', 'competitor', 'credit', 'no_decision', 'other'];
 const distributionReturnCodes = ['expired', 'damaged', 'commercial', 'wrong_item', 'near_expiry', 'other'];
 const distributionFailCodes = ['closed', 'refused', 'address', 'shortage', 'other'];

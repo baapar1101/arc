@@ -12933,6 +12933,268 @@ class AppLocalizationsEn extends AppLocalizations {
       'The payroll add-on is not active for this business. Activate it from the plugin marketplace.';
 
   @override
+  String get fixedAssetsTitle => 'Fixed assets';
+
+  @override
+  String get fixedAssetsMenu => 'Fixed assets';
+
+  @override
+  String get fixedAssetsPluginNotActive =>
+      'The fixed assets add-on is not active for this business. Activate it from the plugin marketplace.';
+
+  @override
+  String get fixedAssetsPermissionManage =>
+      'Manage asset classes, locations, and settings';
+
+  @override
+  String get fixedAssetsPermissionOperate =>
+      'Create asset cards and draft depreciation runs';
+
+  @override
+  String get fixedAssetsPermissionPost =>
+      'Post acquisition and depreciation journals';
+
+  @override
+  String get fixedAssetsAssetsTab => 'Assets';
+
+  @override
+  String get fixedAssetsDepreciationTab => 'Depreciation';
+
+  @override
+  String get fixedAssetsSettingsTab => 'Settings';
+
+  @override
+  String get fixedAssetsNewAsset => 'New asset';
+
+  @override
+  String get fixedAssetsAssetName => 'Asset name';
+
+  @override
+  String get fixedAssetsClass => 'Class';
+
+  @override
+  String get fixedAssetsCost => 'Cost';
+
+  @override
+  String get fixedAssetsSalvage => 'Salvage value';
+
+  @override
+  String get fixedAssetsVat => 'Input VAT';
+
+  @override
+  String get fixedAssetsUsefulLifeMonths => 'Useful life (months)';
+
+  @override
+  String get fixedAssetsAcquisitionKind => 'Acquisition type';
+
+  @override
+  String get fixedAssetsKindPurchase => 'Purchase (not a goods invoice)';
+
+  @override
+  String get fixedAssetsKindOpening => 'Opening balance';
+
+  @override
+  String get fixedAssetsAcquisitionDate => 'Acquisition / ready-for-use date';
+
+  @override
+  String get fixedAssetsCapitalize => 'Capitalize and post';
+
+  @override
+  String get fixedAssetsCapitalizeHint =>
+      'This is not a goods purchase invoice. The counterpart is cash, bank, a person, opening equity, or a leaf account.';
+
+  @override
+  String get fixedAssetsCounterparty => 'Counterpart';
+
+  @override
+  String get fixedAssetsCounterpartyPerson => 'Person (accounts payable)';
+
+  @override
+  String get fixedAssetsCounterpartyBank => 'Bank';
+
+  @override
+  String get fixedAssetsCounterpartyCash => 'Cash register';
+
+  @override
+  String get fixedAssetsCounterpartyPetty => 'Petty cash';
+
+  @override
+  String get fixedAssetsCounterpartyAccount => 'Leaf account';
+
+  @override
+  String get fixedAssetsCounterpartyId => 'Counterpart id';
+
+  @override
+  String get fixedAssetsSaved => 'Saved.';
+
+  @override
+  String get fixedAssetsCapitalized => 'Acquisition journal posted.';
+
+  @override
+  String get fixedAssetsNoAssets => 'No assets yet.';
+
+  @override
+  String get fixedAssetsNoClasses => 'No asset class is ready.';
+
+  @override
+  String get fixedAssetsNoRuns => 'No depreciation run yet.';
+
+  @override
+  String get fixedAssetsNewDepreciationRun => 'Compute monthly depreciation';
+
+  @override
+  String get fixedAssetsDepreciationGregorianHint =>
+      'Enter the Gregorian year and month; the depreciation engine uses Gregorian dates.';
+
+  @override
+  String get fixedAssetsPeriodYear => 'Gregorian year';
+
+  @override
+  String get fixedAssetsPeriodMonth => 'Month';
+
+  @override
+  String get fixedAssetsRunCreated => 'Depreciation draft created.';
+
+  @override
+  String get fixedAssetsPostRun => 'Post depreciation journal';
+
+  @override
+  String get fixedAssetsRunPosted => 'Depreciation journal posted.';
+
+  @override
+  String get fixedAssetsNetBookValue => 'Net book value';
+
+  @override
+  String get fixedAssetsStatusDraft => 'Draft';
+
+  @override
+  String get fixedAssetsStatusCapitalized => 'Capitalized';
+
+  @override
+  String get fixedAssetsConventionHint =>
+      'Depreciation start: Standard 11 from ready-for-use date (first month prorated) or tax article 149 from the first of the next month.';
+
+  @override
+  String get fixedAssetsConventionFromReady =>
+      'From ready-for-use date (Standard 11)';
+
+  @override
+  String get fixedAssetsConventionNextMonth =>
+      'From the next month (article 149)';
+
+  @override
+  String get fixedAssetsClassesHint =>
+      'Default class mapping to the chart of accounts';
+
+  @override
+  String get fixedAssetsNotDepreciable => 'Not depreciable';
+
+  @override
+  String get fixedAssetsDispose => 'Sell / scrap';
+
+  @override
+  String get fixedAssetsSale => 'Sale';
+
+  @override
+  String get fixedAssetsScrap => 'Scrap (no proceeds)';
+
+  @override
+  String get fixedAssetsProceeds => 'Proceeds (exclusive of VAT)';
+
+  @override
+  String get fixedAssetsVatOutput => 'Output VAT';
+
+  @override
+  String get fixedAssetsDisposalDate => 'Disposal date';
+
+  @override
+  String get fixedAssetsDisposed => 'Disposal journal posted.';
+
+  @override
+  String get fixedAssetsMarkIdle => 'Mark idle';
+
+  @override
+  String get fixedAssetsIdleFrom => 'Idle from';
+
+  @override
+  String get fixedAssetsIdleHint =>
+      'Accounting depreciation continues in full. Tax preview applies a 30% reduction only after more than six idle months. A second tax book is not posted in this phase.';
+
+  @override
+  String get fixedAssetsResume => 'Return to use';
+
+  @override
+  String get fixedAssetsIdleSaved => 'Asset marked idle.';
+
+  @override
+  String get fixedAssetsResumed => 'Asset returned to use.';
+
+  @override
+  String get fixedAssetsSubsequent => 'Repair / subsequent cost';
+
+  @override
+  String get fixedAssetsRoutineRepair => 'Period repair (expense)';
+
+  @override
+  String get fixedAssetsMajorRepair => 'Major repair (add to cost)';
+
+  @override
+  String get fixedAssetsExpenditureAmount => 'Amount (exclusive of VAT)';
+
+  @override
+  String get fixedAssetsRemainingLife =>
+      'Remaining useful life (months) from effective date';
+
+  @override
+  String get fixedAssetsExpenditurePosted =>
+      'Subsequent expenditure journal posted.';
+
+  @override
+  String get fixedAssetsEstimateChange => 'Change method / remaining life';
+
+  @override
+  String get fixedAssetsEstimateHint =>
+      'Prospective only: posted accumulated depreciation is not rewritten. Straight-line monthly amount becomes remaining depreciable divided by remaining months.';
+
+  @override
+  String get fixedAssetsEstimateSaved => 'Estimate change saved.';
+
+  @override
+  String get fixedAssetsStatusIdle => 'Idle';
+
+  @override
+  String get fixedAssetsStatusDisposed => 'Disposed';
+
+  @override
+  String get fixedAssetsOpeningEquityAccount => 'Opening equity account id';
+
+  @override
+  String get fixedAssetsGainAccount =>
+      'Disposal gain account id (default 60206)';
+
+  @override
+  String get fixedAssetsLossAccount =>
+      'Disposal loss account id (default 70804)';
+
+  @override
+  String get fixedAssetsRepairAccount =>
+      'Repair expense account id (default 70404)';
+
+  @override
+  String get fixedAssetsVatOutputAccount =>
+      'Output VAT account id (default 20101)';
+
+  @override
+  String get fixedAssetsSaveAccounts => 'Save account mapping';
+
+  @override
+  String get businessSettingsFixedAssets => 'Fixed assets';
+
+  @override
+  String get businessSettingsFixedAssetsDescription =>
+      'Asset classes, depreciation convention, and opening equity account';
+
+  @override
   String get businessSettingsPayroll => 'Payroll';
 
   @override
@@ -20793,4 +21055,112 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get motamedAsaPaymentStatusNotApplicable => 'Not sent';
+
+  @override
+  String get distributionLocationConsentTitle => 'Location sharing consent';
+
+  @override
+  String get distributionLocationConsentHint =>
+      'Allow live location so managers can see you on the team map. It is sent only during an open visit.';
+
+  @override
+  String get distributionLocationConsentAllow => 'Allow';
+
+  @override
+  String get distributionLocationConsentActive =>
+      'Live location is on for the team map.';
+
+  @override
+  String get distributionLocationConsentRevoke => 'Revoke';
+
+  @override
+  String get distributionPlanPublished => 'Today\'s plan is published';
+
+  @override
+  String get distributionPlanUnpublished =>
+      'Today\'s plan is not published yet';
+
+  @override
+  String get distributionPlanLockedHint =>
+      'Stop order is locked until a manager unlocks it.';
+
+  @override
+  String get distributionPlanPublishHint =>
+      'Publishing makes the plan official and can lock route order.';
+
+  @override
+  String get distributionPlanPublish => 'Publish plan';
+
+  @override
+  String get distributionPlanPublishAll => 'Publish all assigned';
+
+  @override
+  String get distributionPlanPublishAllHint =>
+      'Publishes this day\'s plan for every visitor assigned to a route.';
+
+  @override
+  String get distributionPlanPublishAllDone =>
+      'Assigned visitors\' plans were published.';
+
+  @override
+  String get distributionPlanPublishAllEmpty =>
+      'No assigned visitors for this day.';
+
+  @override
+  String get distributionPlanUnlock => 'Unlock';
+
+  @override
+  String get distributionRequireLocationConsent => 'Per-user GPS consent';
+
+  @override
+  String get distributionRequireLocationConsentHint =>
+      'Live location is stored only after the visitor consents.';
+
+  @override
+  String get distributionExclusiveAssignments => 'Exclusive route assignment';
+
+  @override
+  String get distributionExclusiveAssignmentsHint =>
+      'A route can be assigned to only one visitor in a date range.';
+
+  @override
+  String get distributionExclusiveTerritories => 'Exclusive territories';
+
+  @override
+  String get distributionExclusiveTerritoriesHint =>
+      'Only one active visitor per territory in a date range.';
+
+  @override
+  String get distributionExclusiveCustomerOwnership => 'Customer ownership';
+
+  @override
+  String get distributionExclusiveCustomerOwnershipHint =>
+      'Another visitor cannot visit a customer owned by a colleague.';
+
+  @override
+  String get distributionLockPublishedPlans => 'Lock plan after publish';
+
+  @override
+  String get distributionLockPublishedPlansHint =>
+      'After official publish, day-order optimization is locked.';
+
+  @override
+  String get distributionRequirePublishedPlan => 'Require published daily plan';
+
+  @override
+  String get distributionRequirePublishedPlanHint =>
+      'Visits can start only after today\'s plan is published.';
+
+  @override
+  String get distributionTerritoryParent => 'Parent territory';
+
+  @override
+  String get distributionTerritorySupervisor => 'Territory supervisor';
+
+  @override
+  String get distributionWorkspaceSupervisor =>
+      'Distribution — regional supervisor';
+
+  @override
+  String get distributionWorkspaceOffice => 'Distribution — office';
 }

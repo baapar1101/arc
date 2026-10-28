@@ -685,7 +685,7 @@ class _DistributionCommercialPanelState extends State<DistributionCommercialPane
                   subtitle: Text(
                     [
                       '${lines.length} ${t.distributionSkuLines}',
-                      if ((m['variance_line_count'] ?? 0) is num && (m['variance_line_count'] as num) > 0)
+                      if (m['variance_line_count'] is num && (m['variance_line_count'] as num) > 0)
                         '${t.distributionLoadVariance}: ${m['variance_line_count']}',
                     ].join(' · '),
                   ),

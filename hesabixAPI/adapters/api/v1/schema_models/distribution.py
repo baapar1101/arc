@@ -31,6 +31,12 @@ class DistributionSettingsPayload(BaseModel):
 	auto_apply_promotions: Optional[bool] = None
 	enable_perfect_store: Optional[bool] = None
 	near_expiry_days: Optional[int] = Field(None, ge=1, le=90)
+	exclusive_assignments: Optional[bool] = None
+	exclusive_territories: Optional[bool] = None
+	exclusive_customer_ownership: Optional[bool] = None
+	require_location_consent: Optional[bool] = None
+	lock_published_plans: Optional[bool] = None
+	require_published_plan: Optional[bool] = None
 
 
 class TerritoryCreatePayload(BaseModel):
@@ -38,12 +44,16 @@ class TerritoryCreatePayload(BaseModel):
 	name: str = Field(..., min_length=1, max_length=255)
 	description: Optional[str] = None
 	is_active: bool = True
+	parent_id: Optional[int] = Field(None, gt=0)
+	supervisor_user_id: Optional[int] = Field(None, gt=0)
 
 
 class TerritoryUpdatePayload(BaseModel):
 	name: Optional[str] = Field(None, max_length=255)
 	description: Optional[str] = None
 	is_active: Optional[bool] = None
+	parent_id: Optional[int] = Field(None, gt=0)
+	supervisor_user_id: Optional[int] = Field(None, gt=0)
 
 
 class RouteCreatePayload(BaseModel):
@@ -338,6 +348,19 @@ class CustomerProfilePayload(BaseModel):
 	outlet_type: Optional[str] = Field(None, max_length=32)
 	assortment_id: Optional[int] = Field(None, gt=0)
 	storefront_photo_file_id: Optional[int] = Field(None, gt=0)
+	owner_user_id: Optional[int] = Field(None, gt=0)
+	notes: Optional[str] = None
+
+
+class UserPreferencePayload(BaseModel):
+	location_consent: Optional[bool] = None
+
+
+class DailyPlanPublishPayload(BaseModel):
+	plan_date: Optional[str] = Field(None, description="YYYY-MM-DD")
+	target_user_id: Optional[int] = Field(None, gt=0)
+	all_assigned: bool = False
+	locked: bool = True
 	notes: Optional[str] = None
 
 

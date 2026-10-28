@@ -385,6 +385,7 @@ def create_visit_order(
 	payload: Dict[str, Any],
 	*,
 	auto_confirm: bool = False,
+	ctx: Optional[AuthContext] = None,
 ) -> Dict[str, Any]:
 	dist_svc._ensure_plugin(db, business_id)
 	settings = _settings(db, business_id)
@@ -397,6 +398,8 @@ def create_visit_order(
 	person = db.query(Person).filter(Person.id == person_id, Person.business_id == business_id).first()
 	if not person:
 		raise ApiError("NOT_FOUND", "Person not found", http_status=404)
+	if ctx is not None:
+		dist_svc.assert_person_visible_for_ctx(db, business_id, ctx, person_id)
 
 	raw_lines = payload.get("lines") if isinstance(payload.get("lines"), list) else []
 	if not raw_lines:
@@ -450,6 +453,9 @@ def create_visit_order(
 		).first()
 		if not v:
 			raise ApiError("NOT_FOUND", "Visit not found", http_status=404)
+		if int(v.user_id) != int(user_id):
+			if ctx is None or not dist_svc._can_manage_distribution(ctx, business_id):
+				raise ApiError("FORBIDDEN", "نمی‌توانید سفارش را به ویزیت همکار وصل کنید.", http_status=403)
 
 	row = DistributionVisitOrder(
 		business_id=business_id,
@@ -503,13 +509,30 @@ def _confirm_order_internal(db: Session, business_id: int, user_id: int, row: Di
 	row.updated_at = datetime.utcnow()
 
 
-def confirm_visit_order(db: Session, business_id: int, user_id: int, order_id: int) -> Dict[str, Any]:
+def confirm_visit_order(
+	db: Session,
+	business_id: int,
+	user_id: int,
+	order_id: int,
+	ctx: Optional[AuthContext] = None,
+) -> Dict[str, Any]:
 	dist_svc._ensure_plugin(db, business_id)
 	row = db.query(DistributionVisitOrder).filter(
 		DistributionVisitOrder.id == order_id, DistributionVisitOrder.business_id == business_id,
 	).first()
 	if not row:
 		raise ApiError("NOT_FOUND", "Order not found", http_status=404)
+	if ctx is not None:
+		dist_svc._assert_owner_or_access(
+			ctx,
+			business_id,
+			row.user_id,
+			write=True,
+			message="تأیید سفارش همکار برای شما مجاز نیست.",
+			db=db,
+		)
+	elif int(row.user_id) != int(user_id):
+		raise ApiError("FORBIDDEN", "تأیید سفارش همکار برای شما مجاز نیست.", http_status=403)
 	_confirm_order_internal(db, business_id, user_id, row)
 	db.commit()
 	db.refresh(row)
@@ -551,9 +574,7 @@ def list_visit_orders(
 ) -> List[Dict[str, Any]]:
 	dist_svc._ensure_plugin(db, business_id)
 	q = db.query(DistributionVisitOrder).filter(DistributionVisitOrder.business_id == business_id)
-	scope = dist_svc._scope_visit_user_id(ctx, business_id)
-	if scope is not None:
-		q = q.filter(DistributionVisitOrder.user_id == scope)
+	q = dist_svc.apply_user_id_scope(q, DistributionVisitOrder.user_id, db, business_id, ctx)
 	if status:
 		q = q.filter(DistributionVisitOrder.status == status)
 	if person_id:
@@ -729,9 +750,18 @@ def stop_to_dict(s: DistributionDeliveryStop, db: Optional[Session] = None) -> D
 	return d
 
 
-def create_delivery_trip(db: Session, business_id: int, actor_user_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+def create_delivery_trip(
+	db: Session,
+	business_id: int,
+	actor_user_id: int,
+	payload: Dict[str, Any],
+	ctx: Optional[AuthContext] = None,
+) -> Dict[str, Any]:
 	dist_svc._ensure_plugin(db, business_id)
 	driver_id = int(payload.get("driver_user_id") or actor_user_id)
+	if int(driver_id) != int(actor_user_id):
+		if ctx is None or not dist_svc._can_manage_distribution(ctx, business_id):
+			raise ApiError("FORBIDDEN", "فقط مدیر می‌تواند مسیر تحویل را برای رانندهٔ دیگر بسازد.", http_status=403)
 	trip_date = _parse_date(payload.get("trip_date") or business_today(business_id))
 	order_ids = payload.get("order_ids") if isinstance(payload.get("order_ids"), list) else []
 	van_id = int(payload["van_id"]) if payload.get("van_id") else None
@@ -792,9 +822,7 @@ def list_delivery_trips(
 ) -> List[Dict[str, Any]]:
 	dist_svc._ensure_plugin(db, business_id)
 	q = db.query(DistributionDeliveryTrip).filter(DistributionDeliveryTrip.business_id == business_id)
-	scope = dist_svc._scope_visit_user_id(ctx, business_id)
-	if scope is not None and not dist_svc._can_see_full_distribution_catalog(ctx, business_id):
-		q = q.filter(DistributionDeliveryTrip.driver_user_id == scope)
+	q = dist_svc.apply_user_id_scope(q, DistributionDeliveryTrip.driver_user_id, db, business_id, ctx)
 	if trip_date:
 		q = q.filter(DistributionDeliveryTrip.trip_date == trip_date)
 	rows = q.order_by(DistributionDeliveryTrip.trip_date.desc(), DistributionDeliveryTrip.id.desc()).limit(50).all()
@@ -827,7 +855,12 @@ def start_delivery_trip(db: Session, business_id: int, trip_id: int, user_id: in
 
 
 def complete_delivery_stop(
-	db: Session, business_id: int, stop_id: int, user_id: int, payload: Dict[str, Any],
+	db: Session,
+	business_id: int,
+	stop_id: int,
+	user_id: int,
+	payload: Dict[str, Any],
+	ctx: Optional[AuthContext] = None,
 ) -> Dict[str, Any]:
 	from app.services.distribution_documents import finalize_distribution_proforma_invoice
 
@@ -843,6 +876,21 @@ def complete_delivery_stop(
 	)
 	if not stop:
 		raise ApiError("NOT_FOUND", "Stop not found", http_status=404)
+	trip = getattr(stop, "trip", None)
+	if trip is None:
+		trip = db.query(DistributionDeliveryTrip).filter(DistributionDeliveryTrip.id == stop.trip_id).first()
+	driver_id = int(trip.driver_user_id) if trip and trip.driver_user_id else None
+	if ctx is not None:
+		dist_svc._assert_owner_or_access(
+			ctx,
+			business_id,
+			driver_id,
+			write=True,
+			message="تکمیل توقف مسیر همکار برای شما مجاز نیست.",
+			db=db,
+		)
+	elif driver_id is not None and int(driver_id) != int(user_id):
+		raise ApiError("FORBIDDEN", "تکمیل توقف مسیر همکار برای شما مجاز نیست.", http_status=403)
 	if stop.status != "pending":
 		raise ApiError("VALIDATION_ERROR", "این توقف قبلاً تکمیل شده است.", http_status=400)
 	status = str(payload.get("status") or "delivered").strip()
@@ -1090,7 +1138,7 @@ def list_load_plans(db: Session, business_id: int, *, plan_date: Optional[date] 
 
 def _live_location_enabled(db: Session, business_id: int) -> bool:
 	settings = _settings(db, business_id)
-	return bool(getattr(settings, "share_live_location", True))
+	return bool(getattr(settings, "share_live_location", False))
 
 
 def upsert_live_location(
@@ -1172,6 +1220,43 @@ def upsert_live_location(
 	}
 
 
+def clear_live_location_for_user(
+	db: Session,
+	business_id: int,
+	user_id: int,
+	*,
+	commit: bool = False,
+) -> None:
+	"""پس از لغو رضایت، پین زنده و extra ویزیت باز پاک می‌شود. مختصات شروع/پایان ویزیت دست نمی‌خورد."""
+	row = (
+		db.query(DistributionUserLiveLocation)
+		.filter(
+			DistributionUserLiveLocation.business_id == business_id,
+			DistributionUserLiveLocation.user_id == int(user_id),
+		)
+		.first()
+	)
+	if row:
+		db.delete(row)
+	open_visits = (
+		db.query(DistributionFieldVisit)
+		.filter(
+			DistributionFieldVisit.business_id == business_id,
+			DistributionFieldVisit.user_id == int(user_id),
+			DistributionFieldVisit.status == "in_progress",
+		)
+		.all()
+	)
+	for v in open_visits:
+		extra = dict(v.extra_info or {})
+		if "live_location" in extra:
+			extra.pop("live_location", None)
+			v.extra_info = extra or None
+			v.updated_at = datetime.utcnow()
+	if commit:
+		db.commit()
+
+
 def report_live_location(
 	db: Session,
 	business_id: int,
@@ -1181,8 +1266,9 @@ def report_live_location(
 	visit_id: Optional[int] = None,
 ) -> Dict[str, Any]:
 	dist_svc._ensure_plugin(db, business_id)
-	if not _live_location_enabled(db, business_id):
-		return {"skipped": True, "reason": "disabled"}
+	if not dist_svc.live_tracking_allowed(db, business_id, user_id):
+		reason = "disabled" if not _live_location_enabled(db, business_id) else "consent_required"
+		return {"skipped": True, "reason": reason}
 	active_visit_id = int(visit_id) if visit_id else None
 	if active_visit_id:
 		v = (
@@ -1203,8 +1289,6 @@ def report_live_location(
 				"updated_at": datetime.utcnow().isoformat() + "Z",
 			}
 			v.extra_info = extra
-			v.start_latitude = float(latitude)
-			v.start_longitude = float(longitude)
 			v.updated_at = datetime.utcnow()
 	data = upsert_live_location(
 		db, business_id, user_id, latitude, longitude, visit_id=active_visit_id, commit=True,
@@ -1224,8 +1308,24 @@ def record_heartbeat_trail(
 	upsert_live_location(db, business_id, user_id, latitude, longitude, visit_id=visit_id, commit=False)
 
 
-def get_visit_trail(db: Session, business_id: int, visit_id: int) -> Dict[str, Any]:
+def get_visit_trail(db: Session, business_id: int, visit_id: int, ctx: Optional[AuthContext] = None) -> Dict[str, Any]:
 	dist_svc._ensure_plugin(db, business_id)
+	visit = (
+		db.query(DistributionFieldVisit)
+		.filter(DistributionFieldVisit.id == visit_id, DistributionFieldVisit.business_id == business_id)
+		.first()
+	)
+	if not visit:
+		raise ApiError("NOT_FOUND", "Visit not found", http_status=404)
+	if ctx is not None:
+		dist_svc._assert_owner_or_access(
+			ctx,
+			business_id,
+			visit.user_id,
+			write=False,
+			message="مسیر GPS این ویزیت در دسترس شما نیست.",
+			db=db,
+		)
 	points = (
 		db.query(DistributionVisitHeartbeat)
 		.filter(
@@ -1517,12 +1617,21 @@ def list_commission_runs(db: Session, business_id: int) -> List[Dict[str, Any]]:
 # shelf audit + assets
 # ---------------------------------------------------------------------------
 
-def create_shelf_audit(db: Session, business_id: int, user_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+def create_shelf_audit(
+	db: Session,
+	business_id: int,
+	user_id: int,
+	payload: Dict[str, Any],
+	ctx: Optional[AuthContext] = None,
+) -> Dict[str, Any]:
 	dist_svc._ensure_plugin(db, business_id)
 	person_id = int(payload.get("person_id") or 0)
 	answers = payload.get("answers")
 	if person_id <= 0 or not isinstance(answers, (dict, list)):
 		raise ApiError("VALIDATION_ERROR", "person_id and answers required", http_status=400)
+	if ctx is not None:
+		dist_svc.assert_person_visible_for_ctx(db, business_id, ctx, person_id)
+	dist_svc.assert_customer_owner_allows_visit(db, business_id, user_id, person_id, ctx=ctx)
 
 	# simple score: percent of true/yes answers + perfect store weights
 	from app.services.distribution_field_ops_service import perfect_store_score
@@ -1568,9 +1677,14 @@ def list_shelf_audits(
 	person_id: Optional[int] = None,
 	visit_id: Optional[int] = None,
 	limit: int = 100,
+	ctx: Optional[AuthContext] = None,
 ) -> List[Dict[str, Any]]:
 	dist_svc._ensure_plugin(db, business_id)
+	if ctx is not None and person_id:
+		dist_svc.assert_person_visible_for_ctx(db, business_id, ctx, int(person_id))
 	q = db.query(DistributionShelfAudit).filter(DistributionShelfAudit.business_id == business_id)
+	if ctx is not None:
+		q = dist_svc.apply_user_id_scope(q, DistributionShelfAudit.user_id, db, business_id, ctx)
 	if person_id:
 		q = q.filter(DistributionShelfAudit.person_id == int(person_id))
 	if visit_id:
@@ -1592,9 +1706,22 @@ def list_shelf_audits(
 	]
 
 
-def list_customer_assets(db: Session, business_id: int, person_id: Optional[int] = None) -> List[Dict[str, Any]]:
+def list_customer_assets(
+	db: Session,
+	business_id: int,
+	person_id: Optional[int] = None,
+	ctx: Optional[AuthContext] = None,
+) -> List[Dict[str, Any]]:
 	dist_svc._ensure_plugin(db, business_id)
+	if ctx is not None and person_id:
+		dist_svc.assert_person_visible_for_ctx(db, business_id, ctx, int(person_id))
 	q = db.query(DistributionCustomerAsset).filter(DistributionCustomerAsset.business_id == business_id)
+	if ctx is not None:
+		allowed = dist_svc.allowed_person_ids_for_ctx(db, business_id, ctx)
+		if allowed is not None:
+			if not allowed:
+				return []
+			q = q.filter(DistributionCustomerAsset.person_id.in_(allowed))
 	if person_id:
 		q = q.filter(DistributionCustomerAsset.person_id == int(person_id))
 	rows = q.order_by(DistributionCustomerAsset.id.desc()).limit(200).all()
@@ -1682,14 +1809,16 @@ def get_commercial_kpi_pack(
 	base = dist_svc.get_distribution_reports_dashboard(
 		db, business_id, ctx, from_date, to_date, target_user_id,
 	)
-	scope = dist_svc._scope_visit_user_id(ctx, business_id)
-	uid = target_user_id if target_user_id is not None else scope
+	if target_user_id is not None:
+		dist_svc.assert_user_visible_for_ctx(db, business_id, ctx, int(target_user_id))
 
 	oq = db.query(DistributionVisitOrder).filter(DistributionVisitOrder.business_id == business_id)
 	oq = oq.filter(func.date(DistributionVisitOrder.created_at) >= from_date)
 	oq = oq.filter(func.date(DistributionVisitOrder.created_at) <= to_date)
-	if uid is not None:
-		oq = oq.filter(DistributionVisitOrder.user_id == int(uid))
+	if target_user_id is not None:
+		oq = oq.filter(DistributionVisitOrder.user_id == int(target_user_id))
+	else:
+		oq = dist_svc.apply_user_id_scope(oq, DistributionVisitOrder.user_id, db, business_id, ctx)
 	orders = oq.all()
 	presell_count = len(orders)
 	presell_net = sum(_money(o.net_total) for o in orders)
@@ -1700,15 +1829,16 @@ def get_commercial_kpi_pack(
 	sales = float((base.get("visits") or {}).get("sales_linked_net_total") or 0)
 	drop_size = round(sales / orders_outcome, 2) if orders_outcome else None
 
-	audits = (
-		db.query(DistributionShelfAudit)
-		.filter(
-			DistributionShelfAudit.business_id == business_id,
-			func.date(DistributionShelfAudit.created_at) >= from_date,
-			func.date(DistributionShelfAudit.created_at) <= to_date,
-		)
-		.all()
+	aq = db.query(DistributionShelfAudit).filter(
+		DistributionShelfAudit.business_id == business_id,
+		func.date(DistributionShelfAudit.created_at) >= from_date,
+		func.date(DistributionShelfAudit.created_at) <= to_date,
 	)
+	if target_user_id is not None:
+		aq = aq.filter(DistributionShelfAudit.user_id == int(target_user_id))
+	else:
+		aq = dist_svc.apply_user_id_scope(aq, DistributionShelfAudit.user_id, db, business_id, ctx)
+	audits = aq.all()
 	avg_shelf = None
 	scored = [float(a.score) for a in audits if a.score is not None]
 	if scored:

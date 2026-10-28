@@ -3971,6 +3971,8 @@ class _MyAppState extends State<MyApp> {
                                   child: DistributionReportsDashboardPage(
                                     businessId: businessId,
                                     calendarController: _calendarController!,
+                                    canSelectVisitor: _authStore?.hasBusinessPermission('distribution', 'manage') == true ||
+                                        _authStore?.hasBusinessPermission('distribution', 'reports_team') == true,
                                   ),
                                 ),
                               );

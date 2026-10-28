@@ -4,40 +4,31 @@ import 'package:flutter/material.dart';
 
 import '../../../core/auth_store.dart';
 import '../../../core/calendar_controller.dart';
-import '../../../core/date_utils.dart' as Hd;
+import '../../../core/distribution_map_tiles.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../models/person_model.dart';
 import '../../../services/distribution_service.dart';
 import '../../../services/distribution_offline_queue.dart';
 import '../../../services/distribution_offline_catalog.dart';
 import '../../../utils/distribution_location_helper.dart';
+import 'distribution_field_tab.dart';
+import 'distribution_manage_tab.dart';
+import 'distribution_returns_tab.dart';
 import 'distribution_team_map_page.dart';
+import 'distribution_visits_tab.dart';
 import '../distribution_reports_dashboard_page.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart' show SnackBarHelper;
 import '../../../widgets/business_subpage_back_leading.dart';
-import '../../../widgets/distribution/distribution_form_helpers.dart';
 import '../../../widgets/distribution/distribution_setup_plan_sheet.dart';
 import '../../../widgets/distribution/distribution_setup_wizard_sheet.dart';
 import '../../../widgets/distribution/distribution_new_outlet_sheet.dart';
-import '../../../widgets/distribution/distribution_assortment_sheet.dart';
-import '../../../widgets/distribution/distribution_scorecard_card.dart';
-import '../../../widgets/distribution/distribution_map_marker.dart';
-import '../../../widgets/distribution/distribution_memaps_map.dart';
-import '../../../core/distribution_map_tiles.dart';
 import '../../../widgets/distribution/distribution_person_location_sheet.dart';
 import '../../../widgets/distribution/distribution_return_dialog.dart';
-import '../../../widgets/distribution/distribution_ui_helpers.dart';
 import '../../../widgets/distribution/distribution_field_helpers.dart';
 import '../../../widgets/distribution/distribution_visit_sheet.dart';
 import '../../../widgets/distribution/distribution_van_panel.dart';
 import '../../../widgets/distribution/distribution_settlement_panel.dart';
-import '../../../widgets/distribution/distribution_targets_section.dart';
 import '../../../widgets/distribution/distribution_commercial_panel.dart';
-import '../../../widgets/invoice/person_combobox_widget.dart';
-import '../../../widgets/invoice/warehouse_combobox_widget.dart';
-import '../../../widgets/invoice/price_list_combobox_widget.dart';
-import '../../../widgets/jalali_date_picker.dart';
 import '../../../core/api_client.dart';
 import '../../../models/business_user_model.dart';
 import '../../../services/business_user_service.dart';
@@ -63,6 +54,7 @@ class DistributionMainPage extends StatefulWidget {
 class _DistributionMainPageState extends State<DistributionMainPage>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late TabController _tabController;
+  final GlobalKey<DistributionManageTabState> _manageKey = GlobalKey<DistributionManageTabState>();
   final DistributionService _svc = DistributionService();
   Timer? _heartbeatTimer;
   final DistributionOfflineQueue _offlineQueue = DistributionOfflineQueue();
@@ -71,7 +63,12 @@ class _DistributionMainPageState extends State<DistributionMainPage>
   bool _enablePresell = false;
   bool _enablePromotions = false;
   bool _enableSuggestedOrder = true;
-  bool _shareLiveLocation = true;
+  bool _shareLiveLocation = false;
+  bool _requireLocationConsent = true;
+  bool _locationConsent = false;
+  String _workspace = 'field';
+  bool _planPublished = false;
+  bool _planLocked = false;
   bool _autoApplyPromotions = true;
   bool _requirePodSignature = false;
   bool _requirePodPhoto = false;
@@ -88,16 +85,12 @@ class _DistributionMainPageState extends State<DistributionMainPage>
   DateTime _planDay = DateTime.now();
   int? _teamTargetUserId;
   Map<String, dynamic>? _dailyPlan;
-  List<dynamic> _routes = [];
-  List<dynamic> _territories = [];
-  final Map<int, List<dynamic>> _stopsByRoute = {};
   Map<String, dynamic>? _visitListPayload;
   List<dynamic> _returns = [];
   Map<String, dynamic>? _activeVisit;
 
   bool _loadingSummary = false;
   bool _loadingPlan = false;
-  bool _loadingRoutes = false;
   bool _loadingVisits = false;
   bool _loadingReturns = false;
   bool _returnsPendingOnly = true;
@@ -117,11 +110,14 @@ class _DistributionMainPageState extends State<DistributionMainPage>
   int get _tabCount => _tabKeys.length;
 
   List<String> get _tabKeys {
-    final keys = <String>['field', 'visits', 'returns'];
+    final keys = <String>[];
     if (_canOperate) {
+      keys.addAll(['field', 'visits', 'returns']);
       keys.add('settlement');
       if (_enableVanSales) keys.add('van');
       if (_enablePresell || _canManage) keys.add('commercial');
+    } else {
+      keys.addAll(['visits', 'returns']);
     }
     if (_canManage) keys.add('manage');
     return keys;
@@ -148,6 +144,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     });
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _refreshOfflineCount();
+      await _refreshSummary();
       await _loadTab(0);
       _startLiveHeartbeat();
     });
@@ -170,6 +167,8 @@ class _DistributionMainPageState extends State<DistributionMainPage>
 
   Future<void> _sendLiveHeartbeat({bool preferCached = false}) async {
     if (!_canOperate || !_shareLiveLocation) return;
+    if (_requireLocationConsent && !_locationConsent) return;
+    if (_activeVisit == null) return;
     try {
       final loc = await readDistributionVisitLocation(preferCached: preferCached);
       if (loc.latitude == null || loc.longitude == null) {
@@ -190,7 +189,12 @@ class _DistributionMainPageState extends State<DistributionMainPage>
   }
 
   Future<void> _refreshOfflineCount() async {
-    final n = (await _offlineQueue.peek(widget.businessId)).length;
+    final uid = widget.authStore.currentUserId;
+    if (uid == null) {
+      if (mounted) setState(() => _offlinePending = 0);
+      return;
+    }
+    final n = (await _offlineQueue.peek(widget.businessId, userId: uid)).length;
     if (mounted) setState(() => _offlinePending = n);
   }
 
@@ -201,7 +205,8 @@ class _DistributionMainPageState extends State<DistributionMainPage>
       _enablePresell = ds['enable_presell'] == true;
       _enablePromotions = ds['enable_promotions'] == true;
       _enableSuggestedOrder = ds['enable_suggested_order'] != false;
-      _shareLiveLocation = ds['share_live_location'] != false;
+      _shareLiveLocation = ds['share_live_location'] == true;
+      _requireLocationConsent = ds['require_location_consent'] != false;
       _autoApplyPromotions = ds['auto_apply_promotions'] != false;
       _requirePodSignature = ds['require_pod_signature'] == true;
       _requirePodPhoto = ds['require_pod_photo'] == true;
@@ -211,10 +216,13 @@ class _DistributionMainPageState extends State<DistributionMainPage>
       final tpl = ds['visit_checklist_template'];
       _checklistTemplate = tpl is List ? tpl : [];
       final key = (ds['memaps_api_key'] ?? '').toString();
-      if (_memapsKeyCtl.text != key) {
+      if (key.isNotEmpty && _memapsKeyCtl.text != key) {
         _memapsKeyCtl.text = key;
       }
     }
+    _locationConsent = _summary['location_consent'] == true;
+    final ws = (_summary['workspace'] ?? '').toString();
+    if (ws.isNotEmpty) _workspace = ws;
   }
 
   @override
@@ -231,8 +239,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     return DistributionMapTileConfig.fromSettings(ds is Map<String, dynamic> ? ds : null);
   }
 
-  String _iso(DateTime d) =>
-      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  String _iso(DateTime d) => distributionIsoDate(d);
 
   Future<void> _loadTab(int index) async {
     final keys = _tabKeys;
@@ -265,7 +272,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
       case 'commercial':
         break;
       case 'manage':
-        await _refreshRoutesMaster();
+        await _manageKey.currentState?.reload();
         break;
     }
   }
@@ -318,40 +325,13 @@ class _DistributionMainPageState extends State<DistributionMainPage>
       if (mounted) setState(() {
         _dailyPlan = d;
         _optimizedPlanItems = null;
+        _planPublished = d['published'] == true;
+        _planLocked = d['locked'] == true;
       });
     } catch (e) {
       if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     } finally {
       if (mounted) setState(() => _loadingPlan = false);
-    }
-  }
-
-  Future<void> _refreshRoutesMaster() async {
-    if (!_canView) return;
-    setState(() => _loadingRoutes = true);
-    try {
-      final t = await _svc.listTerritories(businessId: widget.businessId);
-      final r = await _svc.listRoutes(businessId: widget.businessId);
-      if (mounted) {
-        setState(() {
-          _territories = t;
-          _routes = r;
-          _stopsByRoute.clear();
-        });
-      }
-    } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
-    } finally {
-      if (mounted) setState(() => _loadingRoutes = false);
-    }
-  }
-
-  Future<void> _loadStops(int routeId) async {
-    try {
-      final s = await _svc.listRouteStops(businessId: widget.businessId, routeId: routeId);
-      if (mounted) setState(() => _stopsByRoute[routeId] = s);
-    } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     }
   }
 
@@ -362,9 +342,15 @@ class _DistributionMainPageState extends State<DistributionMainPage>
 
   Future<void> _openSetupPlan(AppLocalizations t) async {
     if (!_canManage) return;
-    if (_routes.isEmpty) await _refreshRoutesMaster();
+    List<dynamic> routes = const [];
+    try {
+      routes = await _svc.listRoutes(businessId: widget.businessId);
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+      return;
+    }
     if (!mounted) return;
-    if (_routes.isEmpty) {
+    if (routes.isEmpty) {
       SnackBarHelper.show(context, message: t.distributionNoRoutesYet);
       _goToManage();
       return;
@@ -374,7 +360,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
       businessId: widget.businessId,
       service: _svc,
       calendarController: widget.calendarController,
-      routes: _routes,
+      routes: routes,
       planDate: _planDay,
     );
     if (userId == null || !mounted) return;
@@ -391,12 +377,14 @@ class _DistributionMainPageState extends State<DistributionMainPage>
       if (mounted) {
         final items = (d['items'] as List?) ?? [];
         Map<String, dynamic>? active;
+        final myId = widget.authStore.currentUserId;
         for (final raw in items) {
           final v = Map<String, dynamic>.from(raw as Map);
-          if (v['status'] == 'in_progress') {
-            active = v;
-            break;
-          }
+          if (v['status'] != 'in_progress') continue;
+          final owner = int.tryParse('${v['user_id']}');
+          if (myId != null && owner != null && owner != myId) continue;
+          active = v;
+          break;
         }
         setState(() {
           _visitListPayload = d;
@@ -469,12 +457,14 @@ class _DistributionMainPageState extends State<DistributionMainPage>
   }
 
   Future<void> _enqueueOffline(String op, Map<String, dynamic> payload, {required String clientRef}) async {
+    final uid = widget.authStore.currentUserId;
+    if (uid == null) return;
     await _offlineQueue.enqueue(widget.businessId, {
       'op': op,
       'client_ref': clientRef,
       'payload': payload,
       'created_at': DateTime.now().toIso8601String(),
-    });
+    }, userId: uid);
     await _refreshOfflineCount();
     if (mounted) {
       SnackBarHelper.showSuccess(
@@ -486,7 +476,10 @@ class _DistributionMainPageState extends State<DistributionMainPage>
 
   Future<void> _showOfflineQueueSheet() async {
     final t = AppLocalizations.of(context);
-    final items = await _offlineQueue.peek(widget.businessId);
+    final uid = widget.authStore.currentUserId;
+    final items = uid == null
+        ? <Map<String, dynamic>>[]
+        : await _offlineQueue.peek(widget.businessId, userId: uid);
     if (!mounted) return;
     await showModalBottomSheet<void>(
       context: context,
@@ -539,7 +532,9 @@ class _DistributionMainPageState extends State<DistributionMainPage>
   Future<void> _syncOffline() async {
     final t = AppLocalizations.of(context);
     try {
-      final res = await _offlineQueue.sync(widget.businessId);
+      final uid = widget.authStore.currentUserId;
+      if (uid == null) return;
+      final res = await _offlineQueue.sync(widget.businessId, userId: uid);
       await _refreshOfflineCount();
       await _refreshSummary();
       await _refreshVisits();
@@ -553,32 +548,6 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     } catch (e) {
       if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     }
-  }
-
-  /// وضعیت توقف نسبت به ویزیت‌های امروز: done | current | pending
-  String _planStopKind(int? personId) {
-    if (personId == null) return 'pending';
-    final activePid = int.tryParse('${_activeVisit?['person_id']}');
-    if (activePid != null && activePid == personId) return 'current';
-    final today = DateTime(_planDay.year, _planDay.month, _planDay.day);
-    final items = (_visitListPayload?['items'] as List?) ?? [];
-    for (final raw in items) {
-      final v = Map<String, dynamic>.from(raw as Map);
-      if (v['status'] != 'completed') continue;
-      if (int.tryParse('${v['person_id']}') != personId) continue;
-      final started = _parseDt(v['started_at']) ?? _parseDt(v['ended_at']);
-      if (started == null) continue;
-      final d = DateTime(started.year, started.month, started.day);
-      if (d == today) return 'done';
-    }
-    return 'pending';
-  }
-
-  List<DistributionMapMarker> _planMapMarkers(List<dynamic> items) {
-    return items
-        .map((raw) => DistributionMapMarker.tryFromPayload(Map<String, dynamic>.from(raw as Map)))
-        .whereType<DistributionMapMarker>()
-        .toList();
   }
 
   Future<void> _setPersonLocationFromPlan(Map<String, dynamic> item) async {
@@ -833,17 +802,76 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     }
   }
 
-  String _visitStatusLabel(AppLocalizations t, String? status) =>
-      distributionVisitStatusLabel(t, status);
+  Future<void> _grantLocationConsent() async {
+    try {
+      await _svc.updateMyPreferences(
+        businessId: widget.businessId,
+        payload: const {'location_consent': true},
+      );
+      if (mounted) setState(() => _locationConsent = true);
+      unawaited(_sendLiveHeartbeat());
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
 
-  static const _weekdayLabelsFa = ['دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه', 'یکشنبه'];
-  static const _weekdayLabelsEn = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  Future<void> _revokeLocationConsent() async {
+    try {
+      await _svc.updateMyPreferences(
+        businessId: widget.businessId,
+        payload: const {'location_consent': false},
+      );
+      if (mounted) setState(() => _locationConsent = false);
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
 
-  String _weekdayLabel(AppLocalizations t, int? wd) {
-    if (wd == null) return t.distributionWeekdayAny;
-    final labels = t.localeName.startsWith('fa') ? _weekdayLabelsFa : _weekdayLabelsEn;
-    if (wd >= 0 && wd < labels.length) return labels[wd];
-    return '$wd';
+  Future<void> _togglePublishPlan() async {
+    try {
+      if (_planPublished) {
+        await _svc.unpublishDailyPlan(
+          businessId: widget.businessId,
+          planDate: _iso(_planDay),
+          targetUserId: _teamTargetUserId,
+        );
+      } else {
+        await _svc.publishDailyPlan(
+          businessId: widget.businessId,
+          payload: <String, dynamic>{
+            'plan_date': _iso(_planDay),
+            if (_teamTargetUserId != null) 'target_user_id': _teamTargetUserId,
+            'locked': true,
+          },
+        );
+      }
+      await _refreshPlan();
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
+
+  Future<void> _publishAllAssignedPlans() async {
+    final t = AppLocalizations.of(context);
+    try {
+      final data = await _svc.publishDailyPlan(
+        businessId: widget.businessId,
+        payload: <String, dynamic>{
+          'plan_date': _iso(_planDay),
+          'all_assigned': true,
+          'locked': true,
+        },
+      );
+      await _refreshPlan();
+      if (!mounted) return;
+      final count = int.tryParse('${data['published_count']}') ?? 0;
+      SnackBarHelper.showSuccess(
+        context,
+        message: count == 0 ? t.distributionPlanPublishAllEmpty : t.distributionPlanPublishAllDone,
+      );
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
   }
 
   void _openReports() {
@@ -852,6 +880,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
         builder: (_) => DistributionReportsDashboardPage(
           businessId: widget.businessId,
           calendarController: widget.calendarController,
+          canSelectVisitor: _canTeam,
         ),
       ),
     );
@@ -883,7 +912,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     }
 
     final tabs = <Tab>[
-      Tab(text: t.distributionTabField, icon: const Icon(Icons.today_outlined)),
+      if (_canOperate) Tab(text: t.distributionTabField, icon: const Icon(Icons.today_outlined)),
       Tab(text: t.distributionTabVisits, icon: const Icon(Icons.place_outlined)),
       Tab(text: t.distributionTabReturns, icon: const Icon(Icons.assignment_return_outlined)),
       if (_canOperate) Tab(text: t.distributionTabSettlement, icon: const Icon(Icons.account_balance_wallet_outlined)),
@@ -894,9 +923,99 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     ];
 
     final tabChildren = <Widget>[
-      _fieldTab(t),
-      _visitsTab(t),
-      _returnsTab(t),
+      if (_canOperate)
+        DistributionFieldTab(
+          t: t,
+          calendarController: widget.calendarController,
+          service: _svc,
+          businessId: widget.businessId,
+          data: DistributionFieldTabData(
+            planDay: _planDay,
+            teamTargetUserId: _teamTargetUserId,
+            dailyPlan: _dailyPlan,
+            optimizedPlanItems: _optimizedPlanItems,
+            summary: _summary,
+            scorecard: _scorecard,
+            activeVisit: _activeVisit,
+            visitListPayload: _visitListPayload,
+            loadingPlan: _loadingPlan,
+            loadingSummary: _loadingSummary,
+            offlinePending: _offlinePending,
+            shareLiveLocation: _shareLiveLocation,
+            requireLocationConsent: _requireLocationConsent,
+            locationConsent: _locationConsent,
+            liveGpsOk: _liveGpsOk,
+            planPublished: _planPublished,
+            planLocked: _planLocked,
+            setupCompleted: _setupCompleted,
+            canOperate: _canOperate,
+            canManage: _canManage,
+            canTeam: _canTeam,
+            navProvider: _navProvider,
+            mapTiles: _mapTiles,
+          ),
+          actions: DistributionFieldTabActions(
+            onRefresh: () async {
+              await _refreshSummary();
+              await _refreshPlan();
+              await _refreshVisits(detectActiveOnly: true);
+            },
+            onPlanDayChanged: (d) async {
+              setState(() => _planDay = d);
+              await _refreshPlan();
+            },
+            onTeamTargetChanged: (v) async {
+              setState(() => _teamTargetUserId = v);
+              await _refreshPlan();
+            },
+            onGrantConsent: _grantLocationConsent,
+            onRevokeConsent: _revokeLocationConsent,
+            onTogglePublish: _togglePublishPlan,
+            onPublishAll: _publishAllAssignedPlans,
+            onCompleteVisit: _openCompleteSheet,
+            onCancelVisit: _cancelActiveVisit,
+            onStartVisit: _startVisitFromPlan,
+            onSetupPlan: () => _openSetupPlan(t),
+            onGoToManage: _goToManage,
+            onOptimize: _optimizePlanRoute,
+            onPrintPlan: _printDailyPlan,
+            onOpenTeamMap: _openTeamMap,
+            onOpenReports: _openReports,
+            onSetPersonLocation: _setPersonLocationFromPlan,
+            onShowOfflineQueue: _showOfflineQueueSheet,
+            onOpenSetupWizard: () async {
+              final ok = await showDistributionSetupWizard(
+                context: context,
+                businessId: widget.businessId,
+                service: _svc,
+              );
+              if (ok) {
+                await _refreshSummary();
+                await _refreshPlan();
+              }
+            },
+          ),
+        ),
+      DistributionVisitsTab(
+        t: t,
+        jalali: _jalali,
+        loading: _loadingVisits,
+        canOperate: _canOperate,
+        visitListPayload: _visitListPayload,
+        onRefresh: () => _refreshVisits(),
+        onGoToField: () => _tabController.animateTo(0),
+        onCompleteVisit: _openCompleteSheet,
+      ),
+      DistributionReturnsTab(
+        t: t,
+        loading: _loadingReturns,
+        pendingOnly: _returnsPendingOnly,
+        canApproveReturns: _canApproveReturns,
+        returns: _returns,
+        onPendingOnlyChanged: (v) => setState(() => _returnsPendingOnly = v),
+        onRefresh: _refreshReturns,
+        onResolve: _resolveReturn,
+      ),
       if (_canOperate)
         DistributionSettlementPanel(
           businessId: widget.businessId,
@@ -906,7 +1025,14 @@ class _DistributionMainPageState extends State<DistributionMainPage>
           canSettle: widget.authStore.hasBusinessPermission('distribution', 'settle') || _canManage,
           currentUserId: widget.authStore.currentUserId,
         ),
-      if (_canOperate && _enableVanSales) _vanTab(t),
+      if (_canOperate && _enableVanSales)
+        DistributionVanPanel(
+          businessId: widget.businessId,
+          service: _svc,
+          enableVanSales: _enableVanSales,
+          canManage: _canManage,
+          authStore: widget.authStore,
+        ),
       if (_canOperate && (_enablePresell || _canManage))
         DistributionCommercialPanel(
           businessId: widget.businessId,
@@ -917,12 +1043,31 @@ class _DistributionMainPageState extends State<DistributionMainPage>
           requirePodSignature: _requirePodSignature,
           requirePodPhoto: _requirePodPhoto,
         ),
-      if (_canManage) _manageTab(t),
+      if (_canManage)
+        DistributionManageTab(
+          key: _manageKey,
+          businessId: widget.businessId,
+          service: _svc,
+          calendarController: widget.calendarController,
+          settings: _summary['distribution_settings'] is Map<String, dynamic>
+              ? Map<String, dynamic>.from(_summary['distribution_settings'] as Map)
+              : null,
+          checklistTemplate: _checklistTemplate,
+          memapsKeyController: _memapsKeyCtl,
+          mapTiles: _mapTiles,
+          onSettingsSaved: _refreshSummary,
+        ),
     ];
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(t.distributionMenu),
+        title: Text(
+          _workspace == 'supervisor'
+              ? t.distributionWorkspaceSupervisor
+              : _workspace == 'office'
+                  ? t.distributionWorkspaceOffice
+                  : t.distributionMenu,
+        ),
         leading: businessSubpageBackLeading(context, widget.businessId),
         actions: [
           if (_canTeam)
@@ -946,7 +1091,13 @@ class _DistributionMainPageState extends State<DistributionMainPage>
             tooltip: t.distributionOfflinePack,
             onPressed: () async {
               try {
-                await DistributionOfflineCatalog.refresh(businessId: widget.businessId, service: _svc);
+                final uid = widget.authStore.currentUserId;
+                if (uid == null) return;
+                await DistributionOfflineCatalog.refresh(
+                  businessId: widget.businessId,
+                  userId: uid,
+                  service: _svc,
+                );
                 if (mounted) {
                   SnackBarHelper.showSuccess(context, message: t.distributionOfflinePackDone);
                 }
@@ -1017,941 +1168,6 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     );
   }
 
-  Widget _fieldTab(AppLocalizations t) {
-    final cs = Theme.of(context).colorScheme;
-    final theme = Theme.of(context);
-    final planItems = (_optimizedPlanItems ?? (_dailyPlan?['items'] as List?)) ?? [];
-    var doneCount = 0;
-    var remainingCount = 0;
-    Map<String, dynamic>? nextStop;
-    for (final raw in planItems) {
-      final item = Map<String, dynamic>.from(raw as Map);
-      final pid = int.tryParse('${item['person_id']}');
-      final kind = _planStopKind(pid);
-      if (kind == 'done') {
-        doneCount++;
-      } else {
-        remainingCount++;
-        nextStop ??= item;
-      }
-    }
-    final progress = planItems.isEmpty ? 0.0 : doneCount / planItems.length;
-
-    return RefreshIndicator(
-      onRefresh: () async {
-        await _refreshSummary();
-        await _refreshPlan();
-        await _refreshVisits(detectActiveOnly: true);
-      },
-      child: CustomScrollView(
-        slivers: [
-          if (_activeVisit != null)
-            SliverToBoxAdapter(
-              child: Container(
-                margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: cs.primaryContainer.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: cs.primary.withValues(alpha: 0.25)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.timelapse, color: cs.primary),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(t.distributionActiveVisitBanner, style: theme.textTheme.titleSmall),
-                        ),
-                        distributionStatusChip(context, t, _activeVisit!['status']?.toString()),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '${_activeVisit!['person_name'] ?? _activeVisit!['person_id']}',
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-                    ),
-                    if (_canOperate) ...[
-                      const SizedBox(height: 12),
-                      FilledButton.icon(
-                        onPressed: () => _openCompleteSheet(
-                          int.parse('${_activeVisit!['id']}'),
-                          int.tryParse('${_activeVisit!['person_id']}'),
-                        ),
-                        icon: const Icon(Icons.check_circle_outline),
-                        label: Text(t.distributionCompleteVisitCta),
-                      ),
-                      TextButton(
-                        onPressed: _cancelActiveVisit,
-                        child: Text(t.distributionCancelVisit),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          if (_canOperate)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Card(
-                  color: _shareLiveLocation
-                      ? (_liveGpsOk == false ? cs.errorContainer.withValues(alpha: 0.55) : cs.surfaceContainerHighest)
-                      : cs.surfaceContainerHighest,
-                  child: ListTile(
-                    leading: Icon(
-                      !_shareLiveLocation
-                          ? Icons.location_off_outlined
-                          : (_liveGpsOk == false ? Icons.gps_off : Icons.my_location),
-                    ),
-                    title: Text(
-                      !_shareLiveLocation
-                          ? t.distributionLiveLocationDisabledBanner
-                          : (_liveGpsOk == false
-                              ? t.distributionLiveLocationGpsUnavailable
-                              : t.distributionLiveLocationVisitorHint),
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (_canManage && !_setupCompleted)
-                    Card(
-                      color: cs.tertiaryContainer.withValues(alpha: 0.5),
-                      child: ListTile(
-                        leading: const Icon(Icons.auto_fix_high_outlined),
-                        title: Text(t.distributionSetupNeeded),
-                        trailing: FilledButton(
-                          onPressed: () async {
-                            final ok = await showDistributionSetupWizard(
-                              context: context,
-                              businessId: widget.businessId,
-                              service: _svc,
-                            );
-                            if (ok) {
-                              await _refreshSummary();
-                              await _refreshPlan();
-                            }
-                          },
-                          child: Text(t.distributionStartWizard),
-                        ),
-                      ),
-                    ),
-                  if (!_canManage)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Text(t.distributionVisitorHomeHint, style: theme.textTheme.bodySmall),
-                    ),
-                  if (_scorecard != null) ...[
-                    DistributionScorecardCard(kpi: _scorecard!),
-                    const SizedBox(height: 12),
-                  ],
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(t.distributionDayProgress, style: theme.textTheme.titleMedium),
-                      ),
-                      Text(
-                        '$doneCount / ${planItems.length}',
-                        style: theme.textTheme.titleSmall?.copyWith(color: cs.primary, fontWeight: FontWeight.w700),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: LinearProgressIndicator(
-                      value: _loadingPlan ? null : progress,
-                      minHeight: 8,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: [
-                      Chip(
-                        visualDensity: VisualDensity.compact,
-                        avatar: const Icon(Icons.check, size: 16),
-                        label: Text('${t.distributionStopsDone}: $doneCount'),
-                      ),
-                      Chip(
-                        visualDensity: VisualDensity.compact,
-                        avatar: const Icon(Icons.more_horiz, size: 16),
-                        label: Text('${t.distributionStopsRemaining}: $remainingCount'),
-                      ),
-                      if (!_loadingSummary)
-                        Chip(
-                          visualDensity: VisualDensity.compact,
-                          avatar: const Icon(Icons.assignment_return, size: 16),
-                          label: Text('${t.distributionPendingReturns}: ${_summary['pending_return_requests'] ?? 0}'),
-                        ),
-                      if ((_dailyPlan?['carried_over_count'] ?? 0) is num &&
-                          ((_dailyPlan?['carried_over_count'] as num).toInt() > 0))
-                        Chip(
-                          visualDensity: VisualDensity.compact,
-                          avatar: const Icon(Icons.history, size: 16),
-                          label: Text('${t.distributionCarriedOver}: ${_dailyPlan?['carried_over_count']}'),
-                        ),
-                    ],
-                  ),
-                  if (nextStop != null && _activeVisit == null) ...[
-                    const SizedBox(height: 10),
-                    Text(
-                      '${t.distributionNextStop}: ${nextStop['person_name'] ?? nextStop['person_id']}',
-                      style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  FilledButton.tonalIcon(
-                    onPressed: () async {
-                      final d = await showAdaptiveDatePicker(
-                        context: context,
-                        calendarController: widget.calendarController,
-                        initialDate: _planDay,
-                        helpText: t.distributionSelectDate,
-                      );
-                      if (d != null) {
-                        setState(() => _planDay = d);
-                        await _refreshPlan();
-                      }
-                    },
-                    icon: const Icon(Icons.calendar_month),
-                    label: Text(Hd.HesabixDateUtils.formatForDisplay(_planDay, _jalali)),
-                  ),
-                  if (_canManage) ...[
-                    const SizedBox(width: 8),
-                    FilledButton.icon(
-                      onPressed: () => _openSetupPlan(t),
-                      icon: const Icon(Icons.playlist_add_check_outlined),
-                      label: Text(t.distributionSetupPlan),
-                    ),
-                  ],
-                  const SizedBox(width: 4),
-                  PopupMenuButton<String>(
-                    tooltip: t.distributionMoreActions,
-                    onSelected: (v) async {
-                      if (v == 'optimize' && _canOperate) await _optimizePlanRoute();
-                      if (v == 'pdf') await _printDailyPlan();
-                      if (v == 'map' && _canTeam) _openTeamMap();
-                      if (v == 'reports') _openReports();
-                    },
-                    itemBuilder: (ctx) => [
-                      if (_canOperate)
-                        PopupMenuItem(value: 'optimize', child: Text(t.distributionOptimizeRoute)),
-                      PopupMenuItem(value: 'pdf', child: Text(t.distributionPrintDailyPlan)),
-                      if (_canTeam) PopupMenuItem(value: 'map', child: Text(t.distributionTabTeamMap)),
-                      PopupMenuItem(value: 'reports', child: Text(t.distributionGoToReports)),
-                    ],
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.more_horiz, color: cs.onSurfaceVariant),
-                          const SizedBox(width: 4),
-                          Text(t.distributionMoreActions, style: theme.textTheme.labelLarge),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  if (_canTeam)
-                    FutureBuilder<BusinessUsersResponse>(
-                      future: BusinessUserService(ApiClient()).getBusinessUsers(widget.businessId),
-                      builder: (context, snap) {
-                        final users = snap.data?.users ?? const <BusinessUser>[];
-                        return SizedBox(
-                          width: 160,
-                          child: DropdownButtonFormField<int?>(
-                            value: _teamTargetUserId,
-                            isDense: true,
-                            decoration: InputDecoration(
-                              labelText: t.distributionSelectVisitor,
-                              border: const OutlineInputBorder(),
-                              isDense: true,
-                            ),
-                            items: [
-                              const DropdownMenuItem<int?>(value: null, child: Text('—')),
-                              ...users.map(
-                                (u) => DropdownMenuItem<int?>(
-                                  value: u.userId,
-                                  child: Text(
-                                    u.userName.isNotEmpty ? u.userName : '${u.userId}',
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ),
-                            ],
-                            onChanged: (v) async {
-                              setState(() => _teamTargetUserId = v);
-                              await _refreshPlan();
-                            },
-                          ),
-                        );
-                      },
-                    ),
-                ],
-              ),
-            ),
-          ),
-          if (_offlinePending > 0)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Material(
-                  color: cs.tertiaryContainer.withValues(alpha: 0.45),
-                  borderRadius: BorderRadius.circular(12),
-                  child: ListTile(
-                    leading: Badge(
-                      label: Text('$_offlinePending'),
-                      child: const Icon(Icons.cloud_queue_outlined),
-                    ),
-                    title: Text(t.distributionOfflineQueued),
-                    subtitle: Text('${t.distributionOfflinePending}: $_offlinePending'),
-                    trailing: TextButton(onPressed: _showOfflineQueueSheet, child: Text(t.distributionViewQueue)),
-                  ),
-                ),
-              ),
-            ),
-          if (_loadingPlan)
-            const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
-          else if (planItems.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: distributionEmptyState(
-                context: context,
-                icon: Icons.route_outlined,
-                title: t.distributionNoPlan,
-                subtitle: t.distributionNoPlanHint,
-                action: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_canManage)
-                      FilledButton.icon(
-                        onPressed: () => _openSetupPlan(t),
-                        icon: const Icon(Icons.playlist_add_check_outlined),
-                        label: Text(t.distributionSetupPlan),
-                      ),
-                    if (_canManage) ...[
-                      const SizedBox(height: 8),
-                      TextButton.icon(
-                        onPressed: _goToManage,
-                        icon: const Icon(Icons.settings_outlined),
-                        label: Text(t.distributionGoToManage),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            )
-          else
-            SliverMainAxisGroup(
-              slivers: [
-                if (_planMapMarkers(planItems).isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: DistributionMemapsMap(
-                          markers: _planMapMarkers(planItems),
-                          height: 200,
-                          tileConfig: _mapTiles,
-                        ),
-                      ),
-                    ),
-                  ),
-                SliverList.separated(
-                  itemCount: planItems.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemBuilder: (ctx, i) {
-                    final item = Map<String, dynamic>.from(planItems[i] as Map);
-                    final pid = int.tryParse('${item['person_id']}');
-                    final kind = _planStopKind(pid);
-                    final lat = double.tryParse('${item['latitude']}');
-                    final lng = double.tryParse('${item['longitude']}');
-                    final phone = item['person_mobile']?.toString();
-                    final nextId = nextStop == null ? null : '${nextStop['stop_id']}';
-                    final isNext = nextId != null && '${item['stop_id']}' == nextId;
-                    final kindLabel = kind == 'done'
-                        ? t.distributionStopDone
-                        : kind == 'current'
-                            ? t.distributionStopCurrent
-                            : t.distributionStopPending;
-                    final kindColor = kind == 'done'
-                        ? cs.primary
-                        : kind == 'current'
-                            ? cs.tertiary
-                            : cs.outline;
-
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Material(
-                        elevation: isNext && kind == 'pending' ? 1 : 0,
-                        color: kind == 'current'
-                            ? cs.tertiaryContainer.withValues(alpha: 0.35)
-                            : cs.surfaceContainerHighest.withValues(alpha: 0.45),
-                        borderRadius: BorderRadius.circular(16),
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Row(
-                                children: [
-                                  CircleAvatar(
-                                    backgroundColor: kindColor.withValues(alpha: 0.15),
-                                    foregroundColor: kindColor,
-                                    child: Text('${item['sort_order'] ?? i + 1}'),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          '${item['person_name'] ?? item['person_id']}',
-                                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                                        ),
-                                        Text(
-                                          '${item['route_code'] ?? ''} · ${item['route_name'] ?? ''}',
-                                          style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                                        ),
-                                        if (item['carried_over'] == true)
-                                          Text(
-                                            t.distributionCarriedOver,
-                                            style: theme.textTheme.labelSmall?.copyWith(color: cs.tertiary),
-                                          ),
-                                        if (item['customer_class'] != null || item['frequency'] != null)
-                                          Text(
-                                            [
-                                              if (item['customer_class'] != null)
-                                                distributionClassLabel(t, item['customer_class']?.toString()),
-                                              if (item['frequency'] != null)
-                                                distributionFrequencyLabel(t, item['frequency']?.toString()),
-                                            ].join(' · '),
-                                            style: theme.textTheme.labelSmall,
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                  Chip(
-                                    visualDensity: VisualDensity.compact,
-                                    label: Text(kindLabel, style: TextStyle(color: kindColor, fontSize: 12)),
-                                    side: BorderSide(color: kindColor.withValues(alpha: 0.4)),
-                                    backgroundColor: kindColor.withValues(alpha: 0.08),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Wrap(
-                                spacing: 4,
-                                children: [
-                                  if (phone != null && phone.isNotEmpty)
-                                    TextButton.icon(
-                                      onPressed: () => openDistributionPhoneDialer(phone),
-                                      icon: const Icon(Icons.call_outlined, size: 18),
-                                      label: Text(t.distributionCallCustomer),
-                                    ),
-                                  if (lat != null && lng != null)
-                                    TextButton.icon(
-                                      onPressed: () => openDistributionMapsNavigation(lat, lng, provider: _navProvider),
-                                      icon: const Icon(Icons.navigation_outlined, size: 18),
-                                      label: Text(t.distributionNavigate),
-                                    ),
-                                  if (_canManage)
-                                    TextButton.icon(
-                                      onPressed: () => _setPersonLocationFromPlan(item),
-                                      icon: Icon(
-                                        item['latitude'] != null
-                                            ? Icons.edit_location_alt
-                                            : Icons.add_location_alt_outlined,
-                                        size: 18,
-                                      ),
-                                      label: Text(t.distributionSetPersonLocation),
-                                    ),
-                                ],
-                              ),
-                              if (_canOperate && _activeVisit == null && kind != 'done') ...[
-                                const SizedBox(height: 4),
-                                FilledButton(
-                                  onPressed: () => _startVisitFromPlan(item),
-                                  child: Text(t.distributionStartVisit),
-                                ),
-                              ],
-                              if (_canOperate && kind == 'current' && _activeVisit != null) ...[
-                                const SizedBox(height: 4),
-                                FilledButton.tonal(
-                                  onPressed: () => _openCompleteSheet(
-                                    int.parse('${_activeVisit!['id']}'),
-                                    int.tryParse('${_activeVisit!['person_id']}'),
-                                  ),
-                                  child: Text(t.distributionCompleteVisitCta),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          const SliverToBoxAdapter(child: SizedBox(height: 96)),
-        ],
-      ),
-    );
-  }
-
-  Widget _settingsSection(AppLocalizations t) {
-    final ds = _summary['distribution_settings'] as Map<String, dynamic>;
-    final mapSource = (ds['map_tile_source'] ?? 'osm').toString() == 'memaps' ? 'memaps' : 'osm';
-    Future<void> persist(Map<String, dynamic> patch) async {
-      try {
-        await _svc.updateDistributionSettings(
-          businessId: widget.businessId,
-          payload: <String, dynamic>{
-            'shared_routing_catalog': ds['shared_routing_catalog'] == true,
-            'require_visit_in_daily_plan': ds['require_visit_in_daily_plan'] == true,
-            ...patch,
-          },
-        );
-        if (!mounted) return;
-        SnackBarHelper.showSuccess(context, message: t.distributionSettingsSaved);
-        await _refreshSummary();
-      } catch (e) {
-        if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
-      }
-    }
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: Text(t.distributionMapSectionTitle, style: Theme.of(context).textTheme.titleSmall),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(t.distributionMapTileSource, style: Theme.of(context).textTheme.bodyLarge),
-                const SizedBox(height: 4),
-                Text(
-                  t.distributionMapTileSourceHint,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                RadioListTile<String>(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(t.distributionMapTileSourceOsm),
-                  value: 'osm',
-                  groupValue: mapSource,
-                  onChanged: (v) {
-                    if (v != null) persist({'map_tile_source': v});
-                  },
-                ),
-                RadioListTile<String>(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(t.distributionMapTileSourceMemaps),
-                  value: 'memaps',
-                  groupValue: mapSource,
-                  onChanged: (v) {
-                    if (v != null) persist({'map_tile_source': v});
-                  },
-                ),
-              ],
-            ),
-          ),
-          if (mapSource == 'memaps')
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: TextField(
-                controller: _memapsKeyCtl,
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: t.distributionMemapsApiKey,
-                  helperText: t.distributionMemapsApiKeyHint,
-                  helperMaxLines: 4,
-                  border: const OutlineInputBorder(),
-                  suffixIcon: IconButton(
-                    tooltip: t.save,
-                    icon: const Icon(Icons.save_outlined),
-                    onPressed: () => persist({'memaps_api_key': _memapsKeyCtl.text.trim()}),
-                  ),
-                ),
-                onSubmitted: (v) => persist({'memaps_api_key': v.trim()}),
-              ),
-            ),
-          SwitchListTile(
-            title: Text(t.distributionShareLiveLocation),
-            subtitle: Text(t.distributionShareLiveLocationHint),
-            value: ds['share_live_location'] != false,
-            onChanged: (v) => persist({'share_live_location': v}),
-          ),
-          SwitchListTile(
-            title: Text(t.distributionSharedRoutingCatalog),
-            subtitle: Text(t.distributionSharedRoutingCatalogHint),
-            value: ds['shared_routing_catalog'] == true,
-            onChanged: (v) => persist({'shared_routing_catalog': v}),
-          ),
-          SwitchListTile(
-            title: Text(t.distributionRequireVisitInDailyPlan),
-            subtitle: Text(t.distributionRequireVisitInDailyPlanHint),
-            value: ds['require_visit_in_daily_plan'] == true,
-            onChanged: (v) => persist({'require_visit_in_daily_plan': v}),
-          ),
-          SwitchListTile(
-            title: Text(t.distributionEnableVanSales),
-            value: ds['enable_van_sales'] == true,
-            onChanged: (v) => persist({'enable_van_sales': v}),
-          ),
-          SwitchListTile(
-            title: Text(t.distributionEnablePresell),
-            subtitle: Text(t.distributionEnablePresellHint),
-            value: ds['enable_presell'] == true,
-            onChanged: (v) => persist({'enable_presell': v}),
-          ),
-          SwitchListTile(
-            title: Text(t.distributionEnablePromotions),
-            value: ds['enable_promotions'] == true,
-            onChanged: (v) => persist({'enable_promotions': v}),
-          ),
-          SwitchListTile(
-            title: Text(t.distributionEnableSuggestedOrder),
-            value: ds['enable_suggested_order'] != false,
-            onChanged: (v) => persist({'enable_suggested_order': v}),
-          ),
-          SwitchListTile(
-            title: Text(t.distributionCarryOver),
-            value: ds['carry_over_missed_visits'] != false,
-            onChanged: (v) => persist({'carry_over_missed_visits': v}),
-          ),
-          SwitchListTile(
-            title: Text(t.distributionRequirePodSignature),
-            value: ds['require_pod_signature'] == true,
-            onChanged: (v) => persist({'require_pod_signature': v}),
-          ),
-          SwitchListTile(
-            title: Text(t.distributionRequirePodPhoto),
-            value: ds['require_pod_photo'] == true,
-            onChanged: (v) => persist({'require_pod_photo': v}),
-          ),
-          SwitchListTile(
-            title: Text(t.distributionAutoPromo),
-            value: ds['auto_apply_promotions'] != false,
-            onChanged: (v) => persist({'auto_apply_promotions': v}),
-          ),
-          SwitchListTile(
-            title: Text(t.distributionPerfectStore),
-            value: ds['enable_perfect_store'] != false,
-            onChanged: (v) => persist({'enable_perfect_store': v}),
-          ),
-          DropdownButtonFormField<String>(
-            value: (ds['nav_provider'] ?? 'neshan').toString(),
-            decoration: InputDecoration(
-              labelText: t.distributionNavProvider,
-              border: const OutlineInputBorder(),
-            ),
-            items: [
-              DropdownMenuItem(value: 'neshan', child: Text(t.distributionNavNeshan)),
-              DropdownMenuItem(value: 'google', child: Text(t.distributionNavGoogle)),
-              DropdownMenuItem(value: 'waze', child: Text(t.distributionNavWaze)),
-            ],
-            onChanged: (v) {
-              if (v != null) persist({'nav_provider': v});
-            },
-          ),
-          ListTile(
-            title: Text(t.distributionNearExpiryDays),
-            subtitle: Text('${ds['near_expiry_days'] ?? 14}'),
-            trailing: SizedBox(
-              width: 72,
-              child: TextField(
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
-                controller: TextEditingController(text: '${ds['near_expiry_days'] ?? 14}'),
-                onSubmitted: (v) {
-                  final n = int.tryParse(v.trim());
-                  if (n != null && n >= 1 && n <= 90) persist({'near_expiry_days': n});
-                },
-              ),
-            ),
-          ),
-          ListTile(
-            title: Text(t.distributionVisitorMaxDiscount),
-            subtitle: Text('${ds['visitor_max_discount_percent'] ?? 0} %'),
-            trailing: SizedBox(
-              width: 72,
-              child: TextField(
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
-                controller: TextEditingController(text: '${ds['visitor_max_discount_percent'] ?? 0}'),
-                onSubmitted: (v) {
-                  final n = double.tryParse(v.trim().replaceAll(',', '.'));
-                  if (n != null && n >= 0 && n <= 100) persist({'visitor_max_discount_percent': n});
-                },
-              ),
-            ),
-          ),
-          SwitchListTile(
-            title: Text(t.distributionRequireGeofence),
-            subtitle: Text(t.distributionGeofenceRadius),
-            value: ds['require_geofence'] == true,
-            onChanged: (v) => persist({'require_geofence': v}),
-          ),
-          ListTile(
-            title: Text(t.distributionGeofenceRadius),
-            subtitle: Text('${ds['geofence_radius_meters'] ?? 0} m'),
-            trailing: SizedBox(
-              width: 72,
-              child: TextField(
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
-                controller: TextEditingController(text: '${ds['geofence_radius_meters'] ?? 200}'),
-                onSubmitted: (v) {
-                  final n = int.tryParse(v.trim());
-                  if (n != null && n >= 0) persist({'geofence_radius_meters': n});
-                },
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: WarehouseComboboxWidget(
-              businessId: widget.businessId,
-              selectedWarehouseId: ds['default_source_warehouse_id'] is int
-                  ? ds['default_source_warehouse_id'] as int
-                  : int.tryParse('${ds['default_source_warehouse_id'] ?? ''}'),
-              label: t.distributionDefaultWarehouse,
-              onChanged: (id) => persist({'default_source_warehouse_id': id}),
-            ),
-          ),
-          ListTile(
-            title: Text(t.distributionChecklistTitle),
-            subtitle: Text(
-              ((_checklistTemplate).isEmpty)
-                  ? t.distributionChecklistAddItem
-                  : '${_checklistTemplate.length} ${t.distributionChecklistAddItem}',
-            ),
-            trailing: IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: () async {
-                final ctl = TextEditingController();
-                final ok = await showDialog<bool>(
-                  context: context,
-                  builder: (dctx) => AlertDialog(
-                    title: Text(t.distributionChecklistAddItem),
-                    content: TextField(
-                      controller: ctl,
-                      decoration: InputDecoration(
-                        labelText: t.distributionChecklistTitle,
-                        border: const OutlineInputBorder(),
-                      ),
-                    ),
-                    actions: [
-                      TextButton(onPressed: () => Navigator.pop(dctx, false), child: Text(t.cancel)),
-                      FilledButton(onPressed: () => Navigator.pop(dctx, true), child: Text(t.save)),
-                    ],
-                  ),
-                );
-                if (ok != true || ctl.text.trim().isEmpty) return;
-                final next = List<dynamic>.from(_checklistTemplate)
-                  ..add({'id': 'c_${DateTime.now().millisecondsSinceEpoch}', 'label': ctl.text.trim(), 'required': false});
-                await persist({'visit_checklist_template': next});
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _vanTab(AppLocalizations t) {
-    return DistributionVanPanel(
-      businessId: widget.businessId,
-      service: _svc,
-      enableVanSales: _enableVanSales,
-      canManage: _canManage,
-      authStore: widget.authStore,
-    );
-  }
-
-  Widget _visitsTab(AppLocalizations t) {
-    if (_loadingVisits) return const Center(child: CircularProgressIndicator());
-    final items = (_visitListPayload?['items'] as List?) ?? [];
-    if (items.isEmpty) {
-      return distributionEmptyState(
-        context: context,
-        icon: Icons.place_outlined,
-        title: t.distributionEmptyVisits,
-        subtitle: t.distributionEmptyVisitsHint,
-        action: FilledButton.tonal(
-          onPressed: () => _tabController.animateTo(0),
-          child: Text(t.distributionGoToField),
-        ),
-      );
-    }
-    return RefreshIndicator(
-      onRefresh: _refreshVisits,
-      child: ListView.separated(
-        padding: const EdgeInsets.all(12),
-        itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
-        itemBuilder: (ctx, i) {
-          final v = Map<String, dynamic>.from(items[i] as Map);
-          final status = v['status']?.toString();
-          return Card(
-            elevation: 0,
-            color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-            child: ListTile(
-              leading: Icon(
-                status == 'completed'
-                    ? Icons.check_circle
-                    : status == 'cancelled'
-                        ? Icons.cancel
-                        : Icons.timelapse,
-                color: distributionStatusColor(context, status),
-              ),
-              title: Text(v['person_name']?.toString() ?? '${v['person_id']}'),
-              subtitle: Text(
-                '${distributionOutcomeLabel(t, v['outcome']?.toString())}\n'
-                '${Hd.HesabixDateUtils.formatDateTime(_parseDt(v['started_at']), _jalali)}',
-              ),
-              isThreeLine: true,
-              trailing: status == 'in_progress' && _canOperate
-                  ? FilledButton(
-                      onPressed: () => _openCompleteSheet(
-                        int.parse('${v['id']}'),
-                        int.tryParse('${v['person_id']}'),
-                      ),
-                      child: Text(t.distributionCompleteVisitCta),
-                    )
-                  : distributionStatusChip(context, t, status),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _returnsTab(AppLocalizations t) {
-    if (_loadingReturns) return const Center(child: CircularProgressIndicator());
-    final filtered = _returnsPendingOnly
-        ? _returns.where((r) => Map<String, dynamic>.from(r as Map)['status'] == 'pending').toList()
-        : _returns;
-    return RefreshIndicator(
-      onRefresh: _refreshReturns,
-      child: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-              child: SegmentedButton<bool>(
-                segments: [
-                  ButtonSegment(value: true, label: Text(t.distributionFilterPending), icon: const Icon(Icons.hourglass_top)),
-                  ButtonSegment(value: false, label: Text(t.distributionFilterAll), icon: const Icon(Icons.list)),
-                ],
-                selected: {_returnsPendingOnly},
-                onSelectionChanged: (s) => setState(() => _returnsPendingOnly = s.first),
-              ),
-            ),
-          ),
-          if (filtered.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: distributionEmptyState(
-                context: context,
-                icon: Icons.assignment_return_outlined,
-                title: t.distributionEmptyReturns,
-              ),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
-              sliver: SliverList.separated(
-                itemCount: filtered.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (ctx, i) {
-                  final r = Map<String, dynamic>.from(filtered[i] as Map);
-                  final lines = (r['lines'] as List?) ?? [];
-                  final pending = r['status'] == 'pending';
-                  return Card(
-                    elevation: 0,
-                    child: ExpansionTile(
-                      leading: Icon(
-                        pending ? Icons.hourglass_top : Icons.assignment_return,
-                        color: distributionStatusColor(context, r['status']?.toString()),
-                      ),
-                      title: Text('#${r['id']} · ${r['person_name'] ?? '${t.distributionSelectPerson} ${r['person_id']}'}'),
-                      subtitle: Text('${distributionReturnStatusLabel(t, r['status']?.toString())} · ${lines.length} ${t.distributionReturnAddLine}'),
-                      trailing: pending && _canApproveReturns
-                          ? null
-                          : distributionStatusChip(context, t, r['status']?.toString(), isReturn: true),
-                      children: [
-                        ...lines.map((ln) {
-                          final m = Map<String, dynamic>.from(ln as Map);
-                          return ListTile(
-                            dense: true,
-                            title: Text(m['product_name']?.toString() ?? 'product ${m['product_id']}'),
-                            subtitle: Text('× ${m['quantity']} ${m['reason'] ?? ''}'),
-                          );
-                        }),
-                        if (pending && _canApproveReturns)
-                          Padding(
-                            padding: const EdgeInsets.all(8),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton(
-                                    onPressed: () => _resolveReturn(int.parse('${r['id']}'), 'rejected'),
-                                    child: Text(t.distributionRejectReturn),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: FilledButton(
-                                    onPressed: () => _resolveReturn(int.parse('${r['id']}'), 'approved'),
-                                    child: Text(t.distributionApproveReturn),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _resolveReturn(int id, String status) async {
     final t = AppLocalizations.of(context);
     try {
@@ -1967,688 +1183,4 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     }
   }
 
-  Widget _manageTab(AppLocalizations t) {
-    return ListView(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-          child: Text(t.distributionTargetsTitle, style: Theme.of(context).textTheme.titleMedium),
-        ),
-        DistributionTargetsSection(
-          businessId: widget.businessId,
-          service: _svc,
-          calendarController: widget.calendarController,
-        ),
-        const Divider(),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-          child: Text(t.distributionManageSectionRoutes, style: Theme.of(context).textTheme.titleMedium),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-          child: Row(
-            children: [
-              Text(t.distributionTerritoryName, style: Theme.of(context).textTheme.titleSmall),
-              const Spacer(),
-              FilledButton.tonalIcon(
-                onPressed: () => _showTerritoryDialog(t),
-                icon: const Icon(Icons.add),
-                label: Text(t.distributionTerritoryCreate),
-              ),
-              const SizedBox(width: 8),
-              FilledButton.tonalIcon(
-                onPressed: () => showDistributionAssortmentSheet(
-                  context: context,
-                  businessId: widget.businessId,
-                  service: _svc,
-                ),
-                icon: const Icon(Icons.star_outline),
-                label: Text(t.distributionAssortmentsTitle),
-              ),
-            ],
-          ),
-        ),
-        if (_territories.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Text(t.distributionNoRoutesYet, style: Theme.of(context).textTheme.bodySmall),
-          )
-        else
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _territories.map((raw) {
-                final m = Map<String, dynamic>.from(raw as Map);
-                return InputChip(
-                  avatar: const Icon(Icons.map_outlined, size: 18),
-                  label: Text(distributionEntityLabel(m)),
-                  onPressed: () => _showTerritoryDialog(t, existing: m),
-                  onDeleted: () => _confirmDeleteTerritory(t, m),
-                  deleteIcon: const Icon(Icons.close, size: 18),
-                );
-              }).toList(),
-            ),
-          ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
-          child: Row(
-            children: [
-              Text(t.distributionSelectRoute, style: Theme.of(context).textTheme.titleSmall),
-              const Spacer(),
-              FilledButton.tonalIcon(
-                onPressed: () => _showRouteDialog(t),
-                icon: const Icon(Icons.add_road),
-                label: Text(t.distributionRouteCreate),
-              ),
-            ],
-          ),
-        ),
-        if (_loadingRoutes)
-          const Padding(
-            padding: EdgeInsets.all(24),
-            child: Center(child: CircularProgressIndicator()),
-          )
-        else
-          ..._routes.map((raw) {
-            final r = Map<String, dynamic>.from(raw as Map);
-            final rid = r['id'] as int;
-            return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              child: ExpansionTile(
-                leading: const Icon(Icons.alt_route),
-                title: Text(distributionEntityLabel(r)),
-                subtitle: Text('${r['territory_name'] ?? '—'}'),
-                onExpansionChanged: (ex) {
-                  if (ex) _loadStops(rid);
-                },
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Wrap(
-                      spacing: 4,
-                      children: [
-                        TextButton.icon(
-                          onPressed: () => _showStopDialog(t, rid),
-                          icon: const Icon(Icons.add_location_alt),
-                          label: Text(t.distributionAddStop),
-                        ),
-                        TextButton.icon(
-                          onPressed: () => _showAssignmentDialog(t, rid),
-                          icon: const Icon(Icons.person_add_alt),
-                          label: Text(t.distributionAssignVisitor),
-                        ),
-                        IconButton(
-                          tooltip: t.distributionRouteEdit,
-                          onPressed: () => _showRouteDialog(t, existing: r),
-                          icon: const Icon(Icons.edit_outlined),
-                        ),
-                        IconButton(
-                          tooltip: t.distributionDeleteRoute,
-                          onPressed: () => _confirmDeleteRoute(t, rid),
-                          icon: const Icon(Icons.delete_outline),
-                        ),
-                      ],
-                    ),
-                  ),
-                  ...(_stopsByRoute[rid] ?? []).map((s) {
-                    final m = Map<String, dynamic>.from(s as Map);
-                    return ListTile(
-                      dense: true,
-                      title: Text('${m['person_name'] ?? m['person_id']}'),
-                      subtitle: Text(
-                        '${t.distributionSortOrder} ${m['sort_order']} · '
-                        '${t.distributionWeekdayLabel}: ${_weekdayLabel(t, m['weekday'] as int?)}',
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.edit_outlined),
-                            tooltip: t.distributionStopEdit,
-                            onPressed: () => _showStopDialog(t, rid, existing: m),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.edit_location_alt_outlined),
-                            tooltip: t.distributionSetPersonLocation,
-                            onPressed: () async {
-                              final personId = int.tryParse('${m['person_id']}');
-                              if (personId == null) return;
-                              final saved = await showDistributionPersonLocationSheet(
-                                context: context,
-                                businessId: widget.businessId,
-                                personId: personId,
-                                personName: m['person_name']?.toString() ?? '$personId',
-                                distributionService: _svc,
-                                tileConfig: _mapTiles,
-                              );
-                              if (saved == true) await _loadStops(rid);
-                            },
-                          ),
-                          IconButton(
-                            tooltip: t.distributionDeleteStop,
-                            icon: const Icon(Icons.delete_outline),
-                            onPressed: () async {
-                              final sid = int.tryParse('${m['id']}');
-                              if (sid == null) return;
-                              final ok = await confirmDistributionDelete(
-                                context: context,
-                                title: t.distributionDeleteStop,
-                                message: t.distributionDeleteStopConfirm,
-                              );
-                              if (!ok) return;
-                              try {
-                                await _svc.deleteStop(
-                                  businessId: widget.businessId,
-                                  routeId: rid,
-                                  stopId: sid,
-                                );
-                                await _loadStops(rid);
-                                if (mounted) {
-                                  SnackBarHelper.showSuccess(
-                                    context,
-                                    message: t.distributionSettingsSaved,
-                                  );
-                                }
-                              } catch (e) {
-                                if (mounted) {
-                                  SnackBarHelper.showError(
-                                    context,
-                                    message: ErrorExtractor.forContext(e, context),
-                                  );
-                                }
-                              }
-                            },
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-                ],
-              ),
-            );
-          }),
-        if (_summary['distribution_settings'] is Map<String, dynamic>) ...[
-          const Divider(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-            child: Text(t.distributionManageSectionSettings, style: Theme.of(context).textTheme.titleMedium),
-          ),
-          _settingsSection(t),
-        ],
-        const SizedBox(height: 48),
-      ],
-    );
-  }
-
-  Future<void> _confirmDeleteRoute(AppLocalizations t, int routeId) async {
-    final ok = await confirmDistributionDelete(
-      context: context,
-      title: t.distributionDeleteRoute,
-      message: t.distributionDeleteRouteConfirm,
-      confirmLabel: t.distributionDeleteRoute,
-    );
-    if (!ok) return;
-    try {
-      await _svc.deleteRoute(businessId: widget.businessId, routeId: routeId);
-      await _refreshRoutesMaster();
-    } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
-    }
-  }
-
-  Future<void> _confirmDeleteTerritory(AppLocalizations t, Map<String, dynamic> row) async {
-    final id = int.tryParse('${row['id']}');
-    if (id == null) return;
-    final ok = await confirmDistributionDelete(
-      context: context,
-      title: t.distributionDeleteTerritory,
-      message: t.distributionDeleteTerritoryConfirm,
-    );
-    if (!ok) return;
-    try {
-      await _svc.deleteTerritory(businessId: widget.businessId, territoryId: id);
-      await _refreshRoutesMaster();
-    } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
-    }
-  }
-
-  Future<void> _showTerritoryDialog(AppLocalizations t, {Map<String, dynamic>? existing}) async {
-    final nameCtl = TextEditingController(text: existing?['name']?.toString() ?? '');
-    final editing = existing != null;
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(editing ? t.distributionTerritoryEdit : t.distributionTerritoryCreate),
-        content: distributionFormColumn(
-          children: [
-            TextField(
-              controller: nameCtl,
-              autofocus: true,
-              decoration: InputDecoration(
-                labelText: t.distributionTerritoryName,
-                border: const OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.cancel)),
-          FilledButton(
-            onPressed: () async {
-              final name = nameCtl.text.trim();
-              if (name.isEmpty) return;
-              try {
-                if (editing) {
-                  await _svc.updateTerritory(
-                    businessId: widget.businessId,
-                    territoryId: int.parse('${existing['id']}'),
-                    payload: {'name': name},
-                  );
-                } else {
-                  await _svc.createTerritory(
-                    businessId: widget.businessId,
-                    payload: {
-                      'code': nextDistributionCode('T', _territories),
-                      'name': name,
-                    },
-                  );
-                }
-                if (ctx.mounted) Navigator.pop(ctx);
-                await _refreshRoutesMaster();
-              } catch (e) {
-                if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
-              }
-            },
-            child: Text(t.save),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _showRouteDialog(AppLocalizations t, {Map<String, dynamic>? existing}) async {
-    final nameCtl = TextEditingController(text: existing?['name']?.toString() ?? '');
-    int? territoryId = int.tryParse('${existing?['territory_id'] ?? ''}');
-    final editing = existing != null;
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setD) => AlertDialog(
-          title: Text(editing ? t.distributionRouteEdit : t.distributionRouteCreate),
-          content: distributionFormColumn(
-            children: [
-              TextField(
-                controller: nameCtl,
-                autofocus: true,
-                decoration: InputDecoration(
-                  labelText: t.distributionRouteName,
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-              DropdownButtonFormField<int?>(
-                value: territoryId,
-                isExpanded: true,
-                decoration: InputDecoration(
-                  labelText: t.distributionTerritoryName,
-                  border: const OutlineInputBorder(),
-                ),
-                items: [
-                  DropdownMenuItem<int?>(value: null, child: Text('—')),
-                  ..._territories.map<DropdownMenuItem<int?>>((e) {
-                    final m = Map<String, dynamic>.from(e as Map);
-                    return DropdownMenuItem<int?>(
-                      value: m['id'] as int?,
-                      child: Text(distributionEntityLabel(m)),
-                    );
-                  }),
-                ],
-                onChanged: (v) => setD(() => territoryId = v),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.cancel)),
-            FilledButton(
-              onPressed: () async {
-                final name = nameCtl.text.trim();
-                if (name.isEmpty) return;
-                try {
-                  if (editing) {
-                    await _svc.updateRoute(
-                      businessId: widget.businessId,
-                      routeId: int.parse('${existing['id']}'),
-                      payload: <String, dynamic>{
-                        'name': name,
-                        'territory_id': territoryId,
-                      },
-                    );
-                  } else {
-                    await _svc.createRoute(
-                      businessId: widget.businessId,
-                      payload: <String, dynamic>{
-                        'code': nextDistributionCode('R', _routes),
-                        'name': name,
-                        if (territoryId != null) 'territory_id': territoryId,
-                      },
-                    );
-                  }
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  await _refreshRoutesMaster();
-                } catch (e) {
-                  if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
-                }
-              },
-              child: Text(t.save),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showStopDialog(AppLocalizations t, int routeId, {Map<String, dynamic>? existing}) async {
-    Person? person;
-    final pid = int.tryParse('${existing?['person_id'] ?? ''}');
-    if (pid != null) {
-      person = distributionPersonStub(
-        businessId: widget.businessId,
-        id: pid,
-        name: existing?['person_name']?.toString() ?? '$pid',
-      );
-    }
-    final stops = _stopsByRoute[routeId] ?? [];
-    final defaultSort = existing != null
-        ? '${existing['sort_order'] ?? 0}'
-        : '${stops.length + 1}';
-    final sortCtl = TextEditingController(text: defaultSort);
-    int? weekday = existing?['weekday'] is int ? existing!['weekday'] as int : int.tryParse('${existing?['weekday'] ?? ''}');
-    var frequency = (existing?['frequency'] ?? 'weekly').toString();
-    var cls = existing?['customer_class']?.toString();
-    final offsetCtl = TextEditingController(text: '${existing?['cycle_offset'] ?? 0}');
-    int? priceListId = int.tryParse('${existing?['price_list_id'] ?? ''}');
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setD) => AlertDialog(
-          title: Text(existing == null ? t.distributionAddStop : t.distributionStopEdit),
-          content: distributionFormColumn(
-            children: [
-              PersonComboboxWidget(
-                businessId: widget.businessId,
-                selectedPerson: person,
-                label: t.distributionSelectPerson,
-                onChanged: (p) => setD(() => person = p),
-              ),
-              DropdownButtonFormField<int?>(
-                value: weekday,
-                isExpanded: true,
-                decoration: InputDecoration(
-                  labelText: t.distributionWeekdayLabel,
-                  border: const OutlineInputBorder(),
-                ),
-                items: [
-                  DropdownMenuItem<int?>(value: null, child: Text(t.distributionWeekdayAny)),
-                  ...List.generate(
-                    7,
-                    (i) => DropdownMenuItem<int?>(value: i, child: Text(_weekdayLabel(t, i))),
-                  ),
-                ],
-                onChanged: (v) => setD(() => weekday = v),
-              ),
-              DropdownButtonFormField<String>(
-                value: frequency,
-                isExpanded: true,
-                decoration: InputDecoration(
-                  labelText: t.distributionVisitFrequency,
-                  border: const OutlineInputBorder(),
-                ),
-                items: [
-                  DropdownMenuItem(value: 'weekly', child: Text(t.distributionFrequencyWeekly)),
-                  DropdownMenuItem(value: 'biweekly', child: Text(t.distributionFrequencyBiweekly)),
-                  DropdownMenuItem(value: 'monthly', child: Text(t.distributionFrequencyMonthly)),
-                ],
-                onChanged: (v) => setD(() => frequency = v ?? 'weekly'),
-              ),
-              DropdownButtonFormField<String?>(
-                value: cls,
-                isExpanded: true,
-                decoration: InputDecoration(
-                  labelText: t.distributionCustomerClass,
-                  border: const OutlineInputBorder(),
-                ),
-                items: [
-                  const DropdownMenuItem<String?>(value: null, child: Text('—')),
-                  DropdownMenuItem(value: 'A', child: Text(t.distributionClassA)),
-                  DropdownMenuItem(value: 'B', child: Text(t.distributionClassB)),
-                  DropdownMenuItem(value: 'C', child: Text(t.distributionClassC)),
-                ],
-                onChanged: (v) => setD(() => cls = v),
-              ),
-              TextField(
-                controller: offsetCtl,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: t.distributionCycleOffset,
-                  helperText: t.distributionCycleOffsetHint,
-                  helperMaxLines: 3,
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-              PriceListComboboxWidget(
-                businessId: widget.businessId,
-                selectedPriceListId: priceListId,
-                label: t.distributionPriceList,
-                hintText: t.distributionPriceList,
-                onChanged: (p) => setD(() => priceListId = int.tryParse('${p?['id'] ?? ''}')),
-              ),
-              TextField(
-                controller: sortCtl,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(labelText: t.distributionSortOrder, border: const OutlineInputBorder()),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.cancel)),
-            FilledButton(
-              onPressed: () async {
-                if (person == null) return;
-                try {
-                  await _svc.upsertStop(
-                    businessId: widget.businessId,
-                    routeId: routeId,
-                    payload: <String, dynamic>{
-                      if (existing != null) 'id': existing['id'],
-                      'person_id': person!.id,
-                      'sort_order': int.tryParse(sortCtl.text.trim()) ?? 0,
-                      'weekday': weekday,
-                      'frequency': frequency,
-                      'cycle_offset': int.tryParse(offsetCtl.text.trim()) ?? 0,
-                      if (cls != null) 'customer_class': cls,
-                    },
-                  );
-                  final pidSaved = person!.id;
-                  if (pidSaved != null) {
-                    await _svc.upsertCustomerProfile(
-                      businessId: widget.businessId,
-                      personId: pidSaved,
-                      payload: {
-                        'visit_frequency': frequency,
-                        'cycle_offset': int.tryParse(offsetCtl.text.trim()) ?? 0,
-                        if (cls != null) 'customer_class': cls,
-                        'price_list_id': priceListId,
-                      },
-                    );
-                  }
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  await _loadStops(routeId);
-                } catch (e) {
-                  if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
-                }
-              },
-              child: Text(t.save),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showAssignmentDialog(AppLocalizations t, int routeId) async {
-    DateTime from = DateTime.now();
-    DateTime? to;
-    int? selectedUserId;
-    List<BusinessUser> users = const [];
-    try {
-      final res = await BusinessUserService(ApiClient()).getBusinessUsers(widget.businessId);
-      users = res.users;
-    } catch (_) {}
-    List<dynamic> existing = const [];
-    try {
-      existing = await _svc.listAssignments(businessId: widget.businessId, routeId: routeId);
-    } catch (_) {}
-
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setD) => AlertDialog(
-          title: Text(t.distributionAssignVisitor),
-          content: SizedBox(
-            width: 360,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButtonFormField<int>(
-                    value: selectedUserId,
-                    decoration: InputDecoration(
-                      labelText: t.distributionSelectVisitor,
-                      border: const OutlineInputBorder(),
-                    ),
-                    items: users
-                        .map(
-                          (u) => DropdownMenuItem<int>(
-                            value: u.userId,
-                            child: Text(u.userName.isNotEmpty ? u.userName : 'user ${u.userId}'),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (v) => setD(() => selectedUserId = v),
-                  ),
-                  ListTile(
-                    title: Text(Hd.HesabixDateUtils.formatForDisplay(from, _jalali)),
-                    subtitle: Text(t.distributionAssignmentFrom),
-                    onTap: () async {
-                      final d = await showAdaptiveDatePicker(
-                        context: context,
-                        calendarController: widget.calendarController,
-                        initialDate: from,
-                      );
-                      if (d != null) setD(() => from = d);
-                    },
-                  ),
-                  ListTile(
-                    title: Text(to == null ? '∞' : Hd.HesabixDateUtils.formatForDisplay(to!, _jalali)),
-                    subtitle: Text(t.distributionAssignmentTo),
-                    onTap: () async {
-                      final d = await showAdaptiveDatePicker(
-                        context: context,
-                        calendarController: widget.calendarController,
-                        initialDate: to ?? from,
-                      );
-                      setD(() => to = d);
-                    },
-                  ),
-                  if (existing.isNotEmpty) ...[
-                    const Divider(),
-                    ...existing.map((raw) {
-                      final m = Map<String, dynamic>.from(raw as Map);
-                      return ListTile(
-                        dense: true,
-                        title: Text(m['user_name']?.toString() ?? 'user ${m['user_id']}'),
-                        subtitle: Text(
-                          '${t.distributionAssignmentFrom}: ${m['valid_from'] ?? '—'} → ${t.distributionAssignmentTo}: ${m['valid_to'] ?? '∞'}',
-                        ),
-                        trailing: IconButton(
-                          tooltip: t.distributionDeleteAssignment,
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: () async {
-                            final aid = int.tryParse('${m['id']}');
-                            if (aid == null) return;
-                            try {
-                              await _svc.deleteAssignment(
-                                businessId: widget.businessId,
-                                assignmentId: aid,
-                              );
-                              existing = await _svc.listAssignments(
-                                businessId: widget.businessId,
-                                routeId: routeId,
-                              );
-                              setD(() {});
-                            } catch (e) {
-                              if (mounted) {
-                                SnackBarHelper.showError(
-                                  context,
-                                  message: ErrorExtractor.forContext(e, context),
-                                );
-                              }
-                            }
-                          },
-                        ),
-                      );
-                    }),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.cancel)),
-            FilledButton(
-              onPressed: selectedUserId == null
-                  ? null
-                  : () async {
-                      try {
-                        await _svc.createAssignment(
-                          businessId: widget.businessId,
-                          payload: <String, dynamic>{
-                            'route_id': routeId,
-                            'user_id': selectedUserId,
-                            'valid_from': _iso(from),
-                            if (to != null) 'valid_to': _iso(to!),
-                          },
-                        );
-                        if (ctx.mounted) Navigator.pop(ctx);
-                        if (mounted) {
-                          SnackBarHelper.showSuccess(context, message: t.distributionSettingsSaved);
-                        }
-                      } catch (e) {
-                        if (mounted) {
-                          SnackBarHelper.showError(
-                            context,
-                            message: ErrorExtractor.forContext(e, context),
-                          );
-                        }
-                      }
-                    },
-              child: Text(t.save),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  DateTime? _parseDt(dynamic s) {
-    if (s == null) return null;
-    try {
-      return DateTime.parse(s.toString());
-    } catch (_) {
-      return null;
-    }
-  }
 }

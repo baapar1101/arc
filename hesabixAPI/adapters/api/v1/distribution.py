@@ -40,6 +40,8 @@ from adapters.api.v1.schema_models.distribution import (
 	AssortmentPayload,
 	SetupWizardPayload,
 	NewOutletPayload,
+	UserPreferencePayload,
+	DailyPlanPublishPayload,
 )
 from app.core.business_calendar import business_today
 from app.services import distribution_service as dist_svc
@@ -160,7 +162,7 @@ def update_territory(
 	___: None = Depends(require_business_permission_dep("distribution", "manage")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
-	data = dist_svc.update_territory(db, business_id, territory_id, body.model_dump(exclude_none=True))
+	data = dist_svc.update_territory(db, business_id, territory_id, body.model_dump(exclude_unset=True))
 	return success_response(data, request)
 
 
@@ -357,15 +359,14 @@ def daily_plan(
 	uid = ctx.get_user_id()
 	if uid is None:
 		raise ApiError("UNAUTHORIZED", "No user id", http_status=401)
-	can_team = ctx.has_business_permission("distribution", "manage") or ctx.has_business_permission(
-		"distribution", "reports_team"
-	)
+	can_team = dist_svc._can_see_team_distribution(ctx, business_id)
 	can_field = ctx.has_business_permission("distribution", "operate") or ctx.has_business_permission(
 		"distribution", "manage"
 	)
 	if target_user_id is not None:
 		if not can_team:
 			raise ApiError("FORBIDDEN", "Only managers can load another user's plan", http_status=403)
+		dist_svc.assert_user_visible_for_ctx(db, business_id, ctx, int(target_user_id))
 		uid = int(target_user_id)
 	elif not can_field and not ctx.has_business_permission("distribution", "reports_team"):
 		raise ApiError(
@@ -376,6 +377,109 @@ def daily_plan(
 	d = _parse_iso_date(plan_date, "plan_date") if plan_date else business_today(business_id)
 	data = dist_svc.get_daily_plan(db, business_id, uid, d)
 	return success_response(data, request)
+
+
+@router.get("/business/{business_id}/team-members")
+def list_team_members(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("distribution", "view")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	return success_response({"items": dist_svc.list_team_members(db, business_id, ctx)}, request)
+
+
+@router.get("/business/{business_id}/me/preferences")
+def get_my_preferences(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("distribution", "view")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	uid = ctx.get_user_id()
+	if uid is None:
+		raise ApiError("UNAUTHORIZED", "No user id", http_status=401)
+	row = dist_svc.get_user_preference(db, business_id, int(uid))
+	if not row:
+		return success_response({"user_id": int(uid), "location_consent": False, "location_consent_at": None}, request)
+	return success_response(dist_svc.preference_to_dict(row), request)
+
+
+@router.put("/business/{business_id}/me/preferences")
+def update_my_preferences(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	body: UserPreferencePayload = Body(...),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("distribution", "view")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	uid = ctx.get_user_id()
+	if uid is None:
+		raise ApiError("UNAUTHORIZED", "No user id", http_status=401)
+	data = dist_svc.upsert_user_preference(db, business_id, int(uid), body.model_dump(exclude_none=True))
+	return success_response(data, request)
+
+
+@router.post("/business/{business_id}/daily-plan/publish")
+def publish_daily_plan(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	body: DailyPlanPublishPayload = Body(...),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("distribution", "manage")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	actor = ctx.get_user_id()
+	if actor is None:
+		raise ApiError("UNAUTHORIZED", "No user id", http_status=401)
+	d = _parse_iso_date(body.plan_date, "plan_date") if body.plan_date else business_today(business_id)
+	if body.all_assigned:
+		data = dist_svc.publish_daily_plans_for_date(
+			db, business_id, int(actor), d, locked=body.locked, notes=body.notes, ctx=ctx,
+		)
+		return success_response(data, request)
+	target = int(body.target_user_id) if body.target_user_id else int(actor)
+	data = dist_svc.publish_daily_plan(
+		db, business_id, int(actor), target, d, locked=body.locked, notes=body.notes, ctx=ctx,
+	)
+	return success_response(data, request)
+
+
+@router.delete("/business/{business_id}/daily-plan/publish")
+def unpublish_daily_plan(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	plan_date: Optional[str] = Query(None),
+	target_user_id: Optional[int] = Query(None),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("distribution", "manage")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	actor = ctx.get_user_id()
+	if actor is None:
+		raise ApiError("UNAUTHORIZED", "No user id", http_status=401)
+	target = int(target_user_id) if target_user_id else int(actor)
+	d = _parse_iso_date(plan_date, "plan_date") if plan_date else business_today(business_id)
+	dist_svc.unpublish_daily_plan(db, business_id, target, d, ctx=ctx)
+	return success_response({"ok": True}, request)
 
 
 @router.post("/business/{business_id}/visits/start")
@@ -529,7 +633,7 @@ def create_return(
 		raise ApiError("UNAUTHORIZED", "", http_status=401)
 	payload = body.model_dump()
 	payload["lines"] = [ln.model_dump(exclude_none=True) for ln in body.lines]
-	data = dist_svc.create_return_request(db, business_id, uid, payload)
+	data = dist_svc.create_return_request(db, business_id, uid, payload, ctx=ctx)
 	return success_response(data, request)
 
 
@@ -574,13 +678,13 @@ def get_distribution_settings(
 	request: Request,
 	business_id: int = Path(..., gt=0),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
-	data = dist_svc.settings_to_dict(dist_svc.get_or_create_distribution_settings(db, business_id))
+	data = dist_svc.settings_for_client(db, business_id, ctx)
 	return success_response(data, request)
 
 
@@ -675,13 +779,13 @@ def van_stock(
 	business_id: int = Path(..., gt=0),
 	van_id: int = Path(..., gt=0),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
-	return success_response(dist_p3.get_van_stock(db, business_id, van_id), request)
+	return success_response(dist_p3.get_van_stock(db, business_id, van_id, ctx=ctx), request)
 
 
 @router.post("/business/{business_id}/vans/{van_id}/load")
@@ -701,7 +805,7 @@ def load_van(
 	if uid is None:
 		raise ApiError("UNAUTHORIZED", "", http_status=401)
 	lines = [ln.model_dump(exclude_none=True) for ln in body.lines]
-	data = dist_p3.load_van(db, business_id, uid, van_id, lines, body.source_warehouse_id)
+	data = dist_p3.load_van(db, business_id, uid, van_id, lines, body.source_warehouse_id, ctx=ctx)
 	return success_response(data, request)
 
 
@@ -722,7 +826,7 @@ def unload_van(
 	if uid is None:
 		raise ApiError("UNAUTHORIZED", "", http_status=401)
 	lines = [ln.model_dump(exclude_none=True) for ln in body.lines]
-	data = dist_p3.unload_van(db, business_id, uid, van_id, lines, body.dest_warehouse_id)
+	data = dist_p3.unload_van(db, business_id, uid, van_id, lines, body.dest_warehouse_id, ctx=ctx)
 	return success_response(data, request)
 
 
@@ -743,7 +847,7 @@ def my_van_stock(
 	van = dist_p3.get_van_for_user(db, business_id, uid)
 	if not van:
 		return success_response({"van_id": None, "items": []}, request)
-	return success_response(dist_p3.get_van_stock(db, business_id, van.id), request)
+	return success_response(dist_p3.get_van_stock(db, business_id, van.id, ctx=ctx), request)
 
 
 @router.put("/business/{business_id}/persons/{person_id}/location")
@@ -773,7 +877,7 @@ def optimize_route(
 	start_longitude: Optional[float] = Query(None),
 	persist: bool = Query(False),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
@@ -781,6 +885,8 @@ def optimize_route(
 	_ensure_plugin(db, business_id)
 	d = _parse_iso_date(plan_date, "plan_date") if plan_date else business_today(business_id)
 	if persist:
+		if not dist_svc._can_manage_distribution(ctx, business_id):
+			raise ApiError("FORBIDDEN", "ذخیرهٔ بهینه‌سازی مسیر نیاز به distribution.manage دارد.", http_status=403)
 		data = dist_p3.apply_route_optimize(db, business_id, route_id, d, start_latitude, start_longitude)
 	else:
 		data = dist_p3.optimize_route_plan(db, business_id, route_id, d, start_latitude, start_longitude)
@@ -973,12 +1079,13 @@ def list_person_distribution_invoices(
 	person_id: int = Path(..., gt=0),
 	limit: int = Query(20, ge=1, le=50),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
+	dist_svc.assert_person_visible_for_ctx(db, business_id, ctx, person_id)
 	from app.services.distribution_documents import list_person_open_invoices
 
 	items = list_person_open_invoices(db, business_id, person_id, limit=limit)
@@ -991,12 +1098,13 @@ def person_credit_summary(
 	business_id: int = Path(..., gt=0),
 	person_id: int = Path(..., gt=0),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
+	dist_svc.assert_person_visible_for_ctx(db, business_id, ctx, person_id)
 	data = dist_svc.get_person_credit_summary(db, business_id, person_id)
 	return success_response(data, request)
 
@@ -1017,9 +1125,7 @@ def daily_plan_pdf(
 	uid = target_user_id or ctx.get_user_id()
 	if uid is None:
 		raise ApiError("UNAUTHORIZED", "", http_status=401)
-	scope = dist_svc._scope_visit_user_id(ctx, business_id)
-	if scope is not None and int(uid) != int(scope):
-		raise ApiError("FORBIDDEN", "Cannot print another visitor plan", http_status=403)
+	dist_svc.assert_user_visible_for_ctx(db, business_id, ctx, int(uid))
 	d = _parse_iso_date(plan_date, "plan_date") if plan_date else business_today(business_id)
 	return dist_p4.export_daily_plan_pdf(db, request, business_id, int(uid), d)
 
@@ -1030,13 +1136,13 @@ def van_loading_list_pdf(
 	business_id: int = Path(..., gt=0),
 	van_id: int = Path(..., gt=0),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ):
 	_ensure_plugin(db, business_id)
-	return dist_p4.export_van_loading_list_pdf(db, request, business_id, van_id)
+	return dist_p4.export_van_loading_list_pdf(db, request, business_id, van_id, ctx=ctx)
 
 
 @router.get("/business/{business_id}/settlements/{settlement_id}/pdf")
@@ -1045,13 +1151,13 @@ def settlement_pdf(
 	business_id: int = Path(..., gt=0),
 	settlement_id: int = Path(..., gt=0),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ):
 	_ensure_plugin(db, business_id)
-	return dist_p4.export_settlement_pdf(db, request, business_id, settlement_id)
+	return dist_p4.export_settlement_pdf(db, request, business_id, settlement_id, ctx=ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -1110,7 +1216,7 @@ def create_order(
 	uid = ctx.get_user_id()
 	if uid is None:
 		raise ApiError("UNAUTHORIZED", "", http_status=401)
-	data = dist_c.create_visit_order(db, business_id, int(uid), body.model_dump(exclude_none=True))
+	data = dist_c.create_visit_order(db, business_id, int(uid), body.model_dump(exclude_none=True), ctx=ctx)
 	return success_response(data, request)
 
 
@@ -1129,7 +1235,7 @@ def confirm_order(
 	uid = ctx.get_user_id()
 	if uid is None:
 		raise ApiError("UNAUTHORIZED", "", http_status=401)
-	return success_response(dist_c.confirm_visit_order(db, business_id, int(uid), order_id), request)
+	return success_response(dist_c.confirm_visit_order(db, business_id, int(uid), order_id, ctx=ctx), request)
 
 
 @router.post("/business/{business_id}/orders/{order_id}/status")
@@ -1158,12 +1264,13 @@ def suggested_order(
 	business_id: int = Path(..., gt=0),
 	person_id: int = Path(..., gt=0),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
+	dist_svc.assert_person_visible_for_ctx(db, business_id, ctx, person_id)
 	return success_response(dist_c.suggested_order_for_person(db, business_id, person_id), request)
 
 
@@ -1264,7 +1371,7 @@ def create_trip(
 	if uid is None:
 		raise ApiError("UNAUTHORIZED", "", http_status=401)
 	return success_response(
-		dist_c.create_delivery_trip(db, business_id, int(uid), body.model_dump(exclude_none=True)),
+		dist_c.create_delivery_trip(db, business_id, int(uid), body.model_dump(exclude_none=True), ctx=ctx),
 		request,
 	)
 
@@ -1304,7 +1411,9 @@ def complete_stop(
 	_ensure_plugin(db, business_id)
 	uid = ctx.get_user_id() or 0
 	return success_response(
-		dist_c.complete_delivery_stop(db, business_id, stop_id, int(uid), body.model_dump(exclude_none=True)),
+		dist_c.complete_delivery_stop(
+			db, business_id, stop_id, int(uid), body.model_dump(exclude_none=True), ctx=ctx
+		),
 		request,
 	)
 
@@ -1368,13 +1477,13 @@ def visit_trail(
 	business_id: int = Path(..., gt=0),
 	visit_id: int = Path(..., gt=0),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
-	return success_response(dist_c.get_visit_trail(db, business_id, visit_id), request)
+	return success_response(dist_c.get_visit_trail(db, business_id, visit_id, ctx=ctx), request)
 
 
 @router.get("/business/{business_id}/users/{user_id}/day-trail")
@@ -1390,8 +1499,9 @@ def user_day_trail(
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
-	if not dist_svc._can_see_full_distribution_catalog(ctx, business_id):
+	if not dist_svc._can_see_team_distribution(ctx, business_id):
 		raise ApiError("FORBIDDEN", "Day trail requires manage or reports_team", http_status=403)
+	dist_svc.assert_user_visible_for_ctx(db, business_id, ctx, int(user_id))
 	d = _parse_iso_date(day, "day") if day else business_today(business_id)
 	return success_response(dist_c.get_user_day_trail(db, business_id, user_id, d), request)
 
@@ -1472,7 +1582,7 @@ def create_shelf_audit(
 	_ensure_plugin(db, business_id)
 	uid = ctx.get_user_id() or 0
 	return success_response(
-		dist_c.create_shelf_audit(db, business_id, int(uid), body.model_dump(exclude_none=True)),
+		dist_c.create_shelf_audit(db, business_id, int(uid), body.model_dump(exclude_none=True), ctx=ctx),
 		request,
 	)
 
@@ -1484,14 +1594,14 @@ def list_shelf_audits(
 	person_id: Optional[int] = Query(None, gt=0),
 	visit_id: Optional[int] = Query(None, gt=0),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
 	return success_response(
-		dist_c.list_shelf_audits(db, business_id, person_id=person_id, visit_id=visit_id),
+		dist_c.list_shelf_audits(db, business_id, person_id=person_id, visit_id=visit_id, ctx=ctx),
 		request,
 	)
 
@@ -1502,13 +1612,13 @@ def list_assets(
 	business_id: int = Path(..., gt=0),
 	person_id: Optional[int] = Query(None, gt=0),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
-	return success_response(dist_c.list_customer_assets(db, business_id, person_id), request)
+	return success_response(dist_c.list_customer_assets(db, business_id, person_id, ctx=ctx), request)
 
 
 @router.post("/business/{business_id}/customer-assets")
@@ -1536,7 +1646,7 @@ def update_asset(
 	_ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
-	___: None = Depends(require_distribution_operate_dep),
+	___: None = Depends(require_business_permission_dep("distribution", "manage")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
 	return success_response(
@@ -1597,7 +1707,7 @@ def get_customer_360(
 	_ensure_plugin(db, business_id)
 	from app.services.distribution_field_ops_service import customer_360
 
-	return success_response(customer_360(db, business_id, person_id, user_id=ctx.get_user_id()), request)
+	return success_response(customer_360(db, business_id, person_id, user_id=ctx.get_user_id(), ctx=ctx), request)
 
 
 @router.get("/business/{business_id}/products/by-barcode")
@@ -1676,7 +1786,7 @@ def list_profiles_api(
 	business_id: int = Path(..., gt=0),
 	person_id: Optional[int] = Query(None, gt=0),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("distribution", "view")),
@@ -1684,7 +1794,7 @@ def list_profiles_api(
 	_ensure_plugin(db, business_id)
 	from app.services.distribution_field_ops_service import list_customer_profiles
 
-	return success_response({"items": list_customer_profiles(db, business_id, person_id=person_id)}, request)
+	return success_response({"items": list_customer_profiles(db, business_id, person_id=person_id, ctx=ctx)}, request)
 
 
 @router.put("/business/{business_id}/persons/{person_id}/profile")

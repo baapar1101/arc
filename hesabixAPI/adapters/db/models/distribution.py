@@ -63,7 +63,7 @@ class DistributionBusinessSettings(Base):
 	share_live_location: Mapped[bool] = mapped_column(
 		Boolean,
 		nullable=False,
-		default=True,
+		default=False,
 		comment="اگر True باشد موقعیت ویزیتور برای مدیر روی نقشه تیم دیده می‌شود.",
 	)
 	carry_over_missed_visits: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
@@ -75,6 +75,42 @@ class DistributionBusinessSettings(Base):
 	auto_apply_promotions: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 	enable_perfect_store: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 	near_expiry_days: Mapped[int] = mapped_column(Integer, nullable=False, default=14)
+	exclusive_assignments: Mapped[bool] = mapped_column(
+		Boolean,
+		nullable=False,
+		default=True,
+		comment="یک مسیر در یک بازه فقط به یک ویزیتور تخصیص داده می‌شود.",
+	)
+	exclusive_territories: Mapped[bool] = mapped_column(
+		Boolean,
+		nullable=False,
+		default=False,
+		comment="یک قلمرو در یک بازه فقط یک ویزیتور فعال دارد.",
+	)
+	exclusive_customer_ownership: Mapped[bool] = mapped_column(
+		Boolean,
+		nullable=False,
+		default=True,
+		comment="مشتری دارای مالک ویزیتور است؛ ویزیتور دیگر نمی‌تواند ویزیت کند.",
+	)
+	require_location_consent: Mapped[bool] = mapped_column(
+		Boolean,
+		nullable=False,
+		default=True,
+		comment="موقعیت زنده فقط پس از رضایت فردی ویزیتور ذخیره می‌شود.",
+	)
+	lock_published_plans: Mapped[bool] = mapped_column(
+		Boolean,
+		nullable=False,
+		default=False,
+		comment="پس از نشر برنامهٔ روز، بهینه‌سازی و تغییر ترتیب قفل می‌شود.",
+	)
+	require_published_plan: Mapped[bool] = mapped_column(
+		Boolean,
+		nullable=False,
+		default=False,
+		comment="شروع ویزیت فقط پس از نشر رسمی برنامهٔ همان روز.",
+	)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
@@ -89,6 +125,20 @@ class DistributionTerritory(Base):
 	name: Mapped[str] = mapped_column(String(255), nullable=False)
 	description: Mapped[str | None] = mapped_column(Text, nullable=True)
 	is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+	parent_id: Mapped[int | None] = mapped_column(
+		Integer,
+		ForeignKey("distribution_territories.id", ondelete="SET NULL"),
+		index=True,
+		nullable=True,
+		comment="قلمرو والد برای سلسله‌مراتب نظارتی.",
+	)
+	supervisor_user_id: Mapped[int | None] = mapped_column(
+		Integer,
+		ForeignKey("users.id", ondelete="SET NULL"),
+		index=True,
+		nullable=True,
+		comment="ناظر منطقه‌ای این قلمرو و فرزندانش.",
+	)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
@@ -247,7 +297,9 @@ class DistributionVan(Base):
 
 class DistributionOfflineSyncBatch(Base):
 	__tablename__ = "distribution_offline_sync_batches"
-	__table_args__ = (UniqueConstraint("business_id", "client_batch_id", name="uq_distribution_offline_batch"),)
+	__table_args__ = (
+		UniqueConstraint("business_id", "user_id", "client_batch_id", name="uq_distribution_offline_batch_user"),
+	)
 
 	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 	business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), index=True)
@@ -580,6 +632,13 @@ class DistributionCustomerProfile(Base):
 		Integer, ForeignKey("distribution_assortments.id", ondelete="SET NULL"), nullable=True,
 	)
 	storefront_photo_file_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+	owner_user_id: Mapped[int | None] = mapped_column(
+		Integer,
+		ForeignKey("users.id", ondelete="SET NULL"),
+		index=True,
+		nullable=True,
+		comment="ویزیتور مالک این مشتری در پخش مویرگی.",
+	)
 	onboarded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 	notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 	extra_info: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -604,5 +663,43 @@ class DistributionVanLot(Base):
 	quantity: Mapped[float] = mapped_column(Numeric(18, 3), nullable=False, default=0)
 	unit_weight_kg: Mapped[float | None] = mapped_column(Numeric(12, 3), nullable=True)
 	unit_volume_m3: Mapped[float | None] = mapped_column(Numeric(12, 4), nullable=True)
+	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class DistributionUserPreference(Base):
+	"""ترجیح و رضایت فردی ویزیتور در سطح کسب‌وکار."""
+
+	__tablename__ = "distribution_user_preferences"
+	__table_args__ = (UniqueConstraint("business_id", "user_id", name="uq_dist_user_pref_business_user"),)
+
+	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+	business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), index=True)
+	user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+	location_consent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+	location_consent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+	extra_info: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class DistributionDailyPlanLock(Base):
+	"""نشر و قفل برنامهٔ روز برای یک ویزیتور."""
+
+	__tablename__ = "distribution_daily_plan_locks"
+	__table_args__ = (
+		UniqueConstraint("business_id", "user_id", "plan_date", name="uq_dist_daily_plan_lock"),
+	)
+
+	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+	business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), index=True)
+	user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+	plan_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+	is_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+	published_by_user_id: Mapped[int | None] = mapped_column(
+		Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
+	)
+	published_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+	notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

@@ -259,6 +259,7 @@ class AuthStore with ChangeNotifier {
       await MobileLauncherPrefs.clearSession(userId: uid);
       await BusinessSwitcherPrefs.clearSession(userId: uid);
       await BiometricLockPrefs.clearForUser(uid);
+      await _clearDistributionOfflinePrefs(uid);
       // پاک کردن دسترسی‌ها و آخرین URL هنگام خروج
       await _clearAppPermissions();
       await clearCurrentBusiness();
@@ -334,6 +335,19 @@ class AuthStore with ChangeNotifier {
       }
     }
     notifyListeners();
+  }
+
+  Future<void> _clearDistributionOfflinePrefs(int? userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final keys = prefs.getKeys().toList();
+    for (final k in keys) {
+      if (!k.startsWith('distribution_offline_')) continue;
+      final legacyUnscoped = !k.contains('_u');
+      final thisUser = userId != null && k.contains('_u$userId');
+      if (legacyUnscoped || thisUser) {
+        await prefs.remove(k);
+      }
+    }
   }
 
   Future<void> _clearAppPermissions() async {

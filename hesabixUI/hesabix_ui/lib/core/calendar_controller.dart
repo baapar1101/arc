@@ -58,6 +58,10 @@ class CalendarController extends ChangeNotifier {
 
   CalendarController._(this._calendarType);
 
+  @visibleForTesting
+  factory CalendarController.forTest([CalendarType type = CalendarType.gregorian]) =>
+      CalendarController._(type);
+
   static const List<CalendarType> supportedCalendars = <CalendarType>[
     CalendarType.jalali,
     CalendarType.gregorian,

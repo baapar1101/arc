@@ -12864,6 +12864,263 @@ class AppLocalizationsFa extends AppLocalizations {
       'افزونه حقوق و دستمزد برای این کسب‌وکار فعال نیست. از بازار افزونه‌ها آن را فعال کنید.';
 
   @override
+  String get fixedAssetsTitle => 'کنترل اموال و دارایی ثابت';
+
+  @override
+  String get fixedAssetsMenu => 'اموال و دارایی ثابت';
+
+  @override
+  String get fixedAssetsPluginNotActive =>
+      'افزونه کنترل اموال و دارایی ثابت برای این کسب‌وکار فعال نیست. از بازار افزونه‌ها آن را فعال کنید.';
+
+  @override
+  String get fixedAssetsPermissionManage =>
+      'مدیریت طبقات، محل استقرار و تنظیمات اموال';
+
+  @override
+  String get fixedAssetsPermissionOperate =>
+      'ثبت کارت دارایی و تهیه پیش‌نویس استهلاک';
+
+  @override
+  String get fixedAssetsPermissionPost => 'صدور سند تحصیل و استهلاک در دفتر کل';
+
+  @override
+  String get fixedAssetsAssetsTab => 'دارایی‌ها';
+
+  @override
+  String get fixedAssetsDepreciationTab => 'استهلاک';
+
+  @override
+  String get fixedAssetsSettingsTab => 'تنظیمات';
+
+  @override
+  String get fixedAssetsNewAsset => 'دارایی جدید';
+
+  @override
+  String get fixedAssetsAssetName => 'نام دارایی';
+
+  @override
+  String get fixedAssetsClass => 'طبقه';
+
+  @override
+  String get fixedAssetsCost => 'بهای تمام‌شده';
+
+  @override
+  String get fixedAssetsSalvage => 'ارزش اسقاط';
+
+  @override
+  String get fixedAssetsVat => 'مالیات ورودی';
+
+  @override
+  String get fixedAssetsUsefulLifeMonths => 'عمر مفید (ماه)';
+
+  @override
+  String get fixedAssetsAcquisitionKind => 'نوع تحصیل';
+
+  @override
+  String get fixedAssetsKindPurchase => 'خرید (نه فاکتور کالا)';
+
+  @override
+  String get fixedAssetsKindOpening => 'افتتاحیه';
+
+  @override
+  String get fixedAssetsAcquisitionDate => 'تاریخ تحصیل / بهره‌برداری';
+
+  @override
+  String get fixedAssetsCapitalize => 'سرمایه‌گذاری و صدور سند';
+
+  @override
+  String get fixedAssetsCapitalizeHint =>
+      'این ثبت فاکتور خرید کالا نیست. طرف حساب نقد، بانک، شخص، افتتاحیه یا حساب برگ است.';
+
+  @override
+  String get fixedAssetsCounterparty => 'طرف حساب';
+
+  @override
+  String get fixedAssetsCounterpartyPerson => 'شخص (حساب‌های پرداختنی)';
+
+  @override
+  String get fixedAssetsCounterpartyBank => 'بانک';
+
+  @override
+  String get fixedAssetsCounterpartyCash => 'صندوق';
+
+  @override
+  String get fixedAssetsCounterpartyPetty => 'تنخواه';
+
+  @override
+  String get fixedAssetsCounterpartyAccount => 'حساب برگ';
+
+  @override
+  String get fixedAssetsCounterpartyId => 'شناسه طرف حساب';
+
+  @override
+  String get fixedAssetsSaved => 'ذخیره شد.';
+
+  @override
+  String get fixedAssetsCapitalized => 'سند تحصیل در دفتر کل ثبت شد.';
+
+  @override
+  String get fixedAssetsNoAssets => 'هنوز دارایی ثبت نشده است.';
+
+  @override
+  String get fixedAssetsNoClasses => 'طبقه دارایی آماده نیست.';
+
+  @override
+  String get fixedAssetsNoRuns => 'هنوز اجرای استهلاکی ثبت نشده است.';
+
+  @override
+  String get fixedAssetsNewDepreciationRun => 'محاسبه استهلاک ماه';
+
+  @override
+  String get fixedAssetsDepreciationGregorianHint =>
+      'سال و ماه دوره را میلادی وارد کنید؛ موتور استهلاک روی تاریخ میلادی کار می‌کند.';
+
+  @override
+  String get fixedAssetsPeriodYear => 'سال میلادی';
+
+  @override
+  String get fixedAssetsPeriodMonth => 'ماه';
+
+  @override
+  String get fixedAssetsRunCreated => 'پیش‌نویس استهلاک ساخته شد.';
+
+  @override
+  String get fixedAssetsPostRun => 'ثبت سند استهلاک';
+
+  @override
+  String get fixedAssetsRunPosted => 'سند استهلاک در دفتر کل ثبت شد.';
+
+  @override
+  String get fixedAssetsNetBookValue => 'ارزش دفتری';
+
+  @override
+  String get fixedAssetsStatusDraft => 'پیش‌نویس';
+
+  @override
+  String get fixedAssetsStatusCapitalized => 'سرمایه‌شده';
+
+  @override
+  String get fixedAssetsConventionHint =>
+      'شروع استهلاک: استاندارد ۱۱ از تاریخ بهره‌برداری (نسبت روز در ماه اول) یا ماده ۱۴۹ از اول ماه بعد.';
+
+  @override
+  String get fixedAssetsConventionFromReady =>
+      'از تاریخ بهره‌برداری (استاندارد ۱۱)';
+
+  @override
+  String get fixedAssetsConventionNextMonth => 'از اول ماه بعد (ماده ۱۴۹)';
+
+  @override
+  String get fixedAssetsClassesHint => 'نگاشت پیش‌فرض طبقات به دفتر کل';
+
+  @override
+  String get fixedAssetsNotDepreciable => 'غیراستهلاک‌پذیر';
+
+  @override
+  String get fixedAssetsDispose => 'فروش / اسقاط';
+
+  @override
+  String get fixedAssetsSale => 'فروش';
+
+  @override
+  String get fixedAssetsScrap => 'اسقاط (بدون عواید)';
+
+  @override
+  String get fixedAssetsProceeds => 'عواید (بدون مالیات)';
+
+  @override
+  String get fixedAssetsVatOutput => 'مالیات خروجی';
+
+  @override
+  String get fixedAssetsDisposalDate => 'تاریخ خروج';
+
+  @override
+  String get fixedAssetsDisposed => 'سند خروج در دفتر کل ثبت شد.';
+
+  @override
+  String get fixedAssetsMarkIdle => 'ثبت راکد';
+
+  @override
+  String get fixedAssetsIdleFrom => 'از تاریخ رکود';
+
+  @override
+  String get fixedAssetsIdleHint =>
+      'استهلاک حسابداری کامل ادامه می‌یابد. پیش‌نمایش مالیاتی فقط پس از بیش از شش ماه رکود ۳۰٪ کاهش می‌دهد. دفتر مالیاتی موازی در این فاز ثبت نمی‌شود.';
+
+  @override
+  String get fixedAssetsResume => 'بازگشت به بهره‌برداری';
+
+  @override
+  String get fixedAssetsIdleSaved => 'دارایی راکد شد.';
+
+  @override
+  String get fixedAssetsResumed => 'دارایی به بهره‌برداری برگشت.';
+
+  @override
+  String get fixedAssetsSubsequent => 'تعمیر / مخارج بعدی';
+
+  @override
+  String get fixedAssetsRoutineRepair => 'تعمیر جاری (هزینه دوره)';
+
+  @override
+  String get fixedAssetsMajorRepair => 'تعمیر اساسی (افزایش بها)';
+
+  @override
+  String get fixedAssetsExpenditureAmount => 'مبلغ (بدون مالیات)';
+
+  @override
+  String get fixedAssetsRemainingLife => 'عمر باقیمانده (ماه) از تاریخ مؤثر';
+
+  @override
+  String get fixedAssetsExpenditurePosted => 'سند مخارج بعدی ثبت شد.';
+
+  @override
+  String get fixedAssetsEstimateChange => 'تغییر روش / عمر باقیمانده';
+
+  @override
+  String get fixedAssetsEstimateHint =>
+      'فقط از تاریخ مؤثر: استهلاک انباشته ثبت‌شده بازنویسی نمی‌شود. ماهانه خط مستقیم برابر باقیمانده استهلاک‌پذیر تقسیم بر ماه‌های باقیمانده است.';
+
+  @override
+  String get fixedAssetsEstimateSaved => 'تغییر برآورد ذخیره شد.';
+
+  @override
+  String get fixedAssetsStatusIdle => 'راکد';
+
+  @override
+  String get fixedAssetsStatusDisposed => 'خارج‌شده';
+
+  @override
+  String get fixedAssetsOpeningEquityAccount =>
+      'شناسه حساب افتتاحیه / حقوق صاحبان سهام';
+
+  @override
+  String get fixedAssetsGainAccount => 'شناسه حساب سود واگذاری (پیش‌فرض ۶۰۲۰۶)';
+
+  @override
+  String get fixedAssetsLossAccount =>
+      'شناسه حساب زیان واگذاری (پیش‌فرض ۷۰۸۰۴)';
+
+  @override
+  String get fixedAssetsRepairAccount =>
+      'شناسه حساب هزینه تعمیر (پیش‌فرض ۷۰۴۰۴)';
+
+  @override
+  String get fixedAssetsVatOutputAccount =>
+      'شناسه حساب مالیات خروجی (پیش‌فرض ۲۰۱۰۱)';
+
+  @override
+  String get fixedAssetsSaveAccounts => 'ذخیره نگاشت حساب';
+
+  @override
+  String get businessSettingsFixedAssets => 'اموال و دارایی ثابت';
+
+  @override
+  String get businessSettingsFixedAssetsDescription =>
+      'طبقات دارایی، قرارداد استهلاک و حساب افتتاحیه';
+
+  @override
   String get businessSettingsPayroll => 'حقوق و دستمزد';
 
   @override
@@ -20690,4 +20947,110 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get motamedAsaPaymentStatusNotApplicable => 'ارسال نمی‌شود';
+
+  @override
+  String get distributionLocationConsentTitle => 'رضایت اشتراک موقعیت';
+
+  @override
+  String get distributionLocationConsentHint =>
+      'برای نمایش روی نقشه تیم، باید اشتراک موقعیت زنده را تأیید کنید. فقط در زمان ویزیت باز ارسال می‌شود.';
+
+  @override
+  String get distributionLocationConsentAllow => 'اجازه می‌دهم';
+
+  @override
+  String get distributionLocationConsentActive =>
+      'موقعیت زنده برای نقشه تیم فعال است.';
+
+  @override
+  String get distributionLocationConsentRevoke => 'لغو رضایت';
+
+  @override
+  String get distributionPlanPublished => 'برنامه امروز منتشر شده است';
+
+  @override
+  String get distributionPlanUnpublished => 'برنامه امروز هنوز منتشر نشده';
+
+  @override
+  String get distributionPlanLockedHint =>
+      'ترتیب توقف‌ها قفل است تا وقتی مدیر قفل را بردارد.';
+
+  @override
+  String get distributionPlanPublishHint =>
+      'پس از نشر، برنامه برای ویزیتور رسمی و در صورت تنظیم قفل می‌شود.';
+
+  @override
+  String get distributionPlanPublish => 'نشر برنامه';
+
+  @override
+  String get distributionPlanPublishAll => 'نشر برای همه تخصیص‌ها';
+
+  @override
+  String get distributionPlanPublishAllHint =>
+      'برنامه همین روز برای همه ویزیتورهای تخصیص‌یافته منتشر می‌شود.';
+
+  @override
+  String get distributionPlanPublishAllDone =>
+      'برنامه ویزیتورهای تخصیص‌یافته منتشر شد.';
+
+  @override
+  String get distributionPlanPublishAllEmpty =>
+      'برای این روز ویزیتور تخصیص‌یافته‌ای نیست.';
+
+  @override
+  String get distributionPlanUnlock => 'برداشتن قفل';
+
+  @override
+  String get distributionRequireLocationConsent => 'رضایت فردی برای GPS';
+
+  @override
+  String get distributionRequireLocationConsentHint =>
+      'موقعیت زنده فقط پس از تأیید خود ویزیتور ذخیره می‌شود.';
+
+  @override
+  String get distributionExclusiveAssignments => 'انحصار تخصیص مسیر';
+
+  @override
+  String get distributionExclusiveAssignmentsHint =>
+      'یک مسیر در یک بازه فقط به یک ویزیتور داده می‌شود.';
+
+  @override
+  String get distributionExclusiveTerritories => 'انحصار قلمرو';
+
+  @override
+  String get distributionExclusiveTerritoriesHint =>
+      'در یک بازه فقط یک ویزیتور در هر قلمرو فعال است.';
+
+  @override
+  String get distributionExclusiveCustomerOwnership => 'مالکیت مشتری';
+
+  @override
+  String get distributionExclusiveCustomerOwnershipHint =>
+      'ویزیتور دیگر نمی‌تواند مشتری متعلق به همکار را ویزیت کند.';
+
+  @override
+  String get distributionLockPublishedPlans => 'قفل برنامه پس از نشر';
+
+  @override
+  String get distributionLockPublishedPlansHint =>
+      'بعد از نشر رسمی، بهینه‌سازی ترتیب روز قفل می‌شود.';
+
+  @override
+  String get distributionRequirePublishedPlan => 'الزام نشر برنامه روز';
+
+  @override
+  String get distributionRequirePublishedPlanHint =>
+      'شروع ویزیت فقط پس از نشر رسمی برنامه همان روز.';
+
+  @override
+  String get distributionTerritoryParent => 'قلمرو والد';
+
+  @override
+  String get distributionTerritorySupervisor => 'ناظر منطقه';
+
+  @override
+  String get distributionWorkspaceSupervisor => 'پخش — نظارت منطقه';
+
+  @override
+  String get distributionWorkspaceOffice => 'پخش — دفتر';
 }
