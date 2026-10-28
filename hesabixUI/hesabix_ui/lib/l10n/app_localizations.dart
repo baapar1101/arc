@@ -35539,7 +35539,7 @@ abstract class AppLocalizations {
   /// No description provided for @barcodeLabelRollModeHint.
   ///
   /// In en, this message translates to:
-  /// **'Set roll width, columns, label spacing and edge margins. Paper height follows the label count.'**
+  /// **'Set roll width, columns and margins. Each label row prints on its own page; page height is top margin + label height + bottom margin. If top and bottom are zero, the vertical gap is split equally above and below the label.'**
   String get barcodeLabelRollModeHint;
 
   /// No description provided for @barcodeLabelRollWidth.

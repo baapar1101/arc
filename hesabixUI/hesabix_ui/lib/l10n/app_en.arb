@@ -7428,7 +7428,7 @@
   "barcodeLabelLandscape": "Landscape",
   "barcodeLabelSheetColumns": "Columns",
   "barcodeLabelSheetRows": "Rows",
-  "barcodeLabelRollModeHint": "Set roll width, columns, label spacing and edge margins. Paper height follows the label count.",
+  "barcodeLabelRollModeHint": "Set roll width, columns and margins. Each label row prints on its own page; page height is top margin + label height + bottom margin. If top and bottom are zero, the vertical gap is split equally above and below the label.",
   "barcodeLabelRollWidth": "Total roll width (mm)",
   "barcodeLabelRollColumns": "Roll columns",
   "barcodeLabelRollGapX": "Horizontal label gap (mm)",

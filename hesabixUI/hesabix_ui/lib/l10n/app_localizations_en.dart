@@ -19451,7 +19451,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get barcodeLabelRollModeHint =>
-      'Set roll width, columns, label spacing and edge margins. Paper height follows the label count.';
+      'Set roll width, columns and margins. Each label row prints on its own page; page height is top margin + label height + bottom margin. If top and bottom are zero, the vertical gap is split equally above and below the label.';
 
   @override
   String get barcodeLabelRollWidth => 'Total roll width (mm)';

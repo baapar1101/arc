@@ -7470,7 +7470,7 @@
   "barcodeLabelLandscape": "افقی",
   "barcodeLabelSheetColumns": "ستون‌ها",
   "barcodeLabelSheetRows": "ردیف‌ها",
-  "barcodeLabelRollModeHint": "عرض رول، تعداد ستون، فاصله‌ها و حاشیه‌ها را تنظیم کنید. ارتفاع به تعداد برچسب‌ها بستگی دارد.",
+  "barcodeLabelRollModeHint": "عرض رول، تعداد ستون و حاشیه‌ها را تنظیم کنید. هر ردیف لیبل در یک صفحه چاپ می‌شود؛ ارتفاع صفحه برابر حاشیه بالا + ارتفاع لیبل + حاشیه پایین است. اگر حاشیه بالا و پایین صفر باشد، فاصله عمودی نصف‌نصف بالا و پایین اعمال می‌شود.",
   "barcodeLabelRollWidth": "عرض کل رول (mm)",
   "barcodeLabelRollColumns": "ستون روی رول",
   "barcodeLabelRollGapX": "فاصله افقی لیبل‌ها (mm)",

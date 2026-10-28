@@ -14,6 +14,7 @@ import '../../../services/barcode_label_service.dart';
 import '../../../services/bytes_export/bytes_export_service.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
+import '../../../widgets/barcode_label/label_commit_number_field.dart';
 import '../../../widgets/barcode_label/render/label_image_resolver.dart';
 import '../../../widgets/barcode_label/render/label_pdf_renderer.dart';
 import '../../../widgets/barcode_label/studio/label_studio_barcode_painter.dart';
@@ -281,6 +282,9 @@ class _LabelStudioPageState extends State<LabelStudioPage> {
 
   Future<void> _save({bool publish = false}) async {
     if (!_canDesign) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    await Future<void>.delayed(Duration.zero);
+    if (!mounted) return;
     setState(() => _saving = true);
     try {
       LabelTemplateDetail detail;
@@ -328,12 +332,16 @@ class _LabelStudioPageState extends State<LabelStudioPage> {
   }
 
   Future<void> _previewPdf() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    await Future<void>.delayed(Duration.zero);
+    if (!mounted) return;
     final t = AppLocalizations.of(context);
     try {
+      final previewCount = _sheet.isRollMode ? math.max(2, _sheet.rollColumns) : 2;
       final bytes = await LabelPdfRenderer.render(
         design: _design,
         sheet: _sheet,
-        contexts: [_effectiveSample, _effectiveSample],
+        contexts: List<Map<String, dynamic>>.filled(previewCount, _effectiveSample),
         rollMode: _sheet.isRollMode,
         businessId: widget.businessId,
       );
@@ -1629,29 +1637,19 @@ class _Inspector extends StatelessWidget {
   };
 
   Widget _numField(
-    BuildContext context,
+    BuildContext _,
     String label,
     double value,
     bool enabled,
     ValueChanged<double> onChanged, {
     int decimals = 1,
   }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: TextFormField(
-        key: ValueKey('$label-$value'),
-        initialValue: decimals == 0 ? value.round().toString() : value.toStringAsFixed(decimals),
-        enabled: enabled,
-        decoration: InputDecoration(labelText: label, isDense: true),
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        onFieldSubmitted: (s) {
-          final v = double.tryParse(s.replaceAll(',', '.'));
-          if (v != null && v.isFinite) onChanged(v);
-        },
-        onEditingComplete: () {
-          FocusScope.of(context).unfocus();
-        },
-      ),
+    return LabelCommitNumberField(
+      label: label,
+      value: value,
+      enabled: enabled,
+      onChanged: onChanged,
+      decimals: decimals,
     );
   }
 }

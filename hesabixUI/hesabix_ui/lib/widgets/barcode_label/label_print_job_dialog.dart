@@ -13,6 +13,7 @@ import '../../services/bytes_export/bytes_export_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../product/label_pdf_preview_embed.dart';
+import 'label_commit_number_field.dart';
 import 'render/label_escpos_generator.dart';
 import 'render/label_escpos_tcp.dart';
 import 'render/label_pdf_renderer.dart';
@@ -254,6 +255,11 @@ class _LabelPrintJobDialogState extends State<LabelPrintJobDialog> {
   }
 
   Future<Uint8List> _buildPdf({bool rollMode = false}) async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    await Future<void>.delayed(Duration.zero);
+    if (!mounted) {
+      throw StateError('No template');
+    }
     final detail = _detail;
     final design = _designForPrint;
     final sheet = _printSheet ?? detail?.sheet;
@@ -653,14 +659,13 @@ class _LabelPrintJobDialogState extends State<LabelPrintJobDialog> {
               subtitle: Text(row.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
               trailing: SizedBox(
                 width: 88,
-                child: TextFormField(
-                  key: ValueKey('${row.key}-${row.qty}'),
-                  initialValue: '${row.qty}',
-                  decoration: const InputDecoration(isDense: true, labelText: 'Qty'),
-                  keyboardType: TextInputType.number,
-                  onFieldSubmitted: (s) {
-                    final q = int.tryParse(s) ?? 1;
-                    setState(() => _rows[i].qty = q.clamp(1, 9999));
+                child: LabelCommitNumberField(
+                  label: 'Qty',
+                  value: row.qty.toDouble(),
+                  decimals: 0,
+                  outlined: true,
+                  onChanged: (v) {
+                    setState(() => _rows[i].qty = v.round().clamp(1, 9999));
                     _refreshPreview();
                   },
                 ),
@@ -723,18 +728,11 @@ class _LabelPrintJobDialogState extends State<LabelPrintJobDialog> {
             Row(
               children: [
                 Expanded(
-                  child: TextFormField(
-                    key: ValueKey('pw-${sheet.customPaperMm?['width']}'),
-                    initialValue: '${sheet.customPaperMm?['width'] ?? 210}',
-                    decoration: InputDecoration(
-                      labelText: t.barcodeLabelPaperWidth,
-                      border: const OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    keyboardType: TextInputType.number,
-                    onFieldSubmitted: (s) {
-                      final v = double.tryParse(s.replaceAll(',', '.'));
-                      if (v == null) return;
+                  child: LabelCommitNumberField(
+                    label: t.barcodeLabelPaperWidth,
+                    value: (sheet.customPaperMm?['width'] ?? 210).toDouble(),
+                    outlined: true,
+                    onChanged: (v) {
                       setState(
                         () => _printSheet = sheet.copyWith(
                           customPaperMm: {'width': v, 'height': sheet.customPaperMm?['height'] ?? 297},
@@ -746,18 +744,11 @@ class _LabelPrintJobDialogState extends State<LabelPrintJobDialog> {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: TextFormField(
-                    key: ValueKey('ph-${sheet.customPaperMm?['height']}'),
-                    initialValue: '${sheet.customPaperMm?['height'] ?? 297}',
-                    decoration: InputDecoration(
-                      labelText: t.barcodeLabelPaperHeight,
-                      border: const OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    keyboardType: TextInputType.number,
-                    onFieldSubmitted: (s) {
-                      final v = double.tryParse(s.replaceAll(',', '.'));
-                      if (v == null) return;
+                  child: LabelCommitNumberField(
+                    label: t.barcodeLabelPaperHeight,
+                    value: (sheet.customPaperMm?['height'] ?? 297).toDouble(),
+                    outlined: true,
+                    onChanged: (v) {
                       setState(
                         () => _printSheet = sheet.copyWith(
                           customPaperMm: {'width': sheet.customPaperMm?['width'] ?? 210, 'height': v},
@@ -909,18 +900,12 @@ class _LabelPrintJobDialogState extends State<LabelPrintJobDialog> {
   }
 
   Widget _rollNumberField(String label, double value, ValueChanged<double> onSubmitted, {bool integer = false}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: TextFormField(
-        key: ValueKey('roll-$label-$value'),
-        initialValue: integer ? value.round().toString() : value.toStringAsFixed(1),
-        decoration: InputDecoration(labelText: label, border: const OutlineInputBorder(), isDense: true),
-        keyboardType: TextInputType.numberWithOptions(decimal: !integer),
-        onFieldSubmitted: (raw) {
-          final parsed = double.tryParse(raw.replaceAll(',', '.'));
-          if (parsed != null && parsed.isFinite) onSubmitted(parsed);
-        },
-      ),
+    return LabelCommitNumberField(
+      label: label,
+      value: value,
+      onChanged: onSubmitted,
+      decimals: integer ? 0 : 1,
+      outlined: true,
     );
   }
 

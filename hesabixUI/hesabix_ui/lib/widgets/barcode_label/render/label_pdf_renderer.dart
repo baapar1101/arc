@@ -7,6 +7,7 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../../../models/barcode_label/label_design_v1.dart';
 import 'label_image_resolver.dart';
+import 'roll_label_page_metrics.dart';
 import '../../product/product_label_pdf_text.dart';
 
 /// رزولور binding برای چاپ/پیش‌نمایش.
@@ -113,7 +114,7 @@ class LabelPdfRenderer {
     required LabelDesignDocument design,
     required LabelSheet sheet,
     required List<Map<String, dynamic>> contexts, // one per label
-    /// یک برچسب در هر صفحه با اندازه بوم — مناسب چاپگر رولی/pdf_spooler
+    /// رول: یک ردیف چندستونه در هر صفحه — مناسب چاپگر حرارتی/pdf_spooler
     bool rollMode = false,
     int? businessId,
   }) async {
@@ -144,30 +145,33 @@ class LabelPdfRenderer {
     final labelW = design.canvas.widthMm * PdfPageFormat.mm;
     final labelH = design.canvas.heightMm * PdfPageFormat.mm;
     final useRoll = rollMode || sheet.isRollMode;
-    final rollColumns = sheet.rollColumns.clamp(1, 20).toInt();
-    final rollRows = (contexts.length + rollColumns - 1) ~/ rollColumns;
-    final rollLeft = (sheet.rollMarginMm['left'] ?? 0) * PdfPageFormat.mm;
-    final rollRight = (sheet.rollMarginMm['right'] ?? 0) * PdfPageFormat.mm;
-    final rollTop = (sheet.rollMarginMm['top'] ?? 0) * PdfPageFormat.mm;
-    final rollBottom = (sheet.rollMarginMm['bottom'] ?? 0) * PdfPageFormat.mm;
-    final rollGapX = (sheet.rollGapMm['x'] ?? 2) * PdfPageFormat.mm;
-    final rollGapY = (sheet.rollGapMm['y'] ?? 2) * PdfPageFormat.mm;
-    final rollWidth = sheet.rollPaperWidthMm > 0
-        ? sheet.rollPaperWidthMm * PdfPageFormat.mm
-        : rollLeft + rollRight + rollColumns * labelW + (rollColumns - 1) * rollGapX;
-    final rollHeight = rollTop + rollBottom + rollRows * labelH + (rollRows - 1) * rollGapY;
-    final requiredRollWidth = rollLeft + rollRight + rollColumns * labelW + (rollColumns - 1) * rollGapX;
-    if (useRoll && rollWidth + 0.01 < requiredRollWidth) {
+    final rollMetrics = useRoll
+        ? rollLabelPageMetrics(
+            sheet: sheet,
+            labelWidthMm: design.canvas.widthMm,
+            labelHeightMm: design.canvas.heightMm,
+          )
+        : null;
+    if (rollMetrics != null && !rollMetrics.fits) {
       throw ArgumentError(
-        'Roll width (${(rollWidth / PdfPageFormat.mm).toStringAsFixed(1)} mm) is too small for '
-        '$rollColumns columns; at least ${(requiredRollWidth / PdfPageFormat.mm).toStringAsFixed(1)} mm is required.',
+        'Roll width (${rollMetrics.widthMm.toStringAsFixed(1)} mm) is too small for '
+        '${rollMetrics.columns} columns; at least ${rollMetrics.requiredWidthMm.toStringAsFixed(1)} mm is required.',
       );
     }
     final format = useRoll
-        ? PdfPageFormat(rollWidth, rollHeight, marginAll: 0)
+        ? PdfPageFormat(
+            rollMetrics!.widthMm * PdfPageFormat.mm,
+            rollMetrics.heightMm * PdfPageFormat.mm,
+            marginAll: 0,
+          )
         : _paperFormat(sheet, labelW: labelW, labelH: labelH);
     final margin = useRoll
-        ? pw.EdgeInsets.fromLTRB(rollLeft, rollTop, rollRight, rollBottom)
+        ? pw.EdgeInsets.fromLTRB(
+            rollMetrics!.leftMm * PdfPageFormat.mm,
+            rollMetrics.topMm * PdfPageFormat.mm,
+            rollMetrics.rightMm * PdfPageFormat.mm,
+            rollMetrics.bottomMm * PdfPageFormat.mm,
+          )
         : pw.EdgeInsets.only(
             top: (sheet.marginMm['top'] ?? 8) * PdfPageFormat.mm,
             right: (sheet.marginMm['right'] ?? 8) * PdfPageFormat.mm,
@@ -176,10 +180,11 @@ class LabelPdfRenderer {
           );
     final gapX = (sheet.gapMm['x'] ?? 2) * PdfPageFormat.mm;
     final gapY = (sheet.gapMm['y'] ?? 2) * PdfPageFormat.mm;
-    final cols = useRoll ? rollColumns : math.max<int>(1, sheet.columns);
-    final rows = useRoll ? rollRows : math.max<int>(1, sheet.rows);
-    final effectiveGapX = useRoll ? rollGapX : gapX;
-    final effectiveGapY = useRoll ? rollGapY : gapY;
+    final cols = useRoll ? rollMetrics!.columns : math.max<int>(1, sheet.columns);
+    // Roll: one multi-column row per page. Sheet: the configured grid.
+    final rows = useRoll ? 1 : math.max<int>(1, sheet.rows);
+    final effectiveGapX = useRoll ? rollMetrics!.gapXMm * PdfPageFormat.mm : gapX;
+    final effectiveGapY = useRoll ? 0.0 : gapY;
     final int slots = cols * rows;
 
     pw.Widget buildLabel(Map<String, dynamic> ctx, int ctxIndex) {
