@@ -435,6 +435,17 @@ class BusinessSettingsCategorizationService {
           categoryId: 'modules',
           order: 5,
         ),
+      if (ctx.canAccessFixedAssets)
+        _item(
+          id: 'fixed_assets',
+          title: 'businessSettingsFixedAssets',
+          description: 'businessSettingsFixedAssetsDescription',
+          icon: Icons.chair_alt_outlined,
+          color: const Color(0xFF5D4037),
+          route: ctx.panelRoute('settings/fixed-assets'),
+          categoryId: 'modules',
+          order: 6,
+        ),
     ];
 
     return SettingsCategory(

@@ -268,6 +268,10 @@ class DocumentRepository:
                 "transfer": "انتقال",
                 "manual": "سند دستی",
                 "received_loan_facility": "تسهیلات دریافتی",
+                "fixed_asset_acquisition": "تحصیل دارایی ثابت",
+                "fixed_asset_depreciation": "استهلاک دارایی ثابت",
+                "fixed_asset_disposal": "خروج دارایی ثابت",
+                "fixed_asset_subsequent": "مخارج بعدی دارایی ثابت",
                 "invoice": "فاکتور",
                 "check": "چک",
             }

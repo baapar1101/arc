@@ -13118,7 +13118,55 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get businessSettingsFixedAssetsDescription =>
-      'طبقات دارایی، قرارداد استهلاک و حساب افتتاحیه';
+      'قواعد قانونی، نگاشت حساب، عامل رکود مالیاتی و قرارداد استهلاک';
+
+  @override
+  String get fixedAssetsSettingsPageTitle => 'تنظیمات اموال و دارایی ثابت';
+
+  @override
+  String get fixedAssetsLegalRules => 'قواعد قانونی و استاندارد';
+
+  @override
+  String get fixedAssetsLegalRulesHint =>
+      'مقادیر پیش‌فرض مطابق استاندارد ۱۱ و ماده ۱۴۹ است. اگر قانون یا رویه حسابداری عوض شد اینجا تغییر دهید؛ اسناد ثبت‌شده بازنویسی نمی‌شوند.';
+
+  @override
+  String get fixedAssetsTaxIdleMonths => 'تعداد ماه رکود قبل از کاهش استهلاک مالیاتی';
+
+  @override
+  String get fixedAssetsTaxIdleReduction => 'درصد کاهش استهلاک مالیاتی پس از آستانه رکود';
+
+  @override
+  String get fixedAssetsAccountingIdleReduction =>
+      'درصد کاهش استهلاک حسابداری هنگام رکود — پیش‌فرض استاندارد ۱۱ صفر است';
+
+  @override
+  String get fixedAssetsVatInputAccount => 'حساب مالیات ورودی';
+
+  @override
+  String get fixedAssetsEnabled => 'فعال بودن ماژول اموال';
+
+  @override
+  String get fixedAssetsEnabledHint =>
+      'دفتر اموال این کسب‌وکار را بدون حذف اسناد ثبت‌شده خاموش می‌کند.';
+
+  @override
+  String get fixedAssetsPlaquePrefix => 'پیشوند کد دارایی';
+
+  @override
+  String get fixedAssetsRequireCustodian => 'الزام تحویل‌گیرنده قبل از سرمایه‌گذاری';
+
+  @override
+  String get fixedAssetsOpenFullSettings => 'باز کردن تنظیمات کامل افزونه';
+
+  @override
+  String get fixedAssetsClassCostAccount => 'حساب بهای تمام‌شده';
+
+  @override
+  String get fixedAssetsClassAccumAccount => 'حساب استهلاک انباشته';
+
+  @override
+  String get fixedAssetsClassExpenseAccount => 'حساب هزینه استهلاک';
 
   @override
   String get businessSettingsPayroll => 'حقوق و دستمزد';

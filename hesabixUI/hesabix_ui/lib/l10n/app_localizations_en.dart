@@ -13192,7 +13192,56 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get businessSettingsFixedAssetsDescription =>
-      'Asset classes, depreciation convention, and opening equity account';
+      'Legal rules, chart mapping, idle tax factor, and depreciation convention';
+
+  @override
+  String get fixedAssetsSettingsPageTitle => 'Fixed asset settings';
+
+  @override
+  String get fixedAssetsLegalRules => 'Legal and standard rules';
+
+  @override
+  String get fixedAssetsLegalRulesHint =>
+      'These values default to Iranian Standard 11 and tax article 149. Change them here if the law or your accounting policy changes; posted journals are not rewritten.';
+
+  @override
+  String get fixedAssetsTaxIdleMonths => 'Idle months before tax depreciation reduction';
+
+  @override
+  String get fixedAssetsTaxIdleReduction =>
+      'Tax depreciation reduction after idle threshold (%)';
+
+  @override
+  String get fixedAssetsAccountingIdleReduction =>
+      'Accounting depreciation reduction while idle (%) — Standard 11 default is 0';
+
+  @override
+  String get fixedAssetsVatInputAccount => 'Input VAT account';
+
+  @override
+  String get fixedAssetsEnabled => 'Enable fixed assets module';
+
+  @override
+  String get fixedAssetsEnabledHint =>
+      'Turns the register off for this business without removing posted journals.';
+
+  @override
+  String get fixedAssetsPlaquePrefix => 'Asset code prefix';
+
+  @override
+  String get fixedAssetsRequireCustodian => 'Require a custodian before capitalization';
+
+  @override
+  String get fixedAssetsOpenFullSettings => 'Open full plugin settings';
+
+  @override
+  String get fixedAssetsClassCostAccount => 'Cost account';
+
+  @override
+  String get fixedAssetsClassAccumAccount => 'Accumulated depreciation account';
+
+  @override
+  String get fixedAssetsClassExpenseAccount => 'Depreciation expense account';
 
   @override
   String get businessSettingsPayroll => 'Payroll';

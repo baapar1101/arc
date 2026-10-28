@@ -1322,6 +1322,12 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'post': t.payrollPermissionPost,
         'approve': t.payrollPermissionApprove,
       },
+      'fixed_assets': {
+        'view': '${t.view} ${t.fixedAssetsMenu}',
+        'manage': t.fixedAssetsPermissionManage,
+        'operate': t.fixedAssetsPermissionOperate,
+        'post': t.fixedAssetsPermissionPost,
+      },
       'telephony': {
         'view': t.localeName.startsWith('fa') ? 'مشاهده مرکز تماس' : 'View telephony center',
         'manage': t.localeName.startsWith('fa') ? 'مدیریت اتصال و داخلی‌ها' : 'Manage PBX & extensions',
@@ -1924,6 +1930,11 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'sections': ['payroll'],
       },
       {
+        'title': t.fixedAssetsMenu,
+        'icon': Icons.chair_alt_outlined,
+        'sections': ['fixed_assets'],
+      },
+      {
         'title': t.localeName.startsWith('fa') ? 'مرکز تماس' : 'Telephony',
         'icon': Icons.phone_in_talk_outlined,
         'sections': ['telephony'],
@@ -2094,6 +2105,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.distributionMenu;
       case 'payroll':
         return t.payrollMenu;
+      case 'fixed_assets':
+        return t.fixedAssetsMenu;
       case 'telephony':
         return t.localeName.startsWith('fa') ? 'مرکز تماس' : 'Telephony';
       case 'basalam':
@@ -2198,6 +2211,9 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         if (sectionKey == 'payroll') {
           return t.payrollPermissionManage;
         }
+        if (sectionKey == 'fixed_assets') {
+          return t.fixedAssetsPermissionManage;
+        }
         return t.manage;
       case 'design':
         return sectionKey == 'barcode_labels' ? t.barcodeLabelPermissionDesign : action;
@@ -2219,8 +2235,14 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         if (sectionKey == 'payroll') {
           return t.payrollPermissionOperate;
         }
+        if (sectionKey == 'fixed_assets') {
+          return t.fixedAssetsPermissionOperate;
+        }
         return t.distributionPermissionOperate;
       case 'post':
+        if (sectionKey == 'fixed_assets') {
+          return t.fixedAssetsPermissionPost;
+        }
         return t.payrollPermissionPost;
       case 'approve':
         return t.payrollPermissionApprove;

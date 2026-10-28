@@ -222,6 +222,10 @@ class _BusinessShellState extends State<BusinessShell> {
         return t.businessPanelTabRouteRepairShopSettings;
       case 'payroll':
         return t.payrollMenu;
+      case 'fixed-assets':
+        return t.fixedAssetsMenu;
+      case 'settings/fixed-assets':
+        return t.fixedAssetsSettingsPageTitle;
       case 'telephony':
         return 'مرکز تماس';
       case 'telephony/calls':
@@ -1286,6 +1290,8 @@ class _BusinessShellState extends State<BusinessShell> {
 
   bool _isPayrollPluginActive() => _isPluginCodeLicensed('payroll');
 
+  bool _isFixedAssetsPluginActive() => _isPluginCodeLicensed('fixed_assets');
+
   bool _isTelephonyPluginActive() => _isPluginCodeLicensed('asterisk_issabel_connector');
 
   bool _isWooCommerceHesabixPluginActive() {
@@ -2062,6 +2068,15 @@ class _BusinessShellState extends State<BusinessShell> {
         path: _bu('payroll'),
         type: _MenuItemType.simple,
         hasAddButton: true,
+      ),
+      _MenuItem(
+        key: 'fixed-assets',
+        label: t.fixedAssetsMenu,
+        icon: Icons.chair_alt_outlined,
+        selectedIcon: Icons.chair_alt,
+        path: _bu('fixed-assets'),
+        type: _MenuItemType.simple,
+        hasAddButton: false,
       ),
       _MenuItem(
         key: 'telephony',
@@ -3775,6 +3790,12 @@ class _BusinessShellState extends State<BusinessShell> {
       }
     }
 
+    if (section == 'fixed_assets') {
+      if (!_showPluginGatedMenu(_isFixedAssetsPluginActive())) {
+        return false;
+      }
+    }
+
     // طراحی برچسب بارکد
     if (section == 'barcode_labels') {
       if (!_showPluginGatedMenu(_isPluginCodeLicensed('barcode_label_studio'))) {
@@ -3869,6 +3890,8 @@ class _BusinessShellState extends State<BusinessShell> {
         return 'reports';
       case 'payroll':
         return 'payroll';
+      case 'fixed-assets':
+        return 'fixed_assets';
       case 'barcode-labels':
         return 'barcode_labels';
       case 'telephony':
@@ -3890,6 +3913,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (path != null) {
       if (path.contains('/hscript')) return 'reports';
       if (path.contains('/payroll')) return 'payroll';
+      if (path.contains('/fixed-assets')) return 'fixed_assets';
       if (path.contains('/barcode-labels')) return 'barcode_labels';
       if (path.contains('/telephony')) return 'telephony';
       if (path.contains('/customer-club')) return 'customer_club';
@@ -3964,6 +3988,12 @@ class _BusinessShellState extends State<BusinessShell> {
         label == 'Payroll' ||
         label == 'حقوق و دستمزد') {
       return 'payroll';
+    }
+    if (label == t.fixedAssetsMenu ||
+        label == t.fixedAssetsTitle ||
+        label == 'Fixed assets' ||
+        label == 'اموال و دارایی ثابت') {
+      return 'fixed_assets';
     }
     if (label == t.distributionMenu || label == 'Field distribution') return 'distribution';
     if (label == 'مرکز تماس' || label == 'Telephony') return 'telephony';

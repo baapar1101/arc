@@ -153,6 +153,8 @@ import 'pages/business/repair_shop/repair_settings_page.dart';
 import 'pages/business/customer_club/customer_club_main_page.dart';
 import 'pages/business/customer_club/customer_club_settings_page.dart';
 import 'pages/business/payroll/payroll_main_page.dart';
+import 'pages/business/fixed_assets/fixed_assets_main_page.dart';
+import 'pages/business/fixed_assets/fixed_assets_settings_page.dart';
 import 'pages/business/payroll/payroll_reports_page.dart';
 import 'pages/business/payroll/payroll_run_edit_page.dart';
 import 'pages/business/payroll/payroll_settings_page.dart';
@@ -163,6 +165,7 @@ import 'pages/business/telephony/telephony_softphone_page.dart';
 import 'pages/business/distribution/distribution_main_page.dart';
 import 'widgets/marketplace/distribution_plugin_gate.dart';
 import 'widgets/marketplace/payroll_plugin_gate.dart';
+import 'widgets/marketplace/fixed_assets_plugin_gate.dart';
 import 'widgets/marketplace/telephony_plugin_gate.dart';
 import 'widgets/marketplace/barcode_label_plugin_gate.dart';
 import 'pages/business/barcode_labels/label_templates_page.dart';
@@ -2819,6 +2822,25 @@ class _MyAppState extends State<MyApp> {
                             },
                           ),
                           GoRoute(
+                            path: 'fixed-assets',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                FixedAssetsPluginGate(
+                                  businessId: businessId,
+                                  child: FixedAssetsMainPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    calendarController: _calendarController!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
                             path: 'telephony',
                             pageBuilder: (context, state) {
                               final businessId = int.parse(
@@ -4930,6 +4952,53 @@ class _MyAppState extends State<MyApp> {
                                 PayrollPluginGate(
                                   businessId: businessId,
                                   child: PayrollSettingsPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'settings/fixed-assets',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              if (!_authStore!.hasBusinessPermission(
+                                'settings',
+                                'join',
+                              )) {
+                                return hesabixNoTransitionPage(
+                                  state,
+                                  PermissionGuard.buildAccessDeniedPage(),
+                                );
+                              }
+                              final isOwner =
+                                  _authStore!.currentBusiness?.id ==
+                                      businessId &&
+                                  _authStore!.currentBusiness?.isOwner == true;
+                              final canAccess =
+                                  isOwner ||
+                                  _authStore!.hasBusinessPermission(
+                                    'fixed_assets',
+                                    'view',
+                                  ) ||
+                                  _authStore!.hasBusinessPermission(
+                                    'fixed_assets',
+                                    'manage',
+                                  );
+                              if (!canAccess) {
+                                return hesabixNoTransitionPage(
+                                  state,
+                                  PermissionGuard.buildAccessDeniedPage(),
+                                );
+                              }
+                              return hesabixNoTransitionPage(
+                                state,
+                                FixedAssetsPluginGate(
+                                  businessId: businessId,
+                                  child: FixedAssetsSettingsPage(
                                     businessId: businessId,
                                     authStore: _authStore!,
                                   ),

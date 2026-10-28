@@ -24351,8 +24351,24 @@ abstract class AppLocalizations {
   /// No description provided for @businessSettingsFixedAssetsDescription.
   ///
   /// In en, this message translates to:
-  /// **'Asset classes, depreciation convention, and opening equity account'**
+  /// **'Legal rules, chart mapping, idle tax factor, and depreciation convention'**
   String get businessSettingsFixedAssetsDescription;
+
+  String get fixedAssetsSettingsPageTitle;
+  String get fixedAssetsLegalRules;
+  String get fixedAssetsLegalRulesHint;
+  String get fixedAssetsTaxIdleMonths;
+  String get fixedAssetsTaxIdleReduction;
+  String get fixedAssetsAccountingIdleReduction;
+  String get fixedAssetsVatInputAccount;
+  String get fixedAssetsEnabled;
+  String get fixedAssetsEnabledHint;
+  String get fixedAssetsPlaquePrefix;
+  String get fixedAssetsRequireCustodian;
+  String get fixedAssetsOpenFullSettings;
+  String get fixedAssetsClassCostAccount;
+  String get fixedAssetsClassAccumAccount;
+  String get fixedAssetsClassExpenseAccount;
 
   /// No description provided for @businessSettingsPayroll.
   ///

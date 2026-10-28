@@ -85,6 +85,17 @@ from .received_loan_facility import (  # noqa: F401
 	ReceivedLoanInstallment,
 	ReceivedLoanInstallmentPayment,
 )
+from .fixed_asset import (  # noqa: F401
+	FixedAssetSettings,
+	FixedAssetClass,
+	FixedAssetLocation,
+	FixedAsset,
+	FixedAssetDocumentLink,
+	FixedAssetDepreciationRun,
+	FixedAssetDepreciationRunLine,
+	FixedAssetSubsequentExpenditure,
+	FixedAssetEstimateChange,
+)
 from .check import Check  # noqa: F401
 from .warehouse import Warehouse  # noqa: F401
 from .warehouse_location import WarehouseLocation  # noqa: F401

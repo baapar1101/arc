@@ -120,6 +120,13 @@ class BusinessSettingsContext {
         authStore.hasBusinessPermission('payroll', 'manage');
   }
 
+  bool get canAccessFixedAssets {
+    if (!pluginActive('fixed_assets')) return false;
+    if (isOwner) return true;
+    return authStore.hasBusinessPermission('fixed_assets', 'view') ||
+        authStore.hasBusinessPermission('fixed_assets', 'manage');
+  }
+
   bool get canAccessMoadian {
     if (!pluginActive('moadian_tax_integration')) return false;
     if (isOwner) return true;

@@ -153,6 +153,20 @@ _DEFAULT_PLUGINS: Tuple[_PluginSeed, ...] = (
 		plans=(("monthly", 180_000), ("yearly", 1_800_000)),
 	),
 	_PluginSeed(
+		code="fixed_assets",
+		name="کنترل اموال و دارایی ثابت",
+		description=(
+			"دفتر معین اموال مستقل از انبار: تحصیل اثاثیه و دارایی برای استفاده داخلی، "
+			"نگاشت به حساب‌های ۱۰۷/۱۰۸/۷۰۴، استهلاک خط مستقیم و مانده نزولی مطابق استاندارد ۱۱، "
+			"و صدور سند دفتر کل جدا از فاکتور خرید کالا."
+		),
+		category="operations",
+		icon_url=None,
+		trial_days=14,
+		trial_allowed=True,
+		plans=(("monthly", 220_000), ("yearly", 2_200_000)),
+	),
+	_PluginSeed(
 		code="hscript_custom_reports",
 		name="گزارش‌ساز اسکریپتی (HScript)",
 		description=(

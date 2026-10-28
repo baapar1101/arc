@@ -404,6 +404,7 @@ const Set<String> _level1RelativePaths = {
   'repair-shop',
   'customer-club',
   'payroll',
+  'fixed-assets',
   'telephony',
   'distribution',
   'zohal/inquiries',

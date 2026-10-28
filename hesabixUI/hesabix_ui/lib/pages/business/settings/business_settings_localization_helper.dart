@@ -49,6 +49,10 @@ class BusinessSettingsLocalizationHelper {
         return t.customerClubTitle;
       case 'distributionMenu':
         return t.distributionMenu;
+      case 'businessSettingsPayroll':
+        return t.businessSettingsPayroll;
+      case 'businessSettingsFixedAssets':
+        return t.businessSettingsFixedAssets;
       case 'usersAndPermissions':
         return t.usersAndPermissions;
       case 'businessSettingsProjects':
@@ -124,6 +128,10 @@ class BusinessSettingsLocalizationHelper {
         return t.customerClubSettingsSubtitle;
       case 'distributionSettingsSubtitle':
         return t.distributionSettingsSubtitle;
+      case 'businessSettingsPayrollDescription':
+        return t.businessSettingsPayrollDescription;
+      case 'businessSettingsFixedAssetsDescription':
+        return t.businessSettingsFixedAssetsDescription;
       case 'usersAndPermissionsDescription':
         return t.usersAndPermissionsDescription;
       case 'businessSettingsProjectsDescription':

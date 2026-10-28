@@ -21,6 +21,15 @@ logger = logging.getLogger(__name__)
 
 RECEIVED_LOAN_FACILITY_DOC_SOURCE = "received_loan_facility"
 RECEIVED_LOAN_FACILITY_DOC_TYPE = "received_loan_facility"
+FIXED_ASSET_DOC_SOURCE = "fixed_assets"
+FIXED_ASSET_DOC_TYPES = frozenset(
+    {
+        "fixed_asset_acquisition",
+        "fixed_asset_depreciation",
+        "fixed_asset_disposal",
+        "fixed_asset_subsequent",
+    }
+)
 
 
 def _is_received_loan_facility_manual_document(document: Any) -> bool:
@@ -30,6 +39,27 @@ def _is_received_loan_facility_manual_document(document: Any) -> bool:
     return (
         ex.get("source") == RECEIVED_LOAN_FACILITY_DOC_SOURCE
         or getattr(document, "document_type", None) == RECEIVED_LOAN_FACILITY_DOC_TYPE
+    )
+
+
+def _is_fixed_asset_document(document: Any) -> bool:
+    ex = getattr(document, "extra_info", None)
+    if not isinstance(ex, dict):
+        ex = {}
+    return (
+        ex.get("source") == FIXED_ASSET_DOC_SOURCE
+        or getattr(document, "document_type", None) in FIXED_ASSET_DOC_TYPES
+    )
+
+
+def _assert_not_fixed_asset_document(document: Any, *, action: str) -> None:
+    if not _is_fixed_asset_document(document):
+        return
+    verb = "حذف" if action == "delete" else "ویرایش"
+    raise ApiError(
+        "FIXED_ASSET_DOCUMENT_SOURCE_ONLY",
+        f"اسناد دارایی ثابت فقط از بخش کنترل اموال قابل {verb} هستند",
+        http_status=409,
     )
 
 
@@ -217,6 +247,7 @@ def delete_document(db: Session, document_id: int, *, commit: bool = True) -> bo
         )
 
     _assert_not_received_loan_facility_document(document, action="delete")
+    _assert_not_fixed_asset_document(document, action="delete")
     
     # بررسی نوع سند - فقط اسناد manual قابل حذف هستند
     if document.document_type != "manual":
@@ -303,6 +334,7 @@ def delete_multiple_documents(db: Session, document_ids: List[int]) -> Dict[str,
 
             try:
                 _assert_not_received_loan_facility_document(document, action="delete")
+                _assert_not_fixed_asset_document(document, action="delete")
             except ApiError as exc:
                 err = getattr(exc, "detail", None)
                 msg = str(err) if err is not None else str(exc)
@@ -692,6 +724,7 @@ def update_manual_document(
         )
 
     _assert_not_received_loan_facility_document(document, action="edit")
+    _assert_not_fixed_asset_document(document, action="edit")
 
     # بررسی اینکه فقط اسناد manual قابل ویرایش هستند
     if document.document_type != "manual":
