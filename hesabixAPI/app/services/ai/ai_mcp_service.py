@@ -8,14 +8,18 @@ from typing import Any, Dict, Optional
 from sqlalchemy.orm import Session
 
 from app.core.auth_dependency import AuthContext
-from app.services.ai.ai_write_guard import is_readonly_function
+from app.services.ai.ai_mcp_discovery import (
+    AGENT_TOOL_NAME,
+    WRITE_SCOPE,
+    mcp_readonly as _mcp_readonly,
+    mcp_visible_definitions as _get_tools,
+    visible_tool_catalog as _visible_tool_catalog,
+)
 
 logger = logging.getLogger(__name__)
 MCP_PROTOCOL_VERSION = "2025-11-25"
 SERVER_NAME = "hesabix-ai"
-SERVER_VERSION = "1.1.0"
-WRITE_SCOPE = "ai:tools:write"
-AGENT_TOOL_NAME = "ask_hesabix_agent"
+SERVER_VERSION = "1.8.0"
 
 _PROMPT_CATALOG = {
     "business_summary": ("خلاصه مدیریتی کسب‌وکار", "business", "وضعیت کلی و شاخص‌های مدیریتی کسب‌وکار را جمع‌بندی کن."),
@@ -40,45 +44,6 @@ _PROMPT_CATEGORY_ALIASES = {
 
 def _prompt_category_available(category: str, visible: set[str]) -> bool:
     return bool((_PROMPT_CATEGORY_ALIASES.get(category) or {category}) & visible)
-
-
-def _visible_tool_catalog(db: Session, ctx: AuthContext, business_id: int) -> list[dict[str, Any]]:
-    registry, definitions = _get_tools(db, ctx, business_id)
-    catalog = []
-    for definition in definitions:
-        fn_def = definition.get("function") or {}
-        name = str(fn_def.get("name", ""))
-        function = registry.get_function(name)
-        if not function:
-            continue
-        read_only = _mcp_readonly(name, registry)
-        if not read_only and WRITE_SCOPE not in getattr(ctx, "mcp_scopes", set()):
-            continue
-        catalog.append({
-            "name": name,
-            "description": fn_def.get("description") or function.description or "",
-            "input_schema": fn_def.get("parameters") or {"type": "object", "properties": {}},
-            "category": function.category or "general",
-            "capability": getattr(function, "capability", "misc"),
-            "read_only": read_only,
-            "required_permissions": list(function.required_permissions or []),
-        })
-    if getattr(ctx, "mcp_tool_permissions", None) is None:
-        catalog.append({
-            "name": AGENT_TOOL_NAME,
-            "description": "پرسش چندمرحله‌ای از ایجنت حسابیکس در حالت فقط‌خواندنی و محدود به همین کسب‌وکار.",
-            "input_schema": {
-                "type": "object",
-                "properties": {"query": {"type": "string", "description": "درخواست یا پرسش درباره همین کسب‌وکار"}},
-                "required": ["query"],
-                "additionalProperties": False,
-            },
-            "category": "agent",
-            "capability": "business_agent",
-            "read_only": True,
-            "required_permissions": [],
-        })
-    return sorted(catalog, key=lambda item: item["name"])
 
 
 def _prompt_content(name: str, title: str, goal: str, user_request: str, catalog: list[dict[str, Any]]) -> str:
@@ -117,20 +82,6 @@ def prepare_mcp_tool_arguments(arguments: Dict[str, Any], *, business_id: int) -
 def mcp_explicit_write_approval(params: Dict[str, Any]) -> bool:
     """Kept for old callers; an RPC boolean is never an authorization signal."""
     return False
-
-
-def _mcp_readonly(name: str, registry: Any) -> bool:
-    """Fail closed if registry metadata is missing or internally inconsistent."""
-    function = registry.get_function(name)
-    if function is None:
-        return False
-    return bool(
-        is_readonly_function(name, registry)
-        and not getattr(function, "requires_approval", False)
-        and not getattr(function, "intent_write", False)
-        and not getattr(function, "always_confirm", False)
-        and getattr(function, "side_effect", "none") in {None, "none", "read"}
-    )
 
 
 def _jsonrpc_result(req_id: Any, result: Any) -> Dict[str, Any]:
@@ -252,36 +203,6 @@ def _openai_tool_to_mcp(tool_def: Dict[str, Any], registry: Any) -> Dict[str, An
             "openWorldHint": False,
         },
     }
-
-
-def _get_tools(db: Session, ctx: AuthContext, business_id: int) -> tuple[Any, list[dict[str, Any]]]:
-    from app.services.ai.function_registry import AIRole, registry
-
-    context = {
-        "db": db,
-        "user_context": ctx,
-        "business_id": business_id,
-        "session_business_id": business_id,
-    }
-    definitions = registry.get_function_definitions(context)
-    # External business connections must never publish operator/system-wide tools.
-    business_roles = {AIRole.USER, AIRole.BUSINESS_OWNER}
-    definitions = [
-        item
-        for item in definitions
-        if (function := registry.get_function(str((item.get("function") or {}).get("name", ""))))
-        and getattr(function, "enabled", True)
-        and not getattr(function, "deprecated", False)
-        and function.business_context_required
-        and bool(function.allowed_roles & business_roles)
-    ]
-    allowed_tools = getattr(ctx, "mcp_tool_permissions", None)
-    if allowed_tools is not None:
-        definitions = [
-            item for item in definitions
-            if str((item.get("function") or {}).get("name", "")) in allowed_tools
-        ]
-    return registry, definitions
 
 
 async def handle_mcp_request(

@@ -65,6 +65,9 @@ TOOL_DOMAINS: frozenset[str] = frozenset({
     "marketplace",
     "hscript",
     "memory",
+    "fixed_assets",
+    "telephony",
+    "barcode",
 })
 
 DOMAIN_TO_CAPABILITY: dict[str, str] = {
@@ -95,8 +98,11 @@ DOMAIN_TO_CAPABILITY: dict[str, str] = {
     "hscript": ToolCapability.PLATFORM.value,
     "agent": ToolCapability.AGENT.value,
     "memory": ToolCapability.AGENT.value,
+    "fixed_assets": "financial.fixed_assets",
+    "telephony": "integration.telephony",
+    "barcode": "inventory.barcode",
     "query": ToolCapability.QUERY.value,
-    "projects": ToolCapability.ACCOUNTING.value,
+    "projects": "financial.project",
     "misc": ToolCapability.MISC.value,
 }
 

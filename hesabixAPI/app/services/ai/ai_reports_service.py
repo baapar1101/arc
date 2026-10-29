@@ -3,6 +3,7 @@
 """
 from __future__ import annotations
 
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
@@ -17,6 +18,11 @@ from app.services.ai.ai_reports_catalog import (
 )
 
 _MAX_TAKE = 200
+_PLUGIN_CHECKERS = {
+    "distribution": "app.core.distribution_plugin_dependency.check_distribution_plugin_active",
+    "basalam_connector": "app.core.basalam_plugin_dependency.check_basalam_plugin_active",
+    "woocommerce_hesabix": "app.core.woocommerce_plugin_dependency.check_woocommerce_plugin_active",
+}
 
 
 def _pag(args: Dict[str, Any]) -> Dict[str, int]:
@@ -47,11 +53,66 @@ def _ids_arg(args: Dict[str, Any], key: str) -> Optional[List[int]]:
     return None
 
 
+def _as_date(value: Any) -> Optional[date]:
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    try:
+        return datetime.strptime(str(value)[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def _search_activity_logs_for_report(db: Session, business_id: int, filters: Dict[str, Any]) -> Any:
+    """جدا از execute تا تست بتواند بدون cycle فاز ۳ پچ کند."""
+    import app.services.ai.ai_query_service  # noqa: F401
+
+    from app.services.ai.ai_query_phase3_service import search_activity_logs
+
+    return search_activity_logs(db, business_id, filters)
+
+
+def plugin_is_active(db: Optional[Session], business_id: int, plugin_code: Optional[str]) -> bool:
+    """گزارش بدون افزونه همیشه فعال است. بدون db، افزونه fail-closed است."""
+    code = (plugin_code or "").strip()
+    if not code:
+        return True
+    if db is None or not business_id:
+        return False
+    path = _PLUGIN_CHECKERS.get(code)
+    if not path:
+        return False
+    module_name, func_name = path.rsplit(".", 1)
+    try:
+        from importlib import import_module
+
+        fn = getattr(import_module(module_name), func_name)
+        return bool(fn(db, int(business_id)))
+    except Exception:
+        return False
+
+
+def _report_item(d: ReportDefinition) -> Dict[str, Any]:
+    return {
+        "report_type": d.report_type,
+        "label_fa": d.label_fa,
+        "category": d.category,
+        "required_params": list(d.requires),
+        "description": d.description or d.label_fa,
+        "ui_key": d.resolved_ui_key(),
+        "plugin_code": d.plugin_code,
+    }
+
+
 def list_available_reports(
     ctx: AuthContext,
     *,
     business_id: Optional[int] = None,
     category: Optional[str] = None,
+    db: Optional[Session] = None,
 ) -> Dict[str, Any]:
     """گزارش‌هایی که کاربر فعلی مجاز به فراخوانی آن‌هاست."""
     bid = business_id or ctx.business_id
@@ -60,16 +121,11 @@ def list_available_reports(
     for d in REPORT_DEFINITIONS:
         if cat_filter and d.category != cat_filter:
             continue
-        if has_any_ai_tool_permission(ctx, d.permissions, business_id=bid):
-            items.append(
-                {
-                    "report_type": d.report_type,
-                    "label_fa": d.label_fa,
-                    "category": d.category,
-                    "required_params": list(d.requires),
-                    "description": d.description or d.label_fa,
-                }
-            )
+        if not has_any_ai_tool_permission(ctx, d.permissions, business_id=bid):
+            continue
+        if not plugin_is_active(db, int(bid or 0), d.plugin_code):
+            continue
+        items.append(_report_item(d))
     return {
         "items": items,
         "total": len(items),
@@ -90,6 +146,12 @@ def execute_ai_report(
     defn = get_report_definition(rt)
     if not defn:
         raise ValueError(f"report_type نامعتبر: {rt}. از list_available_reports کمک بگیرید.")
+    if user_context is not None and not has_any_ai_tool_permission(
+        user_context, defn.permissions, business_id=business_id
+    ):
+        raise ValueError(f"مجوز گزارش {rt} برای این کاربر برقرار نیست.")
+    if not plugin_is_active(db, business_id, defn.plugin_code):
+        raise ValueError(f"افزونهٔ لازم برای گزارش {rt} در این کسب‌وکار فعال نیست.")
     for req in defn.requires:
         if req == "account_ids" and not _ids_arg(args, "account_ids"):
             raise ValueError("برای general_ledger پارامتر account_ids (لیست) یا account_id لازم است.")
@@ -464,7 +526,7 @@ def execute_ai_report(
         )
 
     if rt == "distribution_dashboard":
-        from datetime import date as date_cls, datetime as dt_cls
+        from datetime import datetime as dt_cls
 
         from app.services.distribution_service import get_distribution_reports_dashboard
 
@@ -504,7 +566,269 @@ def execute_ai_report(
             offset=kw["skip"],
         )
 
+    if rt == "basalam_synced_invoices":
+        from app.services.basalam_reports_service import list_synced_invoices
+
+        return list_synced_invoices(
+            db,
+            business_id,
+            date_from=_as_date(kw.get("date_from")),
+            date_to=_as_date(kw.get("date_to")),
+            skip=kw["skip"],
+            take=kw["take"],
+        )
+
+    if rt == "basalam_product_conflicts":
+        from app.services.basalam_reports_service import list_product_conflicts_for_report
+
+        return list_product_conflicts_for_report(
+            db,
+            business_id,
+            conflict_type=args.get("conflict_type"),
+            direction=args.get("direction"),
+            search=args.get("search"),
+            limit=kw["take"],
+            offset=kw["skip"],
+        )
+
+    if rt == "installments":
+        from app.services.invoice_service import search_installments
+
+        query = {
+            "fiscal_year_id": kw.get("fiscal_year_id"),
+            "due_from": kw.get("date_from") or args.get("due_from"),
+            "due_to": kw.get("date_to") or args.get("due_to"),
+            "status": args.get("status"),
+            "status_in": args.get("status_in"),
+            "bucket": args.get("bucket"),
+            "person_id": args.get("person_id"),
+            "invoice_id": args.get("invoice_id"),
+            "currency_id": kw.get("currency_id"),
+            "group_by": args.get("group_by"),
+            "skip": kw["skip"],
+            "take": kw["take"],
+        }
+        return search_installments(db, business_id, query)
+
+    if rt == "ar_aging" or rt == "ap_aging":
+        from app.services.ar_ap_aging_service import get_ar_ap_aging_report
+
+        return get_ar_ap_aging_report(
+            db,
+            business_id,
+            mode="ap" if rt == "ap_aging" else "ar",
+            fiscal_year_id=kw.get("fiscal_year_id"),
+            currency_id=kw.get("currency_id"),
+            as_of=args.get("as_of_date") or args.get("as_of"),
+            person_ids=_ids_arg(args, "person_ids"),
+            search=args.get("search"),
+            skip=kw["skip"],
+            take=kw["take"],
+        )
+
+    if rt == "person_balances_by_currency":
+        from app.services.person_balances_by_currency_report_service import (
+            get_person_balances_by_currency_report,
+        )
+
+        return get_person_balances_by_currency_report(
+            db,
+            business_id,
+            fiscal_year_id=kw.get("fiscal_year_id"),
+            person_ids=_ids_arg(args, "person_ids"),
+            search=args.get("search"),
+            only_with_balance=bool(args.get("only_with_balance", True)),
+            skip=kw["skip"],
+            take=kw["take"],
+        )
+
+    if rt == "checks":
+        from app.services.check_service import list_checks
+
+        filters = []
+        check_type = args.get("check_type") or args.get("type")
+        if check_type:
+            filters.append({"property": "type", "operator": "=", "value": str(check_type).upper()})
+        status = args.get("status")
+        if status:
+            filters.append({"property": "status", "operator": "=", "value": str(status)})
+        if kw.get("date_from"):
+            filters.append({"property": "due_date", "operator": ">=", "value": str(kw["date_from"])[:10]})
+        if kw.get("date_to"):
+            filters.append({"property": "due_date", "operator": "<=", "value": str(kw["date_to"])[:10]})
+        query: Dict[str, Any] = {"skip": kw["skip"], "take": kw["take"], "sort_desc": True}
+        if filters:
+            query["filters"] = filters
+        if args.get("person_id"):
+            query["person_id"] = int(args["person_id"])
+        if args.get("search"):
+            query["search"] = str(args["search"])
+            query["search_fields"] = ["check_number", "sayad_code", "bank_name", "person_name"]
+        return list_checks(db, business_id, query)
+
+    if rt == "stock_count":
+        from sqlalchemy import String, cast
+
+        from adapters.db.models.warehouse_document import WarehouseDocument
+        from app.services.warehouse_service import warehouse_document_to_dict
+
+        q = db.query(WarehouseDocument).filter(
+            WarehouseDocument.business_id == business_id,
+            WarehouseDocument.doc_type == "adjustment",
+            WarehouseDocument.extra_info.isnot(None),
+            cast(WarehouseDocument.extra_info, String).like("%stock_count_code%"),
+        )
+        status = args.get("status")
+        if status:
+            q = q.filter(WarehouseDocument.status == str(status))
+        date_from = _as_date(kw.get("date_from"))
+        date_to = _as_date(kw.get("date_to"))
+        if date_from:
+            q = q.filter(WarehouseDocument.document_date >= date_from)
+        if date_to:
+            q = q.filter(WarehouseDocument.document_date <= date_to)
+        q = q.order_by(WarehouseDocument.document_date.desc(), WarehouseDocument.id.desc())
+        total = q.count()
+        rows = q.offset(kw["skip"]).limit(kw["take"]).all()
+        items = []
+        for wh in rows:
+            extra = wh.extra_info if isinstance(wh.extra_info, dict) else {}
+            if not extra.get("stock_count_code"):
+                continue
+            payload = warehouse_document_to_dict(db, wh)
+            payload["stock_count_code"] = extra.get("stock_count_code")
+            payload["stock_count_date"] = extra.get("stock_count_date")
+            items.append(payload)
+        return {"items": items, "total": total, "skip": kw["skip"], "take": kw["take"]}
+
+    if rt == "cash_flow_statement":
+        from app.services.cash_flow_report_service import get_cash_flow_report
+
+        return get_cash_flow_report(
+            db,
+            business_id,
+            fiscal_year_id=kw.get("fiscal_year_id"),
+            currency_id=kw.get("currency_id"),
+            date_from=kw.get("date_from"),
+            date_to=kw.get("date_to"),
+            include_indirect=bool(args.get("include_indirect", True)),
+        )
+
+    if rt == "fx_revaluation":
+        from app.services.cash_flow_report_service import get_fx_revaluation_report
+
+        return get_fx_revaluation_report(
+            db,
+            business_id,
+            fiscal_year_id=kw.get("fiscal_year_id"),
+            date_from=kw.get("date_from"),
+            date_to=kw.get("date_to"),
+            skip=kw["skip"],
+            take=kw["take"],
+        )
+
+    if rt == "financial_package":
+        from app.services.financial_package_service import get_financial_package_report
+
+        return get_financial_package_report(
+            db,
+            business_id,
+            fiscal_year_id=kw.get("fiscal_year_id"),
+            currency_id=kw.get("currency_id"),
+            date_from=kw.get("date_from"),
+            date_to=kw.get("date_to"),
+            project_id=args.get("project_id"),
+            include_zero_balance=bool(args.get("include_zero_balance", False)),
+            account_level=int(args.get("account_level", 4) or 4),
+            compare_prior_period=bool(args.get("compare_prior_period", False)),
+            compare_mode=args.get("compare_mode"),
+            include_base_equivalent=bool(args.get("include_base_equivalent", False)),
+        )
+
+    if rt == "kardex":
+        from app.services.kardex_service import list_kardex_lines
+
+        return list_kardex_lines(
+            db,
+            business_id,
+            {
+                "from_date": kw.get("date_from"),
+                "to_date": kw.get("date_to"),
+                "fiscal_year_id": kw.get("fiscal_year_id"),
+                "currency_id": kw.get("currency_id"),
+                "person_ids": _ids_arg(args, "person_ids"),
+                "product_ids": _ids_arg(args, "product_ids"),
+                "account_ids": _ids_arg(args, "account_ids"),
+                "skip": kw["skip"],
+                "take": kw["take"],
+            },
+        )
+
+    if rt == "activity_logs":
+        return _search_activity_logs_for_report(
+            db,
+            business_id,
+            {
+                "from_date": kw.get("date_from"),
+                "to_date": kw.get("date_to"),
+                "category": args.get("log_category") or args.get("category"),
+                "entity_type": args.get("entity_type"),
+                "skip": kw["skip"],
+                "take": min(kw["take"], 100),
+            },
+        )
+
+    if rt == "hscript_reports":
+        from app.services.hscript_report_service import list_reports as list_hscript_reports
+
+        return list_hscript_reports(db, business_id, status=args.get("status"))
+
+    if rt == "woocommerce_overview":
+        from app.services.woocommerce_integration_service import reports_summary
+
+        return reports_summary(
+            db,
+            business_id,
+            after=kw.get("date_from"),
+            before=kw.get("date_to"),
+        )
+
+    if rt == "woocommerce_orders":
+        from app.services.woocommerce_integration_service import list_orders
+
+        page = (kw["skip"] // kw["take"]) + 1
+        return list_orders(
+            db,
+            business_id,
+            page=page,
+            per_page=min(kw["take"], 50),
+            status=args.get("status"),
+            after=kw.get("date_from"),
+            before=kw.get("date_to"),
+            search=args.get("search"),
+        )
+
+    if rt == "woocommerce_catalog":
+        from app.services.woocommerce_integration_service import list_products
+
+        page = (kw["skip"] // kw["take"]) + 1
+        return list_products(
+            db,
+            business_id,
+            page=page,
+            per_page=min(kw["take"], 50),
+            search=args.get("search"),
+        )
+
+    if rt == "woocommerce_bridge":
+        from app.services.woocommerce_integration_service import control_connection, control_sync_stats
+
+        return {
+            "connection": control_connection(db, business_id),
+            "sync_stats": control_sync_stats(db, business_id),
+        }
+
     raise ValueError(f"گزارش {rt} در کاتالوگ است ولی handler پیاده‌سازی نشده است.")
 
 
-__all__ = ["REPORT_TYPES", "execute_ai_report", "list_available_reports"]
+__all__ = ["REPORT_TYPES", "execute_ai_report", "list_available_reports", "plugin_is_active"]

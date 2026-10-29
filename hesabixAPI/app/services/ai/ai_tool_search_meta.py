@@ -183,6 +183,162 @@ TOOL_SEARCH_META: Dict[str, SearchMeta] = {
     "get_opening_balance": {
         "aliases": ("مانده افتتاحیه", "افتتاحیه حساب"),
     },
+    "create_bank_account": {
+        "aliases": ("حساب بانکی جدید", "ثبت حساب بانک"),
+        "examples": ("یک حساب بانکی ملت ثبت کن",),
+    },
+    "delete_bank_account": {
+        "aliases": ("حذف حساب بانکی",),
+        "examples": ("این حساب بانکی را حذف کن",),
+    },
+    "create_cash_register": {
+        "aliases": ("صندوق جدید", "ثبت صندوق"),
+        "examples": ("یک صندوق فروشگاهی بساز",),
+    },
+    "create_petty_cash": {
+        "aliases": ("تنخواه جدید", "ثبت تنخواه"),
+        "examples": ("یک تنخواه گردان ثبت کن",),
+    },
+    "upsert_opening_balance": {
+        "aliases": ("ذخیره تراز افتتاحیه", "ثبت افتتاحیه"),
+        "examples": ("تراز افتتاحیه را ذخیره کن",),
+    },
+    "post_opening_balance": {
+        "aliases": ("نهایی‌سازی تراز افتتاحیه",),
+        "examples": ("تراز افتتاحیه را نهایی کن",),
+    },
+    "create_fixed_asset": {
+        "aliases": ("ثبت دارایی ثابت", "اموال جدید"),
+        "examples": ("یک دارایی ثابت ثبت کن",),
+    },
+    "capitalize_fixed_asset": {
+        "aliases": ("سرمایه‌گذاری دارایی",),
+        "examples": ("این دارایی را سرمایه‌گذاری کن",),
+    },
+    "click_to_call": {
+        "aliases": ("تماس خروجی", "کلیک تو کال"),
+        "examples": ("با این شماره تماس بگیر",),
+    },
+    "create_barcode_label_from_preset": {
+        "aliases": ("طرح برچسب از preset", "برچسب بارکد جدید"),
+        "examples": ("یک طرح برچسب از preset بساز",),
+    },
+    "update_business_info": {
+        "aliases": ("ویرایش مشخصات کسب‌وکار", "تغییر نام کسب‌وکار"),
+        "examples": ("مشخصات کسب‌وکار را ویرایش کن",),
+    },
+    "update_document_numbering_settings": {
+        "aliases": ("شماره‌گذاری اسناد", "پیشوند شماره سند"),
+        "examples": ("شماره‌گذاری اسناد را ویرایش کن",),
+    },
+    "create_project": {
+        "aliases": ("ثبت پروژه", "پروژه جدید"),
+        "examples": ("یک پروژه ساختمانی ثبت کن",),
+    },
+    "create_person_group": {
+        "aliases": ("گروه اشخاص جدید", "گروه مشتریان"),
+        "examples": ("یک گروه اشخاص جدید بساز",),
+    },
+    "update_person_credit": {
+        "aliases": ("سقف اعتبار مشتری", "اعتبار این شخص"),
+        "examples": ("سقف اعتبار این مشتری را عوض کن",),
+    },
+    "create_credit_installment_plan": {
+        "aliases": ("طرح اقساط جدید", "پلن اقساط"),
+        "examples": ("یک طرح اقساط جدید بساز",),
+    },
+    "create_product_bundle": {
+        "aliases": ("باندل جدید", "بسته کالا", "باندل کالا"),
+        "examples": ("یک باندل کالا بساز",),
+    },
+    "search_product_bundles": {
+        "aliases": ("باندل‌ها", "بسته‌های کالا"),
+        "examples": ("باندل‌های کالا را لیست کن",),
+    },
+    "create_price_list": {
+        "aliases": ("لیست قیمت جدید", "قیمت عمده جدید"),
+        "examples": ("یک لیست قیمت عمده بساز",),
+    },
+    "upsert_price_list_item": {
+        "aliases": ("قیمت کالا در لیست", "قیمت عمده این کالا"),
+        "examples": ("قیمت این کالا را در لیست عمده ثبت کن",),
+    },
+    "create_product_category": {
+        "aliases": ("دسته کالا جدید", "دسته‌بندی جدید"),
+        "examples": ("یک دسته کالا جدید بساز",),
+    },
+    "create_product_instance": {
+        "aliases": ("کالای یونیک", "سریال کالا"),
+        "examples": ("یک کالای یونیک با سریال ثبت کن",),
+    },
+    "create_warehouse": {
+        "aliases": ("انبار جدید",),
+        "examples": ("یک انبار جدید بساز",),
+    },
+    "create_warehouse_location": {
+        "aliases": ("محل انبار", "قفسه انبار"),
+        "examples": ("یک قفسه در این انبار بساز",),
+    },
+    "create_frequent_description": {
+        "aliases": ("شرح پرتکرار",),
+        "examples": ("یک شرح پرتکرار اضافه کن",),
+    },
+    "create_catalog_spec_field": {
+        "aliases": ("فیلد مشخصات", "مشخصات کاتالوگ"),
+        "examples": ("یک فیلد مشخصات کاتالوگ بساز",),
+    },
+    "create_currency_rate": {
+        "aliases": ("نرخ تسعیر", "نرخ ارز"),
+        "examples": ("نرخ تسعیر دلار را ثبت کن",),
+    },
+    "create_loan_facility": {
+        "aliases": ("تسهیل دریافتی", "وام دریافتی"),
+        "examples": ("یک تسهیل دریافتی ثبت کن",),
+    },
+    "create_fiscal_year": {
+        "aliases": ("سال مالی جدید",),
+        "examples": ("یک سال مالی جدید بساز",),
+    },
+    "close_fiscal_year": {
+        "aliases": ("بستن سال مالی", "اختتامیه"),
+        "examples": ("سال مالی را ببند",),
+    },
+    "enqueue_quick_sale": {
+        "aliases": ("فروش سریع", "فاکتور فروش سریع"),
+        "examples": ("یک فروش سریع ثبت کن",),
+    },
+    "save_customer_club_reward": {
+        "aliases": ("جایزه باشگاه",),
+        "examples": ("یک جایزه باشگاه مشتریان بساز",),
+    },
+    "create_business_notification_template": {
+        "aliases": ("قالب اعلان", "قالب پیامک"),
+        "examples": ("یک قالب اعلان بساز",),
+    },
+    "create_goods_expense_income": {
+        "aliases": ("کالای هزینه‌شده", "کالای درآمدشده"),
+        "examples": ("یک سند کالای هزینه‌شده ثبت کن",),
+    },
+    "get_product_category_tree": {
+        "aliases": ("درخت دسته‌بندی", "درخت دسته کالا"),
+        "examples": ("درخت دسته‌بندی کالا را نشان بده",),
+    },
+    "list_project_documents": {
+        "aliases": ("اسناد پروژه", "اسناد همین پروژه"),
+        "examples": ("اسناد همین پروژه را نشان بده",),
+    },
+    "delete_project": {
+        "aliases": ("حذف پروژه",),
+        "examples": ("این پروژه را حذف کن",),
+    },
+    "get_person_group": {
+        "aliases": ("جزئیات گروه اشخاص",),
+        "examples": ("جزئیات این گروه اشخاص را بده",),
+    },
+    "update_credit_settings": {
+        "aliases": ("تنظیمات اعتبار", "سقف اعتبار پیش‌فرض"),
+        "examples": ("تنظیمات اعتبار کسب‌وکار را عوض کن",),
+    },
     "list_fiscal_years": {
         "aliases": ("سال‌های مالی", "لیست سال مالی"),
     },
@@ -190,14 +346,45 @@ TOOL_SEARCH_META: Dict[str, SearchMeta] = {
         "aliases": ("جزئیات چک", "جزئیات همان چک"),
     },
     "get_report": {
-        "aliases": ("گزارش یکپارچه", "گزارش", "دفتر کل", "تراز آزمایشی", "سود و زیان", "ترازنامه"),
-        "examples": ("تراز آزمایشی فروردین", "گزارش سود و زیان"),
+        "aliases": ("گزارش یکپارچه", "گزارش", "دفتر کل", "تراز آزمایشی", "سود و زیان", "ترازنامه", "سن بدهی", "اقساط", "تسعیر"),
+        "examples": ("تراز آزمایشی فروردین", "گزارش سود و زیان", "سن بدهی مشتریان", "صورت جریان وجوه نقد"),
+    },
+    "list_mcp_categories": {
+        "aliases": ("دسته ابزار", "چه ابزارهایی داری", "فهرست ابزار"),
+        "examples": ("چه دسته‌هایی از ابزار در این اتصال هست؟",),
+    },
+    "search_mcp_tools": {
+        "aliases": ("جستجوی ابزار", "ابزار MCP", "چه ابزاری"),
+        "examples": ("ابزار تراز آزمایشی چیست؟", "ابزار ثبت فاکتور را پیدا کن"),
     },
     "search_documents": {
         "aliases": ("اسناد حسابداری", "سند حسابداری"),
     },
     "get_document_details": {
         "aliases": ("جزئیات سند", "سند را باز کن"),
+    },
+    "get_document_types_summary": {
+        "aliases": ("خلاصه انواع سند", "آمار نوع سند"),
+        "examples": ("هر نوع سند چندتا داریم؟",),
+    },
+    "create_manual_document": {
+        "aliases": ("سند دستی", "ثبت سند حسابداری", "سند حسابداری جدید", "journal entry"),
+        "examples": (
+            "یک سند حسابداری دستی ثبت کن",
+            "سند دستی متوازن بزن",
+        ),
+    },
+    "update_manual_document": {
+        "aliases": ("ویرایش سند دستی", "اصلاح سند حسابداری"),
+        "examples": ("سطرهای سند دستی را ویرایش کن",),
+    },
+    "delete_manual_document": {
+        "aliases": ("حذف سند دستی", "حذف سند حسابداری"),
+        "examples": ("این سند دستی را حذف کن",),
+    },
+    "bulk_delete_manual_documents": {
+        "aliases": ("حذف گروهی سند دستی", "حذف چند سند حسابداری"),
+        "examples": ("این چند سند دستی را حذف کن",),
     },
     "list_boms": {
         "aliases": ("لیست BOM", "صورت مواد"),

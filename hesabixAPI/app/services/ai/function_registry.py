@@ -198,6 +198,78 @@ class AIFunctionRegistry:
         from app.services.ai.ai_function_extensions_mcp_distribution import register_mcp_distribution_functions
 
         register_mcp_distribution_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_discovery import register_mcp_discovery_functions
+
+        register_mcp_discovery_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_documents import register_mcp_document_functions
+
+        register_mcp_document_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_treasury import register_mcp_treasury_functions
+
+        register_mcp_treasury_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_fixed_assets import register_mcp_fixed_assets_functions
+
+        register_mcp_fixed_assets_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_telephony import register_mcp_telephony_functions
+
+        register_mcp_telephony_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_barcode import register_mcp_barcode_functions
+
+        register_mcp_barcode_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_settings import register_mcp_settings_functions
+
+        register_mcp_settings_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_projects import register_mcp_project_functions
+
+        register_mcp_project_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_person_groups import register_mcp_person_group_functions
+
+        register_mcp_person_group_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_credit import register_mcp_credit_functions
+
+        register_mcp_credit_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_bundles import register_mcp_bundle_functions
+
+        register_mcp_bundle_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_price_lists import register_mcp_price_list_functions
+
+        register_mcp_price_list_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_categories import register_mcp_category_functions
+
+        register_mcp_category_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_instances import register_mcp_instance_functions
+
+        register_mcp_instance_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_warehouse import register_mcp_warehouse_master_functions
+
+        register_mcp_warehouse_master_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_freq import register_mcp_frequent_description_functions
+
+        register_mcp_frequent_description_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_spec import register_mcp_catalog_spec_functions
+
+        register_mcp_catalog_spec_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_fx import register_mcp_fx_functions
+
+        register_mcp_fx_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_loans import register_mcp_loan_functions
+
+        register_mcp_loan_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_fiscal import register_mcp_fiscal_functions
+
+        register_mcp_fiscal_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_quick_sales import register_mcp_quick_sales_functions
+
+        register_mcp_quick_sales_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_club import register_mcp_club_extra_functions
+
+        register_mcp_club_extra_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_notifications import register_mcp_notification_functions
+
+        register_mcp_notification_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_gei import register_mcp_gei_functions
+
+        register_mcp_gei_functions(self)
         from app.services.ai.ai_function_extensions_tax_extra import register_tax_extra_functions
 
         register_tax_extra_functions(self)
