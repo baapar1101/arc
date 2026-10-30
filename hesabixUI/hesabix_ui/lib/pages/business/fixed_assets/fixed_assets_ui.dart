@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
+import 'package:shamsi_date/shamsi_date.dart';
 
 import '../../../utils/number_formatters.dart' show formatWithThousands;
 import '../../../utils/number_normalizer.dart'
@@ -15,6 +16,34 @@ class FixedAssetsUi {
   static const double dialogRadius = 20;
   static const double fieldGap = 14;
   static const EdgeInsets pagePadding = EdgeInsets.all(16);
+  static final DateTime datePickerFirst = DateTime(1990, 1, 1);
+  static DateTime get datePickerLast {
+    final now = DateTime.now();
+    return DateTime(now.year + 5, 12, 31);
+  }
+
+  static DateTime startOfDisplayYear(bool isJalali) {
+    final now = DateTime.now();
+    if (isJalali) {
+      final j = Jalali.fromDateTime(now);
+      return Jalali(j.year, 1, 1).toDateTime();
+    }
+    return DateTime(now.year, 1, 1);
+  }
+
+  static String yearMonth(dynamic year, dynamic month, bool isJalali) {
+    final y = int.tryParse('$year');
+    final m = int.tryParse('$month');
+    if (y == null || m == null || m < 1 || m > 12) {
+      return '${year ?? ''}/${month ?? ''}';
+    }
+    final dt = DateTime(y, m, 1);
+    if (isJalali) {
+      final j = Jalali.fromDateTime(dt);
+      return '${j.year}/${j.month.toString().padLeft(2, '0')}';
+    }
+    return '$y/${m.toString().padLeft(2, '0')}';
+  }
 
   static String money(dynamic value) {
     if (value == null || (value is String && value.trim().isEmpty)) return '—';

@@ -12981,7 +12981,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get fixedAssetsDepreciationGregorianHint =>
-      'سال و ماه دوره را میلادی وارد کنید؛ موتور استهلاک روی تاریخ میلادی کار می‌کند.';
+      'یک روز از ماه مورد نظر را انتخاب کنید. نمایش تاریخ مطابق تقویم کسب‌وکار (شمسی یا میلادی) است.';
 
   @override
   String get fixedAssetsPeriodYear => 'سال میلادی';

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../../core/calendar_controller.dart';
+import '../../../core/date_utils.dart';
 import '../../../models/account_model.dart';
 import '../../../models/person_model.dart';
 import '../../../utils/snackbar_helper.dart';
@@ -18,7 +19,26 @@ int? _parseId(String? raw) {
   return int.tryParse(raw.trim());
 }
 
-String _isoDate(DateTime d) => d.toIso8601String().split('T').first;
+String _isoDate(DateTime d) => HesabixDateUtils.formatForApiDate(d);
+
+Widget _faDateField({
+  required DateTime value,
+  required CalendarController calendarController,
+  required String labelText,
+  required ValueChanged<DateTime> onChanged,
+}) {
+  return DateInputField(
+    value: value,
+    calendarController: calendarController,
+    labelText: labelText,
+    firstDate: FixedAssetsUi.datePickerFirst,
+    lastDate: FixedAssetsUi.datePickerLast,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+    onChanged: (d) {
+      if (d != null) onChanged(d);
+    },
+  );
+}
 
 class FixedAssetCounterpartyResult {
   const FixedAssetCounterpartyResult({
@@ -417,14 +437,11 @@ class _FixedAssetsCreateAssetDialogState extends State<FixedAssetsCreateAssetDia
               if (v != null) setState(() => _kind = v);
             },
           ),
-          DateInputField(
+          _faDateField(
             value: _acquisition,
             calendarController: widget.calendarController,
             labelText: t.fixedAssetsAcquisitionDate,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            onChanged: (d) {
-              if (d != null) setState(() => _acquisition = d);
-            },
+            onChanged: (d) => setState(() => _acquisition = d),
           ),
         ]),
       ),
@@ -602,14 +619,11 @@ class _FixedAssetsDisposeDialogState extends State<FixedAssetsDisposeDialog> {
               onChanged: (v) => _cp = v,
             ),
           ],
-          DateInputField(
+          _faDateField(
             value: _disposal,
             calendarController: widget.calendarController,
             labelText: t.fixedAssetsDisposalDate,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            onChanged: (d) {
-              if (d != null) setState(() => _disposal = d);
-            },
+            onChanged: (d) => setState(() => _disposal = d),
           ),
         ]),
       ),
@@ -747,14 +761,11 @@ class _FixedAssetsSubsequentDialogState extends State<FixedAssetsSubsequentDialo
             initialType: 'person',
             onChanged: (v) => _cp = v,
           ),
-          DateInputField(
+          _faDateField(
             value: _date,
             calendarController: widget.calendarController,
             labelText: t.fixedAssetsEffectiveDate,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            onChanged: (d) {
-              if (d != null) setState(() => _date = d);
-            },
+            onChanged: (d) => setState(() => _date = d),
           ),
         ]),
       ),
@@ -869,14 +880,11 @@ class _FixedAssetsEstimateDialogState extends State<FixedAssetsEstimateDialog> {
               prefixIcon: Icons.percent,
             ),
           ),
-        DateInputField(
+        _faDateField(
           value: _effective,
           calendarController: widget.calendarController,
           labelText: t.fixedAssetsEffectiveDate,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          onChanged: (d) {
-            if (d != null) setState(() => _effective = d);
-          },
+          onChanged: (d) => setState(() => _effective = d),
         ),
       ]),
       actions: [
@@ -919,14 +927,11 @@ class _FixedAssetsIdleDialogState extends State<FixedAssetsIdleDialog> {
       maxWidth: 460,
       child: FixedAssetsUi.spacedColumn([
         FixedAssetsUi.infoBanner(context, t.fixedAssetsIdleHint),
-        DateInputField(
+        _faDateField(
           value: _idleFrom,
           calendarController: widget.calendarController,
           labelText: t.fixedAssetsIdleFrom,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          onChanged: (d) {
-            if (d != null) setState(() => _idleFrom = d);
-          },
+          onChanged: (d) => setState(() => _idleFrom = d),
         ),
       ]),
       actions: [
@@ -941,12 +946,17 @@ class _FixedAssetsIdleDialogState extends State<FixedAssetsIdleDialog> {
 }
 
 class FixedAssetsDepreciationRunDialog extends StatefulWidget {
-  const FixedAssetsDepreciationRunDialog({super.key});
+  const FixedAssetsDepreciationRunDialog({super.key, required this.calendarController});
 
-  static Future<Map<String, dynamic>?> show(BuildContext context) {
+  final CalendarController calendarController;
+
+  static Future<Map<String, dynamic>?> show(
+    BuildContext context, {
+    required CalendarController calendarController,
+  }) {
     return showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (_) => const FixedAssetsDepreciationRunDialog(),
+      builder: (_) => FixedAssetsDepreciationRunDialog(calendarController: calendarController),
     );
   }
 
@@ -955,29 +965,10 @@ class FixedAssetsDepreciationRunDialog extends StatefulWidget {
 }
 
 class _FixedAssetsDepreciationRunDialogState extends State<FixedAssetsDepreciationRunDialog> {
-  late final TextEditingController _yearCtrl;
-  late final TextEditingController _monthCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    final now = DateTime.now();
-    _yearCtrl = TextEditingController(text: '${now.year}');
-    _monthCtrl = TextEditingController(text: '${now.month}');
-  }
-
-  @override
-  void dispose() {
-    _yearCtrl.dispose();
-    _monthCtrl.dispose();
-    super.dispose();
-  }
+  DateTime _periodDay = DateTime.now();
 
   void _submit() {
-    final year = int.tryParse(_yearCtrl.text.trim());
-    final month = int.tryParse(_monthCtrl.text.trim());
-    if (year == null || month == null || month < 1 || month > 12) return;
-    Navigator.pop(context, {'period_year': year, 'period_month': month});
+    Navigator.pop(context, {'period_start': _isoDate(_periodDay)});
   }
 
   @override
@@ -990,17 +981,11 @@ class _FixedAssetsDepreciationRunDialogState extends State<FixedAssetsDepreciati
       maxWidth: 460,
       child: FixedAssetsUi.spacedColumn([
         FixedAssetsUi.infoBanner(context, t.fixedAssetsDepreciationGregorianHint),
-        TextFormField(
-          controller: _yearCtrl,
-          keyboardType: TextInputType.number,
-          inputFormatters: FixedAssetsUi.numericFormatters(allowDecimal: false),
-          decoration: FixedAssetsUi.fieldDecoration(context, t.fixedAssetsPeriodYear, prefixIcon: Icons.calendar_month),
-        ),
-        TextFormField(
-          controller: _monthCtrl,
-          keyboardType: TextInputType.number,
-          inputFormatters: FixedAssetsUi.numericFormatters(allowDecimal: false),
-          decoration: FixedAssetsUi.fieldDecoration(context, t.fixedAssetsPeriodMonth, prefixIcon: Icons.date_range),
+        _faDateField(
+          value: _periodDay,
+          calendarController: widget.calendarController,
+          labelText: t.fixedAssetsPeriodMonth,
+          onChanged: (d) => setState(() => _periodDay = d),
         ),
       ]),
       actions: [

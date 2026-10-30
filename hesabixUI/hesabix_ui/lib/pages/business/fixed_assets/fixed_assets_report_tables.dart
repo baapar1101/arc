@@ -98,7 +98,7 @@ class FixedAssetsReportTables {
       columns: [
         TextColumn('period', t.fixedAssetsPeriodMonth, formatter: (r) {
           final m = r as Map;
-          return '${m['period_year']}/${m['period_month']}';
+          return FixedAssetsUi.yearMonth(m['period_year'], m['period_month'], isJalali);
         }),
         TextColumn('code', t.fixedAssetsPlaquePrefix, width: ColumnWidth.small, formatter: (r) => '${(r as Map)['code'] ?? ''}'),
         TextColumn('name', t.fixedAssetsAssetName, width: ColumnWidth.large, formatter: (r) => '${(r as Map)['name'] ?? ''}'),

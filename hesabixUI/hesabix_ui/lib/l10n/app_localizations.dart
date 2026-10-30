@@ -24085,7 +24085,7 @@ abstract class AppLocalizations {
   /// No description provided for @fixedAssetsDepreciationGregorianHint.
   ///
   /// In en, this message translates to:
-  /// **'Enter the Gregorian year and month; the depreciation engine uses Gregorian dates.'**
+  /// **'Pick any day in the target month. The date follows the business calendar (Jalali or Gregorian).'**
   String get fixedAssetsDepreciationGregorianHint;
 
   /// No description provided for @fixedAssetsPeriodYear.

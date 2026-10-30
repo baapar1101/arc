@@ -50,8 +50,8 @@ class _FixedAssetsReportsPageState extends State<FixedAssetsReportsPage> {
   final FixedAssetsService _svc = FixedAssetsService();
 
   late String _kind;
-  DateTime _from = DateTime(DateTime.now().year, 1, 1);
-  DateTime _to = DateTime.now();
+  late DateTime _from;
+  late DateTime _to;
   int? _classId;
   List<Map<String, dynamic>> _classes = [];
   Map<String, dynamic> _report = const {};
@@ -72,6 +72,8 @@ class _FixedAssetsReportsPageState extends State<FixedAssetsReportsPage> {
   void initState() {
     super.initState();
     _kind = _reportKinds.contains(widget.initialKind) ? widget.initialKind : 'register';
+    _from = FixedAssetsUi.startOfDisplayYear(widget.calendarController.isJalali);
+    _to = DateTime.now();
     _bootstrap();
   }
 
@@ -240,6 +242,8 @@ class _FixedAssetsReportsPageState extends State<FixedAssetsReportsPage> {
                     value: _from,
                     calendarController: widget.calendarController,
                     labelText: t.dateFrom,
+                    firstDate: FixedAssetsUi.datePickerFirst,
+                    lastDate: FixedAssetsUi.datePickerLast,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                     onChanged: (d) {
                       if (d == null) return;
@@ -250,6 +254,8 @@ class _FixedAssetsReportsPageState extends State<FixedAssetsReportsPage> {
                     value: _to,
                     calendarController: widget.calendarController,
                     labelText: t.dateTo,
+                    firstDate: FixedAssetsUi.datePickerFirst,
+                    lastDate: FixedAssetsUi.datePickerLast,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                     onChanged: (d) {
                       if (d == null) return;

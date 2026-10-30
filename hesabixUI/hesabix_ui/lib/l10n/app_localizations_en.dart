@@ -13051,7 +13051,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fixedAssetsDepreciationGregorianHint =>
-      'Enter the Gregorian year and month; the depreciation engine uses Gregorian dates.';
+      'Pick any day in the target month. The date follows the business calendar (Jalali or Gregorian).';
 
   @override
   String get fixedAssetsPeriodYear => 'Gregorian year';

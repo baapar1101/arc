@@ -5166,7 +5166,7 @@
   "fixedAssetsNoClasses": "طبقه دارایی آماده نیست.",
   "fixedAssetsNoRuns": "هنوز اجرای استهلاکی ثبت نشده است.",
   "fixedAssetsNewDepreciationRun": "محاسبه استهلاک ماه",
-  "fixedAssetsDepreciationGregorianHint": "سال و ماه دوره را میلادی وارد کنید؛ موتور استهلاک روی تاریخ میلادی کار می‌کند.",
+  "fixedAssetsDepreciationGregorianHint": "یک روز از ماه مورد نظر را انتخاب کنید. نمایش تاریخ مطابق تقویم کسب‌وکار (شمسی یا میلادی) است.",
   "fixedAssetsPeriodYear": "سال میلادی",
   "fixedAssetsPeriodMonth": "ماه",
   "fixedAssetsRunCreated": "پیش‌نویس استهلاک ساخته شد.",

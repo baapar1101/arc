@@ -162,7 +162,10 @@ class _FixedAssetsMainPageState extends State<FixedAssetsMainPage> with SingleTi
 
   Future<void> _createRun() async {
     final t = AppLocalizations.of(context);
-    final payload = await FixedAssetsDepreciationRunDialog.show(context);
+    final payload = await FixedAssetsDepreciationRunDialog.show(
+      context,
+      calendarController: widget.calendarController,
+    );
     if (payload == null) return;
     await _runAction(
       () => _svc.createRun(businessId: widget.businessId, payload: payload),
@@ -570,7 +573,13 @@ class _FixedAssetsMainPageState extends State<FixedAssetsMainPage> with SingleTi
               r['status'] == 'posted' ? Icons.check_circle_outline : Icons.hourglass_empty,
               color: r['status'] == 'posted' ? SemanticColorResolver.positive(context) : cs.outline,
             ),
-            title: Text('${r['period_year']}/${r['period_month']}'),
+            title: Text(
+              FixedAssetsUi.yearMonth(
+                r['period_year'],
+                r['period_month'],
+                widget.calendarController.isJalali,
+              ),
+            ),
             subtitle: Text(
               '${r['status'] == 'posted' ? t.fixedAssetsRunPostedStatus : t.fixedAssetsRunDraft}'
               ' · ${FixedAssetsUi.money(r['total_amount'])}',
