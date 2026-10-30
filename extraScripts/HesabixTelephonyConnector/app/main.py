@@ -28,7 +28,7 @@ import socket
 import threading
 import time
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 from urllib import error, request
 
 LOG = logging.getLogger("hesabix.telephony.connector")
@@ -159,9 +159,10 @@ class AmiClient:
 				pass
 			self._sock = None
 
-	def _send(self, lines: Dict[str, str]) -> None:
+	def _send(self, lines: Union[Dict[str, str], List[Tuple[str, str]]]) -> None:
 		assert self._sock is not None
-		payload = "".join(f"{k}: {v}\r\n" for k, v in lines.items()) + "\r\n"
+		items = list(lines.items()) if isinstance(lines, dict) else list(lines)
+		payload = "".join(f"{k}: {v}\r\n" for k, v in items) + "\r\n"
 		with self._lock:
 			self._sock.sendall(payload.encode("utf-8"))
 
@@ -208,26 +209,34 @@ class AmiClient:
 		caller_id: str = "",
 		timeout_ms: int = 30000,
 		variable: Optional[str] = None,
+		action_id: Optional[str] = None,
+		variables: Optional[Dict[str, str]] = None,
 	) -> None:
-		payload: Dict[str, str] = {
-			"Action": "Originate",
-			"Channel": channel,
-			"Application": application,
-			"Data": data,
-			"Timeout": str(timeout_ms),
-			"Async": "true",
-		}
+		items: List[Tuple[str, str]] = [
+			("Action", "Originate"),
+			("Channel", channel),
+			("Application", application),
+			("Data", data),
+			("Timeout", str(timeout_ms)),
+			("Async", "true"),
+		]
 		if caller_id:
-			payload["CallerID"] = caller_id
-		if variable:
-			payload["Variable"] = variable
-		self._send(payload)
+			items.append(("CallerID", caller_id))
+		if action_id:
+			items.append(("ActionID", action_id))
+		vars_map: Dict[str, str] = dict(variables or {})
+		if variable and "=" in variable:
+			k, _, v = variable.partition("=")
+			vars_map[k.strip()] = v
+		for k, v in vars_map.items():
+			items.append(("Variable", f"{k}={v}"))
+		self._send(items)
 
 	def play_dtmf(self, channel: str, digit: str) -> None:
 		self._send({"Action": "PlayDTMF", "Channel": channel, "Digit": digit})
 
 	def hangup(self, channel: str) -> None:
-		self._send({"Action": "Hangup", "Channel": channel})
+		self._send({"Action": "Hangup", "Channel": channel, "Cause": "16"})
 
 	def set_var(self, channel: str, variable: str, value: str) -> None:
 		self._send(
@@ -311,6 +320,17 @@ def map_ami_event(ev: Dict[str, str]) -> Optional[Dict[str, Any]]:
 			"to": ev.get("DestExten") or ev.get("Exten"),
 			"extension": ev.get("DestCallerIDNum") or ev.get("DestExten"),
 			"channel": ev.get("Channel"),
+			"dest_channel": ev.get("DestChannel"),
+		}
+	if name == "Newstate" and (ev.get("ChannelStateDesc") or "") == "Up":
+		return {
+			"event_id": str(uuid.uuid4()),
+			"type": "call.answered",
+			"uniqueid": ev.get("Uniqueid") or str(uuid.uuid4()),
+			"linkedid": ev.get("Linkedid"),
+			"from": ev.get("CallerIDNum"),
+			"to": ev.get("ConnectedLineNum") or ev.get("Exten"),
+			"channel": ev.get("Channel"),
 		}
 	if name == "Hangup":
 		return {
@@ -322,8 +342,21 @@ def map_ami_event(ev: Dict[str, str]) -> Optional[Dict[str, Any]]:
 			"extension": ev.get("CallerIDNum"),
 			"from": ev.get("CallerIDNum"),
 			"to": ev.get("ConnectedLineNum"),
+			"channel": ev.get("Channel"),
 		}
 	return None
+
+
+def _local_channel_mates(channel: str) -> List[str]:
+	ch = (channel or "").strip()
+	if not ch:
+		return []
+	out = [ch]
+	if ch.endswith(";1"):
+		out.append(ch[:-2] + ";2")
+	elif ch.endswith(";2"):
+		out.append(ch[:-2] + ";1")
+	return out
 
 
 def main() -> int:
@@ -375,8 +408,113 @@ def main() -> int:
 	session_to_bridge_id: Dict[str, str] = {}
 	session_to_call_id: Dict[str, Any] = {}
 	online_agents_by_ext: Dict[str, str] = {}  # extension -> session_id
+	session_channels: Dict[str, Set[str]] = {}
+	uniqueid_to_session: Dict[str, str] = {}
+	action_to_session: Dict[str, str] = {}
+	cancelled_sessions: Dict[str, float] = {}
+	hangup_initiated: Set[str] = set()
 	media_lock = threading.Lock()
 	tunnel_ref: Dict[str, Any] = {"client": None}
+
+	def _remember_channel(session_id: str, channel: Optional[str] = None, uniqueid: Optional[str] = None) -> None:
+		if not session_id:
+			return
+		with media_lock:
+			bucket = session_channels.setdefault(session_id, set())
+			for ch in _local_channel_mates(channel or ""):
+				bucket.add(ch)
+			if uniqueid:
+				uniqueid_to_session[str(uniqueid)] = session_id
+
+	def _session_from_ami(ev: Dict[str, str]) -> str:
+		aid = ev.get("ActionID") or ""
+		uid = ev.get("Uniqueid") or ""
+		lid = ev.get("Linkedid") or ""
+		ch = ev.get("Channel") or ""
+		dest = ev.get("DestChannel") or ""
+		with media_lock:
+			if aid and aid in action_to_session:
+				return action_to_session[aid]
+			if uid and uid in uniqueid_to_session:
+				return uniqueid_to_session[uid]
+			if lid and lid in uniqueid_to_session:
+				return uniqueid_to_session[lid]
+			for sid, chans in session_channels.items():
+				if ch in chans or dest in chans:
+					return sid
+		return ""
+
+	def _track_ami_event(ev: Dict[str, str]) -> None:
+		name = ev.get("Event") or ""
+		if name not in ("Newchannel", "Newstate", "DialBegin", "BridgeEnter", "OriginateResponse", "Hangup"):
+			return
+		sid = _session_from_ami(ev)
+		if name == "OriginateResponse":
+			aid = ev.get("ActionID") or ""
+			if not sid and aid:
+				with media_lock:
+					sid = action_to_session.get(aid, "")
+		if not sid:
+			return
+		_remember_channel(sid, ev.get("Channel"), ev.get("Uniqueid"))
+		_remember_channel(sid, ev.get("DestChannel"), ev.get("DestUniqueid"))
+		if ev.get("Linkedid"):
+			_remember_channel(sid, None, ev.get("Linkedid"))
+
+	def _session_cancelled(session_id: str) -> bool:
+		if not session_id:
+			return False
+		exp = cancelled_sessions.get(session_id)
+		if not exp:
+			return False
+		if exp < time.time():
+			cancelled_sessions.pop(session_id, None)
+			return False
+		return True
+
+	def _hangup_session(
+		*,
+		session_id: str = "",
+		as_uuid: str = "",
+		channels: Optional[List[Any]] = None,
+		extra_channel: str = "",
+	) -> None:
+		now = time.time()
+		if session_id:
+			cancelled_sessions[session_id] = now + 120.0
+			hangup_initiated.add(session_id)
+		chans: Set[str] = set()
+		for raw in channels or []:
+			chans.update(_local_channel_mates(str(raw or "")))
+		chans.update(_local_channel_mates(extra_channel))
+		with media_lock:
+			if session_id:
+				chans.update(session_channels.get(session_id, set()))
+			if not as_uuid and session_id:
+				as_uuid = session_to_as_uuid.get(session_id, "") or ""
+			if as_uuid:
+				mapped = as_uuid_to_session.get(as_uuid, "")
+				if mapped:
+					chans.update(session_channels.get(mapped, set()))
+					session_id = session_id or mapped
+		LOG.info("hangup session=%s uuid=%s channels=%s", session_id, as_uuid, sorted(chans))
+		for ch in list(chans):
+			if not ch:
+				continue
+			try:
+				ami.hangup(ch)
+			except Exception:
+				LOG.debug("AMI hangup failed channel=%s", ch)
+		if as_uuid:
+			audio_server.hangup(as_uuid)
+		with media_lock:
+			if session_id:
+				session_channels.pop(session_id, None)
+				session_to_as_uuid.pop(session_id, None)
+				session_to_bridge_id.pop(session_id, None)
+				session_to_call_id.pop(session_id, None)
+			if as_uuid:
+				as_uuid_to_session.pop(as_uuid, None)
 
 	def _notify_bridge_active(session_id: str, as_uuid: str, *, call_id: Any = None) -> None:
 		client = tunnel_ref.get("client")
@@ -417,6 +555,9 @@ def main() -> int:
 			if session_id:
 				session_to_as_uuid.pop(session_id, None)
 				session_to_bridge_id.pop(session_id, None)
+		if session_id and session_id in hangup_initiated:
+			hangup_initiated.discard(session_id)
+			return
 		client = tunnel_ref.get("client")
 		if client and session_id:
 			client.send_json({"type": "bridge.failed", "session_id": session_id, "reason": "audiosocket_hangup", "audiosocket_uuid": as_uuid})
@@ -447,18 +588,13 @@ def main() -> int:
 		elif typ == "bridge.stop":
 			session_id = str(payload.get("session_id") or "")
 			as_uuid = str(payload.get("audiosocket_uuid") or "")
-			with media_lock:
-				if not as_uuid:
-					as_uuid = session_to_as_uuid.pop(session_id, "")
-				else:
-					session_to_as_uuid.pop(session_id, None)
-				if as_uuid:
-					as_uuid_to_session.pop(as_uuid, None)
-				if session_id:
-					session_to_bridge_id.pop(session_id, None)
-					session_to_call_id.pop(session_id, None)
-			if as_uuid:
-				audio_server.hangup(as_uuid)
+			raw_channels = payload.get("channels") if isinstance(payload.get("channels"), list) else []
+			_hangup_session(
+				session_id=session_id,
+				as_uuid=as_uuid,
+				channels=raw_channels,
+				extra_channel=str(payload.get("channel") or ""),
+			)
 		elif typ == "agent.online":
 			ext = str(payload.get("extension") or "").strip()
 			sid = str(payload.get("session_id") or "").strip()
@@ -525,7 +661,7 @@ def main() -> int:
 				if client and client.connected:
 					client.send_json({"type": "ping", "ts": int(now)})
 				last_media_ping = now
-			if now - last_poll > 2:
+			if now - last_poll > 0.4:
 				for cmd in api.poll_commands():
 					cid = cmd.get("command_id")
 					ctype = cmd.get("type")
@@ -544,86 +680,90 @@ def main() -> int:
 							session_id = str(cmd.get("session_id") or "")
 							host = str(cmd.get("audiosocket_host") or audio_host)
 							port = int(cmd.get("audiosocket_port") or audio_port)
-							with media_lock:
-								if session_id:
-									as_uuid_to_session[as_uuid] = session_id
-									session_to_as_uuid[session_id] = as_uuid
-									if cmd.get("call_id") is not None:
-										session_to_call_id[session_id] = cmd.get("call_id")
-							# Asterisk AudioSocket(uuid,host:port) — ترتیب آرگومان مهم است.
-							# /n روی Local مانع channel optimization می‌شود تا AudioSocket قطع نشود.
-							ami.originate_to_application(
-								channel=f"Local/{destination}@{context}/n",
-								application="AudioSocket",
-								data=f"{as_uuid},{host}:{port}",
-								caller_id=str(cmd.get("extension") or ""),
-								timeout_ms=int(cmd.get("timeout_ms") or 30000),
-								variable=f"HSX_UUID={as_uuid}",
-							)
-							LOG.info(
-								"softphone_bridge_out dest=%s uuid=%s as=%s:%s",
-								destination,
-								as_uuid,
-								host,
-								port,
-							)
-							# bridge.active بعد از TCP AudioSocket (on_as_connect) تا میکروفون/سکوت به‌موقع برسد
-							if audio_server.has_connection(as_uuid):
-								_notify_bridge_active(session_id, as_uuid, call_id=cmd.get("call_id"))
+							if _session_cancelled(session_id):
+								LOG.info("skip softphone_bridge_out; session cancelled %s", session_id)
+							else:
+								with media_lock:
+									if session_id:
+										as_uuid_to_session[as_uuid] = session_id
+										session_to_as_uuid[session_id] = as_uuid
+										action_to_session[as_uuid] = session_id
+										if cmd.get("call_id") is not None:
+											session_to_call_id[session_id] = cmd.get("call_id")
+								# Asterisk AudioSocket(uuid,host:port) — ترتیب آرگومان مهم است.
+								# /n روی Local مانع channel optimization می‌شود تا AudioSocket قطع نشود.
+								ami.originate_to_application(
+									channel=f"Local/{destination}@{context}/n",
+									application="AudioSocket",
+									data=f"{as_uuid},{host}:{port}",
+									caller_id=str(cmd.get("extension") or ""),
+									timeout_ms=int(cmd.get("timeout_ms") or 30000),
+									action_id=as_uuid,
+									variables={
+										"HSX_UUID": as_uuid,
+										"__HSX_UUID": as_uuid,
+										"__HSX_SID": session_id,
+									},
+								)
+								LOG.info(
+									"softphone_bridge_out dest=%s uuid=%s as=%s:%s",
+									destination,
+									as_uuid,
+									host,
+									port,
+								)
+								# bridge.active بعد از TCP AudioSocket (on_as_connect) تا میکروفون/سکوت به‌موقع برسد
+								if audio_server.has_connection(as_uuid):
+									_notify_bridge_active(session_id, as_uuid, call_id=cmd.get("call_id"))
 						elif ctype == "softphone_bridge_in":
 							as_uuid = str(cmd.get("audiosocket_uuid") or uuid.uuid4())
 							session_id = str(cmd.get("session_id") or "")
 							channel = cmd.get("channel")
 							host = str(cmd.get("audiosocket_host") or audio_host)
 							port = int(cmd.get("audiosocket_port") or audio_port)
-							with media_lock:
-								if session_id:
-									as_uuid_to_session[as_uuid] = session_id
-									session_to_as_uuid[session_id] = as_uuid
-							if channel:
-								# انتقال کانال زنگ‌خور به AudioSocket — UUID را روی کانال ست کن
-								ami.set_var(str(channel), "HSX_UUID", as_uuid)
-								ami.redirect(str(channel), "s", context="hesabix-softphone-relay")
+							if _session_cancelled(session_id):
+								LOG.info("skip softphone_bridge_in; session cancelled %s", session_id)
 							else:
-								ext = str(cmd.get("extension") or "")
-								ami.originate_to_application(
-									channel=f"Local/{ext}@from-internal/n",
-									application="AudioSocket",
-									data=f"{as_uuid},{host}:{port}",
-									caller_id=ext,
-									timeout_ms=30000,
-									variable=f"HSX_UUID={as_uuid}",
-								)
-							if audio_server.has_connection(as_uuid):
-								_notify_bridge_active(session_id, as_uuid, call_id=cmd.get("call_id"))
+								with media_lock:
+									if session_id:
+										as_uuid_to_session[as_uuid] = session_id
+										session_to_as_uuid[session_id] = as_uuid
+										action_to_session[as_uuid] = session_id
+								if channel:
+									_remember_channel(session_id, str(channel))
+									# انتقال کانال زنگ‌خور به AudioSocket — UUID را روی کانال ست کن
+									ami.set_var(str(channel), "HSX_UUID", as_uuid)
+									ami.redirect(str(channel), "s", context="hesabix-softphone-relay")
+								else:
+									ext = str(cmd.get("extension") or "")
+									ami.originate_to_application(
+										channel=f"Local/{ext}@from-internal/n",
+										application="AudioSocket",
+										data=f"{as_uuid},{host}:{port}",
+										caller_id=ext,
+										timeout_ms=30000,
+										action_id=as_uuid,
+										variables={
+											"HSX_UUID": as_uuid,
+											"__HSX_UUID": as_uuid,
+											"__HSX_SID": session_id,
+										},
+									)
+								if audio_server.has_connection(as_uuid):
+									_notify_bridge_active(session_id, as_uuid, call_id=cmd.get("call_id"))
 						elif ctype == "softphone_dtmf":
 							channel = cmd.get("channel")
 							digit = str(cmd.get("digit") or "")
 							if channel and digit:
 								ami.play_dtmf(str(channel), digit)
 						elif ctype == "hangup":
-							channel = cmd.get("channel")
-							if channel:
-								ami.hangup(str(channel))
-							session_id = str(cmd.get("session_id") or "")
-							as_uuid = str(cmd.get("audiosocket_uuid") or "")
-							with media_lock:
-								if not as_uuid and session_id:
-									as_uuid = session_to_as_uuid.pop(session_id, "") or ""
-								elif as_uuid:
-									mapped_session = as_uuid_to_session.pop(as_uuid, "") or ""
-									session_id = session_id or mapped_session
-									if session_id:
-										session_to_as_uuid.pop(session_id, None)
-								if as_uuid:
-									as_uuid_to_session.pop(as_uuid, None)
-								if session_id:
-									session_to_bridge_id.pop(session_id, None)
-							if as_uuid:
-								LOG.info("hangup AudioSocket uuid=%s session=%s", as_uuid, session_id)
-								audio_server.hangup(as_uuid)
-							elif not channel:
-								LOG.warning("hangup without channel/session/uuid cmd=%s", cmd)
+							raw_channels = cmd.get("channels") if isinstance(cmd.get("channels"), list) else []
+							_hangup_session(
+								session_id=str(cmd.get("session_id") or ""),
+								as_uuid=str(cmd.get("audiosocket_uuid") or ""),
+								channels=raw_channels,
+								extra_channel=str(cmd.get("channel") or ""),
+							)
 						elif ctype == "transfer":
 							channel = cmd.get("channel")
 							target = cmd.get("target")
@@ -640,6 +780,7 @@ def main() -> int:
 						if cid:
 							api.ack(str(cid), accepted=False, error=str(e))
 				last_poll = now
+			_track_ami_event(ev)
 			mapped = map_ami_event(ev)
 			if mapped:
 				result = api.send_event(mapped)

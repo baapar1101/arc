@@ -62,6 +62,9 @@ class SoftphoneEngine extends ChangeNotifier with WidgetsBindingObserver {
   bool _wantOnline = false;
   bool _uiHoldingWs = true;
   int _reconnectAttempt = 0;
+  final BytesBuilder _outPcmBuf = BytesBuilder(copy: false);
+  static const int _pcmFrameBytes = 320; // 20ms @ 8kHz mono PCM16
+  DateTime? _lastMicFrameAt;
 
   SoftphoneConnectionState state = SoftphoneConnectionState.idle;
   String? error;
@@ -276,9 +279,8 @@ class SoftphoneEngine extends ChangeNotifier with WidgetsBindingObserver {
         await media.startMic((Uint8List chunk) {
           if (!bridgeActive || muted) return;
           if (!_ws!.isConnected) return;
-          _ws!.sendPcm(sid, chunk);
-          outgoingPcmFrames += 1;
-          if (outgoingPcmFrames % 50 == 0) notifyListeners();
+          _lastMicFrameAt = DateTime.now();
+          _emitOutgoingPcm(sid, chunk);
         });
         _micLive = true;
       }
@@ -295,33 +297,48 @@ class SoftphoneEngine extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
+  void _emitOutgoingPcm(String sid, List<int> chunk) {
+    if (chunk.isEmpty) return;
+    _outPcmBuf.add(chunk);
+    var data = _outPcmBuf.toBytes();
+    _outPcmBuf.clear();
+    var offset = 0;
+    while (offset + _pcmFrameBytes <= data.length) {
+      final frame = data.sublist(offset, offset + _pcmFrameBytes);
+      _ws?.sendPcm(sid, frame);
+      outgoingPcmFrames += 1;
+      offset += _pcmFrameBytes;
+    }
+    if (offset < data.length) {
+      _outPcmBuf.add(data.sublist(offset));
+    }
+    if (outgoingPcmFrames % 50 == 0) notifyListeners();
+  }
+
   void _startSilenceFallback({bool onlyWhenNoMicFrames = false}) {
     _silenceFallback?.cancel();
-    final silence = List<int>.filled(320, 0); // 20ms @ 8kHz
-    var ticks = 0;
+    final silence = List<int>.filled(_pcmFrameBytes, 0); // 20ms @ 8kHz
     _silenceFallback = Timer.periodic(const Duration(milliseconds: 20), (_) {
       if (!bridgeActive || muted) return;
       final sid = sessionId;
       final ws = _ws;
       if (sid == null || ws == null || !ws.isConnected) return;
-      if (onlyWhenNoMicFrames && _micLive && outgoingPcmFrames > 5) {
-        // میکروفون زنده است؛ fallback را متوقف کن
-        if (ticks > 25) {
-          _silenceFallback?.cancel();
-          _silenceFallback = null;
+      if (onlyWhenNoMicFrames && _micLive) {
+        final last = _lastMicFrameAt;
+        if (last != null && DateTime.now().difference(last).inMilliseconds < 80) {
+          return;
         }
-        ticks++;
-        return;
       }
       ws.sendPcm(sid, silence);
       outgoingPcmFrames += 1;
-      ticks++;
     });
   }
 
   Future<void> _stopLiveMedia() async {
     _silenceFallback?.cancel();
     _silenceFallback = null;
+    _outPcmBuf.clear();
+    _lastMicFrameAt = null;
     try {
       await _media?.stopMic();
     } catch (_) {}
@@ -368,20 +385,32 @@ class SoftphoneEngine extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> hangup() async {
     final callId = int.tryParse('${activeCall?['id'] ?? ''}');
     final sid = sessionId;
+    final channel = '${activeCall?['channel'] ?? ''}'.trim();
     await _stopRingtone();
     await _incomingNotif.cancelIncomingCall();
-    _ws?.sendJson({'type': 'hangup_media', 'reason': 'user_hangup', if (sid != null) 'session_id': sid});
+    _ws?.sendJson({
+      'type': 'hangup_media',
+      'reason': 'user_hangup',
+      if (sid != null) 'session_id': sid,
+      if (callId != null) 'call_id': callId,
+      if (channel.isNotEmpty) 'channel': channel,
+    });
     if (callId != null) {
       try {
         await _api.controlCall(
           businessId,
           callId,
           action: 'hangup',
-          extra: sid != null ? {'session_id': sid} : null,
+          extra: {
+            if (sid != null) 'session_id': sid,
+            if (channel.isNotEmpty) 'channel': channel,
+          },
         );
       } catch (_) {}
     }
     bridgeActive = false;
+    _outPcmBuf.clear();
+    _lastMicFrameAt = null;
     await _stopLiveMedia();
     activeCall = null;
     state = SoftphoneConnectionState.registered;

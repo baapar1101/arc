@@ -133,8 +133,8 @@ class WindowsSoftphonePcmMedia implements SoftphonePcmMedia {
     final hwo = _hwo;
     if (hwo == null) return;
     _reclaimOut();
-    // Cap queued audio (~200 ms) to avoid runaway latency.
-    if (_outBusy.length >= 10) return;
+    // سقف ~۸۰ms (۴ فریم ۲۰ms) تا تأخیر تجمعی نشود.
+    if (_outBusy.length >= 4) return;
     final bytes = Uint8List.fromList(pcm);
     final buf = _outFree.isNotEmpty
         ? _outFree.removeLast().ensureCapacity(bytes.length)

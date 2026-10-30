@@ -464,7 +464,14 @@ class TelephonyMediaHub:
 		)
 		return bridge
 
-	async def stop_bridge(self, session_id: str, *, reason: str = "hangup") -> None:
+	async def stop_bridge(
+		self,
+		session_id: str,
+		*,
+		reason: str = "hangup",
+		channel: Optional[str] = None,
+		channels: Optional[list] = None,
+	) -> None:
 		async with self._lock:
 			bridge_id = self._bridges_by_session.pop(session_id, None)
 			bridge = self._bridges.pop(bridge_id, None) if bridge_id else None
@@ -474,18 +481,20 @@ class TelephonyMediaHub:
 			if link:
 				link.bridge_id = None
 				link.active_call_id = None
-		# حتی بدون bridge محلی، به Connector بگو AudioSocket را ببند (قطع واقعی تماس)
+		# حتی بدون bridge محلی، به Connector بگو AudioSocket و کانال AMI را ببند
 		if pbx_id:
-			await self.send_to_tunnel(
-				pbx_id,
-				{
-					"type": "bridge.stop",
-					"bridge_id": bridge_id,
-					"session_id": session_id,
-					"audiosocket_uuid": as_uuid,
-					"reason": reason,
-				},
-			)
+			payload: Dict[str, Any] = {
+				"type": "bridge.stop",
+				"bridge_id": bridge_id,
+				"session_id": session_id,
+				"audiosocket_uuid": as_uuid,
+				"reason": reason,
+			}
+			if channel:
+				payload["channel"] = channel
+			if channels:
+				payload["channels"] = list(channels)
+			await self.send_to_tunnel(pbx_id, payload)
 		await self.send_to_client(
 			session_id,
 			{"type": "bridge.ended", "bridge_id": bridge_id, "reason": reason},

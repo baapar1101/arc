@@ -506,6 +506,34 @@ def start_outbound_relay_call(
 	db.commit()
 	db.refresh(call)
 
+	# پل را از همین لحظه روی Media Hub بساز تا hangup_media قبل از Originate هم uuid داشته باشد
+	def _start_bridge() -> None:
+		async def _run() -> None:
+			await media_hub.start_bridge(
+				session_id=session_id,
+				call_id=call.id,
+				direction="outbound",
+				audiosocket_uuid=as_uuid,
+			)
+
+		import anyio
+
+		try:
+			anyio.from_thread.run(_run)
+		except Exception:
+			try:
+				import asyncio
+
+				loop = asyncio.get_event_loop()
+				if loop.is_running():
+					asyncio.create_task(_run())
+				else:
+					loop.run_until_complete(_run())
+			except Exception:
+				pass
+
+	_start_bridge()
+
 	return {
 		"call": tel.call_to_dict(call),
 		"session_id": session_id,

@@ -22,7 +22,8 @@ class IoSoftphonePcmMedia implements SoftphonePcmMedia {
   StreamSubscription<Uint8List>? _micSub;
   bool _ready = false;
   bool _mic = false;
-  static const int _bufferSize = 4096;
+  // ۲۰–۴۰ms @ 8kHz mono PCM16. مقدار قبلی ۴۰۹۶ بایت (~۲۵۶ms) تأخیر زیاد می‌ساخت.
+  static const int _bufferSize = 640;
 
   @override
   bool get isReady => _ready;

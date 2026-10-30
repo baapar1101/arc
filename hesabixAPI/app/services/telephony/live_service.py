@@ -191,11 +191,19 @@ def enqueue_control_command(
 
 	command_id = str(uuid.uuid4())
 	extra = dict(call.extra_info or {}) if call else {}
+	from app.services.telephony.ami_channels import expand_hangup_channels
+
+	channels = expand_hangup_channels(
+		[extra.get("dest_channel"), extra.get("channel")],
+	)
 	payload = {
+		"type": command_type,
 		"extension": extension,
 		"target": target,
 		"asterisk_uniqueid": call.asterisk_uniqueid if call else None,
-		"channel": extra.get("channel"),
+		"linkedid": call.asterisk_linkedid if call else None,
+		"channel": extra.get("dest_channel") or extra.get("channel"),
+		"channels": channels,
 		"session_id": session_id or extra.get("session_id"),
 		"audiosocket_uuid": extra.get("audiosocket_uuid"),
 	}

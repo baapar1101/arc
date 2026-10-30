@@ -1129,6 +1129,30 @@ def process_connector_event(
 		.filter(TelephonyCall.pbx_id == pbx.id, TelephonyCall.asterisk_uniqueid == uniqueid)
 		.first()
 	)
+	if not call and payload.get("linkedid"):
+		call = (
+			db.query(TelephonyCall)
+			.filter(TelephonyCall.pbx_id == pbx.id, TelephonyCall.asterisk_linkedid == str(payload.get("linkedid")))
+			.filter(TelephonyCall.ended_at.is_(None))
+			.order_by(TelephonyCall.id.desc())
+			.first()
+		)
+	if not call:
+		recent = (
+			db.query(TelephonyCall)
+			.filter(
+				TelephonyCall.pbx_id == pbx.id,
+				TelephonyCall.ended_at.is_(None),
+				TelephonyCall.status.in_(["ringing", "answered"]),
+				TelephonyCall.started_at >= _now() - timedelta(minutes=15),
+			)
+			.order_by(TelephonyCall.id.desc())
+			.limit(25)
+			.all()
+		)
+		from app.services.telephony.ami_channels import match_softphone_relay_call
+
+		call = match_softphone_relay_call(recent, payload)
 
 	settings = get_or_create_settings(db, pbx.business_id)
 	direction = str(payload.get("direction") or (call.direction if call else "inbound")).lower()
@@ -1141,6 +1165,9 @@ def process_connector_event(
 	to_norm = normalize_iran_phone(to_raw)["canonical"]
 
 	created = False
+	if not call and event_type in ("call.answered", "answered"):
+		# Answer بدون تماس قبلی (مثلاً Local AudioSocket) نباید رکورد جعلی بسازد
+		return {"ok": True, "ignored": True, "reason": "answered_without_call"}
 	if not call:
 		match = match_caller(
 			db,
@@ -1191,11 +1218,28 @@ def process_connector_event(
 			call.queue_code = payload.get("queue")
 		if payload.get("linkedid"):
 			call.asterisk_linkedid = payload.get("linkedid")
+		# uniqueid ساختگی Softphone را به uniqueid واقعی Asterisk بچسبان تا Hangup بعدی پیدا شود
+		if call.asterisk_uniqueid != uniqueid:
+			taken = (
+				db.query(TelephonyCall.id)
+				.filter(
+					TelephonyCall.pbx_id == pbx.id,
+					TelephonyCall.asterisk_uniqueid == uniqueid,
+					TelephonyCall.id != call.id,
+				)
+				.first()
+			)
+			if not taken:
+				call.asterisk_uniqueid = uniqueid
+				extra_bind = dict(call.extra_info or {})
+				extra_bind["asterisk_uniqueid_bound"] = True
+				call.extra_info = extra_bind
 
 	# state transitions
 	notify_type = None
 	if event_type in ("call.ringing", "ringing"):
-		call.status = "ringing"
+		if call.status not in ("answered", "completed", "missed", "busy", "failed", "cancelled"):
+			call.status = "ringing"
 		notify_type = "telephony.incoming_call" if call.direction == "inbound" else "telephony.outbound_ringing"
 	elif event_type in ("call.answered", "answered"):
 		call.status = "answered"
@@ -1282,10 +1326,13 @@ def process_connector_event(
 	except Exception:
 		pass
 
-	# store channel for later control
-	if payload.get("channel"):
+	# store channel for later control (DestChannel برای Hangup واقعی لازم است)
+	if payload.get("channel") or payload.get("dest_channel"):
 		extra = dict(call.extra_info or {})
-		extra["channel"] = payload.get("channel")
+		if payload.get("channel"):
+			extra["channel"] = payload.get("channel")
+		if payload.get("dest_channel"):
+			extra["dest_channel"] = payload.get("dest_channel")
 		call.extra_info = extra
 
 	db.commit()

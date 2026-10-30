@@ -66,7 +66,15 @@
       if (!devices || !devices.getUserMedia) {
         throw new Error('mediaDevices unavailable');
       }
-      mediaStream = await devices.getUserMedia({ audio: true, video: false });
+      mediaStream = await devices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1,
+        },
+        video: false,
+      });
       if (onWebmChunk && supportsWebmOpus()) {
         try {
           startWebm(onWebmChunk);
