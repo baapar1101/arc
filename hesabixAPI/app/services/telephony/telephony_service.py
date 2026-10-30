@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import and_, func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from adapters.db.models.crm import CrmActivity, Lead
@@ -1230,10 +1231,15 @@ def process_connector_event(
 				.first()
 			)
 			if not taken:
-				call.asterisk_uniqueid = uniqueid
-				extra_bind = dict(call.extra_info or {})
-				extra_bind["asterisk_uniqueid_bound"] = True
-				call.extra_info = extra_bind
+				try:
+					with db.begin_nested():
+						call.asterisk_uniqueid = uniqueid
+						extra_bind = dict(call.extra_info or {})
+						extra_bind["asterisk_uniqueid_bound"] = True
+						call.extra_info = extra_bind
+						db.flush()
+				except IntegrityError:
+					pass
 
 	# state transitions
 	notify_type = None
