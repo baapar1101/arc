@@ -10,6 +10,7 @@ from app.core.auth_dependency import AuthContext, get_current_user
 from app.core.i18n import locale_dependency
 from app.core.permissions import require_business_access_dep, require_business_permission_dep
 from app.core.responses import format_datetime_fields, success_response
+from app.services import fixed_asset_reports as reports_svc
 from app.services import fixed_asset_service as svc
 
 router = APIRouter(prefix="/fixed-assets", tags=["fixed_assets"])
@@ -143,6 +144,7 @@ def list_assets_endpoint(
 	status: Optional[str] = Query(None),
 	class_id: Optional[int] = Query(None),
 	search: Optional[str] = Query(None),
+	invoice_id: Optional[int] = Query(None),
 	limit: int = Query(100, ge=1, le=500),
 	skip: int = Query(0, ge=0),
 	_: None = Depends(locale_dependency),
@@ -158,6 +160,7 @@ def list_assets_endpoint(
 			status=status,
 			class_id=class_id,
 			search=search,
+			invoice_id=invoice_id,
 			limit=limit,
 			skip=skip,
 		),
@@ -395,3 +398,36 @@ def delete_run_endpoint(
 	_ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	return _fa_response(svc.delete_depreciation_run(db, business_id, run_id), request)
+
+
+@router.get("/business/{business_id}/reports/{kind}")
+def fixed_asset_report_endpoint(
+	request: Request,
+	business_id: int,
+	kind: str,
+	from_date: Optional[str] = Query(None),
+	to_date: Optional[str] = Query(None),
+	class_id: Optional[int] = Query(None),
+	status: Optional[str] = Query(None),
+	location_id: Optional[int] = Query(None),
+	limit: int = Query(500, ge=1, le=2000),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("fixed_assets", "view")),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	return _fa_response(
+		reports_svc.get_fixed_asset_report(
+			db,
+			business_id,
+			kind,
+			from_date=from_date,
+			to_date=to_date,
+			class_id=class_id,
+			status=status,
+			location_id=location_id,
+			limit=limit,
+		),
+		request,
+	)

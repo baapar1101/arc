@@ -24374,6 +24374,65 @@ abstract class AppLocalizations {
   String get fixedAssetsClassAccumAccount;
   String get fixedAssetsClassExpenseAccount;
 
+  String get fixedAssetsSearchHint;
+  String get fixedAssetsStatusAll;
+  String get fixedAssetsSectionIdentity;
+  String get fixedAssetsSectionAmounts;
+  String get fixedAssetsSectionAcquisition;
+  String get fixedAssetsMethodStraight;
+  String get fixedAssetsMethodDeclining;
+  String get fixedAssetsDecliningRate;
+  String get fixedAssetsFromInvoice;
+  String get fixedAssetsEmptyHint;
+  String get fixedAssetsLocation;
+  String get fixedAssetsEffectiveDate;
+  String get fixedAssetsRunDraft;
+  String get fixedAssetsRunPostedStatus;
+  String get fixedAssetsNewAssetHint;
+  String get fixedAssetsCounterpartyRequired;
+  String get fixedAssetsSerial;
+  String get fixedAssetsCustodian;
+  String get fixedAssetsNone;
+  String get fixedAssetsViewInvoice;
+  String get fixedAssetsQuickActions;
+  String get fixedAssetsClassesTab;
+  String get fixedAssetsReportSection;
+  String get fixedAssetsReportFilters;
+  String get fixedAssetsReportKind;
+  String get fixedAssetsReportRegister;
+  String get fixedAssetsReportRegisterHint;
+  String get fixedAssetsReportRegisterSubtitle;
+  String get fixedAssetsReportClassSummary;
+  String get fixedAssetsReportClassSummaryHint;
+  String get fixedAssetsReportClassSummarySubtitle;
+  String get fixedAssetsReportDepreciation;
+  String get fixedAssetsReportDepreciationHint;
+  String get fixedAssetsReportDepreciationSubtitle;
+  String get fixedAssetsReportAcquisitions;
+  String get fixedAssetsReportAcquisitionsHint;
+  String get fixedAssetsReportAcquisitionsSubtitle;
+  String get fixedAssetsReportDisposals;
+  String get fixedAssetsReportDisposalsHint;
+  String get fixedAssetsReportDisposalsSubtitle;
+  String get fixedAssetsReportIdle;
+  String get fixedAssetsReportIdleHint;
+  String get fixedAssetsReportIdleSubtitle;
+  String get fixedAssetsReportLocations;
+  String get fixedAssetsReportLocationsHint;
+  String get fixedAssetsReportLocationsSubtitle;
+  String get fixedAssetsReportExpenditures;
+  String get fixedAssetsReportExpendituresHint;
+  String get fixedAssetsReportExpendituresSubtitle;
+  String get fixedAssetsReportLiveCount;
+  String get fixedAssetsReportOpeningNbv;
+  String get fixedAssetsReportClosingNbv;
+  String get fixedAssetsReportAdditions;
+  String get fixedAssetsReportDisposalsNbv;
+  String get fixedAssetsReportDepreciationAmount;
+  String get fixedAssetsReportTaxPreview;
+  String get fixedAssetsReportGainLoss;
+  String get fixedAssetsReportTaxIdleFactor;
+
   /// No description provided for @businessSettingsPayroll.
   ///
   /// In en, this message translates to:

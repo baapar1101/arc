@@ -5,6 +5,12 @@ from typing import Any, Dict
 
 _ROLES_LAZY = None
 _MAX_LIST = 200
+_METHOD_ENUM = ["straight_line", "declining_balance"]
+_METHOD_ALIASES = {
+    "straight_line": "straight_line",
+    "declining": "declining_balance",
+    "declining_balance": "declining_balance",
+}
 
 CREATE_FIXED_ASSET_SCHEMA: Dict[str, Any] = {}
 UPDATE_FIXED_ASSET_SETTINGS_SCHEMA: Dict[str, Any] = {}
@@ -54,6 +60,15 @@ def _db(context: Dict[str, Any]):
     return context["db"]
 
 
+def _normalize_method_fields(payload: Dict[str, Any]) -> Dict[str, Any]:
+    out = dict(payload)
+    for key in ("method", "default_method"):
+        raw = out.get(key)
+        if isinstance(raw, str) and raw in _METHOD_ALIASES:
+            out[key] = _METHOD_ALIASES[raw]
+    return out
+
+
 _COUNTERPARTY = {
     "counterparty_type": {
         "type": "string",
@@ -81,7 +96,7 @@ CREATE_FIXED_ASSET_SCHEMA = _schema(
         "salvage": {"type": ["number", "null"], "minimum": 0},
         "vat_amount": {"type": ["number", "null"], "minimum": 0},
         "opening_accum_depreciation": {"type": ["number", "null"], "minimum": 0},
-        "method": {"type": "string", "enum": ["straight_line", "declining"]},
+        "method": {"type": "string", "enum": _METHOD_ENUM},
         "useful_life_months": {"type": ["integer", "null"], "minimum": 1, "maximum": 1200},
         "declining_annual_rate": {"type": ["number", "null"], "exclusiveMinimum": 0, "exclusiveMaximum": 1},
         "location_id": {"type": ["integer", "null"], "minimum": 1},
@@ -160,7 +175,7 @@ def list_fixed_asset_classes_handler(args, context):
 
 
 def update_fixed_asset_class_handler(args, context):
-    payload = {k: v for k, v in args.items() if k != "class_id"}
+    payload = _normalize_method_fields({k: v for k, v in args.items() if k != "class_id"})
     return _run(_svc().update_class, _db(context), _bid(context), int(args["class_id"]), payload, _uid(context))
 
 
@@ -192,6 +207,7 @@ def list_fixed_assets_handler(args, context):
             status=args.get("status"),
             class_id=args.get("class_id"),
             search=args.get("search"),
+            invoice_id=args.get("invoice_id"),
             limit=int(args.get("limit", 100)),
             skip=int(args.get("skip", 0)),
         )
@@ -203,11 +219,17 @@ def get_fixed_asset_handler(args, context):
 
 
 def create_fixed_asset_handler(args, context):
-    return _run(_svc().create_asset, _db(context), _bid(context), dict(args), _uid(context))
+    return _run(
+        _svc().create_asset,
+        _db(context),
+        _bid(context),
+        _normalize_method_fields(dict(args)),
+        _uid(context),
+    )
 
 
 def update_fixed_asset_handler(args, context):
-    payload = {k: v for k, v in args.items() if k != "asset_id"}
+    payload = _normalize_method_fields({k: v for k, v in args.items() if k != "asset_id"})
     return _run(_svc().update_asset, _db(context), _bid(context), int(args["asset_id"]), payload, _uid(context))
 
 
@@ -247,7 +269,7 @@ def post_fixed_asset_expenditure_handler(args, context):
 
 
 def change_fixed_asset_estimate_handler(args, context):
-    payload = {k: v for k, v in args.items() if k != "asset_id"}
+    payload = _normalize_method_fields({k: v for k, v in args.items() if k != "asset_id"})
     return _run(_svc().change_asset_estimate, _db(context), _bid(context), int(args["asset_id"]), payload, _uid(context))
 
 
@@ -278,13 +300,63 @@ def delete_fixed_asset_depreciation_run_handler(args, context):
     return _run(_svc().delete_depreciation_run, _db(context), _bid(context), int(args["run_id"]))
 
 
+GET_FIXED_ASSET_REPORT_SCHEMA = _schema(
+    {
+        "kind": {
+            "type": "string",
+            "enum": [
+                "register",
+                "class_summary",
+                "depreciation",
+                "acquisitions",
+                "disposals",
+                "idle",
+                "locations",
+                "expenditures",
+            ],
+            "description": (
+                "register=دفتر اموال، class_summary=گردش طبقات استاندارد ۱۱، "
+                "depreciation=استهلاک ثبت‌شده دوره، acquisitions=تحصیل دوره، "
+                "disposals=خروج/اسقاط، idle=راکد، locations=محل/تحویل‌گیرنده، "
+                "expenditures=مخارج بعدی"
+            ),
+        },
+        "from_date": {"type": "string", "format": "date"},
+        "to_date": {"type": "string", "format": "date"},
+        "class_id": {"type": "integer", "minimum": 1},
+        "status": {"type": "string", "enum": ["draft", "capitalized", "idle", "disposed"]},
+        "location_id": {"type": "integer", "minimum": 1},
+        "limit": {"type": "integer", "minimum": 1, "maximum": _MAX_LIST},
+    },
+    ["kind"],
+)
+
+
+def get_fixed_asset_report_handler(args, context):
+    from app.services.fixed_asset_reports import get_fixed_asset_report
+
+    return _run(
+        lambda: get_fixed_asset_report(
+            _db(context),
+            _bid(context),
+            str(args["kind"]),
+            from_date=args.get("from_date"),
+            to_date=args.get("to_date"),
+            class_id=args.get("class_id"),
+            status=args.get("status"),
+            location_id=args.get("location_id"),
+            limit=int(args.get("limit", 200)),
+        )
+    )
+
+
 _CLASS_UPDATE_SCHEMA = _schema({
     "class_id": {"type": "integer", "minimum": 1},
     "name": {"type": "string", "minLength": 1, "maxLength": 255},
     "cost_account_id": {"type": ["integer", "null"], "minimum": 1},
     "accum_dep_account_id": {"type": ["integer", "null"], "minimum": 1},
     "dep_expense_account_id": {"type": ["integer", "null"], "minimum": 1},
-    "default_method": {"type": "string", "enum": ["straight_line", "declining"]},
+    "default_method": {"type": "string", "enum": _METHOD_ENUM},
     "default_useful_life_months": {"type": ["integer", "null"], "minimum": 1, "maximum": 1200},
     "default_declining_rate": {"type": ["number", "null"], "exclusiveMinimum": 0, "exclusiveMaximum": 1},
     "is_active": {"type": "boolean"},
@@ -302,13 +374,19 @@ _LOCATION_UPDATE_SCHEMA = _schema({
     "parent_id": {"type": ["integer", "null"], "minimum": 1},
     "is_active": {"type": "boolean"},
 }, ["location_id"])
-_LIST_ASSETS_SCHEMA = _schema({
+LIST_FIXED_ASSETS_SCHEMA = _schema({
     "status": {"type": "string", "enum": ["draft", "capitalized", "idle", "disposed"]},
     "class_id": {"type": "integer", "minimum": 1},
+    "invoice_id": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "فیلتر دارایی‌های ساخته‌شده از یک فاکتور خرید سرمایه‌ای",
+    },
     "search": {"type": "string", "maxLength": 200},
     "limit": {"type": "integer", "minimum": 1, "maximum": _MAX_LIST},
     "skip": {"type": "integer", "minimum": 0},
 })
+_LIST_ASSETS_SCHEMA = LIST_FIXED_ASSETS_SCHEMA
 _ASSET_ID_SCHEMA = _schema({"asset_id": {"type": "integer", "minimum": 1}}, ["asset_id"])
 _UPDATE_ASSET_SCHEMA = _schema({
     "asset_id": {"type": "integer", "minimum": 1},
@@ -320,7 +398,7 @@ _UPDATE_ASSET_SCHEMA = _schema({
     "project_id": {"type": ["integer", "null"], "minimum": 1},
     "cost": {"type": "number", "exclusiveMinimum": 0},
     "salvage": {"type": ["number", "null"], "minimum": 0},
-    "method": {"type": "string", "enum": ["straight_line", "declining"]},
+    "method": {"type": "string", "enum": _METHOD_ENUM},
     "useful_life_months": {"type": ["integer", "null"], "minimum": 1, "maximum": 1200},
     "declining_annual_rate": {"type": ["number", "null"], "exclusiveMinimum": 0, "exclusiveMaximum": 1},
 }, ["asset_id"])
@@ -341,7 +419,7 @@ _EXPENDITURE_SCHEMA = _schema({
 _ESTIMATE_SCHEMA = _schema({
     "asset_id": {"type": "integer", "minimum": 1},
     "effective_date": {"type": ["string", "null"], "format": "date"},
-    "method": {"type": "string", "enum": ["straight_line", "declining"]},
+    "method": {"type": "string", "enum": _METHOD_ENUM},
     "salvage": {"type": ["number", "null"], "minimum": 0},
     "remaining_useful_life_months": {"type": ["integer", "null"], "minimum": 1, "maximum": 1200},
     "declining_annual_rate": {"type": ["number", "null"], "exclusiveMinimum": 0, "exclusiveMaximum": 1},
@@ -375,12 +453,12 @@ def register_mcp_fixed_assets_functions(registry) -> None:
     registry.register(AIFunction(name="list_fixed_asset_locations", description="فهرست محل‌های استقرار دارایی.", parameters_schema=include_inactive, handler=list_fixed_asset_locations_handler, allowed_roles=roles, required_permissions=["fixed_assets.view"], category="accounting", is_readonly=True))
     registry.register(AIFunction(name="create_fixed_asset_location", description="ثبت محل استقرار دارایی. code و name الزامی است. نیاز به تأیید.", parameters_schema=_LOCATION_CREATE_SCHEMA, handler=create_fixed_asset_location_handler, allowed_roles=roles, required_permissions=["fixed_assets.manage"], category="accounting", requires_approval=True, risk_level="medium", is_readonly=False))
     registry.register(AIFunction(name="update_fixed_asset_location", description="ویرایش محل استقرار دارایی متعلق به کسب‌وکار متصل.", parameters_schema=_LOCATION_UPDATE_SCHEMA, handler=update_fixed_asset_location_handler, allowed_roles=roles, required_permissions=["fixed_assets.manage"], category="accounting", requires_approval=True, risk_level="medium", is_readonly=False))
-    registry.register(AIFunction(name="list_fixed_assets", description="فهرست دارایی‌های ثابت کسب‌وکار متصل، حداکثر ۲۰۰ مورد در صفحه.", parameters_schema=_LIST_ASSETS_SCHEMA, handler=list_fixed_assets_handler, allowed_roles=roles, required_permissions=["fixed_assets.view"], category="accounting", is_readonly=True))
+    registry.register(AIFunction(name="list_fixed_assets", description="فهرست دارایی‌های ثابت کسب‌وکار متصل، حداکثر ۲۰۰ مورد در صفحه. فیلتر status/class_id/invoice_id/search.", parameters_schema=_LIST_ASSETS_SCHEMA, handler=list_fixed_assets_handler, allowed_roles=roles, required_permissions=["fixed_assets.view"], category="accounting", is_readonly=True))
     registry.register(AIFunction(name="get_fixed_asset", description="جزئیات یک دارایی ثابت متعلق به کسب‌وکار متصل.", parameters_schema=_ASSET_ID_SCHEMA, handler=get_fixed_asset_handler, allowed_roles=roles, required_permissions=["fixed_assets.view"], category="accounting", is_readonly=True))
-    registry.register(AIFunction(name="create_fixed_asset", description="ثبت دارایی پیش‌نویس. سرمایه‌گذاری با capitalize_fixed_asset جداست. نیاز به تأیید.", parameters_schema=CREATE_FIXED_ASSET_SCHEMA, handler=create_fixed_asset_handler, allowed_roles=roles, required_permissions=["fixed_assets.operate"], category="accounting", requires_approval=True, risk_level="medium", is_readonly=False))
+    registry.register(AIFunction(name="create_fixed_asset", description="ثبت دارایی پیش‌نویس بدون فاکتور فروشنده (افتتاحیه یا تحصیل مستقل). برای خرید از فروشنده از create_invoice با سطر fixed_asset استفاده کن تا موجودی کالا بدهکار نشود. سرمایه‌گذاری مستقل با capitalize_fixed_asset. نیاز به تأیید.", parameters_schema=CREATE_FIXED_ASSET_SCHEMA, handler=create_fixed_asset_handler, allowed_roles=roles, required_permissions=["fixed_assets.operate"], category="accounting", requires_approval=True, risk_level="medium", is_readonly=False))
     registry.register(AIFunction(name="update_fixed_asset", description="ویرایش دارایی. پس از سرمایه‌گذاری فقط نام/محل/تحویل‌گیرنده و مشابه آن قابل تغییر است.", parameters_schema=_UPDATE_ASSET_SCHEMA, handler=update_fixed_asset_handler, allowed_roles=roles, required_permissions=["fixed_assets.operate"], category="accounting", requires_approval=True, risk_level="medium", is_readonly=False))
     registry.register(AIFunction(name="delete_fixed_asset", description="حذف دارایی پیش‌نویس سرمایه‌نشده. برگشت‌ناپذیر و نیازمند تأیید.", parameters_schema=_ASSET_ID_SCHEMA, handler=delete_fixed_asset_handler, allowed_roles=roles, required_permissions=["fixed_assets.operate"], category="accounting", requires_approval=True, risk_level="high", is_readonly=False))
-    registry.register(AIFunction(name="capitalize_fixed_asset", description="سرمایه‌گذاری دارایی پیش‌نویس و صدور سند تحصیل. طرف حساب الزامی است. نیازمند تأیید.", parameters_schema=CAPITALIZE_FIXED_ASSET_SCHEMA, handler=capitalize_fixed_asset_handler, allowed_roles=roles, required_permissions=["fixed_assets.post"], category="accounting", requires_approval=True, risk_level="high", is_readonly=False))
+    registry.register(AIFunction(name="capitalize_fixed_asset", description="سرمایه‌گذاری دارایی پیش‌نویس بدون فاکتور فروشنده و صدور سند تحصیل. دارایی ساخته‌شده از فاکتور خرید سرمایه‌ای را دوباره capitalize نکن. طرف حساب الزامی است. نیازمند تأیید.", parameters_schema=CAPITALIZE_FIXED_ASSET_SCHEMA, handler=capitalize_fixed_asset_handler, allowed_roles=roles, required_permissions=["fixed_assets.post"], category="accounting", requires_approval=True, risk_level="high", is_readonly=False))
     registry.register(AIFunction(name="set_fixed_asset_idle", description="قرار دادن دارایی سرمایه‌شده در رکود استهلاک.", parameters_schema=_IDLE_SCHEMA, handler=set_fixed_asset_idle_handler, allowed_roles=roles, required_permissions=["fixed_assets.operate"], category="accounting", requires_approval=True, risk_level="medium", is_readonly=False))
     registry.register(AIFunction(name="resume_fixed_asset", description="خروج دارایی از رکود و بازگشت به وضعیت سرمایه‌شده.", parameters_schema=_ASSET_ID_SCHEMA, handler=resume_fixed_asset_handler, allowed_roles=roles, required_permissions=["fixed_assets.operate"], category="accounting", requires_approval=True, risk_level="medium", is_readonly=False))
     registry.register(AIFunction(name="dispose_fixed_asset", description="خروج فروش یا اسقاط دارایی و صدور سند. نیازمند تأیید.", parameters_schema=DISPOSE_FIXED_ASSET_SCHEMA, handler=dispose_fixed_asset_handler, allowed_roles=roles, required_permissions=["fixed_assets.post"], category="accounting", requires_approval=True, risk_level="high", is_readonly=False))
@@ -391,3 +469,4 @@ def register_mcp_fixed_assets_functions(registry) -> None:
     registry.register(AIFunction(name="create_fixed_asset_depreciation_run", description="ایجاد پیش‌نویس استهلاک یک ماه میلادی. period_year+period_month یا period_start.", parameters_schema=_CREATE_RUN_SCHEMA, handler=create_fixed_asset_depreciation_run_handler, allowed_roles=roles, required_permissions=["fixed_assets.operate"], category="accounting", requires_approval=True, risk_level="medium", is_readonly=False))
     registry.register(AIFunction(name="post_fixed_asset_depreciation_run", description="ثبت قطعی اجرای استهلاک و صدور سند. نیازمند تأیید.", parameters_schema=_RUN_ID_SCHEMA, handler=post_fixed_asset_depreciation_run_handler, allowed_roles=roles, required_permissions=["fixed_assets.post"], category="accounting", requires_approval=True, risk_level="high", is_readonly=False))
     registry.register(AIFunction(name="delete_fixed_asset_depreciation_run", description="حذف پیش‌نویس اجرای استهلاک ثبت‌نشده. نیازمند تأیید.", parameters_schema=_RUN_ID_SCHEMA, handler=delete_fixed_asset_depreciation_run_handler, allowed_roles=roles, required_permissions=["fixed_assets.operate"], category="accounting", requires_approval=True, risk_level="high", is_readonly=False))
+    registry.register(AIFunction(name="get_fixed_asset_report", description="گزارش اموال کسب‌وکار متصل: دفتر، گردش طبقات، استهلاک دوره، تحصیل، خروج، راکد، محل استقرار یا مخارج بعدی. برای گردش/استهلاک/تحصیل/خروج/مخارج from_date و to_date بفرست.", parameters_schema=GET_FIXED_ASSET_REPORT_SCHEMA, handler=get_fixed_asset_report_handler, allowed_roles=roles, required_permissions=["fixed_assets.view"], category="accounting", is_readonly=True))

@@ -1434,6 +1434,11 @@ TOOL_MANIFEST: Dict[str, Dict[str, Any]] = {
     'create_fixed_asset_depreciation_run': {'domains': ('fixed_assets',), 'intent_write': True, 'aliases': ('استهلاک ماهانه',)},
     'post_fixed_asset_depreciation_run': {'domains': ('fixed_assets',), 'intent_write': True, 'always_confirm': True},
     'delete_fixed_asset_depreciation_run': {'domains': ('fixed_assets',), 'intent_write': True, 'always_confirm': True},
+    'get_fixed_asset_report': {
+        'domains': ('fixed_assets', 'reports'),
+        'companion_tools': ('list_fixed_assets', 'get_fixed_assets_dashboard'),
+        'aliases': ('دفتر اموال', 'گردش طبقات', 'گزارش استهلاک', 'گزارش دارایی ثابت'),
+    },
     'get_telephony_settings': {'domains': ('telephony',), 'companion_tools': ('update_telephony_settings', 'list_telephony_pbx')},
     'update_telephony_settings': {'domains': ('telephony',), 'intent_write': True, 'always_confirm': True},
     'get_telephony_dashboard': {'domains': ('telephony',)},

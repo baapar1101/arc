@@ -16,11 +16,14 @@ from app.services.ai.ai_function_extensions_mcp_fixed_assets import (
     CAPITALIZE_FIXED_ASSET_SCHEMA,
     CREATE_FIXED_ASSET_SCHEMA,
     DISPOSE_FIXED_ASSET_SCHEMA,
+    GET_FIXED_ASSET_REPORT_SCHEMA,
+    LIST_FIXED_ASSETS_SCHEMA,
     UPDATE_FIXED_ASSET_SETTINGS_SCHEMA,
     capitalize_fixed_asset_handler,
     create_fixed_asset_handler,
     delete_fixed_asset_handler,
     get_fixed_asset_settings_handler,
+    list_fixed_assets_handler,
     update_fixed_asset_settings_handler,
 )
 from app.services.ai.ai_function_extensions_mcp_settings import (
@@ -67,6 +70,7 @@ FIXED_ASSET_TOOLS = (
     "create_fixed_asset_depreciation_run",
     "post_fixed_asset_depreciation_run",
     "delete_fixed_asset_depreciation_run",
+    "get_fixed_asset_report",
 )
 TELEPHONY_TOOLS = (
     "get_telephony_settings",
@@ -160,6 +164,21 @@ def test_plugin_tools_are_registered_with_strict_schemas():
     assert create["risk_level"] == "medium"
     assert CREATE_FIXED_ASSET_SCHEMA["required"] == ["class_id", "name", "acquisition_date", "cost"]
     assert CREATE_FIXED_ASSET_SCHEMA["properties"]["cost"]["exclusiveMinimum"] == 0
+    assert CREATE_FIXED_ASSET_SCHEMA["properties"]["method"]["enum"] == ["straight_line", "declining_balance"]
+    assert LIST_FIXED_ASSETS_SCHEMA["properties"]["invoice_id"]["type"] == "integer"
+    assert GET_FIXED_ASSET_REPORT_SCHEMA["required"] == ["kind"]
+    assert GET_FIXED_ASSET_REPORT_SCHEMA["properties"]["kind"]["enum"] == [
+        "register",
+        "class_summary",
+        "depreciation",
+        "acquisitions",
+        "disposals",
+        "idle",
+        "locations",
+        "expenditures",
+    ]
+    assert parsed["get_fixed_asset_report"]["is_readonly"] is True
+    assert is_write_function("get_fixed_asset_report") is False
     assert CAPITALIZE_FIXED_ASSET_SCHEMA["required"] == ["asset_id", "counterparty_type"]
     assert DISPOSE_FIXED_ASSET_SCHEMA["properties"]["kind"]["enum"] == ["sale", "scrap"]
     for schema in (
@@ -167,6 +186,7 @@ def test_plugin_tools_are_registered_with_strict_schemas():
         UPDATE_FIXED_ASSET_SETTINGS_SCHEMA,
         CAPITALIZE_FIXED_ASSET_SCHEMA,
         DISPOSE_FIXED_ASSET_SCHEMA,
+        GET_FIXED_ASSET_REPORT_SCHEMA,
         UPDATE_TELEPHONY_SETTINGS_SCHEMA,
         CLICK_TO_CALL_SCHEMA,
         UPDATE_BARCODE_PRINTER_SETTINGS_SCHEMA,
@@ -291,6 +311,32 @@ def test_fixed_asset_writes_pin_tenant_and_convert_api_error():
     ):
         with pytest.raises(ValueError, match="پیش‌نویس"):
             delete_fixed_asset_handler({"asset_id": 4}, _ctx())
+
+    with patch(
+        "app.services.fixed_asset_service.list_assets",
+        return_value={"total": 0, "items": []},
+    ) as listed:
+        list_fixed_assets_handler({"invoice_id": 88, "status": "capitalized"}, _ctx())
+    kwargs = listed.call_args.kwargs
+    assert listed.call_args.args[1] == 7
+    assert kwargs["invoice_id"] == 88
+    assert kwargs["status"] == "capitalized"
+
+    with patch(
+        "app.services.fixed_asset_service.create_asset",
+        return_value={"id": 5, "method": "declining_balance"},
+    ) as create_declining:
+        create_fixed_asset_handler(
+            {
+                "class_id": 1,
+                "name": "خودرو",
+                "acquisition_date": "2026-01-01",
+                "cost": 2000,
+                "method": "declining",
+            },
+            _ctx(),
+        )
+    assert create_declining.call_args.args[2]["method"] == "declining_balance"
 
 
 def test_telephony_inactive_plugin_and_token_redaction():

@@ -6,7 +6,9 @@ import '../../core/auth_store.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/date_utils.dart';
 import '../../services/business_user_service.dart';
+import '../../services/marketplace_service.dart';
 import '../../models/business_user_model.dart';
+import '../../widgets/marketplace/plugin_marketplace_utils.dart';
 import '../../utils/number_normalizer.dart';
 import '../../utils/responsive_helper.dart';
 import '../../utils/error_extractor.dart';
@@ -1046,18 +1048,63 @@ class _PermissionsDialog extends StatefulWidget {
 }
 
 class _PermissionsDialogState extends State<_PermissionsDialog> {
+  static const _pluginPermissionSections = <String, String>{
+    'warranty': 'product_warranty',
+    'barcode_labels': 'barcode_label_studio',
+    'customer_club': 'customer_club',
+    'distribution': 'distribution',
+    'payroll': 'payroll',
+    'fixed_assets': 'fixed_assets',
+    'telephony': 'asterisk_issabel_connector',
+    'basalam': 'basalam_connector',
+    'woocommerce': 'woocommerce_hesabix',
+    'moadian': 'moadian_tax_integration',
+  };
+
   late Map<String, dynamic> _currentPermissions;
   bool _permissionsInitialized = false;
   bool _isUpdating = false;
   late bool _membershipUnlimited;
   DateTime? _membershipEndDate;
   bool _membershipTouched = false;
+  bool _marketplacePluginsResolved = false;
+  final Set<String> _activeMarketplacePluginCodes = <String>{};
+  final MarketplaceService _marketplaceService = MarketplaceService();
 
   @override
   void initState() {
     super.initState();
     _membershipEndDate = widget.user.membershipExpiresAt;
     _membershipUnlimited = widget.user.membershipUnlimited;
+    _loadMarketplacePlugins();
+  }
+
+  Future<void> _loadMarketplacePlugins() async {
+    try {
+      final list = await _marketplaceService.listBusinessPlugins(
+        businessId: int.parse(widget.businessId),
+      );
+      if (!mounted) return;
+      setState(() {
+        _activeMarketplacePluginCodes
+          ..clear()
+          ..addAll(activeMarketplacePluginCodes(list));
+        _marketplacePluginsResolved = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _activeMarketplacePluginCodes.clear();
+        _marketplacePluginsResolved = true;
+      });
+    }
+  }
+
+  bool _permissionSectionVisible(String sectionKey) {
+    final pluginCode = _pluginPermissionSections[sectionKey];
+    if (pluginCode == null) return true;
+    return _marketplacePluginsResolved &&
+        _activeMarketplacePluginCodes.contains(pluginCode);
   }
 
   @override
@@ -1959,6 +2006,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       
       // ساخت گروه‌های دسترسی برای هر بخش
       for (final sectionKey in config['sections'] as List<String>) {
+        if (!_permissionSectionVisible(sectionKey)) continue;
         final allPermissions = _getAllPermissions(t);
         if (allPermissions.containsKey(sectionKey)) {
           final sectionPermissions = allPermissions[sectionKey]!;
@@ -1999,6 +2047,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         }
       }
 
+      if (sectionWidgets.isEmpty) continue;
       final hintKey = config['permissionHintKey'] as String?;
       final String? hintText = hintKey == 'warehouse_inventory_bridge'
           ? t.permissionsWarehouseInventoryHint

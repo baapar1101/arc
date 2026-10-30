@@ -13251,6 +13251,195 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fixedAssetsClassExpenseAccount => 'Depreciation expense account';
 
   @override
+  String get fixedAssetsSearchHint => 'Search code, name, or serial';
+
+  @override
+  String get fixedAssetsStatusAll => 'All';
+
+  @override
+  String get fixedAssetsSectionIdentity => 'Identity';
+
+  @override
+  String get fixedAssetsSectionAmounts => 'Cost and useful life';
+
+  @override
+  String get fixedAssetsSectionAcquisition => 'Acquisition';
+
+  @override
+  String get fixedAssetsMethodStraight => 'Straight line';
+
+  @override
+  String get fixedAssetsMethodDeclining => 'Declining balance';
+
+  @override
+  String get fixedAssetsDecliningRate => 'Declining annual rate (e.g. 0.25)';
+
+  @override
+  String get fixedAssetsFromInvoice => 'From purchase invoice';
+
+  @override
+  String get fixedAssetsEmptyHint =>
+      'Add an asset from a capital purchase invoice line, or with New asset.';
+
+  @override
+  String get fixedAssetsLocation => 'Location';
+
+  @override
+  String get fixedAssetsEffectiveDate => 'Effective date';
+
+  @override
+  String get fixedAssetsRunDraft => 'Draft';
+
+  @override
+  String get fixedAssetsRunPostedStatus => 'Posted';
+
+  @override
+  String get fixedAssetsNewAssetHint =>
+      'For a vendor purchase, mark the purchase-invoice line as a fixed asset so inventory is not debited. Use this form only for opening balances or acquisitions without a vendor invoice.';
+
+  @override
+  String get fixedAssetsCounterpartyRequired => 'Select a counterpart.';
+
+  @override
+  String get fixedAssetsSerial => 'Serial number';
+
+  @override
+  String get fixedAssetsCustodian => 'Custodian';
+
+  @override
+  String get fixedAssetsNone => 'Not selected';
+
+  @override
+  String get fixedAssetsViewInvoice => 'Purchase invoice';
+
+  @override
+  String get fixedAssetsQuickActions => 'Actions';
+
+  @override
+  String get fixedAssetsClassesTab => 'Classes';
+
+  @override
+  String get fixedAssetsReportSection => 'Fixed assets';
+
+  @override
+  String get fixedAssetsReportFilters => 'Report filters';
+
+  @override
+  String get fixedAssetsReportKind => 'Report type';
+
+  @override
+  String get fixedAssetsReportRegister => 'Asset register';
+
+  @override
+  String get fixedAssetsReportRegisterHint =>
+      'Current asset cards with cost, accumulated depreciation, and net book value.';
+
+  @override
+  String get fixedAssetsReportRegisterSubtitle =>
+      'Code, class, location, cost, and net book value';
+
+  @override
+  String get fixedAssetsReportClassSummary => 'Class movement';
+
+  @override
+  String get fixedAssetsReportClassSummaryHint =>
+      'Standard 11 rollforward: opening, acquisitions, major repairs, depreciation, disposals, and closing by class.';
+
+  @override
+  String get fixedAssetsReportClassSummarySubtitle => 'PPE movement note by class';
+
+  @override
+  String get fixedAssetsReportDepreciation => 'Period depreciation';
+
+  @override
+  String get fixedAssetsReportDepreciationHint =>
+      'Posted depreciation journal lines in the selected period, including tax idle preview.';
+
+  @override
+  String get fixedAssetsReportDepreciationSubtitle =>
+      'Posted monthly depreciation and tax preview';
+
+  @override
+  String get fixedAssetsReportAcquisitions => 'Period acquisitions';
+
+  @override
+  String get fixedAssetsReportAcquisitionsHint =>
+      'Assets acquired in the selected period. Vendor invoices are distinct from independent acquisitions.';
+
+  @override
+  String get fixedAssetsReportAcquisitionsSubtitle =>
+      'Capital purchases, independent acquisitions, and opening balances';
+
+  @override
+  String get fixedAssetsReportDisposals => 'Disposals';
+
+  @override
+  String get fixedAssetsReportDisposalsHint =>
+      'Sales and scrap in the period with net book value, proceeds, and gain or loss.';
+
+  @override
+  String get fixedAssetsReportDisposalsSubtitle =>
+      'Proceeds, net book value, and disposal gain or loss';
+
+  @override
+  String get fixedAssetsReportIdle => 'Idle assets';
+
+  @override
+  String get fixedAssetsReportIdleHint =>
+      'Idle assets. Accounting depreciation continues; the tax factor falls only after the settings threshold.';
+
+  @override
+  String get fixedAssetsReportIdleSubtitle => 'Idle status and tax depreciation factor';
+
+  @override
+  String get fixedAssetsReportLocations => 'Location and custodian';
+
+  @override
+  String get fixedAssetsReportLocationsHint =>
+      'Physical control of assets in use by location and custodian.';
+
+  @override
+  String get fixedAssetsReportLocationsSubtitle =>
+      'Location and custodian of assets in use';
+
+  @override
+  String get fixedAssetsReportExpenditures => 'Subsequent expenditure';
+
+  @override
+  String get fixedAssetsReportExpendituresHint =>
+      'Period repairs (expense) and major repairs (added to cost) in the selected range.';
+
+  @override
+  String get fixedAssetsReportExpendituresSubtitle => 'Routine and major repairs';
+
+  @override
+  String get fixedAssetsReportLiveCount => 'In use';
+
+  @override
+  String get fixedAssetsReportOpeningNbv => 'Opening NBV';
+
+  @override
+  String get fixedAssetsReportClosingNbv => 'Closing NBV';
+
+  @override
+  String get fixedAssetsReportAdditions => 'Period additions';
+
+  @override
+  String get fixedAssetsReportDisposalsNbv => 'Disposed NBV';
+
+  @override
+  String get fixedAssetsReportDepreciationAmount => 'Depreciation';
+
+  @override
+  String get fixedAssetsReportTaxPreview => 'Tax preview';
+
+  @override
+  String get fixedAssetsReportGainLoss => 'Disposal gain / loss';
+
+  @override
+  String get fixedAssetsReportTaxIdleFactor => 'Tax idle factor';
+
+  @override
   String get businessSettingsPayroll => 'Payroll';
 
   @override

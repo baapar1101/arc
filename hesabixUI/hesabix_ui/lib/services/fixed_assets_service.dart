@@ -81,6 +81,7 @@ class FixedAssetsService {
     String? status,
     int? classId,
     String? search,
+    int? invoiceId,
   }) async {
     final res = await _api.get<Map<String, dynamic>>(
       '/api/v1/fixed-assets/business/$businessId/assets',
@@ -88,6 +89,7 @@ class FixedAssetsService {
         if (status != null) 'status': status,
         if (classId != null) 'class_id': '$classId',
         if (search != null && search.isNotEmpty) 'search': search,
+        if (invoiceId != null) 'invoice_id': '$invoiceId',
       },
     );
     return _extractData(res.data);
@@ -186,6 +188,28 @@ class FixedAssetsService {
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/fixed-assets/business/$businessId/assets/$assetId/subsequent-expenditure',
       data: payload,
+    );
+    return _extractData(res.data);
+  }
+
+  Future<Map<String, dynamic>> getReport({
+    required int businessId,
+    required String kind,
+    String? fromDate,
+    String? toDate,
+    int? classId,
+    String? status,
+    int? locationId,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/fixed-assets/business/$businessId/reports/$kind',
+      query: {
+        if (fromDate != null) 'from_date': fromDate,
+        if (toDate != null) 'to_date': toDate,
+        if (classId != null) 'class_id': '$classId',
+        if (status != null) 'status': status,
+        if (locationId != null) 'location_id': '$locationId',
+      },
     );
     return _extractData(res.data);
   }

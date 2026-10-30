@@ -21,6 +21,7 @@ import '../../widgets/product/product_form_dialog.dart';
 import '../../widgets/category/category_tree_dialog.dart';
 import '../../services/business_dashboard_service.dart';
 import '../../services/marketplace_service.dart';
+import '../../widgets/marketplace/plugin_marketplace_utils.dart';
 import '../../core/api_client.dart';
 import '../../core/fiscal_year_controller.dart';
 import 'package:hesabix_ui/config/brand_config.dart';
@@ -1202,16 +1203,6 @@ class _BusinessShellState extends State<BusinessShell> {
     }
   }
 
-  bool _jsonBool(dynamic value) {
-    if (value == true) return true;
-    if (value is num) return value != 0;
-    if (value is String) {
-      final v = value.trim().toLowerCase();
-      return v == 'true' || v == '1';
-    }
-    return false;
-  }
-
   bool _isBusinessOwner() {
     final current = widget.authStore.currentBusiness;
     return current != null && current.id == widget.businessId && current.isOwner;
@@ -1220,8 +1211,7 @@ class _BusinessShellState extends State<BusinessShell> {
   bool _isPluginCodeLicensed(String code) {
     for (final plug in _businessPlugins) {
       if (plug['plugin_code'] != code) continue;
-      if (_jsonBool(plug['is_active'])) return true;
-      if (_jsonBool(plug['is_trial']) && !_jsonBool(plug['is_expired'])) return true;
+      if (marketplacePluginLicenseActive(plug)) return true;
     }
     return false;
   }

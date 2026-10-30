@@ -130,6 +130,34 @@ Map<String, dynamic>? businessPluginForId(
   return null;
 }
 
+bool marketplaceJsonBool(dynamic value) {
+  if (value == true) return true;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final v = value.trim().toLowerCase();
+    return v == 'true' || v == '1';
+  }
+  return false;
+}
+
+/// لایسنس کسب‌وکار برای افزونه فعال است (خرید فعال یا آزمایشی منقضی‌نشده).
+bool marketplacePluginLicenseActive(Map<dynamic, dynamic>? row) {
+  if (row == null || row.isEmpty) return false;
+  if (marketplaceJsonBool(row['is_active'])) return true;
+  return marketplaceJsonBool(row['is_trial']) && !marketplaceJsonBool(row['is_expired']);
+}
+
+Set<String> activeMarketplacePluginCodes(Iterable<dynamic> plugins) {
+  final codes = <String>{};
+  for (final raw in plugins) {
+    if (raw is! Map) continue;
+    if (!marketplacePluginLicenseActive(raw)) continue;
+    final code = raw['plugin_code']?.toString();
+    if (code != null && code.isNotEmpty) codes.add(code);
+  }
+  return codes;
+}
+
 bool hasUsedTrial(Map<String, dynamic>? pluginStatus) {
   if (pluginStatus == null || pluginStatus.isEmpty) return false;
   return pluginStatus['is_trial'] == true ||

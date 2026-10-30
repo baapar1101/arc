@@ -13176,6 +13176,190 @@ class AppLocalizationsFa extends AppLocalizations {
   String get fixedAssetsClassExpenseAccount => 'حساب هزینه استهلاک';
 
   @override
+  String get fixedAssetsSearchHint => 'جست‌وجوی کد، نام یا سریال';
+
+  @override
+  String get fixedAssetsStatusAll => 'همه';
+
+  @override
+  String get fixedAssetsSectionIdentity => 'شناسه دارایی';
+
+  @override
+  String get fixedAssetsSectionAmounts => 'بها و عمر مفید';
+
+  @override
+  String get fixedAssetsSectionAcquisition => 'تحصیل';
+
+  @override
+  String get fixedAssetsMethodStraight => 'خط مستقیم';
+
+  @override
+  String get fixedAssetsMethodDeclining => 'مانده نزولی';
+
+  @override
+  String get fixedAssetsDecliningRate => 'نرخ سالانه مانده نزولی (مثلاً ۰٫۲۵)';
+
+  @override
+  String get fixedAssetsFromInvoice => 'از فاکتور خرید';
+
+  @override
+  String get fixedAssetsEmptyHint =>
+      'دارایی را از فاکتور خرید با سطر سرمایه‌ای، یا با دکمه ثبت دارایی جدید اضافه کنید.';
+
+  @override
+  String get fixedAssetsLocation => 'محل استقرار';
+
+  @override
+  String get fixedAssetsEffectiveDate => 'تاریخ مؤثر';
+
+  @override
+  String get fixedAssetsRunDraft => 'پیش‌نویس';
+
+  @override
+  String get fixedAssetsRunPostedStatus => 'ثبت‌شده';
+
+  @override
+  String get fixedAssetsNewAssetHint =>
+      'برای خرید از فروشنده در فاکتور خرید سطر را سرمایه‌ای کنید تا موجودی کالا بدهکار نشود. اینجا فقط تحصیل بدون فاکتور یا افتتاحیه است.';
+
+  @override
+  String get fixedAssetsCounterpartyRequired => 'طرف حساب را انتخاب کنید.';
+
+  @override
+  String get fixedAssetsSerial => 'شماره سریال';
+
+  @override
+  String get fixedAssetsCustodian => 'تحویل‌گیرنده';
+
+  @override
+  String get fixedAssetsNone => 'انتخاب نشده';
+
+  @override
+  String get fixedAssetsViewInvoice => 'فاکتور خرید';
+
+  @override
+  String get fixedAssetsQuickActions => 'اقدامات';
+
+  @override
+  String get fixedAssetsClassesTab => 'طبقات';
+
+  @override
+  String get fixedAssetsReportSection => 'اموال و دارایی ثابت';
+
+  @override
+  String get fixedAssetsReportFilters => 'فیلتر گزارش';
+
+  @override
+  String get fixedAssetsReportKind => 'نوع گزارش';
+
+  @override
+  String get fixedAssetsReportRegister => 'دفتر اموال';
+
+  @override
+  String get fixedAssetsReportRegisterHint =>
+      'فهرست جاری کارت‌های دارایی با بها، استهلاک انباشته و ارزش دفتری.';
+
+  @override
+  String get fixedAssetsReportRegisterSubtitle => 'کد، طبقه، محل، بها و ارزش دفتری';
+
+  @override
+  String get fixedAssetsReportClassSummary => 'گردش طبقات';
+
+  @override
+  String get fixedAssetsReportClassSummaryHint =>
+      'صورت گردش استاندارد ۱۱: مانده ابتدا، تحصیل، تعمیر اساسی، استهلاک، خروج و مانده انتها به تفکیک طبقه.';
+
+  @override
+  String get fixedAssetsReportClassSummarySubtitle => 'افشای گردش دارایی ثابت به تفکیک طبقه';
+
+  @override
+  String get fixedAssetsReportDepreciation => 'جدول استهلاک دوره';
+
+  @override
+  String get fixedAssetsReportDepreciationHint =>
+      'سطرهای استهلاک ثبت‌شده در دفتر کل برای بازه انتخابی، همراه پیش‌نمایش مالیاتی رکود.';
+
+  @override
+  String get fixedAssetsReportDepreciationSubtitle => 'استهلاک ماهانه ثبت‌شده و پیش‌نمایش مالیاتی';
+
+  @override
+  String get fixedAssetsReportAcquisitions => 'تحصیلات دوره';
+
+  @override
+  String get fixedAssetsReportAcquisitionsHint =>
+      'دارایی‌هایی که در بازه انتخابی تحصیل شده‌اند؛ خرید از فاکتور فروشنده جدا از تحصیل مستقل است.';
+
+  @override
+  String get fixedAssetsReportAcquisitionsSubtitle => 'خرید سرمایه‌ای، تحصیل مستقل و افتتاحیه';
+
+  @override
+  String get fixedAssetsReportDisposals => 'خروج و اسقاط';
+
+  @override
+  String get fixedAssetsReportDisposalsHint =>
+      'فروش و اسقاط دوره با ارزش دفتری، عواید و سود یا زیان واگذاری.';
+
+  @override
+  String get fixedAssetsReportDisposalsSubtitle => 'عواید، ارزش دفتری و سود/زیان واگذاری';
+
+  @override
+  String get fixedAssetsReportIdle => 'اموال راکد';
+
+  @override
+  String get fixedAssetsReportIdleHint =>
+      'دارایی‌های در رکود. استهلاک حسابداری ادامه دارد؛ عامل مالیاتی فقط پس از آستانه تنظیمات کاهش می‌یابد.';
+
+  @override
+  String get fixedAssetsReportIdleSubtitle => 'رکود و عامل استهلاک مالیاتی';
+
+  @override
+  String get fixedAssetsReportLocations => 'استقرار و تحویل‌گیرنده';
+
+  @override
+  String get fixedAssetsReportLocationsHint =>
+      'کنترل فیزیکی اموال زنده بر اساس محل استقرار و تحویل‌گیرنده.';
+
+  @override
+  String get fixedAssetsReportLocationsSubtitle => 'محل استقرار و تحویل‌گیرنده اموال در جریان';
+
+  @override
+  String get fixedAssetsReportExpenditures => 'مخارج بعدی';
+
+  @override
+  String get fixedAssetsReportExpendituresHint =>
+      'تعمیر جاری (هزینه دوره) و تعمیر اساسی (افزایش بها) در بازه انتخابی.';
+
+  @override
+  String get fixedAssetsReportExpendituresSubtitle => 'تعمیر جاری و تعمیر اساسی';
+
+  @override
+  String get fixedAssetsReportLiveCount => 'تعداد در جریان';
+
+  @override
+  String get fixedAssetsReportOpeningNbv => 'ارزش دفتری ابتدا';
+
+  @override
+  String get fixedAssetsReportClosingNbv => 'ارزش دفتری انتها';
+
+  @override
+  String get fixedAssetsReportAdditions => 'تحصیل دوره';
+
+  @override
+  String get fixedAssetsReportDisposalsNbv => 'ارزش دفتری خروج';
+
+  @override
+  String get fixedAssetsReportDepreciationAmount => 'استهلاک';
+
+  @override
+  String get fixedAssetsReportTaxPreview => 'پیش‌نمایش مالیاتی';
+
+  @override
+  String get fixedAssetsReportGainLoss => 'سود / زیان واگذاری';
+
+  @override
+  String get fixedAssetsReportTaxIdleFactor => 'عامل رکود مالیاتی';
+
+  @override
   String get businessSettingsPayroll => 'حقوق و دستمزد';
 
   @override

@@ -18,6 +18,15 @@ _LINE_ROOT_TO_EXTRA = (
     "discount_value",
     "unit",
     "unit_price_source",
+    "fixed_asset",
+    "fixed_asset_class_id",
+    "fixed_asset_location_id",
+    "fixed_asset_custodian_person_id",
+    "fixed_asset_salvage",
+    "fixed_asset_useful_life_months",
+    "fixed_asset_declining_annual_rate",
+    "fixed_asset_commission_date",
+    "fixed_asset_name",
 )
 
 _INVOICE_PERSON_TYPES = frozenset({
@@ -87,6 +96,46 @@ _INVOICE_LINE_ITEM_SCHEMA: Dict[str, Any] = {
             "type": "array",
             "items": {"type": "integer"},
             "description": "شناسه نمونه‌های یونیک این سطر (کالای یونیک)",
+        },
+        "fixed_asset": {
+            "type": "boolean",
+            "description": (
+                "فقط فاکتور خرید: سطر سرمایه‌ای اموال. موجودی و حواله انبار ساخته نمی‌شود؛ "
+                "بها به حساب دارایی ثابت می‌رود. fixed_asset_class_id الزامی است."
+            ),
+        },
+        "fixed_asset_class_id": {
+            "type": "integer",
+            "description": "شناسه طبقه اموال از list_fixed_asset_classes وقتی fixed_asset=true",
+        },
+        "fixed_asset_location_id": {
+            "type": "integer",
+            "description": "محل استقرار دارایی سرمایه‌ای (اختیاری؛ از list_fixed_asset_locations)",
+        },
+        "fixed_asset_custodian_person_id": {
+            "type": "integer",
+            "description": "تحویل‌گیرنده دارایی سرمایه‌ای از search_persons (اختیاری)",
+        },
+        "fixed_asset_salvage": {
+            "type": "number",
+            "description": "ارزش اسقاط دارایی سرمایه‌ای (اختیاری)",
+        },
+        "fixed_asset_useful_life_months": {
+            "type": "integer",
+            "description": "عمر مفید به ماه برای دارایی سرمایه‌ای (اختیاری)",
+        },
+        "fixed_asset_declining_annual_rate": {
+            "type": "number",
+            "description": "نرخ مانده نزولی دارایی سرمایه‌ای اگر روش طبقه نزولی باشد (کسری بین ۰ و ۱)",
+        },
+        "fixed_asset_commission_date": {
+            "type": "string",
+            "format": "date",
+            "description": "تاریخ بهره‌برداری دارایی سرمایه‌ای (اختیاری؛ وگرنه تاریخ فاکتور)",
+        },
+        "fixed_asset_name": {
+            "type": "string",
+            "description": "نام کارت دارایی؛ اگر خالی باشد از شرح سطر یا نام کالا استفاده می‌شود",
         },
     },
     "required": ["product_id", "quantity", "unit_price"],
@@ -323,6 +372,8 @@ CREATE_INVOICE_DESCRIPTION = (
     "ثبت فاکتور با همان فیلدهای فرم صدور فاکتور: نوع، تاریخ، سررسید، ارز، طرف‌حساب، "
     "اقلام (قیمت/تخفیف/مالیات/انبار)، تخفیف کلی، اضافات/کسورات، فروشنده و کارمزد، "
     "اقساط، پرداخت همزمان، پروژه، برچسب، پیش‌فاکتور. "
+    "برای خرید دارایی ثابت: invoice_type=invoice_purchase و در همان سطر fixed_asset=true با "
+    "fixed_asset_class_id از list_fixed_asset_classes؛ موجودی کالا بدهکار نمی‌شود و کارت اموال ساخته می‌شود. "
     "قبل از صدا: search_persons، search_products، در صورت نیاز list_currencies و list_warehouses. "
     "برای فروش/خرید person_id عددی الزامی است. نیاز به تأیید."
 )
@@ -690,6 +741,7 @@ UPDATE_INVOICE_DESCRIPTION = (
     "ویرایش فاکتور با همان فیلدهای فرم ویرایش: تاریخ، سررسید، طرف‌حساب، اقلام، "
     "تخفیف کلی، اضافات/کسورات، فروشنده/کارمزد، اقساط، پرداخت‌ها، پروژه، برچسب، پیش‌فاکتور. "
     "اول get_invoice_details. اگر فقط تاریخ/شرح/شخص عوض می‌شود lines را نفرست. "
+    "برای سطر سرمایه‌ای خرید همان پرچم fixed_asset و fixed_asset_class_id را بفرست. "
     "payments در صورت ارسال جایگزین تسویه‌های قبلی است. نیاز به تأیید."
 )
 

@@ -6,6 +6,7 @@ from datetime import date
 from app.services.ai.ai_query_filter_catalog import resolve_filter_property
 from app.services.ai.ai_query_filter_service import normalize_filter_items
 from app.services.ai.ai_tool_payloads import (
+    CREATE_INVOICE_DESCRIPTION,
     CREATE_INVOICE_PARAMETERS_SCHEMA,
     build_create_check_payload,
     build_create_invoice_payload,
@@ -27,6 +28,27 @@ def test_normalize_line_moves_unit_price_to_extra_info():
     assert line["product_id"] == 12
     assert line["quantity"] == 2.0
     assert line["extra_info"]["unit_price"] == 150000
+
+
+def test_normalize_capital_purchase_line_moves_fixed_asset_flag():
+    line = normalize_ai_invoice_line(
+        {
+            "product_id": 9,
+            "quantity": 1,
+            "unit_price": 12000000,
+            "fixed_asset": True,
+            "fixed_asset_class_id": 3,
+            "fixed_asset_name": "میز اداری",
+        }
+    )
+    extra = line["extra_info"]
+    assert extra["fixed_asset"] is True
+    assert extra["fixed_asset_class_id"] == 3
+    assert extra["fixed_asset_name"] == "میز اداری"
+    line_props = CREATE_INVOICE_PARAMETERS_SCHEMA["properties"]["lines"]["items"]["properties"]
+    assert line_props["fixed_asset"]["type"] == "boolean"
+    assert "fixed_asset_class_id" in line_props
+    assert "fixed_asset_class_id" in CREATE_INVOICE_DESCRIPTION
 
 
 def test_build_create_invoice_payload_session_896_shape():

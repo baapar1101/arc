@@ -4,6 +4,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../core/business_nav.dart';
 import '../../services/marketplace_service.dart';
+import 'plugin_marketplace_utils.dart';
 
 /// نمایش محتوا فقط وقتی افزونه کنترل اموال برای کسب‌وکار فعال است.
 class FixedAssetsPluginGate extends StatefulWidget {
@@ -40,9 +41,7 @@ class _FixedAssetsPluginGateState extends State<FixedAssetsPluginGate> {
         (p) => p['plugin_code'] == _pluginCode,
         orElse: () => <String, dynamic>{},
       );
-      final active = row['is_active'] == true ||
-          row['is_active'] == 1 ||
-          (row['is_trial'] == true && row['is_expired'] != true);
+      final active = marketplacePluginLicenseActive(row);
       if (mounted) {
         setState(() {
           _active = active;

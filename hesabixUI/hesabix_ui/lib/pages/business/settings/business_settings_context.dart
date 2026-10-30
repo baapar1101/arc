@@ -1,6 +1,7 @@
 import '../../../core/auth_store.dart';
 import '../../../core/business_panel_ui_store.dart';
 import '../../../core/business_route_paths.dart';
+import '../../../widgets/marketplace/plugin_marketplace_utils.dart';
 
 /// Context for building the business settings hub (permissions, plugins, routes).
 class BusinessSettingsContext {
@@ -53,7 +54,7 @@ class BusinessSettingsContext {
 
   bool pluginActive(String code) {
     return plugins.any(
-      (p) => p['plugin_code'] == code && p['is_active'] == true,
+      (p) => p['plugin_code'] == code && marketplacePluginLicenseActive(p),
     );
   }
 

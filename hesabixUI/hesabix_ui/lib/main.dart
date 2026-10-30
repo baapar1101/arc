@@ -154,6 +154,7 @@ import 'pages/business/customer_club/customer_club_main_page.dart';
 import 'pages/business/customer_club/customer_club_settings_page.dart';
 import 'pages/business/payroll/payroll_main_page.dart';
 import 'pages/business/fixed_assets/fixed_assets_main_page.dart';
+import 'pages/business/fixed_assets/fixed_assets_reports_page.dart';
 import 'pages/business/fixed_assets/fixed_assets_settings_page.dart';
 import 'pages/business/payroll/payroll_reports_page.dart';
 import 'pages/business/payroll/payroll_run_edit_page.dart';
@@ -4365,6 +4366,28 @@ class _MyAppState extends State<MyApp> {
                                 WooCommerceBridgeHealthReportPage(
                                   businessId: businessId,
                                   calendarController: _calendarController!,
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'reports/fixed-assets',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              final kind =
+                                  state.uri.queryParameters['kind'] ?? 'register';
+                              return hesabixNoTransitionPage(
+                                state,
+                                FixedAssetsPluginGate(
+                                  businessId: businessId,
+                                  child: FixedAssetsReportsPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    calendarController: _calendarController!,
+                                    initialKind: kind,
+                                  ),
                                 ),
                               );
                             },

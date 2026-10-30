@@ -789,6 +789,7 @@ def list_assets(
 	status: Optional[str] = None,
 	class_id: Optional[int] = None,
 	search: Optional[str] = None,
+	invoice_id: Optional[int] = None,
 	limit: int = 100,
 	skip: int = 0,
 ) -> Dict[str, Any]:
@@ -801,6 +802,8 @@ def list_assets(
 		q = q.filter(FixedAsset.status == status)
 	if class_id:
 		q = q.filter(FixedAsset.class_id == int(class_id))
+	if invoice_id:
+		q = q.filter(FixedAsset.invoice_id == int(invoice_id))
 	if search:
 		term = f"%{search.strip()}%"
 		q = q.filter(

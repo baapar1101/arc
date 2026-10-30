@@ -10,6 +10,7 @@ import '../../../utils/error_extractor.dart';
 import '../../../utils/number_normalizer.dart' show parseFormattedDouble, parseFormattedInt;
 import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/invoice/account_tree_combobox_widget.dart';
+import 'fixed_assets_ui.dart';
 
 /// تنظیمات افزونه اموال: حساب‌ها، قرارداد استهلاک، و قواعد قانونی قابل‌تغییر.
 class FixedAssetsSettingsPage extends StatefulWidget {
@@ -277,6 +278,8 @@ class _FixedAssetsSettingsPageState extends State<FixedAssetsSettingsPage> {
                       const SizedBox(height: 12),
                       Text(t.fixedAssetsConventionHint, style: Theme.of(context).textTheme.bodySmall),
                       RadioListTile<String>(
+                        contentPadding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
                         value: 'from_ready_date',
                         groupValue: _convention,
                         title: Text(t.fixedAssetsConventionFromReady),
@@ -285,6 +288,8 @@ class _FixedAssetsSettingsPageState extends State<FixedAssetsSettingsPage> {
                             : null,
                       ),
                       RadioListTile<String>(
+                        contentPadding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
                         value: 'next_month',
                         groupValue: _convention,
                         title: Text(t.fixedAssetsConventionNextMonth),
@@ -292,31 +297,32 @@ class _FixedAssetsSettingsPageState extends State<FixedAssetsSettingsPage> {
                             ? (v) => setState(() => _convention = v!)
                             : null,
                       ),
+                      const SizedBox(height: 8),
                       TextField(
                         controller: _idleMonthsCtrl,
                         enabled: _canManage && !_saving,
                         keyboardType: TextInputType.number,
-                        decoration: InputDecoration(labelText: t.fixedAssetsTaxIdleMonths),
+                        decoration: FixedAssetsUi.fieldDecoration(context, t.fixedAssetsTaxIdleMonths),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
                       TextField(
                         controller: _taxReductionCtrl,
                         enabled: _canManage && !_saving,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: InputDecoration(labelText: t.fixedAssetsTaxIdleReduction),
+                        decoration: FixedAssetsUi.fieldDecoration(context, t.fixedAssetsTaxIdleReduction),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
                       TextField(
                         controller: _accountingReductionCtrl,
                         enabled: _canManage && !_saving,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: InputDecoration(labelText: t.fixedAssetsAccountingIdleReduction),
+                        decoration: FixedAssetsUi.fieldDecoration(context, t.fixedAssetsAccountingIdleReduction),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
                       TextField(
                         controller: _prefixCtrl,
                         enabled: _canManage && !_saving,
-                        decoration: InputDecoration(labelText: t.fixedAssetsPlaquePrefix),
+                        decoration: FixedAssetsUi.fieldDecoration(context, t.fixedAssetsPlaquePrefix),
                       ),
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
@@ -508,7 +514,7 @@ class _ClassAccountEditorState extends State<_ClassAccountEditor> {
             '${depreciable ? '' : ' — ${widget.notDepreciableLabel}'}',
             style: Theme.of(context).textTheme.titleSmall,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           AccountTreeComboboxWidget(
             businessId: widget.businessId,
             selectedAccount: _cost,
@@ -517,7 +523,7 @@ class _ClassAccountEditorState extends State<_ClassAccountEditor> {
             onChanged: (a) => setState(() => _cost = a),
           ),
           if (depreciable) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 14),
             AccountTreeComboboxWidget(
               businessId: widget.businessId,
               selectedAccount: _accum,
@@ -525,7 +531,7 @@ class _ClassAccountEditorState extends State<_ClassAccountEditor> {
               dense: true,
               onChanged: (a) => setState(() => _accum = a),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 14),
             AccountTreeComboboxWidget(
               businessId: widget.businessId,
               selectedAccount: _expense,

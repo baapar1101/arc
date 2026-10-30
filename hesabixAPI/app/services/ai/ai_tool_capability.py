@@ -297,6 +297,7 @@ _EXACT: Dict[str, str] = {
     "get_barcode_label_template": "inventory.barcode",
     "get_default_barcode_label_template": "inventory.barcode",
     "get_fixed_asset": "financial.fixed_assets",
+    "get_fixed_asset_report": "financial.fixed_assets",
     "get_fixed_asset_depreciation_run": "financial.fixed_assets",
     "get_fixed_asset_settings": "financial.fixed_assets",
     "get_fixed_assets_dashboard": "financial.fixed_assets",

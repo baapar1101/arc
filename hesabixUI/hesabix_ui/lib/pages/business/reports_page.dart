@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/business_nav.dart';
 import '../../core/auth_store.dart';
 import '../../services/marketplace_service.dart';
+import '../../widgets/marketplace/plugin_marketplace_utils.dart';
 import '../../widgets/permission/access_denied_page.dart';
 
 /// شناسهٔ سکشن «گزارش‌های ووکامرس» در فهرست گزارش‌ها؛ با `?section=` در مسیر `reports` هماهنگ است.
@@ -99,13 +100,7 @@ class _ReportsPageState extends State<ReportsPage> {
     try {
       final svc = MarketplaceService();
       final list = await svc.listBusinessPlugins(businessId: widget.businessId);
-      final codes = <String>{};
-      for (final e in list) {
-        final code = e['plugin_code']?.toString();
-        if (code != null && code.isNotEmpty && e['is_active'] == true) {
-          codes.add(code);
-        }
-      }
+      final codes = activeMarketplacePluginCodes(list);
       if (!mounted) return;
       setState(() {
         _activeMarketplacePluginCodes
@@ -960,6 +955,22 @@ class _ReportsPageState extends State<ReportsPage> {
     return true;
   }
 
+  bool _marketplacePluginActive(String code) {
+    return _marketplacePluginsResolved &&
+        _activeMarketplacePluginCodes.contains(code);
+  }
+
+  bool _sectionVisibleForPlugins(_ReportSection section) {
+    final pluginItems = section.items
+        .where((i) => i.marketplacePluginCode != null)
+        .toList();
+    if (pluginItems.isEmpty) return true;
+    if (pluginItems.length != section.items.length) return true;
+    return pluginItems.any(
+      (i) => _marketplacePluginActive(i.marketplacePluginCode!),
+    );
+  }
+
   void _showAccessDenied(BuildContext context, AppLocalizations t) {
     ScaffoldMessenger.of(
       context,
@@ -1556,6 +1567,98 @@ class _ReportsPageState extends State<ReportsPage> {
       );
     }
     if (_marketplacePluginsResolved &&
+        _activeMarketplacePluginCodes.contains('fixed_assets')) {
+      sections.add(
+        _ReportSection(
+          id: 'fixed_assets_reports',
+          title: t.fixedAssetsReportSection,
+          icon: Icons.precision_manufacturing_outlined,
+          items: [
+            _ReportLink(
+              key: 'fa_register',
+              title: t.fixedAssetsReportRegister,
+              subtitle: t.fixedAssetsReportRegisterSubtitle,
+              icon: Icons.inventory_2_outlined,
+              route: '/business/$b/reports/fixed-assets?kind=register',
+              keywords: const ['اموال', 'دفتر', 'دارایی ثابت', 'nbv', 'register'],
+              permissionSection: 'fixed_assets',
+              marketplacePluginCode: 'fixed_assets',
+            ),
+            _ReportLink(
+              key: 'fa_class_summary',
+              title: t.fixedAssetsReportClassSummary,
+              subtitle: t.fixedAssetsReportClassSummarySubtitle,
+              icon: Icons.account_tree_outlined,
+              route: '/business/$b/reports/fixed-assets?kind=class_summary',
+              keywords: const ['گردش', 'طبقه', 'افشا', 'استاندارد ۱۱', 'rollforward'],
+              permissionSection: 'fixed_assets',
+              marketplacePluginCode: 'fixed_assets',
+            ),
+            _ReportLink(
+              key: 'fa_depreciation',
+              title: t.fixedAssetsReportDepreciation,
+              subtitle: t.fixedAssetsReportDepreciationSubtitle,
+              icon: Icons.calculate_outlined,
+              route: '/business/$b/reports/fixed-assets?kind=depreciation',
+              keywords: const ['استهلاک', 'ماهانه', 'ماده ۱۴۹'],
+              permissionSection: 'fixed_assets',
+              marketplacePluginCode: 'fixed_assets',
+            ),
+            _ReportLink(
+              key: 'fa_acquisitions',
+              title: t.fixedAssetsReportAcquisitions,
+              subtitle: t.fixedAssetsReportAcquisitionsSubtitle,
+              icon: Icons.add_box_outlined,
+              route: '/business/$b/reports/fixed-assets?kind=acquisitions',
+              keywords: const ['تحصیل', 'خرید سرمایه‌ای', 'افتتاحیه'],
+              permissionSection: 'fixed_assets',
+              marketplacePluginCode: 'fixed_assets',
+            ),
+            _ReportLink(
+              key: 'fa_disposals',
+              title: t.fixedAssetsReportDisposals,
+              subtitle: t.fixedAssetsReportDisposalsSubtitle,
+              icon: Icons.output_outlined,
+              route: '/business/$b/reports/fixed-assets?kind=disposals',
+              keywords: const ['خروج', 'اسقاط', 'فروش دارایی', 'سود واگذاری'],
+              permissionSection: 'fixed_assets',
+              marketplacePluginCode: 'fixed_assets',
+            ),
+            _ReportLink(
+              key: 'fa_idle',
+              title: t.fixedAssetsReportIdle,
+              subtitle: t.fixedAssetsReportIdleSubtitle,
+              icon: Icons.pause_circle_outline,
+              route: '/business/$b/reports/fixed-assets?kind=idle',
+              keywords: const ['راکد', 'idle', 'ماده ۱۴۹'],
+              permissionSection: 'fixed_assets',
+              marketplacePluginCode: 'fixed_assets',
+            ),
+            _ReportLink(
+              key: 'fa_locations',
+              title: t.fixedAssetsReportLocations,
+              subtitle: t.fixedAssetsReportLocationsSubtitle,
+              icon: Icons.place_outlined,
+              route: '/business/$b/reports/fixed-assets?kind=locations',
+              keywords: const ['محل', 'تحویل‌گیرنده', 'اموال‌گردانی'],
+              permissionSection: 'fixed_assets',
+              marketplacePluginCode: 'fixed_assets',
+            ),
+            _ReportLink(
+              key: 'fa_expenditures',
+              title: t.fixedAssetsReportExpenditures,
+              subtitle: t.fixedAssetsReportExpendituresSubtitle,
+              icon: Icons.build_outlined,
+              route: '/business/$b/reports/fixed-assets?kind=expenditures',
+              keywords: const ['تعمیر', 'مخارج بعدی', 'تعمیر اساسی'],
+              permissionSection: 'fixed_assets',
+              marketplacePluginCode: 'fixed_assets',
+            ),
+          ],
+        ),
+      );
+    }
+    if (_marketplacePluginsResolved &&
         _activeMarketplacePluginCodes.contains('woocommerce_hesabix')) {
       sections.add(
         _ReportSection(
@@ -1611,7 +1714,7 @@ class _ReportsPageState extends State<ReportsPage> {
         ),
       );
     }
-    return sections;
+    return sections.where(_sectionVisibleForPlugins).toList();
   }
 }
 
