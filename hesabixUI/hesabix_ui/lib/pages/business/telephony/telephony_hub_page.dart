@@ -31,6 +31,20 @@ class _TelephonyHubPageState extends State<TelephonyHubPage> {
   bool _loading = true;
   String? _error;
 
+  bool get _canManage =>
+      widget.authStore.hasBusinessPermission('telephony', 'manage') ||
+      (_dashboard?['access'] is Map && (_dashboard?['access'] as Map)['can_manage'] == true);
+
+  bool get _canLive =>
+      widget.authStore.hasBusinessPermission('telephony', 'live_monitor') ||
+      widget.authStore.hasBusinessPermission('telephony', 'supervise') ||
+      widget.authStore.hasBusinessPermission('telephony', 'manage');
+
+  bool get _canReports =>
+      widget.authStore.hasBusinessPermission('telephony', 'reports') ||
+      widget.authStore.hasBusinessPermission('telephony', 'supervise') ||
+      widget.authStore.hasBusinessPermission('telephony', 'manage');
+
   @override
   void initState() {
     super.initState();
@@ -133,22 +147,25 @@ class _TelephonyHubPageState extends State<TelephonyHubPage> {
                           icon: const Icon(Icons.history_rounded),
                           label: const Text('تاریخچه'),
                         ),
-                        OutlinedButton.icon(
-                          onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony/live')),
-                          icon: const Icon(Icons.monitor_heart_outlined),
-                          label: const Text('زنده'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony/reports')),
-                          icon: const Icon(Icons.insights_outlined),
-                          label: const Text('گزارش'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () =>
-                              context.go(context.businessPanelUrl(widget.businessId, 'settings/telephony')),
-                          icon: const Icon(Icons.settings_outlined),
-                          label: const Text('تنظیمات'),
-                        ),
+                        if (_canLive)
+                          OutlinedButton.icon(
+                            onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony/live')),
+                            icon: const Icon(Icons.monitor_heart_outlined),
+                            label: const Text('زنده'),
+                          ),
+                        if (_canReports)
+                          OutlinedButton.icon(
+                            onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony/reports')),
+                            icon: const Icon(Icons.insights_outlined),
+                            label: const Text('گزارش'),
+                          ),
+                        if (_canManage)
+                          OutlinedButton.icon(
+                            onPressed: () =>
+                                context.go(context.businessPanelUrl(widget.businessId, 'settings/telephony')),
+                            icon: const Icon(Icons.settings_outlined),
+                            label: const Text('تنظیمات'),
+                          ),
                         TextButton.icon(
                           onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony/softphone')),
                           icon: const Icon(Icons.headset_mic_outlined),
@@ -211,11 +228,14 @@ class _TelephonyHubPageState extends State<TelephonyHubPage> {
                         children: [
                           const Text('هنوز مرکز تلفنی متصل نشده است.'),
                           const SizedBox(height: 12),
-                          FilledButton(
-                            onPressed: () =>
-                                context.go(context.businessPanelUrl(widget.businessId, 'settings/telephony')),
-                            child: const Text('اتصال Issabel'),
-                          ),
+                          if (_canManage)
+                            FilledButton(
+                              onPressed: () =>
+                                  context.go(context.businessPanelUrl(widget.businessId, 'settings/telephony')),
+                              child: const Text('اتصال Issabel'),
+                            )
+                          else
+                            const Text('از مدیر تلفن بخواهید مرکز تلفن را متصل کند و داخلی شما را واگذار کند.'),
                         ],
                       ),
                     ),
@@ -529,6 +549,7 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
   List<Map<String, dynamic>> _pbx = [];
   List<Map<String, dynamic>> _extensions = [];
   List<Map<String, dynamic>> _userExt = [];
+  List<Map<String, dynamic>> _users = [];
   Map<String, dynamic>? _settings;
   bool _loading = true;
   String? _freshToken;
@@ -540,18 +561,27 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
   }
 
   Future<void> _load() async {
+    if (!widget.authStore.hasBusinessPermission('telephony', 'manage')) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
     setState(() => _loading = true);
     try {
       final settings = await _api.getSettings(widget.businessId);
       final pbx = await _api.listPbx(widget.businessId);
       final ext = await _api.listExtensions(widget.businessId);
       final ue = await _api.listUserExtensions(widget.businessId);
+      List<Map<String, dynamic>> users = const [];
+      try {
+        users = await _api.listAssignableUsers(widget.businessId);
+      } catch (_) {}
       if (mounted) {
         setState(() {
           _settings = settings;
           _pbx = pbx;
           _extensions = ext;
           _userExt = ue;
+          _users = users;
           _loading = false;
         });
       }
@@ -592,29 +622,64 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
     }
     final extCtrl = TextEditingController();
     final nameCtrl = TextEditingController();
-    final pbxId = _pbx.first['id'];
+    final teamCtrl = TextEditingController();
+    var allowShared = false;
+    var pbxId = int.tryParse('${_pbx.first['id']}');
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('افزودن داخلی'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: extCtrl, decoration: const InputDecoration(labelText: 'شماره داخلی')),
-            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'نام نمایشی')),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('افزودن داخلی'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_pbx.length > 1)
+                DropdownButtonFormField<int>(
+                  value: pbxId,
+                  decoration: const InputDecoration(labelText: 'مرکز تلفن'),
+                  items: _pbx
+                      .map(
+                        (p) => DropdownMenuItem(
+                          value: int.tryParse('${p['id']}'),
+                          child: Text('${p['name']}'),
+                        ),
+                      )
+                      .where((e) => e.value != null)
+                      .toList(),
+                  onChanged: (v) => setLocal(() => pbxId = v),
+                ),
+              TextField(controller: extCtrl, decoration: const InputDecoration(labelText: 'شماره داخلی')),
+              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'نام نمایشی')),
+              TextField(
+                controller: teamCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'کد تیم/بخش',
+                  hintText: 'مثلاً sales',
+                ),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('اجازه اشتراک داخلی'),
+                subtitle: const Text('خاموش = هر داخلی فقط یک کاربر'),
+                value: allowShared,
+                onChanged: (v) => setLocal(() => allowShared = v),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('ذخیره')),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('ذخیره')),
-        ],
       ),
     );
-    if (ok != true) return;
+    if (ok != true || pbxId == null) return;
     await _api.upsertExtension(widget.businessId, {
       'pbx_id': pbxId,
       'extension': extCtrl.text.trim(),
       'display_name': nameCtrl.text.trim(),
+      'team_code': teamCtrl.text.trim().isEmpty ? null : teamCtrl.text.trim(),
+      'allow_shared': allowShared,
     });
     await _load();
   }
@@ -624,10 +689,8 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ابتدا داخلی تعریف کنید')));
       return;
     }
-    final userId = widget.authStore.currentUserId;
-    if (userId == null) return;
     await _editUserExtensionMapping(
-      userId: userId,
+      userId: widget.authStore.currentUserId,
       extensionId: int.tryParse('${_extensions.first['id']}'),
       endpointMode: 'relay',
       allowFallback: true,
@@ -636,19 +699,22 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
   }
 
   Future<void> _editUserExtensionMapping({
-    required int userId,
+    int? userId,
     int? linkId,
     int? extensionId,
     String endpointMode = 'desk',
     bool allowFallback = true,
     bool isPrimary = true,
     String? directSipUser,
+    bool canSuperviseTeam = false,
   }) async {
     if (_extensions.isEmpty) return;
+    var selectedUserId = userId ?? widget.authStore.currentUserId;
     var selectedExtId = extensionId ?? int.tryParse('${_extensions.first['id']}');
     var mode = endpointMode;
     var fallback = allowFallback;
     var primary = isPrimary;
+    var supervise = canSuperviseTeam;
     final sipCtrl = TextEditingController(text: directSipUser ?? '');
 
     final ok = await showDialog<bool>(
@@ -663,6 +729,21 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    DropdownButtonFormField<int>(
+                      value: selectedUserId,
+                      decoration: const InputDecoration(labelText: 'کاربر کسب‌وکار'),
+                      items: [
+                        for (final u in _users)
+                          DropdownMenuItem(
+                            value: int.tryParse('${u['id']}'),
+                            child: Text('${u['name'] ?? u['id']}'),
+                          ),
+                        if (_users.every((u) => int.tryParse('${u['id']}') != selectedUserId) && selectedUserId != null)
+                          DropdownMenuItem(value: selectedUserId, child: Text('کاربر $selectedUserId')),
+                      ].where((e) => e.value != null).toList(),
+                      onChanged: (v) => setLocal(() => selectedUserId = v),
+                    ),
+                    const SizedBox(height: 12),
                     DropdownButtonFormField<int>(
                       value: selectedExtId,
                       decoration: const InputDecoration(labelText: 'داخلی'),
@@ -707,6 +788,13 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                       value: primary,
                       onChanged: (v) => setLocal(() => primary = v),
                     ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('سرپرست تیم این داخلی'),
+                      subtitle: const Text('اگر داخلی کد تیم داشته باشد، این کاربر گزارش و زنده همان تیم را می‌بیند'),
+                      value: supervise,
+                      onChanged: (v) => setLocal(() => supervise = v),
+                    ),
                     if (mode == 'direct')
                       TextField(
                         controller: sipCtrl,
@@ -727,13 +815,14 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
         );
       },
     );
-    if (ok != true || selectedExtId == null) return;
+    if (ok != true || selectedExtId == null || selectedUserId == null) return;
     await _api.upsertUserExtension(widget.businessId, {
-      'user_id': userId,
+      'user_id': selectedUserId,
       'extension_id': selectedExtId,
       'is_primary': primary,
       'receive_screen_pop': true,
       'can_click_to_call': true,
+      'can_supervise_team': supervise,
       'endpoint_mode': mode,
       'allow_mode_fallback': fallback,
       if (mode == 'direct') 'direct_sip_user': sipCtrl.text.trim(),
@@ -827,6 +916,20 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    if (!widget.authStore.hasBusinessPermission('telephony', 'manage')) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('تنظیمات مرکز تماس'),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+        ),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text('فقط مدیر تلفن می‌تواند اتصال، داخلی و واگذاری را مدیریت کند.'),
+          ),
+        ),
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('تنظیمات مرکز تماس'),
@@ -1051,15 +1154,18 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                 ListTile(
                   title: const Text('دسترسی به ضبط مکالمه'),
                   subtitle: Text(
-                    '${_settings?['recording_access_mode']}' == 'all_operators'
-                        ? 'همه اپراتورها'
-                        : 'بر اساس مجوز listen_recordings',
+                    {
+                          'all_operators': 'اپراتورها فقط ضبط تماس‌های مجاز خود/تیم',
+                          'owner_and_managers': 'مالک تماس و سرپرست/مدیر',
+                        }['${_settings?['recording_access_mode']}'] ??
+                        'مجوز listen_recordings در محدوده مجاز',
                   ),
                   trailing: DropdownButton<String>(
                     value: '${_settings?['recording_access_mode'] ?? 'permission_based'}',
                     items: const [
                       DropdownMenuItem(value: 'permission_based', child: Text('مجوزمحور')),
-                      DropdownMenuItem(value: 'all_operators', child: Text('همه')),
+                      DropdownMenuItem(value: 'owner_and_managers', child: Text('مالک و مدیران')),
+                      DropdownMenuItem(value: 'all_operators', child: Text('اپراتورهای مجاز')),
                     ],
                     onChanged: (v) async {
                       if (v == null) return;
@@ -1067,6 +1173,15 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                       _load();
                     },
                   ),
+                ),
+                SwitchListTile(
+                  title: const Text('چند مرکز تلفن'),
+                  subtitle: const Text('اگر خاموش باشد فقط یک PBX برای کسب‌وکار مجاز است'),
+                  value: _settings?['multi_pbx_enabled'] == true,
+                  onChanged: (v) async {
+                    await _api.updateSettings(widget.businessId, {'multi_pbx_enabled': v});
+                    _load();
+                  },
                 ),
                 const Divider(),
                 ListTile(
@@ -1113,31 +1228,40 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                 const Divider(),
                 ListTile(
                   title: const Text('داخلی‌ها'),
+                  subtitle: const Text(
+                    'Connector در heartbeat فهرست داخلی‌ها را همگام می‌کند. پیش‌فرض هر داخلی انحصاری است.',
+                  ),
                   trailing: TextButton(onPressed: _addExtension, child: const Text('افزودن')),
                 ),
                 ..._extensions.map(
                   (e) => ListTile(
                     leading: const Icon(Icons.phone_outlined),
-                    title: Text('${e['extension']}'),
-                    subtitle: Text('${e['display_name'] ?? ''}'),
+                    title: Text('${e['extension']} ${e['display_name'] ?? ''}'),
+                    subtitle: Text(
+                      [
+                        if ('${e['team_code'] ?? ''}'.isNotEmpty) 'تیم ${e['team_code']}',
+                        e['allow_shared'] == true ? 'قابل اشتراک' : 'انحصاری',
+                      ].join(' · '),
+                    ),
                   ),
                 ),
                 const Divider(),
                 ListTile(
                   title: const Text('نگاشت کاربر ↔ داخلی / Softphone'),
-                  subtitle: const Text('حالت Relay برای Softphone داخل اپ، Desk برای تلفن رومیزی'),
-                  trailing: TextButton(onPressed: _mapMe, child: const Text('وصل کردن من (Relay)')),
+                  subtitle: const Text('هر داخلی پیش‌فرض مال یک کاربر است. از لیست کاربر کسب‌وکار انتخاب کنید.'),
+                  trailing: TextButton(onPressed: _mapMe, child: const Text('واگذاری داخلی')),
                 ),
                 ..._userExt.map(
                   (e) => ListTile(
                     leading: const Icon(Icons.person_outline),
-                    title: Text('کاربر ${e['user_id']} → داخلی ${e['extension']}'),
+                    title: Text('${e['user_name'] ?? 'کاربر ${e['user_id']}'} → داخلی ${e['extension']}'),
                     subtitle: Text(
                       '${e['is_primary'] == true ? 'اصلی' : 'فرعی'} · حالت ${e['endpoint_mode'] ?? 'desk'}'
+                      '${'${e['team_code'] ?? ''}'.isNotEmpty ? ' · تیم ${e['team_code']}' : ''}'
                       '${e['allow_mode_fallback'] == false ? ' · بدون fallback' : ''}',
                     ),
                     trailing: IconButton(
-                      tooltip: 'ویرایش Softphone',
+                      tooltip: 'ویرایش نگاشت',
                       icon: const Icon(Icons.edit_outlined),
                       onPressed: () => _editUserExtensionMapping(
                         userId: int.parse('${e['user_id']}'),
@@ -1147,6 +1271,7 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                         allowFallback: e['allow_mode_fallback'] != false,
                         isPrimary: e['is_primary'] == true,
                         directSipUser: e['direct_sip_user']?.toString(),
+                        canSuperviseTeam: e['can_supervise_team'] == true,
                       ),
                     ),
                   ),

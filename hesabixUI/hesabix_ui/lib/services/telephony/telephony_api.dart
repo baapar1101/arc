@@ -114,6 +114,26 @@ class TelephonyApi {
     return _data(res.data);
   }
 
+  Future<List<Map<String, dynamic>>> listAssignableUsers(int businessId) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/telephony/business/$businessId/assignable-users',
+    );
+    final data = _data(res.data);
+    final items = data['items'];
+    if (items is List) {
+      return items.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    }
+    return const [];
+  }
+
+  Future<Map<String, dynamic>> syncExtensions(int businessId, int pbxId, List<Map<String, dynamic>> items) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/telephony/business/$businessId/extensions/sync',
+      data: {'pbx_id': pbxId, 'items': items},
+    );
+    return _data(res.data);
+  }
+
   Future<Map<String, dynamic>> listCalls(
     int businessId, {
     String? direction,

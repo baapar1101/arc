@@ -20,6 +20,7 @@ from adapters.db.models.telephony import (
 	TelephonyNumberAlias,
 	TelephonyPbxConnection,
 	TelephonySettings,
+	TelephonyTeamSupervisor,
 	TelephonyUserExtension,
 )
 from adapters.db.models.user import User
@@ -27,6 +28,16 @@ from app.core.responses import ApiError
 from app.core.security import generate_api_key, hash_api_key
 from app.core.telephony_plugin_dependency import check_telephony_plugin_active
 from app.services.telephony.phone_normalizer import extract_digits, normalize_iran_phone, numbers_match
+from app.services.telephony.telephony_access import (
+	TelephonyScope,
+	exclusive_extension_taken,
+	list_assignable_users,
+	require_business_member,
+	require_call_in_scope,
+	resolve_scope,
+	upsert_team_supervisor,
+	user_display_name,
+)
 from app.services.realtime import realtime_manager
 
 
@@ -72,7 +83,7 @@ def settings_to_dict(row: TelephonySettings) -> Dict[str, Any]:
 		"default_category": row.default_category,
 		"missed_call_create_task": bool(row.missed_call_create_task),
 		"missed_call_task_due_minutes": row.missed_call_task_due_minutes,
-		"recording_access_mode": row.recording_access_mode,
+		"recording_access_mode": row.recording_access_mode or "permission_based",
 		"multi_pbx_enabled": bool(row.multi_pbx_enabled),
 		"ui_preferences": row.ui_preferences or {},
 		"extra_settings": row.extra_settings or {},
@@ -97,7 +108,17 @@ def update_settings(db: Session, business_id: int, payload: Dict[str, Any]) -> D
 		"extra_settings",
 	):
 		if key in payload:
-			setattr(row, key, payload[key])
+			if key == "recording_access_mode":
+				mode = str(payload[key] or "permission_based").strip()
+				if mode not in ("permission_based", "all_operators", "owner_and_managers"):
+					raise ApiError(
+						"VALIDATION_ERROR",
+						"recording_access_mode باید permission_based، owner_and_managers یا all_operators باشد.",
+						http_status=400,
+					)
+				setattr(row, key, mode)
+			else:
+				setattr(row, key, payload[key])
 	row.updated_at = _now()
 	db.commit()
 	db.refresh(row)
@@ -132,20 +153,33 @@ def pbx_to_dict(row: TelephonyPbxConnection, *, include_token_hint: bool = True)
 	}
 
 
-def list_pbx(db: Session, business_id: int) -> List[Dict[str, Any]]:
+def list_pbx(db: Session, business_id: int, *, include_token_hint: bool = True) -> List[Dict[str, Any]]:
 	rows = (
 		db.query(TelephonyPbxConnection)
 		.filter(TelephonyPbxConnection.business_id == business_id)
 		.order_by(TelephonyPbxConnection.id.asc())
 		.all()
 	)
-	return [pbx_to_dict(r) for r in rows]
+	return [pbx_to_dict(r, include_token_hint=include_token_hint) for r in rows]
 
 
 def create_pbx(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
 	name = (payload.get("name") or "").strip()
 	if not name:
 		raise ApiError("VALIDATION_ERROR", "نام مرکز تلفن الزامی است.", http_status=400)
+	settings_row = get_or_create_settings(db, business_id)
+	existing_count = (
+		db.query(func.count(TelephonyPbxConnection.id))
+		.filter(TelephonyPbxConnection.business_id == business_id)
+		.scalar()
+		or 0
+	)
+	if existing_count and not settings_row.multi_pbx_enabled:
+		raise ApiError(
+			"MULTI_PBX_DISABLED",
+			"چند مرکز تلفن برای این کسب‌وکار فعال نیست. ابتدا multi_pbx را در تنظیمات روشن کنید.",
+			http_status=400,
+		)
 	api_key, key_hash = generate_api_key(prefix="hsx_tel_", length=36)
 	row = TelephonyPbxConnection(
 		business_id=business_id,
@@ -237,7 +271,22 @@ def authenticate_connector(
 	)
 	if not row:
 		raise ApiError("UNAUTHORIZED", "Invalid connector token.", http_status=401)
+	_rate_limit_connector(int(pbx_id))
 	return row
+
+
+_CONNECTOR_HITS: Dict[int, List[float]] = {}
+
+
+def _rate_limit_connector(pbx_id: int, *, max_per_sec: int = 50) -> None:
+	import time
+
+	now = time.time()
+	window = _CONNECTOR_HITS.setdefault(pbx_id, [])
+	window[:] = [t for t in window if now - t < 1.0]
+	if len(window) >= max_per_sec:
+		raise ApiError("RATE_LIMITED", "Connector event rate exceeded.", http_status=429)
+	window.append(now)
 
 
 def connector_heartbeat(
@@ -253,6 +302,9 @@ def connector_heartbeat(
 	else:
 		pbx.last_error = None
 	pbx.updated_at = _now()
+	ext_payload = payload.get("extensions")
+	if isinstance(ext_payload, list) and ext_payload:
+		sync_extensions(db, pbx.business_id, pbx.id, ext_payload, commit=False)
 	db.commit()
 	return {"ok": True, "pbx_id": pbx.id, "status": pbx.status}
 
@@ -267,6 +319,8 @@ def extension_to_dict(row: TelephonyExtension) -> Dict[str, Any]:
 		"pbx_id": row.pbx_id,
 		"extension": row.extension,
 		"display_name": row.display_name,
+		"team_code": getattr(row, "team_code", None),
+		"allow_shared": bool(getattr(row, "allow_shared", False)),
 		"queue_codes": row.queue_codes,
 		"is_active": bool(row.is_active),
 		"presence_status": row.presence_status,
@@ -274,10 +328,21 @@ def extension_to_dict(row: TelephonyExtension) -> Dict[str, Any]:
 	}
 
 
-def list_extensions(db: Session, business_id: int, pbx_id: Optional[int] = None) -> List[Dict[str, Any]]:
+def list_extensions(
+	db: Session,
+	business_id: int,
+	pbx_id: Optional[int] = None,
+	*,
+	scope: Optional[TelephonyScope] = None,
+) -> List[Dict[str, Any]]:
 	q = db.query(TelephonyExtension).filter(TelephonyExtension.business_id == business_id)
 	if pbx_id:
 		q = q.filter(TelephonyExtension.pbx_id == pbx_id)
+	if scope is not None and not scope.view_all:
+		if scope.extension_ids:
+			q = q.filter(TelephonyExtension.id.in_(list(scope.extension_ids)))
+		else:
+			return []
 	rows = q.order_by(TelephonyExtension.extension.asc()).all()
 	return [extension_to_dict(r) for r in rows]
 
@@ -313,25 +378,91 @@ def upsert_extension(db: Session, business_id: int, payload: Dict[str, Any]) -> 
 		row.queue_codes = payload.get("queue_codes")
 	if "is_active" in payload:
 		row.is_active = bool(payload.get("is_active"))
+	if "team_code" in payload:
+		code = payload.get("team_code")
+		row.team_code = str(code).strip() if code else None
+	if "allow_shared" in payload:
+		row.allow_shared = bool(payload.get("allow_shared"))
 	row.updated_at = _now()
 	db.commit()
 	db.refresh(row)
 	return extension_to_dict(row)
 
 
-def user_extension_to_dict(row: TelephonyUserExtension) -> Dict[str, Any]:
+def sync_extensions(
+	db: Session,
+	business_id: int,
+	pbx_id: int,
+	items: List[Any],
+	*,
+	commit: bool = True,
+) -> Dict[str, Any]:
+	pbx = (
+		db.query(TelephonyPbxConnection)
+		.filter(TelephonyPbxConnection.id == pbx_id, TelephonyPbxConnection.business_id == business_id)
+		.first()
+	)
+	if not pbx:
+		raise ApiError("NOT_FOUND", "مرکز تلفن یافت نشد.", http_status=404)
+	upserted = 0
+	for raw in items:
+		if isinstance(raw, str):
+			payload = {"pbx_id": pbx_id, "extension": raw}
+		elif isinstance(raw, dict):
+			payload = dict(raw)
+			payload["pbx_id"] = pbx_id
+		else:
+			continue
+		ext = str(payload.get("extension") or "").strip()
+		if not ext:
+			continue
+		row = (
+			db.query(TelephonyExtension)
+			.filter(TelephonyExtension.pbx_id == pbx_id, TelephonyExtension.extension == ext)
+			.first()
+		)
+		if not row:
+			row = TelephonyExtension(
+				business_id=business_id,
+				pbx_id=pbx_id,
+				extension=ext,
+				created_at=_now(),
+				updated_at=_now(),
+			)
+			db.add(row)
+		if payload.get("display_name"):
+			row.display_name = str(payload.get("display_name"))[:120]
+		if "team_code" in payload:
+			code = payload.get("team_code")
+			row.team_code = str(code).strip() if code else None
+		if "is_active" in payload:
+			row.is_active = bool(payload.get("is_active"))
+		row.updated_at = _now()
+		upserted += 1
+	if commit:
+		db.commit()
+	return {"ok": True, "upserted": upserted, "pbx_id": pbx_id}
+
+
+def user_extension_to_dict(
+	row: TelephonyUserExtension, *, user_name: Optional[str] = None, can_supervise_team: Optional[bool] = None
+) -> Dict[str, Any]:
 	ext = row.extension_row
 	return {
 		"id": row.id,
 		"business_id": row.business_id,
 		"user_id": row.user_id,
+		"user_name": user_name,
 		"pbx_id": row.pbx_id,
 		"extension_id": row.extension_id,
 		"extension": ext.extension if ext else None,
 		"extension_display_name": ext.display_name if ext else None,
+		"team_code": getattr(ext, "team_code", None) if ext else None,
+		"allow_shared": bool(getattr(ext, "allow_shared", False)) if ext else False,
 		"is_primary": bool(row.is_primary),
 		"receive_screen_pop": bool(row.receive_screen_pop),
 		"can_click_to_call": bool(row.can_click_to_call),
+		"can_supervise_team": bool(can_supervise_team),
 		"caller_id_override": row.caller_id_override,
 		"endpoint_mode": getattr(row, "endpoint_mode", None) or "desk",
 		"allow_mode_fallback": bool(getattr(row, "allow_mode_fallback", True)),
@@ -340,17 +471,55 @@ def user_extension_to_dict(row: TelephonyUserExtension) -> Dict[str, Any]:
 
 
 def list_user_extensions(
-	db: Session, business_id: int, user_id: Optional[int] = None
+	db: Session,
+	business_id: int,
+	user_id: Optional[int] = None,
+	*,
+	scope: Optional[TelephonyScope] = None,
 ) -> List[Dict[str, Any]]:
 	q = (
 		db.query(TelephonyUserExtension)
 		.options(joinedload(TelephonyUserExtension.extension_row))
 		.filter(TelephonyUserExtension.business_id == business_id)
 	)
-	if user_id:
+	if scope is not None and not scope.view_all:
+		if user_id and int(user_id) != int(scope.user_id) and not scope.can_supervise:
+			user_id = scope.user_id
+		if user_id:
+			q = q.filter(TelephonyUserExtension.user_id == user_id)
+			if scope.can_supervise and int(user_id) != int(scope.user_id) and scope.extension_ids:
+				q = q.filter(TelephonyUserExtension.extension_id.in_(list(scope.extension_ids)))
+		elif scope.can_supervise and scope.extension_ids:
+			q = q.filter(
+				or_(
+					TelephonyUserExtension.user_id == scope.user_id,
+					TelephonyUserExtension.extension_id.in_(list(scope.extension_ids)),
+				)
+			)
+		else:
+			q = q.filter(TelephonyUserExtension.user_id == scope.user_id)
+	elif user_id:
 		q = q.filter(TelephonyUserExtension.user_id == user_id)
 	rows = q.order_by(TelephonyUserExtension.id.asc()).all()
-	return [user_extension_to_dict(r) for r in rows]
+	user_ids = {r.user_id for r in rows}
+	users = {u.id: u for u in db.query(User).filter(User.id.in_(list(user_ids))).all()} if user_ids else {}
+	sup_rows = (
+		db.query(TelephonyTeamSupervisor)
+		.filter(TelephonyTeamSupervisor.business_id == business_id)
+		.all()
+	)
+	sup_pairs = {(int(r.user_id), str(r.team_code)) for r in sup_rows}
+	out = []
+	for r in rows:
+		team = getattr(r.extension_row, "team_code", None) if r.extension_row else None
+		out.append(
+			user_extension_to_dict(
+				r,
+				user_name=user_display_name(users.get(r.user_id)),
+				can_supervise_team=bool(team and (int(r.user_id), str(team)) in sup_pairs),
+			)
+		)
+	return out
 
 
 def upsert_user_extension(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -365,9 +534,22 @@ def upsert_user_extension(db: Session, business_id: int, payload: Dict[str, Any]
 	)
 	if not ext:
 		raise ApiError("NOT_FOUND", "داخلی یافت نشد.", http_status=404)
-	user = db.get(User, user_id)
-	if not user:
-		raise ApiError("NOT_FOUND", "کاربر یافت نشد.", http_status=404)
+	user = require_business_member(db, business_id, user_id)
+	if payload.get("allow_shared") is not None:
+		ext.allow_shared = bool(payload.get("allow_shared"))
+	taken = exclusive_extension_taken(
+		db,
+		business_id=business_id,
+		extension_id=extension_id,
+		user_id=user_id,
+		allow_shared=bool(getattr(ext, "allow_shared", False)),
+	)
+	if taken:
+		raise ApiError(
+			"EXTENSION_IN_USE",
+			"این داخلی به کاربر دیگری واگذار شده است. برای اشتراک، allow_shared را روی داخلی روشن کنید.",
+			http_status=409,
+		)
 
 	row = (
 		db.query(TelephonyUserExtension)
@@ -413,6 +595,11 @@ def upsert_user_extension(db: Session, business_id: int, payload: Dict[str, Any]
 		row.direct_sip_user = payload.get("direct_sip_user")
 	row.pbx_id = ext.pbx_id
 	row.updated_at = _now()
+	if "can_supervise_team" in payload:
+		team = (getattr(ext, "team_code", None) or payload.get("team_code") or "").strip()
+		upsert_team_supervisor(
+			db, business_id, user_id, team, enabled=bool(payload.get("can_supervise_team"))
+		)
 	db.commit()
 	db.refresh(row)
 	row = (
@@ -421,7 +608,21 @@ def upsert_user_extension(db: Session, business_id: int, payload: Dict[str, Any]
 		.filter(TelephonyUserExtension.id == row.id)
 		.first()
 	)
-	return user_extension_to_dict(row)
+	team = getattr(row.extension_row, "team_code", None) if row and row.extension_row else None
+	sup = False
+	if team:
+		sup = (
+			db.query(TelephonyTeamSupervisor)
+			.filter(
+				TelephonyTeamSupervisor.business_id == business_id,
+				TelephonyTeamSupervisor.user_id == user_id,
+				TelephonyTeamSupervisor.team_code == str(team),
+			)
+			.first()
+			is not None
+		)
+	data = user_extension_to_dict(row, user_name=user_display_name(user), can_supervise_team=sup)
+	return data
 
 
 def delete_user_extension(db: Session, business_id: int, link_id: int) -> None:
@@ -436,11 +637,15 @@ def delete_user_extension(db: Session, business_id: int, link_id: int) -> None:
 	db.commit()
 
 
-def get_my_extension_context(db: Session, business_id: int, user_id: int) -> Dict[str, Any]:
-	links = list_user_extensions(db, business_id, user_id=user_id)
+def get_my_extension_context(db: Session, business_id: int, user_id: int, auth_ctx=None) -> Dict[str, Any]:
+	scope = resolve_scope(db, auth_ctx, business_id) if auth_ctx is not None else None
+	links = list_user_extensions(db, business_id, user_id=user_id, scope=scope)
 	primary = next((x for x in links if x.get("is_primary")), links[0] if links else None)
-	pbx_list = list_pbx(db, business_id)
+	include_token = bool(scope.can_manage) if scope else False
+	pbx_list = list_pbx(db, business_id, include_token_hint=include_token)
 	settings = settings_to_dict(get_or_create_settings(db, business_id))
+	if scope is not None and not scope.can_manage:
+		settings.pop("extra_settings", None)
 	missed_today = (
 		db.query(func.count(TelephonyCall.id))
 		.filter(
@@ -474,6 +679,8 @@ def get_my_extension_context(db: Session, business_id: int, user_id: int) -> Dic
 		"missed_today": int(missed_today),
 		"has_extension": bool(links),
 		"softphone": softphone_ctx,
+		"access": scope.to_dict() if scope else None,
+		"assignable_users": list_assignable_users(db, business_id) if scope and scope.can_manage else [],
 	}
 
 
@@ -621,6 +828,17 @@ def _lead_brief(l: Optional[Lead]) -> Optional[Dict[str, Any]]:
 # ─── Calls ───────────────────────────────────────────────────────────────────
 
 
+_PUBLIC_EXTRA_BLOCKED = frozenset(
+	{"recording_url", "recording_path", "recording_file", "connector_token", "install_hint"}
+)
+
+
+def _public_extra(info: Any) -> Dict[str, Any]:
+	if not isinstance(info, dict):
+		return {}
+	return {k: v for k, v in info.items() if k not in _PUBLIC_EXTRA_BLOCKED}
+
+
 def call_to_dict(row: TelephonyCall) -> Dict[str, Any]:
 	return {
 		"id": row.id,
@@ -645,7 +863,8 @@ def call_to_dict(row: TelephonyCall) -> Dict[str, Any]:
 		"talk_sec": row.talk_sec,
 		"hangup_cause": row.hangup_cause,
 		"recording_status": row.recording_status,
-		"recording_url": row.recording_url,
+		"recording_available": row.recording_status == "available",
+		"recording_url": None,
 		"person_id": row.person_id,
 		"lead_id": row.lead_id,
 		"deal_id": row.deal_id,
@@ -657,7 +876,7 @@ def call_to_dict(row: TelephonyCall) -> Dict[str, Any]:
 		"note": row.note,
 		"match_method": row.match_method,
 		"is_anonymous": bool(row.is_anonymous),
-		"extra_info": row.extra_info or {},
+		"extra_info": _public_extra(row.extra_info),
 		"created_at": _iso(row.created_at),
 		"updated_at": _iso(row.updated_at),
 	}
@@ -674,8 +893,13 @@ def list_calls(
 	q: Optional[str] = None,
 	limit: int = 50,
 	offset: int = 0,
+	scope: Optional[TelephonyScope] = None,
+	auth_ctx=None,
 ) -> Dict[str, Any]:
 	query = db.query(TelephonyCall).filter(TelephonyCall.business_id == business_id)
+	resolved = scope or (resolve_scope(db, auth_ctx, business_id) if auth_ctx is not None else None)
+	if resolved is not None:
+		query = resolved.apply_call_filter(query)
 	if direction:
 		query = query.filter(TelephonyCall.direction == direction)
 	if status:
@@ -701,14 +925,17 @@ def list_calls(
 	return {"items": [call_to_dict(r) for r in rows], "total": total, "limit": limit, "offset": offset}
 
 
-def get_call(db: Session, business_id: int, call_id: int) -> Dict[str, Any]:
-	row = (
-		db.query(TelephonyCall)
-		.filter(TelephonyCall.id == call_id, TelephonyCall.business_id == business_id)
-		.first()
-	)
-	if not row:
-		raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
+def get_call(db: Session, business_id: int, call_id: int, *, auth_ctx=None, scope: Optional[TelephonyScope] = None) -> Dict[str, Any]:
+	if auth_ctx is not None:
+		row = require_call_in_scope(db, auth_ctx, business_id, call_id, scope=scope)
+	else:
+		row = (
+			db.query(TelephonyCall)
+			.filter(TelephonyCall.id == call_id, TelephonyCall.business_id == business_id)
+			.first()
+		)
+		if not row:
+			raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
 	data = call_to_dict(row)
 	events = (
 		db.query(TelephonyCallEvent)
@@ -721,7 +948,7 @@ def get_call(db: Session, business_id: int, call_id: int) -> Dict[str, Any]:
 			"id": e.id,
 			"event_id": e.event_id,
 			"event_type": e.event_type,
-			"payload": e.payload,
+			"payload": _public_extra(e.payload),
 			"occurred_at": _iso(e.occurred_at),
 		}
 		for e in events
@@ -729,15 +956,28 @@ def get_call(db: Session, business_id: int, call_id: int) -> Dict[str, Any]:
 	return data
 
 
-def patch_call(db: Session, business_id: int, call_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
-	row = (
-		db.query(TelephonyCall)
-		.filter(TelephonyCall.id == call_id, TelephonyCall.business_id == business_id)
-		.first()
-	)
-	if not row:
-		raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
-	for key in (
+def patch_call(
+	db: Session,
+	business_id: int,
+	call_id: int,
+	payload: Dict[str, Any],
+	*,
+	auth_ctx=None,
+	scope: Optional[TelephonyScope] = None,
+) -> Dict[str, Any]:
+	if auth_ctx is not None:
+		row = require_call_in_scope(db, auth_ctx, business_id, call_id, scope=scope)
+		resolved = scope or resolve_scope(db, auth_ctx, business_id)
+	else:
+		row = (
+			db.query(TelephonyCall)
+			.filter(TelephonyCall.id == call_id, TelephonyCall.business_id == business_id)
+			.first()
+		)
+		if not row:
+			raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
+		resolved = None
+	keys = [
 		"note",
 		"category",
 		"outcome",
@@ -746,7 +986,10 @@ def patch_call(db: Session, business_id: int, call_id: int, payload: Dict[str, A
 		"deal_id",
 		"document_id",
 		"match_method",
-	):
+	]
+	if resolved is None or resolved.can_manage or resolved.can_supervise:
+		keys.append("assigned_user_id")
+	for key in keys:
 		if key in payload:
 			setattr(row, key, payload[key])
 	if payload.get("person_id"):
@@ -755,6 +998,29 @@ def patch_call(db: Session, business_id: int, call_id: int, payload: Dict[str, A
 	db.commit()
 	db.refresh(row)
 	return call_to_dict(row)
+
+
+def _ensure_extension_catalog(db: Session, pbx: TelephonyPbxConnection, extension: str) -> None:
+	ext = str(extension or "").strip()
+	if not ext:
+		return
+	exists = (
+		db.query(TelephonyExtension.id)
+		.filter(TelephonyExtension.pbx_id == pbx.id, TelephonyExtension.extension == ext)
+		.first()
+	)
+	if exists:
+		return
+	db.add(
+		TelephonyExtension(
+			business_id=pbx.business_id,
+			pbx_id=pbx.id,
+			extension=ext,
+			created_at=_now(),
+			updated_at=_now(),
+		)
+	)
+	db.flush()
 
 
 def _users_for_extension(db: Session, business_id: int, extension: Optional[str]) -> List[TelephonyUserExtension]:
@@ -867,6 +1133,8 @@ def process_connector_event(
 	settings = get_or_create_settings(db, pbx.business_id)
 	direction = str(payload.get("direction") or (call.direction if call else "inbound")).lower()
 	extension = str(payload.get("extension") or (call.extension if call else "") or "").strip() or None
+	if extension:
+		_ensure_extension_catalog(db, pbx, extension)
 	from_raw = payload.get("from") or payload.get("from_number") or (call.from_number_raw if call else None)
 	to_raw = payload.get("to") or payload.get("to_number") or (call.to_number_raw if call else None)
 	from_norm = normalize_iran_phone(from_raw)["canonical"]
@@ -1147,17 +1415,20 @@ def _ensure_missed_call_task(db: Session, call: TelephonyCall, settings: Telepho
 # ─── Screen pop context ─────────────────────────────────────────────────────
 
 
-def screen_pop_context(db: Session, business_id: int, call_id: int) -> Dict[str, Any]:
+def screen_pop_context(db: Session, business_id: int, call_id: int, *, auth_ctx=None) -> Dict[str, Any]:
 	from app.services.person_service import calculate_person_balance
 	from adapters.db.models.check import Check, CheckStatus
 
-	call = (
-		db.query(TelephonyCall)
-		.filter(TelephonyCall.id == call_id, TelephonyCall.business_id == business_id)
-		.first()
-	)
-	if not call:
-		raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
+	if auth_ctx is not None:
+		call = require_call_in_scope(db, auth_ctx, business_id, call_id)
+	else:
+		call = (
+			db.query(TelephonyCall)
+			.filter(TelephonyCall.id == call_id, TelephonyCall.business_id == business_id)
+			.first()
+		)
+		if not call:
+			raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
 
 	match = (call.extra_info or {}).get("match") or match_caller(
 		db, business_id, call.from_number_raw if call.direction == "inbound" else call.to_number_raw
@@ -1404,15 +1675,18 @@ def ack_command(db: Session, pbx: TelephonyPbxConnection, command_id: str, paylo
 
 
 def create_person_from_call(
-	db: Session, business_id: int, call_id: int, payload: Dict[str, Any], user_id: int
+	db: Session, business_id: int, call_id: int, payload: Dict[str, Any], user_id: int, *, auth_ctx=None
 ) -> Dict[str, Any]:
-	call = (
-		db.query(TelephonyCall)
-		.filter(TelephonyCall.id == call_id, TelephonyCall.business_id == business_id)
-		.first()
-	)
-	if not call:
-		raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
+	if auth_ctx is not None:
+		call = require_call_in_scope(db, auth_ctx, business_id, call_id)
+	else:
+		call = (
+			db.query(TelephonyCall)
+			.filter(TelephonyCall.id == call_id, TelephonyCall.business_id == business_id)
+			.first()
+		)
+		if not call:
+			raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
 
 	number = call.from_number_normalized if call.direction == "inbound" else call.to_number_normalized
 	number = number or call.from_number_raw or call.to_number_raw
@@ -1453,17 +1727,20 @@ def create_person_from_call(
 
 
 def create_lead_from_call(
-	db: Session, business_id: int, call_id: int, payload: Dict[str, Any], user_id: int
+	db: Session, business_id: int, call_id: int, payload: Dict[str, Any], user_id: int, *, auth_ctx=None
 ) -> Dict[str, Any]:
 	from adapters.db.models.crm import CrmProcessDefinition, CrmProcessStage
 
-	call = (
-		db.query(TelephonyCall)
-		.filter(TelephonyCall.id == call_id, TelephonyCall.business_id == business_id)
-		.first()
-	)
-	if not call:
-		raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
+	if auth_ctx is not None:
+		call = require_call_in_scope(db, auth_ctx, business_id, call_id)
+	else:
+		call = (
+			db.query(TelephonyCall)
+			.filter(TelephonyCall.id == call_id, TelephonyCall.business_id == business_id)
+			.first()
+		)
+		if not call:
+			raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
 
 	process = (
 		db.query(CrmProcessDefinition)
@@ -1515,29 +1792,33 @@ def create_lead_from_call(
 	return {"call": call_to_dict(call), "lead": _lead_brief(lead)}
 
 
-def dashboard_summary(db: Session, business_id: int, user_id: Optional[int] = None) -> Dict[str, Any]:
+def dashboard_summary(db: Session, business_id: int, user_id: Optional[int] = None, auth_ctx=None) -> Dict[str, Any]:
 	today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+	scope = resolve_scope(db, auth_ctx, business_id) if auth_ctx is not None else None
 	base = db.query(TelephonyCall).filter(
 		TelephonyCall.business_id == business_id, TelephonyCall.started_at >= today_start
 	)
+	if scope is not None:
+		base = scope.apply_call_filter(base)
 	inbound = base.filter(TelephonyCall.direction == "inbound").count()
 	outbound = base.filter(TelephonyCall.direction == "outbound").count()
 	answered = base.filter(TelephonyCall.status.in_(["answered", "completed"])).count()
 	missed = base.filter(TelephonyCall.status == "missed").count()
-	active = (
-		db.query(TelephonyCall)
-		.filter(
-			TelephonyCall.business_id == business_id,
-			TelephonyCall.status.in_(["ringing", "answered"]),
-			TelephonyCall.ended_at.is_(None),
-		)
-		.count()
+	active_q = db.query(TelephonyCall).filter(
+		TelephonyCall.business_id == business_id,
+		TelephonyCall.status.in_(["ringing", "answered"]),
+		TelephonyCall.ended_at.is_(None),
 	)
-	pbx_rows = list_pbx(db, business_id)
+	if scope is not None:
+		active_q = scope.apply_call_filter(active_q)
+	active = active_q.count()
+	include_token = bool(scope.can_manage) if scope else False
+	pbx_rows = list_pbx(db, business_id, include_token_hint=include_token)
 	my_missed = 0
-	if user_id:
+	uid = user_id or (scope.user_id if scope else None)
+	if uid:
 		my_missed = (
-			base.filter(TelephonyCall.assigned_user_id == user_id, TelephonyCall.status == "missed").count()
+			base.filter(TelephonyCall.assigned_user_id == uid, TelephonyCall.status == "missed").count()
 		)
 	return {
 		"today": {
@@ -1549,4 +1830,5 @@ def dashboard_summary(db: Session, business_id: int, user_id: Optional[int] = No
 		},
 		"active_calls": active,
 		"pbx_connections": pbx_rows,
+		"access": scope.to_dict() if scope else None,
 	}

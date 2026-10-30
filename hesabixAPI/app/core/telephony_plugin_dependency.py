@@ -113,3 +113,34 @@ def require_telephony_click_or_view(business_id_param: str = "business_id"):
 		return None
 
 	return dependency
+
+
+def require_telephony_any(*actions: str, business_id_param: str = "business_id"):
+	"""یکی از مجوزهای تلفن کافی است (مثلاً live_monitor یا supervise)."""
+
+	def dependency(
+		request: Request,
+		ctx: AuthContext = Depends(get_current_user),
+		db: Session = Depends(get_db),
+	) -> None:
+		business_id = None
+		try:
+			business_id = int(request.path_params.get(business_id_param))
+		except Exception:
+			business_id = None
+		if not business_id:
+			raise ApiError("INVALID_BUSINESS_ID", "Invalid business id.", http_status=400)
+		ok = any(
+			has_business_permission_for_business(ctx, db, business_id, "telephony", action)
+			for action in actions
+		)
+		if not ok:
+			needed = actions[0] if actions else "view"
+			raise ApiError(
+				"FORBIDDEN",
+				f"Missing business permission: telephony.{needed}",
+				http_status=403,
+			)
+		return None
+
+	return dependency

@@ -67,7 +67,7 @@ UPDATE_TELEPHONY_SETTINGS_SCHEMA = _schema(
         "default_category": {"type": ["string", "null"], "maxLength": 80},
         "missed_call_create_task": {"type": "boolean"},
         "missed_call_task_due_minutes": {"type": ["integer", "null"], "minimum": 1, "maximum": 10080},
-        "recording_access_mode": {"type": "string", "enum": ["permission_based", "all_operators"]},
+        "recording_access_mode": {"type": "string", "enum": ["permission_based", "all_operators", "owner_and_managers"]},
         "multi_pbx_enabled": {"type": "boolean"},
     }
 )
@@ -110,15 +110,17 @@ def get_telephony_dashboard_handler(args, context):
 
     db, bid, uid = _ctx(context)
     _ensure_plugin(db, bid)
-    return _redact_dashboard(_run(svc.dashboard_summary, db, bid, uid))
+    return _redact_dashboard(_run(svc.dashboard_summary, db, bid, uid, auth_ctx=context["user_context"]))
 
 
 def list_telephony_pbx_handler(args, context):
     from app.services.telephony import telephony_service as svc
+    from app.services.telephony.telephony_access import resolve_scope
 
     db, bid, _ = _ctx(context)
     _ensure_plugin(db, bid)
-    return {"items": [_redact_pbx(item) for item in _run(svc.list_pbx, db, bid)]}
+    scope = resolve_scope(db, context["user_context"], bid)
+    return {"items": [_redact_pbx(item) for item in _run(svc.list_pbx, db, bid, include_token_hint=scope.can_manage)]}
 
 
 def update_telephony_pbx_handler(args, context):
@@ -132,10 +134,12 @@ def update_telephony_pbx_handler(args, context):
 
 def list_telephony_extensions_handler(args, context):
     from app.services.telephony import telephony_service as svc
+    from app.services.telephony.telephony_access import resolve_scope
 
     db, bid, _ = _ctx(context)
     _ensure_plugin(db, bid)
-    return {"items": _run(svc.list_extensions, db, bid, args.get("pbx_id"))}
+    scope = resolve_scope(db, context["user_context"], bid)
+    return {"items": _run(svc.list_extensions, db, bid, args.get("pbx_id"), scope=scope)}
 
 
 def upsert_telephony_extension_handler(args, context):
@@ -148,10 +152,12 @@ def upsert_telephony_extension_handler(args, context):
 
 def list_telephony_user_extensions_handler(args, context):
     from app.services.telephony import telephony_service as svc
+    from app.services.telephony.telephony_access import resolve_scope
 
     db, bid, _ = _ctx(context)
     _ensure_plugin(db, bid)
-    return {"items": _run(svc.list_user_extensions, db, bid, args.get("user_id"))}
+    scope = resolve_scope(db, context["user_context"], bid)
+    return {"items": _run(svc.list_user_extensions, db, bid, args.get("user_id"), scope=scope)}
 
 
 def upsert_telephony_user_extension_handler(args, context):
@@ -187,6 +193,7 @@ def list_telephony_calls_handler(args, context):
         q=args.get("q"),
         limit=int(args.get("limit", 50)),
         offset=int(args.get("offset", 0)),
+        auth_ctx=context["user_context"],
     )
 
 
@@ -195,7 +202,7 @@ def get_telephony_call_handler(args, context):
 
     db, bid, _ = _ctx(context)
     _ensure_plugin(db, bid)
-    return _run(svc.get_call, db, bid, int(args["call_id"]))
+    return _run(svc.get_call, db, bid, int(args["call_id"]), auth_ctx=context["user_context"])
 
 
 def update_telephony_call_handler(args, context):
@@ -204,7 +211,7 @@ def update_telephony_call_handler(args, context):
     db, bid, _ = _ctx(context)
     _ensure_plugin(db, bid)
     payload = {k: v for k, v in args.items() if k != "call_id"}
-    return _run(svc.patch_call, db, bid, int(args["call_id"]), payload)
+    return _run(svc.patch_call, db, bid, int(args["call_id"]), payload, auth_ctx=context["user_context"])
 
 
 def create_person_from_telephony_call_handler(args, context):
@@ -213,7 +220,7 @@ def create_person_from_telephony_call_handler(args, context):
     db, bid, uid = _ctx(context)
     _ensure_plugin(db, bid)
     payload = {k: v for k, v in args.items() if k != "call_id"}
-    return _run(svc.create_person_from_call, db, bid, int(args["call_id"]), payload, uid)
+    return _run(svc.create_person_from_call, db, bid, int(args["call_id"]), payload, uid, auth_ctx=context["user_context"])
 
 
 def create_lead_from_telephony_call_handler(args, context):
@@ -222,7 +229,7 @@ def create_lead_from_telephony_call_handler(args, context):
     db, bid, uid = _ctx(context)
     _ensure_plugin(db, bid)
     payload = {k: v for k, v in args.items() if k != "call_id"}
-    return _run(svc.create_lead_from_call, db, bid, int(args["call_id"]), payload, uid)
+    return _run(svc.create_lead_from_call, db, bid, int(args["call_id"]), payload, uid, auth_ctx=context["user_context"])
 
 
 def click_to_call_handler(args, context):
@@ -246,7 +253,14 @@ def get_telephony_reports_summary_handler(args, context):
 
     db, bid, _ = _ctx(context)
     _ensure_plugin(db, bid)
-    return _run(summary_report, db, bid, date_from=args.get("date_from"), date_to=args.get("date_to"))
+    return _run(
+        summary_report,
+        db,
+        bid,
+        date_from=args.get("date_from"),
+        date_to=args.get("date_to"),
+        auth_ctx=context["user_context"],
+    )
 
 
 def register_mcp_telephony_functions(registry) -> None:
@@ -261,9 +275,9 @@ def register_mcp_telephony_functions(registry) -> None:
     registry.register(AIFunction(name="list_telephony_pbx", description="فهرست مراکز تلفن متصل. توکن کانکتور برنمی‌گردد.", parameters_schema=empty, handler=list_telephony_pbx_handler, allowed_roles=roles, required_permissions=["telephony.view"], category="crm", is_readonly=True))
     registry.register(AIFunction(name="update_telephony_pbx", description="ویرایش نام/نوع/وضعیت مرکز تلفن. چرخش توکن از MCP ممکن نیست.", parameters_schema=_schema({"pbx_id": {"type": "integer", "minimum": 1}, "name": {"type": "string", "minLength": 1, "maxLength": 120}, "pbx_type": {"type": "string", "enum": ["issabel", "asterisk"]}, "host_hint": {"type": ["string", "null"], "maxLength": 255}, "is_active": {"type": "boolean"}}, ["pbx_id"]), handler=update_telephony_pbx_handler, allowed_roles=roles, required_permissions=["telephony.manage"], category="crm", requires_approval=True, risk_level="medium", is_readonly=False))
     registry.register(AIFunction(name="list_telephony_extensions", description="فهرست داخلی‌های مراکز تلفن کسب‌وکار متصل.", parameters_schema=_schema({"pbx_id": {"type": "integer", "minimum": 1}}), handler=list_telephony_extensions_handler, allowed_roles=roles, required_permissions=["telephony.view"], category="crm", is_readonly=True))
-    registry.register(AIFunction(name="upsert_telephony_extension", description="ایجاد یا به‌روزرسانی داخلی روی یک مرکز تلفن متعلق به کسب‌وکار.", parameters_schema=_schema({"pbx_id": {"type": "integer", "minimum": 1}, "extension": {"type": "string", "minLength": 1, "maxLength": 32}, "display_name": {"type": ["string", "null"], "maxLength": 120}, "is_active": {"type": "boolean"}}, ["pbx_id", "extension"]), handler=upsert_telephony_extension_handler, allowed_roles=roles, required_permissions=["telephony.manage"], category="crm", requires_approval=True, risk_level="medium", is_readonly=False))
+    registry.register(AIFunction(name="upsert_telephony_extension", description="ایجاد یا به‌روزرسانی داخلی روی یک مرکز تلفن متعلق به کسب‌وکار.", parameters_schema=_schema({"pbx_id": {"type": "integer", "minimum": 1}, "extension": {"type": "string", "minLength": 1, "maxLength": 32}, "display_name": {"type": ["string", "null"], "maxLength": 120}, "team_code": {"type": ["string", "null"], "maxLength": 64}, "allow_shared": {"type": "boolean"}, "is_active": {"type": "boolean"}}, ["pbx_id", "extension"]), handler=upsert_telephony_extension_handler, allowed_roles=roles, required_permissions=["telephony.manage"], category="crm", requires_approval=True, risk_level="medium", is_readonly=False))
     registry.register(AIFunction(name="list_telephony_user_extensions", description="اتصال کاربران کسب‌وکار به داخلی‌ها.", parameters_schema=_schema({"user_id": {"type": "integer", "minimum": 1}}), handler=list_telephony_user_extensions_handler, allowed_roles=roles, required_permissions=["telephony.view"], category="crm", is_readonly=True))
-    registry.register(AIFunction(name="upsert_telephony_user_extension", description="اتصال کاربر عضو کسب‌وکار به داخلی برای Screen-pop یا Click-to-Call.", parameters_schema=_schema({"user_id": {"type": "integer", "minimum": 1}, "extension_id": {"type": "integer", "minimum": 1}, "is_primary": {"type": "boolean"}, "receive_screen_pop": {"type": "boolean"}, "can_click_to_call": {"type": "boolean"}, "caller_id_override": {"type": ["string", "null"], "maxLength": 32}}, ["user_id", "extension_id"]), handler=upsert_telephony_user_extension_handler, allowed_roles=roles, required_permissions=["telephony.manage"], category="crm", requires_approval=True, risk_level="medium", is_readonly=False))
+    registry.register(AIFunction(name="upsert_telephony_user_extension", description="اتصال کاربر عضو کسب‌وکار به داخلی برای Screen-pop یا Click-to-Call. پیش‌فرض انحصاری است مگر allow_shared روی داخلی روشن باشد.", parameters_schema=_schema({"user_id": {"type": "integer", "minimum": 1}, "extension_id": {"type": "integer", "minimum": 1}, "is_primary": {"type": "boolean"}, "receive_screen_pop": {"type": "boolean"}, "can_click_to_call": {"type": "boolean"}, "allow_shared": {"type": "boolean"}, "can_supervise_team": {"type": "boolean"}, "caller_id_override": {"type": ["string", "null"], "maxLength": 32}}, ["user_id", "extension_id"]), handler=upsert_telephony_user_extension_handler, allowed_roles=roles, required_permissions=["telephony.manage"], category="crm", requires_approval=True, risk_level="medium", is_readonly=False))
     registry.register(AIFunction(name="delete_telephony_user_extension", description="حذف اتصال کاربر به داخلی. نیازمند تأیید.", parameters_schema=_schema({"link_id": {"type": "integer", "minimum": 1}}, ["link_id"]), handler=delete_telephony_user_extension_handler, allowed_roles=roles, required_permissions=["telephony.manage"], category="crm", requires_approval=True, risk_level="high", is_readonly=False))
     registry.register(AIFunction(name="list_telephony_calls", description="جستجوی تماس‌های کسب‌وکار متصل، حداکثر ۲۰۰ مورد در صفحه.", parameters_schema=_schema({"direction": {"type": "string", "enum": ["inbound", "outbound"]}, "status": {"type": "string", "enum": ["ringing", "answered", "completed", "missed", "busy", "failed"]}, "assigned_user_id": {"type": "integer", "minimum": 1}, "person_id": {"type": "integer", "minimum": 1}, "q": {"type": "string", "maxLength": 80}, "limit": {"type": "integer", "minimum": 1, "maximum": 200}, "offset": {"type": "integer", "minimum": 0}}), handler=list_telephony_calls_handler, allowed_roles=roles, required_permissions=["telephony.view"], category="crm", is_readonly=True))
     registry.register(AIFunction(name="get_telephony_call", description="جزئیات یک تماس متعلق به کسب‌وکار متصل.", parameters_schema=call_id, handler=get_telephony_call_handler, allowed_roles=roles, required_permissions=["telephony.view"], category="crm", is_readonly=True))

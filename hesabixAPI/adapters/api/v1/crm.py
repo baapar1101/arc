@@ -2057,6 +2057,12 @@ async def list_activities(
         q = q.filter(CrmActivity.deal_id == deal_id)
     if activity_type:
         q = q.filter(CrmActivity.activity_type == activity_type)
+    try:
+        from app.services.telephony.telephony_access import filter_crm_activities_for_telephony
+
+        q = filter_crm_activities_for_telephony(q, db, ctx, business_id)
+    except Exception:
+        pass
     total = q.count()
     items = q.order_by(CrmActivity.activity_date.desc()).offset((page - 1) * limit).limit(limit).all()
     data = [_activity_to_dict(a, request) for a in items]

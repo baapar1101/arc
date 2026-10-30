@@ -218,7 +218,7 @@ class _TelephonyPhoneBarHostState extends State<TelephonyPhoneBarHost> with Sing
                 borderRadius: BorderRadius.circular(10),
                 onTap: () {
                   if (_session.presenceLabel == 'no_extension') {
-                    context.go(context.businessPanelUrl(widget.businessId, 'settings/telephony'));
+                    context.go(context.businessPanelUrl(widget.businessId, 'telephony'));
                     return;
                   }
                   context.go(context.businessPanelUrl(widget.businessId, 'telephony/softphone'));

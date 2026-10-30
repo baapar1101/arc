@@ -107,6 +107,13 @@ class TelephonyExtension(Base):
 	)
 	extension: Mapped[str] = mapped_column(String(32), nullable=False)
 	display_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+	team_code: Mapped[str | None] = mapped_column(
+		String(64), nullable=True, comment="کد تیم/بخش مثلاً sales"
+	)
+	allow_shared: Mapped[bool] = mapped_column(
+		Boolean, nullable=False, default=False, server_default="0",
+		comment="اگر خاموش باشد فقط یک کاربر به این داخلی وصل می‌شود",
+	)
 	queue_codes: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 	is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
 	presence_status: Mapped[str] = mapped_column(
@@ -166,6 +173,51 @@ class TelephonyUserExtension(Base):
 	)
 
 	extension_row: Mapped["TelephonyExtension"] = relationship(back_populates="user_links")
+
+
+class TelephonyTeamSupervisor(Base):
+	"""سرپرست یک تیم/بخش تلفنی در کسب‌وکار."""
+
+	__tablename__ = "telephony_team_supervisors"
+	__table_args__ = (
+		UniqueConstraint(
+			"business_id", "user_id", "team_code", name="uq_telephony_team_sup_biz_user_team"
+		),
+		Index("idx_telephony_team_sup_lookup", "business_id", "user_id"),
+	)
+
+	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+	business_id: Mapped[int] = mapped_column(
+		Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False, index=True
+	)
+	user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+	team_code: Mapped[str] = mapped_column(String(64), nullable=False)
+	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+	updated_at: Mapped[datetime] = mapped_column(
+		DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+	)
+
+
+class TelephonyAuditLog(Base):
+	"""حسابرسی پخش ضبط و کنترل تماس."""
+
+	__tablename__ = "telephony_audit_logs"
+	__table_args__ = (Index("idx_telephony_audit_biz_created", "business_id", "created_at"),)
+
+	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+	business_id: Mapped[int] = mapped_column(
+		Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False, index=True
+	)
+	user_id: Mapped[int | None] = mapped_column(
+		Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+	)
+	action: Mapped[str] = mapped_column(String(40), nullable=False, comment="listen_recording | control_call")
+	call_id: Mapped[int | None] = mapped_column(
+		Integer, ForeignKey("telephony_calls.id", ondelete="SET NULL"), nullable=True
+	)
+	target: Mapped[str | None] = mapped_column(String(120), nullable=True)
+	extra_info: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
 
 class TelephonySoftphoneSession(Base):

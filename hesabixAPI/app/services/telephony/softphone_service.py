@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from adapters.db.models.telephony import (
@@ -203,13 +204,16 @@ def create_session(
 			http_status=503,
 		)
 
-	# پایان سشن‌های قبلی همان کاربر
+	# پایان سشن‌های قبلی همان کاربر و هر سشن فعال روی همین داخلی
 	old_rows = (
 		db.query(TelephonySoftphoneSession)
 		.filter(
 			TelephonySoftphoneSession.business_id == business_id,
-			TelephonySoftphoneSession.user_id == user_id,
 			TelephonySoftphoneSession.state.in_(ACTIVE_SESSION_STATES),
+			or_(
+				TelephonySoftphoneSession.user_id == user_id,
+				TelephonySoftphoneSession.extension == link.extension_row.extension,
+			),
 		)
 		.all()
 	)

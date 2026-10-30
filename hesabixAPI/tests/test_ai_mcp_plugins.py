@@ -185,6 +185,7 @@ def test_plugin_tools_are_registered_with_strict_schemas():
     assert UPDATE_TELEPHONY_SETTINGS_SCHEMA["properties"]["recording_access_mode"]["enum"] == [
         "permission_based",
         "all_operators",
+        "owner_and_managers",
     ]
     assert CLICK_TO_CALL_SCHEMA["required"] == ["destination"]
     assert "create_pbx" not in parsed
@@ -323,9 +324,13 @@ def test_telephony_inactive_plugin_and_token_redaction():
     assert "ui_preferences" not in out
     assert "number_normalization_rules" not in out
 
+    fake_scope = MagicMock(can_manage=False, view_all=False)
     with patch(
         "app.core.telephony_plugin_dependency.check_telephony_plugin_active",
         return_value=True,
+    ), patch(
+        "app.services.telephony.telephony_access.resolve_scope",
+        return_value=fake_scope,
     ), patch(
         "app.services.telephony.telephony_service.list_pbx",
         return_value=[{

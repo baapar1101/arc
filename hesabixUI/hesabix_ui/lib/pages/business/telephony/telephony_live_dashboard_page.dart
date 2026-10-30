@@ -31,8 +31,12 @@ class _TelephonyLiveDashboardPageState extends State<TelephonyLiveDashboardPage>
   @override
   void initState() {
     super.initState();
-    _load();
-    _timer = Timer.periodic(const Duration(seconds: 3), (_) => _load(silent: true));
+    if (_canLive) {
+      _load();
+      _timer = Timer.periodic(const Duration(seconds: 3), (_) => _load(silent: true));
+    } else {
+      _loading = false;
+    }
   }
 
   @override
@@ -89,8 +93,27 @@ class _TelephonyLiveDashboardPageState extends State<TelephonyLiveDashboardPage>
     }
   }
 
+  bool get _canLive =>
+      widget.authStore.hasBusinessPermission('telephony', 'live_monitor') ||
+      widget.authStore.hasBusinessPermission('telephony', 'supervise') ||
+      widget.authStore.hasBusinessPermission('telephony', 'manage');
+
   @override
   Widget build(BuildContext context) {
+    if (!_canLive) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('داشبورد زنده تماس'),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+        ),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text('مجوز مانیتورینگ زنده برای محدوده خود/تیم را ندارید.'),
+          ),
+        ),
+      );
+    }
     final scheme = Theme.of(context).colorScheme;
     final kpis = _snap?['kpis'] as Map? ?? {};
     final blf = (_snap?['blf'] as List? ?? const []).map((e) => Map<String, dynamic>.from(e as Map)).toList();

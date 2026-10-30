@@ -12,10 +12,12 @@ from app.core.i18n import locale_dependency
 from app.core.permissions import require_business_access_dep, require_business_permission_dep
 from app.core.responses import ApiError, format_datetime_fields, success_response
 from app.core.telephony_plugin_dependency import (
+	require_telephony_any,
 	require_telephony_click_or_view,
 	require_telephony_plugin_active,
 )
 from app.services.telephony import telephony_service as svc
+from app.services.telephony.telephony_access import list_assignable_users, list_team_supervisors, resolve_scope
 
 router = APIRouter(prefix="/telephony", tags=["telephony"])
 
@@ -77,7 +79,7 @@ def my_context(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	return _resp(svc.get_my_extension_context(db, business_id, ctx.get_user_id()), request)
+	return _resp(svc.get_my_extension_context(db, business_id, ctx.get_user_id(), auth_ctx=ctx), request)
 
 
 @router.get("/business/{business_id}/dashboard")
@@ -91,7 +93,7 @@ def dashboard(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	return _resp(svc.dashboard_summary(db, business_id, user_id=ctx.get_user_id()), request)
+	return _resp(svc.dashboard_summary(db, business_id, user_id=ctx.get_user_id(), auth_ctx=ctx), request)
 
 
 # ─── PBX ────────────────────────────────────────────────────────────────────
@@ -108,7 +110,8 @@ def list_pbx(
 	db: Session = Depends(get_db),
 	_ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	return _resp({"items": svc.list_pbx(db, business_id)}, request)
+	scope = resolve_scope(db, _ctx, business_id)
+	return _resp({"items": svc.list_pbx(db, business_id, include_token_hint=scope.can_manage)}, request)
 
 
 @router.post("/business/{business_id}/pbx")
@@ -172,7 +175,8 @@ def list_extensions(
 	db: Session = Depends(get_db),
 	_ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	return _resp({"items": svc.list_extensions(db, business_id, pbx_id=pbx_id)}, request)
+	scope = resolve_scope(db, _ctx, business_id)
+	return _resp({"items": svc.list_extensions(db, business_id, pbx_id=pbx_id, scope=scope)}, request)
 
 
 @router.post("/business/{business_id}/extensions")
@@ -190,6 +194,53 @@ def upsert_extension(
 	return _resp(svc.upsert_extension(db, business_id, payload), request)
 
 
+@router.post("/business/{business_id}/extensions/sync")
+def sync_extensions(
+	request: Request,
+	business_id: int,
+	payload: Dict[str, Any] = Body(...),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_telephony_plugin_active()),
+	____: None = Depends(require_business_permission_dep("telephony", "manage")),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	pbx_id = int(payload.get("pbx_id") or 0)
+	items = payload.get("items") or payload.get("extensions") or []
+	if not pbx_id:
+		raise ApiError("VALIDATION_ERROR", "pbx_id الزامی است.", http_status=400)
+	return _resp(svc.sync_extensions(db, business_id, pbx_id, items), request)
+
+
+@router.get("/business/{business_id}/assignable-users")
+def assignable_users(
+	request: Request,
+	business_id: int,
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_telephony_plugin_active()),
+	____: None = Depends(require_business_permission_dep("telephony", "manage")),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	return _resp({"items": list_assignable_users(db, business_id)}, request)
+
+
+@router.get("/business/{business_id}/team-supervisors")
+def team_supervisors(
+	request: Request,
+	business_id: int,
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_telephony_plugin_active()),
+	____: None = Depends(require_business_permission_dep("telephony", "manage")),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	return _resp({"items": list_team_supervisors(db, business_id)}, request)
+
+
 @router.get("/business/{business_id}/user-extensions")
 def list_user_extensions(
 	request: Request,
@@ -202,7 +253,8 @@ def list_user_extensions(
 	db: Session = Depends(get_db),
 	_ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	return _resp({"items": svc.list_user_extensions(db, business_id, user_id=user_id)}, request)
+	scope = resolve_scope(db, _ctx, business_id)
+	return _resp({"items": svc.list_user_extensions(db, business_id, user_id=user_id, scope=scope)}, request)
 
 
 @router.put("/business/{business_id}/user-extensions")
@@ -255,7 +307,7 @@ def list_calls(
 	___: None = Depends(require_telephony_plugin_active()),
 	____: None = Depends(require_business_permission_dep("telephony", "view")),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	return _resp(
 		svc.list_calls(
@@ -268,6 +320,7 @@ def list_calls(
 			q=q,
 			limit=limit,
 			offset=offset,
+			auth_ctx=ctx,
 		),
 		request,
 	)
@@ -283,9 +336,9 @@ def get_call(
 	___: None = Depends(require_telephony_plugin_active()),
 	____: None = Depends(require_business_permission_dep("telephony", "view")),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	return _resp(svc.get_call(db, business_id, call_id), request)
+	return _resp(svc.get_call(db, business_id, call_id, auth_ctx=ctx), request)
 
 
 @router.patch("/business/{business_id}/calls/{call_id}")
@@ -299,9 +352,9 @@ def patch_call(
 	___: None = Depends(require_telephony_plugin_active()),
 	____: None = Depends(require_business_permission_dep("telephony", "view")),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	return _resp(svc.patch_call(db, business_id, call_id, payload), request)
+	return _resp(svc.patch_call(db, business_id, call_id, payload, auth_ctx=ctx), request)
 
 
 @router.get("/business/{business_id}/calls/{call_id}/screen-pop-context")
@@ -314,9 +367,9 @@ def screen_pop(
 	___: None = Depends(require_telephony_plugin_active()),
 	____: None = Depends(require_business_permission_dep("telephony", "view")),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	return _resp(svc.screen_pop_context(db, business_id, call_id), request)
+	return _resp(svc.screen_pop_context(db, business_id, call_id, auth_ctx=ctx), request)
 
 
 @router.post("/business/{business_id}/calls/{call_id}/create-person")
@@ -332,7 +385,7 @@ def create_person(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	return _resp(svc.create_person_from_call(db, business_id, call_id, payload or {}, ctx.get_user_id()), request)
+	return _resp(svc.create_person_from_call(db, business_id, call_id, payload or {}, ctx.get_user_id(), auth_ctx=ctx), request)
 
 
 @router.post("/business/{business_id}/calls/{call_id}/create-lead")
@@ -348,7 +401,7 @@ def create_lead(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	return _resp(svc.create_lead_from_call(db, business_id, call_id, payload or {}, ctx.get_user_id()), request)
+	return _resp(svc.create_lead_from_call(db, business_id, call_id, payload or {}, ctx.get_user_id(), auth_ctx=ctx), request)
 
 
 @router.post("/business/{business_id}/click-to-call")
@@ -514,13 +567,13 @@ def report_summary(
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_telephony_plugin_active()),
-	____: None = Depends(require_business_permission_dep("telephony", "reports")),
+	____: None = Depends(require_telephony_any("reports", "supervise", "manage")),
 	db: Session = Depends(get_db),
 	_ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	from app.services.telephony import reports_service as reports
 
-	return _resp(reports.summary_report(db, business_id, date_from=date_from, date_to=date_to), request)
+	return _resp(reports.summary_report(db, business_id, date_from=date_from, date_to=date_to, auth_ctx=_ctx), request)
 
 
 @router.get("/business/{business_id}/reports/operators")
@@ -532,13 +585,13 @@ def report_operators(
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_telephony_plugin_active()),
-	____: None = Depends(require_business_permission_dep("telephony", "reports")),
+	____: None = Depends(require_telephony_any("reports", "supervise", "manage")),
 	db: Session = Depends(get_db),
 	_ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	from app.services.telephony import reports_service as reports
 
-	return _resp(reports.operators_report(db, business_id, date_from=date_from, date_to=date_to), request)
+	return _resp(reports.operators_report(db, business_id, date_from=date_from, date_to=date_to, auth_ctx=_ctx), request)
 
 
 @router.get("/business/{business_id}/reports/by-person")
@@ -550,13 +603,13 @@ def report_by_person(
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_telephony_plugin_active()),
-	____: None = Depends(require_business_permission_dep("telephony", "reports")),
+	____: None = Depends(require_telephony_any("reports", "supervise", "manage")),
 	db: Session = Depends(get_db),
 	_ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	from app.services.telephony import reports_service as reports
 
-	return _resp(reports.by_person_report(db, business_id, date_from=date_from, date_to=date_to), request)
+	return _resp(reports.by_person_report(db, business_id, date_from=date_from, date_to=date_to, auth_ctx=_ctx), request)
 
 
 @router.get("/business/{business_id}/reports/by-extension")
@@ -568,13 +621,13 @@ def report_by_extension(
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_telephony_plugin_active()),
-	____: None = Depends(require_business_permission_dep("telephony", "reports")),
+	____: None = Depends(require_telephony_any("reports", "supervise", "manage")),
 	db: Session = Depends(get_db),
 	_ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	from app.services.telephony import reports_service as reports
 
-	return _resp(reports.by_extension_report(db, business_id, date_from=date_from, date_to=date_to), request)
+	return _resp(reports.by_extension_report(db, business_id, date_from=date_from, date_to=date_to, auth_ctx=_ctx), request)
 
 
 # ─── Phase 2 recording / Phase 3 live / Phase 4 ops ──────────────────────────
@@ -588,14 +641,13 @@ def get_recording(
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_telephony_plugin_active()),
-	____: None = Depends(require_business_permission_dep("telephony", "listen_recordings")),
+	____: None = Depends(require_business_permission_dep("telephony", "view")),
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	from app.services.telephony import recording_service as rec_svc
 
-	rec_svc.assert_can_listen(ctx, db, business_id)
-	return _resp(rec_svc.recording_info(db, business_id, call_id), request)
+	return _resp(rec_svc.recording_info(db, business_id, call_id, auth_ctx=ctx), request)
 
 
 @router.get("/business/{business_id}/live/snapshot")
@@ -605,13 +657,13 @@ def live_snapshot(
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_telephony_plugin_active()),
-	____: None = Depends(require_business_permission_dep("telephony", "live_monitor")),
+	____: None = Depends(require_telephony_any("live_monitor", "supervise", "manage")),
 	db: Session = Depends(get_db),
 	_ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	from app.services.telephony import live_service as live
 
-	return _resp(live.live_snapshot(db, business_id), request)
+	return _resp(live.live_snapshot(db, business_id, auth_ctx=_ctx), request)
 
 
 @router.post("/business/{business_id}/calls/{call_id}/control")
@@ -635,6 +687,7 @@ def control_call(
 			business_id,
 			ctx.get_user_id(),
 			command_type=str(payload.get("action") or payload.get("type") or ""),
+			auth_ctx=ctx,
 			call_id=call_id,
 			target=payload.get("target"),
 			session_id=str(payload.get("session_id") or "") or None,

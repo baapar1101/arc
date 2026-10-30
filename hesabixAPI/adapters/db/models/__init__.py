@@ -272,6 +272,8 @@ from .telephony import (  # noqa: F401
 	TelephonyPbxConnection,
 	TelephonyExtension,
 	TelephonyUserExtension,
+	TelephonyTeamSupervisor,
+	TelephonyAuditLog,
 	TelephonySoftphoneSession,
 	TelephonyQueue,
 	TelephonyCall,

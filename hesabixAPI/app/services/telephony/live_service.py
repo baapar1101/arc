@@ -16,6 +16,7 @@ from adapters.db.models.telephony import (
 	TelephonyUserExtension,
 )
 from app.core.responses import ApiError
+from app.services.telephony.telephony_access import TelephonyScope, require_call_in_scope, resolve_scope, write_audit
 from app.services.telephony.telephony_service import call_to_dict, extension_to_dict, list_pbx
 
 
@@ -23,8 +24,9 @@ def _now() -> datetime:
 	return datetime.utcnow()
 
 
-def live_snapshot(db: Session, business_id: int) -> Dict[str, Any]:
-	active = (
+def live_snapshot(db: Session, business_id: int, *, auth_ctx=None) -> Dict[str, Any]:
+	scope: Optional[TelephonyScope] = resolve_scope(db, auth_ctx, business_id) if auth_ctx is not None else None
+	active_q = (
 		db.query(TelephonyCall)
 		.filter(
 			TelephonyCall.business_id == business_id,
@@ -32,17 +34,22 @@ def live_snapshot(db: Session, business_id: int) -> Dict[str, Any]:
 			TelephonyCall.ended_at.is_(None),
 		)
 		.order_by(TelephonyCall.started_at.desc())
-		.limit(100)
-		.all()
 	)
+	if scope is not None:
+		active_q = scope.apply_call_filter(active_q)
+	active = active_q.limit(100).all()
 	waiting = [c for c in active if c.status == "ringing"]
 	talking = [c for c in active if c.status == "answered"]
-	exts = (
+	exts_q = (
 		db.query(TelephonyExtension)
 		.filter(TelephonyExtension.business_id == business_id, TelephonyExtension.is_active == True)  # noqa: E712
-		.order_by(TelephonyExtension.extension.asc())
-		.all()
 	)
+	if scope is not None and not scope.view_all:
+		if scope.extension_ids:
+			exts_q = exts_q.filter(TelephonyExtension.id.in_(list(scope.extension_ids)))
+		else:
+			exts_q = exts_q.filter(TelephonyExtension.id == -1)
+	exts = exts_q.order_by(TelephonyExtension.extension.asc()).all()
 	# refresh stale presence to unavailable if PBX offline
 	pbx_status = {p["id"]: p["status"] for p in list_pbx(db, business_id)}
 	blf = []
@@ -61,16 +68,25 @@ def live_snapshot(db: Session, business_id: int) -> Dict[str, Any]:
 		.filter(TelephonyQueue.business_id == business_id, TelephonyQueue.is_active == True)  # noqa: E712
 		.all()
 	)
+	if scope is not None and not scope.view_all:
+		if scope.team_codes:
+			queues = [q for q in queues if scope.allows_queue(q.queue_code)]
+		else:
+			queues = []
+	if scope is not None and not scope.view_all:
+		if scope.team_codes:
+			queues = [q for q in queues if str(q.queue_code or "") in scope.team_codes]
+		else:
+			queues = []
 	today = _now().replace(hour=0, minute=0, second=0, microsecond=0)
-	missed_today = (
-		db.query(TelephonyCall)
-		.filter(
-			TelephonyCall.business_id == business_id,
-			TelephonyCall.status == "missed",
-			TelephonyCall.started_at >= today,
-		)
-		.count()
+	missed_q = db.query(TelephonyCall).filter(
+		TelephonyCall.business_id == business_id,
+		TelephonyCall.status == "missed",
+		TelephonyCall.started_at >= today,
 	)
+	if scope is not None:
+		missed_q = scope.apply_call_filter(missed_q)
+	missed_today = missed_q.count()
 	online_ops = len([b for b in blf if b["presence_status"] in ("idle", "busy", "ringing")])
 	return {
 		"generated_at": _now().isoformat(),
@@ -93,7 +109,8 @@ def live_snapshot(db: Session, business_id: int) -> Dict[str, Any]:
 			}
 			for q in queues
 		],
-		"pbx": list_pbx(db, business_id),
+		"pbx": list_pbx(db, business_id, include_token_hint=bool(scope.can_manage) if scope else False),
+		"access": scope.to_dict() if scope else None,
 	}
 
 
@@ -119,6 +136,7 @@ def enqueue_control_command(
 	user_id: int,
 	*,
 	command_type: str,
+	auth_ctx=None,
 	call_id: Optional[int] = None,
 	extension: Optional[str] = None,
 	target: Optional[str] = None,
@@ -129,16 +147,22 @@ def enqueue_control_command(
 		raise ApiError("VALIDATION_ERROR", "نوع دستور نامعتبر است.", http_status=400)
 
 	call = None
+	scope = resolve_scope(db, auth_ctx, business_id) if auth_ctx is not None else None
 	if call_id:
-		call = (
-			db.query(TelephonyCall)
-			.filter(TelephonyCall.id == call_id, TelephonyCall.business_id == business_id)
-			.first()
-		)
-		if not call:
-			raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
+		if auth_ctx is not None:
+			call = require_call_in_scope(db, auth_ctx, business_id, call_id, scope=scope)
+		else:
+			call = (
+				db.query(TelephonyCall)
+				.filter(TelephonyCall.id == call_id, TelephonyCall.business_id == business_id)
+				.first()
+			)
+			if not call:
+				raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
 		pbx_id = call.pbx_id
 		extension = extension or call.extension
+	elif scope is not None and extension and not scope.allows_extension(extension):
+		raise ApiError("NOT_FOUND", "داخلی در محدوده شما نیست.", http_status=404)
 
 	if not pbx_id:
 		# pick primary extension pbx for user
@@ -188,5 +212,14 @@ def enqueue_control_command(
 		expires_at=_now() + timedelta(minutes=1),
 	)
 	db.add(cmd)
+	write_audit(
+		db,
+		business_id=business_id,
+		user_id=user_id,
+		action="control_call",
+		call_id=call.id if call else None,
+		target=command_type,
+		extra={"target_extension": target},
+	)
 	db.commit()
 	return {"ok": True, "command_id": command_id, "type": command_type, "call_id": call.id if call else None}

@@ -114,31 +114,44 @@ def apply_recording_meta(
 	return call
 
 
-def assert_can_listen(auth_ctx, db: Session, business_id: int) -> None:
-	from adapters.db.models.telephony import TelephonySettings
+def assert_can_listen(auth_ctx, db: Session, business_id: int, call: Optional[TelephonyCall] = None) -> None:
+	from app.services.telephony.telephony_access import can_listen_recording, require_call_in_scope, resolve_scope
 
-	settings = (
-		db.query(TelephonySettings).filter(TelephonySettings.business_id == business_id).first()
-	)
-	mode = (settings.recording_access_mode if settings else None) or "permission_based"
-	if mode == "all_operators":
-		if has_business_permission_for_business(auth_ctx, db, business_id, "telephony", "view") or has_business_permission_for_business(
-			auth_ctx, db, business_id, "telephony", "listen_recordings"
+	if call is None:
+		if not has_business_permission_for_business(auth_ctx, db, business_id, "telephony", "listen_recordings") and not has_business_permission_for_business(
+			auth_ctx, db, business_id, "telephony", "view"
 		):
-			return
-		raise ApiError("FORBIDDEN", "مجوز گوش دادن به ضبط مکالمه را ندارید.", http_status=403)
-	if not has_business_permission_for_business(auth_ctx, db, business_id, "telephony", "listen_recordings"):
+			raise ApiError("FORBIDDEN", "مجوز گوش دادن به ضبط مکالمه را ندارید.", http_status=403)
+		return
+	scope = resolve_scope(db, auth_ctx, business_id)
+	require_call_in_scope(db, auth_ctx, business_id, call.id, scope=scope)
+	if not can_listen_recording(auth_ctx, db, business_id, call, scope=scope):
 		raise ApiError("FORBIDDEN", "مجوز گوش دادن به ضبط مکالمه را ندارید.", http_status=403)
 
 
-def recording_info(db: Session, business_id: int, call_id: int) -> Dict[str, Any]:
-	call = (
-		db.query(TelephonyCall)
-		.filter(TelephonyCall.id == call_id, TelephonyCall.business_id == business_id)
-		.first()
-	)
-	if not call:
-		raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
+def recording_info(db: Session, business_id: int, call_id: int, *, auth_ctx=None) -> Dict[str, Any]:
+	from app.services.telephony.telephony_access import can_listen_recording, require_call_in_scope, write_audit
+
+	if auth_ctx is not None:
+		call = require_call_in_scope(db, auth_ctx, business_id, call_id)
+		if not can_listen_recording(auth_ctx, db, business_id, call):
+			raise ApiError("FORBIDDEN", "مجوز گوش دادن به ضبط مکالمه را ندارید.", http_status=403)
+		write_audit(
+			db,
+			business_id=business_id,
+			user_id=auth_ctx.get_user_id(),
+			action="listen_recording",
+			call_id=call.id,
+		)
+		db.commit()
+	else:
+		call = (
+			db.query(TelephonyCall)
+			.filter(TelephonyCall.id == call_id, TelephonyCall.business_id == business_id)
+			.first()
+		)
+		if not call:
+			raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
 	return {
 		"call_id": call.id,
 		"recording_status": call.recording_status,

@@ -25,7 +25,11 @@ class _TelephonyReportsPageState extends State<TelephonyReportsPage> with Single
   void initState() {
     super.initState();
     _tabs = TabController(length: 2, vsync: this);
-    _load();
+    if (_canReports) {
+      _load();
+    } else {
+      _loading = false;
+    }
   }
 
   @override
@@ -54,8 +58,27 @@ class _TelephonyReportsPageState extends State<TelephonyReportsPage> with Single
     }
   }
 
+  bool get _canReports =>
+      widget.authStore.hasBusinessPermission('telephony', 'reports') ||
+      widget.authStore.hasBusinessPermission('telephony', 'supervise') ||
+      widget.authStore.hasBusinessPermission('telephony', 'manage');
+
   @override
   Widget build(BuildContext context) {
+    if (!_canReports) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('گزارش تماس'),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+        ),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text('مجوز گزارش تماس برای محدوده خود/تیم را ندارید.'),
+          ),
+        ),
+      );
+    }
     final scheme = Theme.of(context).colorScheme;
     final totals = _summary?['totals'] as Map? ?? {};
     final hourly = (_summary?['hourly'] as List? ?? const []).map((e) => Map<String, dynamic>.from(e as Map)).toList();

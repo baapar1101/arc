@@ -9,6 +9,9 @@ from sqlalchemy.orm import Session
 
 from adapters.db.models.telephony import TelephonyCall
 from adapters.db.models.user import User
+from app.services.telephony.telephony_access import TelephonyScope, resolve_scope
+
+TEHRAN_OFFSET_MINUTES = 210
 
 
 def _parse_range(
@@ -30,19 +33,33 @@ def _parse_range(
 	return start, end
 
 
+def _scope_query(query, scope: Optional[TelephonyScope]):
+	if scope is None:
+		return query
+	return scope.apply_call_filter(query)
+
+
+def _tehran_hour(dt: datetime) -> int:
+	shifted = dt + timedelta(minutes=TEHRAN_OFFSET_MINUTES)
+	return int(shifted.hour)
+
+
 def summary_report(
 	db: Session,
 	business_id: int,
 	*,
 	date_from: Optional[str] = None,
 	date_to: Optional[str] = None,
+	auth_ctx=None,
 ) -> Dict[str, Any]:
 	start, end = _parse_range(date_from, date_to)
+	scope = resolve_scope(db, auth_ctx, business_id) if auth_ctx is not None else None
 	base = db.query(TelephonyCall).filter(
 		TelephonyCall.business_id == business_id,
 		TelephonyCall.started_at >= start,
 		TelephonyCall.started_at <= end,
 	)
+	base = _scope_query(base, scope)
 	total = base.count()
 	inbound = base.filter(TelephonyCall.direction == "inbound").count()
 	outbound = base.filter(TelephonyCall.direction == "outbound").count()
@@ -50,29 +67,22 @@ def summary_report(
 	missed = base.filter(TelephonyCall.status == "missed").count()
 	busy = base.filter(TelephonyCall.status == "busy").count()
 	failed = base.filter(TelephonyCall.status == "failed").count()
-	avg_duration = (
-		db.query(func.avg(TelephonyCall.talk_sec))
-		.filter(
-			TelephonyCall.business_id == business_id,
-			TelephonyCall.started_at >= start,
-			TelephonyCall.started_at <= end,
-			TelephonyCall.talk_sec.isnot(None),
-		)
-		.scalar()
+	avg_q = db.query(func.avg(TelephonyCall.talk_sec)).filter(
+		TelephonyCall.business_id == business_id,
+		TelephonyCall.started_at >= start,
+		TelephonyCall.started_at <= end,
+		TelephonyCall.talk_sec.isnot(None),
 	)
+	avg_duration = _scope_query(avg_q, scope).scalar()
 	avg_ring = None
-	answered_calls = (
-		db.query(TelephonyCall)
-		.filter(
-			TelephonyCall.business_id == business_id,
-			TelephonyCall.started_at >= start,
-			TelephonyCall.started_at <= end,
-			TelephonyCall.answered_at.isnot(None),
-			TelephonyCall.started_at.isnot(None),
-		)
-		.limit(5000)
-		.all()
+	answered_q = db.query(TelephonyCall).filter(
+		TelephonyCall.business_id == business_id,
+		TelephonyCall.started_at >= start,
+		TelephonyCall.started_at <= end,
+		TelephonyCall.answered_at.isnot(None),
+		TelephonyCall.started_at.isnot(None),
 	)
+	answered_calls = _scope_query(answered_q, scope).limit(5000).all()
 	if answered_calls:
 		rings = [
 			max(0, int((c.answered_at - c.started_at).total_seconds()))
@@ -81,18 +91,19 @@ def summary_report(
 		]
 		if rings:
 			avg_ring = sum(rings) / len(rings)
-	# hourly histogram (UTC)
-	rows = (
-		db.query(func.extract("hour", TelephonyCall.started_at), func.count(TelephonyCall.id))
-		.filter(
+	hour_calls = _scope_query(
+		db.query(TelephonyCall.started_at).filter(
 			TelephonyCall.business_id == business_id,
 			TelephonyCall.started_at >= start,
 			TelephonyCall.started_at <= end,
-		)
-		.group_by(func.extract("hour", TelephonyCall.started_at))
-		.all()
-	)
-	by_hour = {int(h or 0): int(c) for h, c in rows}
+		),
+		scope,
+	).limit(20000).all()
+	by_hour: Dict[int, int] = {}
+	for (started,) in hour_calls:
+		if started:
+			h = _tehran_hour(started)
+			by_hour[h] = by_hour.get(h, 0) + 1
 	hourly = [{"hour": h, "count": by_hour.get(h, 0)} for h in range(24)]
 	return {
 		"range": {"from": start.isoformat(), "to": end.isoformat()},
@@ -109,6 +120,8 @@ def summary_report(
 			"avg_ring_sec": round(float(avg_ring or 0), 1) if avg_ring is not None else None,
 		},
 		"hourly": hourly,
+		"timezone": "Asia/Tehran",
+		"access": scope.to_dict() if scope else None,
 	}
 
 
@@ -118,19 +131,18 @@ def operators_report(
 	*,
 	date_from: Optional[str] = None,
 	date_to: Optional[str] = None,
+	auth_ctx=None,
 ) -> Dict[str, Any]:
 	start, end = _parse_range(date_from, date_to)
+	scope = resolve_scope(db, auth_ctx, business_id) if auth_ctx is not None else None
 	agg: Dict[int, Dict[str, Any]] = {}
-	calls = (
-		db.query(TelephonyCall)
-		.filter(
-			TelephonyCall.business_id == business_id,
-			TelephonyCall.started_at >= start,
-			TelephonyCall.started_at <= end,
-			TelephonyCall.assigned_user_id.isnot(None),
-		)
-		.all()
+	calls_q = db.query(TelephonyCall).filter(
+		TelephonyCall.business_id == business_id,
+		TelephonyCall.started_at >= start,
+		TelephonyCall.started_at <= end,
+		TelephonyCall.assigned_user_id.isnot(None),
 	)
+	calls = _scope_query(calls_q, scope).all()
 	for c in calls:
 		uid = int(c.assigned_user_id)
 		slot = agg.setdefault(
@@ -172,21 +184,23 @@ def by_person_report(
 	date_from: Optional[str] = None,
 	date_to: Optional[str] = None,
 	limit: int = 50,
+	auth_ctx=None,
 ) -> Dict[str, Any]:
 	start, end = _parse_range(date_from, date_to)
+	scope = resolve_scope(db, auth_ctx, business_id) if auth_ctx is not None else None
+	q = db.query(
+		TelephonyCall.person_id,
+		func.count(TelephonyCall.id).label("cnt"),
+		func.sum(func.coalesce(TelephonyCall.talk_sec, 0)).label("talk"),
+	).filter(
+		TelephonyCall.business_id == business_id,
+		TelephonyCall.started_at >= start,
+		TelephonyCall.started_at <= end,
+		TelephonyCall.person_id.isnot(None),
+	)
+	q = _scope_query(q, scope)
 	rows = (
-		db.query(
-			TelephonyCall.person_id,
-			func.count(TelephonyCall.id).label("cnt"),
-			func.sum(func.coalesce(TelephonyCall.talk_sec, 0)).label("talk"),
-		)
-		.filter(
-			TelephonyCall.business_id == business_id,
-			TelephonyCall.started_at >= start,
-			TelephonyCall.started_at <= end,
-			TelephonyCall.person_id.isnot(None),
-		)
-		.group_by(TelephonyCall.person_id)
+		q.group_by(TelephonyCall.person_id)
 		.order_by(func.count(TelephonyCall.id).desc())
 		.limit(min(limit, 200))
 		.all()
@@ -220,21 +234,23 @@ def by_extension_report(
 	*,
 	date_from: Optional[str] = None,
 	date_to: Optional[str] = None,
+	auth_ctx=None,
 ) -> Dict[str, Any]:
 	start, end = _parse_range(date_from, date_to)
+	scope = resolve_scope(db, auth_ctx, business_id) if auth_ctx is not None else None
+	q = db.query(
+		TelephonyCall.extension,
+		func.count(TelephonyCall.id),
+		func.sum(func.coalesce(TelephonyCall.talk_sec, 0)),
+	).filter(
+		TelephonyCall.business_id == business_id,
+		TelephonyCall.started_at >= start,
+		TelephonyCall.started_at <= end,
+		TelephonyCall.extension.isnot(None),
+	)
+	q = _scope_query(q, scope)
 	rows = (
-		db.query(
-			TelephonyCall.extension,
-			func.count(TelephonyCall.id),
-			func.sum(func.coalesce(TelephonyCall.talk_sec, 0)),
-		)
-		.filter(
-			TelephonyCall.business_id == business_id,
-			TelephonyCall.started_at >= start,
-			TelephonyCall.started_at <= end,
-			TelephonyCall.extension.isnot(None),
-		)
-		.group_by(TelephonyCall.extension)
+		q.group_by(TelephonyCall.extension)
 		.order_by(func.count(TelephonyCall.id).desc())
 		.all()
 	)
