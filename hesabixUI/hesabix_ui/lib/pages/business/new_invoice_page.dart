@@ -53,6 +53,7 @@ import '../../utils/invoice_form_prefill.dart';
 import '../../utils/invoice_adjustments_account_filter.dart';
 import 'business_shell_side_nav_scope.dart';
 import '../../widgets/business_subpage_back_leading.dart';
+import '../../widgets/barcode_label/label_print_from_invoice.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
@@ -2655,6 +2656,19 @@ class _NewInvoicePageState extends State<NewInvoicePage>
           businessId: widget.businessId,
         ),
         actions: [
+          if (_selectedInvoiceType == InvoiceType.purchase)
+            IconButton(
+              tooltip: t.barcodeLabelPrintFromInvoice,
+              onPressed: _isSaving
+                  ? null
+                  : () => showBarcodePrintFromInvoiceLines(
+                      context: context,
+                      businessId: widget.businessId,
+                      authStore: widget.authStore,
+                      lines: _lineItems,
+                    ),
+              icon: const Icon(Icons.qr_code_2),
+            ),
           Tooltip(
             message: t.saveInvoice,
             child: IconButton(

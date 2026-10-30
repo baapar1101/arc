@@ -35114,6 +35114,36 @@ abstract class AppLocalizations {
   /// **'Apply'**
   String get barcodeLabelApplyQty;
 
+  /// No description provided for @barcodeLabelQtyFromStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Qty from stock'**
+  String get barcodeLabelQtyFromStock;
+
+  /// No description provided for @barcodeLabelQtyFromPurchase.
+  ///
+  /// In en, this message translates to:
+  /// **'Qty from purchase'**
+  String get barcodeLabelQtyFromPurchase;
+
+  /// No description provided for @barcodeLabelQtyNoneAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No row has a quantity for this source.'**
+  String get barcodeLabelQtyNoneAvailable;
+
+  /// No description provided for @barcodeLabelPrintFromInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Print barcodes'**
+  String get barcodeLabelPrintFromInvoice;
+
+  /// No description provided for @barcodeLabelPrintFromInvoiceEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Add at least one product line first.'**
+  String get barcodeLabelPrintFromInvoiceEmpty;
+
   /// No description provided for @barcodeLabelPrintItems.
   ///
   /// In en, this message translates to:

@@ -76,13 +76,26 @@ class _LabelPdfPreviewEmbedState extends State<LabelPdfPreviewEmbed> {
       final vt = 'hesabix-label-pdf-$seq-${DateTime.now().microsecondsSinceEpoch}';
 
       ui_web.platformViewRegistry.registerViewFactory(vt, (int viewId) {
+        final host = web.document.createElement('div') as web.HTMLDivElement;
+        host.style
+          ..width = '100%'
+          ..height = '100%'
+          ..overflow = 'hidden'
+          ..position = 'relative';
         final iframe = web.document.createElement('iframe') as web.HTMLIFrameElement;
         iframe.src = url;
-        iframe.style.border = 'none';
-        iframe.style.width = '100%';
-        iframe.style.height = '100%';
-        iframe.style.display = 'block';
-        return iframe;
+        iframe.style
+          ..border = 'none'
+          ..width = '100%'
+          ..height = '100%'
+          ..display = 'block'
+          ..position = 'absolute'
+          ..left = '0'
+          ..top = '0'
+          ..right = '0'
+          ..bottom = '0';
+        host.append(iframe);
+        return host;
       });
 
       setState(() {
@@ -172,11 +185,27 @@ class _LabelPdfPreviewEmbedState extends State<LabelPdfPreviewEmbed> {
     if (vt == null) {
       return const SizedBox.shrink();
     }
-    return SizedBox.expand(
-      child: HtmlElementView(
-        key: ValueKey(vt),
-        viewType: vt,
-      ),
+    // HtmlElementView is a DOM overlay. In RTL dialogs it often paints off-screen
+    // to the right; force LTR + an explicit box so it stays in the preview pane.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth.isFinite && constraints.maxWidth > 0
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        final height = constraints.maxHeight.isFinite && constraints.maxHeight > 0
+            ? constraints.maxHeight
+            : 320.0;
+        return Directionality(
+          textDirection: TextDirection.ltr,
+          child: ClipRect(
+            child: SizedBox(
+              width: width,
+              height: height,
+              child: HtmlElementView(key: ValueKey(vt), viewType: vt),
+            ),
+          ),
+        );
+      },
     );
   }
 }

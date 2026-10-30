@@ -19224,6 +19224,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get barcodeLabelApplyQty => 'Apply';
 
   @override
+  String get barcodeLabelQtyFromStock => 'Qty from stock';
+
+  @override
+  String get barcodeLabelQtyFromPurchase => 'Qty from purchase';
+
+  @override
+  String get barcodeLabelQtyNoneAvailable => 'No row has a quantity for this source.';
+
+  @override
+  String get barcodeLabelPrintFromInvoice => 'Print barcodes';
+
+  @override
+  String get barcodeLabelPrintFromInvoiceEmpty => 'Add at least one product line first.';
+
+  @override
   String get barcodeLabelPrintItems => 'Print items';
 
   @override

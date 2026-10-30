@@ -27,6 +27,9 @@ class LabelPrintJobRow {
   final String title;
   final String subtitle;
   final Map<String, dynamic> context;
+  final int? productId;
+  final int? stockQty;
+  final int? sourceQty;
   int qty;
 
   LabelPrintJobRow({
@@ -35,6 +38,9 @@ class LabelPrintJobRow {
     required this.subtitle,
     required this.context,
     this.qty = 1,
+    this.productId,
+    this.stockQty,
+    this.sourceQty,
   });
 }
 
@@ -95,8 +101,31 @@ class LabelPrintJobDialog extends StatefulWidget {
     };
   }
 
+  static int? stockQtyFromProduct(Map<String, dynamic> product) {
+    final raw =
+        product['inventory_stock_warehouse'] ??
+        product['inventory_stock_physical'] ??
+        product['inventory_stock_accounting'] ??
+        product['inventory_stock_financial'];
+    final n = raw is num ? raw : num.tryParse(raw?.toString() ?? '');
+    if (n == null) return null;
+    return n.round().clamp(0, 9999);
+  }
+
+  static int? _productIdFromMap(Map<String, dynamic> product) {
+    final raw = product['id'];
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    return int.tryParse(raw?.toString() ?? '');
+  }
+
   /// ساخت ردیف از داده کالای عمومی.
-  static LabelPrintJobRow fromProductMap(Map<String, dynamic> product, {String? barcodeOverride, int qty = 1}) {
+  static LabelPrintJobRow fromProductMap(
+    Map<String, dynamic> product, {
+    String? barcodeOverride,
+    int qty = 1,
+    int? sourceQty,
+  }) {
     final fields = productBindingMap(product, barcodeOverride: barcodeOverride);
     final name = fields['name']?.toString() ?? '';
     final code = fields['code']?.toString() ?? '';
@@ -106,6 +135,9 @@ class LabelPrintJobDialog extends StatefulWidget {
       title: name,
       subtitle: '$code · $firstBarcode',
       qty: qty,
+      productId: _productIdFromMap(product),
+      stockQty: stockQtyFromProduct(product),
+      sourceQty: sourceQty,
       context: {
         'product': fields,
         'instance': {'serial': '', 'barcode': ''},
@@ -146,6 +178,9 @@ class _LabelPrintJobDialogState extends State<LabelPrintJobDialog> {
             subtitle: r.subtitle,
             context: Map<String, dynamic>.from(r.context),
             qty: r.qty < 1 ? 1 : r.qty,
+            productId: r.productId,
+            stockQty: r.stockQty,
+            sourceQty: r.sourceQty,
           ),
         )
         .toList();
@@ -464,16 +499,39 @@ class _LabelPrintJobDialogState extends State<LabelPrintJobDialog> {
     _refreshPreview();
   }
 
+  bool get _hasStockQty => _rows.any((r) => r.stockQty != null && r.stockQty! > 0);
+  bool get _hasSourceQty => _rows.any((r) => r.sourceQty != null && r.sourceQty! > 0);
+
+  void _applyQtyFrom(int? Function(LabelPrintJobRow row) pick, String emptyMessage) {
+    var applied = 0;
+    setState(() {
+      for (final r in _rows) {
+        final q = pick(r);
+        if (q == null || q < 1) continue;
+        r.qty = q.clamp(1, 9999);
+        applied++;
+      }
+    });
+    if (applied == 0) {
+      SnackBarHelper.showInfo(context, message: emptyMessage);
+      return;
+    }
+    _refreshPreview();
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final cs = Theme.of(context).colorScheme;
     final wide = MediaQuery.sizeOf(context).width >= 900;
 
+    final size = MediaQuery.sizeOf(context);
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: wide ? 1100 : 640, maxHeight: MediaQuery.sizeOf(context).height * 0.92),
+      clipBehavior: Clip.hardEdge,
+      child: SizedBox(
+        width: wide ? (size.width - 32).clamp(320.0, 1100.0).toDouble() : (size.width - 32).clamp(280.0, 640.0).toDouble(),
+        height: size.height * 0.92,
         child: Column(
           children: [
             Padding(
@@ -498,12 +556,27 @@ class _LabelPrintJobDialogState extends State<LabelPrintJobDialog> {
                   : _templates.isEmpty
                   ? _emptyTemplates(t)
                   : wide
-                  ? Row(
-                      children: [
-                        Expanded(flex: 5, child: _leftPane(t, cs)),
-                        const VerticalDivider(width: 1),
-                        Expanded(flex: 4, child: _previewPane(t)),
-                      ],
+                  ? Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 5,
+                            child: Directionality(
+                              textDirection: Directionality.maybeOf(context) ?? TextDirection.rtl,
+                              child: _leftPane(t, cs),
+                            ),
+                          ),
+                          const VerticalDivider(width: 1),
+                          Expanded(
+                            flex: 4,
+                            child: Directionality(
+                              textDirection: Directionality.maybeOf(context) ?? TextDirection.rtl,
+                              child: _previewPane(t),
+                            ),
+                          ),
+                        ],
+                      ),
                     )
                   : ListView(
                       children: [
@@ -646,6 +719,27 @@ class _LabelPrintJobDialogState extends State<LabelPrintJobDialog> {
             FilledButton.tonal(onPressed: _applyQtyToAll, child: Text(t.barcodeLabelApplyQty)),
           ],
         ),
+        if (_hasStockQty || _hasSourceQty) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (_hasStockQty)
+                OutlinedButton.icon(
+                  onPressed: () => _applyQtyFrom((r) => r.stockQty, t.barcodeLabelQtyNoneAvailable),
+                  icon: const Icon(Icons.inventory_2_outlined, size: 18),
+                  label: Text(t.barcodeLabelQtyFromStock),
+                ),
+              if (_hasSourceQty)
+                OutlinedButton.icon(
+                  onPressed: () => _applyQtyFrom((r) => r.sourceQty, t.barcodeLabelQtyNoneAvailable),
+                  icon: const Icon(Icons.shopping_cart_outlined, size: 18),
+                  label: Text(t.barcodeLabelQtyFromPurchase),
+                ),
+            ],
+          ),
+        ],
         const SizedBox(height: 12),
         Text(t.barcodeLabelPrintItems, style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
@@ -968,21 +1062,24 @@ class _LabelPrintJobDialogState extends State<LabelPrintJobDialog> {
           ),
           const SizedBox(height: 8),
           Expanded(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: _detail == null
-                  ? Center(child: Text(t.barcodeLabelPreviewEmpty))
-                  : LabelPdfPreviewEmbed(
-                      key: ValueKey(
-                        'preview-$_previewNonce-$_templateId-${_printSheet?.printMode}-'
-                        '${_designForPrint?.canvas.widthMm}x${_designForPrint?.canvas.heightMm}',
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: _detail == null
+                    ? Center(child: Text(t.barcodeLabelPreviewEmpty))
+                    : LabelPdfPreviewEmbed(
+                        key: ValueKey(
+                          'preview-$_previewNonce-$_templateId-${_printSheet?.printMode}-'
+                          '${_designForPrint?.canvas.widthMm}x${_designForPrint?.canvas.heightMm}',
+                        ),
+                        pageFormat: _previewFormat(),
+                        buildPdf: _buildPreviewPdf,
                       ),
-                      pageFormat: _previewFormat(),
-                      buildPdf: _buildPreviewPdf,
-                    ),
+              ),
             ),
           ),
         ],

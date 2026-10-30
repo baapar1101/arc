@@ -37,6 +37,7 @@ import '../../models/account_model.dart';
 import '../../services/account_service.dart';
 import 'business_shell_side_nav_scope.dart';
 import '../../widgets/business_subpage_back_leading.dart';
+import '../../widgets/barcode_label/label_print_from_invoice.dart';
 
 
 class EditInvoicePage extends StatefulWidget {
@@ -810,6 +811,19 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
         title: Text(t.editInvoiceTitle),
         leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
+          if (_selectedInvoiceType == InvoiceType.purchase)
+            IconButton(
+              tooltip: t.barcodeLabelPrintFromInvoice,
+              onPressed: (_loading || _isSaving)
+                  ? null
+                  : () => showBarcodePrintFromInvoiceLines(
+                      context: context,
+                      businessId: widget.businessId,
+                      authStore: widget.authStore,
+                      lines: _lineItems,
+                    ),
+              icon: const Icon(Icons.qr_code_2),
+            ),
           IconButton(
             tooltip: t.saveChangesTooltip,
             onPressed: (_loading || _isSaving) ? null : _saveChanges,

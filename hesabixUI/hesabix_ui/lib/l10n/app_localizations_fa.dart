@@ -19118,6 +19118,21 @@ class AppLocalizationsFa extends AppLocalizations {
   String get barcodeLabelApplyQty => 'اعمال';
 
   @override
+  String get barcodeLabelQtyFromStock => 'تعداد از موجودی انبار';
+
+  @override
+  String get barcodeLabelQtyFromPurchase => 'تعداد از مقدار خرید';
+
+  @override
+  String get barcodeLabelQtyNoneAvailable => 'برای این منبع، تعدادی روی ردیف‌ها موجود نیست.';
+
+  @override
+  String get barcodeLabelPrintFromInvoice => 'چاپ بارکد';
+
+  @override
+  String get barcodeLabelPrintFromInvoiceEmpty => 'دست‌کم یک ردیف کالا اضافه کنید.';
+
+  @override
   String get barcodeLabelPrintItems => 'آیتم‌های چاپ';
 
   @override
