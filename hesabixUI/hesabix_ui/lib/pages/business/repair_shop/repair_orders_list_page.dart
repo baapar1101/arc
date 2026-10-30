@@ -10,6 +10,7 @@ import '../../../utils/error_extractor.dart';
 import '../../../widgets/date_input_field.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
 import 'repair_shop_calendar_utils.dart';
+import 'repair_shop_status.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// صفحه لیست سفارشات تعمیر
@@ -32,9 +33,14 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
   Timer? _debounceTimer;
 
   bool _isLoading = true;
+  bool _loadingMore = false;
   List<RepairOrderListItem> _orders = [];
   String? _errorMessage;
   int _totalOrders = 0;
+  int _offset = 0;
+  static const int _pageSize = 20;
+  bool _hasMore = true;
+  final ScrollController _scrollController = ScrollController();
 
   // فیلترها
   String? _selectedStatus;
@@ -42,54 +48,45 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
   DateTime? _toDate;
   final TextEditingController _searchController = TextEditingController();
 
-  // وضعیت‌های مختلف
-  final Map<String, String> _statusLabels = {
-    'received': 'دریافت شده',
-    'assigned': 'اختصاص داده شده',
-    'in_progress': 'در حال تعمیر',
-    'waiting_parts': 'منتظر قطعات',
-    'testing': 'در حال تست',
-    'completed_fixed': 'تعمیر موفق',
-    'completed_unfixable': 'غیرقابل تعمیر',
-    'ready_for_pickup': 'آماده تحویل',
-    'delivered': 'تحویل داده شده',
-    'cancelled': 'لغو شده',
-  };
-
-  Color _statusColorFor(BuildContext context, String? status) {
-    final map = <String, Color>{
-    'received': SemanticColorResolver.info(context),
-    'assigned': Colors.purple,
-    'in_progress': SemanticColorResolver.warning(context),
-    'waiting_parts': Colors.amber,
-    'testing': Colors.cyan,
-    'completed_fixed': SemanticColorResolver.positive(context),
-    'completed_unfixable': SemanticColorResolver.negative(context),
-    'ready_for_pickup': Colors.teal,
-    'delivered': Colors.grey,
-    'cancelled': Colors.black54,
-    };
-    return map[status] ?? Colors.grey;
-  }
-
 
   @override
   void initState() {
     super.initState();
     _service = RepairShopService(ApiClient());
-    _loadOrders();
+    _scrollController.addListener(_onScroll);
+    _loadOrders(reset: true);
   }
 
   @override
   void dispose() {
     _debounceTimer?.cancel();
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadOrders() async {
+  void _onScroll() {
+    if (!_hasMore || _isLoading || _loadingMore) return;
+    if (!_scrollController.hasClients) return;
+    final pos = _scrollController.position;
+    if (pos.pixels >= pos.maxScrollExtent - 240) {
+      _loadOrders();
+    }
+  }
+
+  Future<void> _loadOrders({bool reset = false}) async {
+    if (reset) {
+      _offset = 0;
+      _hasMore = true;
+    }
+    if (!_hasMore && !reset) return;
+
     setState(() {
-      _isLoading = true;
+      if (reset) {
+        _isLoading = true;
+      } else {
+        _loadingMore = true;
+      }
       _errorMessage = null;
     });
 
@@ -106,12 +103,24 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
         toDate: _toDate != null
             ? HesabixDateUtils.formatForApiDate(_toDate!)
             : null,
+        offset: _offset,
+        limit: _pageSize,
       );
 
+      final items = response['items'] as List<RepairOrderListItem>;
+      final total = response['total'] as int;
+      if (!mounted) return;
       setState(() {
-        _orders = response['items'] as List<RepairOrderListItem>;
-        _totalOrders = response['total'] as int;
+        if (reset) {
+          _orders = items;
+        } else {
+          _orders = [..._orders, ...items];
+        }
+        _totalOrders = total;
+        _offset = _orders.length;
+        _hasMore = _orders.length < total;
         _isLoading = false;
+        _loadingMore = false;
       });
     } catch (e) {
       if (!mounted) return;
@@ -119,6 +128,7 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
         _errorMessage =
             'خطا در بارگذاری سفارشات: ${ErrorExtractor.forContext(e, context)}';
         _isLoading = false;
+        _loadingMore = false;
       });
     }
   }
@@ -196,7 +206,7 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
         _fromDate = fromDate;
         _toDate = toDate;
       });
-      _loadOrders();
+      _loadOrders(reset: true);
     }
   }
 
@@ -230,7 +240,7 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
                   setState(() {
                     _selectedStatus = status == 'all' ? null : status;
                   });
-                  _loadOrders();
+                  _loadOrders(reset: true);
                 },
                 itemBuilder: (context) => [
                   const PopupMenuItem(
@@ -238,7 +248,7 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
                     child: Text('همه وضعیت‌ها'),
                   ),
                   const PopupMenuDivider(),
-                  ..._statusLabels.entries.map(
+                  ...RepairShopStatus.labels.entries.map(
                     (entry) => PopupMenuItem(
                       value: entry.key,
                       child: Row(
@@ -247,7 +257,7 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
                             width: 12,
                             height: 12,
                             decoration: BoxDecoration(
-                              color: _statusColorFor(context, entry.key),
+                              color: RepairShopStatus.color(context, entry.key),
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -305,7 +315,7 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
             ),
             const SizedBox(height: 16),
             ElevatedButton.icon(
-              onPressed: _loadOrders,
+              onPressed: () => _loadOrders(reset: true),
               icon: const Icon(Icons.refresh),
               label: const Text('تلاش مجدد'),
             ),
@@ -352,11 +362,18 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
         _buildSearchBar(theme, colorScheme),
         Expanded(
           child: RefreshIndicator(
-            onRefresh: _loadOrders,
+            onRefresh: () => _loadOrders(reset: true),
             child: ListView.builder(
+              controller: _scrollController,
               padding: const EdgeInsets.all(16),
-              itemCount: _orders.length,
+              itemCount: _orders.length + (_loadingMore ? 1 : 0),
               itemBuilder: (context, index) {
+                if (index >= _orders.length) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
                 final order = _orders[index];
                 return _buildOrderCard(order, theme, colorScheme);
               },
@@ -392,7 +409,7 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
                       _fromDate = null;
                       _toDate = null;
                     });
-                    _loadOrders();
+                    _loadOrders(reset: true);
                   },
                 ),
               ],
@@ -421,7 +438,7 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
                           _debounceTimer?.cancel();
                           _debounceTimer = Timer(
                             const Duration(milliseconds: 500),
-                            _loadOrders,
+                            () => _loadOrders(reset: true),
                           );
                         },
                       ),
@@ -439,7 +456,7 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
                             onPressed: () {
                               _searchController.clear();
                               _debounceTimer?.cancel();
-                              _loadOrders();
+                              _loadOrders(reset: true);
                             },
                           );
                         },
@@ -476,8 +493,8 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
     ColorScheme colorScheme,
   ) {
     final status = order.status;
-    final statusLabel = _statusLabels[status] ?? status;
-    final statusColor = _statusColorFor(context, status);
+    final statusLabel = RepairShopStatus.label(status);
+    final statusColor = RepairShopStatus.color(context, status);
     final isJalali = widget.calendarController.isJalali;
     final receivedLabel = RepairShopCalendarUtils.formatDateTime(
       order.receivedAt,
@@ -651,7 +668,7 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
   void _createNewOrder() async {
     final result = await context.push('/business/${widget.businessId}/repair-shop/new');
     if (result == true) {
-      _loadOrders();
+      _loadOrders(reset: true);
     }
   }
 }

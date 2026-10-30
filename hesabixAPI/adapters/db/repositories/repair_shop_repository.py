@@ -96,6 +96,14 @@ class RepairTechnicianRepository:
         query = query.offset(offset).limit(limit)
         
         return query.all()
+
+    def count_by_business(self, business_id: int, only_active: bool = True) -> int:
+        query = self.db.query(func.count(self.model_class.id)).filter(
+            self.model_class.business_id == business_id
+        )
+        if only_active:
+            query = query.filter(self.model_class.is_active == True)  # noqa: E712
+        return int(query.scalar() or 0)
     
     def create(self, data: Dict[str, Any]) -> RepairTechnician:
         """ایجاد تعمیرکار جدید"""
@@ -185,21 +193,23 @@ class RepairOrderRepository:
             
             if filters.get("search"):
                 search_term = f"%{filters['search']}%"
-                # جستجو در اطلاعات سفارش و اطلاعات مشتری (با join به Person)
                 query = query.join(
-                    Person, 
+                    Person,
                     self.model_class.customer_person_id == Person.id
                 ).filter(
                     or_(
                         self.model_class.code.like(search_term),
                         self.model_class.product_name.like(search_term),
                         self.model_class.product_serial.like(search_term),
-                        Person.name.like(search_term),
+                        Person.alias_name.like(search_term),
+                        Person.first_name.like(search_term),
+                        Person.last_name.like(search_term),
+                        Person.company_name.like(search_term),
                         Person.mobile.like(search_term),
                         Person.mobile_2.like(search_term),
                         Person.mobile_3.like(search_term),
                         Person.phone.like(search_term),
-                        Person.email.like(search_term)
+                        Person.email.like(search_term),
                     )
                 )
         
@@ -273,6 +283,18 @@ class RepairOrderPartRepository:
         self.db.add(part)
         self.db.flush()
         return part
+
+    def get_by_id(self, part_id: int, repair_order_id: int) -> Optional[RepairOrderPart]:
+        return self.db.query(self.model_class).filter(
+            and_(
+                self.model_class.id == part_id,
+                self.model_class.repair_order_id == repair_order_id,
+            )
+        ).first()
+
+    def delete(self, part: RepairOrderPart) -> None:
+        self.db.delete(part)
+        self.db.flush()
     
     def delete_by_order(self, repair_order_id: int) -> None:
         """حذف تمام قطعات یک سفارش"""
@@ -331,6 +353,14 @@ class RepairOrderAttachmentRepository:
         self.db.add(attachment)
         self.db.flush()
         return attachment
+
+    def get_by_id(self, attachment_id: int, repair_order_id: int) -> Optional[RepairOrderAttachment]:
+        return self.db.query(self.model_class).filter(
+            and_(
+                self.model_class.id == attachment_id,
+                self.model_class.repair_order_id == repair_order_id,
+            )
+        ).first()
     
     def delete(self, attachment: RepairOrderAttachment) -> None:
         """حذف ضمیمه"""

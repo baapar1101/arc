@@ -37,6 +37,7 @@ from adapters.db.repositories.repair_shop_repository import (
 )
 from app.core.responses import ApiError
 from app.core.repair_shop_plugin_dependency import check_repair_shop_plugin_active
+from app.core.calendar import CalendarConverter
 
 logger = logging.getLogger(__name__)
 
@@ -169,6 +170,7 @@ def list_technicians(
     
     repo = RepairTechnicianRepository(db)
     technicians = repo.list_by_business(business_id, only_active, offset, limit)
+    total = repo.count_by_business(business_id, only_active)
     
     items = []
     for tech in technicians:
@@ -189,7 +191,9 @@ def list_technicians(
     
     return {
         "items": items,
-        "total": len(items),
+        "total": total,
+        "offset": offset,
+        "limit": limit,
     }
 
 
@@ -365,34 +369,33 @@ def delete_technician(
 
 # ========== سفارشات تعمیر ==========
 
+def _receipt_year(calendar_type: str = "jalali") -> int:
+    if calendar_type == "gregorian":
+        return datetime.utcnow().year
+    jalali = CalendarConverter.to_jalali(datetime.utcnow())
+    return int(jalali["year"]) if jalali else datetime.utcnow().year
+
+
 def _generate_repair_code(
     db: Session,
     business_id: int,
     format_type: str,
-    prefix: str
+    prefix: str,
+    calendar_type: str = "jalali",
 ) -> str:
     """تولید کد یکتا برای سفارش تعمیر"""
     repo = RepairOrderRepository(db)
     
     if format_type == "random":
-        # تولید کد رندوم
         while True:
             code = f"{prefix}-{_generate_random_code(8)}"
             existing = repo.get_by_code(code, business_id)
             if not existing:
                 return code
     
-    elif format_type == "sequential":
-        # تولید کد ترتیبی
-        year = datetime.utcnow().year
-        next_num = repo.get_next_sequential_number(business_id, prefix, year)
-        return f"{prefix}-{year}-{next_num:04d}"
-    
-    else:
-        # پیش‌فرض: sequential
-        year = datetime.utcnow().year
-        next_num = repo.get_next_sequential_number(business_id, prefix, year)
-        return f"{prefix}-{year}-{next_num:04d}"
+    year = _receipt_year(calendar_type)
+    next_num = repo.get_next_sequential_number(business_id, prefix, year)
+    return f"{prefix}-{year}-{next_num:04d}"
 
 
 def list_repair_orders(
@@ -559,6 +562,19 @@ def get_repair_order(
             "sms_sent": status.sms_sent,
             "email_sent": status.email_sent,
         })
+
+    att_repo = RepairOrderAttachmentRepository(db)
+    attachments = [
+        {
+            "id": att.id,
+            "file_storage_id": att.file_storage_id,
+            "file_type": att.file_type,
+            "attachment_type": att.attachment_type,
+            "description": att.description,
+            "created_at": att.created_at,
+        }
+        for att in att_repo.list_by_order(order_id)
+    ]
     
     return {
         "id": order.id,
@@ -593,6 +609,10 @@ def get_repair_order(
         "extra_info": order.extra_info or {},
         "parts": parts_list,
         "status_history": status_history,
+        "attachments": attachments,
+        "has_invoice": bool((order.extra_info or {}).get("invoice_document_id")),
+        "invoice_document_id": (order.extra_info or {}).get("invoice_document_id"),
+        "invoice_code": (order.extra_info or {}).get("invoice_code"),
     }
 
 
@@ -672,7 +692,8 @@ def create_repair_order(
         db,
         business_id,
         settings.receipt_code_format,
-        settings.receipt_code_prefix
+        settings.receipt_code_prefix,
+        calendar_type=calendar_type,
     )
     
     # ایجاد سفارش
@@ -757,6 +778,12 @@ def update_repair_order(
     
     if "product_serial" in data:
         update_data["product_serial"] = data["product_serial"]
+    if "product_name" in data and data["product_name"]:
+        update_data["product_name"] = data["product_name"]
+    if "product_id" in data:
+        update_data["product_id"] = data["product_id"]
+    if "warranty_code_id" in data:
+        update_data["warranty_code_id"] = data["warranty_code_id"]
     if "problem_description" in data:
         update_data["problem_description"] = data["problem_description"]
     if "customer_notes" in data:
@@ -838,4 +865,61 @@ def delete_repair_order(
         "order_id": order.id,
         "code": order.code
     }
+
+
+def add_repair_order_attachment(
+    db: Session,
+    business_id: int,
+    order_id: int,
+    data: Dict[str, Any],
+    user_id: int,
+) -> Dict[str, Any]:
+    _check_plugin_active(db, business_id)
+    repo = RepairOrderRepository(db)
+    order = repo.get_by_id(order_id, business_id)
+    if not order:
+        raise ApiError("REPAIR_ORDER_NOT_FOUND", "سفارش تعمیر یافت نشد", http_status=404)
+
+    file_storage_id = data.get("file_storage_id")
+    if not file_storage_id:
+        raise ApiError("FILE_REQUIRED", "شناسه فایل الزامی است", http_status=400)
+
+    attachment_type = data.get("attachment_type") or "during_repair"
+    if attachment_type not in {"before_repair", "during_repair", "after_repair"}:
+        raise ApiError("INVALID_ATTACHMENT_TYPE", "نوع ضمیمه نامعتبر است", http_status=400)
+
+    file_type = data.get("file_type") or "image"
+    att_repo = RepairOrderAttachmentRepository(db)
+    att_repo.create({
+        "repair_order_id": order_id,
+        "file_storage_id": str(file_storage_id),
+        "file_type": file_type,
+        "attachment_type": attachment_type,
+        "description": data.get("description"),
+        "uploaded_by_user_id": user_id,
+    })
+    db.commit()
+    return get_repair_order(db, business_id, order_id)
+
+
+def delete_repair_order_attachment(
+    db: Session,
+    business_id: int,
+    order_id: int,
+    attachment_id: int,
+    user_id: int,
+) -> Dict[str, Any]:
+    _check_plugin_active(db, business_id)
+    repo = RepairOrderRepository(db)
+    order = repo.get_by_id(order_id, business_id)
+    if not order:
+        raise ApiError("REPAIR_ORDER_NOT_FOUND", "سفارش تعمیر یافت نشد", http_status=404)
+
+    att_repo = RepairOrderAttachmentRepository(db)
+    attachment = att_repo.get_by_id(attachment_id, order_id)
+    if not attachment:
+        raise ApiError("ATTACHMENT_NOT_FOUND", "ضمیمه یافت نشد", http_status=404)
+    att_repo.delete(attachment)
+    db.commit()
+    return get_repair_order(db, business_id, order_id)
 

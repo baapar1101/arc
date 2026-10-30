@@ -6,6 +6,8 @@ import '../../../core/calendar_controller.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
+import '../../../widgets/invoice/product_combobox_widget.dart';
+import '../../../widgets/invoice/warehouse_combobox_widget.dart';
 
 
 /// صفحه تنظیمات تعمیرگاه
@@ -38,6 +40,8 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
   bool _autoSmsOnStatusChange = false;
   bool _autoEmailOnReceive = false;
   bool _autoEmailOnStatusChange = false;
+  Map<String, dynamic>? _serviceProduct;
+  int? _defaultWarehouseId;
 
   @override
   void initState() {
@@ -59,7 +63,7 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
     });
 
     try {
-      final settings = await _service.getSettings(
+      final RepairShopSettings settings = await _service.getSettings(
         businessId: widget.businessId,
       );
 
@@ -70,6 +74,10 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
         _autoSmsOnStatusChange = settings.autoSendSmsOnStatusChange;
         _autoEmailOnReceive = settings.autoSendEmailOnReceive;
         _autoEmailOnStatusChange = settings.autoSendEmailOnStatusChange;
+        _defaultWarehouseId = settings.defaultWarehouseId;
+        _serviceProduct = settings.defaultServiceProductId == null
+            ? null
+            : {'id': settings.defaultServiceProductId};
         _isLoading = false;
       });
     } catch (e) {
@@ -95,6 +103,8 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
         'auto_send_sms_on_status_change': _autoSmsOnStatusChange,
         'auto_send_email_on_receive': _autoEmailOnReceive,
         'auto_send_email_on_status_change': _autoEmailOnStatusChange,
+        'default_service_product_id': _serviceProduct?['id'],
+        'default_warehouse_id': _defaultWarehouseId,
       };
 
       await _service.updateSettings(
@@ -225,6 +235,43 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
                                     }
                                     return null;
                                   },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        _buildSectionTitle('پیش‌فرض‌های فاکتور و انبار', Icons.inventory_2),
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              children: [
+                                ProductComboboxWidget(
+                                  businessId: widget.businessId,
+                                  selectedProduct: _serviceProduct,
+                                  label: 'محصول خدمات تعمیر',
+                                  hintText: 'خدمت پیش‌فرض برای ردیف دستمزد فاکتور',
+                                  onChanged: (product) {
+                                    setState(() => _serviceProduct = product);
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+                                WarehouseComboboxWidget(
+                                  businessId: widget.businessId,
+                                  selectedWarehouseId: _defaultWarehouseId,
+                                  label: 'انبار پیش‌فرض قطعات',
+                                  hintText: 'انبار خروج قطعات',
+                                  onChanged: (id) {
+                                    setState(() => _defaultWarehouseId = id);
+                                  },
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'اگر محصول خدمات انتخاب نشود، سیستم هنگام صدور فاکتور یک خدمت «خدمات تعمیر» می‌سازد.',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey),
                                 ),
                               ],
                             ),

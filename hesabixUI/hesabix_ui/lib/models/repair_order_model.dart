@@ -53,6 +53,10 @@ class RepairOrder {
   final Map<String, dynamic> extraInfo;
   final List<RepairOrderPart> parts;
   final List<RepairOrderStatusItem> statusHistory;
+  final List<RepairOrderAttachment> attachments;
+  final bool hasInvoice;
+  final int? invoiceDocumentId;
+  final String? invoiceCode;
 
   RepairOrder({
     required this.id,
@@ -87,6 +91,10 @@ class RepairOrder {
     required this.extraInfo,
     required this.parts,
     required this.statusHistory,
+    this.attachments = const [],
+    this.hasInvoice = false,
+    this.invoiceDocumentId,
+    this.invoiceCode,
   });
 
   factory RepairOrder.fromJson(Map<String, dynamic> json) {
@@ -130,6 +138,22 @@ class RepairOrder {
                   RepairOrderStatusItem.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
+      attachments: (json['attachments'] as List<dynamic>?)
+              ?.map((e) =>
+                  RepairOrderAttachment.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      hasInvoice: json['has_invoice'] as bool? ??
+          (json['extra_info'] is Map &&
+              (json['extra_info'] as Map)['invoice_document_id'] != null),
+      invoiceDocumentId: json['invoice_document_id'] as int? ??
+          (json['extra_info'] is Map
+              ? (json['extra_info'] as Map)['invoice_document_id'] as int?
+              : null),
+      invoiceCode: json['invoice_code'] as String? ??
+          (json['extra_info'] is Map
+              ? (json['extra_info'] as Map)['invoice_code'] as String?
+              : null),
     );
   }
 
@@ -167,6 +191,10 @@ class RepairOrder {
       'extra_info': extraInfo,
       'parts': parts.map((e) => e.toJson()).toList(),
       'status_history': statusHistory.map((e) => e.toJson()).toList(),
+      'attachments': attachments.map((e) => e.toJson()).toList(),
+      'has_invoice': hasInvoice,
+      'invoice_document_id': invoiceDocumentId,
+      'invoice_code': invoiceCode,
     };
   }
 
@@ -203,6 +231,10 @@ class RepairOrder {
     Map<String, dynamic>? extraInfo,
     List<RepairOrderPart>? parts,
     List<RepairOrderStatusItem>? statusHistory,
+    List<RepairOrderAttachment>? attachments,
+    bool? hasInvoice,
+    int? invoiceDocumentId,
+    String? invoiceCode,
   }) {
     return RepairOrder(
       id: id ?? this.id,
@@ -237,6 +269,10 @@ class RepairOrder {
       extraInfo: extraInfo ?? this.extraInfo,
       parts: parts ?? this.parts,
       statusHistory: statusHistory ?? this.statusHistory,
+      attachments: attachments ?? this.attachments,
+      hasInvoice: hasInvoice ?? this.hasInvoice,
+      invoiceDocumentId: invoiceDocumentId ?? this.invoiceDocumentId,
+      invoiceCode: invoiceCode ?? this.invoiceCode,
     );
   }
 
@@ -396,6 +432,57 @@ class RepairOrderPart {
       'warehouse_id': warehouseId,
       'description': description,
     };
+  }
+}
+
+class RepairOrderAttachment {
+  final int id;
+  final String fileStorageId;
+  final String fileType;
+  final String attachmentType;
+  final String? description;
+  final DateTime createdAt;
+
+  RepairOrderAttachment({
+    required this.id,
+    required this.fileStorageId,
+    required this.fileType,
+    required this.attachmentType,
+    this.description,
+    required this.createdAt,
+  });
+
+  factory RepairOrderAttachment.fromJson(Map<String, dynamic> json) {
+    return RepairOrderAttachment(
+      id: json['id'] as int,
+      fileStorageId: json['file_storage_id'] as String,
+      fileType: json['file_type'] as String? ?? 'image',
+      attachmentType: json['attachment_type'] as String? ?? 'during_repair',
+      description: json['description'] as String?,
+      createdAt: _parseOrderDate(json, 'created_at'),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'file_storage_id': fileStorageId,
+      'file_type': fileType,
+      'attachment_type': attachmentType,
+      'description': description,
+      'created_at': createdAt.toIso8601String(),
+    };
+  }
+
+  String get typeLabel {
+    switch (attachmentType) {
+      case 'before_repair':
+        return 'قبل از تعمیر';
+      case 'after_repair':
+        return 'بعد از تعمیر';
+      default:
+        return 'حین تعمیر';
+    }
   }
 }
 

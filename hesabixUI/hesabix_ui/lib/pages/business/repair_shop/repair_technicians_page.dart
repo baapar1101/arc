@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../services/repair_shop_service.dart';
-import '../../../services/person_service.dart';
 import '../../../models/repair_technician_model.dart';
 import '../../../models/person_model.dart';
 import '../../../core/api_client.dart';
@@ -8,6 +7,7 @@ import '../../../core/calendar_controller.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
+import '../../../widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 
@@ -236,8 +236,10 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
               ? colorScheme.primary
               : Colors.grey,
           child: Text(
-            technician.personName[0].toUpperCase(),
-            style: TextStyle(color: Colors.white),
+            technician.personName.trim().isNotEmpty
+                ? technician.personName.trim()[0].toUpperCase()
+                : '?',
+            style: const TextStyle(color: Colors.white),
           ),
         ),
         title: Text(
@@ -252,7 +254,7 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
           children: [
             Text('کد: ${technician.code}'),
             Text(
-              '${technician.commissionTypeLabel}: ${technician.formattedCommission}',
+              '${technician.commissionTypeLabel}: ${technician.formattedCommission()}',
               style: TextStyle(
                 color: colorScheme.primary,
                 fontSize: 12,
@@ -322,7 +324,6 @@ class _TechnicianFormDialog extends StatefulWidget {
 class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
   final _formKey = GlobalKey<FormState>();
   late final RepairShopService _service;
-  late final PersonService _personService;
 
   Person? _selectedPerson;
   final TextEditingController _codeController = TextEditingController();
@@ -337,7 +338,6 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
     super.initState();
     final apiClient = ApiClient();
     _service = RepairShopService(apiClient);
-    _personService = PersonService(apiClient: apiClient);
     if (widget.technician != null) {
       _loadTechnician();
     }
@@ -350,8 +350,7 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
     _commissionValueController.text = tech.commissionValue.toString();
     _isActive = tech.isActive;
 
-    // بارگذاری Person - فعلاً skip می‌کنیم چون تنها نام می‌خواهیم
-    setState(() => _selectedPerson = null);
+    setState(() {});
   }
 
   @override
@@ -359,34 +358,6 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
     _codeController.dispose();
     _commissionValueController.dispose();
     super.dispose();
-  }
-
-  Future<void> _selectPerson() async {
-    final response = await _personService.getPersons(
-      businessId: widget.businessId,
-    );
-
-    final items = response['items'] as List<dynamic>;
-    final persons = items.map((e) => Person.fromJson(e as Map<String, dynamic>)).toList();
-
-    if (!mounted) return;
-
-    final selected = await showDialog<Person>(
-      context: context,
-      builder: (context) => SimpleDialog(
-        title: const Text('انتخاب فرد'),
-        children: persons.map((person) {
-          return SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, person),
-            child: Text(person.aliasName),
-          );
-        }).toList(),
-      ),
-    );
-
-    if (selected != null) {
-      setState(() => _selectedPerson = selected);
-    }
   }
 
   Future<void> _save() async {
@@ -400,15 +371,18 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
     setState(() => _isSaving = true);
 
     try {
-      final data = {
-        'code': _codeController.text,
+      final data = <String, dynamic>{
         'commission_type': _commissionType,
-        'commission_value': double.parse(_commissionValueController.text),
+        'commission_value': _commissionType == 'case_by_case'
+            ? 0
+            : double.parse(_commissionValueController.text),
         'is_active': _isActive,
       };
+      if (_codeController.text.trim().isNotEmpty) {
+        data['code'] = _codeController.text.trim();
+      }
 
       if (widget.technician == null) {
-        // ایجاد جدید
         data['person_id'] = _selectedPerson!.id!;
         await _service.createTechnician(
           businessId: widget.businessId,
@@ -470,19 +444,25 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
             children: [
               // انتخاب فرد (فقط برای ایجاد جدید)
               if (widget.technician == null)
-                Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.person),
-                    title: Text(_selectedPerson?.aliasName ?? 'انتخاب فرد'),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                    onTap: _selectPerson,
-                  ),
+                PersonComboboxWidget(
+                  businessId: widget.businessId,
+                  selectedPerson: _selectedPerson,
+                  label: 'شخص',
+                  hintText: 'جست‌وجو و انتخاب شخص',
+                  isRequired: true,
+                  onChanged: (person) {
+                    setState(() => _selectedPerson = person);
+                  },
                 )
               else
                 Card(
                   child: ListTile(
                     leading: const Icon(Icons.person),
-                    title: Text(_selectedPerson?.aliasName ?? widget.technician?.personName ?? 'در حال بارگذاری...'),
+                    title: Text(
+                      _selectedPerson?.displayName ??
+                          widget.technician?.personName ??
+                          '',
+                    ),
                   ),
                 ),
 
@@ -492,16 +472,11 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
               TextFormField(
                 controller: _codeController,
                 decoration: const InputDecoration(
-                  labelText: 'کد تعمیرکار',
+                  labelText: 'کد تعمیرکار (اختیاری)',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.qr_code),
+                  helperText: 'در صورت خالی بودن، به‌صورت خودکار تولید می‌شود',
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'کد الزامی است';
-                  }
-                  return null;
-                },
               ),
 
               const SizedBox(height: 16),

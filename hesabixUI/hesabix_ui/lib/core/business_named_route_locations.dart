@@ -31,6 +31,7 @@ abstract final class BusinessNamedRoutes {
     'business_repair_shop': 'repair-shop',
     'business_repair_shop_new': 'repair-shop/new',
     'business_repair_shop_detail': 'repair-shop/:order_id',
+    'business_repair_shop_edit': 'repair-shop/:order_id/edit',
     'business_repair_shop_technicians': 'repair-shop-technicians',
     'business_repair_shop_settings': 'repair-shop-settings',
     'business_customer_club': 'customer-club',

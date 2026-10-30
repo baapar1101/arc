@@ -256,6 +256,19 @@ class RepairShopService {
     return RepairOrder.fromJson(data);
   }
 
+  /// حذف قطعه از سفارش
+  Future<RepairOrder> removePart({
+    required int businessId,
+    required int orderId,
+    required int partId,
+  }) async {
+    final response = await _api.delete<Map<String, dynamic>>(
+      '/api/v1/repair-shop/businesses/$businessId/orders/$orderId/parts/$partId',
+    );
+    final data = response.data?['data'] as Map<String, dynamic>;
+    return RepairOrder.fromJson(data);
+  }
+
   /// افزودن قطعات به سفارش
   Future<RepairOrder> addParts({
     required int businessId,
@@ -340,6 +353,39 @@ class RepairShopService {
   }
 
   // ========== Reports ==========
+
+  Future<RepairOrder> addAttachment({
+    required int businessId,
+    required int orderId,
+    required String fileStorageId,
+    String fileType = 'image',
+    String attachmentType = 'during_repair',
+    String? description,
+  }) async {
+    final response = await _api.post<Map<String, dynamic>>(
+      '/api/v1/repair-shop/businesses/$businessId/orders/$orderId/attachments',
+      data: {
+        'file_storage_id': fileStorageId,
+        'file_type': fileType,
+        'attachment_type': attachmentType,
+        'description': description,
+      },
+    );
+    final data = response.data?['data'] as Map<String, dynamic>;
+    return RepairOrder.fromJson(data);
+  }
+
+  Future<RepairOrder> deleteAttachment({
+    required int businessId,
+    required int orderId,
+    required int attachmentId,
+  }) async {
+    final response = await _api.delete<Map<String, dynamic>>(
+      '/api/v1/repair-shop/businesses/$businessId/orders/$orderId/attachments/$attachmentId',
+    );
+    final data = response.data?['data'] as Map<String, dynamic>;
+    return RepairOrder.fromJson(data);
+  }
 
   /// تاریخچه تعمیرات براساس کد گارانتی
   Future<List<Map<String, dynamic>>> getWarrantyRepairHistory({

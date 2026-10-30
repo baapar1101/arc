@@ -2739,6 +2739,25 @@ class _MyAppState extends State<MyApp> {
                             },
                           ),
                           GoRoute(
+                            path: 'repair-shop/:order_id/edit',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              final orderId = int.parse(
+                                state.pathParameters['order_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                RepairOrderFormPage(
+                                  businessId: businessId,
+                                  orderId: orderId,
+                                  calendarController: _calendarController!,
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
                             path: 'repair-shop/:order_id',
                             pageBuilder: (context, state) {
                               final businessId = int.parse(

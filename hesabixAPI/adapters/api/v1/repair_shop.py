@@ -31,6 +31,7 @@ from adapters.api.v1.schema_models.repair_shop import (
     CalculateCostsResponse,
     CompleteRepairRequest,
     DeliverRepairRequest,
+    AddAttachmentRequest,
     RepairOrderFilters,
 )
 from app.services import repair_shop_service
@@ -416,6 +417,28 @@ def add_parts(
     return success_response(data=_format_response(result, request), request=request)
 
 
+@router.delete("/businesses/{business_id}/orders/{order_id}/parts/{part_id}")
+def remove_part(
+    request: Request,
+    business_id: int,
+    order_id: int,
+    part_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """حذف قطعه از سفارش"""
+    if not ctx.can_access_business(business_id):
+        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+
+    if not ctx.has_business_permission("repair_shop", "write"):
+        raise ApiError("FORBIDDEN", "دسترسی ویرایش سفارش تعمیر ندارید", http_status=403)
+
+    result = repair_shop_operations.remove_part_from_repair_order(
+        db, business_id, order_id, part_id, ctx.user.id
+    )
+    return success_response(data=_format_response(result, request), request=request)
+
+
 @router.post("/businesses/{business_id}/orders/{order_id}/calculate-costs")
 def calculate_costs(
     request: Request,
@@ -557,4 +580,44 @@ def get_warranty_repair_history(
         db, business_id, warranty_code_id
     )
     return success_response(data=_format_response({"items": result}, request), request=request)
+
+
+@router.post("/businesses/{business_id}/orders/{order_id}/attachments")
+def add_attachment(
+    request: Request,
+    business_id: int,
+    order_id: int,
+    data: AddAttachmentRequest,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """افزودن ضمیمه به سفارش تعمیر"""
+    if not ctx.can_access_business(business_id):
+        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+    if not ctx.has_business_permission("repair_shop", "write"):
+        raise ApiError("FORBIDDEN", "دسترسی ویرایش سفارش تعمیر ندارید", http_status=403)
+    result = repair_shop_service.add_repair_order_attachment(
+        db, business_id, order_id, data.dict(), ctx.user.id
+    )
+    return success_response(data=_format_response(result, request), request=request, http_status=201)
+
+
+@router.delete("/businesses/{business_id}/orders/{order_id}/attachments/{attachment_id}")
+def delete_attachment(
+    request: Request,
+    business_id: int,
+    order_id: int,
+    attachment_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """حذف ضمیمه سفارش تعمیر"""
+    if not ctx.can_access_business(business_id):
+        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+    if not ctx.has_business_permission("repair_shop", "write"):
+        raise ApiError("FORBIDDEN", "دسترسی ویرایش سفارش تعمیر ندارید", http_status=403)
+    result = repair_shop_service.delete_repair_order_attachment(
+        db, business_id, order_id, attachment_id, ctx.user.id
+    )
+    return success_response(data=_format_response(result, request), request=request)
 
