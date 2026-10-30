@@ -5,14 +5,16 @@ import logging
 import re
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from adapters.db.models.account import Account
 from adapters.db.models.business import Business
+from adapters.db.models.document_line import DocumentLine
 from adapters.db.models.fixed_asset import (
 	FixedAsset,
 	FixedAssetClass,
@@ -23,7 +25,9 @@ from adapters.db.models.fixed_asset import (
 	FixedAssetSettings,
 	FixedAssetSubsequentExpenditure,
 )
+from adapters.db.models.invoice_item_line import InvoiceItemLine
 from adapters.db.models.person import Person
+from adapters.db.models.product import Product
 from app.core.fixed_asset_accounts import (
 	GAIN_DISPOSAL,
 	LOSS_DISPOSAL,
@@ -273,6 +277,8 @@ def _asset_to_dict(
 		"custodian_person_id": row.custodian_person_id,
 		"project_id": row.project_id,
 		"acquisition_document_id": row.acquisition_document_id,
+		"invoice_id": row.invoice_id,
+		"invoice_item_line_id": row.invoice_item_line_id,
 		"idle_from": row.idle_from.isoformat() if row.idle_from else None,
 		"disposed_at": row.disposed_at.isoformat() if row.disposed_at else None,
 		"disposal_kind": row.disposal_kind,
@@ -930,7 +936,7 @@ def delete_asset(db: Session, business_id: int, asset_id: int) -> Dict[str, Any]
 	)
 	if not row:
 		raise ApiError("ASSET_NOT_FOUND", "دارایی یافت نشد.", http_status=404)
-	if row.status != "draft" or row.acquisition_document_id:
+	if row.status != "draft" or row.acquisition_document_id or row.invoice_id:
 		raise ApiError("ASSET_NOT_DRAFT", "فقط دارایی پیش‌نویسِ سرمایه‌نشده قابل حذف است.", http_status=409)
 	db.delete(row)
 	db.commit()
@@ -955,6 +961,12 @@ def capitalize_asset(
 		raise ApiError("ASSET_NOT_FOUND", "دارایی یافت نشد.", http_status=404)
 	if row.status != "draft":
 		raise ApiError("ASSET_NOT_DRAFT", "فقط دارایی پیش‌نویس قابل سرمایه‌گذاری است.", http_status=409)
+	if row.invoice_id or row.invoice_item_line_id:
+		raise ApiError(
+			"ASSET_CAPITALIZED_VIA_INVOICE",
+			"این دارایی از فاکتور خرید سرمایه‌ای ثبت شده است؛ سند تحصیل جدا صادر نمی‌شود.",
+			http_status=409,
+		)
 	cls = _get_class(db, business_id, row.class_id)
 	if settings.require_custodian and not row.custodian_person_id:
 		raise ApiError("CUSTODIAN_REQUIRED", "تحویل‌گیرنده برای سرمایه‌گذاری الزامی است.", http_status=400)
@@ -989,6 +1001,356 @@ def capitalize_asset(
 	data = _asset_to_dict(row, cls)
 	data["acquisition_document_code"] = document.code
 	return data
+
+
+def prepare_invoice_capital_lines(
+	db: Session,
+	business_id: int,
+	invoice_type: str,
+	lines: List[Dict[str, Any]],
+	*,
+	existing_invoice_id: Optional[int] = None,
+) -> bool:
+	"""اعتبارسنجی سطر سرمایه‌ای. موجودی را برای این سطرها خاموش می‌کند. False اگر سطر سرمایه‌ای نباشد."""
+	from app.services.fixed_asset_capital_purchase import (
+		EXTRA_FLAG,
+		INVOICE_PURCHASE_RETURN_TYPE,
+		INVOICE_PURCHASE_TYPE,
+		capital_class_id,
+		capital_optional_decimal,
+		capital_optional_int,
+		is_capital_invoice_line,
+	)
+
+	has_capital = any(is_capital_invoice_line(ln.get("extra_info")) for ln in lines)
+	existing_fa = False
+	if existing_invoice_id:
+		existing_fa = (
+			db.query(FixedAsset.id)
+			.filter(
+				FixedAsset.business_id == business_id,
+				FixedAsset.invoice_id == int(existing_invoice_id),
+			)
+			.first()
+			is not None
+		)
+	if not has_capital and not existing_fa:
+		return False
+	if invoice_type == INVOICE_PURCHASE_RETURN_TYPE and has_capital:
+		raise ApiError(
+			"CAPITAL_PURCHASE_RETURN_FORBIDDEN",
+			"برگشت کالای سرمایه‌ای از فاکتور برگشت خرید مجاز نیست. دارایی را از ماژول اموال خارج کنید.",
+			http_status=409,
+		)
+	if invoice_type != INVOICE_PURCHASE_TYPE:
+		if has_capital:
+			raise ApiError(
+				"CAPITAL_LINE_ONLY_ON_PURCHASE",
+				"سطر سرمایه‌ای فقط در فاکتور خرید مجاز است.",
+				http_status=400,
+			)
+		if existing_fa:
+			raise ApiError(
+				"CAPITAL_INVOICE_TYPE_LOCKED",
+				"این فاکتور به کارت دارایی پیوند دارد و نوع آن قابل تغییر نیست.",
+				http_status=409,
+			)
+		return False
+	_ensure_plugin(db, business_id)
+	settings = _get_or_create_settings(db, business_id)
+	if not settings.enabled:
+		raise ApiError("FIXED_ASSETS_DISABLED", "ماژول اموال در تنظیمات این کسب‌وکار غیرفعال است.", http_status=400)
+	if not has_capital:
+		return True
+	for idx, ln in enumerate(lines, start=1):
+		info = dict(ln.get("extra_info") or {})
+		if not is_capital_invoice_line(info):
+			continue
+		cls_id = capital_class_id(info)
+		if not cls_id:
+			raise ApiError(
+				"FIXED_ASSET_CLASS_REQUIRED",
+				f"سطر {idx}: طبقه دارایی برای سطر سرمایه‌ای الزامی است.",
+				http_status=400,
+			)
+		cls = _get_class(db, business_id, cls_id)
+		class_cost_account(db, business_id, cls)
+		if cls.depreciable:
+			class_accum_account(db, business_id, cls)
+			class_expense_account(db, business_id, cls)
+		life = capital_optional_int(info, "fixed_asset_useful_life_months", "useful_life_months")
+		if life is None and cls.default_useful_life_months is not None:
+			life = int(cls.default_useful_life_months)
+		rate = capital_optional_decimal(info, "fixed_asset_declining_annual_rate", "declining_annual_rate")
+		if rate is None and cls.default_declining_rate is not None:
+			rate = Decimal(str(cls.default_declining_rate))
+		method = str(cls.default_method or METHOD_STRAIGHT_LINE)
+		_validate_method_fields(method=method, depreciable=bool(cls.depreciable), life=life, rate=rate)
+		info[EXTRA_FLAG] = True
+		info["inventory_tracked"] = False
+		info["inventory_posted"] = False
+		ln["extra_info"] = info
+	return True
+
+
+def add_capital_cost_document_lines(
+	db: Session,
+	business_id: int,
+	document_id: int,
+	capital_net_by_class: Dict[int, Decimal],
+) -> None:
+	if not capital_net_by_class:
+		return
+	settings = _get_or_create_settings(db, business_id)
+	quant = _quant_for_settings(db, settings)
+	for class_id, net in capital_net_by_class.items():
+		amount = q_amount(Decimal(str(net or 0)), quant)
+		if amount <= 0:
+			continue
+		if not class_id:
+			raise ApiError(
+				"FIXED_ASSET_CLASS_REQUIRED",
+				"طبقه دارایی برای سطر سرمایه‌ای الزامی است.",
+				http_status=400,
+			)
+		cls = _get_class(db, business_id, int(class_id))
+		acc = class_cost_account(db, business_id, cls)
+		db.add(
+			DocumentLine(
+				document_id=document_id,
+				account_id=acc.id,
+				debit=amount,
+				credit=Decimal(0),
+				description=f"تحصیل دارایی ثابت — {cls.name}",
+				extra_info={"source": "fixed_asset_capital_purchase", "class_id": cls.id},
+			)
+		)
+
+
+def _invoice_linked_assets(db: Session, business_id: int, invoice_id: int) -> List[FixedAsset]:
+	return (
+		db.query(FixedAsset)
+		.filter(FixedAsset.business_id == business_id, FixedAsset.invoice_id == int(invoice_id))
+		.order_by(FixedAsset.id.asc())
+		.all()
+	)
+
+
+def _asset_is_invoice_reversible(db: Session, asset: FixedAsset) -> bool:
+	if asset.invoice_id is None:
+		return False
+	if asset.status not in ("draft", "capitalized"):
+		return False
+	if Decimal(str(asset.accum_depreciation or 0)) != Decimal(str(asset.opening_accum_depreciation or 0)):
+		return False
+	if asset.disposal_document_id or asset.disposed_at:
+		return False
+	if (
+		db.query(FixedAssetSubsequentExpenditure.id)
+		.filter(FixedAssetSubsequentExpenditure.asset_id == asset.id)
+		.first()
+	):
+		return False
+	if (
+		db.query(FixedAssetEstimateChange.id)
+		.filter(FixedAssetEstimateChange.asset_id == asset.id)
+		.first()
+	):
+		return False
+	if (
+		db.query(FixedAssetDepreciationRunLine.id)
+		.filter(FixedAssetDepreciationRunLine.asset_id == asset.id)
+		.first()
+	):
+		return False
+	return True
+
+
+def assert_invoice_capital_assets_rebuildable(db: Session, business_id: int, invoice_id: int) -> None:
+	assets = _invoice_linked_assets(db, business_id, invoice_id)
+	blocked = [a.code for a in assets if not _asset_is_invoice_reversible(db, a)]
+	if blocked:
+		raise ApiError(
+			"CAPITAL_INVOICE_LOCKED",
+			"فاکتور خرید سرمایه‌ای پس از استهلاک، تعمیر، تغییر برآورد یا خروج دارایی قابل ویرایش یا حذف نیست.",
+			http_status=409,
+			details={"asset_codes": blocked},
+		)
+
+
+def _delete_reversible_invoice_asset(db: Session, asset: FixedAsset) -> None:
+	if not _asset_is_invoice_reversible(db, asset):
+		raise ApiError(
+			"CAPITAL_INVOICE_LOCKED",
+			"این دارایی از فاکتور خرید دیگر قابل برگشت نیست.",
+			http_status=409,
+		)
+	db.delete(asset)
+
+
+def delete_invoice_capital_assets(db: Session, business_id: int, invoice_id: int) -> int:
+	assert_invoice_capital_assets_rebuildable(db, business_id, invoice_id)
+	assets = _invoice_linked_assets(db, business_id, invoice_id)
+	count = 0
+	for asset in assets:
+		_delete_reversible_invoice_asset(db, asset)
+		count += 1
+	if count:
+		db.flush()
+	return count
+
+
+def _match_key(class_id: int, cost: Decimal, vat: Decimal, product_id: Optional[int]) -> Tuple[int, str, str, int]:
+	return (int(class_id), str(cost), str(vat), int(product_id or 0))
+
+
+def sync_capital_assets_from_purchase_invoice(
+	db: Session,
+	business_id: int,
+	document: Any,
+	user_id: Optional[int],
+) -> List[int]:
+	"""کارت دارایی سرمایه‌شده از سطرهای فاکتور؛ بدون سند FAA جدا (بها روی خود فاکتور است)."""
+	from app.services.fixed_asset_capital_purchase import (
+		EXTRA_ASSET_ID,
+		capital_asset_name,
+		capital_class_id,
+		capital_custodian_id,
+		capital_location_id,
+		capital_optional_decimal,
+		capital_optional_int,
+		is_capital_invoice_line,
+		line_purchase_amounts,
+	)
+
+	if bool(getattr(document, "is_proforma", False)):
+		return []
+	assert_invoice_capital_assets_rebuildable(db, business_id, int(document.id))
+	settings = _get_or_create_settings(db, business_id)
+	quant = _quant_for_settings(db, settings)
+	item_lines = (
+		db.query(InvoiceItemLine)
+		.filter(InvoiceItemLine.document_id == int(document.id))
+		.order_by(InvoiceItemLine.id.asc())
+		.all()
+	)
+	specs: List[Dict[str, Any]] = []
+	for row in item_lines:
+		info = dict(row.extra_info or {})
+		if not is_capital_invoice_line(info):
+			continue
+		_gross, _disc, net, tax = line_purchase_amounts(
+			{"quantity": row.quantity, "extra_info": info}
+		)
+		cls_id = capital_class_id(info)
+		if not cls_id:
+			raise ApiError("FIXED_ASSET_CLASS_REQUIRED", "طبقه دارایی برای سطر سرمایه‌ای الزامی است.", http_status=400)
+		product = db.query(Product).filter(Product.id == int(row.product_id)).first()
+		fallback_name = (row.description or "").strip() or (product.name if product else None) or f"دارایی سطر {row.id}"
+		salvage = capital_optional_decimal(info, "fixed_asset_salvage", "salvage") or Decimal("0")
+		specs.append(
+			{
+				"line": row,
+				"info": info,
+				"class_id": int(cls_id),
+				"cost": q_amount(net, quant),
+				"vat": q_amount(tax, quant),
+				"salvage": q_amount(salvage, quant),
+				"product_id": int(row.product_id) if row.product_id else None,
+				"name": capital_asset_name(info, fallback_name),
+				"location_id": capital_location_id(info),
+				"custodian_person_id": capital_custodian_id(info),
+				"life": capital_optional_int(info, "fixed_asset_useful_life_months", "useful_life_months"),
+				"rate": capital_optional_decimal(info, "fixed_asset_declining_annual_rate", "declining_annual_rate"),
+			}
+		)
+
+	old_assets = _invoice_linked_assets(db, business_id, int(document.id))
+	unused: List[FixedAsset] = list(old_assets)
+	created_or_kept: List[int] = []
+	acq_date = document.document_date
+	if not isinstance(acq_date, date):
+		acq_date = date.fromisoformat(str(acq_date)[:10])
+
+	for spec in specs:
+		key = _match_key(spec["class_id"], spec["cost"], spec["vat"], spec["product_id"])
+		matched: Optional[FixedAsset] = None
+		for asset in unused:
+			asset_key = _match_key(
+				int(asset.class_id),
+				q_amount(Decimal(str(asset.cost or 0)), quant),
+				q_amount(Decimal(str(asset.vat_amount or 0)), quant),
+				int((asset.extra_info or {}).get("product_id") or 0) or None,
+			)
+			if asset_key == key:
+				matched = asset
+				break
+		if matched is not None:
+			unused.remove(matched)
+			matched.invoice_item_line_id = int(spec["line"].id)
+			matched.acquisition_document_id = int(document.id)
+			matched.name = spec["name"]
+			matched.location_id = spec["location_id"]
+			matched.custodian_person_id = spec["custodian_person_id"]
+			ex = dict(matched.extra_info or {})
+			ex["source"] = "purchase_invoice"
+			ex["product_id"] = spec["product_id"]
+			matched.extra_info = ex
+			created_or_kept.append(int(matched.id))
+			info = spec["info"]
+			info[EXTRA_ASSET_ID] = int(matched.id)
+			spec["line"].extra_info = info
+			flag_modified(spec["line"], "extra_info")
+			continue
+		cls = _get_class(db, business_id, spec["class_id"])
+		life = spec["life"]
+		if life is None and cls.default_useful_life_months is not None:
+			life = int(cls.default_useful_life_months)
+		rate = spec["rate"]
+		if rate is None and cls.default_declining_rate is not None:
+			rate = Decimal(str(cls.default_declining_rate))
+		method = str(cls.default_method or METHOD_STRAIGHT_LINE)
+		_validate_method_fields(method=method, depreciable=bool(cls.depreciable), life=life, rate=rate)
+		if spec["salvage"] > spec["cost"]:
+			raise ApiError("INVALID_SALVAGE", "ارزش اسقاط نمی‌تواند از بها بیشتر باشد.", http_status=400)
+		row = FixedAsset(
+			business_id=business_id,
+			class_id=cls.id,
+			code=_next_asset_code(db, business_id, settings, cls),
+			name=spec["name"],
+			description=(str(spec["line"].description).strip() or None) if spec["line"].description else None,
+			status="capitalized",
+			acquisition_kind="purchase",
+			acquisition_date=acq_date,
+			commission_date=acq_date,
+			cost=spec["cost"],
+			salvage=spec["salvage"],
+			vat_amount=spec["vat"],
+			accum_depreciation=Decimal("0"),
+			opening_accum_depreciation=Decimal("0"),
+			method=method,
+			useful_life_months=life,
+			declining_annual_rate=rate,
+			location_id=spec["location_id"],
+			custodian_person_id=spec["custodian_person_id"],
+			acquisition_document_id=int(document.id),
+			invoice_id=int(document.id),
+			invoice_item_line_id=int(spec["line"].id),
+			created_by_user_id=user_id,
+			extra_info={"source": "purchase_invoice", "product_id": spec["product_id"]},
+		)
+		db.add(row)
+		db.flush()
+		created_or_kept.append(int(row.id))
+		info = spec["info"]
+		info[EXTRA_ASSET_ID] = int(row.id)
+		spec["line"].extra_info = info
+		flag_modified(spec["line"], "extra_info")
+
+	for leftover in unused:
+		_delete_reversible_invoice_asset(db, leftover)
+	db.flush()
+	return created_or_kept
 
 
 def list_depreciation_runs(

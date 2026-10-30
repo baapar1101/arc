@@ -12988,7 +12988,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fixedAssetsAcquisitionKind => 'Acquisition type';
 
   @override
-  String get fixedAssetsKindPurchase => 'Purchase (not a goods invoice)';
+  String get fixedAssetsKindPurchase => 'Standalone purchase (no vendor invoice)';
+
+  @override
+  String get invoiceLineFixedAsset => 'Fixed asset / PPE';
+
+  @override
+  String get invoiceLineFixedAssetHint =>
+      'This line does not post inventory or a warehouse receipt; its cost is capitalized to PPE.';
 
   @override
   String get fixedAssetsKindOpening => 'Opening balance';
@@ -13001,7 +13008,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fixedAssetsCapitalizeHint =>
-      'This is not a goods purchase invoice. The counterpart is cash, bank, a person, opening equity, or a leaf account.';
+      'Without a vendor invoice, the counterpart is cash, bank, a person, or opening equity. If there is a vendor invoice, mark the purchase line as capital so inventory is not debited.';
 
   @override
   String get fixedAssetsCounterparty => 'Counterpart';

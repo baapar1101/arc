@@ -61,8 +61,12 @@ def product_has_stale_inventory_tracking_lines(
     """خطوط فاکتور قطعی که inventory_tracked با وضعیت فعلی کالا ناسازگار است."""
     rows = _invoice_lines_for_product(db, business_id=business_id, product_id=product_id)
     expected = bool(expected_tracked)
+    from app.services.fixed_asset_capital_purchase import is_capital_invoice_line
+
     for line, _document in rows:
         info = line.extra_info or {}
+        if is_capital_invoice_line(info):
+            continue
         current = info.get("inventory_tracked")
         if current is None:
             if not expected:
@@ -182,8 +186,11 @@ def sync_product_inventory_tracking_change(
     """
     if bool(old_track_inventory) == bool(new_track_inventory):
         rows = _invoice_lines_for_product(db, business_id=business_id, product_id=product_id)
+        from app.services.fixed_asset_capital_purchase import is_capital_invoice_line
+
         stale = any(
-            bool((line.extra_info or {}).get("inventory_tracked", True)) != bool(new_track_inventory)
+            not is_capital_invoice_line(line.extra_info or {})
+            and bool((line.extra_info or {}).get("inventory_tracked", True)) != bool(new_track_inventory)
             for line, _doc in rows
         )
         if not stale:
@@ -203,7 +210,11 @@ def sync_product_inventory_tracking_change(
 
     lines_updated = 0
     documents_by_id: Dict[int, Document] = {}
+    from app.services.fixed_asset_capital_purchase import is_capital_invoice_line
+
     for line, document in rows:
+        if is_capital_invoice_line(line.extra_info or {}):
+            continue
         if _set_line_inventory_tracked(line, new_track_inventory):
             lines_updated += 1
         documents_by_id[int(document.id)] = document

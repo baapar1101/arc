@@ -607,9 +607,13 @@ def _compute_line_quantities_core(
 			else:
 				orphan_by_product[wh_line.product_id] = orphan_by_product.get(wh_line.product_id, Decimal(0)) + qty
 
+	from app.services.fixed_asset_capital_purchase import invoice_line_skips_warehouse
+
 	line_quantities: List[Dict[str, Any]] = []
 	for row in item_rows:
 		if not row.product_id:
+			continue
+		if invoice_line_skips_warehouse(row.extra_info or {}):
 			continue
 		required = Decimal(str(row.quantity or 0))
 		processed = processed_by_line.get(int(row.id), Decimal(0))
@@ -1056,6 +1060,8 @@ def invoice_lines_have_trackable_inventory_products(
 	"""آیا حداقل یک ردیف فاکتور وجود دارد که در create_from_invoice به خط حواله انبار تبدیل شود؟
 	(همان فیلتر product معتبر، quantity مثبت، track_inventory=True)
 	"""
+	from app.services.fixed_asset_capital_purchase import invoice_line_skips_warehouse
+
 	for ln in lines:
 		pid = ln.get("product_id")
 		try:
@@ -1063,6 +1069,8 @@ def invoice_lines_have_trackable_inventory_products(
 		except Exception:
 			qty = Decimal(0)
 		if not pid or qty <= 0:
+			continue
+		if invoice_line_skips_warehouse(ln.get("extra_info") or {}):
 			continue
 		product = db.query(Product).filter(and_(Product.id == int(pid), Product.business_id == business_id)).first()
 		if not product or not getattr(product, "track_inventory", False):
@@ -1184,6 +1192,10 @@ def create_from_invoice(
 			continue
 
 		extra = ln.get("extra_info") or {}
+		from app.services.fixed_asset_capital_purchase import invoice_line_skips_warehouse
+
+		if invoice_line_skips_warehouse(extra):
+			continue
 		# حرکت خط حواله باید با نوع حواله (issue/receipt) هم‌خوان باشد، نه movement ذخیره‌شده در فاکتور.
 		mv = "out" if wh_doc_type in ("issue", "production_out") else "in"
 

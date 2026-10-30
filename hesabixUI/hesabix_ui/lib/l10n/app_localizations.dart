@@ -23976,6 +23976,10 @@ abstract class AppLocalizations {
   /// **'Purchase (not a goods invoice)'**
   String get fixedAssetsKindPurchase;
 
+  String get invoiceLineFixedAsset;
+
+  String get invoiceLineFixedAssetHint;
+
   /// No description provided for @fixedAssetsKindOpening.
   ///
   /// In en, this message translates to:

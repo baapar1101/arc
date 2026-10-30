@@ -686,6 +686,10 @@ def _apply_invoice_missing_line_warehouse_policy(
         info = dict(ln.get("extra_info") or {})
         if not bool(info.get("inventory_tracked", True)):
             continue
+        from app.services.fixed_asset_capital_purchase import invoice_line_skips_warehouse
+
+        if invoice_line_skips_warehouse(info):
+            continue
         if _invoice_line_has_resolvable_warehouse(ln, document_extra_info):
             continue
         missing_rows.append(idx)
@@ -868,6 +872,10 @@ def _remove_old_invoice_warehouse_documents(
                 InvoiceItemLine.document_id == int(invoice_document_id)
             ).all():
                 info = line.extra_info or {}
+                from app.services.fixed_asset_capital_purchase import invoice_line_skips_warehouse
+
+                if invoice_line_skips_warehouse(info):
+                    continue
                 if int(line.product_id) not in tracked_product_ids or info.get("inventory_tracked") is False:
                     continue
                 movement = info.get("movement") or _movement_from_type(invoice.document_type)[0]
@@ -1240,6 +1248,10 @@ def _iter_product_movements(
 
     for line, doc in iil_rows:
         info = line.extra_info or {}
+        from app.services.fixed_asset_capital_purchase import invoice_line_skips_inventory_kardex
+
+        if invoice_line_skips_inventory_kardex(info):
+            continue
         try:
             posted = info.get("inventory_posted")
             if posted is False:
@@ -2106,6 +2118,83 @@ def _extract_totals_from_lines(lines: List[Dict[str, Any]]) -> Dict[str, Decimal
         "tax": tax,
         "net": net,
     }
+
+
+def _apply_purchase_invoice_accounting(
+    db: Session,
+    *,
+    business_id: int,
+    document_id: int,
+    purchase_mode: str,
+    accounts: Dict[str, Account],
+    lines_input: List[Dict[str, Any]],
+    person_id: Optional[int],
+    tax: Decimal,
+    total_with_tax: Decimal,
+    description: Optional[str],
+    invoice_type: str,
+    header_extra: Dict[str, Any],
+) -> None:
+    """ثبت خرید: موجودی/GRNI فقط برای سطر غیرسرمایه‌ای؛ سطر سرمایه‌ای بدهکار ۱۰۷."""
+    from app.services.fixed_asset_capital_purchase import split_purchase_debit_amounts
+    from app.services.fixed_asset_service import add_capital_cost_document_lines
+    from app.services.invoice_adjustments_service import add_adjustment_document_lines
+    from app.services.purchase_accounting_service import add_purchase_invoice_debit_lines
+
+    split = split_purchase_debit_amounts(lines_input)
+    add_purchase_invoice_debit_lines(
+        db,
+        document_id=int(document_id),
+        mode=purchase_mode,
+        accounts=accounts,
+        gross=split.inventory_gross,
+    )
+    add_capital_cost_document_lines(
+        db,
+        business_id=int(business_id),
+        document_id=int(document_id),
+        capital_net_by_class=split.capital_net_by_class,
+    )
+    if split.purchase_discount_credit > 0:
+        db.add(
+            DocumentLine(
+                document_id=document_id,
+                account_id=accounts["purchase_discount"].id,
+                debit=Decimal(0),
+                credit=split.purchase_discount_credit,
+                description="تخفیفات خرید",
+            )
+        )
+    if tax > 0:
+        db.add(
+            DocumentLine(
+                document_id=document_id,
+                account_id=accounts["vat_in"].id,
+                debit=tax,
+                credit=Decimal(0),
+                description="مالیات بر ارزش افزوده ورودی",
+            )
+        )
+    if person_id:
+        db.add(
+            DocumentLine(
+                document_id=document_id,
+                account_id=accounts["person"].id,
+                person_id=person_id,
+                debit=Decimal(0),
+                credit=total_with_tax,
+                description=description,
+                extra_info={"side": "person", "person_id": person_id},
+            )
+        )
+    add_adjustment_document_lines(
+        db,
+        business_id=business_id,
+        document_id=int(document_id),
+        invoice_type=invoice_type,
+        accounts=accounts,
+        header_extra=header_extra,
+    )
 
 
 def _canonicalize_quick_sale_line_amounts(lines: List[Dict[str, Any]]) -> None:
@@ -4383,9 +4472,13 @@ def _calculate_average_purchase_cost(
     total_cost = Decimal(0)
     total_qty = Decimal(0)
     
+    from app.services.fixed_asset_capital_purchase import invoice_line_skips_inventory_kardex
+
     for line, _doc in purchase_lines:
         qty = Decimal(str(line.quantity or 0))
         if qty <= 0:
+            continue
+        if invoice_line_skips_inventory_kardex(line.extra_info or {}):
             continue
         extra_info = line.extra_info or {}
         cost_per_unit = Decimal(0)
@@ -4435,8 +4528,12 @@ def _iter_profit_movements_from_invoice_lines(
         .all()
     )
     movements: List[Dict[str, Any]] = []
+    from app.services.fixed_asset_capital_purchase import invoice_line_skips_inventory_kardex
+
     for line, doc in rows:
         info = line.extra_info or {}
+        if invoice_line_skips_inventory_kardex(info):
+            continue
         if info.get("inventory_tracked") is False and not include_untracked:
             continue
         movement = (info.get("movement") or None)
@@ -6198,6 +6295,9 @@ def create_invoice(
             snapshot["captured_at"] = datetime.utcnow().isoformat()
             info["tax_snapshot"] = snapshot
         ln["extra_info"] = info
+    from app.services.fixed_asset_service import prepare_invoice_capital_lines
+
+    prepare_invoice_capital_lines(db, business_id, invoice_type, lines_input)
     _apply_invoice_missing_line_warehouse_policy(
         db,
         business_id,
@@ -6422,7 +6522,10 @@ def create_invoice(
         if not product_id or qty <= 0:
             raise ApiError("INVALID_LINE", "line.product_id and positive quantity are required", http_status=400)
         extra_info = dict(line.get("extra_info") or {})
-        extra_info.pop("inventory_posted", None)
+        from app.services.fixed_asset_capital_purchase import is_capital_invoice_line
+
+        if not is_capital_invoice_line(extra_info):
+            extra_info.pop("inventory_posted", None)
         
         # اعتبارسنجی selected_instance_ids برای کالاهای یونیک
         selected_instance_ids = extra_info.get("selected_instance_ids")
@@ -6440,6 +6543,7 @@ def create_invoice(
             description=line.get("description"),
             extra_info=extra_info,
         ))
+    db.flush()
 
     # Accounting lines for finalized invoices (COGS/Inventory در invoice_cogs_gl_service ثبت می‌شود)
     if not document.is_proforma:
@@ -6574,50 +6678,18 @@ def create_invoice(
 
         # Purchase
         elif invoice_type == INVOICE_PURCHASE:
-            from app.services.purchase_accounting_service import add_purchase_invoice_debit_lines
-
-            add_purchase_invoice_debit_lines(
-                db,
-                document_id=int(document.id),
-                mode=_purchase_mode,
-                accounts=accounts,
-                gross=gross,
-            )
-            # تخفیفات خرید به صورت جداگانه
-            if discount > 0:
-                db.add(DocumentLine(
-                    document_id=document.id,
-                    account_id=accounts["purchase_discount"].id,
-                    debit=Decimal(0),
-                    credit=discount,
-                    description="تخفیفات خرید",
-                ))
-            # VAT ورودی
-            if tax > 0:
-                db.add(DocumentLine(
-                    document_id=document.id,
-                    account_id=accounts["vat_in"].id,
-                    debit=tax,
-                    credit=Decimal(0),
-                    description="مالیات بر ارزش افزوده ورودی",
-                ))
-            # طرف‌شخص (حساب‌های پرداختنی) به مبلغ خالص با مالیات
-            if person_id:
-                db.add(DocumentLine(
-                    document_id=document.id,
-                    account_id=accounts["person"].id,
-                    person_id=person_id,
-                    debit=Decimal(0),
-                    credit=total_with_tax,
-                    description=data.get("description"),
-                    extra_info={"side": "person", "person_id": person_id},
-                ))
-            add_adjustment_document_lines(
+            _apply_purchase_invoice_accounting(
                 db,
                 business_id=business_id,
                 document_id=int(document.id),
-                invoice_type=invoice_type,
+                purchase_mode=_purchase_mode,
                 accounts=accounts,
+                lines_input=lines_input,
+                person_id=person_id,
+                tax=tax,
+                total_with_tax=total_with_tax,
+                description=data.get("description"),
+                invoice_type=invoice_type,
                 header_extra=_adj_extra,
             )
 
@@ -7015,6 +7087,11 @@ def create_invoice(
     elif payments and isinstance(payments, list) and payments:
         logger.debug(f"No payment_docs for invoice {document.id}; payments payload present: {payments}")
 
+    if invoice_type == INVOICE_PURCHASE and not document.is_proforma:
+        from app.services.fixed_asset_service import sync_capital_assets_from_purchase_invoice
+
+        sync_capital_assets_from_purchase_invoice(db, business_id, document, user_id)
+
     # ایجاد حواله انبار در صورت نیاز (همان منطق در _create_warehouse_documents_for_invoice)
     try:
         created_wh_ids = _create_warehouse_documents_for_invoice(
@@ -7407,6 +7484,9 @@ def update_invoice(
     )
 
     # Recreate lines: حذف سطرهای حسابداری و اقلام فاکتور و بازایجاد
+    from app.services.fixed_asset_service import assert_invoice_capital_assets_rebuildable
+
+    assert_invoice_capital_assets_rebuildable(db, int(document.business_id), int(document.id))
     db.query(DocumentLine).filter(DocumentLine.document_id == document.id).delete(synchronize_session=False)
     db.query(InvoiceItemLine).filter(InvoiceItemLine.document_id == document.id).delete(synchronize_session=False)
 
@@ -7507,6 +7587,15 @@ def update_invoice(
             snapshot["captured_at"] = datetime.utcnow().isoformat()
             info["tax_snapshot"] = snapshot
         ln["extra_info"] = info
+    from app.services.fixed_asset_service import prepare_invoice_capital_lines
+
+    prepare_invoice_capital_lines(
+        db,
+        int(document.business_id),
+        inv_type,
+        lines_input,
+        existing_invoice_id=int(document.id),
+    )
     _doc_ex_work = dict(document.extra_info or {})
     _apply_invoice_missing_line_warehouse_policy(
         db,
@@ -7594,6 +7683,7 @@ def update_invoice(
             description=line.get("description"),
             extra_info=extra_info,
         ))
+    db.flush()
 
     # Accounting lines if finalized
     if not document.is_proforma:
@@ -7803,50 +7893,19 @@ def update_invoice(
                 db.add(DocumentLine(document_id=document.id, account_id=accounts["vat_out"].id, debit=tax, credit=Decimal(0), description="تعدیل VAT برگشت از فروش"))
             # Inventory/COGS handled in warehouse posting
         elif inv_type == INVOICE_PURCHASE:
-            from app.services.purchase_accounting_service import add_purchase_invoice_debit_lines
-
             _purchase_mode_upd = (header_extra.get("purchase_accounting_mode") or "").strip()
-            add_purchase_invoice_debit_lines(
-                db,
-                document_id=int(document.id),
-                mode=_purchase_mode_upd,
-                accounts=accounts,
-                gross=gross,
-            )
-            # تخفیفات خرید
-            if discount > 0:
-                db.add(DocumentLine(
-                    document_id=document.id,
-                    account_id=accounts["purchase_discount"].id,
-                    debit=Decimal(0),
-                    credit=discount,
-                    description="تخفیفات خرید",
-                ))
-            # VAT ورودی
-            if tax > 0:
-                db.add(DocumentLine(
-                    document_id=document.id,
-                    account_id=accounts["vat_in"].id,
-                    debit=tax,
-                    credit=Decimal(0),
-                    description="مالیات ورودی",
-                ))
-            # طرف‌شخص
-            if person_id:
-                db.add(DocumentLine(
-                    document_id=document.id,
-                    account_id=accounts["person"].id,
-                    person_id=person_id,
-                    debit=Decimal(0),
-                    credit=total_with_tax,
-                    description=document.description,
-                ))
-            add_adjustment_document_lines(
+            _apply_purchase_invoice_accounting(
                 db,
                 business_id=int(document.business_id),
                 document_id=int(document.id),
-                invoice_type=inv_type,
+                purchase_mode=_purchase_mode_upd,
                 accounts=accounts,
+                lines_input=lines_input,
+                person_id=person_id,
+                tax=tax,
+                total_with_tax=total_with_tax,
+                description=document.description,
+                invoice_type=inv_type,
                 header_extra=_adj_extra_hdr,
             )
         elif inv_type == INVOICE_PURCHASE_RETURN:
@@ -8258,6 +8317,13 @@ def update_invoice(
         flag_modified(document, "extra_info")
         db.flush()
 
+        if inv_type == INVOICE_PURCHASE and not document.is_proforma:
+            from app.services.fixed_asset_service import sync_capital_assets_from_purchase_invoice
+
+            sync_capital_assets_from_purchase_invoice(
+                db, int(document.business_id), document, user_id
+            )
+
         if not document.is_proforma:
             _post_warehouse_types_for_rebuild = set(_old_posted_warehouse_types)
             if inv_type != _old_document_type and _post_warehouse_types_for_rebuild:
@@ -8515,6 +8581,10 @@ def delete_invoice(db: Session, document_id: int, *, commit: bool = True) -> boo
             raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
         
         logger.info(f"[DELETE_INVOICE] Invoice {document_id}: Found document - code={document.code}, type={document.document_type}, business_id={document.business_id}")
+
+        from app.services.fixed_asset_service import delete_invoice_capital_assets
+
+        delete_invoice_capital_assets(db, int(document.business_id), int(document.id))
         
         # بررسی نوع سند
         if document.document_type not in SUPPORTED_INVOICE_TYPES:

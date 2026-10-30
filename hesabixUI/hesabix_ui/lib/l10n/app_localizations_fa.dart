@@ -12918,7 +12918,14 @@ class AppLocalizationsFa extends AppLocalizations {
   String get fixedAssetsAcquisitionKind => 'نوع تحصیل';
 
   @override
-  String get fixedAssetsKindPurchase => 'خرید (نه فاکتور کالا)';
+  String get fixedAssetsKindPurchase => 'خرید مستقل (بدون فاکتور فروشنده)';
+
+  @override
+  String get invoiceLineFixedAsset => 'اموال / دارایی ثابت';
+
+  @override
+  String get invoiceLineFixedAssetHint =>
+      'این سطر موجودی کالا و حواله انبار نمی‌سازد؛ بهای آن در حساب دارایی ثابت ثبت می‌شود.';
 
   @override
   String get fixedAssetsKindOpening => 'افتتاحیه';
@@ -12931,7 +12938,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get fixedAssetsCapitalizeHint =>
-      'این ثبت فاکتور خرید کالا نیست. طرف حساب نقد، بانک، شخص، افتتاحیه یا حساب برگ است.';
+      'تحصیل بدون فاکتور فروشنده: طرف حساب نقد، بانک، شخص یا افتتاحیه است. اگر خرید با فاکتور است، در فاکتور خرید سطر را سرمایه‌ای کنید تا موجودی کالا بدهکار نشود.';
 
   @override
   String get fixedAssetsCounterparty => 'طرف حساب';

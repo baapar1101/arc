@@ -247,6 +247,10 @@ def apply_invoice_product_price_sync(
         if qty <= 0:
             continue
         info = dict(row.extra_info or {})
+        from app.services.fixed_asset_capital_purchase import invoice_line_skips_inventory_kardex
+
+        if invoice_type == INVOICE_PURCHASE and invoice_line_skips_inventory_kardex(info):
+            continue
         per_line = _per_unit_line_currency(
             info,
             qty,

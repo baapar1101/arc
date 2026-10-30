@@ -60,6 +60,10 @@ def _build_base_currency_payload(db: Session, b: Business) -> Optional[Dict[str,
 
 def _line_passes_inventory_filters(line: InvoiceItemLine, doc: Document) -> bool:
 	info = line.extra_info or {}
+	from app.services.fixed_asset_capital_purchase import invoice_line_skips_inventory_kardex
+
+	if invoice_line_skips_inventory_kardex(info):
+		return False
 	try:
 		if info.get("inventory_posted") is False:
 			return False

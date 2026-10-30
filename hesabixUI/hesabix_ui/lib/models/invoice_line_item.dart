@@ -170,4 +170,21 @@ class InvoiceLineItem {
   num get taxAmount => taxableAmount * (taxRate / 100);
 
   num get total => taxableAmount + taxAmount;
+
+  bool get isFixedAssetCapital {
+    final v = extraInfo?['fixed_asset'];
+    if (v == true || v == 1) return true;
+    if (v is String) {
+      final s = v.trim().toLowerCase();
+      return s == 'true' || s == '1' || s == 'yes';
+    }
+    return false;
+  }
+
+  int? get fixedAssetClassId {
+    final v = extraInfo?['fixed_asset_class_id'];
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse(v?.toString() ?? '');
+  }
 }

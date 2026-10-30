@@ -143,6 +143,13 @@ class FixedAsset(Base):
 		Index("ix_fa_assets_business_id", "business_id"),
 		Index("ix_fa_assets_class_id", "class_id"),
 		Index("ix_fa_assets_status", "status"),
+		Index("ix_fa_assets_invoice_id", "invoice_id"),
+		Index(
+			"uq_fa_assets_invoice_item_line_id",
+			"invoice_item_line_id",
+			unique=True,
+			postgresql_where=text("invoice_item_line_id IS NOT NULL"),
+		),
 	)
 
 	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -190,6 +197,12 @@ class FixedAsset(Base):
 	)
 	acquisition_document_id: Mapped[Optional[int]] = mapped_column(
 		Integer, ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
+	)
+	invoice_id: Mapped[Optional[int]] = mapped_column(
+		Integer, ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
+	)
+	invoice_item_line_id: Mapped[Optional[int]] = mapped_column(
+		Integer, ForeignKey("invoice_item_lines.id", ondelete="SET NULL"), nullable=True
 	)
 	extra_info: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 	created_by_user_id: Mapped[Optional[int]] = mapped_column(
