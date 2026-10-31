@@ -61,8 +61,15 @@ from .document_line import DocumentLine  # noqa: F401
 from .account import Account  # noqa: F401
 from .category import BusinessCategory  # noqa: F401
 from .product_attribute import ProductAttribute  # noqa: F401
+from .product_attribute_option import ProductAttributeOption  # noqa: F401
 from .business_catalog_spec_field import BusinessCatalogSpecField  # noqa: F401
 from .product import Product  # noqa: F401
+from .product_variant import ProductVariantDimension, ProductVariant, ProductVariantValue  # noqa: F401
+from .product_variant_allocation import (  # noqa: F401
+	InvoiceItemLineVariantAllocation,
+	WarehouseLineVariantAllocation,
+)
+from .inventory_variant_balance import InventoryVariantBalance  # noqa: F401
 from .product_bundle import ProductBundle, ProductBundleItem  # noqa: F401
 from .product_supplier import ProductSupplier, ProductSupplierSocialContact  # noqa: F401
 from .public_catalog_contact_message import PublicCatalogContactMessage  # noqa: F401

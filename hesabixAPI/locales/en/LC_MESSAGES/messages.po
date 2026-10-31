@@ -1346,3 +1346,66 @@ msgstr "Close DigiPay receivable"
 
 msgid "DIGIPAY_SETTLEMENT_BANK"
 msgstr "DigiPay settlement deposit"
+
+msgid "VARIANT_DIMENSIONS_UPDATED"
+msgstr "Inventory-affecting attributes were updated"
+
+msgid "VARIANT_CREATED"
+msgstr "Product combination created"
+
+msgid "VARIANT_UPDATED"
+msgstr "Product combination updated"
+
+msgid "VARIANT_DEACTIVATED"
+msgstr "Product combination deactivated"
+
+msgid "VARIANT_INVENTORY_ENABLED"
+msgstr "Inventory split by attributes is now enabled"
+
+msgid "VARIANT_INSUFFICIENT_STOCK"
+msgstr "Selected combination does not have enough stock"
+
+msgid "VARIANT_REQUIRED"
+msgstr "An inventory combination must be selected for this product"
+
+msgid "VARIANT_ALLOCATION_MISMATCH"
+msgstr "Allocated quantities must equal the line quantity"
+
+msgid "VARIANT_NOT_ALLOWED"
+msgstr "Attribute allocations are not allowed for products without inventory split"
+
+msgid "VARIANT_UNIQUE_NOT_SUPPORTED"
+msgstr "Inventory split by attributes is not supported for unique products"
+
+msgid "VARIANT_NOT_SUPPORTED_HERE"
+msgstr "Products with inventory split by attributes are not supported here"
+
+msgid "VARIANT_COMBINATION_DUPLICATE"
+msgstr "This combination already exists"
+
+msgid "VARIANT_DIMENSION_LIMIT"
+msgstr "At most two inventory attributes are allowed in this version"
+
+msgid "VARIANT_DIMENSION_IN_USE"
+msgstr "Inventory attributes cannot be changed after variant stock movement"
+
+msgid "VARIANT_INACTIVE"
+msgstr "This combination is inactive"
+
+msgid "DUPLICATE_VARIANT_BARCODE"
+msgstr "This barcode is already used by another combination"
+
+msgid "GENERAL_BARCODE_CONFLICTS_WITH_VARIANT"
+msgstr "This barcode is already used by a product combination"
+
+msgid "BARCODE_NOT_FOUND"
+msgstr "Barcode was not found"
+
+msgid "TRANSFER_VARIANT_MISMATCH"
+msgstr "Transfer lines must use the same attribute allocations"
+
+msgid "VARIANT_NEGATIVE_STOCK"
+msgstr "Negative stock must be corrected before enabling inventory split"
+
+msgid "OPTION_LABEL_CONFLICT"
+msgstr "Two options normalize to the same label and are not auto-merged"

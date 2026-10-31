@@ -9,6 +9,7 @@ import '../services/tax_service.dart';
 import '../services/price_list_service.dart';
 import '../services/currency_service.dart';
 import '../services/warehouse_service.dart';
+import '../services/product_variant_service.dart';
 import '../core/api_client.dart';
 import '../utils/error_extractor.dart';
 import '../utils/product_form_auto_save.dart';
@@ -37,6 +38,7 @@ class ProductFormController extends ChangeNotifier {
   int? _editingProductId;
   int? _lastCreatedProductId;
   String? _originalInventoryMode; // برای تشخیص تغییر از bulk به unique
+  Set<int> _originalDimensionIds = <int>{};
   
   // Reference data
   List<Map<String, dynamic>> _categories = [];
@@ -364,6 +366,7 @@ class ProductFormController extends ChangeNotifier {
         _formData = ProductFormData.fromProduct(productMap);
         // ذخیره inventory_mode اولیه برای تشخیص تغییر
         _originalInventoryMode = _formData.inventoryMode ?? 'bulk';
+        _originalDimensionIds = Set<int>.from(_formData.inventoryDimensionAttributeIds);
         if (_editingProductId != null) {
           await _loadExistingPriceItems(productId: _editingProductId!);
         }
@@ -606,6 +609,7 @@ class ProductFormController extends ChangeNotifier {
       _lastCreatedProductId = newId;
       if (newId != null) {
         await _saveDraftPriceItems(productId: newId);
+        await _syncInventoryDimensions(newId);
       }
       
       // پاک کردن عکس انتخابی بعد از آپلود موفق
@@ -705,6 +709,7 @@ class ProductFormController extends ChangeNotifier {
         imageFilename: _selectedImageFilename,
       );
       await _saveDraftPriceItems(productId: productId);
+      await _syncInventoryDimensions(productId);
       
       // پاک کردن عکس انتخابی بعد از آپلود موفق
       _selectedImageBytes = null;
@@ -827,6 +832,31 @@ class ProductFormController extends ChangeNotifier {
         // keep going for other items; errors can be surfaced later
       }
     }
+  }
+
+  Future<void> _syncInventoryDimensions(int productId) async {
+    if ((_formData.inventoryMode ?? 'bulk') == 'unique') return;
+    final ids = _formData.inventoryDimensionAttributeIds.toList()..sort();
+    final original = _originalDimensionIds.toList()..sort();
+    if (ids.isEmpty && original.isEmpty) return;
+    if (ids.length == original.length &&
+        ids.asMap().entries.every((e) => e.value == original[e.key])) {
+      return;
+    }
+    final svc = ProductVariantService(apiClient: _apiClient);
+    await svc.replaceDimensions(
+      businessId: businessId,
+      productId: productId,
+      dimensions: [
+        for (var i = 0; i < ids.length; i++)
+          {
+            'attribute_id': ids[i],
+            'is_required': true,
+            'sort_order': i + 1,
+          },
+      ],
+    );
+    _originalDimensionIds = ids.toSet();
   }
 
   // Reset form

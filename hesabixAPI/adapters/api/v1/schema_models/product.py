@@ -547,6 +547,8 @@ class ProductResponse(BaseModel):
     
     # حالت موجودی و ردیابی
     inventory_mode: Optional[str] = None
+    variant_mode: Optional[str] = "none"
+    variant_dimensions: Optional[List[dict]] = None
     track_serial: bool = False
     track_barcode: bool = False
     

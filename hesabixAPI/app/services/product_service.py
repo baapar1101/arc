@@ -401,6 +401,9 @@ def _upsert_attributes(
     """
     if attribute_ids is None:
         return
+    from app.services.product_variant_service import assert_attribute_ids_keep_dimensions
+
+    assert_attribute_ids_keep_dimensions(db, business_id, product_id, attribute_ids)
     db.query(ProductAttributeLink).filter(ProductAttributeLink.product_id == product_id).delete()
     if not attribute_ids:
         if auto_commit:
@@ -846,7 +849,16 @@ def update_product(
     old_inventory_mode = obj.inventory_mode or "bulk"
     new_inventory_mode = payload.inventory_mode if 'inventory_mode' in fields_set else old_inventory_mode
     converting_to_unique = (old_inventory_mode != "unique" and new_inventory_mode == "unique")
-    
+    if converting_to_unique:
+        from app.services.product_variant_service import is_variant_inventory_product, list_dimensions, list_variants
+
+        if is_variant_inventory_product(obj) or list_dimensions(db, business_id, product_id) or list_variants(db, business_id, product_id):
+            raise ApiError(
+                "VARIANT_UNIQUE_NOT_SUPPORTED",
+                "کالای دارای تفکیک موجودی ویژگی را نمی‌توان به حالت یونیک تبدیل کرد",
+                http_status=422,
+            )
+
     # اگر در حال تبدیل به unique هستیم و موجودی داریم، باید instance ها ایجاد شوند
     if converting_to_unique and obj.track_inventory:
         from app.services.warehouse_service import get_warehouse_stock_report
@@ -1421,6 +1433,22 @@ def delete_product(db: Session, product_id: int, business_id: int) -> tuple[bool
         return False, f"خطا در حذف کالا: {str(e)}"
 
 
+def _variant_dimensions_payload(db: Session, obj: Product) -> List[Dict[str, Any]]:
+    try:
+        from app.services.product_variant_service import list_dimensions
+
+        return [
+            {
+                "attribute_id": int(row.attribute_id),
+                "is_required": bool(row.is_required),
+                "sort_order": int(row.sort_order or 0),
+            }
+            for row in list_dimensions(db, int(obj.business_id), int(obj.id))
+        ]
+    except Exception:
+        return []
+
+
 def _get_image_url(obj: Product) -> str | None:
     """تولید URL برای نمایش عکس محصول (فایل اصلی)"""
     if not obj.image_file_id:
@@ -1467,6 +1495,8 @@ def _to_dict(obj: Product, db: Optional[Session] = None) -> Dict[str, Any]:
         "min_order_qty": obj.min_order_qty,
         "lead_time_days": obj.lead_time_days,
         "inventory_mode": obj.inventory_mode or "bulk",
+        "variant_mode": getattr(obj, "variant_mode", None) or "none",
+        "variant_dimensions": _variant_dimensions_payload(db, obj) if db is not None else [],
         "track_serial": obj.track_serial,
         "track_barcode": obj.track_barcode,
         "is_sales_taxable": obj.is_sales_taxable,

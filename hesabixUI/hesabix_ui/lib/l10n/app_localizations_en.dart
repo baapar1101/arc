@@ -23502,4 +23502,83 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsDigipaySubtitle =>
       'UPG credentials, DigiPay receivable person, and delayed settlement';
+
+  @override
+  String get productVariantInventorySplit => 'Split inventory';
+
+  @override
+  String get productVariantInventorySplitHint =>
+      'Stock for this attribute is kept separately in the warehouse. Maximum two attributes.';
+
+  @override
+  String get productVariantCombinations => 'Actual product combinations';
+
+  @override
+  String get productVariantAddCombination => 'Add combination';
+
+  @override
+  String get productVariantCode => 'Combination code';
+
+  @override
+  String get productVariantBarcode => 'Combination barcode';
+
+  @override
+  String get productVariantSalesPrice => 'Combination sales price';
+
+  @override
+  String get productVariantPurchasePrice => 'Combination purchase price';
+
+  @override
+  String get productVariantActive => 'Active';
+
+  @override
+  String get productVariantDeactivate => 'Deactivate';
+
+  @override
+  String get productVariantEnableInventory => 'Enable inventory split';
+
+  @override
+  String get productVariantEnableWizardTitle =>
+      'Allocate current stock to combinations';
+
+  @override
+  String get productVariantEnableWizardHelp =>
+      'Allocated quantities must equal physical warehouse stock. The document date uses the business calendar.';
+
+  @override
+  String get productVariantSplitQuantity => 'Quantity';
+
+  @override
+  String get productVariantSelectCombination => 'Select attribute combination';
+
+  @override
+  String get productVariantAllocations => 'Inventory attribute allocation';
+
+  @override
+  String get productVariantDimensionLimit =>
+      'At most two attributes can split inventory';
+
+  @override
+  String get productVariantSaveThenCombine =>
+      'Save the product first, then create combinations';
+
+  @override
+  String get productVariantNoCombinations => 'No combinations yet';
+
+  @override
+  String get productVariantAllocatedQty => 'Allocated quantity';
+
+  @override
+  String get productVariantPhysicalStock => 'Physical stock';
+
+  @override
+  String get productVariantEnableSuccess => 'Inventory split enabled';
+
+  @override
+  String get productVariantRequired =>
+      'An inventory combination is required for this product';
+
+  @override
+  String get productVariantAllocationMismatch =>
+      'Allocated quantities must equal the line quantity';
 }

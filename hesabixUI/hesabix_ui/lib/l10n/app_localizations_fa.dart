@@ -23374,4 +23374,82 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get settingsDigipaySubtitle =>
       'اعتبارنامه UPG، شخص طلب دیجی‌پی و تسویه تأخیری';
+
+  @override
+  String get productVariantInventorySplit => 'تفکیک موجودی';
+
+  @override
+  String get productVariantInventorySplitHint =>
+      'موجودی این ویژگی جداگانه در انبار نگه داشته می‌شود. حداکثر دو ویژگی.';
+
+  @override
+  String get productVariantCombinations => 'ترکیب‌های واقعی کالا';
+
+  @override
+  String get productVariantAddCombination => 'افزودن ترکیب';
+
+  @override
+  String get productVariantCode => 'کد ترکیب';
+
+  @override
+  String get productVariantBarcode => 'بارکد ترکیب';
+
+  @override
+  String get productVariantSalesPrice => 'قیمت فروش ترکیب';
+
+  @override
+  String get productVariantPurchasePrice => 'قیمت خرید ترکیب';
+
+  @override
+  String get productVariantActive => 'فعال';
+
+  @override
+  String get productVariantDeactivate => 'غیرفعال‌سازی';
+
+  @override
+  String get productVariantEnableInventory => 'فعال‌سازی تفکیک موجودی';
+
+  @override
+  String get productVariantEnableWizardTitle => 'تخصیص موجودی فعلی به ترکیب‌ها';
+
+  @override
+  String get productVariantEnableWizardHelp =>
+      'جمع مقدار ترکیب‌ها باید با مانده فیزیکی انبار برابر باشد. تاریخ سند با تقویم کسب‌وکار انتخاب می‌شود.';
+
+  @override
+  String get productVariantSplitQuantity => 'مقدار';
+
+  @override
+  String get productVariantSelectCombination => 'انتخاب ترکیب ویژگی';
+
+  @override
+  String get productVariantAllocations => 'تخصیص ویژگی انباری';
+
+  @override
+  String get productVariantDimensionLimit =>
+      'حداکثر دو ویژگی می‌تواند موجودی را تفکیک کند';
+
+  @override
+  String get productVariantSaveThenCombine =>
+      'پس از ذخیره کالا می‌توانید ترکیب‌ها را بسازید';
+
+  @override
+  String get productVariantNoCombinations => 'هنوز ترکیبی ساخته نشده است';
+
+  @override
+  String get productVariantAllocatedQty => 'مقدار تخصیص‌یافته';
+
+  @override
+  String get productVariantPhysicalStock => 'مانده فیزیکی';
+
+  @override
+  String get productVariantEnableSuccess => 'تفکیک موجودی فعال شد';
+
+  @override
+  String get productVariantRequired =>
+      'برای این کالا انتخاب ترکیب انباری الزامی است';
+
+  @override
+  String get productVariantAllocationMismatch =>
+      'جمع تخصیص‌ها باید با تعداد ردیف برابر باشد';
 }

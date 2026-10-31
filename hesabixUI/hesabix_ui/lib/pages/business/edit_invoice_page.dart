@@ -1648,10 +1648,12 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       extraInfoMap['selected_instance_ids'] = e.selectedInstanceIds;
     }
 
+    final allocations = extraInfoMap['allocations'];
     return <String, dynamic>{
       'product_id': e.productId,
       'quantity': e.quantity,
       if ((e.description ?? '').isNotEmpty) 'description': e.description,
+      if (allocations is List && allocations.isNotEmpty) 'allocations': allocations,
       'extra_info': extraInfoMap,
     };
   }

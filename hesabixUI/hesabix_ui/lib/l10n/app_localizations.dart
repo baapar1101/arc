@@ -43014,6 +43014,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'UPG credentials, DigiPay receivable person, and delayed settlement'**
   String get settingsDigipaySubtitle;
+
+  /// No description provided for @productVariantInventorySplit.
+  ///
+  /// In en, this message translates to:
+  /// **'Split inventory'**
+  String get productVariantInventorySplit;
+
+  /// No description provided for @productVariantInventorySplitHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock for this attribute is kept separately in the warehouse. Maximum two attributes.'**
+  String get productVariantInventorySplitHint;
+
+  /// No description provided for @productVariantCombinations.
+  ///
+  /// In en, this message translates to:
+  /// **'Actual product combinations'**
+  String get productVariantCombinations;
+
+  /// No description provided for @productVariantAddCombination.
+  ///
+  /// In en, this message translates to:
+  /// **'Add combination'**
+  String get productVariantAddCombination;
+
+  /// No description provided for @productVariantCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Combination code'**
+  String get productVariantCode;
+
+  /// No description provided for @productVariantBarcode.
+  ///
+  /// In en, this message translates to:
+  /// **'Combination barcode'**
+  String get productVariantBarcode;
+
+  /// No description provided for @productVariantSalesPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Combination sales price'**
+  String get productVariantSalesPrice;
+
+  /// No description provided for @productVariantPurchasePrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Combination purchase price'**
+  String get productVariantPurchasePrice;
+
+  /// No description provided for @productVariantActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get productVariantActive;
+
+  /// No description provided for @productVariantDeactivate.
+  ///
+  /// In en, this message translates to:
+  /// **'Deactivate'**
+  String get productVariantDeactivate;
+
+  /// No description provided for @productVariantEnableInventory.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable inventory split'**
+  String get productVariantEnableInventory;
+
+  /// No description provided for @productVariantEnableWizardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Allocate current stock to combinations'**
+  String get productVariantEnableWizardTitle;
+
+  /// No description provided for @productVariantEnableWizardHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Allocated quantities must equal physical warehouse stock. The document date uses the business calendar.'**
+  String get productVariantEnableWizardHelp;
+
+  /// No description provided for @productVariantSplitQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity'**
+  String get productVariantSplitQuantity;
+
+  /// No description provided for @productVariantSelectCombination.
+  ///
+  /// In en, this message translates to:
+  /// **'Select attribute combination'**
+  String get productVariantSelectCombination;
+
+  /// No description provided for @productVariantAllocations.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory attribute allocation'**
+  String get productVariantAllocations;
+
+  /// No description provided for @productVariantDimensionLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'At most two attributes can split inventory'**
+  String get productVariantDimensionLimit;
+
+  /// No description provided for @productVariantSaveThenCombine.
+  ///
+  /// In en, this message translates to:
+  /// **'Save the product first, then create combinations'**
+  String get productVariantSaveThenCombine;
+
+  /// No description provided for @productVariantNoCombinations.
+  ///
+  /// In en, this message translates to:
+  /// **'No combinations yet'**
+  String get productVariantNoCombinations;
+
+  /// No description provided for @productVariantAllocatedQty.
+  ///
+  /// In en, this message translates to:
+  /// **'Allocated quantity'**
+  String get productVariantAllocatedQty;
+
+  /// No description provided for @productVariantPhysicalStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Physical stock'**
+  String get productVariantPhysicalStock;
+
+  /// No description provided for @productVariantEnableSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory split enabled'**
+  String get productVariantEnableSuccess;
+
+  /// No description provided for @productVariantRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'An inventory combination is required for this product'**
+  String get productVariantRequired;
+
+  /// No description provided for @productVariantAllocationMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Allocated quantities must equal the line quantity'**
+  String get productVariantAllocationMismatch;
 }
 
 class _AppLocalizationsDelegate

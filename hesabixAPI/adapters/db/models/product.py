@@ -110,6 +110,14 @@ class Product(Base):
     
     # حالت موجودی (فله‌ای/یونیک)
     inventory_mode: Mapped[str | None] = mapped_column(String(16), nullable=True, default="bulk", comment="حالت موجودی: bulk (فله‌ای) یا unique (یونیک)")
+    # تفکیک موجودی با ویژگی select؛ مستقل از inventory_mode. پیش‌فرض none رفتار فعلی را حفظ می‌کند.
+    variant_mode: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default="none",
+        server_default="none",
+        comment="none یا inventory؛ MVP فقط bulk+inventory",
+    )
     track_serial: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, comment="ردیابی سریال نامبر برای کالاهای یونیک")
     track_barcode: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, comment="ردیابی بارکد برای کالاهای یونیک")
 

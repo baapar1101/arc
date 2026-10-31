@@ -853,6 +853,7 @@ def get_products_metadata_endpoint(
         Product.default_warehouse_id,
         Product.track_inventory,
         Product.inventory_mode,
+        Product.variant_mode,
         Product.general_barcodes,
     ).filter(
         Product.business_id == business_id,
@@ -887,6 +888,7 @@ def get_products_metadata_endpoint(
             "default_warehouse_id": product.default_warehouse_id,
             "track_inventory": product.track_inventory,
             "inventory_mode": product.inventory_mode or "bulk",
+            "variant_mode": getattr(product, "variant_mode", None) or "none",
             "general_barcodes": product.general_barcodes,
             "attribute_ids": attribute_ids_by_product.get(int(product.id), []),
         }

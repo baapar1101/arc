@@ -2184,6 +2184,31 @@ def publish_products_to_basalam(
         if not local_product:
             results.append({"status": "local_product_not_found", "input": item})
             continue
+        from app.services.product_variant_service import is_variant_inventory_product
+
+        if is_variant_inventory_product(local_product):
+            processed += 1
+            conflict_queue.append(
+                {
+                    "conflict_id": _new_conflict_id("variant"),
+                    "type": "variant_conflict",
+                    "direction": "push",
+                    "reason": "local_has_inventory_variants",
+                    "local_product_id": int(local_product.id),
+                    "local_product_name": local_product.name,
+                    "local_product_code": local_product.code,
+                    "payload": item,
+                    "created_at": datetime.utcnow().isoformat(),
+                }
+            )
+            results.append(
+                {
+                    "status": "manual_review_required",
+                    "local_product_id": int(local_product.id),
+                    "reason": "inventory_variant_not_supported",
+                }
+            )
+            continue
         if (item.get("variants") or (local_product.inventory_mode or "bulk") == "unique") and variant_strategy == "manual_review":
             processed += 1
             conflict_queue.append(

@@ -40,6 +40,44 @@ from app.services.invoice_unit_conversion_service import (
 	warehouse_payload_quantity_to_main,
 )
 
+def _attach_variant_allocations_for_warehouse_line(
+	db: Session,
+	business_id: int,
+	document: WarehouseDocument,
+	wline: WarehouseDocumentLine,
+	product: Product,
+	payload: Dict[str, Any],
+) -> None:
+	from adapters.db.models.invoice_item_line import InvoiceItemLine
+	from app.services.variant_allocation_service import (
+		attach_warehouse_line_from_payload,
+		copy_invoice_allocations_to_warehouse_line,
+	)
+
+	extra = extra_info_dict(wline.extra_info)
+	invoice_line_id = payload.get("invoice_item_line_id") or extra.get("invoice_item_line_id")
+	if invoice_line_id:
+		try:
+			invoice_line = db.get(InvoiceItemLine, int(invoice_line_id))
+		except (TypeError, ValueError):
+			invoice_line = None
+		if invoice_line is not None:
+			copy_invoice_allocations_to_warehouse_line(
+				db, int(business_id), wline, product, invoice_line
+			)
+			return
+	source_unit = payload_line_unit(payload, extra_info_dict(payload.get("extra_info")))
+	attach_warehouse_line_from_payload(
+		db,
+		int(business_id),
+		wline,
+		product,
+		payload,
+		document=document,
+		source_line_unit=source_unit,
+	)
+
+
 _INVOICE_TYPE_LABELS_FA = {
 	"invoice_sales": "فاکتور فروش",
 	"invoice_sales_return": "برگشت از فروش",
@@ -1506,6 +1544,8 @@ def create_from_invoice(
 			instance_ids=line_instance_ids,
 		)
 		db.add(wline)
+		db.flush()
+		_attach_variant_allocations_for_warehouse_line(db, business_id, wh, wline, product, ln)
 		lines_added += 1
 
 	if lines_added == 0:
@@ -2099,8 +2139,24 @@ def create_manual_warehouse_document(
 				instance_ids=line_instance_ids,
 			)
 			db.add(wline)
+			db.flush()
+			_attach_variant_allocations_for_warehouse_line(db, business_id, wh, wline, product, ln)
 	
 	db.flush()
+	if wh.doc_type == "transfer":
+		from app.services.variant_allocation_service import assert_transfer_allocations_match
+
+		posted_lines = (
+			db.query(WarehouseDocumentLine)
+			.filter(WarehouseDocumentLine.warehouse_document_id == int(wh.id))
+			.all()
+		)
+		outs = [ln for ln in posted_lines if ln.movement == "out"]
+		ins = [ln for ln in posted_lines if ln.movement == "in"]
+		for out_line in outs:
+			in_line = next((x for x in ins if int(x.product_id) == int(out_line.product_id)), None)
+			if in_line is not None:
+				assert_transfer_allocations_match(db, out_line, in_line)
 	
 	# Invalidate cache بعد از ایجاد موفق سند انبار
 	invalidate_warehouse_docs_cache(
@@ -2975,6 +3031,8 @@ def update_warehouse_document(
 						instance_ids=final_instance_ids if final_instance_ids else None,
 					)
 					db.add(wline)
+					db.flush()
+					_attach_variant_allocations_for_warehouse_line(db, business_id, wh, wline, product, ln)
 					lines_added += 1
 
 				if lines_added == 0:
@@ -3201,10 +3259,13 @@ def post_warehouse_document(
 			
 			# وضعیت کنترل موجودی همه کالاهای سند بالاتر به‌صورت bulk خوانده شده است.
 			if int(ln.product_id) in tracked_product_ids:
+				from app.services.variant_allocation_service import allocations_as_payload, list_warehouse_line_allocations
+
 				line_extra = extra_info_dict(ln.extra_info)
 				outgoing_lines.append({
 					"product_id": ln.product_id,
 					"quantity": float(ln.quantity),
+					"allocations": allocations_as_payload(list_warehouse_line_allocations(db, int(ln.id))),
 					"extra_info": {
 						"warehouse_id": ln.warehouse_id,
 						"movement": "out",
@@ -3368,6 +3429,9 @@ def post_warehouse_document(
 	
 	# تغییر وضعیت به posted
 	wh.status = "posted"
+	from app.services.variant_inventory_service import rebuild_balances_for_warehouse_document
+
+	rebuild_balances_for_warehouse_document(db, wh)
 	wh.touch()
 	db.flush()
 	if exclude_production_order_id is not None:
@@ -4270,6 +4334,10 @@ def cancel_warehouse_document(
 			},
 		)
 		db.add(cancel_line)
+		db.flush()
+		from app.services.variant_allocation_service import copy_warehouse_allocations_to_reverse_line
+
+		copy_warehouse_allocations_to_reverse_line(db, business_id, ln, cancel_line)
 	
 	try:
 		from app.services.purchase_accounting_service import reverse_purchase_grni_clearance_for_warehouse
@@ -4312,6 +4380,10 @@ def cancel_warehouse_document(
 		)
 	
 	db.flush()
+	from app.services.variant_inventory_service import rebuild_balances_for_warehouse_document
+
+	rebuild_balances_for_warehouse_document(db, wh)
+	rebuild_balances_for_warehouse_document(db, cancel_wh)
 	
 	# Invalidate cache بعد از تغییر status به cancelled و ایجاد حواله معکوس
 	invalidate_warehouse_docs_cache(

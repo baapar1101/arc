@@ -60,6 +60,8 @@ class ProductFormData {
   
   // Attributes
   Set<int> selectedAttributeIds;
+  /// ویژگی‌های select که موجودی را تفکیک می‌کنند؛ به payload کالا ارسال نمی‌شود.
+  Set<int> inventoryDimensionAttributeIds;
   
   // Image
   String? imageFileId;
@@ -118,6 +120,7 @@ class ProductFormData {
     this.taxCode,
     this.taxUnitId,
     Set<int>? selectedAttributeIds,
+    Set<int>? inventoryDimensionAttributeIds,
     this.imageFileId,
     this.imageUrl,
     this.defaultWarehouseId,
@@ -132,6 +135,7 @@ class ProductFormData {
     List<String>? catalogGalleryFileIds,
     List<ProductSupplierItem>? suppliers,
   })  : selectedAttributeIds = selectedAttributeIds ?? <int>{},
+        inventoryDimensionAttributeIds = inventoryDimensionAttributeIds ?? <int>{},
         catalogSpecifications = catalogSpecifications ?? <CatalogSpecificationItem>[],
         catalogGalleryFileIds = catalogGalleryFileIds ?? <String>[],
         suppliers = suppliers ?? <ProductSupplierItem>[];
@@ -170,6 +174,7 @@ class ProductFormData {
     Object? taxCode = _kProductFormFieldUnset,
     Object? taxUnitId = _kProductFormFieldUnset,
     Object? selectedAttributeIds = _kProductFormFieldUnset,
+    Object? inventoryDimensionAttributeIds = _kProductFormFieldUnset,
     Object? imageFileId = _kProductFormFieldUnset,
     Object? imageUrl = _kProductFormFieldUnset,
     Object? defaultWarehouseId = _kProductFormFieldUnset,
@@ -220,6 +225,9 @@ class ProductFormData {
       selectedAttributeIds: identical(selectedAttributeIds, _kProductFormFieldUnset)
           ? this.selectedAttributeIds
           : Set<int>.from((selectedAttributeIds as Set<int>?) ?? const <int>{}),
+      inventoryDimensionAttributeIds: identical(inventoryDimensionAttributeIds, _kProductFormFieldUnset)
+          ? this.inventoryDimensionAttributeIds
+          : Set<int>.from((inventoryDimensionAttributeIds as Set<int>?) ?? const <int>{}),
       imageFileId: _nullableCopyField<String>(imageFileId, this.imageFileId),
       imageUrl: _nullableCopyField<String>(imageUrl, this.imageUrl),
       defaultWarehouseId: _nullableCopyField<int>(defaultWarehouseId, this.defaultWarehouseId),
@@ -371,6 +379,7 @@ class ProductFormData {
       taxCode: product['tax_code']?.toString(),
       taxUnitId: _parseInt(product['tax_unit_id']),
       selectedAttributeIds: _parseAttributeIds(product['attribute_ids']),
+      inventoryDimensionAttributeIds: _parseDimensionAttributeIds(product['variant_dimensions']),
       imageFileId: product['image_file_id']?.toString(),
       imageUrl: product['image_url']?.toString(),
       defaultWarehouseId: _parseInt(product['default_warehouse_id']),
@@ -402,9 +411,24 @@ class ProductFormData {
 
   static Set<int> _parseAttributeIds(dynamic value) {
     if (value is List) {
-      return value.whereType<int>().toSet();
+      return value
+          .map((e) => e is int ? e : (e is num ? e.toInt() : int.tryParse(e.toString())))
+          .whereType<int>()
+          .toSet();
     }
     return <int>{};
+  }
+
+  static Set<int> _parseDimensionAttributeIds(dynamic value) {
+    if (value is! List) return <int>{};
+    final ids = <int>{};
+    for (final item in value) {
+      if (item is Map) {
+        final id = _parseInt(item['attribute_id']);
+        if (id != null) ids.add(id);
+      }
+    }
+    return ids;
   }
 
   static List<CatalogSpecificationItem> _parseCatalogSpecifications(dynamic value) {

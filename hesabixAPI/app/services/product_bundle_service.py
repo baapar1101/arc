@@ -65,6 +65,17 @@ def _validate_items(
             http_status=400,
         )
 
+    from app.services.product_variant_service import is_variant_inventory_product
+
+    variant_products = [product.name for product in products if is_variant_inventory_product(product)]
+    if variant_products:
+        raise ApiError(
+            "VARIANT_NOT_SUPPORTED_HERE",
+            "باندل نمی‌تواند شامل کالای با تفکیک موجودی ویژگی باشد.",
+            http_status=422,
+            details={"products": variant_products},
+        )
+
     services = [
         product.name
         for product in products

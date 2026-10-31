@@ -600,6 +600,20 @@ def post_control_sync_product(
 	product_id: int,
 	variation_id: Optional[int] = None,
 ) -> Dict[str, Any]:
+	from adapters.db.models.product import Product
+	from app.services.product_variant_service import is_variant_inventory_product
+
+	local = (
+		db.query(Product)
+		.filter(Product.id == int(product_id), Product.business_id == int(business_id))
+		.first()
+	)
+	if is_variant_inventory_product(local):
+		raise ApiError(
+			"VARIANT_NOT_SUPPORTED_HERE",
+			"همگام‌سازی ووکامرس Legacy برای کالای با تفکیک موجودی ویژگی پشتیبانی نمی‌شود",
+			http_status=422,
+		)
 	body: Dict[str, Any] = {"product_id": int(product_id)}
 	if variation_id is not None and int(variation_id) > 0:
 		body["variation_id"] = int(variation_id)

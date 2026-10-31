@@ -230,6 +230,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
         attributes: _controller.attributes,
         controller: _controller,
         authStore: widget.authStore,
+        productId: widget.product?['id'] as int?,
       ),
     );
   }

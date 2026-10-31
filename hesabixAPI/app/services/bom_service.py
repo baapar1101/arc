@@ -27,6 +27,14 @@ def _validate_product_belongs_to_business(db: Session, product_id: int, business
     product = db.get(Product, product_id)
     if not product or product.business_id != business_id:
         raise ApiError("INVALID_PRODUCT", f"{field_name} انتخابی معتبر نیست یا به کسب‌وکار دیگری تعلق دارد", http_status=400)
+    from app.services.product_variant_service import is_variant_inventory_product
+
+    if is_variant_inventory_product(product):
+        raise ApiError(
+            "VARIANT_NOT_SUPPORTED_HERE",
+            f"{field_name} با تفکیک موجودی ویژگی در فرمول تولید پشتیبانی نمی‌شود",
+            http_status=422,
+        )
     return product
 
 

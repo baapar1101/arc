@@ -15,6 +15,7 @@ import '../../utils/number_formatters.dart' show formatWithThousands;
 import '../../utils/attribute_formatter.dart';
 import 'product_instance_form_dialog.dart';
 import 'unique_product_selector_dialog.dart';
+import '../invoice/invoice_line_variant_picker_dialog.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/error_extractor.dart';
 import '../../constants/frequent_description_scope.dart';
@@ -432,6 +433,7 @@ class _WarehouseDocumentFormDialogState
       if (_docType == 'transfer') {
         final splitLine = line['movement'] != null &&
             (line['movement'] as String).isNotEmpty;
+        final allocations = extra['allocations'] ?? line['allocations'];
         final row = <String, dynamic>{
           'product_id': line['product_id'],
           'warehouse_id_from': warehouseResolved['warehouse_id_from'],
@@ -439,6 +441,7 @@ class _WarehouseDocumentFormDialogState
           'quantity': line['quantity'],
           'instance_data': instanceData,
           'instance_ids': instanceIds,
+          if (allocations is List && allocations.isNotEmpty) 'allocations': allocations,
           'extra_info': extra,
         };
         if (!splitLine) {
@@ -451,6 +454,7 @@ class _WarehouseDocumentFormDialogState
         return row;
       }
 
+      final allocations = extra['allocations'] ?? line['allocations'];
       return {
         'product_id': line['product_id'],
         if (_invoiceItemLineId(line) != null)
@@ -462,6 +466,7 @@ class _WarehouseDocumentFormDialogState
         'instance_data':
             instanceData, // برای حواله ورود (receipt/production_in)
         'instance_ids': instanceIds, // برای حواله خروج (issue/production_out)
+        if (allocations is List && allocations.isNotEmpty) 'allocations': allocations,
         'extra_info': extra,
       };
     }).toList();
@@ -1609,6 +1614,8 @@ class _WarehouseDocumentFormDialogState
         _registerUniqueProductInstances(index);
       } else if (value == 'unique_out') {
         _selectUniqueProductInstances(index);
+      } else if (value == 'variant_alloc') {
+        _selectVariantAllocations(index);
       } else if (value == 'auto_line') {
         _autoCompleteLine(index);
       } else if (value == 'delete') {
@@ -1637,6 +1644,13 @@ class _WarehouseDocumentFormDialogState
           tooltip: _docType == 'transfer'
               ? 'انتخاب کالاهای یونیک از انبار مبدا'
               : 'انتخاب کالاهای یونیک',
+          color: Theme.of(context).colorScheme.primary,
+        ),
+      if (line['product_id'] != null && _isProductInventoryVariant(line['product_id'] as int))
+        IconButton(
+          icon: const Icon(Icons.tune, size: 20),
+          onPressed: () => _selectVariantAllocations(index),
+          tooltip: AppLocalizations.of(context).productVariantSelectCombination,
           color: Theme.of(context).colorScheme.primary,
         ),
       if (_isFromInvoice && line['product_id'] != null)
@@ -1694,6 +1708,18 @@ class _WarehouseDocumentFormDialogState
                   ? 'انتخاب یونیک از مبدا'
                   : 'انتخاب کالاهای یونیک',
             ),
+          ),
+        ),
+      );
+    }
+    if (line['product_id'] != null && _isProductInventoryVariant(line['product_id'] as int)) {
+      entries.add(
+        PopupMenuItem(
+          value: 'variant_alloc',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.tune),
+            title: Text(AppLocalizations.of(context).productVariantSelectCombination),
           ),
         ),
       );
@@ -1837,6 +1863,39 @@ class _WarehouseDocumentFormDialogState
     final product = _productCache[productId];
     if (product == null) return false;
     return product['inventory_mode'] == 'unique';
+  }
+
+  bool _isProductInventoryVariant(int productId) {
+    final product = _productCache[productId];
+    if (product == null) return false;
+    return (product['variant_mode']?.toString() ?? 'none') == 'inventory';
+  }
+
+  Future<void> _selectVariantAllocations(int lineIndex) async {
+    final line = _lines[lineIndex];
+    final productId = line['product_id'] as int?;
+    if (productId == null) return;
+    await _loadProductInfo(productId);
+    if (!_isProductInventoryVariant(productId)) return;
+    final product = _productCache[productId]!;
+    final extra = Map<String, dynamic>.from(line['extra_info'] ?? const {});
+    final warehouseId = _docType == 'transfer'
+        ? (line['warehouse_id_from'] as int? ?? _warehouseIdFrom)
+        : (_warehouseIdFrom ?? line['warehouse_id'] as int?);
+    final result = await showDialog<List<Map<String, dynamic>>>(
+      context: context,
+      builder: (context) => InvoiceLineVariantPickerDialog(
+        businessId: widget.businessId,
+        productId: productId,
+        productName: product['name']?.toString() ?? '',
+        lineQuantity: (line['quantity'] as num?) ?? 0,
+        warehouseId: warehouseId,
+        initialAllocations: allocationsFromExtra(extra),
+      ),
+    );
+    if (result == null || !mounted) return;
+    extra['allocations'] = result;
+    _updateLine(lineIndex, {'extra_info': extra, 'allocations': result});
   }
 
   Future<void> _registerUniqueProductInstances(int lineIndex) async {

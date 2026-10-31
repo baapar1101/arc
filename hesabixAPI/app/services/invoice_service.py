@@ -1632,6 +1632,8 @@ def collect_stock_shortages(
                 Product.main_unit,
                 Product.secondary_unit,
                 Product.unit_conversion_factor,
+                Product.inventory_mode,
+                Product.variant_mode,
             )
             .filter(Product.business_id == business_id, Product.id.in_(pids))
             .all()
@@ -1647,11 +1649,17 @@ def collect_stock_shortages(
         ):
             warehouse_labels[int(row.id)] = str(row.name or "")
 
-    required: Dict[Tuple[int, Optional[int]], Decimal] = {}
-    for pid, wh_id, qty, info in pending_required:
-        qty_main = inventory_quantity_to_main(qty, product_units.get(pid), info, strict=False)
-        key = (pid, wh_id)
-        required[key] = required.get(key, Decimal(0)) + qty_main
+    from app.services.variant_inventory_service import (
+        acquire_variant_stock_locks,
+        compute_available_variant_stock,
+        expand_outgoing_shortage_requirements,
+    )
+
+    required_variant, lock_keys = expand_outgoing_shortage_requirements(
+        db, business_id, outgoing_lines, product_units
+    )
+    if lock_keys:
+        acquire_variant_stock_locks(db, business_id, lock_keys)
 
     shortages: List[Dict[str, Any]] = []
     mode_map: Dict[int, str] = {}
@@ -1664,17 +1672,30 @@ def collect_stock_shortages(
         }
 
     # همهٔ کسری‌ها یک‌جا برگردانده می‌شوند تا کاربر مجبور به چند بار ذخیره نباشد.
-    for (pid, wh_id), req in required.items():
-        avail = _compute_available_stock(
-            db,
-            business_id,
-            pid,
-            wh_id,
-            document_date,
-            exclude_document_id,
-            exclude_invoice_source_document_id=exclude_invoice_source_document_id,
-            exclude_warehouse_document_ids=exclude_warehouse_document_ids,
-        )
+    for (pid, wh_id, variant_id), req in required_variant.items():
+        if variant_id is not None:
+            avail = compute_available_variant_stock(
+                db,
+                business_id,
+                pid,
+                wh_id,
+                int(variant_id),
+                document_date,
+                exclude_document_id,
+                exclude_invoice_source_document_id=exclude_invoice_source_document_id,
+                exclude_warehouse_document_ids=exclude_warehouse_document_ids,
+            )
+        else:
+            avail = _compute_available_stock(
+                db,
+                business_id,
+                pid,
+                wh_id,
+                document_date,
+                exclude_document_id,
+                exclude_invoice_source_document_id=exclude_invoice_source_document_id,
+                exclude_warehouse_document_ids=exclude_warehouse_document_ids,
+            )
         # Production reservations affect only explicitly production-linked stock
         # checks. Keeping this opt-in preserves the established behavior of
         # sales, purchases, returns, waste, and direct-consumption invoices.
@@ -1697,6 +1718,7 @@ def collect_stock_shortages(
             shortages.append(
                 {
                     "product_id": pid,
+                    "variant_id": int(variant_id) if variant_id is not None else None,
                     "product_name": pname or "کالا",
                     "product_code": pcode or None,
                     "warehouse_id": wh_id,
@@ -1708,6 +1730,30 @@ def collect_stock_shortages(
                 }
             )
     return shortages
+
+
+def _persist_invoice_variant_allocations(
+    db: Session,
+    business_id: int,
+    created_lines: List[tuple[InvoiceItemLine, Dict[str, Any]]],
+) -> None:
+    if not created_lines:
+        return
+    from app.services.variant_allocation_service import persist_invoice_allocations
+
+    pids = {int(item.product_id) for item, _payload in created_lines if item.product_id}
+    products = {
+        int(row.id): row
+        for row in db.query(Product).filter(
+            Product.business_id == int(business_id),
+            Product.id.in_(list(pids)),
+        ).all()
+    } if pids else {}
+    for item, payload in created_lines:
+        product = products.get(int(item.product_id))
+        if not product:
+            continue
+        persist_invoice_allocations(db, int(business_id), item, product, payload)
 
 
 def _acquire_inventory_stock_locks(
@@ -1770,8 +1816,9 @@ def _ensure_stock_sufficient(
     wh_id = first.get("warehouse_id")
     wh_disp = f"«{wh_name}»" if wh_name else (f"انبار (شناسه {wh_id})" if wh_id else "—")
     suffix = f" و {len(shortages) - 1} کالای دیگر" if len(shortages) > 1 else ""
+    err_code = "VARIANT_INSUFFICIENT_STOCK" if first.get("variant_id") else "INSUFFICIENT_STOCK"
     raise ApiError(
-        "INSUFFICIENT_STOCK",
+        err_code,
         f"موجودی کافی برای کالا {p_disp}{suffix} در انبار {wh_disp} موجود نیست.",
         http_status=409,
         details={"shortages": shortages},
@@ -1863,10 +1910,13 @@ def _validate_outgoing_stock_before_invoice_commit(
             wh_id = int(wh_raw)
         except (TypeError, ValueError):
             raise ApiError("WAREHOUSE_REQUIRED", "شناسه انبار نامعتبر است", http_status=400)
+        from app.services.variant_allocation_service import parse_payload_allocations
+
         outgoing_lines.append(
             {
                 "product_id": int(pid),
                 "quantity": float(qty),
+                "allocations": parse_payload_allocations(ln),
                 "extra_info": {
                     "warehouse_id": wh_id,
                     "movement": "out",
@@ -2774,6 +2824,20 @@ def _validate_production_invoice_lines(
             has_out = True
         elif movement == "in":
             has_in = True
+
+        pid = line.get("product_id")
+        if pid:
+            product = db.query(Product).filter(
+                Product.id == int(pid), Product.business_id == int(business_id)
+            ).first()
+            from app.services.product_variant_service import is_variant_inventory_product
+
+            if is_variant_inventory_product(product):
+                raise ApiError(
+                    "VARIANT_NOT_SUPPORTED_HERE",
+                    "کالای با تفکیک موجودی ویژگی در فاکتور تولید این نسخه پشتیبانی نمی‌شود",
+                    http_status=422,
+                )
 
     if not has_out:
         raise ApiError(
@@ -6686,6 +6750,7 @@ def create_invoice(
     )
 
     # ذخیره اقلام فاکتور در جدول مجزا (invoice_item_lines)
+    created_invoice_lines: List[tuple[InvoiceItemLine, Dict[str, Any]]] = []
     for line in lines_input:
         product_id = line.get("product_id")
         qty = Decimal(str(line.get("quantity", 0) or 0))
@@ -6706,14 +6771,17 @@ def create_invoice(
 
         _validate_invoice_line_custom_attributes(db, business_id, line)
 
-        db.add(InvoiceItemLine(
+        item_line = InvoiceItemLine(
             document_id=document.id,
             product_id=int(product_id),
             quantity=qty,
             description=line.get("description"),
             extra_info=extra_info,
-        ))
+        )
+        db.add(item_line)
+        created_invoice_lines.append((item_line, line))
     db.flush()
+    _persist_invoice_variant_allocations(db, business_id, created_invoice_lines)
 
     # Accounting lines for finalized invoices (COGS/Inventory در invoice_cogs_gl_service ثبت می‌شود)
     if not document.is_proforma:
@@ -7830,6 +7898,7 @@ def update_invoice(
     header_for_costing = data if data else {"extra_info": document.extra_info}
     post_inventory_update: bool = _is_inventory_posting_enabled(header_for_costing)
 
+    created_invoice_lines: List[tuple[InvoiceItemLine, Dict[str, Any]]] = []
     for line in lines_input:
         product_id = line.get("product_id")
         qty = Decimal(str(line.get("quantity", 0) or 0))
@@ -7846,14 +7915,17 @@ def update_invoice(
 
         _validate_invoice_line_custom_attributes(db, document.business_id, line)
 
-        db.add(InvoiceItemLine(
+        item_line = InvoiceItemLine(
             document_id=document.id,
             product_id=int(product_id),
             quantity=qty,
             description=line.get("description"),
             extra_info=extra_info,
-        ))
+        )
+        db.add(item_line)
+        created_invoice_lines.append((item_line, line))
     db.flush()
+    _persist_invoice_variant_allocations(db, int(document.business_id), created_invoice_lines)
 
     # Accounting lines if finalized
     if not document.is_proforma:

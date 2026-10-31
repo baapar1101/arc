@@ -16,6 +16,7 @@ import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../utils/responsive_helper.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
+import '../product_variant_inventory_section.dart';
 
 
 class ProductBasicInfoSection extends StatefulWidget {
@@ -26,6 +27,7 @@ class ProductBasicInfoSection extends StatefulWidget {
   final List<Map<String, dynamic>> attributes;
   final ProductFormController? controller;
   final AuthStore? authStore;
+  final int? productId;
   
   const ProductBasicInfoSection({
     super.key,
@@ -36,6 +38,7 @@ class ProductBasicInfoSection extends StatefulWidget {
     required this.attributes,
     this.controller,
     this.authStore,
+    this.productId,
   });
 
   @override
@@ -304,15 +307,28 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
                 selected: selected,
                 onSelected: (value) {
                   final newIds = Set<int>.from(widget.formData.selectedAttributeIds);
+                  final dimIds = Set<int>.from(widget.formData.inventoryDimensionAttributeIds);
                   if (value) {
                     newIds.add(id);
                   } else {
                     newIds.remove(id);
+                    dimIds.remove(id);
                   }
-                  _updateFormData(widget.formData.copyWith(selectedAttributeIds: newIds));
+                  _updateFormData(widget.formData.copyWith(
+                    selectedAttributeIds: newIds,
+                    inventoryDimensionAttributeIds: dimIds,
+                  ));
                 },
               );
             }).toList(),
+          ),
+          ProductVariantInventorySection(
+            businessId: widget.businessId,
+            productId: widget.productId,
+            formData: widget.formData,
+            attributes: widget.attributes,
+            onChanged: widget.onChanged,
+            warehouses: widget.controller?.warehouses ?? const [],
           ),
         ],
       ],

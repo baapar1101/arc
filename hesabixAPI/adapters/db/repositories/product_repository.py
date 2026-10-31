@@ -9,6 +9,7 @@ from .base_repo import BaseRepository
 from ..models.product import Product
 from ..models.product_general_barcode_alias import ProductGeneralBarcodeAlias
 from ..models.product_instance import ProductInstance
+from ..models.product_variant import ProductVariant
 from ..models.product_attribute_link import ProductAttributeLink
 from ..models.category import BusinessCategory
 
@@ -42,6 +43,7 @@ class ProductRepository(BaseRepository[Product]):
             if "barcode" in field_set:
                 field_set.add("general_barcodes")
                 field_set.add("unique_instance_codes")
+                field_set.add("variant_barcodes")
             if "serial" in field_set or "serial_number" in field_set:
                 field_set.add("unique_instance_codes")
 
@@ -118,6 +120,33 @@ class ProductRepository(BaseRepository[Product]):
                                 )
                             )
                         )
+                    ors.append(and_(*per_row))
+
+            if "variant_barcodes" in field_set:
+                if len(tokens) == 1:
+                    like_1 = f"%{tokens[0]}%"
+                    ors.append(
+                        exists(
+                            select(1).select_from(ProductVariant).where(
+                                ProductVariant.business_id == business_id,
+                                ProductVariant.product_id == Product.id,
+                                ProductVariant.barcode.isnot(None),
+                                ProductVariant.barcode.ilike(like_1),
+                            )
+                        )
+                    )
+                else:
+                    per_row = [
+                        exists(
+                            select(1).select_from(ProductVariant).where(
+                                ProductVariant.business_id == business_id,
+                                ProductVariant.product_id == Product.id,
+                                ProductVariant.barcode.isnot(None),
+                                ProductVariant.barcode.ilike(f"%{t}%"),
+                            )
+                        )
+                        for t in tokens
+                    ]
                     ors.append(and_(*per_row))
 
             if ors:
@@ -285,6 +314,7 @@ class ProductRepository(BaseRepository[Product]):
                 "min_order_qty": p.min_order_qty,
                 "lead_time_days": p.lead_time_days,
                 "inventory_mode": getattr(p, 'inventory_mode', None) or "bulk",
+                "variant_mode": getattr(p, "variant_mode", None) or "none",
                 "track_serial": p.track_serial,
                 "track_barcode": p.track_barcode,
                 "general_barcodes": getattr(p, "general_barcodes", None),

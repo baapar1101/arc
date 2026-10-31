@@ -15,6 +15,7 @@ import './warehouse_combobox_widget.dart';
 import '../../utils/number_normalizer.dart' show EnglishDigitsFormatter, formatNumberForInput, parseFormattedNumber, parseFormattedDouble, ThousandsSeparatorInputFormatter;
 import '../../core/calendar_controller.dart';
 import './unique_product_instance_selector_dialog.dart';
+import './invoice_line_variant_picker_dialog.dart';
 import './invoice_line_attributes_dialog.dart';
 import '../../services/product_service.dart';
 import '../../services/warehouse_service.dart';
@@ -527,6 +528,45 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     if (product == null) return false;
     
     return product['inventory_mode'] == 'unique';
+  }
+
+  bool _shouldShowVariantPicker(InvoiceLineItem item) {
+    if (item.productId == null) return false;
+    final product = _productCache[item.productId];
+    if (product == null) return false;
+    return (product['variant_mode']?.toString() ?? 'none') == 'inventory';
+  }
+
+  String _variantAllocationsSummary(InvoiceLineItem item) {
+    final t = AppLocalizations.of(context);
+    final allocs = allocationsFromExtra(item.extraInfo);
+    if (allocs.isEmpty) return t.productVariantRequired;
+    return allocs
+        .map((e) => '${e['variant_id']}: ${e['quantity']}')
+        .join('، ');
+  }
+
+  Future<void> _selectVariantAllocations(int index, InvoiceLineItem item) async {
+    if (item.productId == null) return;
+    await _loadProductInfo(item.productId!);
+    if (!mounted) return;
+    if (!_shouldShowVariantPicker(item)) return;
+    final product = _productCache[item.productId!]!;
+    final result = await showDialog<List<Map<String, dynamic>>>(
+      context: context,
+      builder: (context) => InvoiceLineVariantPickerDialog(
+        businessId: widget.businessId,
+        productId: item.productId!,
+        productName: item.productName ?? product['name']?.toString() ?? '',
+        lineQuantity: item.quantity,
+        warehouseId: item.warehouseId,
+        initialAllocations: allocationsFromExtra(item.extraInfo),
+      ),
+    );
+    if (result == null || !mounted) return;
+    final ei = Map<String, dynamic>.from(item.extraInfo ?? {});
+    ei['allocations'] = result;
+    _updateRow(index, item.copyWith(extraInfo: ei));
   }
   
   /// بارگذاری اطلاعات کالا برای بررسی یونیک بودن و ویژگی‌ها
@@ -1872,6 +1912,29 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
               ],
             ),
             // سطر سوم: نمایش instance های انتخاب شده (فقط برای کالاهای یونیک)
+            if (_shouldShowVariantPicker(item)) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.indigo.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.indigo.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.tune, size: 20, color: Colors.indigo),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(_variantAllocationsSummary(item))),
+                    TextButton.icon(
+                      onPressed: () => _selectVariantAllocations(index, item),
+                      icon: const Icon(Icons.arrow_forward, size: 18),
+                      label: Text(AppLocalizations.of(context).productVariantSelectCombination),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             if (_shouldShowInstanceSelector(item)) ...[
               SizedBox(height: 12),
               Container(
@@ -2193,6 +2256,37 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
             ],
           ),
           // سطر سوم: نمایش instance های انتخاب شده (فقط برای کالاهای یونیک)
+          if (_shouldShowVariantPicker(item)) ...[
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(width: 48),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.indigo.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.indigo.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.tune, size: 18, color: Colors.indigo),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(_variantAllocationsSummary(item))),
+                        TextButton.icon(
+                          onPressed: () => _selectVariantAllocations(index, item),
+                          icon: const Icon(Icons.arrow_forward, size: 18),
+                          label: Text(AppLocalizations.of(context).productVariantSelectCombination),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
           if (_shouldShowInstanceSelector(item)) ...[
             SizedBox(height: 8),
             Row(

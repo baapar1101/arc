@@ -1369,3 +1369,66 @@ msgstr "بستن طلب دیجی‌پی"
 
 msgid "DIGIPAY_SETTLEMENT_BANK"
 msgstr "واریز تسویه دیجی‌پی"
+
+msgid "VARIANT_DIMENSIONS_UPDATED"
+msgstr "ویژگی‌های اثرگذار بر موجودی به‌روزرسانی شد"
+
+msgid "VARIANT_CREATED"
+msgstr "ترکیب کالا ایجاد شد"
+
+msgid "VARIANT_UPDATED"
+msgstr "ترکیب کالا به‌روزرسانی شد"
+
+msgid "VARIANT_DEACTIVATED"
+msgstr "ترکیب کالا غیرفعال شد"
+
+msgid "VARIANT_INVENTORY_ENABLED"
+msgstr "تفکیک موجودی ویژگی برای این کالا فعال شد"
+
+msgid "VARIANT_INSUFFICIENT_STOCK"
+msgstr "موجودی ترکیب انتخاب‌شده کافی نیست"
+
+msgid "VARIANT_REQUIRED"
+msgstr "برای این کالا انتخاب ویژگی انباری الزامی است"
+
+msgid "VARIANT_ALLOCATION_MISMATCH"
+msgstr "جمع تخصیص‌ها با مقدار ردیف برابر نیست"
+
+msgid "VARIANT_NOT_ALLOWED"
+msgstr "برای کالای بدون تفکیک موجودی نمی‌توان تخصیص ویژگی ثبت کرد"
+
+msgid "VARIANT_UNIQUE_NOT_SUPPORTED"
+msgstr "تفکیک موجودی ویژگی برای کالای یونیک پشتیبانی نمی‌شود"
+
+msgid "VARIANT_NOT_SUPPORTED_HERE"
+msgstr "کالای با تفکیک موجودی ویژگی در این بخش پشتیبانی نمی‌شود"
+
+msgid "VARIANT_COMBINATION_DUPLICATE"
+msgstr "این ترکیب قبلاً ساخته شده است"
+
+msgid "VARIANT_DIMENSION_LIMIT"
+msgstr "در نسخه اول حداکثر دو ویژگی انباری مجاز است"
+
+msgid "VARIANT_DIMENSION_IN_USE"
+msgstr "پس از گردش Variantدار، حذف یا جایگزینی ابعاد مجاز نیست"
+
+msgid "VARIANT_INACTIVE"
+msgstr "این ترکیب غیرفعال است"
+
+msgid "DUPLICATE_VARIANT_BARCODE"
+msgstr "این بارکد قبلاً برای ترکیب دیگری ثبت شده است"
+
+msgid "GENERAL_BARCODE_CONFLICTS_WITH_VARIANT"
+msgstr "این بارکد برای ترکیب ویژگی کالا ثبت شده است"
+
+msgid "BARCODE_NOT_FOUND"
+msgstr "بارکد یافت نشد"
+
+msgid "TRANSFER_VARIANT_MISMATCH"
+msgstr "تخصیص ویژگی دو سمت حواله انتقال یکسان نیست"
+
+msgid "VARIANT_NEGATIVE_STOCK"
+msgstr "تا اصلاح مانده منفی کالا، تفکیک موجودی ممکن نیست"
+
+msgid "OPTION_LABEL_CONFLICT"
+msgstr "دو گزینه پس از نرمال‌سازی یکسان شدند و ادغام خودکار انجام نمی‌شود"
