@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:dio/dio.dart' as dio;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -261,6 +262,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   final FocusNode _barcodeFocus = FocusNode();
   final FocusNode _keyboardListenerFocus = FocusNode();
   final LayerLink _barcodeFieldLayerLink = LayerLink();
+  final GlobalKey _barcodeFieldKey = GlobalKey();
   final ScrollController _barcodeOverlayScrollController = ScrollController();
   OverlayEntry? _barcodeOverlayEntry;
   List<Map<String, dynamic>> _barcodeSuggestions =
@@ -568,6 +570,10 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     if (_mobileTabController.indexIsChanging) return;
     final index = _mobileTabController.index;
     if (_mobileTabIndex == index && _mobileTabsBuilt.contains(index)) return;
+    if (index != 0) {
+      _barcodeFocus.unfocus();
+      _clearBarcodeSuggestions();
+    }
     setState(() {
       _mobileTabIndex = index;
       _mobileTabsBuilt.add(index);
@@ -3672,12 +3678,8 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         ctx.findAncestorWidgetOfExactType<EditableText>() != null;
   }
 
-  bool get _isDesktopLike =>
-      MediaQuery.sizeOf(context).width >=
-      ResponsiveHelper.shellPersistentNavMinWidth;
-
   void _onBarcodeFocusChanged() {
-    if (!mounted || !_isDesktopLike) return;
+    if (!mounted) return;
     if (_barcodeFocus.hasFocus) {
       final query = _barcodeController.text;
       if (shouldShowProductSearchSuggestions(query)) {
@@ -3693,7 +3695,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   }
 
   void _showBarcodeOverlay() {
-    if (!mounted || !_isDesktopLike) return;
+    if (!mounted) return;
     if (_barcodeOverlayEntry != null) {
       _barcodeOverlayEntry!.markNeedsBuild();
       return;
@@ -3749,13 +3751,46 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   }
 
   Widget _buildBarcodeOverlay(BuildContext overlayContext) {
+    final mediaQuery = MediaQuery.of(overlayContext);
+    final viewportSize = mediaQuery.size;
+    final fieldRenderObject = _barcodeFieldKey.currentContext
+        ?.findRenderObject();
+    final fieldBox = fieldRenderObject is RenderBox && fieldRenderObject.hasSize
+        ? fieldRenderObject
+        : null;
+    final fieldSize = fieldBox?.size;
+    final fieldTopLeft = fieldBox?.localToGlobal(Offset.zero);
+    final fallbackWidth = math.max(0.0, viewportSize.width - 24).toDouble();
+    final overlayWidth = math
+        .min(
+          620.0,
+          fieldSize != null && fieldSize.width > 0
+              ? fieldSize.width
+              : fallbackWidth,
+        )
+        .toDouble();
+    final desiredHeight = _barcodeOverlayHeight();
+    final keyboardTop = viewportSize.height - mediaQuery.viewInsets.bottom;
+    final fieldTop = fieldTopLeft?.dy ?? mediaQuery.padding.top;
+    final fieldBottom = fieldTop + (fieldSize?.height ?? 56);
+    final spaceBelow = math.max(0.0, keyboardTop - fieldBottom - 12).toDouble();
+    final spaceAbove = math
+        .max(0.0, fieldTop - mediaQuery.padding.top - 12)
+        .toDouble();
+    final showAbove =
+        spaceBelow < math.min(140.0, desiredHeight) && spaceAbove > spaceBelow;
+    final availableHeight = showAbove ? spaceAbove : spaceBelow;
+    final overlayHeight = math
+        .min(desiredHeight, math.max(90.0, availableHeight))
+        .toDouble();
+
     return Positioned.fill(
       child: CompositedTransformFollower(
         link: _barcodeFieldLayerLink,
         showWhenUnlinked: false,
-        targetAnchor: Alignment.bottomLeft,
-        followerAnchor: Alignment.topLeft,
-        offset: const Offset(0, 6),
+        targetAnchor: showAbove ? Alignment.topLeft : Alignment.bottomLeft,
+        followerAnchor: showAbove ? Alignment.bottomLeft : Alignment.topLeft,
+        offset: Offset(0, showAbove ? -6 : 6),
         child: Align(
           alignment: Alignment.topLeft,
           child: TextFieldTapRegion(
@@ -3763,13 +3798,10 @@ class _QuickSalesPageState extends State<QuickSalesPage>
               elevation: 10,
               borderRadius: BorderRadius.circular(10),
               clipBehavior: Clip.antiAlias,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 620, minWidth: 300),
-                child: SizedBox(
-                  width: 620,
-                  height: _barcodeOverlayHeight(),
-                  child: _buildBarcodeSuggestionList(overlayContext),
-                ),
+              child: SizedBox(
+                width: overlayWidth,
+                height: overlayHeight,
+                child: _buildBarcodeSuggestionList(overlayContext),
               ),
             ),
           ),
@@ -3865,7 +3897,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   }
 
   void _scheduleBarcodeSuggestionSearch(String rawQuery) {
-    if (!_isDesktopLike) return;
     _searchDebounce?.cancel();
     final query = rawQuery.trim();
     _barcodeSuggestionNavigatedByKeyboard = false;
@@ -3892,7 +3923,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   }
 
   Future<void> _loadBarcodeSuggestions(String query) async {
-    if (!mounted || !_isDesktopLike) return;
+    if (!mounted) return;
     if (query.isEmpty) {
       _clearBarcodeSuggestions();
       return;
@@ -5676,6 +5707,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     );
 
     Widget searchField = CompositedTransformTarget(
+      key: _barcodeFieldKey,
       link: _barcodeFieldLayerLink,
       child: TextField(
         controller: _barcodeController,
@@ -5759,6 +5791,10 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             suggestionCount: _barcodeSuggestions.length,
             hasMoreSuggestions: _barcodeSuggestionsHasMore,
             navigatedByKeyboard: _barcodeSuggestionNavigatedByKeyboard,
+            // Hardware scanners type the whole barcode and press Enter before
+            // the suggestion debounce settles. The current field must win over
+            // any previously loaded/highlighted suggestion in that window.
+            preferDirectSearch: _searchDebounce?.isActive == true,
           );
           switch (action) {
             case QuickSalesProductSearchSubmitAction.selectSuggestion:
@@ -5780,15 +5816,13 @@ class _QuickSalesPageState extends State<QuickSalesPage>
               _lastFailedSearchQuery = null;
             });
           }
-          if (_isDesktopLike) {
-            if (!shouldShowProductSearchSuggestions(value)) {
-              _clearBarcodeSuggestions();
-            } else {
-              if (_barcodeOverlayEntry == null && _barcodeFocus.hasFocus) {
-                _showBarcodeOverlay();
-              }
-              _scheduleBarcodeSuggestionSearch(value);
+          if (!shouldShowProductSearchSuggestions(value)) {
+            _clearBarcodeSuggestions();
+          } else {
+            if (_barcodeOverlayEntry == null && _barcodeFocus.hasFocus) {
+              _showBarcodeOverlay();
             }
+            _scheduleBarcodeSuggestionSearch(value);
           }
         },
         textInputAction: TextInputAction.search,

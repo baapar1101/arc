@@ -28,6 +28,23 @@ void main() {
       );
     });
 
+    test(
+      'rapid scanner Enter prefers the current barcode over suggestions',
+      () {
+        expect(
+          resolveQuickSalesProductSearchSubmitAction(
+            input: '6260151234567',
+            loadedQuery: '6260151234567',
+            suggestionCount: 3,
+            hasMoreSuggestions: false,
+            navigatedByKeyboard: true,
+            preferDirectSearch: true,
+          ),
+          QuickSalesProductSearchSubmitAction.searchField,
+        );
+      },
+    );
+
     test('commits the highlighted row after keyboard navigation', () {
       expect(
         resolveQuickSalesProductSearchSubmitAction(
