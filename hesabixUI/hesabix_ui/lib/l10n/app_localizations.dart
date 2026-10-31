@@ -26747,6 +26747,42 @@ abstract class AppLocalizations {
   /// **'Close'**
   String get windowsExitConfirmAction;
 
+  /// No description provided for @windowsSoftphoneStayInTrayTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Softphone is online'**
+  String get windowsSoftphoneStayInTrayTitle;
+
+  /// No description provided for @windowsSoftphoneStayInTrayMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'The window will hide to the system tray so incoming calls can still ring.'**
+  String get windowsSoftphoneStayInTrayMessage;
+
+  /// No description provided for @windowsSoftphoneStayInTrayAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep in tray'**
+  String get windowsSoftphoneStayInTrayAction;
+
+  /// No description provided for @windowsSoftphoneExitAnywayAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit'**
+  String get windowsSoftphoneExitAnywayAction;
+
+  /// No description provided for @windowsTrayShow.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Hesabix'**
+  String get windowsTrayShow;
+
+  /// No description provided for @windowsTrayExit.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit'**
+  String get windowsTrayExit;
+
   /// No description provided for @windowsUpdateInstallWillCloseApp.
   ///
   /// In en, this message translates to:

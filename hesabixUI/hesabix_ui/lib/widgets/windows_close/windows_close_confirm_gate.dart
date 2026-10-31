@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../core/windows_update_platform.dart';
 import '../../main.dart' show navigatorKey;
+import '../../services/telephony/softphone_background_presence.dart';
+import '../../services/telephony/softphone_engine.dart';
+import '../../services/windows_desktop/windows_desktop_shell.dart';
 
 /// Intercepts the Windows title-bar close button (and Alt+F4) for confirmation.
 class WindowsCloseConfirmGate extends StatefulWidget {
@@ -16,13 +18,9 @@ class WindowsCloseConfirmGate extends StatefulWidget {
 
   /// Register before [runApp] so the native WM_CLOSE handler can reach Dart immediately.
   static void installPlatformHandler() {
-    if (!_isWindowsDesktop || _handlerInstalled) return;
-    _handlerInstalled = true;
-    _channel.setMethodCallHandler((call) async {
-      if (call.method == 'requestClose') {
-        await _confirmClose();
-      }
-    });
+    if (!supportsWindowsDesktopUpdate) return;
+    WindowsDesktopShell.install();
+    WindowsDesktopShell.onCloseRequested = _confirmClose;
   }
 
   @override
@@ -34,12 +32,7 @@ class _WindowsCloseConfirmGateState extends State<WindowsCloseConfirmGate> {
   Widget build(BuildContext context) => widget.child;
 }
 
-const _channel = MethodChannel('hesabix/window_close');
-
-bool _handlerInstalled = false;
 bool _confirming = false;
-
-bool get _isWindowsDesktop => supportsWindowsDesktopUpdate;
 
 Future<void> _confirmClose() async {
   if (_confirming) return;
@@ -53,6 +46,47 @@ Future<void> _confirmClose() async {
   _confirming = true;
   try {
     final t = AppLocalizations.of(ctx);
+    final engine = SoftphoneEngineStore.instance.engine;
+    final softphoneOnline = engine?.wantsBackgroundPresence == true;
+    final decision = windowsCloseDecision(softphoneWantsPresence: softphoneOnline);
+
+    if (decision == WindowsCloseDecision.hideToTray) {
+      final choice = await showDialog<String>(
+        context: ctx,
+        builder: (dialogCtx) {
+          return AlertDialog(
+            title: Text(t.branded(t.windowsSoftphoneStayInTrayTitle)),
+            content: Text(t.windowsSoftphoneStayInTrayMessage),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogCtx).pop('cancel'),
+                child: Text(t.cancel),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogCtx).pop('exit'),
+                child: Text(t.windowsSoftphoneExitAnywayAction),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogCtx).pop('tray'),
+                child: Text(t.windowsSoftphoneStayInTrayAction),
+              ),
+            ],
+          );
+        },
+      );
+      if (choice == 'tray') {
+        await WindowsDesktopShell.hideToTray(
+          tooltip: engine?.windowsTrayTooltip ?? t.windowsSoftphoneStayInTrayTitle,
+          showLabel: t.branded(t.windowsTrayShow),
+          exitLabel: t.windowsTrayExit,
+        );
+      } else if (choice == 'exit') {
+        await engine?.unregister();
+        await WindowsDesktopShell.quit();
+      }
+      return;
+    }
+
     final ok = await showDialog<bool>(
       context: ctx,
       builder: (dialogCtx) {
@@ -73,7 +107,7 @@ Future<void> _confirmClose() async {
       },
     );
     if (ok == true) {
-      await _channel.invokeMethod<void>('close');
+      await WindowsDesktopShell.quit();
     }
   } finally {
     _confirming = false;

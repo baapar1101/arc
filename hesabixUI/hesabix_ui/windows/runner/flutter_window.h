@@ -7,6 +7,7 @@
 #include <flutter/standard_method_codec.h>
 
 #include <memory>
+#include <string>
 
 #include "win32_window.h"
 
@@ -26,6 +27,15 @@ class FlutterWindow : public Win32Window {
 
  private:
   void SetupCloseChannel();
+  void HideToTray();
+  void ShowFromTray();
+  void EnsureTrayIcon();
+  void RemoveTrayIcon();
+  void ShowIncomingBalloon(const std::wstring& title,
+                           const std::wstring& body);
+  void ShowTrayMenu();
+  void NotifyDart(const char* method);
+  void ApplyTrayLabels(const flutter::EncodableMap* args);
 
   // The project to run.
   flutter::DartProject project_;
@@ -35,6 +45,11 @@ class FlutterWindow : public Win32Window {
 
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
       close_channel_;
+
+  bool tray_added_ = false;
+  std::wstring tray_tooltip_ = L"Hesabix Softphone";
+  std::wstring tray_show_label_ = L"Show";
+  std::wstring tray_exit_label_ = L"Exit";
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

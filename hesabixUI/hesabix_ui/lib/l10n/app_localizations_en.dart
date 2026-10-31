@@ -14703,6 +14703,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get windowsExitConfirmAction => 'Close';
 
   @override
+  String get windowsSoftphoneStayInTrayTitle => 'Softphone is online';
+
+  @override
+  String get windowsSoftphoneStayInTrayMessage =>
+      'The window will hide to the system tray so incoming calls can still ring.';
+
+  @override
+  String get windowsSoftphoneStayInTrayAction => 'Keep in tray';
+
+  @override
+  String get windowsSoftphoneExitAnywayAction => 'Exit';
+
+  @override
+  String get windowsTrayShow => 'Show Hesabix';
+
+  @override
+  String get windowsTrayExit => 'Exit';
+
+  @override
   String get windowsUpdateInstallWillCloseApp =>
       'The app will close after the installer starts so files can be replaced.';
 

@@ -14622,6 +14622,25 @@ class AppLocalizationsFa extends AppLocalizations {
   String get windowsExitConfirmAction => 'بستن';
 
   @override
+  String get windowsSoftphoneStayInTrayTitle => 'Softphone آنلاین است';
+
+  @override
+  String get windowsSoftphoneStayInTrayMessage =>
+      'پنجره به سینی سیستم می‌رود تا تماس‌های ورودی همچنان زنگ بخورند.';
+
+  @override
+  String get windowsSoftphoneStayInTrayAction => 'ماندن در سینی';
+
+  @override
+  String get windowsSoftphoneExitAnywayAction => 'خروج کامل';
+
+  @override
+  String get windowsTrayShow => 'نمایش حسابیکس';
+
+  @override
+  String get windowsTrayExit => 'خروج';
+
+  @override
   String get windowsUpdateInstallWillCloseApp =>
       'پس از شروع نصب‌کننده، برنامه بسته می‌شود تا فایل‌ها قابل جایگزینی باشند.';
 

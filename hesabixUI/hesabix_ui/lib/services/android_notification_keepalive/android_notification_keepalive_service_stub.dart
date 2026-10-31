@@ -36,6 +36,8 @@ class AndroidNotificationKeepAliveService {
   Future<void> setSoftphoneUiHoldingWs(bool holding) async {}
 
   Future<void> disableSoftphonePresence({bool stopIfOnlySoftphone = false}) async {}
+
+  Future<Map<String, dynamic>?> loadSoftphonePresence() async => null;
 }
 
 AndroidNotificationKeepAliveService createAndroidNotificationKeepAliveService() =>
