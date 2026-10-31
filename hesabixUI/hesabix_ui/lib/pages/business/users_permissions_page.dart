@@ -1059,6 +1059,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
     'basalam': 'basalam_connector',
     'woocommerce': 'woocommerce_hesabix',
     'moadian': 'moadian_tax_integration',
+    'digipay': 'digipay_credit',
   };
 
   late Map<String, dynamic> _currentPermissions;
@@ -1397,6 +1398,11 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       'woocommerce': {
         'view': t.permissionWooCommerceView,
         'manage': t.permissionWooCommerceManage,
+      },
+      'digipay': {
+        'view': t.digipayPermissionView,
+        'operate': t.digipayPermissionOperate,
+        'manage': t.digipayPermissionManage,
       },
       'moadian': {
         'view': t.moadianPermissionView,
@@ -1991,7 +1997,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       {
         'title': t.localeName.startsWith('fa') ? 'اتصال فروشگاه' : 'Store integrations',
         'icon': Icons.store_mall_directory_outlined,
-        'sections': ['basalam', 'woocommerce'],
+        'sections': ['basalam', 'woocommerce', 'digipay'],
       },
       {
         'title': t.moadianMenuSection,
@@ -2164,6 +2170,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.localeName.startsWith('fa') ? 'اتصال باسلام' : 'Basalam';
       case 'woocommerce':
         return t.permissionSectionWooCommerce;
+      case 'digipay':
+        return t.digipayMenuTitle;
       case 'moadian':
         return t.moadianMenuSection;
       case 'crm':

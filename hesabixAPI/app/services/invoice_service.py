@@ -3163,6 +3163,8 @@ def _build_invoice_payment_account_line(p: Dict[str, Any]) -> Optional[Dict[str,
         "bank_account_id",
         "detail_type",
         "detail_name",
+        "digipay_provider_id",
+        "extra_info",
     ):
         if p.get(key) is not None:
             account_line[key] = p.get(key)
@@ -3515,6 +3517,15 @@ def _create_receipt_payment_documents_for_invoice_payments(
                 "ایجاد سند دریافت/پرداخت مرتبط با فاکتور ناموفق بود.",
                 http_status=500,
             )
+
+    try:
+        from app.services.digipay_service import link_purchases_from_invoice_payments
+
+        link_purchases_from_invoice_payments(
+            db, int(business_id), int(document.id), payment_docs, payments
+        )
+    except Exception:
+        logger.exception("digipay invoice payment link failed invoice_id=%s", document.id)
 
     return payment_docs
 

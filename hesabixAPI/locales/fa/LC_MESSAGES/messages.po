@@ -1294,3 +1294,78 @@ msgstr "به‌روزرسانی سند ناموفق بود"
 
 msgid "UPDATE_DOCUMENT_FAILED"
 msgstr "به‌روزرسانی سند ناموفق بود"
+
+msgid "DIGIPAY_PLUGIN_NOT_ACTIVE"
+msgstr "افزونه پرداخت اعتباری دیجی‌پی برای این کسب‌وکار فعال نیست."
+
+msgid "DIGIPAY_DECRYPT_FAILED"
+msgstr "بازیابی اعتبارنامه دیجی‌پی ممکن نیست."
+
+msgid "DIGIPAY_INVALID_MOBILE"
+msgstr "شماره همراه مشتری نامعتبر است."
+
+msgid "DIGIPAY_INVALID_ENVIRONMENT"
+msgstr "محیط باید تست یا عملیاتی باشد."
+
+msgid "DIGIPAY_CREDENTIALS_MISSING"
+msgstr "اعتبارنامه UPG دیجی‌پی کامل نیست."
+
+msgid "DIGIPAY_AUTH_FAILED"
+msgstr "ورود به دیجی‌پی ناموفق بود. اعتبارنامه را بررسی کنید."
+
+msgid "DIGIPAY_INVALID_AMOUNT"
+msgstr "مبلغ باید بزرگ‌تر از صفر باشد."
+
+msgid "DIGIPAY_TICKET_FAILED"
+msgstr "صدور تیکت دیجی‌پی ناموفق بود."
+
+msgid "DIGIPAY_VERIFY_FAILED"
+msgstr "تأیید پرداخت دیجی‌پی ناموفق بود."
+
+msgid "DIGIPAY_DELIVER_FAILED"
+msgstr "ثبت تحویل در دیجی‌پی ناموفق بود."
+
+msgid "DIGIPAY_PROVIDER_ID_REQUIRED"
+msgstr "شناسه خرید ارسال نشده است."
+
+msgid "DIGIPAY_PURCHASE_NOT_FOUND"
+msgstr "خرید دیجی‌پی یافت نشد."
+
+msgid "DIGIPAY_AMOUNT_MISMATCH"
+msgstr "مبلغ بازگشتی با خرید ثبت‌شده یکسان نیست."
+
+msgid "DIGIPAY_INVALID_STATUS"
+msgstr "وضعیت خرید برای تحویل مناسب نیست."
+
+msgid "DIGIPAY_REFUND_IN_PERSON_UNSUPPORTED"
+msgstr "عودت خرید حضوری QR/پوز از API پشتیبانی نمی‌شود."
+
+msgid "DIGIPAY_REFUND_FAILED"
+msgstr "عودت دیجی‌پی ناموفق بود."
+
+msgid "DIGIPAY_PERSON_REQUIRED"
+msgstr "شخص دیجی‌پی در تنظیمات مشخص نشده است."
+
+msgid "DIGIPAY_NO_OPEN_PURCHASES"
+msgstr "خرید تسویه‌نشده‌ای برای ثبت وجود ندارد."
+
+msgid "DIGIPAY_SETTLEMENT_UNBALANCED"
+msgstr "مبالغ تسویه با هم تراز نیستند."
+
+msgid "DIGIPAY_SETTLEMENT_NEGATIVE"
+msgstr "مبلغ خالص تسویه منفی است."
+
+msgid "DIGIPAY_COMMISSION_LINE"
+msgstr "کارمزد توسعه فروش دیجی‌پی"
+
+msgid "DIGIPAY_COMMISSION_VAT_LINE"
+msgstr "مالیات ارزش افزوده کارمزد دیجی‌پی"
+
+msgid "DIGIPAY_SETTLEMENT_DOC"
+msgstr "تسویه دیجی‌پی"
+
+msgid "DIGIPAY_SETTLEMENT_PERSON"
+msgstr "بستن طلب دیجی‌پی"
+
+msgid "DIGIPAY_SETTLEMENT_BANK"
+msgstr "واریز تسویه دیجی‌پی"

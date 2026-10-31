@@ -71,6 +71,7 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
   static const List<String> _defaultOrderPrograms = [
     'basalam',
     'woocommerce',
+    'digipay',
     'plugin-marketplace',
     'group:warehouses',
     'storage-files',
@@ -133,6 +134,7 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
     'reports': 'گزارش‌ها',
     'basalam': 'باسلام',
     'woocommerce': 'ووکامرس',
+    'digipay': 'دیجی‌پی',
     'group:warehouses': 'مدیریت انبار',
     'storage-files': 'فضای ذخیره‌سازی',
     'tax-workspace': 'مودیان',

@@ -7,12 +7,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/auth_store.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/invoice_transaction.dart';
 import '../../models/person_model.dart';
 import '../../models/quick_sales_payment_button.dart';
 import '../../models/quick_sales_change_resolution.dart';
+import '../../services/marketplace_service.dart';
 import '../../services/person_service.dart';
 import '../../services/quick_sales_service.dart';
+import '../marketplace/plugin_marketplace_utils.dart';
+import 'digipay_payment_dialog.dart';
 import '../../utils/date_formatters.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/number_formatters.dart';
@@ -90,6 +94,7 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
   List<QuickSalesPaymentButtonModel> _buttons = const [];
   Map<String, QuickSalesPaymentButtonModel> _buttonsByShortcut = const {};
   bool _loadingButtons = true;
+  bool _digipayActive = false;
   double _buttonWidth = _defaultButtonWidth;
   bool _expanded = false;
 
@@ -226,14 +231,32 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
     };
   }
 
+  bool get _canUseDigipay {
+    if (!_digipayActive || !widget.enabled) return false;
+    if (widget.authStore.currentBusiness?.isOwner == true) return true;
+    return widget.authStore.hasBusinessPermission('digipay', 'operate');
+  }
+
   Future<void> _loadButtons() async {
     try {
       final rows = await _service.listPaymentButtons(
         businessId: widget.businessId,
       );
+      var digipayActive = false;
+      try {
+        final plugins = await MarketplaceService().listBusinessPlugins(
+          businessId: widget.businessId,
+        );
+        final row = plugins.cast<Map>().firstWhere(
+          (p) => p['plugin_code'] == 'digipay_credit',
+          orElse: () => <String, dynamic>{},
+        );
+        digipayActive = marketplacePluginLicenseActive(row);
+      } catch (_) {}
       if (!mounted) return;
       setState(() {
         _replaceButtons(rows);
+        _digipayActive = digipayActive;
         _loadingButtons = false;
       });
     } catch (e) {
@@ -245,6 +268,21 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
         isError: true,
       );
     }
+  }
+
+  Future<void> _openDigipay() async {
+    if (!_canUseDigipay) return;
+    if (widget.payments.length >= _maxPaymentLines) return;
+    final tx = await showDigipayPaymentDialog(
+      context: context,
+      businessId: widget.businessId,
+      authStore: widget.authStore,
+      remainingAmount: _remaining > 0 ? _remaining : widget.paymentTarget,
+      decimalPlaces: widget.decimalPlaces,
+      currencyUnit: widget.currencyUnit,
+    );
+    if (tx == null || !mounted) return;
+    widget.onChanged([...widget.payments, tx]);
   }
 
   Future<void> _loadWidth() async {
@@ -945,9 +983,20 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
                               crossAxisSpacing: 8,
                               mainAxisSpacing: 8,
                             ),
-                      itemCount: _buttons.length + 1,
+                      itemCount: _buttons.length + 1 + (_canUseDigipay ? 1 : 0),
                       itemBuilder: (context, index) {
-                        if (index == _buttons.length) {
+                        if (_canUseDigipay && index == _buttons.length) {
+                          final t = AppLocalizations.of(context);
+                          return FilledButton.tonalIcon(
+                            onPressed: widget.enabled ? _openDigipay : null,
+                            icon: const Icon(Icons.credit_score_outlined),
+                            label: Text(
+                              t.digipayPayButton,
+                              textAlign: TextAlign.center,
+                            ),
+                          );
+                        }
+                        if (index == _buttons.length + (_canUseDigipay ? 1 : 0)) {
                           return OutlinedButton.icon(
                             onPressed: widget.enabled
                                 ? () => _openEditor()

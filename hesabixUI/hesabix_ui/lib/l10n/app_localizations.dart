@@ -42648,6 +42648,372 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Document date is required'**
   String get documentDateRequired;
+
+  /// No description provided for @digipayMenuTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'DigiPay credit'**
+  String get digipayMenuTitle;
+
+  /// No description provided for @digipayPluginNotActive.
+  ///
+  /// In en, this message translates to:
+  /// **'The DigiPay credit plugin is not active for this business.'**
+  String get digipayPluginNotActive;
+
+  /// No description provided for @digipaySettingsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get digipaySettingsTab;
+
+  /// No description provided for @digipayPurchasesTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchases'**
+  String get digipayPurchasesTab;
+
+  /// No description provided for @digipaySettlementsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Settlements'**
+  String get digipaySettlementsTab;
+
+  /// No description provided for @digipaySettingsIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Store your DigiPay UPG credentials. The sale posts a receivable to the DigiPay person (10401); the bank is not debited until settlement.'**
+  String get digipaySettingsIntro;
+
+  /// No description provided for @digipayPersonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'DigiPay person'**
+  String get digipayPersonLabel;
+
+  /// No description provided for @digipayEnvironmentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Environment'**
+  String get digipayEnvironmentLabel;
+
+  /// No description provided for @digipayEnvironmentSandbox.
+  ///
+  /// In en, this message translates to:
+  /// **'Sandbox'**
+  String get digipayEnvironmentSandbox;
+
+  /// No description provided for @digipayEnvironmentLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Live'**
+  String get digipayEnvironmentLive;
+
+  /// No description provided for @digipayUsernameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'UPG username'**
+  String get digipayUsernameLabel;
+
+  /// No description provided for @digipayClientIdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Client ID'**
+  String get digipayClientIdLabel;
+
+  /// No description provided for @digipayClientSecretLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Client secret'**
+  String get digipayClientSecretLabel;
+
+  /// No description provided for @digipaySellerIdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Seller ID'**
+  String get digipaySellerIdLabel;
+
+  /// No description provided for @digipayCommissionPercentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission percent'**
+  String get digipayCommissionPercentLabel;
+
+  /// No description provided for @digipayVatOnCommissionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'VAT on commission percent'**
+  String get digipayVatOnCommissionLabel;
+
+  /// No description provided for @digipaySettlementBankLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Settlement bank account'**
+  String get digipaySettlementBankLabel;
+
+  /// No description provided for @digipayAutoDeliverLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-deliver in-store credit purchases'**
+  String get digipayAutoDeliverLabel;
+
+  /// No description provided for @digipaySettingsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'DigiPay settings saved'**
+  String get digipaySettingsSaved;
+
+  /// No description provided for @digipayConnectionOk.
+  ///
+  /// In en, this message translates to:
+  /// **'DigiPay login succeeded'**
+  String get digipayConnectionOk;
+
+  /// No description provided for @digipayTestConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Test connection'**
+  String get digipayTestConnection;
+
+  /// No description provided for @digipayPayButton.
+  ///
+  /// In en, this message translates to:
+  /// **'DigiPay'**
+  String get digipayPayButton;
+
+  /// No description provided for @digipayPaymentHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'The sale amount is recorded as a DigiPay receivable. The store bank is not charged until the later settlement.'**
+  String get digipayPaymentHelp;
+
+  /// No description provided for @digipayChannelUpg.
+  ///
+  /// In en, this message translates to:
+  /// **'Online ticket'**
+  String get digipayChannelUpg;
+
+  /// No description provided for @digipayChannelManual.
+  ///
+  /// In en, this message translates to:
+  /// **'QR / POS'**
+  String get digipayChannelManual;
+
+  /// No description provided for @digipayAmountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get digipayAmountLabel;
+
+  /// No description provided for @digipayMobileLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer mobile'**
+  String get digipayMobileLabel;
+
+  /// No description provided for @digipayMobileRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer mobile number is required for an online ticket.'**
+  String get digipayMobileRequired;
+
+  /// No description provided for @digipayTrackingCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Tracking code (optional)'**
+  String get digipayTrackingCodeLabel;
+
+  /// No description provided for @digipayConfirmPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get digipayConfirmPayment;
+
+  /// No description provided for @digipayWaitingForPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for DigiPay confirmation…'**
+  String get digipayWaitingForPayment;
+
+  /// No description provided for @digipayPaymentFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'DigiPay payment failed'**
+  String get digipayPaymentFailed;
+
+  /// No description provided for @digipayPaymentTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Timed out waiting for DigiPay confirmation'**
+  String get digipayPaymentTimeout;
+
+  /// No description provided for @digipayStatusFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get digipayStatusFilter;
+
+  /// No description provided for @digipayStatusAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get digipayStatusAll;
+
+  /// No description provided for @digipayStatusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get digipayStatusPending;
+
+  /// No description provided for @digipayStatusPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid'**
+  String get digipayStatusPaid;
+
+  /// No description provided for @digipayStatusVerified.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified'**
+  String get digipayStatusVerified;
+
+  /// No description provided for @digipayStatusDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered'**
+  String get digipayStatusDelivered;
+
+  /// No description provided for @digipayStatusSettled.
+  ///
+  /// In en, this message translates to:
+  /// **'Settled'**
+  String get digipayStatusSettled;
+
+  /// No description provided for @digipayStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get digipayStatusFailed;
+
+  /// No description provided for @digipayStatusRefunded.
+  ///
+  /// In en, this message translates to:
+  /// **'Refunded'**
+  String get digipayStatusRefunded;
+
+  /// No description provided for @digipayDateFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'From date'**
+  String get digipayDateFrom;
+
+  /// No description provided for @digipayDateTo.
+  ///
+  /// In en, this message translates to:
+  /// **'To date'**
+  String get digipayDateTo;
+
+  /// No description provided for @digipayDeliverAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Notify delivery'**
+  String get digipayDeliverAction;
+
+  /// No description provided for @digipayRefundAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund'**
+  String get digipayRefundAction;
+
+  /// No description provided for @digipaySettlementHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'When DigiPay deposits the net amount, register settlement: Dr bank (10203) + commission (70902) + input VAT (10104), Cr DigiPay receivable (10401).'**
+  String get digipaySettlementHelp;
+
+  /// No description provided for @digipayGrossAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Gross'**
+  String get digipayGrossAmount;
+
+  /// No description provided for @digipayCommissionAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission'**
+  String get digipayCommissionAmount;
+
+  /// No description provided for @digipayVatAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'VAT on commission'**
+  String get digipayVatAmount;
+
+  /// No description provided for @digipayNetAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Net deposit'**
+  String get digipayNetAmount;
+
+  /// No description provided for @digipayAccountsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Accounts: 10401 receivable, 10203 bank, 70902 fee, 10104 input VAT'**
+  String get digipayAccountsHint;
+
+  /// No description provided for @digipaySettlementDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Settlement date'**
+  String get digipaySettlementDate;
+
+  /// No description provided for @digipayRegisterSettlement.
+  ///
+  /// In en, this message translates to:
+  /// **'Register settlement'**
+  String get digipayRegisterSettlement;
+
+  /// No description provided for @digipaySettlementSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'DigiPay settlement registered'**
+  String get digipaySettlementSaved;
+
+  /// No description provided for @digipaySettlementHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Settlement history'**
+  String get digipaySettlementHistory;
+
+  /// No description provided for @digipayPermissionView.
+  ///
+  /// In en, this message translates to:
+  /// **'View DigiPay credit payments'**
+  String get digipayPermissionView;
+
+  /// No description provided for @digipayPermissionOperate.
+  ///
+  /// In en, this message translates to:
+  /// **'Create DigiPay tickets and record QR/POS payments'**
+  String get digipayPermissionOperate;
+
+  /// No description provided for @digipayPermissionManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage DigiPay settings and settlements'**
+  String get digipayPermissionManage;
+
+  /// No description provided for @settingsDigipayTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'DigiPay credit'**
+  String get settingsDigipayTitle;
+
+  /// No description provided for @settingsDigipaySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'UPG credentials, DigiPay receivable person, and delayed settlement'**
+  String get settingsDigipaySubtitle;
 }
 
 class _AppLocalizationsDelegate

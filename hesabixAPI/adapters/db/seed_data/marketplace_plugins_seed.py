@@ -194,6 +194,20 @@ _DEFAULT_PLUGINS: Tuple[_PluginSeed, ...] = (
 		plans=(("monthly", 350_000), ("yearly", 3_500_000)),
 	),
 	_PluginSeed(
+		code="digipay_credit",
+		name="پرداخت اعتباری دیجی‌پی",
+		description=(
+			"پذیرش خرید اعتباری و اقساطی دیجی‌پی در فروش حضوری و آنلاین: تیکت UPG، "
+			"ثبت طلب روی حساب دریافتنی شخص دیجی‌پی (۱۰۴۰۱) بدون بدهکار کردن بانک در لحظه فروش، "
+			"و سند تسویهٔ دوره‌ای با کارمزد (۷۰۹۰۲) و مالیات ورودی کارمزد (۱۰۱۰۴)."
+		),
+		category="integration",
+		icon_url=None,
+		trial_days=14,
+		trial_allowed=True,
+		plans=(("monthly", 250_000), ("yearly", 2_500_000)),
+	),
+	_PluginSeed(
 		code="barcode_label_studio",
 		name="طراحی و چاپ برچسب بارکد",
 		description=(

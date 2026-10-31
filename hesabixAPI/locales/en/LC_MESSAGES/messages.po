@@ -1271,3 +1271,78 @@ msgstr "Failed to update the document"
 
 msgid "UPDATE_DOCUMENT_FAILED"
 msgstr "Failed to update the document"
+
+msgid "DIGIPAY_PLUGIN_NOT_ACTIVE"
+msgstr "The DigiPay credit payment plugin is not active for this business."
+
+msgid "DIGIPAY_DECRYPT_FAILED"
+msgstr "Could not decrypt DigiPay credentials."
+
+msgid "DIGIPAY_INVALID_MOBILE"
+msgstr "Customer mobile number is invalid."
+
+msgid "DIGIPAY_INVALID_ENVIRONMENT"
+msgstr "Environment must be sandbox or live."
+
+msgid "DIGIPAY_CREDENTIALS_MISSING"
+msgstr "DigiPay UPG credentials are incomplete."
+
+msgid "DIGIPAY_AUTH_FAILED"
+msgstr "DigiPay login failed. Check the credentials."
+
+msgid "DIGIPAY_INVALID_AMOUNT"
+msgstr "Amount must be greater than zero."
+
+msgid "DIGIPAY_TICKET_FAILED"
+msgstr "Could not create a DigiPay ticket."
+
+msgid "DIGIPAY_VERIFY_FAILED"
+msgstr "DigiPay payment verification failed."
+
+msgid "DIGIPAY_DELIVER_FAILED"
+msgstr "DigiPay delivery notification failed."
+
+msgid "DIGIPAY_PROVIDER_ID_REQUIRED"
+msgstr "providerId is required."
+
+msgid "DIGIPAY_PURCHASE_NOT_FOUND"
+msgstr "DigiPay purchase was not found."
+
+msgid "DIGIPAY_AMOUNT_MISMATCH"
+msgstr "Callback amount does not match the ticket."
+
+msgid "DIGIPAY_INVALID_STATUS"
+msgstr "Purchase is not ready for delivery."
+
+msgid "DIGIPAY_REFUND_IN_PERSON_UNSUPPORTED"
+msgstr "In-person QR/POS refunds are not supported via the API."
+
+msgid "DIGIPAY_REFUND_FAILED"
+msgstr "DigiPay refund failed."
+
+msgid "DIGIPAY_PERSON_REQUIRED"
+msgstr "DigiPay person is not configured."
+
+msgid "DIGIPAY_NO_OPEN_PURCHASES"
+msgstr "There are no unsettled DigiPay purchases."
+
+msgid "DIGIPAY_SETTLEMENT_UNBALANCED"
+msgstr "Settlement amounts do not balance."
+
+msgid "DIGIPAY_SETTLEMENT_NEGATIVE"
+msgstr "Settlement net amount is negative."
+
+msgid "DIGIPAY_COMMISSION_LINE"
+msgstr "DigiPay sales-development commission"
+
+msgid "DIGIPAY_COMMISSION_VAT_LINE"
+msgstr "VAT on DigiPay commission"
+
+msgid "DIGIPAY_SETTLEMENT_DOC"
+msgstr "DigiPay settlement"
+
+msgid "DIGIPAY_SETTLEMENT_PERSON"
+msgstr "Close DigiPay receivable"
+
+msgid "DIGIPAY_SETTLEMENT_BANK"
+msgstr "DigiPay settlement deposit"

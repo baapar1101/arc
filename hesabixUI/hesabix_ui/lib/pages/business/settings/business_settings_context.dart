@@ -53,9 +53,10 @@ class BusinessSettingsContext {
   }
 
   bool pluginActive(String code) {
-    return plugins.any(
-      (p) => p['plugin_code'] == code && marketplacePluginLicenseActive(p),
-    );
+    return plugins.any((p) {
+      final pluginCode = (p['plugin_code'] ?? p['code'] ?? '').toString();
+      return pluginCode == code && marketplacePluginLicenseActive(p);
+    });
   }
 
   bool get canJoinSettings => authStore.hasBusinessPermission('settings', 'join');
@@ -146,5 +147,12 @@ class BusinessSettingsContext {
     if (isOwner) return true;
     return authStore.hasBusinessPermission('woocommerce', 'view') ||
         authStore.hasBusinessPermission('woocommerce', 'manage');
+  }
+
+  bool get canAccessDigipay {
+    if (!canJoinSettings || !pluginActive('digipay_credit')) return false;
+    if (isOwner) return true;
+    return authStore.hasBusinessPermission('digipay', 'view') ||
+        authStore.hasBusinessPermission('digipay', 'manage');
   }
 }

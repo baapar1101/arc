@@ -41,6 +41,8 @@ class BusinessSettingsLocalizationHelper {
         return t.settingsBasalamTitle;
       case 'settingsWooCommerceTitle':
         return t.settingsWooCommerceTitle;
+      case 'settingsDigipayTitle':
+        return t.settingsDigipayTitle;
       case 'warrantySettings':
         return t.warrantySettings;
       case 'businessSettingsRepairShop':
@@ -120,6 +122,8 @@ class BusinessSettingsLocalizationHelper {
         return t.settingsBasalamSubtitle;
       case 'settingsWooCommerceSubtitle':
         return t.settingsWooCommerceSubtitle;
+      case 'settingsDigipaySubtitle':
+        return t.settingsDigipaySubtitle;
       case 'businessSettingsWarrantyDescription':
         return t.businessSettingsWarrantyDescription;
       case 'businessSettingsRepairShopDescription':
@@ -214,6 +218,22 @@ class BusinessSettingsLocalizationHelper {
     }
   }
 
+  static String normalizeSettingsQuery(String input) {
+    return input
+        .toLowerCase()
+        .replaceAll('\u200c', '')
+        .replaceAll('ي', 'ی')
+        .replaceAll('ك', 'ک')
+        .replaceAll(RegExp(r'\s+'), '');
+  }
+
+  static bool _containsQuery(String haystack, String lowerQuery) {
+    if (haystack.contains(lowerQuery)) return true;
+    final foldedHay = normalizeSettingsQuery(haystack);
+    final foldedNeedle = normalizeSettingsQuery(lowerQuery);
+    return foldedNeedle.isNotEmpty && foldedHay.contains(foldedNeedle);
+  }
+
   static bool itemMatchesSearch(
     AppLocalizations t,
     SettingsItem item,
@@ -222,11 +242,13 @@ class BusinessSettingsLocalizationHelper {
     if (lowerQuery.isEmpty) return false;
     final title = getTitle(t, item.title).toLowerCase();
     final desc = getDescription(t, item.description).toLowerCase();
-    return item.id.toLowerCase().contains(lowerQuery) ||
-        item.title.toLowerCase().contains(lowerQuery) ||
-        item.description.toLowerCase().contains(lowerQuery) ||
-        title.contains(lowerQuery) ||
-        desc.contains(lowerQuery);
+    final tags = item.tags.join(' ').toLowerCase();
+    return _containsQuery(item.id.toLowerCase(), lowerQuery) ||
+        _containsQuery(item.title.toLowerCase(), lowerQuery) ||
+        _containsQuery(item.description.toLowerCase(), lowerQuery) ||
+        _containsQuery(title, lowerQuery) ||
+        _containsQuery(desc, lowerQuery) ||
+        _containsQuery(tags, lowerQuery);
   }
 
   static bool categoryMatchesSearch(

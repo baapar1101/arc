@@ -127,6 +127,8 @@ abstract final class BusinessNamedRoutes {
         'reports/woocommerce/bridge-health',
     'business_basalam': 'basalam',
     'business_woocommerce': 'woocommerce',
+    'business_digipay': 'digipay',
+    'business_settings_digipay': 'settings/digipay',
     'business_woocommerce_opening_inventory': 'woocommerce/opening-inventory',
     'business_settings': 'settings',
     'business_settings_backup': 'settings/backup',

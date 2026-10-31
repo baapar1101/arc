@@ -23183,4 +23183,195 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get documentDateRequired => 'تاریخ سند الزامی است';
+
+  @override
+  String get digipayMenuTitle => 'پرداخت اعتباری دیجی‌پی';
+
+  @override
+  String get digipayPluginNotActive =>
+      'افزونه پرداخت اعتباری دیجی‌پی برای این کسب‌وکار فعال نیست.';
+
+  @override
+  String get digipaySettingsTab => 'تنظیمات';
+
+  @override
+  String get digipayPurchasesTab => 'خریدها';
+
+  @override
+  String get digipaySettlementsTab => 'تسویه‌ها';
+
+  @override
+  String get digipaySettingsIntro =>
+      'اعتبارنامه UPG دیجی‌پی را ذخیره کنید. مبلغ فروش روی شخص دیجی‌پی (۱۰۴۰۱) ثبت می‌شود و بانک تا زمان تسویه بدهکار نمی‌شود.';
+
+  @override
+  String get digipayPersonLabel => 'شخص دیجی‌پی';
+
+  @override
+  String get digipayEnvironmentLabel => 'محیط';
+
+  @override
+  String get digipayEnvironmentSandbox => 'تست';
+
+  @override
+  String get digipayEnvironmentLive => 'عملیاتی';
+
+  @override
+  String get digipayUsernameLabel => 'نام کاربری UPG';
+
+  @override
+  String get digipayClientIdLabel => 'شناسه کلاینت';
+
+  @override
+  String get digipayClientSecretLabel => 'رمز کلاینت';
+
+  @override
+  String get digipaySellerIdLabel => 'شناسه فروشنده';
+
+  @override
+  String get digipayCommissionPercentLabel => 'درصد کارمزد';
+
+  @override
+  String get digipayVatOnCommissionLabel => 'درصد مالیات کارمزد';
+
+  @override
+  String get digipaySettlementBankLabel => 'حساب بانکی تسویه';
+
+  @override
+  String get digipayAutoDeliverLabel => 'اعلام خودکار تحویل برای خرید حضوری';
+
+  @override
+  String get digipaySettingsSaved => 'تنظیمات دیجی‌پی ذخیره شد';
+
+  @override
+  String get digipayConnectionOk => 'ورود به دیجی‌پی موفق بود';
+
+  @override
+  String get digipayTestConnection => 'آزمایش اتصال';
+
+  @override
+  String get digipayPayButton => 'دیجی‌پی';
+
+  @override
+  String get digipayPaymentHelp =>
+      'مبلغ فروش به‌صورت طلب از دیجی‌پی ثبت می‌شود. بانک فروشگاه تا تسویه بعدی بدهکار نمی‌شود.';
+
+  @override
+  String get digipayChannelUpg => 'تیکت آنلاین';
+
+  @override
+  String get digipayChannelManual => 'QR / پوز';
+
+  @override
+  String get digipayAmountLabel => 'مبلغ';
+
+  @override
+  String get digipayMobileLabel => 'موبایل مشتری';
+
+  @override
+  String get digipayMobileRequired =>
+      'برای تیکت آنلاین، شماره همراه مشتری لازم است.';
+
+  @override
+  String get digipayTrackingCodeLabel => 'کد پیگیری (اختیاری)';
+
+  @override
+  String get digipayConfirmPayment => 'ادامه';
+
+  @override
+  String get digipayWaitingForPayment => 'در انتظار تأیید دیجی‌پی…';
+
+  @override
+  String get digipayPaymentFailed => 'پرداخت دیجی‌پی ناموفق بود';
+
+  @override
+  String get digipayPaymentTimeout =>
+      'زمان انتظار برای تأیید دیجی‌پی به پایان رسید';
+
+  @override
+  String get digipayStatusFilter => 'وضعیت';
+
+  @override
+  String get digipayStatusAll => 'همه';
+
+  @override
+  String get digipayStatusPending => 'در انتظار';
+
+  @override
+  String get digipayStatusPaid => 'پرداخت‌شده';
+
+  @override
+  String get digipayStatusVerified => 'تأییدشده';
+
+  @override
+  String get digipayStatusDelivered => 'تحویل‌شده';
+
+  @override
+  String get digipayStatusSettled => 'تسویه‌شده';
+
+  @override
+  String get digipayStatusFailed => 'ناموفق';
+
+  @override
+  String get digipayStatusRefunded => 'عودت‌شده';
+
+  @override
+  String get digipayDateFrom => 'از تاریخ';
+
+  @override
+  String get digipayDateTo => 'تا تاریخ';
+
+  @override
+  String get digipayDeliverAction => 'اعلام تحویل';
+
+  @override
+  String get digipayRefundAction => 'عودت';
+
+  @override
+  String get digipaySettlementHelp =>
+      'پس از واریز خالص دیجی‌پی، تسویه را ثبت کنید: بدهکار بانک (۱۰۲۰۳) + کارمزد (۷۰۹۰۲) + مالیات ورودی (۱۰۱۰۴)، بستانکار طلب دیجی‌پی (۱۰۴۰۱).';
+
+  @override
+  String get digipayGrossAmount => 'ناخالص';
+
+  @override
+  String get digipayCommissionAmount => 'کارمزد';
+
+  @override
+  String get digipayVatAmount => 'مالیات کارمزد';
+
+  @override
+  String get digipayNetAmount => 'خالص واریز';
+
+  @override
+  String get digipayAccountsHint =>
+      'حساب‌ها: ۱۰۴۰۱ دریافتنی، ۱۰۲۰۳ بانک، ۷۰۹۰۲ کارمزد، ۱۰۱۰۴ مالیات ورودی';
+
+  @override
+  String get digipaySettlementDate => 'تاریخ تسویه';
+
+  @override
+  String get digipayRegisterSettlement => 'ثبت تسویه';
+
+  @override
+  String get digipaySettlementSaved => 'تسویه دیجی‌پی ثبت شد';
+
+  @override
+  String get digipaySettlementHistory => 'تاریخچه تسویه';
+
+  @override
+  String get digipayPermissionView => 'مشاهده پرداخت‌های اعتباری دیجی‌پی';
+
+  @override
+  String get digipayPermissionOperate => 'صدور تیکت دیجی‌پی و ثبت خرید QR/پوز';
+
+  @override
+  String get digipayPermissionManage => 'مدیریت تنظیمات و تسویه دیجی‌پی';
+
+  @override
+  String get settingsDigipayTitle => 'پرداخت اعتباری دیجی‌پی';
+
+  @override
+  String get settingsDigipaySubtitle =>
+      'اعتبارنامه UPG، شخص طلب دیجی‌پی و تسویه تأخیری';
 }

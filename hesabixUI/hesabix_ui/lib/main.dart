@@ -177,6 +177,8 @@ import 'pages/business/basalam/basalam_settings_page.dart';
 import 'pages/business/woocommerce/woocommerce_integration_page.dart';
 import 'pages/business/woocommerce/woocommerce_opening_inventory_bridge_page.dart';
 import 'pages/business/woocommerce/woocommerce_settings_page.dart';
+import 'pages/business/digipay/digipay_hub_page.dart';
+import 'widgets/marketplace/digipay_plugin_gate.dart';
 import 'pages/business/notification_templates_page.dart';
 import 'pages/business/notification_template_form_page.dart';
 import 'pages/public/public_warranty_activation_page.dart';
@@ -3079,6 +3081,24 @@ class _MyAppState extends State<MyApp> {
                             },
                           ),
                           GoRoute(
+                            path: 'digipay',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                DigipayPluginGate(
+                                  businessId: businessId,
+                                  child: DigipayHubPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
                             path: 'woocommerce/opening-inventory',
                             pageBuilder: (context, state) {
                               final businessId = int.parse(
@@ -4906,6 +4926,45 @@ class _MyAppState extends State<MyApp> {
                                 WoocommerceSettingsPage(
                                   businessId: businessId,
                                   authStore: _authStore!,
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'settings/digipay',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              if (!_authStore!.hasBusinessPermission(
+                                'settings',
+                                'join',
+                              )) {
+                                return hesabixNoTransitionPage(
+                                  state,
+                                  PermissionGuard.buildAccessDeniedPage(),
+                                );
+                              }
+                              final canDigipay =
+                                  _authStore!.hasBusinessPermission(
+                                    'digipay',
+                                    'view',
+                                  ) ||
+                                  _authStore!.currentBusiness?.isOwner == true;
+                              if (!canDigipay) {
+                                return hesabixNoTransitionPage(
+                                  state,
+                                  PermissionGuard.buildAccessDeniedPage(),
+                                );
+                              }
+                              return hesabixNoTransitionPage(
+                                state,
+                                DigipayPluginGate(
+                                  businessId: businessId,
+                                  child: DigipayHubPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                  ),
                                 ),
                               );
                             },

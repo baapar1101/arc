@@ -23308,4 +23308,198 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get documentDateRequired => 'Document date is required';
+
+  @override
+  String get digipayMenuTitle => 'DigiPay credit';
+
+  @override
+  String get digipayPluginNotActive =>
+      'The DigiPay credit plugin is not active for this business.';
+
+  @override
+  String get digipaySettingsTab => 'Settings';
+
+  @override
+  String get digipayPurchasesTab => 'Purchases';
+
+  @override
+  String get digipaySettlementsTab => 'Settlements';
+
+  @override
+  String get digipaySettingsIntro =>
+      'Store your DigiPay UPG credentials. The sale posts a receivable to the DigiPay person (10401); the bank is not debited until settlement.';
+
+  @override
+  String get digipayPersonLabel => 'DigiPay person';
+
+  @override
+  String get digipayEnvironmentLabel => 'Environment';
+
+  @override
+  String get digipayEnvironmentSandbox => 'Sandbox';
+
+  @override
+  String get digipayEnvironmentLive => 'Live';
+
+  @override
+  String get digipayUsernameLabel => 'UPG username';
+
+  @override
+  String get digipayClientIdLabel => 'Client ID';
+
+  @override
+  String get digipayClientSecretLabel => 'Client secret';
+
+  @override
+  String get digipaySellerIdLabel => 'Seller ID';
+
+  @override
+  String get digipayCommissionPercentLabel => 'Commission percent';
+
+  @override
+  String get digipayVatOnCommissionLabel => 'VAT on commission percent';
+
+  @override
+  String get digipaySettlementBankLabel => 'Settlement bank account';
+
+  @override
+  String get digipayAutoDeliverLabel =>
+      'Auto-deliver in-store credit purchases';
+
+  @override
+  String get digipaySettingsSaved => 'DigiPay settings saved';
+
+  @override
+  String get digipayConnectionOk => 'DigiPay login succeeded';
+
+  @override
+  String get digipayTestConnection => 'Test connection';
+
+  @override
+  String get digipayPayButton => 'DigiPay';
+
+  @override
+  String get digipayPaymentHelp =>
+      'The sale amount is recorded as a DigiPay receivable. The store bank is not charged until the later settlement.';
+
+  @override
+  String get digipayChannelUpg => 'Online ticket';
+
+  @override
+  String get digipayChannelManual => 'QR / POS';
+
+  @override
+  String get digipayAmountLabel => 'Amount';
+
+  @override
+  String get digipayMobileLabel => 'Customer mobile';
+
+  @override
+  String get digipayMobileRequired =>
+      'Customer mobile number is required for an online ticket.';
+
+  @override
+  String get digipayTrackingCodeLabel => 'Tracking code (optional)';
+
+  @override
+  String get digipayConfirmPayment => 'Continue';
+
+  @override
+  String get digipayWaitingForPayment => 'Waiting for DigiPay confirmation…';
+
+  @override
+  String get digipayPaymentFailed => 'DigiPay payment failed';
+
+  @override
+  String get digipayPaymentTimeout =>
+      'Timed out waiting for DigiPay confirmation';
+
+  @override
+  String get digipayStatusFilter => 'Status';
+
+  @override
+  String get digipayStatusAll => 'All';
+
+  @override
+  String get digipayStatusPending => 'Pending';
+
+  @override
+  String get digipayStatusPaid => 'Paid';
+
+  @override
+  String get digipayStatusVerified => 'Verified';
+
+  @override
+  String get digipayStatusDelivered => 'Delivered';
+
+  @override
+  String get digipayStatusSettled => 'Settled';
+
+  @override
+  String get digipayStatusFailed => 'Failed';
+
+  @override
+  String get digipayStatusRefunded => 'Refunded';
+
+  @override
+  String get digipayDateFrom => 'From date';
+
+  @override
+  String get digipayDateTo => 'To date';
+
+  @override
+  String get digipayDeliverAction => 'Notify delivery';
+
+  @override
+  String get digipayRefundAction => 'Refund';
+
+  @override
+  String get digipaySettlementHelp =>
+      'When DigiPay deposits the net amount, register settlement: Dr bank (10203) + commission (70902) + input VAT (10104), Cr DigiPay receivable (10401).';
+
+  @override
+  String get digipayGrossAmount => 'Gross';
+
+  @override
+  String get digipayCommissionAmount => 'Commission';
+
+  @override
+  String get digipayVatAmount => 'VAT on commission';
+
+  @override
+  String get digipayNetAmount => 'Net deposit';
+
+  @override
+  String get digipayAccountsHint =>
+      'Accounts: 10401 receivable, 10203 bank, 70902 fee, 10104 input VAT';
+
+  @override
+  String get digipaySettlementDate => 'Settlement date';
+
+  @override
+  String get digipayRegisterSettlement => 'Register settlement';
+
+  @override
+  String get digipaySettlementSaved => 'DigiPay settlement registered';
+
+  @override
+  String get digipaySettlementHistory => 'Settlement history';
+
+  @override
+  String get digipayPermissionView => 'View DigiPay credit payments';
+
+  @override
+  String get digipayPermissionOperate =>
+      'Create DigiPay tickets and record QR/POS payments';
+
+  @override
+  String get digipayPermissionManage =>
+      'Manage DigiPay settings and settlements';
+
+  @override
+  String get settingsDigipayTitle => 'DigiPay credit';
+
+  @override
+  String get settingsDigipaySubtitle =>
+      'UPG credentials, DigiPay receivable person, and delayed settlement';
 }

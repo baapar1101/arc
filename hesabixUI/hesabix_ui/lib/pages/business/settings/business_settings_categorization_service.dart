@@ -353,6 +353,25 @@ class BusinessSettingsCategorizationService {
           categoryId: 'integrations',
           order: 4,
         ),
+      if (ctx.canAccessDigipay)
+        _item(
+          id: 'digipay',
+          title: 'settingsDigipayTitle',
+          description: 'settingsDigipaySubtitle',
+          icon: Icons.credit_score_outlined,
+          color: const Color(0xFF00695C),
+          route: ctx.panelRoute('settings/digipay'),
+          categoryId: 'integrations',
+          order: 5,
+          tags: const [
+            'digipay',
+            'دیجی‌پی',
+            'دیجی پی',
+            'اعتباری',
+            'upg',
+            'credit',
+          ],
+        ),
     ];
 
     return SettingsCategory(

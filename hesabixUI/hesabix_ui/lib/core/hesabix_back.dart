@@ -373,6 +373,7 @@ const Set<String> _level1RelativePaths = {
   'reports',
   'basalam',
   'woocommerce',
+  'digipay',
   'plugin-marketplace',
   'hscript',
   'warehouses',

@@ -90,6 +90,7 @@ class _SettingsPageState extends State<SettingsPage> {
         _pluginsLoadFailed = false;
       });
       _initializeExpansionStates();
+      if (_isSearching) _onSearchChanged(_searchQuery);
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -97,6 +98,7 @@ class _SettingsPageState extends State<SettingsPage> {
         _pluginsLoadFailed = true;
       });
       _initializeExpansionStates();
+      if (_isSearching) _onSearchChanged(_searchQuery);
     }
   }
 
@@ -186,9 +188,7 @@ class _SettingsPageState extends State<SettingsPage> {
     }
 
     final ctx = _buildContext();
-    if (_categories.isEmpty && _authStore != null) {
-      _refreshCategories();
-    }
+    _refreshCategories();
     final categories = _categories;
     final setupItems = BusinessSettingsCategorizationService.buildSetupChecklist(ctx);
     final totalItems = categories.fold<int>(0, (sum, c) => sum + c.items.length);

@@ -1638,6 +1638,16 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         default:
           break;
       }
+      if (p.description != null && p.description!.isNotEmpty) {
+        map['description'] = p.description;
+      }
+      if (p.extraInfo != null && p.extraInfo!.isNotEmpty) {
+        map['extra_info'] = p.extraInfo;
+        final providerId = p.extraInfo!['digipay_provider_id'];
+        if (providerId != null) {
+          map['digipay_provider_id'] = providerId;
+        }
+      }
       out.add(map);
     }
     return out;

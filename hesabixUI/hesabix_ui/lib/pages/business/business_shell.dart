@@ -239,6 +239,10 @@ class _BusinessShellState extends State<BusinessShell> {
         return t.telephonySoftphoneTitle;
       case 'settings/telephony':
         return t.telephonySettingsTitle;
+      case 'digipay':
+        return t.digipayMenuTitle;
+      case 'settings/digipay':
+        return t.settingsDigipayTitle;
       case 'distribution':
         return t.distributionMenu;
       case 'hscript':
@@ -1296,6 +1300,8 @@ class _BusinessShellState extends State<BusinessShell> {
     }
   }
 
+  bool _isDigipayPluginActive() => _isPluginCodeLicensed('digipay_credit');
+
   bool _isBasalamPluginActive() {
     try {
       final plug = _businessPlugins.firstWhere(
@@ -1743,6 +1749,15 @@ class _BusinessShellState extends State<BusinessShell> {
         icon: Icons.shopping_cart_outlined,
         selectedIcon: Icons.shopping_cart,
         path: _bu('woocommerce'),
+        type: _MenuItemType.simple,
+        hasAddButton: false,
+      ),
+      _MenuItem(
+        key: 'digipay',
+        label: t.digipayMenuTitle,
+        icon: Icons.credit_score_outlined,
+        selectedIcon: Icons.credit_score,
+        path: _bu('digipay'),
         type: _MenuItemType.simple,
         hasAddButton: false,
       ),
@@ -3733,6 +3748,16 @@ class _BusinessShellState extends State<BusinessShell> {
       return widget.authStore.hasBusinessPermission('woocommerce', 'view');
     }
 
+    if (item.path != null && item.path!.contains('/digipay')) {
+      if (!_isDigipayPluginActive()) {
+        return false;
+      }
+      if (widget.authStore.currentBusiness?.isOwner == true) {
+        return true;
+      }
+      return widget.authStore.hasBusinessPermission('digipay', 'view');
+    }
+
     if (item.path != null && item.path!.contains('/crm/web-chat')) {
       if (widget.authStore.currentBusiness?.isOwner == true) return true;
       return widget.authStore.canViewCrmWebChat();
@@ -3989,6 +4014,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.telephonyMenu || label == 'مرکز تماس' || label == 'Telephony') return 'telephony';
     if (label == t.basalamIntegrationMenuTitle) return 'basalam';
     if (label == t.woocommerceIntegrationMenuTitle) return 'woocommerce';
+    if (label == t.digipayMenuTitle) return 'digipay';
     if (label == 'هوش مصنوعی' || label == 'AI Tools') return 'ai';
     if (label == 'چت با AI' || label == 'AI Chat') return 'ai';
     if (label == 'اشتراک AI' || label == 'AI Subscription') return 'ai';

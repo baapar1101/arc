@@ -267,6 +267,7 @@ from .distribution import (  # noqa: F401
 	DistributionUserPreference,
 	DistributionDailyPlanLock,
 )
+from .digipay import DigipaySettings, DigipayPurchase, DigipaySettlement  # noqa: F401
 from .telephony import (  # noqa: F401
 	TelephonySettings,
 	TelephonyPbxConnection,

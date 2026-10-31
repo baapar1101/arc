@@ -107,6 +107,7 @@ from adapters.api.v1.basalam_integration import router as basalam_integration_ro
 from adapters.api.v1.telephony import router as telephony_router
 from adapters.api.v1.telephony_softphone_ws import router as telephony_softphone_ws_router
 from adapters.api.v1.woocommerce_integration import router as woocommerce_integration_router
+from adapters.api.v1.digipay import router as digipay_router, public_router as digipay_public_router
 from adapters.api.v1.notifications import router as notifications_router
 from adapters.api.v1.admin.notification_templates import router as admin_notification_templates_router
 from adapters.api.v1.admin.notification_event_types import router as admin_notification_event_types_router
@@ -1106,6 +1107,8 @@ def create_app() -> FastAPI:
     application.include_router(bale_integration_router, prefix=settings.api_v1_prefix)
     application.include_router(basalam_integration_router, prefix=settings.api_v1_prefix)
     application.include_router(woocommerce_integration_router, prefix=settings.api_v1_prefix)
+    application.include_router(digipay_router, prefix=settings.api_v1_prefix)
+    application.include_router(digipay_public_router, prefix=settings.api_v1_prefix)
     application.include_router(telephony_router, prefix=settings.api_v1_prefix)
     application.include_router(telephony_softphone_ws_router)
     # Notifications
