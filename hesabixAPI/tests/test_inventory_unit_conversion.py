@@ -21,9 +21,15 @@ from app.services.invoice_unit_conversion_service import (
     stamp_inventory_quantity_as_main,
     warehouse_payload_quantity_to_main,
 )
+from adapters.db.models.product import Product
+from app.services.purchase_accounting_service import (
+    compute_warehouse_receipt_inventory_amount,
+)
 from app.services.warehouse_service import (
     _compute_line_quantities_core,
+    _warehouse_qty_in_invoice_line_unit,
     get_physical_stock_bulk,
+    validate_invoice_warehouse_lines_quantities,
 )
 
 
@@ -259,3 +265,130 @@ def test_issuing_one_piece_from_ten_stamped_cartons_leaves_nine_point_nine() -> 
 
     result = get_physical_stock_bulk(db, business_id=10, product_ids=[1])
     assert result[1] == Decimal("9.9")
+
+
+def test_stamped_warehouse_qty_converts_back_to_invoice_piece_unit() -> None:
+    product = _carton_product()
+    stamped = {
+        "inventory_quantity_unit": "main",
+        "unit": "کارتن",
+        "source_line_unit": "عدد",
+    }
+    assert _warehouse_qty_in_invoice_line_unit(
+        Decimal("1.1"), product, stamped, "عدد"
+    ) == Decimal("11.0")
+    assert _warehouse_qty_in_invoice_line_unit(
+        Decimal("11"), product, {"unit": "عدد"}, "عدد"
+    ) == Decimal("11")
+
+
+def test_validate_allows_stamped_main_qty_equal_to_piece_remaining() -> None:
+    product = _carton_product(id=1)
+    lines = [{
+        "product_id": 1,
+        "quantity": Decimal("1.1"),
+        "extra_info": {
+            "invoice_item_line_id": 10,
+            "inventory_quantity_unit": "main",
+            "unit": "کارتن",
+            "source_line_unit": "عدد",
+        },
+    }]
+    remaining = [{
+        "invoice_item_line_id": 10,
+        "product_id": 1,
+        "unit": "عدد",
+        "remaining_quantity": 11.0,
+    }]
+    db = MagicMock()
+    db.query.return_value.filter.return_value.all.return_value = [product]
+    with patch(
+        "app.services.warehouse_service.compute_invoice_line_quantities",
+        return_value=remaining,
+    ):
+        validate_invoice_warehouse_lines_quantities(db, 1, SimpleNamespace(), lines)
+
+
+def test_validate_rejects_stamped_main_qty_that_matches_piece_remaining_number() -> None:
+    product = _carton_product(id=1)
+    lines = [{
+        "product_id": 1,
+        "quantity": Decimal("11"),
+        "extra_info": {
+            "invoice_item_line_id": 10,
+            "inventory_quantity_unit": "main",
+            "unit": "کارتن",
+            "source_line_unit": "عدد",
+        },
+    }]
+    remaining = [{
+        "invoice_item_line_id": 10,
+        "product_id": 1,
+        "unit": "عدد",
+        "remaining_quantity": 11.0,
+    }]
+    db = MagicMock()
+    db.query.return_value.filter.return_value.all.return_value = [product]
+    with patch(
+        "app.services.warehouse_service.compute_invoice_line_quantities",
+        return_value=remaining,
+    ):
+        with pytest.raises(ApiError) as exc:
+            validate_invoice_warehouse_lines_quantities(db, 1, SimpleNamespace(), lines)
+    assert exc.value.code == "QUANTITY_EXCEEDS_REMAINING"
+
+
+def test_grni_amount_multiplies_main_qty_by_converted_line_cost() -> None:
+    product = _carton_product(id=1, track_inventory=True, base_purchase_price=Decimal("100000"))
+    invoice_line = SimpleNamespace(id=10, extra_info={"unit": "عدد", "unit_price": 10000})
+    wh_line = SimpleNamespace(
+        movement="in",
+        quantity=Decimal("1.1"),
+        product_id=1,
+        extra_info={
+            "invoice_item_line_id": 10,
+            "inventory_quantity_unit": "main",
+            "unit": "کارتن",
+            "source_line_unit": "عدد",
+            "unit_price": 10000,
+        },
+    )
+
+    def _query(model):
+        q = MagicMock()
+        if model is Product:
+            q.filter.return_value.first.return_value = product
+        else:
+            q.filter.return_value.first.return_value = invoice_line
+        return q
+
+    db = MagicMock()
+    db.query.side_effect = _query
+    amount = compute_warehouse_receipt_inventory_amount(db, 1, [wh_line])
+    assert amount == Decimal("110000.0")
+
+
+def test_grni_amount_uses_source_line_unit_when_invoice_row_missing() -> None:
+    product = _carton_product(id=1, track_inventory=True, base_purchase_price=Decimal("100000"))
+    wh_line = SimpleNamespace(
+        movement="in",
+        quantity=Decimal("1.1"),
+        product_id=1,
+        extra_info={
+            "invoice_item_line_id": 10,
+            "inventory_quantity_unit": "main",
+            "unit": "کارتن",
+            "source_line_unit": "عدد",
+            "unit_price": 10000,
+        },
+    )
+
+    def _query(model):
+        q = MagicMock()
+        q.filter.return_value.first.return_value = product if model is Product else None
+        return q
+
+    db = MagicMock()
+    db.query.side_effect = _query
+    amount = compute_warehouse_receipt_inventory_amount(db, 1, [wh_line])
+    assert amount == Decimal("110000.0")

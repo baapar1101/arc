@@ -18,6 +18,29 @@ from adapters.db.models.business import Business
 from adapters.db.models.currency import Currency
 from app.core.responses import ApiError
 from app.services.invoice_service import _compute_available_stock
+from app.services.invoice_unit_conversion_service import inventory_quantity_to_main
+
+
+def _products_by_id(db: Session, business_id: int, product_ids) -> Dict[int, Product]:
+    pids = sorted({int(pid) for pid in product_ids if pid is not None})
+    if not pids:
+        return {}
+    return {
+        int(product.id): product
+        for product in db.query(Product).filter(
+            and_(Product.business_id == business_id, Product.id.in_(pids))
+        ).all()
+    }
+
+
+def _line_qty_main(line: WarehouseDocumentLine, products_by_id: Dict[int, Product]) -> Decimal:
+    product = products_by_id.get(int(line.product_id)) if line.product_id is not None else None
+    return inventory_quantity_to_main(
+        line.quantity,
+        product,
+        getattr(line, "extra_info", None),
+        strict=False,
+    )
 
 
 def get_warehouse_documents_summary_report(
@@ -79,6 +102,12 @@ def get_warehouse_documents_summary_report(
         WarehouseDocument.id.desc()
     ).offset(skip).limit(take).all()
     
+    products_by_id = _products_by_id(
+        db,
+        business_id,
+        [line.product_id for doc in documents for line in doc.lines],
+    )
+
     # محاسبه آمار
     summary_by_type = {}
     total_documents = 0
@@ -103,13 +132,12 @@ def get_warehouse_documents_summary_report(
         for line in doc.lines:
             summary_by_type[doc_type]["items_count"] += 1
             total_items += 1
+            qty = _line_qty_main(line, products_by_id)
             
             if line.movement == "in":
-                qty = Decimal(str(line.quantity))
                 summary_by_type[doc_type]["quantity_in"] += qty
                 total_quantity_in += qty
             elif line.movement == "out":
-                qty = Decimal(str(line.quantity))
                 summary_by_type[doc_type]["quantity_out"] += qty
                 total_quantity_out += qty
     
@@ -124,7 +152,7 @@ def get_warehouse_documents_summary_report(
             "warehouse_from_id": doc.warehouse_id_from,
             "warehouse_to_id": doc.warehouse_id_to,
             "items_count": len(doc.lines),
-            "total_quantity": sum(Decimal(str(line.quantity)) for line in doc.lines),
+            "total_quantity": sum(_line_qty_main(line, products_by_id) for line in doc.lines),
         })
     
     return {
@@ -392,6 +420,12 @@ def get_inter_warehouse_transfers_report(
         for wh in wh_list:
             warehouses[wh.id] = wh
     
+    products_by_id = _products_by_id(
+        db,
+        business_id,
+        [line.product_id for doc in documents for line in doc.lines],
+    )
+
     items = []
     for doc in documents:
         warehouse_from_name = None
@@ -406,7 +440,7 @@ def get_inter_warehouse_transfers_report(
         
         # محاسبه تعداد اقلام و مقدار
         items_count = len(doc.lines)
-        total_quantity = sum(Decimal(str(line.quantity)) for line in doc.lines)
+        total_quantity = sum(_line_qty_main(line, products_by_id) for line in doc.lines)
         
         items.append({
             "id": doc.id,
@@ -467,6 +501,12 @@ def get_adjustment_documents_report(
         WarehouseDocument.document_date.desc(),
         WarehouseDocument.id.desc()
     ).offset(skip).limit(take).all()
+
+    products_by_id = _products_by_id(
+        db,
+        business_id,
+        [line.product_id for doc in documents for line in doc.lines],
+    )
     
     # محاسبه آمار تعدیل‌ها
     total_increases = Decimal(0)
@@ -481,7 +521,7 @@ def get_adjustment_documents_report(
         
         for line in doc.lines:
             items_count += 1
-            qty = Decimal(str(line.quantity))
+            qty = _line_qty_main(line, products_by_id)
             if line.movement == "in":
                 increases += qty
             elif line.movement == "out":
@@ -576,6 +616,11 @@ def get_warehouse_performance_report(
             docs_query = docs_query.filter(WarehouseDocument.document_date <= date_to_obj)
         
         documents = docs_query.all()
+        products_by_id = _products_by_id(
+            db,
+            business_id,
+            [line.product_id for doc in documents for line in doc.lines],
+        )
         
         # محاسبه آمار
         total_documents = len(documents)
@@ -613,7 +658,7 @@ def get_warehouse_performance_report(
                 # فقط خطوط مربوط به این انبار
                 if line_warehouse_id == warehouse.id:
                     total_items += 1
-                    qty = Decimal(str(line.quantity))
+                    qty = _line_qty_main(line, products_by_id)
                     if line.movement == "in":
                         total_quantity_in += qty
                     elif line.movement == "out":
@@ -713,6 +758,8 @@ def get_product_movement_history_report(
         ).all()
         for wh in wh_list:
             warehouses[wh.id] = wh
+
+    products_by_id = {int(product.id): product}
     
     items = []
     for line in lines:
@@ -731,7 +778,8 @@ def get_product_movement_history_report(
             "warehouse_id": line.warehouse_id,
             "warehouse_name": warehouse_name,
             "movement": line.movement,
-            "quantity": float(line.quantity),
+            "quantity": float(_line_qty_main(line, products_by_id)),
+            "unit": product.main_unit or "",
             "created_by_user_id": doc.created_by_user_id,
         })
     

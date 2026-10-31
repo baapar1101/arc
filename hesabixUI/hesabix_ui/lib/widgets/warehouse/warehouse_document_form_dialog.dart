@@ -98,18 +98,33 @@ class _WarehouseDocumentFormDialogState
       widget.lockDocType || _isFromInvoice || _isEditMode;
   bool get _isPosted => _documentStatus == 'posted'; // آیا حواله قطعی شده است؟
 
+  int? _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return null;
+  }
+
+  int? _invoiceItemLineId(Map<String, dynamic> line) {
+    return _asInt(line['invoice_item_line_id']) ??
+        _asInt(_lineExtra(line)['invoice_item_line_id']);
+  }
+
   Map<String, double>? _quantitiesForLine(Map<String, dynamic> line) {
     if (_lineQuantitiesIndex == null) return null;
-    final lineId = line['invoice_item_line_id'];
-    final productId = line['product_id'];
     return _lineQuantitiesIndex!.lookup(
-      invoiceItemLineId: lineId is int
-          ? lineId
-          : (lineId is num ? lineId.toInt() : null),
-      productId: productId is int
-          ? productId
-          : (productId is num ? productId.toInt() : null),
+      invoiceItemLineId: _invoiceItemLineId(line),
+      productId: _asInt(line['product_id']),
     );
+  }
+
+  Map<String, double>? _quantitiesForLineInFieldUnit(Map<String, dynamic> line) {
+    final raw = _quantitiesForLine(line);
+    if (raw == null) return null;
+    return {
+      'required': _invoiceQtyToFieldUnit(line, raw['required'] ?? 0.0),
+      'processed': _invoiceQtyToFieldUnit(line, raw['processed'] ?? 0.0),
+      'remaining': _invoiceQtyToFieldUnit(line, raw['remaining'] ?? 0.0),
+    };
   }
 
   double _lineQuantity(Map<String, dynamic> line) {
@@ -118,14 +133,50 @@ class _WarehouseDocumentFormDialogState
 
   Map<String, dynamic> _lineExtra(Map<String, dynamic> line) {
     final extra = line['extra_info'];
-    return extra is Map<String, dynamic>
-        ? Map<String, dynamic>.from(extra)
-        : <String, dynamic>{};
+    if (extra is Map) {
+      return Map<String, dynamic>.from(extra);
+    }
+    return <String, dynamic>{};
   }
 
   bool _lineQuantityStoredAsMain(Map<String, dynamic> line) {
     final flag = _lineExtra(line)['inventory_quantity_unit']?.toString().toLowerCase();
     return flag == 'main' || flag == 'main_unit';
+  }
+
+  bool _isSecondaryUnitName(Map<String, dynamic> line, String? unit) {
+    final selected = (unit ?? '').trim();
+    if (selected.isEmpty) return false;
+    final lower = selected.toLowerCase();
+    if (lower == 'secondary' ||
+        lower == 'secondary_unit' ||
+        lower == 'sub' ||
+        lower == 'alt') {
+      return true;
+    }
+    if (lower == 'main' || lower == 'main_unit' || lower == 'primary') {
+      return false;
+    }
+    final main = (line['main_unit'] ?? line['product_main_unit'] ?? '')
+        .toString()
+        .trim();
+    final secondary = (line['secondary_unit'] ?? line['product_secondary_unit'] ?? '')
+        .toString()
+        .trim();
+    if (main.isNotEmpty && selected == main) return false;
+    if (secondary.isNotEmpty && selected == secondary) return true;
+    return false;
+  }
+
+  double _invoiceQtyToFieldUnit(Map<String, dynamic> line, double invoiceQty) {
+    if (!_lineQuantityStoredAsMain(line)) return invoiceQty;
+    final factor =
+        (line['unit_conversion_factor'] as num?)?.toDouble() ?? 0.0;
+    if (factor <= 0) return invoiceQty;
+    final source = (_lineExtra(line)['source_line_unit'] ?? '').toString().trim();
+    if (source.isEmpty) return invoiceQty;
+    if (_isSecondaryUnitName(line, source)) return invoiceQty / factor;
+    return invoiceQty;
   }
 
   String? _lineSelectedUnit(Map<String, dynamic> line) {
@@ -402,8 +453,8 @@ class _WarehouseDocumentFormDialogState
 
       return {
         'product_id': line['product_id'],
-        if (line['invoice_item_line_id'] != null)
-          'invoice_item_line_id': line['invoice_item_line_id'],
+        if (_invoiceItemLineId(line) != null)
+          'invoice_item_line_id': _invoiceItemLineId(line),
         'warehouse_id': warehouseResolved['warehouse_id'],
         'movement': movement,
         'quantity': line['quantity'],
@@ -524,7 +575,9 @@ class _WarehouseDocumentFormDialogState
     double value,
     BuildContext context, {
     bool isRemaining = false,
+    String? unit,
   }) {
+    final unitText = (unit ?? '').trim();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -537,7 +590,9 @@ class _WarehouseDocumentFormDialogState
         ),
         const SizedBox(height: 2),
         Text(
-          formatWithThousands(value, decimalPlaces: 2),
+          unitText.isEmpty
+              ? formatWithThousands(value, decimalPlaces: 2)
+              : '${formatWithThousands(value, decimalPlaces: 2)} $unitText',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             fontWeight: FontWeight.bold,
             color: isRemaining && value > 0
@@ -613,7 +668,9 @@ class _WarehouseDocumentFormDialogState
     Map<String, dynamic> product,
   ) {
     final extra = _lineExtra(line);
-    extra['unit'] ??= product['main_unit'];
+    if (!_lineQuantityStoredAsMain(line)) {
+      extra['unit'] ??= product['main_unit'];
+    }
     return {
       'main_unit': product['main_unit'],
       'secondary_unit': product['secondary_unit'],
@@ -829,6 +886,10 @@ class _WarehouseDocumentFormDialogState
         lineMap['extra_info'] = Map<String, dynamic>.from(
           lineMap['extra_info'] ?? const {},
         );
+        lineMap['invoice_item_line_id'] ??=
+            lineMap['extra_info']['invoice_item_line_id'];
+        lineMap['main_unit'] ??= lineMap['product_main_unit'];
+        lineMap['secondary_unit'] ??= lineMap['product_secondary_unit'];
         if (lineMap['movement'] == null) {
           lineMap['movement'] = _movementForDocType(_docType);
         }
@@ -1906,7 +1967,7 @@ class _WarehouseDocumentFormDialogState
 
   void _autoCompleteLine(int index) {
     final line = _lines[index];
-    final quantities = _quantitiesForLine(line);
+    final quantities = _quantitiesForLineInFieldUnit(line);
     if (quantities == null) return;
 
     final remaining = quantities['remaining'] ?? 0.0;
@@ -1918,7 +1979,7 @@ class _WarehouseDocumentFormDialogState
   void _autoCompleteAllLines() {
     for (var i = 0; i < _lines.length; i++) {
       final line = _lines[i];
-      final quantities = _quantitiesForLine(line);
+      final quantities = _quantitiesForLineInFieldUnit(line);
       if (quantities == null) continue;
 
       final remaining = quantities['remaining'] ?? 0.0;
@@ -1992,9 +2053,9 @@ class _WarehouseDocumentFormDialogState
       activeLineCount++;
 
       if (_isFromInvoice) {
-        final quantities = _quantitiesForLine(line);
+        final quantities = _quantitiesForLineInFieldUnit(line);
         final remaining = quantities?['remaining'] ?? 0.0;
-        if (qty > remaining) {
+        if (qty > remaining + 0.000001) {
           SnackBarHelper.show(
             context,
             message:
@@ -2168,12 +2229,13 @@ class _WarehouseDocumentFormDialogState
             if (_isFromInvoice && line['product_id'] != null)
               Builder(
                 builder: (context) {
-                  final quantities = _quantitiesForLine(line);
+                  final quantities = _quantitiesForLineInFieldUnit(line);
                   if (quantities == null) return const SizedBox.shrink();
 
                   final required = quantities['required'] ?? 0.0;
                   final processed = quantities['processed'] ?? 0.0;
                   final remaining = quantities['remaining'] ?? 0.0;
+                  final unit = _lineSelectedUnit(line);
 
                   return Container(
                     margin: const EdgeInsets.only(top: 8, bottom: 8),
@@ -2201,15 +2263,26 @@ class _WarehouseDocumentFormDialogState
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _buildQuantityRow('مورد نیاز', required, context),
+                              _buildQuantityRow(
+                                'مورد نیاز',
+                                required,
+                                context,
+                                unit: unit,
+                              ),
                               const SizedBox(height: 4),
-                              _buildQuantityRow('از قبل', processed, context),
+                              _buildQuantityRow(
+                                'از قبل',
+                                processed,
+                                context,
+                                unit: unit,
+                              ),
                               const SizedBox(height: 4),
                               _buildQuantityRow(
                                 'باقی مانده',
                                 remaining,
                                 context,
                                 isRemaining: true,
+                                unit: unit,
                               ),
                             ],
                           );
@@ -2217,13 +2290,24 @@ class _WarehouseDocumentFormDialogState
                         return Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
-                            _buildQuantityRow('مورد نیاز', required, context),
-                            _buildQuantityRow('از قبل', processed, context),
+                            _buildQuantityRow(
+                              'مورد نیاز',
+                              required,
+                              context,
+                              unit: unit,
+                            ),
+                            _buildQuantityRow(
+                              'از قبل',
+                              processed,
+                              context,
+                              unit: unit,
+                            ),
                             _buildQuantityRow(
                               'باقی مانده',
                               remaining,
                               context,
                               isRemaining: true,
+                              unit: unit,
                             ),
                           ],
                         );

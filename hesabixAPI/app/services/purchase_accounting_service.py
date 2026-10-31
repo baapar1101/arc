@@ -16,6 +16,12 @@ from adapters.db.models.invoice_item_line import InvoiceItemLine
 from adapters.db.models.product import Product
 from adapters.db.models.warehouse_document import WarehouseDocument
 from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
+from app.services.invoice_unit_conversion_service import (
+	extra_info_dict,
+	inventory_quantity_is_already_main,
+	inventory_quantity_to_main,
+	price_line_to_main,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -178,6 +184,37 @@ def _line_unit_cost_for_purchase(extra: Dict[str, Any]) -> Decimal:
 	return Decimal(0)
 
 
+def _invoice_item_line_id_from_warehouse_line(ln: WarehouseDocumentLine) -> Optional[int]:
+	extra = extra_info_dict(getattr(ln, "extra_info", None))
+	raw = extra.get("invoice_item_line_id")
+	if raw is None:
+		raw = getattr(ln, "invoice_item_line_id", None)
+	try:
+		return int(raw) if raw is not None else None
+	except (TypeError, ValueError):
+		return None
+
+
+def _purchase_unit_cost_on_main(
+	product: Product,
+	warehouse_extra: Dict[str, Any],
+	invoice_extra: Optional[Dict[str, Any]],
+) -> Decimal:
+	if invoice_extra:
+		raw = _line_unit_cost_for_purchase(invoice_extra)
+		if raw > 0:
+			return price_line_to_main(raw, product, invoice_extra.get("unit"), strict=False)
+	raw = _line_unit_cost_for_purchase(warehouse_extra)
+	if raw > 0:
+		cost_unit = warehouse_extra.get("unit")
+		if inventory_quantity_is_already_main(warehouse_extra):
+			cost_unit = warehouse_extra.get("source_line_unit") or cost_unit
+		return price_line_to_main(raw, product, cost_unit, strict=False)
+	if getattr(product, "base_purchase_price", None) is not None:
+		return Decimal(str(product.base_purchase_price))
+	return Decimal(0)
+
+
 def compute_warehouse_receipt_inventory_amount(
 	db: Session,
 	business_id: int,
@@ -187,9 +224,7 @@ def compute_warehouse_receipt_inventory_amount(
 	for ln in wh_lines:
 		if str(ln.movement or "").strip().lower() != "in":
 			continue
-		qty = Decimal(str(ln.quantity or 0))
-		if qty <= 0:
-			continue
+		warehouse_extra = extra_info_dict(getattr(ln, "extra_info", None))
 		product = (
 			db.query(Product)
 			.filter(Product.id == int(ln.product_id), Product.business_id == int(business_id))
@@ -197,23 +232,29 @@ def compute_warehouse_receipt_inventory_amount(
 		)
 		if not product or not getattr(product, "track_inventory", False):
 			continue
-		unit_cost = Decimal(0)
-		if getattr(ln, "invoice_item_line_id", None):
+		qty_main = inventory_quantity_to_main(
+			ln.quantity,
+			product,
+			warehouse_extra,
+			strict=False,
+		)
+		if qty_main <= 0:
+			continue
+		invoice_extra = None
+		invoice_line_id = _invoice_item_line_id_from_warehouse_line(ln)
+		if invoice_line_id is not None:
 			row = (
 				db.query(InvoiceItemLine)
 				.filter(
-					InvoiceItemLine.id == int(ln.invoice_item_line_id),
+					InvoiceItemLine.id == int(invoice_line_id),
 					InvoiceItemLine.document_id.isnot(None),
 				)
 				.first()
 			)
 			if row:
-				unit_cost = _line_unit_cost_for_purchase(dict(row.extra_info or {}))
-		if unit_cost <= 0:
-			unit_cost = _line_unit_cost_for_purchase(dict(ln.extra_info or {}))
-		if unit_cost <= 0 and getattr(product, "base_purchase_price", None) is not None:
-			unit_cost = Decimal(str(product.base_purchase_price))
-		total += qty * unit_cost
+				invoice_extra = extra_info_dict(row.extra_info)
+		unit_cost_main = _purchase_unit_cost_on_main(product, warehouse_extra, invoice_extra)
+		total += qty_main * unit_cost_main
 	return total
 
 
