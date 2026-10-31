@@ -861,20 +861,28 @@ def _create_warehouse_and_post(
 	if wh is None:
 		raise ApiError("WAREHOUSE_CODE_CONFLICT", "تولید کد حواله ناموفق بود", http_status=500)
 
+	from app.services.invoice_unit_conversion_service import warehouse_payload_quantity_to_main
+
 	for ln in doc.lines:
+		product = db.query(Product).filter(Product.id == int(ln.product_id)).first()
+		qty, extra = warehouse_payload_quantity_to_main(
+			product,
+			ln.quantity,
+			{
+				"unit_cost": float(ln.unit_cost or 0),
+				"amount": float(ln.amount or 0),
+				"goods_expense_income_line_id": ln.id,
+				"description": ln.description,
+			},
+		)
 		db.add(
 			WarehouseDocumentLine(
 				warehouse_document_id=wh.id,
 				product_id=ln.product_id,
 				warehouse_id=ln.warehouse_id,
 				movement=movement,
-				quantity=ln.quantity,
-				extra_info={
-					"unit_cost": float(ln.unit_cost or 0),
-					"amount": float(ln.amount or 0),
-					"goods_expense_income_line_id": ln.id,
-					"description": ln.description,
-				},
+				quantity=qty,
+				extra_info=extra,
 			)
 		)
 	db.flush()

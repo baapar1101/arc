@@ -15,6 +15,7 @@ from adapters.db.models.product import Product
 from adapters.db.models.warehouse_document import WarehouseDocument
 from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
 from app.core.responses import ApiError
+from app.services.invoice_unit_conversion_service import inventory_quantity_to_main
 
 InventoryKey = Tuple[int, int]
 
@@ -50,12 +51,23 @@ def _desired_opening_inventory(
         DocumentLine.document_id == int(document_id),
         DocumentLine.product_id.in_(product_ids),
     ).all()
+    products_by_id: Dict[int, Any] = {}
+    if product_ids:
+        products_by_id = {
+            int(product.id): product
+            for product in db.query(Product).filter(Product.id.in_(product_ids)).all()
+        }
     for row in rows:
         info = dict(row.extra_info or {})
         if str(info.get("movement") or "in").strip().lower() != "in":
             continue
         warehouse_id = info.get("warehouse_id")
-        quantity = _decimal(row.quantity)
+        quantity = inventory_quantity_to_main(
+            row.quantity,
+            products_by_id.get(int(row.product_id)),
+            info,
+            strict=False,
+        )
         if warehouse_id is None or quantity <= 0:
             continue
         key = (int(row.product_id), int(warehouse_id))
@@ -86,11 +98,22 @@ def _linked_opening_inventory(
         )
         .all()
     )
+    products_by_id: Dict[int, Any] = {}
+    if product_ids:
+        products_by_id = {
+            int(product.id): product
+            for product in db.query(Product).filter(Product.id.in_(product_ids)).all()
+        }
     for row in rows:
         if row.warehouse_id is None:
             continue
         key = (int(row.product_id), int(row.warehouse_id))
-        quantity = _decimal(row.quantity)
+        quantity = inventory_quantity_to_main(
+            row.quantity,
+            products_by_id.get(int(row.product_id)),
+            getattr(row, "extra_info", None),
+            strict=False,
+        )
         if str(row.movement or "").lower() == "in":
             linked[key] += quantity
         elif str(row.movement or "").lower() == "out":

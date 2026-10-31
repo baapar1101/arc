@@ -35,6 +35,14 @@ from app.core.responses import ApiError, success_response
 from app.core.transaction_lock import acquire_transaction_lock
 from app.services.document_monetization_service import ensure_document_policy_allows_creation
 from app.services.credit_service import get_business_credit_settings
+from app.services.invoice_unit_conversion_service import (
+    INVENTORY_QUANTITY_UNIT_MAIN,
+    extra_info_dict,
+    inventory_price_to_main,
+    inventory_quantity_to_main,
+    price_main_to_line,
+    quantity_line_to_main,
+)
 import jdatetime
 import io
 import csv
@@ -840,13 +848,30 @@ def _remove_old_invoice_warehouse_documents(
         # cancelled: بدون اقدام
 
     if posted_documents:
+        receipt_product_ids = set()
+        receipt_lines: List[Any] = []
         for line in db.query(WarehouseDocumentLine).filter(
             WarehouseDocumentLine.warehouse_document_id.in_(list(posted_documents))
         ).all():
             if str(line.movement or "").strip().lower() != "in" or line.warehouse_id is None:
                 continue
+            receipt_lines.append(line)
+            receipt_product_ids.add(int(line.product_id))
+        receipt_products = {
+            int(row.id): row
+            for row in db.query(Product).filter(
+                Product.business_id == int(business_id),
+                Product.id.in_(list(receipt_product_ids)),
+            ).all()
+        } if receipt_product_ids else {}
+        for line in receipt_lines:
             key = (int(line.product_id), int(line.warehouse_id))
-            posted_receipts[key] += Decimal(str(line.quantity or 0))
+            posted_receipts[key] += inventory_quantity_to_main(
+                line.quantity,
+                receipt_products.get(int(line.product_id)),
+                getattr(line, "extra_info", None),
+                strict=False,
+            )
 
         # The invoice lines have already been replaced by update_invoice. Compare the new
         # receipts with the old posted receipt lines and reject only reductions that would
@@ -871,7 +896,7 @@ def _remove_old_invoice_warehouse_documents(
             for line in db.query(InvoiceItemLine).filter(
                 InvoiceItemLine.document_id == int(invoice_document_id)
             ).all():
-                info = line.extra_info or {}
+                info = extra_info_dict(line.extra_info)
                 from app.services.fixed_asset_capital_purchase import invoice_line_skips_warehouse
 
                 if invoice_line_skips_warehouse(info):
@@ -886,7 +911,12 @@ def _remove_old_invoice_warehouse_documents(
                     key = (int(line.product_id), int(warehouse_id))
                 except (TypeError, ValueError):
                     continue
-                new_receipts[key] += Decimal(str(line.quantity or 0))
+                new_receipts[key] += inventory_quantity_to_main(
+                    line.quantity,
+                    receipt_products.get(int(line.product_id)),
+                    info,
+                    strict=False,
+                )
 
         reductions = {
             key: quantity - new_receipts.get(key, Decimal(0))
@@ -899,7 +929,10 @@ def _remove_old_invoice_warehouse_documents(
                 {
                     "product_id": product_id,
                     "quantity": float(quantity),
-                    "extra_info": {"warehouse_id": warehouse_id},
+                    "extra_info": {
+                        "warehouse_id": warehouse_id,
+                        "inventory_quantity_unit": INVENTORY_QUANTITY_UNIT_MAIN,
+                    },
                 }
                 for (product_id, warehouse_id), quantity in reductions.items()
             if product_id in tracked_product_ids
@@ -1211,14 +1244,22 @@ def _iter_product_movements(
     if not product_ids:
         return []
     # فقط کالاهای با کنترل موجودی را لحاظ کن
-    tracked_ids: List[int] = [
-        int(pid)
-        for pid, tracked in db.query(Product.id, Product.track_inventory).filter(
+    tracked_rows = (
+        db.query(
+            Product.id,
+            Product.track_inventory,
+            Product.main_unit,
+            Product.secondary_unit,
+            Product.unit_conversion_factor,
+        )
+        .filter(
             Product.business_id == business_id,
             Product.id.in_(list({int(pid) for pid in product_ids})),
-        ).all()
-        if bool(tracked)
-    ]
+        )
+        .all()
+    )
+    product_by_id = {int(row.id): row for row in tracked_rows if bool(row.track_inventory)}
+    tracked_ids: List[int] = list(product_by_id)
     if not tracked_ids:
         return []
 
@@ -1277,7 +1318,10 @@ def _iter_product_movements(
                 continue
         if movement not in ("in", "out"):
             continue
-        qty = Decimal(str(line.quantity or 0))
+        movement_product = product_by_id.get(int(line.product_id))
+        qty = inventory_quantity_to_main(
+            line.quantity, movement_product, info, strict=False
+        )
         if qty <= 0:
             continue
         cost_price = None
@@ -1287,9 +1331,13 @@ def _iter_product_movements(
             except Exception:
                 cost_price = None
         if cost_price is None and info.get("cost_price") is not None:
-            cost_price = Decimal(str(info.get("cost_price")))
+            cost_price = inventory_price_to_main(
+                info.get("cost_price"), movement_product, info, strict=False
+            )
         if cost_price is None and info.get("unit_price") is not None:
-            cost_price = Decimal(str(info.get("unit_price")))
+            cost_price = inventory_price_to_main(
+                info.get("unit_price"), movement_product, info, strict=False
+            )
         movements.append(
             {
                 "document_id": doc.id,
@@ -1349,7 +1397,10 @@ def _iter_product_movements(
                 continue
         if movement not in ("in", "out"):
             continue
-        qty = Decimal(str(line.quantity or 0))
+        movement_product = product_by_id.get(int(line.product_id))
+        qty = inventory_quantity_to_main(
+            line.quantity, movement_product, info, strict=False
+        )
         if qty <= 0:
             continue
         cost_price = None
@@ -1359,9 +1410,13 @@ def _iter_product_movements(
             except Exception:
                 cost_price = None
         if cost_price is None and info.get("cost_price") is not None:
-            cost_price = Decimal(str(info.get("cost_price")))
+            cost_price = inventory_price_to_main(
+                info.get("cost_price"), movement_product, info, strict=False
+            )
         if cost_price is None and info.get("unit_price") is not None:
-            cost_price = Decimal(str(info.get("unit_price")))
+            cost_price = inventory_price_to_main(
+                info.get("unit_price"), movement_product, info, strict=False
+            )
         movements.append(
             {
                 "document_id": doc.id,
@@ -1467,15 +1522,19 @@ def _compute_available_stock(
             )
 
     wh_movements = wh_movements_query.with_entities(WarehouseDocumentLine, WarehouseDocument).all()
+    stock_product = db.get(Product, int(product_id))
     for wh_mv, wh_doc in wh_movements:
         # حوالهٔ معکوس لغو: موجودی با cancelled شدن اصل اصلاح شده؛ شمارش مجدد دوبرابر می‌کند.
         # (شامل معکوس فاکتور و معکوس دستی/کالای هزینه-درآمد)
         if _warehouse_doc_is_cancel_reversal_of_cancelled(db, business_id, wh_doc):
             continue
+        qty_main = inventory_quantity_to_main(
+            wh_mv.quantity, stock_product, wh_mv.extra_info, strict=False
+        )
         if wh_mv.movement == "in":
-            bal += Decimal(str(wh_mv.quantity))
+            bal += qty_main
         elif wh_mv.movement == "out":
-            bal -= Decimal(str(wh_mv.quantity))
+            bal -= qty_main
     
     return bal
 
@@ -1550,27 +1609,35 @@ def collect_stock_shortages(
     include_production_reservations: bool = False,
 ) -> List[Dict[str, Any]]:
     # تجمیع نیاز خروجی به تفکیک کالا/انبار
-    required: Dict[Tuple[int, Optional[int]], Decimal] = {}
+    pending_required: List[Tuple[int, Optional[int], Decimal, Dict[str, Any]]] = []
     for ln in outgoing_lines:
         pid = int(ln.get("product_id"))
-        info = ln.get("extra_info") or {}
+        info = extra_info_dict(ln.get("extra_info"))
         wh_id = info.get("warehouse_id")
         qty = Decimal(str(ln.get("quantity", 0) or 0))
-        key = (pid, int(wh_id) if wh_id is not None else None)
-        required[key] = required.get(key, Decimal(0)) + qty
+        pending_required.append((pid, int(wh_id) if wh_id is not None else None, qty, info))
 
     from adapters.db.models.warehouse import Warehouse
 
-    pids = list({k[0] for k in required})
-    wh_ids_unique = sorted({int(k[1]) for k in required if k[1] is not None})
+    pids = list({item[0] for item in pending_required})
+    wh_ids_unique = sorted({int(item[1]) for item in pending_required if item[1] is not None})
     product_labels: Dict[int, Tuple[str, str]] = {}
+    product_units: Dict[int, Any] = {}
     if pids:
         for row in (
-            db.query(Product.id, Product.name, Product.code)
+            db.query(
+                Product.id,
+                Product.name,
+                Product.code,
+                Product.main_unit,
+                Product.secondary_unit,
+                Product.unit_conversion_factor,
+            )
             .filter(Product.business_id == business_id, Product.id.in_(pids))
             .all()
         ):
             product_labels[int(row.id)] = (str(row.name or ""), str(row.code or ""))
+            product_units[int(row.id)] = row
     warehouse_labels: Dict[int, str] = {}
     if wh_ids_unique:
         for row in (
@@ -1579,6 +1646,12 @@ def collect_stock_shortages(
             .all()
         ):
             warehouse_labels[int(row.id)] = str(row.name or "")
+
+    required: Dict[Tuple[int, Optional[int]], Decimal] = {}
+    for pid, wh_id, qty, info in pending_required:
+        qty_main = inventory_quantity_to_main(qty, product_units.get(pid), info, strict=False)
+        key = (pid, wh_id)
+        required[key] = required.get(key, Decimal(0)) + qty_main
 
     shortages: List[Dict[str, Any]] = []
     mode_map: Dict[int, str] = {}
@@ -1776,7 +1849,7 @@ def _validate_outgoing_stock_before_invoice_commit(
         product = products_by_id.get(int(pid))
         if not product or not getattr(product, "track_inventory", False):
             continue
-        extra = dict(ln.get("extra_info") or {})
+        extra = extra_info_dict(ln.get("extra_info"))
         wh_raw = extra.get("warehouse_id")
         if wh_raw is None:
             wh_raw = inv_wh_int
@@ -1798,6 +1871,8 @@ def _validate_outgoing_stock_before_invoice_commit(
                     "warehouse_id": wh_id,
                     "movement": "out",
                     "inventory_tracked": True,
+                    "unit": extra.get("unit"),
+                    "inventory_quantity_unit": extra.get("inventory_quantity_unit"),
                 },
             }
         )
@@ -1833,7 +1908,7 @@ def _validate_outgoing_stock_before_invoice_commit(
         exclude_warehouse_document_ids=None,
         exclude_production_order_id=(document.extra_info or {}).get("production_order_id"),
         include_production_reservations=(
-            document.document_type == INVOICE_PRODUCTION
+            getattr(document, "document_type", None) == INVOICE_PRODUCTION
             and (document.extra_info or {}).get("production_order_id") is not None
         ),
     )
@@ -4474,18 +4549,23 @@ def _calculate_average_purchase_cost(
     
     from app.services.fixed_asset_capital_purchase import invoice_line_skips_inventory_kardex
 
+    avg_product = db.get(Product, int(product_id))
     for line, _doc in purchase_lines:
-        qty = Decimal(str(line.quantity or 0))
+        extra_info = extra_info_dict(line.extra_info)
+        if invoice_line_skips_inventory_kardex(extra_info):
+            continue
+        qty = inventory_quantity_to_main(line.quantity, avg_product, extra_info, strict=False)
         if qty <= 0:
             continue
-        if invoice_line_skips_inventory_kardex(line.extra_info or {}):
-            continue
-        extra_info = line.extra_info or {}
         cost_per_unit = Decimal(0)
         if extra_info.get("cost_price") is not None:
-            cost_per_unit = Decimal(str(extra_info.get("cost_price")))
+            cost_per_unit = inventory_price_to_main(
+                extra_info.get("cost_price"), avg_product, extra_info, strict=False
+            )
         elif extra_info.get("unit_price") is not None:
-            cost_per_unit = Decimal(str(extra_info.get("unit_price")))
+            cost_per_unit = inventory_price_to_main(
+                extra_info.get("unit_price"), avg_product, extra_info, strict=False
+            )
         total_cost += qty * cost_per_unit
         total_qty += qty
     
@@ -4530,8 +4610,9 @@ def _iter_profit_movements_from_invoice_lines(
     movements: List[Dict[str, Any]] = []
     from app.services.fixed_asset_capital_purchase import invoice_line_skips_inventory_kardex
 
+    movement_product = db.get(Product, int(product_id))
     for line, doc in rows:
-        info = line.extra_info or {}
+        info = extra_info_dict(line.extra_info)
         if invoice_line_skips_inventory_kardex(info):
             continue
         if info.get("inventory_tracked") is False and not include_untracked:
@@ -4541,13 +4622,9 @@ def _iter_profit_movements_from_invoice_lines(
             movement, _ = _movement_from_type(doc.document_type)
         if movement not in ("in", "out"):
             continue
-        qty = Decimal(str(line.quantity or 0))
-        if normalize_quantity_to_main:
-            from app.services.invoice_unit_conversion_service import quantity_line_to_main
-
-            movement_product = db.get(Product, int(product_id))
-            if movement_product is not None:
-                qty = quantity_line_to_main(qty, movement_product, info.get("unit"))
+        qty = inventory_quantity_to_main(
+            line.quantity, movement_product, info, strict=False
+        )
         if qty <= 0:
             continue
         wh_id_raw = info.get("warehouse_id")
@@ -4566,9 +4643,13 @@ def _iter_profit_movements_from_invoice_lines(
             except Exception:
                 cost_price = None
         if cost_price is None and info.get("cost_price") is not None:
-            cost_price = Decimal(str(info.get("cost_price")))
+            cost_price = inventory_price_to_main(
+                info.get("cost_price"), movement_product, info, strict=False
+            )
         if cost_price is None and info.get("unit_price") is not None:
-            cost_price = Decimal(str(info.get("unit_price")))
+            cost_price = inventory_price_to_main(
+                info.get("unit_price"), movement_product, info, strict=False
+            )
         movements.append(
             {
                 "document_id": int(doc.id),
@@ -4610,7 +4691,10 @@ def _iter_profit_movements_from_invoice_lines(
     for line, doc in warehouse_rows:
         if warehouse_id is not None and int(line.warehouse_id or 0) != int(warehouse_id):
             continue
-        info = line.extra_info or {}
+        info = extra_info_dict(line.extra_info)
+        qty_main = inventory_quantity_to_main(
+            line.quantity, movement_product, info, strict=False
+        )
         movements.append(
             {
                 "document_id": -int(doc.id),
@@ -4620,8 +4704,10 @@ def _iter_profit_movements_from_invoice_lines(
                 "product_id": int(product_id),
                 "warehouse_id": int(line.warehouse_id) if line.warehouse_id else None,
                 "movement": "in",
-                "quantity": Decimal(str(line.quantity or 0)),
-                "cost_price": Decimal(str(info.get("unit_cost") or 0)),
+                "quantity": qty_main,
+                "cost_price": inventory_price_to_main(
+                    info.get("unit_cost") or 0, movement_product, info, strict=False
+                ),
                 "invoice_item_line_id": -int(line.id),
             }
         )
@@ -4666,8 +4752,8 @@ def _historical_sale_line_unit_cost(
 
     nb = _normalize_invoice_profit_basis(normalized_basis)
 
-    extra_info = ln.extra_info or {}
-    qty = Decimal(str(ln.quantity or 0))
+    extra_info = extra_info_dict(ln.extra_info)
+    qty = inventory_quantity_to_main(ln.quantity, product, extra_info, strict=False)
 
     if nb == "purchase_price":
         from app.services.invoice_purchase_price_snapshot_service import (
@@ -4695,12 +4781,16 @@ def _historical_sale_line_unit_cost(
 
     if nb == "cost_price":
         if extra_info.get("cost_price") is not None:
-            return Decimal(str(extra_info.get("cost_price")))
+            return inventory_price_to_main(
+                extra_info.get("cost_price"), product, extra_info, strict=False
+            )
         return Decimal(str(product.base_purchase_price or 0))
 
     if nb == "actual_cost":
         if extra_info.get("cost_price") is not None:
-            return Decimal(str(extra_info.get("cost_price")))
+            return inventory_price_to_main(
+                extra_info.get("cost_price"), product, extra_info, strict=False
+            )
         if extra_info.get("cogs_amount") is not None and qty > 0:
             return Decimal(str(extra_info.get("cogs_amount"))) / qty
         return Decimal(str(product.base_purchase_price or 0))
@@ -5245,6 +5335,26 @@ def _calculate_weighted_average_cost(
     return _calculate_average_purchase_cost(db, business_id, product_id, as_of_date)
 
 
+def _invoice_line_qty_main(product: Product, line: Any) -> Decimal:
+    extra = extra_info_dict(getattr(line, "extra_info", None))
+    return inventory_quantity_to_main(getattr(line, "quantity", 0), product, extra, strict=False)
+
+
+def _main_cost_to_line_unit(cost_main: Decimal, product: Product, line: Any) -> Decimal:
+    extra = extra_info_dict(getattr(line, "extra_info", None))
+    return price_main_to_line(cost_main, product, extra.get("unit"), strict=False)
+
+
+def _base_purchase_as_line_unit(product: Product, line: Any) -> Decimal:
+    extra = extra_info_dict(getattr(line, "extra_info", None))
+    return price_main_to_line(
+        Decimal(str(product.base_purchase_price or 0)),
+        product,
+        extra.get("unit"),
+        strict=False,
+    )
+
+
 def _get_cost_per_unit_by_basis(
     db: Session,
     business_id: int,
@@ -5259,9 +5369,10 @@ def _get_cost_per_unit_by_basis(
     """
     محاسبه هزینه هر واحد بر اساس مبنای انتخاب شده
     """
-    extra_info = line.extra_info or {}
+    extra_info = extra_info_dict(line.extra_info)
     normalized_basis = _normalize_invoice_profit_basis(calculation_basis)
     sm = _normalize_invoice_profit_fifo_shortage_mode(fifo_shortage_mode)
+    qty_main = _invoice_line_qty_main(product, line)
     
     if normalized_basis == "purchase_price":
         from app.services.invoice_purchase_price_snapshot_service import (
@@ -5284,88 +5395,112 @@ def _get_cost_per_unit_by_basis(
     elif normalized_basis == "cost_price":
         if extra_info.get("cost_price") is not None:
             return Decimal(str(extra_info.get("cost_price")))
-        return Decimal(str(product.base_purchase_price or 0))
+        return _base_purchase_as_line_unit(product, line)
     
     elif normalized_basis == "actual_cost":
         if extra_info.get("cost_price") is not None:
             return Decimal(str(extra_info.get("cost_price")))
         if extra_info.get("cogs_amount") is not None and line.quantity > 0:
             return Decimal(str(extra_info.get("cogs_amount"))) / Decimal(str(line.quantity))
-        return Decimal(str(product.base_purchase_price or 0))
+        return _base_purchase_as_line_unit(product, line)
     
     elif normalized_basis == "average_cost":
-        return _calculate_average_purchase_cost(db, business_id, product.id, document_date)
+        return _main_cost_to_line_unit(
+            _calculate_average_purchase_cost(db, business_id, product.id, document_date),
+            product,
+            line,
+        )
     
     elif normalized_basis == "fifo":
         _doc_id = getattr(line, "document_id", None)
         _line_id = getattr(line, "id", None)
-        return _calculate_fifo_cost(
-            db,
-            business_id,
-            product.id,
-            Decimal(str(line.quantity)),
-            document_date,
-            warehouse_id,
-            document_id=int(_doc_id) if _doc_id is not None else None,
-            invoice_item_line_id=int(_line_id) if _line_id is not None else None,
-            fifo_shortage_mode=sm,
+        return _main_cost_to_line_unit(
+            _calculate_fifo_cost(
+                db,
+                business_id,
+                product.id,
+                qty_main,
+                document_date,
+                warehouse_id,
+                document_id=int(_doc_id) if _doc_id is not None else None,
+                invoice_item_line_id=int(_line_id) if _line_id is not None else None,
+                fifo_shortage_mode=sm,
+            ),
+            product,
+            line,
         )
 
     elif normalized_basis == "fifo_jbfn":
         _doc_id = getattr(line, "document_id", None)
         _line_id = getattr(line, "id", None)
-        return _calculate_fifo_jbfn_cost(
-            db,
-            business_id,
-            product.id,
-            Decimal(str(line.quantity)),
-            document_date,
-            warehouse_id,
-            document_id=int(_doc_id) if _doc_id is not None else None,
-            invoice_item_line_id=int(_line_id) if _line_id is not None else None,
-            fifo_shortage_mode=sm,
+        return _main_cost_to_line_unit(
+            _calculate_fifo_jbfn_cost(
+                db,
+                business_id,
+                product.id,
+                qty_main,
+                document_date,
+                warehouse_id,
+                document_id=int(_doc_id) if _doc_id is not None else None,
+                invoice_item_line_id=int(_line_id) if _line_id is not None else None,
+                fifo_shortage_mode=sm,
+            ),
+            product,
+            line,
         )
 
     elif normalized_basis == "lifo":
         _doc_id = getattr(line, "document_id", None)
         _line_id = getattr(line, "id", None)
-        return _calculate_lifo_cost(
-            db,
-            business_id,
-            product.id,
-            Decimal(str(line.quantity)),
-            document_date,
-            warehouse_id,
-            document_id=int(_doc_id) if _doc_id is not None else None,
-            invoice_item_line_id=int(_line_id) if _line_id is not None else None,
-            fifo_shortage_mode=sm,
+        return _main_cost_to_line_unit(
+            _calculate_lifo_cost(
+                db,
+                business_id,
+                product.id,
+                qty_main,
+                document_date,
+                warehouse_id,
+                document_id=int(_doc_id) if _doc_id is not None else None,
+                invoice_item_line_id=int(_line_id) if _line_id is not None else None,
+                fifo_shortage_mode=sm,
+            ),
+            product,
+            line,
         )
 
     elif normalized_basis == "moving_weighted_average":
         _doc_id = getattr(line, "document_id", None)
         _line_id = getattr(line, "id", None)
-        return _calculate_moving_weighted_average_cost(
-            db,
-            business_id,
-            product.id,
-            Decimal(str(line.quantity)),
-            document_date,
-            warehouse_id,
-            document_id=int(_doc_id) if _doc_id is not None else None,
-            invoice_item_line_id=int(_line_id) if _line_id is not None else None,
-            fifo_shortage_mode=sm,
+        return _main_cost_to_line_unit(
+            _calculate_moving_weighted_average_cost(
+                db,
+                business_id,
+                product.id,
+                qty_main,
+                document_date,
+                warehouse_id,
+                document_id=int(_doc_id) if _doc_id is not None else None,
+                invoice_item_line_id=int(_line_id) if _line_id is not None else None,
+                fifo_shortage_mode=sm,
+            ),
+            product,
+            line,
         )
     
     elif normalized_basis == "weighted_average":
-        return _calculate_weighted_average_cost(db, business_id, product.id, document_date)
+        return _main_cost_to_line_unit(
+            _calculate_weighted_average_cost(db, business_id, product.id, document_date),
+            product,
+            line,
+        )
     
     elif normalized_basis == "standard_cost":
         if extra_info.get("standard_cost") is not None:
             return Decimal(str(extra_info.get("standard_cost")))
-        return Decimal(str(product.base_purchase_price or 0))
+        return _base_purchase_as_line_unit(product, line)
     
     else:
-        return Decimal(str(product.base_purchase_price or 0))
+        return _base_purchase_as_line_unit(product, line)
 
 
 def _calculate_overhead_cost(
@@ -5415,7 +5550,8 @@ def _invoice_profit_line_sale_cost_per_unit(
     expected_base_currency_id: int | None = None,
 ) -> Decimal:
     """بهای هر واحد در ردیف فاکتور فروش یا خدمت (مسیر عمومی)، بدون منطق خاص بازگشت کالای ورودی."""
-    extra_info = item_line.extra_info or {}
+    extra_info = extra_info_dict(item_line.extra_info)
+    qty_main = inventory_quantity_to_main(qty, product, extra_info, strict=False)
 
     if normalized_basis == "purchase_price":
         from app.services.invoice_purchase_price_snapshot_service import (
@@ -5439,79 +5575,103 @@ def _invoice_profit_line_sale_cost_per_unit(
     if normalized_basis == "cost_price":
         if extra_info.get("cost_price") is not None:
             return Decimal(str(extra_info.get("cost_price")))
-        return Decimal(str(product.base_purchase_price or 0))
+        return _base_purchase_as_line_unit(product, item_line)
 
     if normalized_basis == "actual_cost":
         if extra_info.get("cost_price") is not None:
             return Decimal(str(extra_info.get("cost_price")))
         if extra_info.get("cogs_amount") is not None and qty > 0:
             return Decimal(str(extra_info.get("cogs_amount"))) / qty
-        return Decimal(str(product.base_purchase_price or 0))
+        return _base_purchase_as_line_unit(product, item_line)
 
     if normalized_basis == "average_cost":
-        return _calculate_average_purchase_cost(db, business_id, product.id, document_date)
+        return _main_cost_to_line_unit(
+            _calculate_average_purchase_cost(db, business_id, product.id, document_date),
+            product,
+            item_line,
+        )
 
     if normalized_basis == "fifo":
-        return _calculate_fifo_cost(
-            db,
-            business_id,
-            product.id,
-            qty,
-            document_date,
-            warehouse_id,
-            document_id=document_id_hdr,
-            invoice_item_line_id=int(item_line.id),
-            fifo_shortage_mode=fifo_sm,
+        return _main_cost_to_line_unit(
+            _calculate_fifo_cost(
+                db,
+                business_id,
+                product.id,
+                qty_main,
+                document_date,
+                warehouse_id,
+                document_id=document_id_hdr,
+                invoice_item_line_id=int(item_line.id),
+                fifo_shortage_mode=fifo_sm,
+            ),
+            product,
+            item_line,
         )
 
     if normalized_basis == "fifo_jbfn":
-        return _calculate_fifo_jbfn_cost(
-            db,
-            business_id,
-            product.id,
-            qty,
-            document_date,
-            warehouse_id,
-            document_id=document_id_hdr,
-            invoice_item_line_id=int(item_line.id),
-            fifo_shortage_mode=fifo_sm,
+        return _main_cost_to_line_unit(
+            _calculate_fifo_jbfn_cost(
+                db,
+                business_id,
+                product.id,
+                qty_main,
+                document_date,
+                warehouse_id,
+                document_id=document_id_hdr,
+                invoice_item_line_id=int(item_line.id),
+                fifo_shortage_mode=fifo_sm,
+            ),
+            product,
+            item_line,
         )
 
     if normalized_basis == "lifo":
-        return _calculate_lifo_cost(
-            db,
-            business_id,
-            product.id,
-            qty,
-            document_date,
-            warehouse_id,
-            document_id=document_id_hdr,
-            invoice_item_line_id=int(item_line.id),
-            fifo_shortage_mode=fifo_sm,
+        return _main_cost_to_line_unit(
+            _calculate_lifo_cost(
+                db,
+                business_id,
+                product.id,
+                qty_main,
+                document_date,
+                warehouse_id,
+                document_id=document_id_hdr,
+                invoice_item_line_id=int(item_line.id),
+                fifo_shortage_mode=fifo_sm,
+            ),
+            product,
+            item_line,
         )
 
     if normalized_basis == "moving_weighted_average":
-        return _calculate_moving_weighted_average_cost(
-            db,
-            business_id,
-            product.id,
-            qty,
-            document_date,
-            warehouse_id,
-            document_id=document_id_hdr,
-            invoice_item_line_id=int(item_line.id),
-            fifo_shortage_mode=fifo_sm,
+        return _main_cost_to_line_unit(
+            _calculate_moving_weighted_average_cost(
+                db,
+                business_id,
+                product.id,
+                qty_main,
+                document_date,
+                warehouse_id,
+                document_id=document_id_hdr,
+                invoice_item_line_id=int(item_line.id),
+                fifo_shortage_mode=fifo_sm,
+            ),
+            product,
+            item_line,
         )
 
     if normalized_basis == "weighted_average":
-        return _calculate_weighted_average_cost(db, business_id, product.id, document_date)
+        return _main_cost_to_line_unit(
+            _calculate_weighted_average_cost(db, business_id, product.id, document_date),
+            product,
+            item_line,
+        )
 
     if normalized_basis == "standard_cost":
         if extra_info.get("standard_cost") is not None:
             return Decimal(str(extra_info.get("standard_cost")))
-        return Decimal(str(product.base_purchase_price or 0))
+        return _base_purchase_as_line_unit(product, item_line)
 
-    return Decimal(str(product.base_purchase_price or 0))
+    return _base_purchase_as_line_unit(product, item_line)
 
 
 def _invoice_line_net_before_global_discount(item_line: Any) -> Decimal:
@@ -5886,15 +6046,12 @@ def _calculate_invoice_profit(
                         mvl = _mv_list_pid_wh(product.id, wh_iter)
                         idx_ln = _find_profit_movement_index_for_line(mvl, int(item_line.id))
                         if idx_ln is not None:
-                            restoration_qty_for_match = qty
-                            if normalized_basis == "purchase_price":
-                                from app.services.invoice_unit_conversion_service import quantity_line_to_main
-
-                                restoration_qty_for_match = quantity_line_to_main(
-                                    qty,
-                                    product,
-                                    extra_info.get("unit"),
-                                )
+                            restoration_qty_for_match = quantity_line_to_main(
+                                qty,
+                                product,
+                                extra_info.get("unit"),
+                                strict=False,
+                            )
                             cost_per_unit = _restoration_unit_cost_sales_return_match_prior_sales(
                                 db,
                                 business_id,
@@ -5910,14 +6067,12 @@ def _calculate_invoice_profit(
                                 fallback_line=item_line,
                                 missing_purchase_price_policy=missing_purchase_price_policy,
                             )
-                            if normalized_basis == "purchase_price":
-                                from app.services.invoice_unit_conversion_service import price_main_to_line
-
-                                cost_per_unit = price_main_to_line(
-                                    cost_per_unit,
-                                    product,
-                                    extra_info.get("unit"),
-                                )
+                            cost_per_unit = price_main_to_line(
+                                cost_per_unit,
+                                product,
+                                extra_info.get("unit"),
+                                strict=False,
+                            )
                         else:
                             if normalized_basis == "purchase_price":
                                 from app.services.invoice_purchase_price_snapshot_service import (
@@ -5929,8 +6084,12 @@ def _calculate_invoice_profit(
                                     missing_purchase_price_policy,
                                 )
                             else:
-                                cost_per_unit = _calculate_average_purchase_cost(
-                                    db, business_id, product.id, document.document_date
+                                cost_per_unit = _main_cost_to_line_unit(
+                                    _calculate_average_purchase_cost(
+                                        db, business_id, product.id, document.document_date
+                                    ),
+                                    product,
+                                    item_line,
                                 )
                     total_line_cost = qty * cost_per_unit
                     line_gross_profit = sales_amount + total_line_cost

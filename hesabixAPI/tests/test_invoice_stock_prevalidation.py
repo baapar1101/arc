@@ -22,10 +22,15 @@ def _prevalidation_db() -> MagicMock:
     def _query(model, *unused_models):
         query = MagicMock()
         if model is Product:
-            query.filter.return_value.first.return_value = SimpleNamespace(
+            product = SimpleNamespace(
                 id=520098,
                 track_inventory=True,
+                main_unit=None,
+                secondary_unit=None,
+                unit_conversion_factor=None,
             )
+            query.filter.return_value.first.return_value = product
+            query.filter.return_value.all.return_value = [product]
         elif model is Business:
             query.filter.return_value.first.return_value = SimpleNamespace(
                 allow_negative_inventory_for_bulk=False,
@@ -44,6 +49,7 @@ def test_precommit_validation_excludes_current_invoice_from_available_stock() ->
     document = SimpleNamespace(
         id=731,
         is_proforma=False,
+        document_type=INVOICE_SALES,
         document_date=date(2026, 10, 3),
         extra_info={"auto_post_warehouse": True, "warehouse_id": 9},
     )

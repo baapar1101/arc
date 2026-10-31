@@ -5606,10 +5606,15 @@ async def import_invoices_excel(
                     line_errors.append("قیمت واحد الزامی است")
                     continue
                 
-                # Unit
-                unit = str(row_data.get("unit", "main")).strip().lower()
-                if unit not in ("main", "secondary"):
-                    unit = "main"
+                # Unit: Excel uses main/secondary aliases; store the product's real unit label
+                # so inventory conversion matches UI invoices.
+                unit_key = str(row_data.get("unit", "main")).strip().lower()
+                if unit_key not in ("main", "secondary"):
+                    unit_key = "main"
+                if unit_key == "secondary" and getattr(product, "secondary_unit", None):
+                    unit = str(product.secondary_unit).strip()
+                else:
+                    unit = str(getattr(product, "main_unit", None) or "").strip() or None
                 
                 # Discount
                 discount_type = str(row_data.get("discount_type", "amount")).strip().lower()
@@ -5649,6 +5654,8 @@ async def import_invoices_excel(
                     "discount_value": float(discount_value),
                     "tax_rate": float(tax_rate),
                 }
+                if unit:
+                    line_extra_info["unit"] = unit
                 if movement:
                     line_extra_info["movement"] = movement
                 if warehouse_id:

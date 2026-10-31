@@ -105,8 +105,8 @@ USER_TEMPLATE_COLUMNS: List[ImportColumn] = [
     ImportColumn(
         "unit_conversion_factor",
         {"fa": "ضریب تبدیل", "en": "Unit Conversion Factor"},
-        "چند واحد اصلی در یک واحد فرعی. مثال: ۱۲.",
-        "How many main units in one secondary unit. Example: 12.",
+        "چند واحد فرعی در یک واحد اصلی. مثال: ۱ کارتن = ۱۲ عدد، ضریب ۱۲.",
+        "How many secondary units in one main unit. Example: 1 carton = 12 pcs, factor 12.",
         aliases=("unit conversion factor", "conversion factor"),
         group="units",
     ),

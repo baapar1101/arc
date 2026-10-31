@@ -32,6 +32,13 @@ from adapters.api.v1.schemas import QueryInfo, FilterItem
 from app.services.query_service import QueryService
 from app.services.product_attribute_service import validate_custom_attributes
 from app.services.document_numbering_service import generate_document_code
+from app.services.invoice_unit_conversion_service import (
+	extra_info_dict,
+	inventory_quantity_to_main,
+	payload_line_unit,
+	quantity_main_to_line,
+	warehouse_payload_quantity_to_main,
+)
 
 _INVOICE_TYPE_LABELS_FA = {
 	"invoice_sales": "فاکتور فروش",
@@ -579,14 +586,59 @@ def _warehouse_line_matches_invoice_movement(invoice_document_type: str, movemen
 _WAREHOUSE_QTY_EPSILON = Decimal("0.000001")
 
 
+def _products_by_id_for_lines(db: Session, business_id: int, item_rows: List[Any]) -> Dict[int, Any]:
+	pids = sorted({int(row.product_id) for row in item_rows if getattr(row, "product_id", None)})
+	if not pids:
+		return {}
+	return {
+		int(product.id): product
+		for product in db.query(Product).filter(
+			Product.business_id == int(business_id),
+			Product.id.in_(pids),
+		).all()
+	}
+
+
+def _warehouse_qty_in_invoice_line_unit(
+	raw_qty: Any,
+	product: Any,
+	warehouse_extra: Any,
+	invoice_unit: str | None,
+) -> Decimal:
+	"""Express a stored warehouse quantity in the invoice line's unit."""
+	qty_main = inventory_quantity_to_main(raw_qty, product, warehouse_extra, strict=False)
+	if product is None:
+		return qty_main
+	return quantity_main_to_line(qty_main, product, invoice_unit, strict=False)
+
+
+def _normalize_warehouse_line_quantity(
+	product: Any,
+	quantity: Any,
+	extra_info: Any = None,
+	line_unit: str | None = None,
+) -> tuple[Decimal, Dict[str, Any]]:
+	extra = dict(extra_info_dict(extra_info))
+	if line_unit is not None:
+		extra["unit"] = line_unit
+	return warehouse_payload_quantity_to_main(product, quantity, extra)
+
+
 def _compute_line_quantities_core(
 	invoice_document_type: str,
 	item_rows: List[Any],
 	warehouse_docs: List[WarehouseDocument],
+	products_by_id: Optional[Dict[int, Any]] = None,
 ) -> List[Dict[str, Any]]:
-	"""هستهٔ محاسبه required/processed/remaining برای ردیف‌های فاکتور."""
-	processed_by_line: Dict[int, Decimal] = {}
-	orphan_by_product: Dict[int, Decimal] = {}
+	"""هستهٔ محاسبه required/processed/remaining برای ردیف‌های فاکتور.
+
+	remaining در واحد ردیف فاکتور برمی‌گردد تا UI صدور حواله همان تعداد واردشده
+	را ببیند. تعداد حوالهٔ ذخیره‌شده ابتدا به واحد اصلی و بعد به واحد ردیف فاکتور
+	برگردانده می‌شود تا حواله‌های قدیمی (کپی واحد فرعی) و جدید (واحد اصلی) یکی شوند.
+	"""
+	products_by_id = products_by_id or {}
+	processed_main_by_line: Dict[int, Decimal] = {}
+	orphan_main_by_product: Dict[int, Decimal] = {}
 
 	for wh_doc in warehouse_docs:
 		if (wh_doc.status or "").strip().lower() != "posted":
@@ -597,27 +649,36 @@ def _compute_line_quantities_core(
 			qty = Decimal(str(wh_line.quantity or 0))
 			if qty <= 0:
 				continue
-			extra = wh_line.extra_info or {}
+			extra = extra_info_dict(getattr(wh_line, "extra_info", None))
+			product = products_by_id.get(int(wh_line.product_id)) if wh_line.product_id is not None else None
+			qty_main = inventory_quantity_to_main(qty, product, extra, strict=False)
 			line_id = extra.get("invoice_item_line_id")
 			if line_id is not None:
 				try:
-					processed_by_line[int(line_id)] = processed_by_line.get(int(line_id), Decimal(0)) + qty
+					processed_main_by_line[int(line_id)] = processed_main_by_line.get(int(line_id), Decimal(0)) + qty_main
 				except (TypeError, ValueError):
-					orphan_by_product[wh_line.product_id] = orphan_by_product.get(wh_line.product_id, Decimal(0)) + qty
+					orphan_main_by_product[wh_line.product_id] = orphan_main_by_product.get(wh_line.product_id, Decimal(0)) + qty_main
 			else:
-				orphan_by_product[wh_line.product_id] = orphan_by_product.get(wh_line.product_id, Decimal(0)) + qty
+				orphan_main_by_product[wh_line.product_id] = orphan_main_by_product.get(wh_line.product_id, Decimal(0)) + qty_main
 
 	from app.services.fixed_asset_capital_purchase import invoice_line_skips_warehouse
 
 	line_quantities: List[Dict[str, Any]] = []
+	invoice_unit_by_entry: Dict[int, Optional[str]] = {}
 	for row in item_rows:
 		if not row.product_id:
 			continue
-		if invoice_line_skips_warehouse(row.extra_info or {}):
+		if invoice_line_skips_warehouse(getattr(row, "extra_info", None) or {}):
 			continue
+		product = products_by_id.get(int(row.product_id))
+		invoice_extra = extra_info_dict(getattr(row, "extra_info", None))
+		invoice_unit = invoice_extra.get("unit")
 		required = Decimal(str(row.quantity or 0))
-		processed = processed_by_line.get(int(row.id), Decimal(0))
+		processed_main = processed_main_by_line.get(int(row.id), Decimal(0))
+		processed = quantity_main_to_line(processed_main, product, invoice_unit, strict=False)
 		remaining = required - processed
+		entry_index = len(line_quantities)
+		invoice_unit_by_entry[entry_index] = invoice_unit
 		line_quantities.append(
 			{
 				"invoice_item_line_id": int(row.id),
@@ -628,21 +689,25 @@ def _compute_line_quantities_core(
 			}
 		)
 
-	for pid, orphan_qty in orphan_by_product.items():
-		left = orphan_qty
-		if left <= 0:
+	for pid, orphan_main in orphan_main_by_product.items():
+		left_main = orphan_main
+		if left_main <= 0:
 			continue
-		for entry in line_quantities:
-			if entry["product_id"] != pid or left <= 0:
+		product = products_by_id.get(int(pid))
+		for idx, entry in enumerate(line_quantities):
+			if entry["product_id"] != pid or left_main <= 0:
 				continue
+			invoice_unit = invoice_unit_by_entry.get(idx)
 			req = Decimal(str(entry["required_quantity"]))
 			proc = Decimal(str(entry["processed_quantity"]))
-			space = req - proc
-			if space <= 0:
+			space_line = req - proc
+			if space_line <= 0:
 				continue
-			take = min(left, space)
-			proc += take
-			left -= take
+			space_main = inventory_quantity_to_main(space_line, product, {"unit": invoice_unit}, strict=False)
+			take_main = min(left_main, space_main)
+			take_line = quantity_main_to_line(take_main, product, invoice_unit, strict=False)
+			proc += take_line
+			left_main -= take_main
 			entry["processed_quantity"] = float(proc)
 			rem = req - proc
 			entry["remaining_quantity"] = float(rem) if rem > _WAREHOUSE_QTY_EPSILON else 0.0
@@ -678,7 +743,12 @@ def compute_invoice_line_quantities(
 		.all()
 	)
 
-	return _compute_line_quantities_core(invoice.document_type, item_rows, warehouse_docs)
+	return _compute_line_quantities_core(
+		invoice.document_type,
+		item_rows,
+		warehouse_docs,
+		products_by_id=_products_by_id_for_lines(db, business_id, item_rows),
+	)
 
 
 def compute_invoice_line_quantities_batch(
@@ -720,6 +790,7 @@ def compute_invoice_line_quantities_batch(
 		if wh.source_document_id is not None:
 			wh_by_invoice[int(wh.source_document_id)].append(wh)
 
+	products_by_id = _products_by_id_for_lines(db, business_id, item_rows)
 	result: Dict[int, List[Dict[str, Any]]] = {}
 	for inv in invoices:
 		inv_id = int(inv.id)
@@ -727,6 +798,7 @@ def compute_invoice_line_quantities_batch(
 			inv.document_type,
 			items_by_invoice.get(inv_id, []),
 			wh_by_invoice.get(inv_id, []),
+			products_by_id=products_by_id,
 		)
 	return result
 
@@ -1356,6 +1428,13 @@ def create_from_invoice(
 				if instance_count > int(qty):
 					raise ApiError("INSTANCE_COUNT_EXCEEDS_QUANTITY", f"خط با product_id {pid}: تعداد کالاهای یونیک ({instance_count}) نمی‌تواند از تعداد وارد شده ({int(qty)}) بیشتر باشد", http_status=400)
 
+		qty, extra = _normalize_warehouse_line_quantity(
+			product,
+			qty,
+			extra,
+			payload_line_unit(ln, extra),
+		)
+
 		line_wh_loc = _warehouse_location_id_from_payload(
 			{"warehouse_location_id": ln.get("warehouse_location_id"), "extra_info": extra}
 		)
@@ -1852,6 +1931,12 @@ def create_manual_warehouse_document(
 				extra_info_transfer["instance_ids"] = final_instance_ids
 			
 			loc_from, loc_to = _transfer_location_pair_from_payload(ln)
+			qty, extra_info_transfer = _normalize_warehouse_line_quantity(
+				product,
+				qty,
+				extra_info_transfer,
+				payload_line_unit(ln, extra_info_transfer),
+			)
 
 			# ایجاد خط خروج از مبدا
 			wline_out = WarehouseDocumentLine(
@@ -1925,6 +2010,13 @@ def create_manual_warehouse_document(
 					# برای کالاهای یونیک، تعداد instance ها باید با quantity برابر باشد
 					if instance_count > int(qty):
 						raise ApiError("INSTANCE_COUNT_EXCEEDS_QUANTITY", f"خط {i}: تعداد کالاهای یونیک ({instance_count}) نمی‌تواند از تعداد وارد شده ({int(qty)}) بیشتر باشد", http_status=400)
+
+			qty, extra_info = _normalize_warehouse_line_quantity(
+				product,
+				qty,
+				extra_info,
+				payload_line_unit(ln, extra_info),
+			)
 			
 			line_wh_loc = _warehouse_location_id_from_payload(ln)
 			wline = WarehouseDocumentLine(
@@ -2002,12 +2094,12 @@ def create_linked_warehouse_document_bulk(
 		)
 
 	product_ids = sorted({int(line.get("product_id")) for line in lines if line.get("product_id")})
-	products = db.query(Product.id).filter(
+	products = db.query(Product).filter(
 		Product.business_id == int(business_id),
 		Product.id.in_(product_ids),
 	).all()
-	found_product_ids = {int(row.id) for row in products}
-	missing_product_ids = [pid for pid in product_ids if pid not in found_product_ids]
+	products_by_id = {int(row.id): row for row in products}
+	missing_product_ids = [pid for pid in product_ids if pid not in products_by_id]
 	if missing_product_ids:
 		raise ApiError(
 			"PRODUCT_NOT_FOUND",
@@ -2027,9 +2119,13 @@ def create_linked_warehouse_document_bulk(
 		if quantity <= 0 or quantity > _MAX_WAREHOUSE_LINE_QUANTITY:
 			raise ApiError("INVALID_QUANTITY", f"خط {index}: تعداد معتبر نیست", http_status=400)
 		line_extra = line.get("extra_info")
-		normalized_lines.append(
-			(int(pid), quantity, dict(line_extra) if isinstance(line_extra, dict) else {})
+		quantity, stamped_extra = _normalize_warehouse_line_quantity(
+			products_by_id[int(pid)],
+			quantity,
+			line_extra,
+			payload_line_unit(line, line_extra),
 		)
+		normalized_lines.append((int(pid), quantity, stamped_extra))
 
 	wh: Optional[WarehouseDocument] = None
 	for attempt in range(10):
@@ -2790,6 +2886,13 @@ def update_warehouse_document(
 						# اضافه کردن به لیست کلی instance های جدید
 						if isinstance(final_instance_ids, list):
 							all_new_instance_ids.extend([int(x) for x in final_instance_ids if x is not None])
+
+					qty, extra_info = _normalize_warehouse_line_quantity(
+						product,
+						qty,
+						extra_info,
+						payload_line_unit(ln, extra_info),
+					)
 					
 					line_wh_loc = _warehouse_location_id_from_payload(ln)
 					wline = WarehouseDocumentLine(
@@ -2916,7 +3019,18 @@ def update_warehouse_document_line(
 		qty = Decimal(str(data.get("quantity") or 0))
 		if qty <= 0:
 			raise ApiError("INVALID_QUANTITY", "تعداد باید مثبت باشد", http_status=400)
+		product = db.query(Product).filter(
+			and_(Product.id == int(wline.product_id), Product.business_id == business_id)
+		).first()
+		line_extra = data.get("extra_info") if "extra_info" in data else wline.extra_info
+		qty, stamped_extra = _normalize_warehouse_line_quantity(
+			product,
+			qty,
+			line_extra,
+			payload_line_unit(data, line_extra),
+		)
 		wline.quantity = qty
+		wline.extra_info = stamped_extra
 	
 	if "movement" in data:
 		movement = data.get("movement")
@@ -2924,7 +3038,7 @@ def update_warehouse_document_line(
 			raise ApiError("INVALID_MOVEMENT", "movement باید 'in' یا 'out' باشد", http_status=400)
 		wline.movement = movement
 	
-	if "extra_info" in data:
+	if "extra_info" in data and "quantity" not in data:
 		wline.extra_info = data.get("extra_info")
 
 	if "warehouse_location_id" in data:
@@ -3018,6 +3132,7 @@ def post_warehouse_document(
 			
 			# وضعیت کنترل موجودی همه کالاهای سند بالاتر به‌صورت bulk خوانده شده است.
 			if int(ln.product_id) in tracked_product_ids:
+				line_extra = extra_info_dict(ln.extra_info)
 				outgoing_lines.append({
 					"product_id": ln.product_id,
 					"quantity": float(ln.quantity),
@@ -3025,6 +3140,8 @@ def post_warehouse_document(
 						"warehouse_id": ln.warehouse_id,
 						"movement": "out",
 						"inventory_tracked": True,
+						"unit": line_extra.get("unit"),
+						"inventory_quantity_unit": line_extra.get("inventory_quantity_unit"),
 						**({"production_order_id": exclude_production_order_id} if exclude_production_order_id is not None else {}),
 					},
 				})
@@ -3590,6 +3707,10 @@ def warehouse_document_to_dict(db: Session, wh: WarehouseDocument) -> Dict[str, 
 			d["product_name"] = p.name
 			d["product_code"] = p.code
 			d["product_main_unit"] = p.main_unit
+			d["product_secondary_unit"] = p.secondary_unit
+			d["unit_conversion_factor"] = (
+				float(p.unit_conversion_factor) if p.unit_conversion_factor is not None else None
+			)
 			if p.category_id:
 				cat = categories_map.get(int(p.category_id))
 				cat_title = _category_display_title(cat)
@@ -4526,17 +4647,22 @@ def create_stock_count_adjustment(
 		if not product:
 			continue
 		
+		quantity, stamped_extra = _normalize_warehouse_line_quantity(
+			product,
+			quantity,
+			{
+				"system_quantity": item.get("system_quantity"),
+				"physical_quantity": item.get("physical_quantity"),
+				"difference": item.get("difference"),
+			},
+		)
 		line = WarehouseDocumentLine(
 			warehouse_document_id=wh.id,
 			product_id=int(product_id),
 			warehouse_id=int(warehouse_id) if warehouse_id else None,
 			movement=movement,
 			quantity=quantity,
-			extra_info={
-				"system_quantity": item.get("system_quantity"),
-				"physical_quantity": item.get("physical_quantity"),
-				"difference": item.get("difference"),
-			},
+			extra_info=stamped_extra,
 		)
 		db.add(line)
 	
@@ -4597,10 +4723,31 @@ def get_physical_stock_bulk(
 
 	lines = lines_query.all()
 
+	convert_product_ids = {
+		int(line.product_id)
+		for line, _doc in lines
+		if isinstance(getattr(line, "extra_info", None), dict)
+		and (
+			line.extra_info.get("unit")
+			or line.extra_info.get("inventory_quantity_unit")
+		)
+	}
+	products_by_id: Dict[int, Any] = {}
+	if convert_product_ids:
+		products_by_id = {
+			int(product.id): product
+			for product in db.query(Product).filter(Product.id.in_(list(convert_product_ids))).all()
+		}
+
 	stock_dict: Dict[int, Decimal] = {}
 	for line, _doc in lines:
 		pid = int(line.product_id)
-		qty = Decimal(str(line.quantity or 0))
+		qty = inventory_quantity_to_main(
+			line.quantity,
+			products_by_id.get(pid),
+			getattr(line, "extra_info", None),
+			strict=False,
+		)
 		if qty <= 0:
 			continue
 

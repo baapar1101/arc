@@ -860,7 +860,11 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
                               final productName = lineMap['product_name'] as String?;
                               final productCode = lineMap['product_code'] as String?;
                               final productCategoryName = lineMap['product_category_name'] as String?;
-                              final unit = lineMap['product_main_unit'] as String?;
+                              final extra = lineMap['extra_info'];
+                              final extraUnit = extra is Map ? extra['unit']?.toString() : null;
+                              final unit = (extraUnit != null && extraUnit.trim().isNotEmpty)
+                                  ? extraUnit
+                                  : lineMap['product_main_unit'] as String?;
                               final instanceSummary = _instanceSummaryText(lineMap['instance_data']);
 
                               return DataRow(

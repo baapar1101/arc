@@ -116,6 +116,110 @@ class _WarehouseDocumentFormDialogState
     return (line['quantity'] as num?)?.toDouble() ?? 0.0;
   }
 
+  Map<String, dynamic> _lineExtra(Map<String, dynamic> line) {
+    final extra = line['extra_info'];
+    return extra is Map<String, dynamic>
+        ? Map<String, dynamic>.from(extra)
+        : <String, dynamic>{};
+  }
+
+  bool _lineQuantityStoredAsMain(Map<String, dynamic> line) {
+    final flag = _lineExtra(line)['inventory_quantity_unit']?.toString().toLowerCase();
+    return flag == 'main' || flag == 'main_unit';
+  }
+
+  String? _lineSelectedUnit(Map<String, dynamic> line) {
+    final extraUnit = _lineExtra(line)['unit']?.toString().trim();
+    if (extraUnit != null && extraUnit.isNotEmpty) return extraUnit;
+    final selected = line['selected_unit']?.toString().trim();
+    if (selected != null && selected.isNotEmpty) return selected;
+    final main = line['main_unit']?.toString().trim();
+    return (main != null && main.isNotEmpty) ? main : null;
+  }
+
+  List<String> _lineUnitChoices(Map<String, dynamic> line) {
+    final units = <String>[];
+    void add(String? value) {
+      final text = value?.trim();
+      if (text != null && text.isNotEmpty && !units.contains(text)) {
+        units.add(text);
+      }
+    }
+
+    add(line['main_unit']?.toString());
+    add(line['secondary_unit']?.toString());
+    add(_lineSelectedUnit(line));
+    return units;
+  }
+
+  void _setLineUnit(int index, String unit) {
+    final line = _lines[index];
+    final extra = _lineExtra(line);
+    extra['unit'] = unit;
+    _updateLine(index, {'selected_unit': unit, 'extra_info': extra});
+  }
+
+  InputDecoration _quantityDecoration(Map<String, dynamic> line) {
+    final unit = _lineSelectedUnit(line);
+    return InputDecoration(
+      labelText: _isFromInvoice ? 'تعداد' : 'تعداد *',
+      helperText: _isFromInvoice ? 'صفر = ارسال نمی‌شود' : null,
+      suffixText: unit,
+      border: const OutlineInputBorder(),
+      isDense: true,
+    );
+  }
+
+  Widget _buildQuantityField(int index) {
+    final line = _lines[index];
+    final quantityField = TextFormField(
+      decoration: _quantityDecoration(line),
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      initialValue: line['quantity'].toString(),
+      enabled: !_isPosted,
+      onChanged: _isPosted
+          ? null
+          : (value) {
+              final qty = parseFormattedNumber(value) ?? 0.0;
+              _updateLine(index, {'quantity': qty});
+            },
+      validator: _quantityFieldValidator,
+    );
+    final units = _lineUnitChoices(line);
+    final selected = _lineSelectedUnit(line);
+    final canSwitchUnit = !_isPosted &&
+        !_isFromInvoice &&
+        !_lineQuantityStoredAsMain(line) &&
+        units.length > 1;
+    if (!canSwitchUnit) {
+      return quantityField;
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(flex: 2, child: quantityField),
+        const SizedBox(width: 8),
+        Expanded(
+          child: DropdownButtonFormField<String>(
+            value: units.contains(selected) ? selected : units.first,
+            decoration: const InputDecoration(
+              labelText: 'واحد',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            items: [
+              for (final unit in units)
+                DropdownMenuItem(value: unit, child: Text(unit)),
+            ],
+            onChanged: (value) {
+              if (value != null) _setLineUnit(index, value);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   bool _isLineActive(Map<String, dynamic> line) => _lineQuantity(line) > 0;
 
   String? _quantityFieldValidator(String? value) {
@@ -504,30 +608,39 @@ class _WarehouseDocumentFormDialogState
     super.dispose();
   }
 
+  Map<String, dynamic> _productUnitFields(
+    Map<String, dynamic> line,
+    Map<String, dynamic> product,
+  ) {
+    final extra = _lineExtra(line);
+    extra['unit'] ??= product['main_unit'];
+    return {
+      'main_unit': product['main_unit'],
+      'secondary_unit': product['secondary_unit'],
+      'unit_conversion_factor': product['unit_conversion_factor'],
+      'selected_unit': extra['unit'] ?? product['main_unit'],
+      'extra_info': extra,
+    };
+  }
+
   /// بارگذاری اطلاعات کامل کالاها برای خطوط اولیه
   Future<void> _loadInitialLinesProductInfo() async {
     for (var i = 0; i < _lines.length; i++) {
       final line = _lines[i];
       final productId = line['product_id'] as int?;
       if (productId != null) {
-        // بررسی اینکه آیا اطلاعات کامل (name و code) موجود است یا نه
-        final hasName = line['product_name'] != null;
-        final hasCode = line['product_code'] != null;
-
-        // اگر اطلاعات کامل موجود نیست، از API بارگذاری کن
-        if (!hasName || !hasCode) {
-          try {
-            await _loadProductInfo(productId);
-            if (_productCache.containsKey(productId)) {
-              final product = _productCache[productId]!;
-              _updateLine(i, {
-                'product_name': product['name'],
-                'product_code': product['code'],
-              });
-            }
-          } catch (e) {
-            debugPrint('Error loading product info for line $i: $e');
+        try {
+          await _loadProductInfo(productId);
+          if (_productCache.containsKey(productId)) {
+            final product = _productCache[productId]!;
+            _updateLine(i, {
+              'product_name': line['product_name'] ?? product['name'],
+              'product_code': line['product_code'] ?? product['code'],
+              ..._productUnitFields(line, product),
+            });
           }
+        } catch (e) {
+          debugPrint('Error loading product info for line $i: $e');
         }
       }
     }
@@ -767,6 +880,7 @@ class _WarehouseDocumentFormDialogState
             _updateLine(i, {
               'product_name': product['name'],
               'product_code': product['code'],
+              ..._productUnitFields(line, product),
             });
           }
         } catch (e) {
@@ -1396,15 +1510,31 @@ class _WarehouseDocumentFormDialogState
                 'product_id': productId,
                 'product_name': productName,
                 'product_code': productCode,
+                'main_unit': product?['main_unit'],
+                'secondary_unit': product?['secondary_unit'],
+                'unit_conversion_factor': product?['unit_conversion_factor'],
+                'selected_unit': product?['main_unit'],
                 'instance_data': null,
+                'extra_info': {
+                  ..._lineExtra(line),
+                  if (product?['main_unit'] != null) 'unit': product?['main_unit'],
+                },
               });
               if (productId != null) {
                 _loadProductInfo(productId).then((_) {
                   if (_productCache.containsKey(productId)) {
                     final cachedProduct = _productCache[productId]!;
+                    final extra = _lineExtra(_lines[index]);
+                    extra['unit'] ??= cachedProduct['main_unit'];
                     _updateLine(index, {
                       'product_name': cachedProduct['name'],
                       'product_code': cachedProduct['code'],
+                      'main_unit': cachedProduct['main_unit'],
+                      'secondary_unit': cachedProduct['secondary_unit'],
+                      'unit_conversion_factor':
+                          cachedProduct['unit_conversion_factor'],
+                      'selected_unit': extra['unit'] ?? cachedProduct['main_unit'],
+                      'extra_info': extra,
                     });
                   }
                   if (mounted) setState(() {});
@@ -2711,28 +2841,7 @@ class _WarehouseDocumentFormDialogState
                         ),
                         const SizedBox(height: 8),
                       ],
-                      TextFormField(
-                        decoration: InputDecoration(
-                          labelText: _isFromInvoice ? 'تعداد' : 'تعداد *',
-                          helperText: _isFromInvoice
-                              ? 'صفر = ارسال نمی‌شود'
-                              : null,
-                          border: const OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        initialValue: line['quantity'].toString(),
-                        enabled: !_isPosted,
-                        onChanged: _isPosted
-                            ? null
-                            : (value) {
-                                final qty = parseFormattedNumber(value) ?? 0.0;
-                                _updateLine(index, {'quantity': qty});
-                              },
-                        validator: _quantityFieldValidator,
-                      ),
+                      _buildQuantityField(index),
                     ],
                   );
                 }
@@ -2778,30 +2887,7 @@ class _WarehouseDocumentFormDialogState
                       ),
                       const SizedBox(width: 8),
                     ],
-                    Expanded(
-                      child: TextFormField(
-                        decoration: InputDecoration(
-                          labelText: _isFromInvoice ? 'تعداد' : 'تعداد *',
-                          helperText: _isFromInvoice
-                              ? 'صفر = ارسال نمی‌شود'
-                              : null,
-                          border: const OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        initialValue: line['quantity'].toString(),
-                        enabled: !_isPosted,
-                        onChanged: _isPosted
-                            ? null
-                            : (value) {
-                                final qty = parseFormattedNumber(value) ?? 0.0;
-                                _updateLine(index, {'quantity': qty});
-                              },
-                        validator: _quantityFieldValidator,
-                      ),
-                    ),
+                    Expanded(child: _buildQuantityField(index)),
                   ],
                 );
               },
