@@ -203,6 +203,7 @@ class _CrmCustomer360PageState extends State<CrmCustomer360Page> {
     final tags = _list(data['tags']);
     final timeline = _list(data['timeline']);
     final tasksOpen = _list(data['tasks_open']);
+    final recentCalls = _list(data['recent_calls']);
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -256,6 +257,33 @@ class _CrmCustomer360PageState extends State<CrmCustomer360Page> {
                       if (m['assigned_to_name'] != null) m['assigned_to_name'].toString(),
                       if (m['due_at'] != null) 'سررسید: ${_formatDate(m['due_at'], withTime: true)}',
                     ].join(' · ')),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+          if (recentCalls.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            CrmSectionCard(
+              title: 'تماس‌ها',
+              child: Column(
+                children: recentCalls.map((raw) {
+                  final m = Map<String, dynamic>.from(raw as Map);
+                  final dir = m['direction']?.toString() ?? '';
+                  return ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      dir == 'inbound' ? Icons.call_received_rounded : Icons.call_made_rounded,
+                      size: 20,
+                    ),
+                    title: Text(m['peer_number']?.toString() ?? '-', overflow: TextOverflow.ellipsis),
+                    subtitle: Text([
+                      dir,
+                      m['status']?.toString() ?? '',
+                      if (m['duration_sec'] != null) '${m['duration_sec']} ثانیه',
+                      _formatDate(m['started_at'], withTime: true),
+                    ].where((e) => e.toString().trim().isNotEmpty).join(' · ')),
                   );
                 }).toList(),
               ),
@@ -441,6 +469,9 @@ class _CrmCustomer360PageState extends State<CrmCustomer360Page> {
         break;
       case 'document':
         icon = Icons.receipt_long_outlined;
+        break;
+      case 'call':
+        icon = Icons.call_outlined;
         break;
       default:
         icon = Icons.history;

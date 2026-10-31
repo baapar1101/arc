@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:dio/dio.dart';
@@ -30,6 +31,9 @@ import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:hesabix_ui/widgets/person/person_balances_by_currency_card.dart';
+import 'package:hesabix_ui/services/telephony/telephony_api.dart';
+import 'package:hesabix_ui/widgets/telephony/telephony_party.dart';
+import 'package:hesabix_ui/widgets/telephony/telephony_phone_link.dart';
 import 'package:hesabix_ui/utils/currency_display_utils.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart';
 import '../../utils/snackbar_helper.dart';
@@ -50,6 +54,7 @@ class PersonDetailsDialog extends StatefulWidget {
   final Person person;
   final AuthStore authStore;
   final bool isWarrantyPluginActive;
+  final bool isTelephonyPluginActive;
 
   const PersonDetailsDialog({
     super.key,
@@ -57,6 +62,7 @@ class PersonDetailsDialog extends StatefulWidget {
     required this.person,
     required this.authStore,
     required this.isWarrantyPluginActive,
+    this.isTelephonyPluginActive = false,
   });
 
   @override
@@ -95,6 +101,10 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
   bool _includeInvoiceLines = true;
   int _documentsLimit = 50;
   int _activitiesRefreshKey = 0;
+  final TelephonyApi _telephonyApi = TelephonyApi();
+  List<Map<String, dynamic>> _personCalls = [];
+  bool _loadingCalls = false;
+  String? _callsError;
   final TextEditingController _maxViewsController = TextEditingController();
   final TextEditingController _smsRecipientController = TextEditingController();
 
@@ -107,10 +117,16 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     _warrantyService = WarrantyService();
     final crmTab = widget.authStore.canReadSection('crm');
     _tabController = TabController(
-      length: 4 + (widget.isWarrantyPluginActive ? 1 : 0) + (crmTab ? 2 : 0),
+      length: 4 +
+          (widget.isWarrantyPluginActive ? 1 : 0) +
+          (crmTab ? 2 : 0) +
+          (widget.isTelephonyPluginActive ? 1 : 0),
       vsync: this,
     );
     _loadPersonDetails();
+    if (widget.isTelephonyPluginActive) {
+      unawaited(_loadPersonCalls());
+    }
     _ensureCalendarController();
     _loadFiscalYearInfo();
     _loadShareLinkStatus();
@@ -364,6 +380,36 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     return 'عملیات ناموفق بود.';
   }
 
+  Future<void> _loadPersonCalls() async {
+    final pid = widget.person.id;
+    if (!widget.isTelephonyPluginActive || pid == null) return;
+    setState(() {
+      _loadingCalls = true;
+      _callsError = null;
+    });
+    try {
+      final res = await _telephonyApi.listCalls(widget.businessId, personId: pid, limit: 50);
+      final items = res['items'];
+      final rows = <Map<String, dynamic>>[];
+      if (items is List) {
+        for (final e in items) {
+          if (e is Map) rows.add(Map<String, dynamic>.from(e));
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _personCalls = rows;
+        _loadingCalls = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _callsError = ErrorExtractor.forContext(e, context);
+        _loadingCalls = false;
+      });
+    }
+  }
+
   Future<void> _copyShareLink() async {
     final link = _shareLink?.shortUrl;
     if (link == null || link.isEmpty) return;
@@ -542,6 +588,8 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
                     const Tab(icon: Icon(Icons.history), text: 'تاریخچه تعامل'),
                   if (widget.authStore.canReadSection('crm'))
                     const Tab(icon: Icon(Icons.trending_up), text: 'فرصت‌های فروش'),
+                  if (widget.isTelephonyPluginActive)
+                    Tab(icon: const Icon(Icons.call), text: t.telephonyCallsTab),
                   const Tab(icon: Icon(Icons.share), text: 'اشتراک‌گذاری'),
                 ],
               ),
@@ -556,6 +604,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
                   _buildAttachmentsTab(theme),
                   if (widget.authStore.canReadSection('crm')) _buildActivitiesTab(t, theme),
                   if (widget.authStore.canReadSection('crm')) _buildDealsTab(t, theme),
+                  if (widget.isTelephonyPluginActive) _buildCallsTab(t, theme),
                   _buildShareTab(t, theme),
                 ],
               ),
@@ -702,6 +751,10 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
           ]),
           const SizedBox(height: 24),
           _buildSectionHeader('اطلاعات تماس'),
+          if (widget.isTelephonyPluginActive) ...[
+            _buildPersonCallButtons(person, t),
+            const SizedBox(height: 12),
+          ],
           _buildInfoGrid([
             _InfoRow(t.personMobile, person.mobile),
             _InfoRow(t.personMobile2, person.mobile2),
@@ -747,6 +800,76 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
             _InfoRow('شهر', person.city),
           ]),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPersonCallButtons(Person person, AppLocalizations t) {
+    final numbers = <(String, String)>[
+      if ((person.mobile ?? '').trim().isNotEmpty) (t.personMobile, person.mobile!.trim()),
+      if ((person.mobile2 ?? '').trim().isNotEmpty) (t.personMobile2, person.mobile2!.trim()),
+      if ((person.mobile3 ?? '').trim().isNotEmpty) (t.personMobile3, person.mobile3!.trim()),
+      if ((person.phone ?? '').trim().isNotEmpty) ('تلفن ثابت', person.phone!.trim()),
+    ];
+    if (numbers.isEmpty) return const SizedBox.shrink();
+    return Wrap(
+      spacing: 12,
+      runSpacing: 8,
+      children: [
+        for (final n in numbers)
+          TelephonyPhoneLink(
+            businessId: widget.businessId,
+            number: n.$2,
+            personId: person.id,
+            enabled: true,
+          ),
+      ],
+    );
+  }
+
+  Widget _buildCallsTab(AppLocalizations t, ThemeData theme) {
+    if (_loadingCalls) return const Center(child: CircularProgressIndicator());
+    if (_callsError != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_callsError!),
+            const SizedBox(height: 12),
+            FilledButton(onPressed: _loadPersonCalls, child: const Text('تلاش مجدد')),
+          ],
+        ),
+      );
+    }
+    if (_personCalls.isEmpty) {
+      return Center(child: Text(t.telephonyNoCalls));
+    }
+    return RefreshIndicator(
+      onRefresh: _loadPersonCalls,
+      child: ListView.separated(
+        padding: const EdgeInsets.all(16),
+        itemCount: _personCalls.length,
+        separatorBuilder: (_, __) => const Divider(height: 1),
+        itemBuilder: (context, i) {
+          final c = _personCalls[i];
+          final title = telephonyPartyTitle(
+            c,
+            unknownLabel: t.telephonyUnknownNumber,
+            ambiguousLabel: t.telephonyAmbiguousCaller,
+          );
+          final sub = [
+            telephonyPartySubtitle(c),
+            '${c['direction'] ?? ''} · ${c['status'] ?? ''}',
+            if (c['started_at'] != null) '${c['started_at']}'.split('T').first,
+          ].where((e) => e != null && e.toString().trim().isNotEmpty).join(' · ');
+          return ListTile(
+            leading: Icon(
+              '${c['direction']}' == 'inbound' ? Icons.call_received_rounded : Icons.call_made_rounded,
+            ),
+            title: Text(title),
+            subtitle: Text(sub),
+          );
+        },
       ),
     );
   }

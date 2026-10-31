@@ -450,6 +450,19 @@ def start_outbound_relay_call(
 
 	uniqueid = f"hsx-sf-{uuid.uuid4().hex[:16]}"
 	as_uuid = str(uuid.uuid4())
+	person_id = payload.get("person_id")
+	lead_id = payload.get("lead_id")
+	match: Dict[str, Any] = {}
+	if not person_id and not lead_id:
+		settings_row = tel.get_or_create_settings(db, business_id)
+		match = tel.match_caller(
+			db,
+			business_id,
+			destination,
+			phone_fields=settings_row.primary_phone_fields or tel.DEFAULT_PHONE_FIELDS,
+		)
+		person_id = (match.get("person") or {}).get("id")
+		lead_id = (match.get("lead") or {}).get("id")
 	call = TelephonyCall(
 		business_id=business_id,
 		pbx_id=row.pbx_id,
@@ -464,11 +477,17 @@ def start_outbound_relay_call(
 		extension=row.extension,
 		started_at=_now(),
 		assigned_user_id=user_id,
-		person_id=payload.get("person_id"),
-		lead_id=payload.get("lead_id"),
-		match_method="manual" if payload.get("person_id") or payload.get("lead_id") else None,
-		is_anonymous=False,
-		extra_info={"softphone": True, "session_id": session_id, "mode": "relay", "audiosocket_uuid": as_uuid},
+		person_id=person_id,
+		lead_id=lead_id,
+		match_method=("manual" if payload.get("person_id") or payload.get("lead_id") else match.get("match_method")),
+		is_anonymous=bool(match.get("is_anonymous")) if match else not bool(person_id or lead_id),
+		extra_info={
+			"softphone": True,
+			"session_id": session_id,
+			"mode": "relay",
+			"audiosocket_uuid": as_uuid,
+			"match": match or None,
+		},
 		created_at=_now(),
 		updated_at=_now(),
 	)

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../services/telephony/telephony_session_controller.dart';
 import '../../l10n/app_localizations.dart';
+import 'telephony_party.dart';
 
 Future<void> showTelephonyPostCallSheet(
   BuildContext context, {
@@ -58,7 +59,15 @@ Future<void> showTelephonyPostCallSheet(
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '${call['from_number_normalized'] ?? call['to_number_normalized'] ?? ''} · ${call['status'] ?? ''}',
+                    [
+                      telephonyPartyTitle(
+                        call,
+                        unknownLabel: t.telephonyUnknownNumber,
+                        ambiguousLabel: t.telephonyAmbiguousCaller,
+                      ),
+                      telephonyPartySubtitle(call),
+                      '${call['status'] ?? ''}',
+                    ].where((e) => e != null && e.toString().trim().isNotEmpty).join(' · '),
                     style: TextStyle(color: Theme.of(ctx).colorScheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: 16),

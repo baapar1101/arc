@@ -982,6 +982,16 @@ async def delete_stage(
 # --- سرنخ (Leads) ---
 
 
+def _person_display_name(person) -> Optional[str]:
+    if not person:
+        return None
+    name = (getattr(person, "alias_name", None) or "").strip()
+    if name:
+        return name
+    full = f"{getattr(person, 'first_name', None) or ''} {getattr(person, 'last_name', None) or ''}".strip()
+    return full or (getattr(person, "company_name", None) or None)
+
+
 def _lead_to_dict(lead: Lead, request: Request = None, tags: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
     d = {
         "id": lead.id,
@@ -1003,7 +1013,7 @@ def _lead_to_dict(lead: Lead, request: Request = None, tags: Optional[List[Dict[
         ),
         "next_follow_up_at": lead.next_follow_up_at.isoformat() if lead.next_follow_up_at else None,
         "person_id": lead.person_id,
-        "person_name": lead.person.alias_name if lead.person else None,
+        "person_name": _person_display_name(lead.person) if lead.person else None,
         "converted_at": lead.converted_at.isoformat() if lead.converted_at else None,
         "score": lead.score,
         "sla_due_at": lead.sla_due_at.isoformat() if lead.sla_due_at else None,
@@ -1528,7 +1538,7 @@ def _deal_to_dict(deal: Deal, request: Request = None, tags: Optional[List[Dict[
         "business_id": deal.business_id,
         "code": deal.code,
         "person_id": deal.person_id,
-        "person_name": deal.person.alias_name if deal.person else None,
+        "person_name": _person_display_name(deal.person) if deal.person else None,
         "process_definition_id": deal.process_definition_id,
         "stage_id": deal.stage_id,
         "stage_name": deal.stage.name if deal.stage else None,
@@ -1988,7 +1998,7 @@ def _activity_to_dict(a: CrmActivity, request: Request = None) -> Dict[str, Any]
         "id": a.id,
         "business_id": a.business_id,
         "person_id": a.person_id,
-        "person_name": a.person.alias_name if getattr(a, "person", None) else None,
+        "person_name": _person_display_name(getattr(a, "person", None)),
         "lead_id": a.lead_id,
         "lead_name": a.lead.name if getattr(a, "lead", None) else None,
         "code": a.code,

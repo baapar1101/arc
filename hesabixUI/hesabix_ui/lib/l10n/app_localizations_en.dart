@@ -22767,6 +22767,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get telephonyUnknownNumber => 'Unknown number';
 
   @override
+  String get telephonyAmbiguousCaller => 'Multiple contacts';
+
+  @override
+  String get telephonyCallsTab => 'Calls';
+
+  @override
+  String get telephonyNoCalls => 'No calls yet';
+
+  @override
   String get telephonyLeadCreated => 'Lead created';
 
   @override

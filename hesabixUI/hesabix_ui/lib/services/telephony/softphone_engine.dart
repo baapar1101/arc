@@ -234,6 +234,12 @@ class SoftphoneEngine extends ChangeNotifier with WidgetsBindingObserver {
           'from': msg['from'] ?? activeCall?['from'],
           'extension': msg['extension'] ?? activeCall?['extension'],
           'channel': msg['channel'] ?? activeCall?['channel'],
+          'person': msg['person'] ?? activeCall?['person'],
+          'lead': msg['lead'] ?? activeCall?['lead'],
+          'person_name': msg['person_name'] ?? activeCall?['person_name'],
+          'lead_name': msg['lead_name'] ?? activeCall?['lead_name'],
+          'party_name': msg['party_name'] ?? activeCall?['party_name'],
+          'ambiguous': msg['ambiguous'] ?? activeCall?['ambiguous'],
           'status': 'ringing',
           'direction': 'inbound',
         };
@@ -442,10 +448,33 @@ class SoftphoneEngine extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
-  String get incomingCallerDisplay {
-    final from = '${activeCall?['from'] ?? ''}'.trim();
+  String get incomingCallerNumber {
+    final from = '${activeCall?['from'] ?? activeCall?['peer_number'] ?? activeCall?['from_number_normalized'] ?? ''}'.trim();
     if (from.isNotEmpty && from != 'null') return from;
-    return telephonyL10n().telephonyUnknownNumber;
+    return '';
+  }
+
+  String get incomingCallerDisplay {
+    final t = telephonyL10n();
+    final call = activeCall ?? const <String, dynamic>{};
+    if (call['ambiguous'] == true) return t.telephonyAmbiguousCaller;
+    for (final key in ['party_name', 'person_name', 'lead_name']) {
+      final v = '${call[key] ?? ''}'.trim();
+      if (v.isNotEmpty && v != 'null') return v;
+    }
+    final person = call['person'];
+    if (person is Map) {
+      final v = '${person['name'] ?? ''}'.trim();
+      if (v.isNotEmpty && v != 'null') return v;
+    }
+    final lead = call['lead'];
+    if (lead is Map) {
+      final v = '${lead['name'] ?? ''}'.trim();
+      if (v.isNotEmpty && v != 'null') return v;
+    }
+    final from = incomingCallerNumber;
+    if (from.isNotEmpty) return from;
+    return t.telephonyUnknownNumber;
   }
 
   int? get activeCallId => int.tryParse('${activeCall?['id'] ?? ''}');

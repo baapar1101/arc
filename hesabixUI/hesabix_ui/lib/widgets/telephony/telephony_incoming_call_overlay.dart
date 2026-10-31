@@ -171,6 +171,17 @@ class _TelephonyIncomingCallOverlayState extends State<TelephonyIncomingCallOver
                           color: scheme.onSurface,
                         ),
                   ),
+                  if (engine.incomingCallerNumber.isNotEmpty &&
+                      engine.incomingCallerNumber != caller) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      engine.incomingCallerNumber,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                    ),
+                  ],
                   const SizedBox(height: 6),
                   Text(
                     t.telephonyRingingNow,

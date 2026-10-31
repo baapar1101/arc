@@ -41759,6 +41759,24 @@ abstract class AppLocalizations {
   /// **'Unknown number'**
   String get telephonyUnknownNumber;
 
+  /// No description provided for @telephonyAmbiguousCaller.
+  ///
+  /// In en, this message translates to:
+  /// **'Multiple contacts'**
+  String get telephonyAmbiguousCaller;
+
+  /// No description provided for @telephonyCallsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Calls'**
+  String get telephonyCallsTab;
+
+  /// No description provided for @telephonyNoCalls.
+  ///
+  /// In en, this message translates to:
+  /// **'No calls yet'**
+  String get telephonyNoCalls;
+
   /// No description provided for @telephonyLeadCreated.
   ///
   /// In en, this message translates to:

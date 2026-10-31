@@ -19,6 +19,7 @@ import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:hesabix_ui/core/hesabix_back.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:hesabix_ui/services/telephony/telephony_session_controller.dart';
 
 /// صفحه رکورد سرنخ: هدر، اکشن سریع، مرحله، تایم‌لاین.
 class CrmLeadRecordPage extends StatefulWidget {
@@ -331,6 +332,18 @@ class _CrmLeadRecordPageState extends State<CrmLeadRecordPage> {
   Future<void> _callMobile() async {
     final mobile = _lead?['mobile']?.toString() ?? '';
     if (mobile.isEmpty) return;
+    try {
+      final session = TelephonySessionStore.instance.controller;
+      session.bindBusiness(widget.businessId, pluginActive: true);
+      await session.clickToCall(
+        destination: mobile,
+        leadId: (_lead?['id'] as num?)?.toInt(),
+        personId: (_lead?['person_id'] as num?)?.toInt(),
+      );
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: 'در حال برقراری تماس…');
+      return;
+    } catch (_) {}
     final uri = Uri(scheme: 'tel', path: mobile);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);

@@ -28,7 +28,7 @@ from adapters.db.models.user import User
 from app.core.responses import ApiError
 from app.core.security import generate_api_key, hash_api_key
 from app.core.telephony_plugin_dependency import check_telephony_plugin_active
-from app.services.telephony.phone_normalizer import extract_digits, normalize_iran_phone, numbers_match
+from app.services.telephony.phone_normalizer import extract_digits, identity_candidates, normalize_iran_phone, numbers_match
 from app.services.telephony.telephony_access import (
 	TelephonyScope,
 	exclusive_extension_taken,
@@ -43,6 +43,12 @@ from app.services.realtime import realtime_manager
 
 
 DEFAULT_PHONE_FIELDS = ["mobile", "mobile_2", "mobile_3", "phone"]
+_NORMALIZED_PERSON_ATTR = {
+	"mobile": "mobile_normalized",
+	"mobile_2": "mobile_2_normalized",
+	"mobile_3": "mobile_3_normalized",
+	"phone": "phone_normalized",
+}
 
 
 def _iso(dt: Optional[datetime]) -> Optional[str]:
@@ -688,16 +694,66 @@ def get_my_extension_context(db: Session, business_id: int, user_id: int, auth_c
 # ─── Caller ID match ────────────────────────────────────────────────────────
 
 
+def _business_phone_region(db: Session, business_id: int) -> str:
+	from app.services.customer_quick_entry_service import get_business_default_phone_region
+
+	return get_business_default_phone_region(db, int(business_id))
+
+
+def _dedupe_persons(rows: List[Person]) -> List[Person]:
+	seen: set[int] = set()
+	out: List[Person] = []
+	for p in rows:
+		if p.id not in seen:
+			seen.add(p.id)
+			out.append(p)
+	return out
+
+
+def _persons_by_normalized(
+	db: Session,
+	business_id: int,
+	e164: str,
+	fields: List[str],
+) -> List[Person]:
+	ors = []
+	for field in fields:
+		attr = _NORMALIZED_PERSON_ATTR.get(field)
+		if not attr:
+			continue
+		col = getattr(Person, attr, None)
+		if col is not None:
+			ors.append(col == e164)
+	if not ors:
+		return []
+	return (
+		db.query(Person)
+		.filter(Person.business_id == business_id, or_(*ors))
+		.limit(10)
+		.all()
+	)
+
+
 def match_caller(
 	db: Session,
 	business_id: int,
 	raw_number: Optional[str],
 	phone_fields: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-	norm = normalize_iran_phone(raw_number)
-	candidates = norm["candidates"]
+	region = _business_phone_region(db, business_id)
+	ident = identity_candidates(raw_number, default_region=region)
+	candidates = ident["candidates"]
 	if not candidates:
-		return {"person": None, "lead": None, "persons": [], "leads": [], "is_anonymous": True, "normalized": None}
+		return {
+			"person": None,
+			"lead": None,
+			"persons": [],
+			"leads": [],
+			"is_anonymous": True,
+			"normalized": None,
+			"e164": None,
+			"ambiguous": False,
+		}
 
 	# aliases
 	alias = (
@@ -717,34 +773,49 @@ def match_caller(
 			"persons": [],
 			"leads": [],
 			"is_anonymous": person is None and lead is None,
-			"normalized": norm["canonical"],
+			"normalized": ident["canonical"],
+			"e164": ident["e164"],
 			"match_method": "alias",
+			"ambiguous": False,
+		}
+
+	# داخلی کوتاه را با موبایل دفترچه تطبیق نده
+	if ident["is_short"]:
+		return {
+			"person": None,
+			"lead": None,
+			"persons": [],
+			"leads": [],
+			"is_anonymous": True,
+			"normalized": ident["canonical"],
+			"e164": None,
+			"match_method": None,
+			"ambiguous": False,
 		}
 
 	fields = phone_fields or DEFAULT_PHONE_FIELDS
-	ors = []
-	for field in fields:
-		col = getattr(Person, field, None)
-		if col is not None:
-			ors.append(col.in_(candidates))
-	persons: List[Person] = []
-	if ors:
-		persons = (
-			db.query(Person)
-			.filter(Person.business_id == business_id, or_(*ors))
-			.limit(10)
-			.all()
-		)
-	# de-dupe keeping order
-	seen = set()
-	uniq_persons = []
-	for p in persons:
-		if p.id not in seen:
-			seen.add(p.id)
-			uniq_persons.append(p)
+	uniq_persons: List[Person] = []
+	e164 = ident.get("e164")
+	if e164:
+		uniq_persons = _dedupe_persons(_persons_by_normalized(db, business_id, str(e164), fields))
 
-	# soft suffix match فقط اگر exact چیزی پیدا نشد (حداقل ۱۰ رقم)
 	if not uniq_persons:
+		ors = []
+		for field in fields:
+			col = getattr(Person, field, None)
+			if col is not None:
+				ors.append(col.in_(candidates))
+		if ors:
+			uniq_persons = _dedupe_persons(
+				db.query(Person)
+				.filter(Person.business_id == business_id, or_(*ors))
+				.limit(10)
+				.all()
+			)
+
+	# soft suffix match فقط اگر exact/E.164 چیزی پیدا نشد (حداقل ۱۰ رقم)
+	if not uniq_persons:
+		seen = {p.id for p in uniq_persons}
 		suffixes = [extract_digits(c)[-10:] for c in candidates if len(extract_digits(c)) >= 10]
 		suffixes = list({s for s in suffixes if len(s) == 10})
 		soft_ors = []
@@ -762,7 +833,6 @@ def match_caller(
 				.all()
 			)
 			for p in soft_persons:
-				# تأیید نهایی با numbers_match
 				vals = [getattr(p, f, None) for f in fields]
 				if any(numbers_match(raw_number, v) for v in vals if v):
 					if p.id not in seen:
@@ -791,7 +861,8 @@ def match_caller(
 		"persons": [_person_brief(p) for p in uniq_persons],
 		"leads": [_lead_brief(l) for l in leads],
 		"is_anonymous": is_anon,
-		"normalized": norm["canonical"],
+		"normalized": ident["canonical"],
+		"e164": ident["e164"],
 		"match_method": "auto" if not is_anon else None,
 		"ambiguous": len(uniq_persons) > 1 or (len(uniq_persons) == 0 and len(leads) > 1),
 	}
@@ -840,7 +911,65 @@ def _public_extra(info: Any) -> Dict[str, Any]:
 	return {k: v for k, v in info.items() if k not in _PUBLIC_EXTRA_BLOCKED}
 
 
-def call_to_dict(row: TelephonyCall) -> Dict[str, Any]:
+def _peer_number(row: TelephonyCall) -> Optional[str]:
+	if getattr(row, "direction", None) == "inbound":
+		return row.from_number_normalized or row.from_number_raw
+	if getattr(row, "direction", None) == "outbound":
+		return row.to_number_normalized or row.to_number_raw
+	return (
+		row.from_number_normalized
+		or row.to_number_normalized
+		or row.from_number_raw
+		or row.to_number_raw
+	)
+
+
+def _name_from_match_extra(row: TelephonyCall, key: str) -> Optional[str]:
+	extra = getattr(row, "extra_info", None) or {}
+	if not isinstance(extra, dict):
+		return None
+	match = extra.get("match")
+	if not isinstance(match, dict):
+		return None
+	brief = match.get(key)
+	if isinstance(brief, dict):
+		name = str(brief.get("name") or "").strip()
+		return name or None
+	return None
+
+
+def _load_party_names(
+	db: Session, rows: List[TelephonyCall]
+) -> Tuple[Dict[int, str], Dict[int, str]]:
+	pids = {int(r.person_id) for r in rows if getattr(r, "person_id", None)}
+	lids = {int(r.lead_id) for r in rows if getattr(r, "lead_id", None)}
+	persons: Dict[int, str] = {}
+	if pids:
+		for p in db.query(Person).filter(Person.id.in_(pids)).all():
+			brief = _person_brief(p)
+			if brief:
+				persons[int(p.id)] = str(brief["name"])
+	leads: Dict[int, str] = {}
+	if lids:
+		for lead in db.query(Lead).filter(Lead.id.in_(lids)).all():
+			brief = _lead_brief(lead)
+			if brief:
+				leads[int(lead.id)] = str(brief["name"])
+	return persons, leads
+
+
+def call_to_dict(
+	row: TelephonyCall,
+	*,
+	person_name: Optional[str] = None,
+	lead_name: Optional[str] = None,
+) -> Dict[str, Any]:
+	if not person_name:
+		person_name = _name_from_match_extra(row, "person")
+	if not lead_name:
+		lead_name = _name_from_match_extra(row, "lead")
+	peer = _peer_number(row)
+	party_name = person_name or lead_name or peer
 	return {
 		"id": row.id,
 		"business_id": row.business_id,
@@ -867,6 +996,10 @@ def call_to_dict(row: TelephonyCall) -> Dict[str, Any]:
 		"recording_available": row.recording_status == "available",
 		"recording_url": None,
 		"person_id": row.person_id,
+		"person_name": person_name,
+		"lead_name": lead_name,
+		"party_name": party_name,
+		"peer_number": peer,
 		"lead_id": row.lead_id,
 		"deal_id": row.deal_id,
 		"document_id": row.document_id,
@@ -923,7 +1056,20 @@ def list_calls(
 		)
 	total = query.count()
 	rows = query.order_by(TelephonyCall.started_at.desc()).offset(offset).limit(min(limit, 200)).all()
-	return {"items": [call_to_dict(r) for r in rows], "total": total, "limit": limit, "offset": offset}
+	pnames, lnames = _load_party_names(db, rows)
+	return {
+		"items": [
+			call_to_dict(
+				r,
+				person_name=pnames.get(int(r.person_id)) if r.person_id else None,
+				lead_name=lnames.get(int(r.lead_id)) if r.lead_id else None,
+			)
+			for r in rows
+		],
+		"total": total,
+		"limit": limit,
+		"offset": offset,
+	}
 
 
 def get_call(db: Session, business_id: int, call_id: int, *, auth_ctx=None, scope: Optional[TelephonyScope] = None) -> Dict[str, Any]:
@@ -937,7 +1083,12 @@ def get_call(db: Session, business_id: int, call_id: int, *, auth_ctx=None, scop
 		)
 		if not row:
 			raise ApiError("CALL_NOT_FOUND", "CALL_NOT_FOUND", http_status=404)
-	data = call_to_dict(row)
+	pnames, lnames = _load_party_names(db, [row])
+	data = call_to_dict(
+		row,
+		person_name=pnames.get(int(row.person_id)) if row.person_id else None,
+		lead_name=lnames.get(int(row.lead_id)) if row.lead_id else None,
+	)
 	events = (
 		db.query(TelephonyCallEvent)
 		.filter(TelephonyCallEvent.call_id == call_id)
@@ -1069,6 +1220,9 @@ def _notify_softphone_incoming_sync(
 	call_id: int,
 	from_number: Optional[str] = None,
 	channel: Optional[str] = None,
+	person: Optional[Dict[str, Any]] = None,
+	lead: Optional[Dict[str, Any]] = None,
+	ambiguous: bool = False,
 ) -> None:
 	import anyio
 
@@ -1081,6 +1235,9 @@ def _notify_softphone_incoming_sync(
 			call_id=call_id,
 			from_number=from_number,
 			channel=channel,
+			person=person,
+			lead=lead,
+			ambiguous=ambiguous,
 		)
 
 	try:
@@ -1351,12 +1508,18 @@ def process_connector_event(
 		and call.extension
 		and call.status == "ringing"
 	):
+		person_brief = _person_brief(db.get(Person, call.person_id)) if call.person_id else None
+		lead_brief = _lead_brief(db.get(Lead, call.lead_id)) if call.lead_id else None
+		match_info = (call.extra_info or {}).get("match") if isinstance(call.extra_info, dict) else None
 		_notify_softphone_incoming_sync(
 			pbx_id=pbx.id,
 			extension=str(call.extension),
 			call_id=int(call.id),
 			from_number=call.from_number_normalized or call.from_number_raw,
 			channel=str(payload.get("channel") or "") or None,
+			person=person_brief or ((match_info or {}).get("person") if isinstance(match_info, dict) else None),
+			lead=lead_brief or ((match_info or {}).get("lead") if isinstance(match_info, dict) else None),
+			ambiguous=bool(isinstance(match_info, dict) and match_info.get("ambiguous")),
 		)
 
 	# realtime
@@ -1401,7 +1564,15 @@ def _ensure_crm_activity(db: Session, call: TelephonyCall, user_id: Optional[int
 		call.crm_activity_id = existing.id
 		return
 	direction_fa = {"inbound": "ورودی", "outbound": "خروجی", "internal": "داخلی"}.get(call.direction, call.direction)
-	subject = f"تماس {direction_fa} {call.from_number_normalized or call.from_number_raw or ''}".strip()
+	party = None
+	if call.person_id:
+		brief = _person_brief(db.get(Person, call.person_id))
+		party = brief.get("name") if brief else None
+	elif call.lead_id:
+		brief = _lead_brief(db.get(Lead, call.lead_id))
+		party = brief.get("name") if brief else None
+	peer = _peer_number(call) or call.from_number_normalized or call.from_number_raw or ""
+	subject = f"تماس {direction_fa} {party or peer}".strip()
 	act = CrmActivity(
 		business_id=call.business_id,
 		person_id=call.person_id,
@@ -1441,14 +1612,21 @@ def _ensure_missed_call_task(db: Session, call: TelephonyCall, settings: Telepho
 		return
 	due_min = int(settings.missed_call_task_due_minutes or 60)
 	due_at = (call.ended_at or _now()) + timedelta(minutes=due_min)
-	number = call.from_number_normalized or call.from_number_raw or ""
+	number = _peer_number(call) or call.from_number_normalized or call.from_number_raw or ""
+	party = None
+	if call.person_id:
+		brief = _person_brief(db.get(Person, call.person_id))
+		party = brief.get("name") if brief else None
+	elif call.lead_id:
+		brief = _lead_brief(db.get(Lead, call.lead_id))
+		party = brief.get("name") if brief else None
 	act = CrmActivity(
 		business_id=call.business_id,
 		person_id=call.person_id,
 		lead_id=call.lead_id,
 		code=code,
 		activity_type="call",
-		subject=f"پیگیری تماس از دست‌رفته {number}"[:255],
+		subject=f"پیگیری تماس از دست‌رفته {party or number}"[:255],
 		description="ایجاد خودکار پس از تماس از دست‌رفته",
 		activity_date=_now(),
 		created_by_user_id=uid,

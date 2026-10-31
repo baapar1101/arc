@@ -7,6 +7,7 @@ import '../../../core/auth_store.dart';
 import '../../../core/business_nav.dart';
 import '../../../services/telephony/telephony_api.dart';
 import '../../../widgets/telephony/telephony_dialer_sheet.dart';
+import '../../../widgets/telephony/telephony_party.dart';
 import '../../../widgets/telephony/telephony_recording_player.dart';
 import '../../../services/telephony/telephony_session_controller.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
@@ -441,9 +442,12 @@ class _TelephonyCallsPageState extends State<TelephonyCallsPage> {
                         final c = _items[i];
                         final status = '${c['status'] ?? ''}';
                         final dir = '${c['direction'] ?? ''}';
-                        final peer = dir == 'inbound'
-                            ? (c['from_number_normalized'] ?? c['from_number_raw'])
-                            : (c['to_number_normalized'] ?? c['to_number_raw']);
+                        final peer = telephonyPartyTitle(
+                          c,
+                          unknownLabel: t.telephonyUnknownNumber,
+                          ambiguousLabel: t.telephonyAmbiguousCaller,
+                        );
+                        final peerSub = telephonyPartySubtitle(c);
                         return ListTile(
                           leading: CircleAvatar(
                             backgroundColor: _statusColor(status, scheme).withValues(alpha: 0.15),
@@ -452,10 +456,12 @@ class _TelephonyCallsPageState extends State<TelephonyCallsPage> {
                               color: _statusColor(status, scheme),
                             ),
                           ),
-                          title: Text('$peer'),
+                          title: Text(peer),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              if (peerSub != null && peerSub.isNotEmpty)
+                                Text(peerSub, style: Theme.of(context).textTheme.bodySmall),
                               Text(
                                 t.telephonyCallListSubtitle(_statusFa(status), '${c['extension'] ?? '—'}', '${c['duration_sec'] ?? 0}'),
                               ),

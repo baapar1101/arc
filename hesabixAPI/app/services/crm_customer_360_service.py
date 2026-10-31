@@ -19,6 +19,7 @@ from adapters.db.models.crm import (
 )
 from adapters.db.models.document import Document
 from adapters.db.models.document_line import DocumentLine
+from adapters.db.models.telephony import TelephonyCall
 from app.core.responses import ApiError
 
 
@@ -221,6 +222,35 @@ def get_customer_360(db: Session, business_id: int, person_id: int) -> Dict[str,
                 }
             )
 
+    # تماس‌های تلفنی متصل به این شخص
+    call_rows = (
+        db.query(TelephonyCall)
+        .filter(TelephonyCall.business_id == business_id, TelephonyCall.person_id == person_id)
+        .order_by(TelephonyCall.started_at.desc())
+        .limit(20)
+        .all()
+    )
+    recent_calls: List[Dict[str, Any]] = []
+    for c in call_rows:
+        peer = (
+            (c.from_number_normalized or c.from_number_raw)
+            if c.direction == "inbound"
+            else (c.to_number_normalized or c.to_number_raw)
+        )
+        recent_calls.append(
+            {
+                "id": c.id,
+                "direction": c.direction,
+                "status": c.status,
+                "peer_number": peer,
+                "extension": c.extension,
+                "started_at": _iso(c.started_at),
+                "duration_sec": c.duration_sec,
+                "talk_sec": c.talk_sec,
+                "recording_available": c.recording_status == "available",
+            }
+        )
+
     # برچسب‌ها از معاملات متصل
     deal_ids = [d.id for d in deals]
     tags: List[Dict[str, Any]] = []
@@ -264,6 +294,16 @@ def get_customer_360(db: Session, business_id: int, person_id: int) -> Dict[str,
         timeline.append(
             {"type": "document", "date": doc["document_date"], "title": doc["code"], "ref_id": doc["id"]}
         )
+    for c in recent_calls:
+        dir_fa = {"inbound": "ورودی", "outbound": "خروجی", "internal": "داخلی"}.get(c["direction"], c["direction"])
+        timeline.append(
+            {
+                "type": "call",
+                "date": c["started_at"],
+                "title": f"تماس {dir_fa} {c.get('peer_number') or ''}".strip(),
+                "ref_id": c["id"],
+            }
+        )
     timeline.sort(key=lambda x: (x.get("date") or ""), reverse=True)
 
     # خلاصه آماری
@@ -288,6 +328,7 @@ def get_customer_360(db: Session, business_id: int, person_id: int) -> Dict[str,
         "converted_leads": converted_leads,
         "notes": notes,
         "documents": documents,
+        "recent_calls": recent_calls,
         "tags": tags,
         "timeline": timeline,
     }

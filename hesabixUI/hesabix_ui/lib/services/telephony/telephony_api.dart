@@ -138,6 +138,7 @@ class TelephonyApi {
     int businessId, {
     String? direction,
     String? status,
+    int? personId,
     String? q,
     int limit = 50,
     int offset = 0,
@@ -147,6 +148,7 @@ class TelephonyApi {
       query: {
         if (direction != null) 'direction': direction,
         if (status != null) 'status': status,
+        if (personId != null) 'person_id': '$personId',
         if (q != null && q.isNotEmpty) 'q': q,
         'limit': '$limit',
         'offset': '$offset',

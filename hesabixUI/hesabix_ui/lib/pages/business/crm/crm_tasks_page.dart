@@ -363,7 +363,11 @@ class _CrmTasksPageState extends State<CrmTasksPage> with SingleTickerProviderSt
                 leading: Icon(Icons.contact_phone_outlined),
                 title: Text(l['name']?.toString() ?? '-', overflow: TextOverflow.ellipsis),
                 subtitle: Text(
-                  'سرنخ · ${_formatDateTime(at)}',
+                  [
+                    'سرنخ',
+                    if ((l['person_name']?.toString() ?? '').trim().isNotEmpty) l['person_name'],
+                    _formatDateTime(at),
+                  ].join(' · '),
                   style: TextStyle(color: overdue ? SemanticColorResolver.negative(context) : null),
                 ),
                 onTap: () => _navigateForEntity(leadId: (l['id'] as num?)?.toInt()),

@@ -7,6 +7,7 @@ import '../../../services/telephony/telephony_api.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../services/telephony/telephony_l10n.dart';
+import '../../../widgets/telephony/telephony_party.dart';
 
 /// داشبورد لحظه‌ای مرکز تماس (BLF + تماس‌های فعال).
 class TelephonyLiveDashboardPage extends StatefulWidget {
@@ -227,8 +228,16 @@ class _TelephonyLiveDashboardPageState extends State<TelephonyLiveDashboardPage>
                             margin: const EdgeInsets.only(bottom: 8),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                             child: ListTile(
-                              title: Text('${c['from_number_normalized'] ?? c['from_number_raw'] ?? ''} → ${c['extension'] ?? ''}'),
-                              subtitle: Text('${c['direction']} · ${c['status']}'),
+                              title: Text(
+                                '${telephonyPartyTitle(Map<String, dynamic>.from(c as Map), unknownLabel: t.telephonyUnknownNumber, ambiguousLabel: t.telephonyAmbiguousCaller)} → ${c['extension'] ?? ''}',
+                              ),
+                              subtitle: Text(
+                                [
+                                  telephonyPartySubtitle(Map<String, dynamic>.from(c as Map)),
+                                  '${c['direction']}',
+                                  '${c['status']}',
+                                ].where((e) => e != null && e.toString().isNotEmpty).join(' · '),
+                              ),
                               trailing: Wrap(
                                 spacing: 4,
                                 children: [

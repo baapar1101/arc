@@ -22648,6 +22648,15 @@ class AppLocalizationsFa extends AppLocalizations {
   String get telephonyUnknownNumber => 'شماره ناشناس';
 
   @override
+  String get telephonyAmbiguousCaller => 'چند مخاطب';
+
+  @override
+  String get telephonyCallsTab => 'تماس‌ها';
+
+  @override
+  String get telephonyNoCalls => 'تماسی ثبت نشده است';
+
+  @override
   String get telephonyLeadCreated => 'سرنخ ایجاد شد';
 
   @override

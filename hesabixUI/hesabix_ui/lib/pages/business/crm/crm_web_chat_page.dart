@@ -1804,8 +1804,10 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                         if (id == null) {
                           return const SizedBox.shrink();
                         }
-                        final title =
-                            '${c['visitor_first_name'] ?? ''} ${c['visitor_last_name'] ?? ''}'.trim();
+                        final title = (c['display_name'] ?? c['person_name'] ??
+                                '${c['visitor_first_name'] ?? ''} ${c['visitor_last_name'] ?? ''}')
+                            .toString()
+                            .trim();
                         final sub = c['visitor_email']?.toString() ?? '';
                         final ph = c['visitor_phone']?.toString() ?? '';
                         final sel = _selectedConvId == id;

@@ -136,6 +136,58 @@ def test_call_to_dict_does_not_leak_recording_url():
 	assert data["recording_available"] is True
 	assert "recording_url" not in data["extra_info"]
 	assert data["extra_info"]["channel"] == "SIP/101"
+	assert data["peer_number"] == "0912"
+	assert data["party_name"] == "0912"
+	assert data["person_name"] is None
+
+
+def test_call_to_dict_prefers_person_name():
+	from types import SimpleNamespace
+	from app.services.telephony.telephony_service import call_to_dict
+
+	row = SimpleNamespace(
+		id=2,
+		business_id=1,
+		pbx_id=1,
+		asterisk_uniqueid="u2",
+		asterisk_linkedid=None,
+		direction="inbound",
+		status="ringing",
+		from_number_raw="09121234567",
+		from_number_normalized="09121234567",
+		to_number_raw="101",
+		to_number_normalized="101",
+		extension="101",
+		queue_code=None,
+		transferred_from=None,
+		transferred_to=None,
+		started_at=datetime(2026, 1, 1, 12, 0),
+		answered_at=None,
+		ended_at=None,
+		duration_sec=None,
+		talk_sec=None,
+		hangup_cause=None,
+		recording_status="none",
+		recording_url=None,
+		person_id=9,
+		lead_id=None,
+		deal_id=None,
+		document_id=None,
+		crm_activity_id=None,
+		assigned_user_id=10,
+		category=None,
+		outcome=None,
+		note=None,
+		match_method="auto",
+		is_anonymous=False,
+		extra_info={"match": {"person": {"id": 9, "name": "علی رضایی"}}},
+		created_at=datetime(2026, 1, 1, 12, 0),
+		updated_at=datetime(2026, 1, 1, 12, 0),
+	)
+	data = call_to_dict(row)
+	assert data["person_name"] == "علی رضایی"
+	assert data["party_name"] == "علی رضایی"
+	assert data["peer_number"] == "09121234567"
 
 
 def _settings_db(mode: str):

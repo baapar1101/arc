@@ -298,7 +298,14 @@ class _FollowUpsCard extends StatelessWidget {
                   dense: true,
                   leading: const Icon(Icons.person_outline, size: 20),
                   title: Text(m['name']?.toString() ?? '-', overflow: TextOverflow.ellipsis),
-                  subtitle: Text('سرنخ • $dateStr', style: Theme.of(context).textTheme.bodySmall),
+                  subtitle: Text(
+                    [
+                      'سرنخ',
+                      if ((m['person_name']?.toString() ?? '').trim().isNotEmpty) m['person_name'],
+                      dateStr,
+                    ].join(' • '),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                   onTap: () => context.go('/business/$businessId/crm/leads/${m['id']}'),
                 );
               }),

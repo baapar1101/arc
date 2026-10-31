@@ -166,7 +166,55 @@ def _upload_likely_audio(*, content_type: Optional[str], filename: Optional[str]
 	return False
 
 
-def conversation_to_dict(c: CrmChatConversation) -> Dict[str, Any]:
+def _visitor_party_from_phone(
+	db: Session, business_id: int, phone: Optional[str]
+) -> tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+	if not phone:
+		return None, None
+	try:
+		from app.services.telephony.telephony_service import match_caller
+
+		match = match_caller(db, business_id, phone)
+		if match.get("ambiguous"):
+			return None, None
+		person = match.get("person") if isinstance(match.get("person"), dict) else None
+		lead = match.get("lead") if isinstance(match.get("lead"), dict) else None
+		return person, lead
+	except Exception:
+		logger.exception("crm chat visitor phone match failed")
+		return None, None
+
+
+def _party_names_for_conversations(
+	db: Session, rows: List[CrmChatConversation]
+) -> tuple[Dict[int, str], Dict[int, str]]:
+	from adapters.db.models.crm import Lead
+	from adapters.db.models.person import Person
+
+	pids = {int(c.person_id) for c in rows if c.person_id}
+	lids = {int(c.lead_id) for c in rows if c.lead_id}
+	persons: Dict[int, str] = {}
+	if pids:
+		for p in db.query(Person).filter(Person.id.in_(pids)).all():
+			name = (p.alias_name or "").strip() or f"{p.first_name or ''} {p.last_name or ''}".strip()
+			if name:
+				persons[int(p.id)] = name
+	leads: Dict[int, str] = {}
+	if lids:
+		for lead in db.query(Lead).filter(Lead.id.in_(lids)).all():
+			name = (lead.name or "").strip()
+			if name:
+				leads[int(lead.id)] = name
+	return persons, leads
+
+
+def conversation_to_dict(
+	c: CrmChatConversation,
+	*,
+	person_name: Optional[str] = None,
+	lead_name: Optional[str] = None,
+) -> Dict[str, Any]:
+	visitor = f"{c.visitor_first_name or ''} {c.visitor_last_name or ''}".strip()
 	return {
 		"id": c.id,
 		"business_id": c.business_id,
@@ -179,12 +227,24 @@ def conversation_to_dict(c: CrmChatConversation) -> Dict[str, Any]:
 		"page_url": c.page_url,
 		"extra_metadata": c.extra_metadata if c.extra_metadata else {},
 		"lead_id": c.lead_id,
+		"lead_name": lead_name,
 		"person_id": c.person_id,
+		"person_name": person_name,
+		"display_name": person_name or lead_name or visitor,
 		"assigned_to_user_id": c.assigned_to_user_id,
 		"last_message_at": c.last_message_at,
 		"created_at": c.created_at,
 		"updated_at": c.updated_at,
 	}
+
+
+def _conversation_dict(db: Session, c: CrmChatConversation) -> Dict[str, Any]:
+	pnames, lnames = _party_names_for_conversations(db, [c])
+	return conversation_to_dict(
+		c,
+		person_name=pnames.get(int(c.person_id)) if c.person_id else None,
+		lead_name=lnames.get(int(c.lead_id)) if c.lead_id else None,
+	)
 
 
 def message_to_dict(m: CrmChatMessage) -> Dict[str, Any]:
@@ -418,6 +478,7 @@ async def start_conversation_public(
 	if dt in ("mobile", "tablet", "desktop"):
 		meta["device_type"] = dt
 
+	person_brief, lead_brief = _visitor_party_from_phone(db, w.business_id, ph)
 	c = CrmChatConversation(
 		business_id=w.business_id,
 		widget_id=w.id,
@@ -430,6 +491,8 @@ async def start_conversation_public(
 		page_url=(page_url or None) if page_url else None,
 		last_message_at=None,
 		extra_metadata=meta if meta else None,
+		person_id=(person_brief or {}).get("id") if person_brief else None,
+		lead_id=(lead_brief or {}).get("id") if lead_brief else None,
 	)
 	db.add(c)
 	db.commit()
@@ -454,7 +517,7 @@ async def start_conversation_public(
 		{
 			"type": "crm_chat.event",
 			"event": "conversation.started",
-			"conversation": conversation_to_dict(c),
+			"conversation": _conversation_dict(db, c),
 		},
 	)
 
@@ -498,7 +561,7 @@ async def update_visitor_current_page_url(
 	if len(raw) > _MAX_PAGE_URL_LEN:
 		raw = raw[:_MAX_PAGE_URL_LEN]
 	if c.page_url == raw:
-		return conversation_to_dict(c)
+		return _conversation_dict(db, c)
 	c.page_url = raw
 	c.updated_at = datetime.utcnow()
 	db.commit()
@@ -507,12 +570,12 @@ async def update_visitor_current_page_url(
 	ev = {
 		"type": "crm_chat.event",
 		"event": "conversation.updated",
-		"conversation": conversation_to_dict(c),
+		"conversation": _conversation_dict(db, c),
 	}
 	await crm_chat_realtime_manager.broadcast_conversation(c.id, ev)
 	await crm_chat_realtime_manager.broadcast_business(c.business_id, ev)
 
-	return conversation_to_dict(c)
+	return _conversation_dict(db, c)
 
 
 def _assert_widget_origin(db: Session, c: CrmChatConversation, origin_header: Optional[str]) -> None:
@@ -886,7 +949,18 @@ def list_conversations_agent(
 	rows = list(db.scalars(q).all())
 	has_more = len(rows) > lim
 	rows = rows[:lim]
-	return ([conversation_to_dict(c) for c in rows], has_more)
+	pnames, lnames = _party_names_for_conversations(db, rows)
+	return (
+		[
+			conversation_to_dict(
+				c,
+				person_name=pnames.get(int(c.person_id)) if c.person_id else None,
+				lead_name=lnames.get(int(c.lead_id)) if c.lead_id else None,
+			)
+			for c in rows
+		],
+		has_more,
+	)
 
 
 async def delete_message_agent(
@@ -1133,12 +1207,12 @@ async def patch_conversation_agent(
 	ev = {
 		"type": "crm_chat.event",
 		"event": "conversation.updated",
-		"conversation": conversation_to_dict(c),
+		"conversation": _conversation_dict(db, c),
 	}
 	await crm_chat_realtime_manager.broadcast_conversation(c.id, ev)
 	await crm_chat_realtime_manager.broadcast_business(c.business_id, ev)
 
-	return conversation_to_dict(c)
+	return _conversation_dict(db, c)
 
 
 async def broadcast_typing(

@@ -98,6 +98,35 @@ def _stable_unique(items: Iterable[str]) -> List[str]:
 	return out
 
 
+_SHORT_NUMBER_MAX_DIGITS = 7
+
+
+def identity_candidates(raw: Optional[str], *, default_region: str = "IR") -> dict:
+	"""Candidates for caller-ID lookup: Iran variants + E.164 when the number is PSTN-length."""
+	norm = normalize_iran_phone(raw)
+	candidates = list(norm["candidates"])
+	digits = extract_digits(raw or "")
+	is_short = bool(digits) and len(digits) <= _SHORT_NUMBER_MAX_DIGITS
+	e164 = None
+	if digits and not is_short:
+		from app.services.person_phone_normalization import normalize_phone_e164
+
+		e164 = normalize_phone_e164(raw, default_region=default_region)
+		if e164:
+			if e164 not in candidates:
+				candidates.append(e164)
+			e164_digits = extract_digits(e164)
+			if e164_digits and e164_digits not in candidates:
+				candidates.append(e164_digits)
+	return {
+		"canonical": norm["canonical"] or e164,
+		"candidates": candidates,
+		"e164": e164,
+		"digits": digits,
+		"is_short": is_short,
+	}
+
+
 def numbers_match(a: Optional[str], b: Optional[str], min_len: int = 8) -> bool:
 	na = normalize_iran_phone(a)
 	nb = normalize_iran_phone(b)

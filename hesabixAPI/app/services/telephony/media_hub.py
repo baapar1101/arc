@@ -159,10 +159,15 @@ class TelephonyMediaHub:
 		call_id: int,
 		from_number: Optional[str] = None,
 		channel: Optional[str] = None,
+		person: Optional[Dict[str, Any]] = None,
+		lead: Optional[Dict[str, Any]] = None,
+		ambiguous: bool = False,
 	) -> int:
 		"""ارسال زنگ ورودی به Softphone clientهای آنلاین روی همان داخلی."""
 		ext = str(extension or "").strip()
 		sent = 0
+		person_name = (person or {}).get("name") if isinstance(person, dict) else None
+		lead_name = (lead or {}).get("name") if isinstance(lead, dict) else None
 		for session_id, link in list(self._clients.items()):
 			if link.pbx_id != pbx_id:
 				continue
@@ -176,6 +181,12 @@ class TelephonyMediaHub:
 					"from": from_number,
 					"extension": ext,
 					"channel": channel,
+					"person": person,
+					"lead": lead,
+					"person_name": person_name,
+					"lead_name": lead_name,
+					"party_name": person_name or lead_name,
+					"ambiguous": bool(ambiguous),
 				},
 			)
 			if ok:

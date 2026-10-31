@@ -17,7 +17,24 @@ from adapters.db.models.telephony import (
 )
 from app.core.responses import ApiError
 from app.services.telephony.telephony_access import TelephonyScope, require_call_in_scope, resolve_scope, write_audit
-from app.services.telephony.telephony_service import call_to_dict, extension_to_dict, list_pbx
+from app.services.telephony.telephony_service import (
+	_load_party_names,
+	call_to_dict,
+	extension_to_dict,
+	list_pbx,
+)
+
+
+def _calls_with_party_names(db: Session, rows: List[TelephonyCall]) -> List[Dict[str, Any]]:
+	pnames, lnames = _load_party_names(db, rows)
+	return [
+		call_to_dict(
+			c,
+			person_name=pnames.get(int(c.person_id)) if c.person_id else None,
+			lead_name=lnames.get(int(c.lead_id)) if c.lead_id else None,
+		)
+		for c in rows
+	]
 
 
 def _now() -> datetime:
@@ -97,7 +114,7 @@ def live_snapshot(db: Session, business_id: int, *, auth_ctx=None) -> Dict[str, 
 			"missed_today": missed_today,
 			"operators_online": online_ops,
 		},
-		"active_calls": [call_to_dict(c) for c in active],
+		"active_calls": _calls_with_party_names(db, active),
 		"blf": blf,
 		"queues": [
 			{
