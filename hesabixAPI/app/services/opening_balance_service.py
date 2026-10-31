@@ -283,6 +283,9 @@ def upsert_opening_balance(
         cost_price = _norm_amount(info.get("cost_price"))
         if cost_price > 0:
             inventory_total_value += qty * cost_price
+        allocations = inv.get("allocations")
+        if isinstance(allocations, list) and allocations:
+            info["allocations"] = allocations
         lines.append(
             {
                 "product_id": int(inv.get("product_id")),
@@ -456,6 +459,9 @@ def preview_opening_balance(
         cost_price = _norm_amount(info.get("cost_price"))
         if cost_price > 0:
             inventory_total_value += qty * cost_price
+        allocations = inv.get("allocations")
+        if isinstance(allocations, list) and allocations:
+            info["allocations"] = allocations
         lines.append(
             {
                 "product_id": int(inv.get("product_id")),

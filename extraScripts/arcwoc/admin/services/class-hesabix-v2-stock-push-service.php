@@ -119,6 +119,18 @@ class Hesabix_V2_Stock_Push_Service
 
 		$db = new Hesabix_V2_DB_Service();
 		$parent_id = $product->is_type('variation') ? (int) $product->get_parent_id() : 0;
+		if ($parent_id > 0 && class_exists('Hesabix_V2_Native_Variation_Sync')) {
+			$resolved = Hesabix_V2_Native_Variation_Sync::resolve_invoice_line($db, $wc_id, $parent_id);
+			if ($resolved) {
+				return self::push_native_variant_quantity($product, $resolved, $wc_qty);
+			}
+			if (Hesabix_V2_Native_Variation_Sync::has_native_parent_mapping($parent_id, $db)) {
+				return array(
+					'success' => false,
+					'message' => __('واریانت Native هنوز به ترکیب حسابیکس وصل نشده است.', 'hesabix-v2'),
+				);
+			}
+		}
 		$mapping = $parent_id > 0
 			? $db->get_mapping('product', $wc_id, $parent_id)
 			: $db->get_mapping('product', $wc_id, null);
@@ -268,6 +280,207 @@ class Hesabix_V2_Stock_Push_Service
 			'hesabix_id' => $hesabix_id,
 			'warehouse_doc_id' => $wh_id,
 		);
+	}
+
+	/**
+	 * پوش موجودی واریانت Native با حواله تعدیل و تخصیص ترکیب.
+	 *
+	 * @param WC_Product           $product
+	 * @param array{product_id:int,variant_id:int} $resolved
+	 * @param float                $wc_qty
+	 * @return array{success:bool, message:string, diff?:float, hesabix_id?:int}
+	 */
+	private static function push_native_variant_quantity($product, array $resolved, $wc_qty)
+	{
+		$wc_id = (int) $product->get_id();
+		$hesabix_id = (int) $resolved['product_id'];
+		$variant_id = (int) $resolved['variant_id'];
+		if ($hesabix_id < 1 || $variant_id < 1) {
+			return array(
+				'success' => false,
+				'message' => __('نگاشت ترکیب Native ناقص است.', 'hesabix-v2'),
+			);
+		}
+
+		$warehouse_id = absint(get_option('hesabix_v2_default_warehouse_id', 0));
+		if ($warehouse_id < 1) {
+			return array(
+				'success' => false,
+				'message' => __('انبار پیش‌فرض برای ارسال موجودی مشخص نیست.', 'hesabix-v2'),
+			);
+		}
+
+		$last_pushed = $product->get_meta(self::META_LAST_PUSHED_QTY, true);
+		if ($last_pushed !== '' && $last_pushed !== null && abs((float) $last_pushed - $wc_qty) < 0.00001) {
+			return array(
+				'success' => true,
+				'message' => __('موجودی قبلاً هم‌تراز است.', 'hesabix-v2'),
+				'diff' => 0.0,
+				'hesabix_id' => $hesabix_id,
+			);
+		}
+
+		$api = new Hesabix_V2_Api();
+		$hx_qty = self::fetch_hesabix_variant_quantity($api, $hesabix_id, $variant_id, $warehouse_id);
+		if (is_wp_error($hx_qty)) {
+			return array(
+				'success' => false,
+				'message' => $hx_qty->get_error_message(),
+				'hesabix_id' => $hesabix_id,
+			);
+		}
+
+		$diff = $wc_qty - (float) $hx_qty;
+		if (abs($diff) < 0.00001) {
+			$product->update_meta_data(self::META_LAST_PUSHED_QTY, $wc_qty);
+			$product->save_meta_data();
+			return array(
+				'success' => true,
+				'message' => __('موجودی حسابیکس با ووکامرس برابر است.', 'hesabix-v2'),
+				'diff' => 0.0,
+				'hesabix_id' => $hesabix_id,
+			);
+		}
+
+		$movement = $diff > 0 ? 'in' : 'out';
+		$qty = abs($diff);
+		$payload = array(
+			'doc_type' => 'adjustment',
+			'document_date' => function_exists('current_time') ? current_time('Y-m-d') : gmdate('Y-m-d'),
+			'warehouse_id_to' => $warehouse_id,
+			'warehouse_id_from' => $warehouse_id,
+			'description' => sprintf(
+				/* translators: 1: WC product id, 2: qty */
+				__('تعدیل موجودی Native از ووکامرس (واریانت #%1$d → %2$s)', 'hesabix-v2'),
+				$wc_id,
+				wc_format_decimal($wc_qty, 4)
+			),
+			'extra_info' => array(
+				self::ORIGIN_KEY => self::ORIGIN_VALUE,
+				'wc_product_id' => $wc_id,
+				'wc_target_qty' => $wc_qty,
+				'hesabix_prev_qty' => (float) $hx_qty,
+				'native_variant_id' => $variant_id,
+			),
+			'lines' => array(
+				array(
+					'product_id' => $hesabix_id,
+					'quantity' => $qty,
+					'movement' => $movement,
+					'warehouse_id' => $warehouse_id,
+					'allocations' => array(
+						array(
+							'variant_id' => $variant_id,
+							'quantity' => $qty,
+						),
+					),
+				),
+			),
+		);
+
+		$create = $api->create_warehouse_document($payload);
+		if (empty($create['success'])) {
+			$msg = isset($create['message']) ? (string) $create['message'] : __('ایجاد حواله تعدیل ناموفق بود.', 'hesabix-v2');
+			Hesabix_V2_Log_Service::error(
+				'WC→Hesabix native stock push: create warehouse doc failed',
+				array(
+					'entity_type' => 'stock_push',
+					'entity_id' => $wc_id,
+					'hesabix_id' => $hesabix_id,
+					'variant_id' => $variant_id,
+					'request' => array('decoded' => $payload),
+					'response' => array('decoded' => $create),
+				)
+			);
+			return array('success' => false, 'message' => $msg, 'hesabix_id' => $hesabix_id, 'diff' => $diff);
+		}
+
+		$doc = isset($create['data']) && is_array($create['data']) ? $create['data'] : array();
+		$wh_id = isset($doc['id']) ? (int) $doc['id'] : 0;
+		if ($wh_id < 1 && isset($doc['item']) && is_array($doc['item']) && isset($doc['item']['id'])) {
+			$wh_id = (int) $doc['item']['id'];
+		}
+		if ($wh_id < 1) {
+			return array(
+				'success' => false,
+				'message' => __('شناسه حواله تعدیل دریافت نشد.', 'hesabix-v2'),
+				'hesabix_id' => $hesabix_id,
+				'diff' => $diff,
+			);
+		}
+
+		$post = $api->post_warehouse_document($wh_id);
+		if (empty($post['success'])) {
+			$msg = isset($post['message']) ? (string) $post['message'] : __('قطعی‌سازی حواله تعدیل ناموفق بود.', 'hesabix-v2');
+			Hesabix_V2_Log_Service::error(
+				'WC→Hesabix native stock push: post warehouse doc failed',
+				array(
+					'entity_type' => 'stock_push',
+					'entity_id' => $wc_id,
+					'hesabix_id' => $hesabix_id,
+					'variant_id' => $variant_id,
+					'warehouse_doc_id' => $wh_id,
+					'response' => array('decoded' => $post),
+				)
+			);
+			return array('success' => false, 'message' => $msg, 'hesabix_id' => $hesabix_id, 'diff' => $diff);
+		}
+
+		$product->update_meta_data(self::META_LAST_PUSHED_QTY, $wc_qty);
+		$product->save_meta_data();
+
+		Hesabix_V2_Log_Service::info(
+			'WC→Hesabix native stock push completed',
+			array(
+				'entity_type' => 'stock_push',
+				'entity_id' => $wc_id,
+				'hesabix_id' => $hesabix_id,
+				'variant_id' => $variant_id,
+				'diff' => $diff,
+				'movement' => $movement,
+				'warehouse_doc_id' => $wh_id,
+				'wc_qty' => $wc_qty,
+				'hesabix_prev_qty' => (float) $hx_qty,
+			)
+		);
+
+		return array(
+			'success' => true,
+			/* translators: 1: diff, 2: warehouse doc id */
+			'message' => sprintf(__('موجودی ترکیب Native تعدیل شد (اختلاف %1$s، حواله #%2$d).', 'hesabix-v2'), wc_format_decimal($diff, 4), $wh_id),
+			'diff' => $diff,
+			'hesabix_id' => $hesabix_id,
+			'warehouse_doc_id' => $wh_id,
+		);
+	}
+
+	/**
+	 * @param Hesabix_V2_Api $api
+	 * @param int            $hesabix_product_id
+	 * @param int            $variant_id
+	 * @param int            $warehouse_id
+	 * @return float|WP_Error
+	 */
+	private static function fetch_hesabix_variant_quantity($api, $hesabix_product_id, $variant_id, $warehouse_id)
+	{
+		$res = $api->list_variant_balances((int) $hesabix_product_id, (int) $warehouse_id);
+		if (empty($res['success'])) {
+			$msg = isset($res['message']) ? (string) $res['message'] : __('خطا در مانده ترکیب حسابیکس', 'hesabix-v2');
+			return new WP_Error('hesabix_variant_stock_api', $msg);
+		}
+		$data = isset($res['data']) && is_array($res['data']) ? $res['data'] : array();
+		$list = isset($data['items']) && is_array($data['items']) ? $data['items'] : $data;
+		if (!is_array($list)) {
+			return 0.0;
+		}
+		$total = 0.0;
+		foreach ($list as $row) {
+			if (!is_array($row) || (int) ($row['variant_id'] ?? 0) !== (int) $variant_id) {
+				continue;
+			}
+			$total += isset($row['quantity']) ? (float) $row['quantity'] : 0.0;
+		}
+		return $total;
 	}
 
 	/**

@@ -907,6 +907,9 @@ class Hesabix_V2_Admin
 			'queue_items_per_cron_run' => isset($_POST['queue_items_per_cron_run'])
 				? max(1, min(500, absint(wp_unslash($_POST['queue_items_per_cron_run']))))
 				: 15,
+			'product_variation_mode' => isset($_POST['product_variation_mode'])
+				? sanitize_key(wp_unslash($_POST['product_variation_mode']))
+				: (isset($prev_sync['product_variation_mode']) ? (string) $prev_sync['product_variation_mode'] : 'legacy'),
 		);
 
 		$fiscal_policy_allowed = array('keep', 'clamp', 'skip');
@@ -920,6 +923,9 @@ class Hesabix_V2_Admin
 		}
 		if (!in_array($sync_settings['shipping_line_mode'], array('service', 'account_adjustment'), true)) {
 			$sync_settings['shipping_line_mode'] = 'service';
+		}
+		if (!in_array($sync_settings['product_variation_mode'], array('legacy', 'native'), true)) {
+			$sync_settings['product_variation_mode'] = 'legacy';
 		}
 
 		if (class_exists('Hesabix_V2_Gateway_Fee_Service')) {

@@ -130,6 +130,7 @@ class Hesabix_V2
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-customer-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-invoice-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-sync-service.php';
+		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-native-variation-sync.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-orphan-product-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-opening-inventory-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-queue-service.php';

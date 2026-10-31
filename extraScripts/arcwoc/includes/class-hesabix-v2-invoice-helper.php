@@ -110,6 +110,12 @@ class Hesabix_V2_Invoice_Helper
 			$sync = Hesabix_V2_Product_Sync_Payload::normalize_sync_settings($sync);
 		}
 
+		if (class_exists('Hesabix_V2_Native_Variation_Sync')) {
+			$sync['product_variation_mode'] = Hesabix_V2_Native_Variation_Sync::normalize_mode($sync);
+		} elseif (!isset($sync['product_variation_mode']) || $sync['product_variation_mode'] !== 'native') {
+			$sync['product_variation_mode'] = 'legacy';
+		}
+
 		return $sync;
 	}
 

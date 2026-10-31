@@ -265,7 +265,8 @@ class Hesabix_V2_Stock_Pull_Service
 
 			$db = new Hesabix_V2_DB_Service();
 			$mappings = $db->get_all_product_mappings();
-			if (empty($mappings)) {
+			$native_preview = $db->get_all_native_variation_mappings();
+			if (empty($mappings) && empty($native_preview)) {
 				return self::finish_result(
 					array(
 						'success' => true,
@@ -290,20 +291,6 @@ class Hesabix_V2_Stock_Pull_Service
 						}
 					)
 				);
-				if (empty($mappings)) {
-					return self::finish_result(
-						array(
-							'success' => true,
-							'message' => __('هیچ نگاشتی برای شناسه‌های درخواستی یافت نشد.', 'hesabix-v2'),
-							'updated' => 0,
-							'skipped' => 0,
-							'errors' => 0,
-							'guarded_zero' => 0,
-							'execution_time' => microtime(true) - $start,
-						),
-						$source
-					);
-				}
 			}
 
 			$hesabix_ids = array();
@@ -339,6 +326,19 @@ class Hesabix_V2_Stock_Pull_Service
 			$policy_auto_manage_stock = !empty($sync_pull['sync_product_stock'])
 				&& in_array($pinv, array('physical_always', 'always_on'), true);
 
+			$native_wc_ids = array();
+			$native_parent_ids = array();
+			foreach ($native_preview as $nr) {
+				$nwc = isset($nr['wc_id']) ? (int) $nr['wc_id'] : 0;
+				$nparent = isset($nr['wc_parent_id']) ? (int) $nr['wc_parent_id'] : 0;
+				if ($nwc > 0) {
+					$native_wc_ids[ $nwc ] = true;
+				}
+				if ($nparent > 0) {
+					$native_parent_ids[ $nparent ] = true;
+				}
+			}
+
 			Hesabix_V2_Stock_Push_Service::set_stock_pull_applying(true);
 
 			try {
@@ -347,6 +347,12 @@ class Hesabix_V2_Stock_Pull_Service
 					$wc_id = isset($row['wc_id']) ? (int) $row['wc_id'] : 0;
 
 					if ($hid < 1 || $wc_id < 1) {
+						$skipped++;
+						continue;
+					}
+
+					$row_parent = isset($row['wc_parent_id']) ? (int) $row['wc_parent_id'] : 0;
+					if (isset($native_wc_ids[ $wc_id ]) || ($row_parent > 0 && isset($native_parent_ids[ $row_parent ]))) {
 						$skipped++;
 						continue;
 					}
@@ -427,6 +433,86 @@ class Hesabix_V2_Stock_Pull_Service
 						);
 					}
 				}
+
+				$native_rows = $db->get_all_native_variation_mappings();
+				if (!empty($filter_hids) && !empty($native_rows)) {
+					$native_rows = array_values(
+						array_filter(
+							$native_rows,
+							function ($row) use ($filter_hids) {
+								$meta = class_exists('Hesabix_V2_Native_Variation_Sync')
+									? Hesabix_V2_Native_Variation_Sync::mapping_meta($row)
+									: array();
+								$parent_hx = isset($meta['hesabix_product_id']) ? (int) $meta['hesabix_product_id'] : 0;
+								return $parent_hx > 0 && in_array($parent_hx, $filter_hids, true);
+							}
+						)
+					);
+				}
+				if (!empty($native_rows)) {
+					$native_qty = self::fetch_quantities_for_native_variants($api, $native_rows, $wh_filter);
+					if (is_wp_error($native_qty)) {
+						return self::finish_result(
+							array(
+								'success' => false,
+								'message' => $native_qty->get_error_message(),
+								'execution_time' => microtime(true) - $start,
+							),
+							$source
+						);
+					}
+					foreach ($native_rows as $row) {
+						$vid = isset($row['hesabix_id']) ? (int) $row['hesabix_id'] : 0;
+						$wc_id = isset($row['wc_id']) ? (int) $row['wc_id'] : 0;
+						if ($vid < 1 || $wc_id < 1) {
+							$skipped++;
+							continue;
+						}
+						$qty = array_key_exists($vid, $native_qty) ? (float) $native_qty[ $vid ] : 0.0;
+						$product = wc_get_product($wc_id);
+						if (!$product || $product->is_virtual() || $product->is_type('variable')) {
+							$skipped++;
+							continue;
+						}
+						if (!apply_filters('hesabix_v2_stock_pull_apply_to_product', true, $product, $row, $qty, $opts)) {
+							$skipped++;
+							continue;
+						}
+						$current_qty = $product->managing_stock() ? (float) $product->get_stock_quantity() : null;
+						if (
+							!$force_zero
+							&& !empty($opts['skip_zero_overwrite'])
+							&& abs($qty) < 0.00001
+							&& $current_qty !== null
+							&& $current_qty > 0.00001
+						) {
+							$guarded_zero++;
+							continue;
+						}
+						try {
+							if (!empty($opts['force_manage_stock']) || $policy_auto_manage_stock) {
+								$product->set_manage_stock(true);
+							} elseif (!$product->managing_stock()) {
+								$skipped++;
+								continue;
+							}
+							$product->set_stock_quantity($qty);
+							$product->save();
+							$updated++;
+						} catch (Exception $e) {
+							$errors++;
+							Hesabix_V2_Log_Service::error(
+								'Stock pull: failed to update WooCommerce variation (native)',
+								array(
+									'entity_type' => 'stock_pull',
+									'entity_id' => $wc_id,
+									'hesabix_id' => $vid,
+									'error' => $e->getMessage(),
+								)
+							);
+						}
+					}
+				}
 			} finally {
 				Hesabix_V2_Stock_Push_Service::set_stock_pull_applying(false);
 			}
@@ -492,6 +578,7 @@ class Hesabix_V2_Stock_Pull_Service
 
 		$db = new Hesabix_V2_DB_Service();
 		$mappings = $db->get_all_product_mappings();
+		$native_rows = $db->get_all_native_variation_mappings();
 		$hesabix_ids = array();
 		foreach ($mappings as $row) {
 			$hid = isset($row['hesabix_id']) ? (int) $row['hesabix_id'] : 0;
@@ -500,14 +587,30 @@ class Hesabix_V2_Stock_Pull_Service
 			}
 		}
 		$hesabix_ids = array_values(array_unique($hesabix_ids));
-		if (empty($hesabix_ids)) {
+		if (empty($hesabix_ids) && empty($native_rows)) {
 			return array('success' => true, 'items' => array(), 'checked' => 0);
 		}
 
 		$api = new Hesabix_V2_Api();
-		$totals = self::fetch_quantities_for_product_ids($api, $hesabix_ids, $wh_filter);
-		if (is_wp_error($totals)) {
-			return array('success' => false, 'message' => $totals->get_error_message());
+		$totals = array();
+		if (!empty($hesabix_ids)) {
+			$totals = self::fetch_quantities_for_product_ids($api, $hesabix_ids, $wh_filter);
+			if (is_wp_error($totals)) {
+				return array('success' => false, 'message' => $totals->get_error_message());
+			}
+		}
+
+		$native_wc_ids = array();
+		$native_parent_ids = array();
+		foreach ($native_rows as $nr) {
+			$nwc = isset($nr['wc_id']) ? (int) $nr['wc_id'] : 0;
+			$nparent = isset($nr['wc_parent_id']) ? (int) $nr['wc_parent_id'] : 0;
+			if ($nwc > 0) {
+				$native_wc_ids[ $nwc ] = true;
+			}
+			if ($nparent > 0) {
+				$native_parent_ids[ $nparent ] = true;
+			}
 		}
 
 		$items = array();
@@ -518,7 +621,11 @@ class Hesabix_V2_Stock_Pull_Service
 			}
 			$hid = isset($row['hesabix_id']) ? (int) $row['hesabix_id'] : 0;
 			$wc_id = isset($row['wc_id']) ? (int) $row['wc_id'] : 0;
+			$row_parent = isset($row['wc_parent_id']) ? (int) $row['wc_parent_id'] : 0;
 			if ($hid < 1 || $wc_id < 1 || !array_key_exists($hid, $totals)) {
+				continue;
+			}
+			if (isset($native_wc_ids[ $wc_id ]) || ($row_parent > 0 && isset($native_parent_ids[ $row_parent ]))) {
 				continue;
 			}
 			$product = wc_get_product($wc_id);
@@ -539,6 +646,41 @@ class Hesabix_V2_Stock_Pull_Service
 				'hesabix_qty' => $hx_qty,
 				'diff' => $wc_qty - $hx_qty,
 			);
+		}
+
+		if (count($items) < $limit && !empty($native_rows)) {
+			$native_qty = self::fetch_quantities_for_native_variants($api, $native_rows, $wh_filter);
+			if (is_wp_error($native_qty)) {
+				return array('success' => false, 'message' => $native_qty->get_error_message());
+			}
+			foreach ($native_rows as $row) {
+				if (count($items) >= $limit) {
+					break;
+				}
+				$vid = isset($row['hesabix_id']) ? (int) $row['hesabix_id'] : 0;
+				$wc_id = isset($row['wc_id']) ? (int) $row['wc_id'] : 0;
+				if ($vid < 1 || $wc_id < 1) {
+					continue;
+				}
+				$product = wc_get_product($wc_id);
+				if (!$product || $product->is_virtual() || $product->is_type('variable') || !$product->managing_stock()) {
+					continue;
+				}
+				$checked++;
+				$wc_qty = (float) $product->get_stock_quantity();
+				$hx_qty = array_key_exists($vid, $native_qty) ? (float) $native_qty[ $vid ] : 0.0;
+				if (abs($wc_qty - $hx_qty) < 0.00001) {
+					continue;
+				}
+				$items[] = array(
+					'wc_id' => $wc_id,
+					'hesabix_id' => $vid,
+					'name' => $product->get_name(),
+					'wc_qty' => $wc_qty,
+					'hesabix_qty' => $hx_qty,
+					'diff' => $wc_qty - $hx_qty,
+				);
+			}
 		}
 
 		return array(
@@ -676,6 +818,66 @@ class Hesabix_V2_Stock_Pull_Service
 				$skip += $take;
 				$guard++;
 			} while ($has_next && $guard < 80);
+		}
+
+		return $totals;
+	}
+
+	/**
+	 * مانده Variant Native: کلید آرایه شناسهٔ ترکیب حسابیکس است.
+	 *
+	 * @param Hesabix_V2_Api  $api
+	 * @param array           $native_rows
+	 * @param array<int>|null $warehouse_ids
+	 * @return array<int, float>|WP_Error
+	 */
+	private static function fetch_quantities_for_native_variants($api, $native_rows, $warehouse_ids)
+	{
+		$totals = array();
+		$parent_ids = array();
+		foreach ($native_rows as $row) {
+			$meta = class_exists('Hesabix_V2_Native_Variation_Sync')
+				? Hesabix_V2_Native_Variation_Sync::mapping_meta($row)
+				: array();
+			$pid = isset($meta['hesabix_product_id']) ? (int) $meta['hesabix_product_id'] : 0;
+			if ($pid > 0) {
+				$parent_ids[ $pid ] = true;
+			}
+		}
+		$allow_wh = null;
+		if (is_array($warehouse_ids)) {
+			$allow_wh = array();
+			foreach ($warehouse_ids as $wid) {
+				$allow_wh[ (int) $wid ] = true;
+			}
+		}
+
+		foreach (array_keys($parent_ids) as $product_id) {
+			$res = $api->list_variant_balances($product_id, null);
+			if (empty($res['success'])) {
+				$msg = isset($res['message']) ? (string) $res['message'] : __('خطا در مانده ترکیب حسابیکس', 'hesabix-v2');
+				return new WP_Error('hesabix_variant_stock_api', $msg);
+			}
+			$data = isset($res['data']) && is_array($res['data']) ? $res['data'] : array();
+			$list = isset($data['items']) && is_array($data['items']) ? $data['items'] : $data;
+			if (!is_array($list)) {
+				continue;
+			}
+			foreach ($list as $row) {
+				if (!is_array($row) || empty($row['variant_id'])) {
+					continue;
+				}
+				$wh = isset($row['warehouse_id']) ? (int) $row['warehouse_id'] : 0;
+				if ($allow_wh !== null && ($wh < 1 || !isset($allow_wh[ $wh ]))) {
+					continue;
+				}
+				$vid = (int) $row['variant_id'];
+				$q = isset($row['quantity']) ? (float) $row['quantity'] : 0.0;
+				if (!isset($totals[ $vid ])) {
+					$totals[ $vid ] = 0.0;
+				}
+				$totals[ $vid ] += $q;
+			}
 		}
 
 		return $totals;

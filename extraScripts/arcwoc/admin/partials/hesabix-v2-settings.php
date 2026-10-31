@@ -369,6 +369,26 @@ $hsx_post = ini_get('post_max_size') ?: '';
 			</tr>
 
 			<tr>
+				<th scope="row"><?php _e('همگام‌سازی محصول متغیر', 'hesabix-v2'); ?></th>
+				<td>
+					<?php
+					$variation_mode = isset($sync_settings['product_variation_mode'])
+						? (string) $sync_settings['product_variation_mode']
+						: 'legacy';
+					?>
+					<select name="product_variation_mode" id="hesabix_v2_product_variation_mode" class="regular-text">
+						<option value="legacy" <?php selected($variation_mode, 'legacy'); ?>>
+							<?php esc_html_e('Legacy (هر واریانت ووکامرس = یک کالا در حسابیکس)', 'hesabix-v2'); ?>
+						</option>
+						<option value="native" <?php selected($variation_mode, 'native'); ?>>
+							<?php esc_html_e('Native (یک کالا با تفکیک موجودی ویژگی — حداکثر دو بُعد)', 'hesabix-v2'); ?>
+						</option>
+					</select>
+					<p class="description"><?php esc_html_e('پیش‌فرض Legacy است و کالاهای قبلاً همگام‌شده به‌صورت واریانت-کالا تبدیل نمی‌شوند. Native فقط برای محصول متغیر جدید (یا قبلاً Native) با یک یا دو ویژگی واریانت، والد را به یک کالای حسابیکس با ترکیب‌ها می‌فرستد. برای Native باید انبار پیش‌فرض تنظیم شده باشد.', 'hesabix-v2'); ?></p>
+				</td>
+			</tr>
+
+			<tr>
 				<th scope="row"><?php _e('سیاست به‌روزرسانی محصول از ووکامرس', 'hesabix-v2'); ?></th>
 				<td>
 					<?php

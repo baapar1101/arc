@@ -28,6 +28,22 @@ class Hesabix_V2_Sync_Service
 	private $db;
 
 	/**
+	 * @return Hesabix_V2_Api
+	 */
+	public function api_client()
+	{
+		return $this->api;
+	}
+
+	/**
+	 * @return Hesabix_V2_DB_Service
+	 */
+	public function db_client()
+	{
+		return $this->db;
+	}
+
+	/**
 	 * پیش از فراخوانی API؛ انبار خطوط حل نشده باشد تا زمان اصلاح تنظیمات نباید دوباره به صف رود.
 	 */
 	const ERR_INVOICE_WAREHOUSE_PREFLIGHT = 94001;
@@ -159,6 +175,9 @@ class Hesabix_V2_Sync_Service
 				}
 			}
 			if ($probe && $probe->is_type('variable')) {
+				if (class_exists('Hesabix_V2_Native_Variation_Sync') && Hesabix_V2_Native_Variation_Sync::should_sync_parent_as_native($product_id, $this->db)) {
+					return Hesabix_V2_Native_Variation_Sync::sync($this, $product_id, null, $wc_currency_override);
+				}
 				return $this->sync_variable_product_children($product_id, $wc_currency_override);
 			}
 		}
@@ -176,6 +195,11 @@ class Hesabix_V2_Sync_Service
 			$guard_key = $product_id . ':' . $variation_id;
 			if (isset(self::$variation_sync_guard[ $guard_key ])) {
 				return self::$variation_sync_guard[ $guard_key ];
+			}
+
+			if (class_exists('Hesabix_V2_Native_Variation_Sync') && Hesabix_V2_Native_Variation_Sync::should_sync_parent_as_native($product_id, $this->db)) {
+				$result = Hesabix_V2_Native_Variation_Sync::sync($this, $product_id, $variation_id, $wc_currency_override);
+				return $this->remember_variation_sync_result($product_id, $variation_id, $result);
 			}
 		}
 
@@ -1678,6 +1702,15 @@ class Hesabix_V2_Sync_Service
 			}
 
 			if ($product->is_type('variable')) {
+				if (class_exists('Hesabix_V2_Native_Variation_Sync') && Hesabix_V2_Native_Variation_Sync::should_sync_parent_as_native($product_id, $this->db)) {
+					$list[] = array(
+						'kind' => 'native_variable',
+						'parent_id' => $product_id,
+						'variation_id' => null,
+					);
+					continue;
+				}
+
 				$variation_ids = $product->get_children();
 				if (empty($variation_ids)) {
 					$list[] = array(
@@ -1870,17 +1903,27 @@ class Hesabix_V2_Sync_Service
 					continue;
 				}
 
-				if (($pl['kind'] ?? '') === 'empty_variable') {
-					$results['failed']++;
-					$results['errors'][] = array(
-						'product_id' => (int) ($pl['product_id'] ?? 0),
-						'message' => __('محصول متغیر بدون واریانت', 'hesabix-v2'),
-					);
-					continue;
-				}
+			if (($pl['kind'] ?? '') === 'empty_variable') {
+				$results['failed']++;
+				$results['errors'][] = array(
+					'product_id' => (int) ($pl['product_id'] ?? 0),
+					'message' => __('محصول متغیر بدون واریانت', 'hesabix-v2'),
+				);
+				continue;
+			}
 
+			if (($pl['kind'] ?? '') === 'native_variable') {
 				$parent_id = (int) ($pl['parent_id'] ?? 0);
-				$vid = isset($pl['variation_id']) ? (int) $pl['variation_id'] : 0;
+				$results['failed']++;
+				$results['errors'][] = array(
+					'product_id' => $parent_id,
+					'message' => $gmsg,
+				);
+				continue;
+			}
+
+			$parent_id = (int) ($pl['parent_id'] ?? 0);
+			$vid = isset($pl['variation_id']) ? (int) $pl['variation_id'] : 0;
 
 				$row_err = array('message' => $gmsg);
 				if ($vid > 0) {
@@ -1915,6 +1958,21 @@ class Hesabix_V2_Sync_Service
 					'product_id' => (int) ($pl['product_id'] ?? 0),
 					'message' => __('محصول متغیر بدون واریانت', 'hesabix-v2'),
 				);
+				continue;
+			}
+
+			if (($pl['kind'] ?? '') === 'native_variable') {
+				$parent_id = (int) ($pl['parent_id'] ?? 0);
+				$native_res = Hesabix_V2_Native_Variation_Sync::sync($this, $parent_id, null, null);
+				if (!empty($native_res['success'])) {
+					$results['success']++;
+				} else {
+					$results['failed']++;
+					$results['errors'][] = array(
+						'product_id' => $parent_id,
+						'message' => isset($native_res['message']) ? (string) $native_res['message'] : __('همگام‌سازی Native ناموفق بود.', 'hesabix-v2'),
+					);
+				}
 				continue;
 			}
 

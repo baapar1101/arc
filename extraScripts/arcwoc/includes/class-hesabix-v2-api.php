@@ -1413,6 +1413,221 @@ class Hesabix_V2_Api
 	}
 
 	/**
+	 * شناسه را از پاسخ موفق API حسابیکس بخوان.
+	 *
+	 * @param array       $result
+	 * @param string|null $fallback_key
+	 * @return int
+	 */
+	public static function extract_id($result, $fallback_key = null)
+	{
+		if (!is_array($result) || empty($result['success'])) {
+			return 0;
+		}
+		$data = isset($result['data']) && is_array($result['data']) ? $result['data'] : array();
+		if (isset($data['id'])) {
+			return (int) $data['id'];
+		}
+		if (isset($data['item']) && is_array($data['item']) && isset($data['item']['id'])) {
+			return (int) $data['item']['id'];
+		}
+		if ($fallback_key && isset($data[ $fallback_key ])) {
+			return (int) $data[ $fallback_key ];
+		}
+		return 0;
+	}
+
+	/**
+	 * جستجوی ویژگی‌های کالا.
+	 *
+	 * @since 4.11.0
+	 * @param array $query
+	 * @return array
+	 */
+	public function search_product_attributes($query = array())
+	{
+		$default_query = array(
+			'take' => 50,
+			'skip' => 0,
+		);
+		$query = array_merge($default_query, $query);
+
+		return $this->request(
+			'POST',
+			'/product-attributes/business/' . (int) $this->business_id . '/search',
+			$query
+		);
+	}
+
+	/**
+	 * ایجاد ویژگی کالا.
+	 *
+	 * @since 4.11.0
+	 * @param array $data
+	 * @return array
+	 */
+	public function create_product_attribute($data)
+	{
+		return $this->request(
+			'POST',
+			'/product-attributes/business/' . (int) $this->business_id,
+			$data
+		);
+	}
+
+	/**
+	 * به‌روزرسانی ویژگی کالا.
+	 *
+	 * @since 4.11.0
+	 * @param int   $attribute_id
+	 * @param array $data
+	 * @return array
+	 */
+	public function update_product_attribute($attribute_id, $data)
+	{
+		return $this->request(
+			'PUT',
+			'/product-attributes/business/' . (int) $this->business_id . '/' . absint($attribute_id),
+			$data
+		);
+	}
+
+	/**
+	 * دریافت یک ویژگی کالا.
+	 *
+	 * @since 4.11.0
+	 * @param int $attribute_id
+	 * @return array
+	 */
+	public function get_product_attribute($attribute_id)
+	{
+		return $this->request(
+			'GET',
+			'/product-attributes/business/' . (int) $this->business_id . '/' . absint($attribute_id)
+		);
+	}
+
+	/**
+	 * جایگزینی ابعاد Variant کالا.
+	 *
+	 * @since 4.11.0
+	 * @param int   $product_id
+	 * @param array $dimensions
+	 * @return array
+	 */
+	public function replace_variant_dimensions($product_id, $dimensions)
+	{
+		return $this->request(
+			'PUT',
+			'/products/business/' . (int) $this->business_id . '/' . absint($product_id) . '/variant-dimensions',
+			array('dimensions' => $dimensions)
+		);
+	}
+
+	/**
+	 * فهرست ابعاد Variant کالا.
+	 *
+	 * @since 4.11.0
+	 * @param int $product_id
+	 * @return array
+	 */
+	public function get_variant_dimensions($product_id)
+	{
+		return $this->request(
+			'GET',
+			'/products/business/' . (int) $this->business_id . '/' . absint($product_id) . '/variant-dimensions'
+		);
+	}
+
+	/**
+	 * فهرست ترکیب‌های کالا.
+	 *
+	 * @since 4.11.0
+	 * @param int $product_id
+	 * @return array
+	 */
+	public function list_product_variants($product_id)
+	{
+		return $this->request(
+			'GET',
+			'/products/business/' . (int) $this->business_id . '/' . absint($product_id) . '/variants'
+		);
+	}
+
+	/**
+	 * ایجاد ترکیب کالا.
+	 *
+	 * @since 4.11.0
+	 * @param int   $product_id
+	 * @param array $data
+	 * @return array
+	 */
+	public function create_product_variant($product_id, $data)
+	{
+		return $this->request(
+			'POST',
+			'/products/business/' . (int) $this->business_id . '/' . absint($product_id) . '/variants',
+			$data
+		);
+	}
+
+	/**
+	 * به‌روزرسانی ترکیب کالا.
+	 *
+	 * @since 4.11.0
+	 * @param int   $product_id
+	 * @param int   $variant_id
+	 * @param array $data
+	 * @return array
+	 */
+	public function update_product_variant($product_id, $variant_id, $data)
+	{
+		return $this->request(
+			'PUT',
+			'/products/business/' . (int) $this->business_id . '/' . absint($product_id) . '/variants/' . absint($variant_id),
+			$data
+		);
+	}
+
+	/**
+	 * فعال‌سازی تفکیک موجودی ویژگی.
+	 *
+	 * @since 4.11.0
+	 * @param int   $product_id
+	 * @param array $data
+	 * @return array
+	 */
+	public function enable_inventory_variants($product_id, $data)
+	{
+		return $this->request(
+			'POST',
+			'/products/business/' . (int) $this->business_id . '/' . absint($product_id) . '/enable-inventory-variants',
+			$data
+		);
+	}
+
+	/**
+	 * مانده Variant به تفکیک انبار.
+	 *
+	 * @since 4.11.0
+	 * @param int      $product_id
+	 * @param int|null $warehouse_id
+	 * @return array
+	 */
+	public function list_variant_balances($product_id, $warehouse_id = null)
+	{
+		$qs = '';
+		if ($warehouse_id !== null && (int) $warehouse_id > 0) {
+			$qs = '?warehouse_id=' . absint($warehouse_id);
+		}
+
+		return $this->request(
+			'GET',
+			'/products/business/' . (int) $this->business_id . '/' . absint($product_id) . '/variant-balances' . $qs
+		);
+	}
+
+	/**
 	 * پاک کردن URL فروشگاه و توکن پل ووکامرس در تنظیمات کسب‌وکار حسابیکس.
 	 *
 	 * @param int|null $business_id پیش‌فرض: کسب‌وکار ذخیره‌شده

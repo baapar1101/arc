@@ -580,17 +580,35 @@ class Hesabix_V2_Mapper
 
 			$variation_id = absint($item->get_variation_id());
 			$parent_id = absint($item->get_product_id());
+			$native_variant_id = 0;
+			$hesabix_product_id = 0;
+			$sync_product_id = $parent_id;
+			$sync_variation_id = $variation_id > 0 ? $variation_id : null;
+			$log_wc_id = $variation_id > 0 ? $variation_id : $parent_id;
 
-			if ($variation_id > 0) {
-				$hesabix_product_id = $db_service->get_hesabix_id('product', $variation_id, $parent_id);
-				$sync_product_id = $parent_id;
-				$sync_variation_id = $variation_id;
-				$log_wc_id = $variation_id;
-			} else {
-				$hesabix_product_id = $db_service->get_hesabix_id('product', $parent_id, null);
-				$sync_product_id = $parent_id;
-				$sync_variation_id = null;
-				$log_wc_id = $parent_id;
+			if ($variation_id > 0 && class_exists('Hesabix_V2_Native_Variation_Sync')) {
+				$native_line = Hesabix_V2_Native_Variation_Sync::resolve_invoice_line($db_service, $variation_id, $parent_id);
+				if ($native_line) {
+					$hesabix_product_id = (int) $native_line['product_id'];
+					$native_variant_id = (int) $native_line['variant_id'];
+					$sync_product_id = $parent_id;
+					$sync_variation_id = $variation_id;
+					$log_wc_id = $variation_id;
+				}
+			}
+
+			if (empty($native_variant_id)) {
+				if ($variation_id > 0) {
+					$hesabix_product_id = $db_service->get_hesabix_id('product', $variation_id, $parent_id);
+					$sync_product_id = $parent_id;
+					$sync_variation_id = $variation_id;
+					$log_wc_id = $variation_id;
+				} else {
+					$hesabix_product_id = $db_service->get_hesabix_id('product', $parent_id, null);
+					$sync_product_id = $parent_id;
+					$sync_variation_id = null;
+					$log_wc_id = $parent_id;
+				}
 			}
 
 			if (!$hesabix_product_id) {
@@ -598,6 +616,22 @@ class Hesabix_V2_Mapper
 				$sync_result = $sync_service->sync_product($sync_product_id, $sync_variation_id, $order->get_currency());
 				if (!empty($sync_result['success']) && !empty($sync_result['hesabix_id'])) {
 					$hesabix_product_id = $sync_result['hesabix_id'];
+					if (!empty($sync_result['native']) && $variation_id > 0 && class_exists('Hesabix_V2_Native_Variation_Sync')) {
+						$resolved = Hesabix_V2_Native_Variation_Sync::resolve_invoice_line($db_service, $variation_id, $parent_id);
+						if ($resolved) {
+							$hesabix_product_id = (int) $resolved['product_id'];
+							$native_variant_id = (int) $resolved['variant_id'];
+						} elseif (!empty($sync_result['variant_id'])) {
+							$native_variant_id = (int) $sync_result['variant_id'];
+						} elseif (!$product->is_virtual()) {
+							Hesabix_V2_Log_Service::warning('Native variation missing allocation, skipping from invoice', array(
+								'wc_product_id' => $log_wc_id,
+								'wc_parent_id' => $parent_id,
+								'order_id' => $order->get_id(),
+							));
+							continue;
+						}
+					}
 				} else {
 					Hesabix_V2_Log_Service::warning('Product not synced, skipping from invoice', array(
 						'wc_product_id' => $log_wc_id,
@@ -607,6 +641,15 @@ class Hesabix_V2_Mapper
 					));
 					continue;
 				}
+			}
+
+			if ($variation_id > 0 && !$product->is_virtual() && class_exists('Hesabix_V2_Native_Variation_Sync') && Hesabix_V2_Native_Variation_Sync::has_native_parent_mapping($parent_id, $db_service) && $native_variant_id < 1) {
+				Hesabix_V2_Log_Service::warning('Native invoice line without variant allocation skipped', array(
+					'wc_product_id' => $log_wc_id,
+					'wc_parent_id' => $parent_id,
+					'order_id' => $order->get_id(),
+				));
+				continue;
 			}
 
 			$quantity = $item->get_quantity();
@@ -631,11 +674,22 @@ class Hesabix_V2_Mapper
 				$line_extra['warehouse_id'] = (int) $warehouse_id;
 			}
 
-			$lines[] = array(
+			$line_row = array(
 				'product_id' => $hesabix_product_id,
 				'quantity' => $quantity,
 				'extra_info' => $line_extra,
 			);
+			if ($native_variant_id > 0 && !$product->is_virtual()) {
+				$alloc = array(
+					array(
+						'variant_id' => $native_variant_id,
+						'quantity' => $quantity,
+					),
+				);
+				$line_row['allocations'] = $alloc;
+				$line_row['extra_info']['allocations'] = $alloc;
+			}
+			$lines[] = $line_row;
 		}
 
 		// هزینه حمل و نقل

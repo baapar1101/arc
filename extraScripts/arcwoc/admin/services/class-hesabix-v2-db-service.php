@@ -434,5 +434,28 @@ class Hesabix_V2_DB_Service
 
 		return is_array($rows) ? $rows : array();
 	}
+
+	/**
+	 * نگاشت Native: واریانت ووکامرس → ترکیب حسابیکس.
+	 *
+	 * @since 4.11.0
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function get_all_native_variation_mappings()
+	{
+		global $wpdb;
+
+		$query = $wpdb->prepare(
+			"SELECT wc_id, wc_parent_id, hesabix_id, hesabix_type, meta_data FROM {$this->table}
+			WHERE entity_type = %s AND hesabix_type = %s AND business_id = %d",
+			'variation',
+			'product_variant',
+			$this->business_id
+		);
+
+		$rows = $wpdb->get_results($query, ARRAY_A);
+
+		return is_array($rows) ? $rows : array();
+	}
 }
 
