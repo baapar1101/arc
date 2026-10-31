@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../services/quick_sales_service.dart';
+import '../../services/customer_service.dart';
 import '../../services/payment_gateway_service.dart';
 import '../../services/person_group_service.dart';
 import '../../core/api_client.dart';
@@ -18,6 +19,7 @@ import '../../widgets/business_subpage_back_leading.dart';
 import '../../widgets/quick_sales/quick_sales_default_shortcuts_dialog.dart';
 import '../../constants/invoice_print_paper.dart';
 import '../../services/report_template_service.dart';
+import '../../utils/responsive_helper.dart';
 
 class QuickSalesSettingsPage extends StatefulWidget {
   final int businessId;
@@ -110,8 +112,15 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
     }
     try {
       final settings = await _service.getSettings(businessId: widget.businessId);
+      final anonymousId = (settings['default_anonymous_customer_id'] as num?)?.toInt();
+      final anonymousCustomer = anonymousId == null ? null
+          : await CustomerService(ApiClient()).getCustomerById(
+              businessId: widget.businessId, customerId: anonymousId);
+      if (!mounted) return;
       setState(() {
         _settings = settings;
+        _selectedAnonymousCustomer = anonymousCustomer ?? (anonymousId == null ? null
+            : Customer(id: anonymousId, name: 'مشتری #$anonymousId'));
         _anonymousCustomerNameController.text = settings['anonymous_customer_name'] ?? 'مشتری ناشناس';
         _autoCreateAnonymousCustomer = settings['auto_create_anonymous_customer'] ?? true;
         _selectedWarehouseId = settings['default_warehouse_id'];
@@ -142,19 +151,17 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
       });
 
       await _loadQuickCustomerGroups();
+      if (!mounted) return;
       await _loadShareGateways();
+      if (!mounted) return;
       await _loadPrintTemplates();
-      
-      // بارگذاری مشتری ناشناس اگر وجود دارد
-      if (settings['default_anonymous_customer_id'] != null) {
-        // TODO: بارگذاری اطلاعات مشتری
-      }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = ErrorExtractor.forContext(e, context);
       });
     } finally {
-      setState(() {
+      if (mounted) setState(() {
         _loading = false;
       });
     }
@@ -295,21 +302,17 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
     });
     try {
       final payload = <String, dynamic>{
-        'anonymous_customer_name': _anonymousCustomerNameController.text.trim().isEmpty 
-            ? null 
+        'anonymous_customer_name':
+            _anonymousCustomerNameController.text.trim().isEmpty
+            ? null
             : _anonymousCustomerNameController.text.trim(),
         'auto_create_anonymous_customer': _autoCreateAnonymousCustomer,
         'quick_customer_group_id': _selectedQuickCustomerGroupId,
-        if (_selectedAnonymousCustomer != null)
-          'default_anonymous_customer_id': _selectedAnonymousCustomer!.id,
-        if (_selectedWarehouseId != null)
-          'default_warehouse_id': _selectedWarehouseId,
-        if (_selectedCashRegisterId != null)
-          'default_cash_register_id': int.tryParse(_selectedCashRegisterId!),
-        if (_selectedCurrencyId != null)
-          'default_currency_id': _selectedCurrencyId,
-        if (_selectedPriceListId != null)
-          'default_price_list_id': _selectedPriceListId,
+        'default_anonymous_customer_id': _selectedAnonymousCustomer?.id,
+        'default_warehouse_id': _selectedWarehouseId,
+        'default_cash_register_id': int.tryParse(_selectedCashRegisterId ?? ''),
+        'default_currency_id': _selectedCurrencyId,
+        'default_price_list_id': _selectedPriceListId,
         'auto_print': _autoPrint,
         'print_paper_size': _printPaperSize,
         'print_template_id': _printTemplateId,
@@ -321,29 +324,30 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
         'auto_create_payment_document': _autoCreatePaymentDocument,
         'show_purchase_price': _showPurchasePrice,
         'default_share_online_payment': _defaultShareOnlinePayment,
-        if (_defaultShareGatewayId != null) 'default_share_gateway_id': _defaultShareGatewayId,
+        'default_share_gateway_id': _defaultShareGatewayId,
         'default_share_channels': _buildShareChannelsPayload(),
         'default_share_expiry_hours': _defaultShareExpiryHours,
       };
-      
+
       final saved = await _service.updateSettings(
         businessId: widget.businessId,
         payload: payload,
       );
+      if (!mounted) return;
       setState(() {
         _settings = saved;
       });
-      if (!mounted) return;
       final t = AppLocalizations.of(context);
       SnackBarHelper.show(context, message: t.savedSuccessfully);
     } catch (e) {
-      setState(() {
-        _error = ErrorExtractor.forContext(e, context);
-      });
+      if (!mounted) return;
+      SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     } finally {
-      setState(() {
-        _saving = false;
-      });
+      if (mounted) {
+        setState(() {
+          _saving = false;
+        });
+      }
     }
   }
 
@@ -351,6 +355,7 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final cs = Theme.of(context).colorScheme;
+    final compact = ResponsiveHelper.isShellCompactWidth(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -359,6 +364,41 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
         backgroundColor: cs.surface,
         foregroundColor: cs.onSurface,
       ),
+      bottomNavigationBar:
+          compact && _canManageGeneralSettings && !_loading && _settings != null
+          ? Material(
+              elevation: 3,
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _saving ? null : _save,
+                          icon: _saving
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.save),
+                          label: Text(t.save),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: _saving ? null : _load,
+                        child: Text(t.reload),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          : null,
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -381,7 +421,7 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (_canManageDefaultShortcuts) ...[
+                          if (_canManageDefaultShortcuts && !compact) ...[
                             _buildDefaultShortcutsSection(),
                             const SizedBox(height: 24),
                           ],
@@ -745,7 +785,11 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
                           const SizedBox(height: 24),
                           
                           // دکمه‌های ذخیره
-                          Align(
+                          if (_canManageDefaultShortcuts && compact) ...[
+                            _buildDefaultShortcutsSection(),
+                            const SizedBox(height: 24),
+                          ],
+                          if (!compact) Align(
                             alignment: AlignmentDirectional.centerEnd,
                             child: Wrap(
                               spacing: 8,
@@ -920,14 +964,25 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
     required List<Widget> children,
   }) {
     final cs = Theme.of(context).colorScheme;
-    
+    if (ResponsiveHelper.isShellCompactWidth(context)) {
+      return Card(
+        margin: EdgeInsets.zero,
+        child: ExpansionTile(
+          key: PageStorageKey('quick-sales-settings-$title'),
+          leading: Icon(icon),
+          title: Text(title),
+          childrenPadding: const EdgeInsets.all(12),
+          expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+          children: children,
+        ),
+      );
+    }
+
     return Card(
       margin: EdgeInsets.zero,
       elevation: 1,
       color: cs.surfaceContainerHighest,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -937,12 +992,14 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
               children: [
                 Icon(icon, color: cs.primary, size: 24),
                 const SizedBox(width: 12),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: cs.onSurface,
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
+                    ),
                   ),
                 ),
               ],

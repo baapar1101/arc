@@ -37,8 +37,8 @@ import '../../models/quick_sales_parked_sale.dart';
 import '../../models/quick_sales_change_resolution.dart';
 import '../../widgets/invoice/customer_combobox_widget.dart';
 import '../../widgets/quick_sales/quick_sales_parked_sales_bar.dart';
-import '../../widgets/quick_sales/quick_sales_payment_composer.dart';
 import '../../widgets/quick_sales/quick_sales_payment_dock.dart';
+import '../../widgets/quick_sales/quick_sales_stock_shortage_dialog.dart';
 import '../../widgets/quick_sales/quick_sales_change_resolution_dialog.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
 import '../../utils/currency_display_utils.dart';
@@ -308,6 +308,9 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   final List<QuickSalesParkedSale> _sales = [];
   String _activeSaleId = '';
   final Set<String> _pendingQuickSaleRequestIds = <String>{};
+  final Map<String, ({Map<String, dynamic> job, bool shouldPrint})>
+  _deferredStockShortages = {};
+  bool _reviewingStockShortage = false;
   final Completer<void> _parkedSalesHydratedCompleter = Completer<void>();
   bool _parkedHydrated = false;
   Timer? _parkedPersistDebounce;
@@ -404,21 +407,21 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       }
 
       if (failed.isNotEmpty && mounted) {
-        Map<String, dynamic>? firstStockShortageJob;
-        String? firstStockShortageSaleId;
         for (final job in failed) {
           final requestId = job['request_id']?.toString();
           if (requestId != null && requestId.isNotEmpty) {
             final saleId = _markQueuedSaleFailed(requestId, notify: false);
             final details = job['error_details'];
             final shortages = details is Map ? details['shortages'] : null;
-            if (firstStockShortageJob == null &&
-                job['error_code'] == 'INSUFFICIENT_STOCK' &&
+            if (job['error_code'] == 'INSUFFICIENT_STOCK' &&
                 saleId != null &&
                 shortages is List &&
                 shortages.isNotEmpty) {
-              firstStockShortageJob = job;
-              firstStockShortageSaleId = saleId;
+              await _handleQueuedStockShortage(
+                saleId: saleId,
+                job: job,
+                shouldPrint: false,
+              );
             }
           }
         }
@@ -430,13 +433,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
               : 'یک فروش قبلی ثبت نشد: $message',
           isError: true,
         );
-        if (firstStockShortageJob != null && firstStockShortageSaleId != null) {
-          await _handleQueuedStockShortage(
-            saleId: firstStockShortageSaleId,
-            job: firstStockShortageJob,
-            shouldPrint: false,
-          );
-        }
       }
 
       for (final job in completed) {
@@ -639,7 +635,13 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     _invoiceCurrencyRoundMonetary = rm;
   }
 
-  Future<void> _loadSettings() async {
+  Future<void> _loadSettings({bool preserveSale = false}) async {
+    final savedSale = preserveSale && !_isActiveSaleBlank
+        ? _snapshotActiveSale()
+        : null;
+    final wasAnonymous = _isAnonymousSelected;
+    final savedCurrencyId = _defaultCurrencyId;
+    final savedPriceListId = _defaultPriceListId;
     setState(() {
       _loading = true;
     });
@@ -689,8 +691,20 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       });
 
       try {
-        await _hydrateParkedSalesIntoFields();
+        if (preserveSale) {
+          if (savedSale != null) {
+            _applySaleState(savedSale);
+            if (wasAnonymous) _selectedCustomer = _anonymousCustomer;
+            _defaultWarehouseId = savedSale.warehouseId;
+            _selectedCashRegisterId = savedSale.cashRegisterId;
+            _defaultCurrencyId = savedCurrencyId;
+            _defaultPriceListId = savedPriceListId;
+          }
+        } else {
+          await _hydrateParkedSalesIntoFields();
+        }
       } catch (_) {
+        if (preserveSale) rethrow;
         _activeSaleId = QuickSalesParkedSale.newId();
         _sales.clear();
         _captureActiveSaleIntoList();
@@ -936,6 +950,11 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     _checkoutDiscountExpanded = false;
     _selectedCashRegisterId = _settingsDefaultCashRegisterId;
     _defaultWarehouseId = _settingsDefaultWarehouseId;
+    _defaultCurrencyId =
+        _settings?['default_currency_id'] ??
+        widget.authStore.currentBusiness?.defaultCurrency?.id;
+    _defaultPriceListId = _settings?['default_price_list_id'];
+    _applyCurrencyMetaFromCache();
     _documentDate = DateTime.now();
     _documentDescriptionController.clear();
     _globalDiscountType = 'percent';
@@ -1020,6 +1039,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     final completedSaleId = _activeSaleId;
     final newSaleId = QuickSalesParkedSale.newId();
     setState(() {
+      _deferredStockShortages.remove(completedSaleId);
       _activeSaleId = newSaleId;
       _applyBlankSaleState();
       _saveAction = _QuickSalesSaveAction.none;
@@ -1046,6 +1066,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     _captureActiveSaleIntoList();
     final newSaleId = QuickSalesParkedSale.newId();
     setState(() {
+      _deferredStockShortages.remove(requestId);
       _activeSaleId = newSaleId;
       _applyBlankSaleState();
       _saveAction = _QuickSalesSaveAction.none;
@@ -1162,6 +1183,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
 
     final wasActive = id == _activeSaleId;
     setState(() {
+      _deferredStockShortages.remove(id);
       _sales.removeWhere((s) => s.id == id);
       if (_sales.isEmpty) {
         if (_activeSaleId.isEmpty) {
@@ -1230,25 +1252,42 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   }
 
   Widget _withParkedSalesBar(Widget child, {required bool compact}) {
-    if (!_shouldShowParkedSalesBar) return child;
+    if (!_shouldShowParkedSalesBar && _deferredStockShortages.isEmpty) {
+      return child;
+    }
     final t = AppLocalizations.of(context);
     return Column(
       children: [
-        QuickSalesParkedSalesBar(
-          sales: _parkedSaleChipData(t),
-          compact: compact,
-          enabled: !_isSaving,
-          newSaleEnabled:
-              !_isActiveSaleBlank && _sales.length < _maxParkedSales,
-          newSaleLabel: t.quickSalesParkedNewSale,
-          newSaleTooltip: _isActiveSaleBlank
-              ? t.quickSalesParkedNewSaleAlreadyEmpty
-              : t.quickSalesParkedNewSaleTooltip,
-          discardTooltip: t.quickSalesParkedDiscardTooltip,
-          onNewSale: _startNewSale,
-          onSelect: _selectParkedSale,
-          onDiscard: (id) => unawaited(_discardParkedSale(id)),
-        ),
+        if (_deferredStockShortages.isNotEmpty)
+          MaterialBanner(
+            content: Text(
+              '${_deferredStockShortages.length} فروش با کسری موجودی منتظر بررسی است؛ سبدها محفوظ‌اند.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: _isSaving || _reviewingStockShortage
+                    ? null
+                    : () => unawaited(_reviewDeferredStockShortage()),
+                child: const Text('بررسی کسری'),
+              ),
+            ],
+          ),
+        if (_shouldShowParkedSalesBar)
+          QuickSalesParkedSalesBar(
+            sales: _parkedSaleChipData(t),
+            compact: compact,
+            enabled: !_isSaving,
+            newSaleEnabled:
+                !_isActiveSaleBlank && _sales.length < _maxParkedSales,
+            newSaleLabel: t.quickSalesParkedNewSale,
+            newSaleTooltip: _isActiveSaleBlank
+                ? t.quickSalesParkedNewSaleAlreadyEmpty
+                : t.quickSalesParkedNewSaleTooltip,
+            discardTooltip: t.quickSalesParkedDiscardTooltip,
+            onNewSale: _startNewSale,
+            onSelect: _selectParkedSale,
+            onDiscard: (id) => unawaited(_discardParkedSale(id)),
+          ),
         Expanded(child: child),
       ],
     );
@@ -2707,86 +2746,35 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     List<Map<String, dynamic>> shortages, {
     bool correctionAlreadyApplied = false,
   }) {
-    final canOverride =
-        _enableStockShortageOverride &&
-        widget.authStore.hasBusinessPermission(
-          'inventory',
-          'negative_stock_override',
-        );
-    final canCorrect =
-        _enableStockShortageOverride &&
-        widget.authStore.hasBusinessPermission('goods_expense_income', 'add') &&
-        widget.authStore.hasBusinessPermission('goods_expense_income', 'post');
     return showDialog<_StockShortageAction>(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('کسری موجودی'),
-        content: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'موجودی سیستمی کالاهای زیر برای ثبت فاکتور کافی نیست:',
-              ),
-              const SizedBox(height: 12),
-              ...shortages.map((item) {
-                final name = item['product_name'] ?? 'کالا';
-                final warehouse = item['warehouse_name'];
-                final available = item['available_quantity'] ?? 0;
-                final requested = item['requested_quantity'] ?? 0;
-                return ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(name.toString()),
-                  subtitle: Text(
-                    '${warehouse == null ? '' : '$warehouse — '}موجودی: $available، موردنیاز: $requested',
-                  ),
-                );
-              }),
-              if (!_enableStockShortageOverride)
-                const Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: Text(
-                    'گردش‌کار کسری موجودی در تنظیمات فروش سریع فعال نیست.',
-                  ),
-                ),
-              if (correctionAlreadyApplied)
-                const Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: Text(
-                    'اصلاح موجودی این فروش قبلاً ثبت شده است؛ برای جلوگیری از ثبت سند تکراری، اصلاح دوباره در دسترس نیست.',
-                  ),
-                ),
-            ],
-          ),
+      builder: (dialogContext) => QuickSalesStockShortageDialog(
+        shortages: shortages,
+        saleLabel:
+            '${_selectedCustomer?.name ?? 'مشتری ناشناس'} — ${_cartItems.length} قلم',
+        workflowEnabled: _enableStockShortageOverride,
+        canOverride: widget.authStore.hasBusinessPermission(
+          'inventory',
+          'negative_stock_override',
         ),
-        actions: [
-          TextButton(
-            onPressed: () =>
-                Navigator.pop(dialogContext, _StockShortageAction.cancel),
-            child: const Text('انصراف'),
-          ),
-          TextButton(
-            onPressed: () =>
-                Navigator.pop(dialogContext, _StockShortageAction.park),
-            child: const Text('پارک فروش'),
-          ),
-          if (canCorrect && !correctionAlreadyApplied)
-            OutlinedButton(
-              onPressed: () =>
-                  Navigator.pop(dialogContext, _StockShortageAction.correct),
-              child: const Text('اصلاح موجودی'),
+        canCorrect:
+            widget.authStore.hasBusinessPermission(
+              'goods_expense_income',
+              'add',
+            ) &&
+            widget.authStore.hasBusinessPermission(
+              'goods_expense_income',
+              'post',
             ),
-          if (canOverride)
-            FilledButton(
-              onPressed: () =>
-                  Navigator.pop(dialogContext, _StockShortageAction.override),
-              child: const Text('ثبت با موجودی منفی'),
-            ),
-        ],
+        correctionAlreadyApplied: correctionAlreadyApplied,
+        onCancel: () =>
+            Navigator.pop(dialogContext, _StockShortageAction.cancel),
+        onPark: () => Navigator.pop(dialogContext, _StockShortageAction.park),
+        onCorrect: () =>
+            Navigator.pop(dialogContext, _StockShortageAction.correct),
+        onOverride: () =>
+            Navigator.pop(dialogContext, _StockShortageAction.override),
       ),
     );
   }
@@ -2798,11 +2786,13 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+          scrollable: true,
           title: const Text('ثبت یک‌باره با موجودی منفی'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
+                isExpanded: true,
                 value: reason,
                 decoration: const InputDecoration(labelText: 'علت'),
                 items: const [
@@ -2863,6 +2853,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        scrollable: true,
         title: const Text('اصلاح موجودی'),
         content: const Text(
           'این گزینه «کالای درآمدشده» را با همان تاریخ فاکتور ثبت می‌کند. فقط وقتی ادامه دهید که کالا واقعاً در انبار موجود است و خرید، انتقال یا موجودی اول دوره‌ای از قلم نیفتاده باشد.',
@@ -3339,6 +3330,37 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     required Map<String, dynamic> job,
     required bool shouldPrint,
   }) async {
+    if (!mounted) return;
+    setState(() {
+      _deferredStockShortages[saleId] = (job: job, shouldPrint: shouldPrint);
+    });
+  }
+
+  Future<void> _reviewDeferredStockShortage() async {
+    if (_isSaving ||
+        _reviewingStockShortage ||
+        _deferredStockShortages.isEmpty) {
+      return;
+    }
+    if (ModalRoute.of(context)?.isCurrent != true) return;
+    final entry = _deferredStockShortages.entries.first;
+    setState(() => _reviewingStockShortage = true);
+    try {
+      await _resolveQueuedStockShortage(
+        saleId: entry.key,
+        job: entry.value.job,
+        shouldPrint: entry.value.shouldPrint,
+      );
+    } finally {
+      if (mounted) setState(() => _reviewingStockShortage = false);
+    }
+  }
+
+  Future<void> _resolveQueuedStockShortage({
+    required String saleId,
+    required Map<String, dynamic> job,
+    required bool shouldPrint,
+  }) async {
     final shortagesValue = job['error_details'] is Map
         ? (job['error_details'] as Map)['shortages']
         : null;
@@ -3354,6 +3376,10 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     // correction/override workflow. The failed request already has a new ID,
     // so any retry gets a fresh idempotency key.
     _selectParkedSale(saleId);
+    if (_activeSaleId != saleId) {
+      setState(() => _deferredStockShortages.remove(saleId));
+      return;
+    }
     final correctionAlreadyApplied =
         (job['error_details'] as Map?)?['stock_correction_already_applied'] ==
         true;
@@ -3372,6 +3398,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     if (!mounted || action == null || action == _StockShortageAction.cancel) {
       return;
     }
+    setState(() => _deferredStockShortages.remove(saleId));
     if (action == _StockShortageAction.park) {
       _startNewSale();
       return;
@@ -4102,6 +4129,9 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   }
 
   bool _handleKeyEvent(KeyEvent event) {
+    if (_reviewingStockShortage || ModalRoute.of(context)?.isCurrent != true) {
+      return false;
+    }
     if (event is KeyDownEvent) {
       final isControlPressed = HardwareKeyboard.instance.isControlPressed;
       final isMetaPressed = HardwareKeyboard.instance.isMetaPressed;
@@ -4218,6 +4248,9 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           authStore: widget.authStore,
           isRequired: false,
           enableQuickCreateOnSubmit: true,
+          quickCreateHint: _settings?['quick_customer_group_id'] == null
+              ? 'مشتری جدید بدون گروه ثبت می‌شود؛ نام، موبایل یا هر دو را وارد کنید.'
+              : 'مشتری جدید در گروه پیش‌فرض فروش سریع ثبت می‌شود؛ نام، موبایل یا هر دو را وارد کنید.',
           dense: dense,
           label: 'مشتری',
           hintText: 'مشتری ناشناس',
@@ -4687,15 +4720,26 @@ class _QuickSalesPageState extends State<QuickSalesPage>
               tooltip: 'پاک کردن سبد (Ctrl+K)',
               onPressed: _clearCart,
             ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            tooltip: 'تنظیمات',
-            onPressed: () {
-              context.push(
-                '/business/${widget.businessId}/settings/quick-sales',
-              );
-            },
-          ),
+          if (widget.authStore.hasBusinessPermission('settings', 'business') ||
+              widget.authStore.hasBusinessPermission(
+                'quick_sales',
+                'manage_default_payment_shortcuts',
+              ))
+            IconButton(
+              icon: const Icon(Icons.settings),
+              tooltip: 'تنظیمات',
+              onPressed: _isSaving
+                  ? null
+                  : () async {
+                      final router = GoRouter.of(context);
+                      await _persistParkedSalesNow();
+                      if (!mounted) return;
+                      await router.push(
+                        '/business/${widget.businessId}/settings/quick-sales',
+                      );
+                      if (mounted) await _loadSettings(preserveSale: true);
+                    },
+            ),
         ],
       ),
       bottomNavigationBar: null,
@@ -5673,6 +5717,17 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           child: ListView(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
             children: [
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.person_outline),
+                title: Text(_selectedCustomer?.name ?? 'مشتری ناشناس'),
+                trailing: TextButton(
+                  onPressed: _isSaving
+                      ? null
+                      : () => _mobileTabController.animateTo(1),
+                  child: const Text('تغییر مشتری'),
+                ),
+              ),
               _buildCheckoutScrollBody(
                 cs,
                 includeCustomer: false,
@@ -6365,25 +6420,27 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         ),
         const SizedBox(height: 8),
         if (_autoCreatePaymentDocument) ...[
-          QuickSalesPaymentComposer(
+          QuickSalesPaymentDock(
             key: ValueKey(_activeSaleId),
+            mobile: true,
             businessId: widget.businessId,
             payments: _payments,
-            onChanged: _onPaymentsChanged,
-            cashFollowsTotal: _cashFollowsTotal,
-            onCashFollowsTotalChanged: (v) {
-              if (v == _cashFollowsTotal) return;
-              setState(() => _cashFollowsTotal = v);
+            onChanged: (payments) {
+              _cashFollowsTotal = false;
+              _onPaymentsChanged(payments);
             },
-            invoiceTotal: _paymentTargetAmount,
+            invoiceTotal: _totalAmount,
+            paymentTarget: _paymentTargetAmount,
+            changeResolution: _validChangeResolution,
+            onConfigureChange: _openChangeResolutionDialog,
             defaultCashRegisterId: _selectedCashRegisterId,
             enabled: !_isSaving,
-            currencyId: _defaultCurrencyId,
+            currencyId: _defaultCurrencyId!,
             currencyUnit: _paymentCurrencyUnit,
             decimalPlaces: _invoiceCurrencyDecimalPlaces,
             authStore: widget.authStore,
-            calendarController: widget.calendarController,
-            isAnonymousCustomer: _isAnonymousSelected,
+            onSave: () => _saveInvoice(print: false),
+            onSaveAndPrint: () => _saveInvoice(print: true),
           ),
           if (_isOverpaid) ...[
             const SizedBox(height: 8),

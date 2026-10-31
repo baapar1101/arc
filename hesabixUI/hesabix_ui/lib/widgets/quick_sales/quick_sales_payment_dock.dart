@@ -42,6 +42,9 @@ class QuickSalesPaymentDock extends StatefulWidget {
   final VoidCallback onSaveAndPrint;
   final QuickSalesService? service;
 
+  /// Inline layout for the mobile checkout tab; the page owns save actions.
+  final bool mobile;
+
   const QuickSalesPaymentDock({
     super.key,
     required this.businessId,
@@ -60,6 +63,7 @@ class QuickSalesPaymentDock extends StatefulWidget {
     required this.onSave,
     required this.onSaveAndPrint,
     this.service,
+    this.mobile = false,
   });
 
   @override
@@ -89,7 +93,9 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
   double _buttonWidth = _defaultButtonWidth;
   bool _expanded = false;
 
-  String? get _activeShortcutPlatform => kIsWeb
+  String? get _activeShortcutPlatform => widget.mobile
+      ? null
+      : kIsWeb
       ? 'web'
       : defaultTargetPlatform == TargetPlatform.windows
       ? 'windows'
@@ -136,8 +142,10 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
     });
     _syncAmount();
     unawaited(_loadButtons());
-    unawaited(_loadWidth());
-    unawaited(_loadExpanded());
+    if (!widget.mobile) {
+      unawaited(_loadWidth());
+      unawaited(_loadExpanded());
+    }
   }
 
   @override
@@ -378,6 +386,7 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    if (widget.mobile) return _buildMobile(cs);
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth < 1050) {
@@ -545,6 +554,101 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildMobile(ColorScheme cs) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _SummaryValue(
+                  label: 'قابل تسویه',
+                  value: _format(widget.paymentTarget),
+                ),
+                _SummaryValue(label: 'پرداخت‌شده', value: _format(_paid)),
+                _SummaryValue(label: 'مانده', value: _format(_remaining)),
+              ],
+            ),
+          ),
+        ),
+        SizedBox(height: 300, child: _buildAmountAndButtons(cs)),
+        if (widget.payments.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(12),
+            child: Text('هنوز پرداختی ثبت نشده است'),
+          ),
+        for (final payment in widget.payments)
+          Card(
+            key: ValueKey('mobile-payment-${payment.id}'),
+            margin: const EdgeInsets.only(bottom: 8),
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        _paymentIcon(payment.type),
+                        color: _paymentColor(payment.type, cs),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(_paymentTitle(payment))),
+                      IconButton(
+                        tooltip: 'حذف پرداخت',
+                        color: cs.error,
+                        onPressed: widget.enabled
+                            ? () => _removePayment(payment.id)
+                            : null,
+                        icon: const Icon(Icons.delete_outline),
+                      ),
+                    ],
+                  ),
+                  Text(_formatPaymentDate(payment.transactionDate)),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    key: ValueKey('payment-${payment.id}'),
+                    initialValue: formatNumberForInput(
+                      payment.amount,
+                      decimalPlaces: widget.decimalPlaces,
+                    ),
+                    enabled: widget.enabled,
+                    textDirection: TextDirection.ltr,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: [
+                      const EnglishDigitsFormatter(),
+                      ThousandsSeparatorInputFormatter(
+                        allowDecimal: widget.decimalPlaces > 0,
+                      ),
+                    ],
+                    decoration: InputDecoration(
+                      labelText: 'مبلغ',
+                      suffixText: widget.currencyUnit,
+                      border: const OutlineInputBorder(),
+                    ),
+                    onChanged: (raw) {
+                      final amount = parseFormattedNumber(raw);
+                      if (amount != null && amount > _epsilon) {
+                        _updatePaymentAmount(payment, raw);
+                      }
+                    },
+                    onFieldSubmitted: (raw) =>
+                        _updatePaymentAmount(payment, raw),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -774,7 +878,7 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
               border: const OutlineInputBorder(),
             ),
           ),
-          if (_change > 0)
+          if (_change > 0 && !widget.mobile)
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: InkWell(
@@ -828,13 +932,19 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
                     thumbVisibility: _buttons.length > 6,
                     child: GridView.builder(
                       controller: _buttonScroll,
-                      gridDelegate:
-                          const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 122,
-                            mainAxisExtent: 66,
-                            crossAxisSpacing: 8,
-                            mainAxisSpacing: 8,
-                          ),
+                      gridDelegate: widget.mobile
+                          ? const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              mainAxisExtent: 84,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                            )
+                          : const SliverGridDelegateWithMaxCrossAxisExtent(
+                              maxCrossAxisExtent: 122,
+                              mainAxisExtent: 66,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                            ),
                       itemCount: _buttons.length + 1,
                       itemBuilder: (context, index) {
                         if (index == _buttons.length) {
@@ -871,7 +981,10 @@ class _QuickSalesPaymentDockState extends State<QuickSalesPaymentDock> {
                           onEdit: button.isSystem
                               ? null
                               : () => _openEditor(existing: button),
-                          onShortcut: () => _openShortcutEditor(button),
+                          onShortcut: widget.mobile
+                              ? null
+                              : () => _openShortcutEditor(button),
+                          showShortcut: !widget.mobile,
                           onDelete: button.isSystem
                               ? null
                               : () => _deleteButton(button),
@@ -1128,6 +1241,7 @@ class _SummaryValue extends StatelessWidget {
 }
 
 class _PaymentTargetTile extends StatelessWidget {
+  final bool showShortcut;
   final QuickSalesPaymentButtonModel button;
   final IconData icon;
   final bool enabled;
@@ -1148,6 +1262,7 @@ class _PaymentTargetTile extends StatelessWidget {
     this.onDelete,
     this.onMoveBefore,
     this.onMoveAfter,
+    this.showShortcut = true,
   });
 
   @override
@@ -1167,13 +1282,15 @@ class _PaymentTargetTile extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (button.shortcutForPlatform(kIsWeb ? 'web' : 'windows') !=
-                    null)
+                if (showShortcut &&
+                    button.shortcutForPlatform(kIsWeb ? 'web' : 'windows') !=
+                        null)
                   Text(
                     '${kIsWeb ? 'وب' : 'ویندوز'}: ${button.shortcutForPlatform(kIsWeb ? 'web' : 'windows')!}',
                     style: Theme.of(context).textTheme.labelSmall,
                   ),
-                if (button.shortcutProfile(kIsWeb ? 'web' : 'windows').conflict)
+                if (showShortcut &&
+                    button.shortcutProfile(kIsWeb ? 'web' : 'windows').conflict)
                   Text(
                     'تداخل میانبر',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -1193,6 +1310,7 @@ class _PaymentTargetTile extends StatelessWidget {
             top: 0,
             end: 0,
             child: PopupMenuButton<String>(
+              enabled: enabled,
               padding: EdgeInsets.zero,
               iconSize: 17,
               tooltip: 'مدیریت دکمه',
