@@ -820,6 +820,31 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     );
   }
 
+  String _ensureValidActiveSaleRequestId() {
+    final normalizedId = QuickSalesParkedSale.normalizeRequestId(
+      _activeSaleId,
+    );
+    if (normalizedId == _activeSaleId) return normalizedId;
+
+    final oldId = _activeSaleId;
+    _captureActiveSaleIntoList();
+    final index = _sales.indexWhere((sale) => sale.id == oldId);
+    setState(() {
+      _activeSaleId = normalizedId;
+      if (index >= 0) {
+        _sales[index] = QuickSalesParkedSale.fromJson({
+          ..._sales[index].toJson(),
+          'id': normalizedId,
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+      } else {
+        _sales.add(_snapshotActiveSale());
+      }
+    });
+    unawaited(_persistParkedSalesNow());
+    return normalizedId;
+  }
+
   QuickSalesParkedSale _snapshotActiveSale({DateTime? createdAt}) {
     final now = DateTime.now();
     return QuickSalesParkedSale(
@@ -3028,6 +3053,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     final savedShareAmount = _remainingAmount > 0
         ? _remainingAmount
         : _paymentTargetAmount;
+    final quickSaleRequestId = _ensureValidActiveSaleRequestId();
     Map<String, dynamic>? retryOverride;
     String? retryCorrectionToken;
     var parkAfterFailure = false;
@@ -3100,7 +3126,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       // ساخت extra_info با person_id و تنظیمات حواله انبار
       final extraInfo = <String, dynamic>{
         'quick_sale': true,
-        'quick_sale_request_id': _activeSaleId,
+        'quick_sale_request_id': quickSaleRequestId,
         'person_id': personId, // همیشه person_id را اضافه می‌کنیم
         'post_inventory': _enableWarehouseDocument, // آیا حواله ایجاد شود؟
         'auto_post_warehouse':
