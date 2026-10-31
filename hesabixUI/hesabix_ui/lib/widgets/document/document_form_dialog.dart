@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -164,25 +165,26 @@ class _DocumentFormDialogState extends State<DocumentFormDialog> {
   }
 
   String? _validateBeforeSave() {
-    if (_loadingFiscalYear) return 'در حال دریافت سال مالی جاری...';
-    if (_currentFiscalYearId == null) return 'سال مالی جاری یافت نشد';
-    if (_fiscalYearError != null) return 'خطا در دریافت سال مالی جاری';
-    if (_documentDate == null) return 'تاریخ سند الزامی است';
+    final t = AppLocalizations.of(context);
+    if (_loadingFiscalYear) return t.documentLoadingFiscalYear;
+    if (_currentFiscalYearId == null) return t.documentCurrentFiscalYearMissing;
+    if (_fiscalYearError != null) return t.documentFiscalYearLoadError;
+    if (_documentDate == null) return t.documentDateRequired;
     if (_currentFiscalYearStart != null && _documentDate!.isBefore(_currentFiscalYearStart!)) {
-      return 'تاریخ سند خارج از بازه سال مالی جاری است';
+      return t.documentDateOutsideFiscalYear;
     }
     if (_currentFiscalYearEnd != null && _documentDate!.isAfter(_currentFiscalYearEnd!)) {
-      return 'تاریخ سند خارج از بازه سال مالی جاری است';
+      return t.documentDateOutsideFiscalYear;
     }
-    if (_currencyId == null) return 'انتخاب ارز الزامی است';
-    if (_lines.length < 2) return 'سند باید حداقل 2 سطر داشته باشد';
+    if (_currencyId == null) return t.documentCurrencyRequired;
+    if (_lines.length < 2) return t.documentNeedMinLines;
     for (int i = 0; i < _lines.length; i++) {
       final l = _lines[i];
-      if (l.account == null) return 'سطر ${i + 1} باید حساب داشته باشد';
-      if (l.debit == 0 && l.credit == 0) return 'سطر ${i + 1} باید بدهکار یا بستانکار داشته باشد';
-      if (l.debit > 0 && l.credit > 0) return 'سطر ${i + 1} نمی‌تواند همزمان بدهکار و بستانکار داشته باشد';
+      if (l.account == null) return t.documentLineNeedAccount('${i + 1}');
+      if (l.debit == 0 && l.credit == 0) return t.documentLineNeedAmount('${i + 1}');
+      if (l.debit > 0 && l.credit > 0) return t.documentLineBothSides('${i + 1}');
     }
-    if (!_isBalanced) return 'سند متوازن نیست';
+    if (!_isBalanced) return t.documentUnbalanced;
     return null;
   }
 

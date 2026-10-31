@@ -67,13 +67,13 @@ def require_telephony_plugin_active(business_id_param: str = "business_id"):
 		if not business_id:
 			raise ApiError(
 				"INVALID_BUSINESS_ID",
-				f"Invalid business identifier ({business_id_param}).",
+				"INVALID_BUSINESS_ID",
 				http_status=400,
 			)
 		if not check_telephony_plugin_active(db, business_id):
 			raise ApiError(
 				"TELEPHONY_PLUGIN_NOT_ACTIVE",
-				"Asterisk/Issabel telephony add-on is not active for this business.",
+				"TELEPHONY_PLUGIN_NOT_ACTIVE",
 				http_status=403,
 				details={
 					"plugin_code": PLUGIN_CODE,
@@ -100,14 +100,14 @@ def require_telephony_click_or_view(business_id_param: str = "business_id"):
 		except Exception:
 			business_id = None
 		if not business_id:
-			raise ApiError("INVALID_BUSINESS_ID", "Invalid business id.", http_status=400)
+			raise ApiError("INVALID_BUSINESS_ID", "INVALID_BUSINESS_ID", http_status=400)
 		ok = has_business_permission_for_business(
 			ctx, db, business_id, "telephony", "click_to_call"
 		) or has_business_permission_for_business(ctx, db, business_id, "telephony", "view")
 		if not ok:
 			raise ApiError(
-				"FORBIDDEN",
-				"Missing business permission: telephony.click_to_call",
+				"TELEPHONY_PERMISSION_DENIED",
+				"TELEPHONY_PERMISSION_DENIED",
 				http_status=403,
 			)
 		return None
@@ -129,16 +129,15 @@ def require_telephony_any(*actions: str, business_id_param: str = "business_id")
 		except Exception:
 			business_id = None
 		if not business_id:
-			raise ApiError("INVALID_BUSINESS_ID", "Invalid business id.", http_status=400)
+			raise ApiError("INVALID_BUSINESS_ID", "INVALID_BUSINESS_ID", http_status=400)
 		ok = any(
 			has_business_permission_for_business(ctx, db, business_id, "telephony", action)
 			for action in actions
 		)
 		if not ok:
-			needed = actions[0] if actions else "view"
 			raise ApiError(
-				"FORBIDDEN",
-				f"Missing business permission: telephony.{needed}",
+				"TELEPHONY_PERMISSION_DENIED",
+				"TELEPHONY_PERMISSION_DENIED",
 				http_status=403,
 			)
 		return None

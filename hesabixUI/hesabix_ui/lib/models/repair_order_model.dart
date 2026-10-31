@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:intl/intl.dart' as intl;
 
 import '../core/date_utils.dart';
@@ -474,14 +475,14 @@ class RepairOrderAttachment {
     };
   }
 
-  String get typeLabel {
+  String typeLabel(AppLocalizations t) {
     switch (attachmentType) {
       case 'before_repair':
-        return 'قبل از تعمیر';
+        return t.repairShopAttachmentBefore;
       case 'after_repair':
-        return 'بعد از تعمیر';
+        return t.repairShopAttachmentAfter;
       default:
-        return 'حین تعمیر';
+        return t.repairShopAttachmentDuring;
     }
   }
 }

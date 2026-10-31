@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../../../core/auth_store.dart';
 import '../../../services/telephony/telephony_api.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../../services/telephony/telephony_l10n.dart';
 
 /// داشبورد لحظه‌ای مرکز تماس (BLF + تماس‌های فعال).
 class TelephonyLiveDashboardPage extends StatefulWidget {
@@ -83,7 +85,7 @@ class _TelephonyLiveDashboardPageState extends State<TelephonyLiveDashboardPage>
     try {
       await _api.controlCall(widget.businessId, callId, action: action, target: target);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('دستور $action ارسال شد')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).telephonyCommandSent(action))));
       }
       _load(silent: true);
     } catch (e) {
@@ -100,16 +102,17 @@ class _TelephonyLiveDashboardPageState extends State<TelephonyLiveDashboardPage>
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     if (!_canLive) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('داشبورد زنده تماس'),
+          title: Text(t.telephonyLiveDashboardTitle),
           leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         ),
-        body: const Center(
+        body: Center(
           child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Text('مجوز مانیتورینگ زنده برای محدوده خود/تیم را ندارید.'),
+            padding: const EdgeInsets.all(24),
+            child: Text(t.telephonyLiveForbidden),
           ),
         ),
       );
@@ -123,7 +126,7 @@ class _TelephonyLiveDashboardPageState extends State<TelephonyLiveDashboardPage>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('داشبورد زنده تماس'),
+        title: Text(t.telephonyLiveDashboardTitle),
         leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(onPressed: _load, icon: const Icon(Icons.refresh_rounded)),
@@ -152,26 +155,26 @@ class _TelephonyLiveDashboardPageState extends State<TelephonyLiveDashboardPage>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('مرکز تماس — لحظه‌ای', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                            Text(t.telephonyLiveHeadline, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
                             const SizedBox(height: 6),
-                            Text('به‌روزرسانی هر ۳ ثانیه', style: TextStyle(color: scheme.onSurfaceVariant)),
+                            Text(t.telephonyRefreshEvery3s, style: TextStyle(color: scheme.onSurfaceVariant)),
                             const SizedBox(height: 14),
                             Wrap(
                               spacing: 10,
                               runSpacing: 10,
                               children: [
-                                _MiniKpi('فعال', '${kpis['active'] ?? 0}', scheme.primary),
-                                _MiniKpi('در انتظار', '${kpis['waiting'] ?? 0}', const Color(0xFFD97706)),
-                                _MiniKpi('در مکالمه', '${kpis['talking'] ?? 0}', const Color(0xFF159947)),
-                                _MiniKpi('از دست‌رفته امروز', '${kpis['missed_today'] ?? 0}', scheme.error),
-                                _MiniKpi('اپراتور آنلاین', '${kpis['operators_online'] ?? 0}', scheme.tertiary),
+                                _MiniKpi(t.telephonyStatusActive, '${kpis['active'] ?? 0}', scheme.primary),
+                                _MiniKpi(t.telephonyWaiting, '${kpis['waiting'] ?? 0}', const Color(0xFFD97706)),
+                                _MiniKpi(t.telephonyTalking, '${kpis['talking'] ?? 0}', const Color(0xFF159947)),
+                                _MiniKpi(t.telephonyMissedToday, '${kpis['missed_today'] ?? 0}', scheme.error),
+                                _MiniKpi(t.telephonyOperatorsOnline, '${kpis['operators_online'] ?? 0}', scheme.tertiary),
                               ],
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(height: 18),
-                      Text('وضعیت داخلی‌ها (BLF)', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                      Text(t.telephonyBlfTitle, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                       const SizedBox(height: 10),
                       GridView.builder(
                         shrinkWrap: true,
@@ -206,17 +209,17 @@ class _TelephonyLiveDashboardPageState extends State<TelephonyLiveDashboardPage>
                                 ),
                                 const Spacer(),
                                 Text('${e['display_name'] ?? ''}', maxLines: 1, overflow: TextOverflow.ellipsis),
-                                Text(presence, style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 12)),
+                                Text(telephonyPresenceLabel(t, presence), style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 12)),
                               ],
                             ),
                           );
                         },
                       ),
                       const SizedBox(height: 18),
-                      Text('تماس‌های فعال', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                      Text(t.telephonyActiveCalls, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                       const SizedBox(height: 8),
                       if (active.isEmpty)
-                        Text('تماسی در جریان نیست', style: TextStyle(color: scheme.onSurfaceVariant))
+                        Text(t.telephonyNoActiveCalls, style: TextStyle(color: scheme.onSurfaceVariant))
                       else
                         ...active.map((c) {
                           final id = int.tryParse('${c['id']}') ?? 0;
@@ -230,35 +233,35 @@ class _TelephonyLiveDashboardPageState extends State<TelephonyLiveDashboardPage>
                                 spacing: 4,
                                 children: [
                                   IconButton(
-                                    tooltip: 'نگه داشتن',
+                                    tooltip: t.telephonyHold,
                                     onPressed: () => _control(id, 'hold'),
                                     icon: const Icon(Icons.pause_circle_outline),
                                   ),
                                   IconButton(
-                                    tooltip: 'ادامه',
+                                    tooltip: t.telephonyResume,
                                     onPressed: () => _control(id, 'resume'),
                                     icon: const Icon(Icons.play_circle_outline),
                                   ),
                                   IconButton(
-                                    tooltip: 'قطع',
+                                    tooltip: t.telephonyHangup,
                                     onPressed: () => _control(id, 'hangup'),
                                     icon: Icon(Icons.call_end, color: scheme.error),
                                   ),
                                   IconButton(
-                                    tooltip: 'انتقال',
+                                    tooltip: t.telephonyTransfer,
                                     onPressed: () async {
                                       final ctrl = TextEditingController();
                                       final ok = await showDialog<bool>(
                                         context: context,
                                         builder: (ctx) => AlertDialog(
-                                          title: const Text('انتقال تماس'),
+                                          title: Text(t.telephonyTransferCall),
                                           content: TextField(
                                             controller: ctrl,
-                                            decoration: const InputDecoration(labelText: 'داخلی مقصد'),
+                                            decoration: InputDecoration(labelText: t.telephonyDestExtension),
                                           ),
                                           actions: [
-                                            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
-                                            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('انتقال')),
+                                            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+                                            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.telephonyTransfer)),
                                           ],
                                         ),
                                       );
@@ -275,12 +278,12 @@ class _TelephonyLiveDashboardPageState extends State<TelephonyLiveDashboardPage>
                         }),
                       if (queues.isNotEmpty) ...[
                         const SizedBox(height: 16),
-                        Text('صف‌ها', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                        Text(t.telephonyQueues, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                         ...queues.map(
                           (q) => ListTile(
                             leading: const Icon(Icons.queue_rounded),
                             title: Text('${q['name']} (${q['queue_code']})'),
-                            subtitle: Text('انتظار: ${q['waiting']} · مکالمه: ${q['talking']}'),
+                            subtitle: Text(t.telephonyQueueWaitTalk('${q['waiting']}', '${q['talking']}')),
                           ),
                         ),
                       ],

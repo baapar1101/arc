@@ -13138,10 +13138,12 @@ class AppLocalizationsFa extends AppLocalizations {
       'مقادیر پیش‌فرض مطابق استاندارد ۱۱ و ماده ۱۴۹ است. اگر قانون یا رویه حسابداری عوض شد اینجا تغییر دهید؛ اسناد ثبت‌شده بازنویسی نمی‌شوند.';
 
   @override
-  String get fixedAssetsTaxIdleMonths => 'تعداد ماه رکود قبل از کاهش استهلاک مالیاتی';
+  String get fixedAssetsTaxIdleMonths =>
+      'تعداد ماه رکود قبل از کاهش استهلاک مالیاتی';
 
   @override
-  String get fixedAssetsTaxIdleReduction => 'درصد کاهش استهلاک مالیاتی پس از آستانه رکود';
+  String get fixedAssetsTaxIdleReduction =>
+      'درصد کاهش استهلاک مالیاتی پس از آستانه رکود';
 
   @override
   String get fixedAssetsAccountingIdleReduction =>
@@ -13161,7 +13163,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get fixedAssetsPlaquePrefix => 'پیشوند کد دارایی';
 
   @override
-  String get fixedAssetsRequireCustodian => 'الزام تحویل‌گیرنده قبل از سرمایه‌گذاری';
+  String get fixedAssetsRequireCustodian =>
+      'الزام تحویل‌گیرنده قبل از سرمایه‌گذاری';
 
   @override
   String get fixedAssetsOpenFullSettings => 'باز کردن تنظیمات کامل افزونه';
@@ -13260,7 +13263,8 @@ class AppLocalizationsFa extends AppLocalizations {
       'فهرست جاری کارت‌های دارایی با بها، استهلاک انباشته و ارزش دفتری.';
 
   @override
-  String get fixedAssetsReportRegisterSubtitle => 'کد، طبقه، محل، بها و ارزش دفتری';
+  String get fixedAssetsReportRegisterSubtitle =>
+      'کد، طبقه، محل، بها و ارزش دفتری';
 
   @override
   String get fixedAssetsReportClassSummary => 'گردش طبقات';
@@ -13270,7 +13274,8 @@ class AppLocalizationsFa extends AppLocalizations {
       'صورت گردش استاندارد ۱۱: مانده ابتدا، تحصیل، تعمیر اساسی، استهلاک، خروج و مانده انتها به تفکیک طبقه.';
 
   @override
-  String get fixedAssetsReportClassSummarySubtitle => 'افشای گردش دارایی ثابت به تفکیک طبقه';
+  String get fixedAssetsReportClassSummarySubtitle =>
+      'افشای گردش دارایی ثابت به تفکیک طبقه';
 
   @override
   String get fixedAssetsReportDepreciation => 'جدول استهلاک دوره';
@@ -13280,7 +13285,8 @@ class AppLocalizationsFa extends AppLocalizations {
       'سطرهای استهلاک ثبت‌شده در دفتر کل برای بازه انتخابی، همراه پیش‌نمایش مالیاتی رکود.';
 
   @override
-  String get fixedAssetsReportDepreciationSubtitle => 'استهلاک ماهانه ثبت‌شده و پیش‌نمایش مالیاتی';
+  String get fixedAssetsReportDepreciationSubtitle =>
+      'استهلاک ماهانه ثبت‌شده و پیش‌نمایش مالیاتی';
 
   @override
   String get fixedAssetsReportAcquisitions => 'تحصیلات دوره';
@@ -13290,7 +13296,8 @@ class AppLocalizationsFa extends AppLocalizations {
       'دارایی‌هایی که در بازه انتخابی تحصیل شده‌اند؛ خرید از فاکتور فروشنده جدا از تحصیل مستقل است.';
 
   @override
-  String get fixedAssetsReportAcquisitionsSubtitle => 'خرید سرمایه‌ای، تحصیل مستقل و افتتاحیه';
+  String get fixedAssetsReportAcquisitionsSubtitle =>
+      'خرید سرمایه‌ای، تحصیل مستقل و افتتاحیه';
 
   @override
   String get fixedAssetsReportDisposals => 'خروج و اسقاط';
@@ -13300,7 +13307,8 @@ class AppLocalizationsFa extends AppLocalizations {
       'فروش و اسقاط دوره با ارزش دفتری، عواید و سود یا زیان واگذاری.';
 
   @override
-  String get fixedAssetsReportDisposalsSubtitle => 'عواید، ارزش دفتری و سود/زیان واگذاری';
+  String get fixedAssetsReportDisposalsSubtitle =>
+      'عواید، ارزش دفتری و سود/زیان واگذاری';
 
   @override
   String get fixedAssetsReportIdle => 'اموال راکد';
@@ -13320,7 +13328,8 @@ class AppLocalizationsFa extends AppLocalizations {
       'کنترل فیزیکی اموال زنده بر اساس محل استقرار و تحویل‌گیرنده.';
 
   @override
-  String get fixedAssetsReportLocationsSubtitle => 'محل استقرار و تحویل‌گیرنده اموال در جریان';
+  String get fixedAssetsReportLocationsSubtitle =>
+      'محل استقرار و تحویل‌گیرنده اموال در جریان';
 
   @override
   String get fixedAssetsReportExpenditures => 'مخارج بعدی';
@@ -13330,7 +13339,8 @@ class AppLocalizationsFa extends AppLocalizations {
       'تعمیر جاری (هزینه دوره) و تعمیر اساسی (افزایش بها) در بازه انتخابی.';
 
   @override
-  String get fixedAssetsReportExpendituresSubtitle => 'تعمیر جاری و تعمیر اساسی';
+  String get fixedAssetsReportExpendituresSubtitle =>
+      'تعمیر جاری و تعمیر اساسی';
 
   @override
   String get fixedAssetsReportLiveCount => 'تعداد در جریان';
@@ -19327,13 +19337,15 @@ class AppLocalizationsFa extends AppLocalizations {
   String get barcodeLabelQtyFromPurchase => 'تعداد از مقدار خرید';
 
   @override
-  String get barcodeLabelQtyNoneAvailable => 'برای این منبع، تعدادی روی ردیف‌ها موجود نیست.';
+  String get barcodeLabelQtyNoneAvailable =>
+      'برای این منبع، تعدادی روی ردیف‌ها موجود نیست.';
 
   @override
   String get barcodeLabelPrintFromInvoice => 'چاپ بارکد';
 
   @override
-  String get barcodeLabelPrintFromInvoiceEmpty => 'دست‌کم یک ردیف کالا اضافه کنید.';
+  String get barcodeLabelPrintFromInvoiceEmpty =>
+      'دست‌کم یک ردیف کالا اضافه کنید.';
 
   @override
   String get barcodeLabelPrintItems => 'آیتم‌های چاپ';
@@ -21326,4 +21338,1840 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get distributionWorkspaceOffice => 'پخش — دفتر';
+
+  @override
+  String get repairShopMenu => 'تعمیرگاه';
+
+  @override
+  String get repairShopTitle => 'مدیریت تعمیرگاه';
+
+  @override
+  String get repairShopNewOrder => 'سفارش جدید';
+
+  @override
+  String get repairShopEmptyOrders => 'هنوز سفارش تعمیری ثبت نشده است';
+
+  @override
+  String get repairShopEmptyOrdersHint =>
+      'با دکمه زیر اولین سفارش تعمیر را ثبت کنید';
+
+  @override
+  String get repairShopCreateFirstOrder => 'ثبت سفارش جدید';
+
+  @override
+  String get repairShopSearchHint => 'جستجو (کد، مشتری، شماره تماس، کالا)...';
+
+  @override
+  String get repairShopDateFilter => 'فیلتر تاریخ دریافت';
+
+  @override
+  String get repairShopDateFrom => 'از تاریخ';
+
+  @override
+  String get repairShopDateTo => 'تا تاریخ';
+
+  @override
+  String repairShopDateRange(String from, String to) {
+    return 'از $from تا $to';
+  }
+
+  @override
+  String get repairShopStatusFilter => 'فیلتر وضعیت';
+
+  @override
+  String repairShopTotalCount(int count) {
+    return 'کل: $count';
+  }
+
+  @override
+  String repairShopReceivedOn(String date) {
+    return 'دریافت: $date';
+  }
+
+  @override
+  String repairShopLoadOrdersError(String error) {
+    return 'خطا در بارگذاری سفارشات: $error';
+  }
+
+  @override
+  String repairShopLoadOrderError(String error) {
+    return 'خطا در بارگذاری سفارش: $error';
+  }
+
+  @override
+  String repairShopLoadSettingsError(String error) {
+    return 'خطا در بارگذاری تنظیمات: $error';
+  }
+
+  @override
+  String repairShopLoadTechniciansError(String error) {
+    return 'خطا در بارگذاری تعمیرکاران: $error';
+  }
+
+  @override
+  String repairShopSaveOrderError(String error) {
+    return 'خطا در ذخیره سفارش: $error';
+  }
+
+  @override
+  String repairShopSaveSettingsError(String error) {
+    return 'خطا در ذخیره تنظیمات: $error';
+  }
+
+  @override
+  String repairShopErrorWithDetails(String error) {
+    return 'خطا: $error';
+  }
+
+  @override
+  String get repairShopStatusReceived => 'دریافت شده';
+
+  @override
+  String get repairShopStatusAssigned => 'اختصاص داده شده';
+
+  @override
+  String get repairShopStatusInProgress => 'در حال تعمیر';
+
+  @override
+  String get repairShopStatusWaitingParts => 'منتظر قطعات';
+
+  @override
+  String get repairShopStatusTesting => 'در حال تست';
+
+  @override
+  String get repairShopStatusCompletedFixed => 'تعمیر موفق';
+
+  @override
+  String get repairShopStatusCompletedUnfixable => 'غیرقابل تعمیر';
+
+  @override
+  String get repairShopStatusReadyForPickup => 'آماده تحویل';
+
+  @override
+  String get repairShopStatusDelivered => 'تحویل داده شده';
+
+  @override
+  String get repairShopStatusCancelled => 'لغو شده';
+
+  @override
+  String get repairShopNewOrderTitle => 'سفارش تعمیر جدید';
+
+  @override
+  String get repairShopEditOrderTitle => 'ویرایش سفارش';
+
+  @override
+  String get repairShopCustomer => 'مشتری';
+
+  @override
+  String get repairShopCustomerHint => 'جست‌وجو و انتخاب مشتری';
+
+  @override
+  String get repairShopCustomerSearchHint =>
+      'جستجو بر اساس نام، تلفن یا ایمیل...';
+
+  @override
+  String get repairShopCustomerSubtitle => 'مشتری سفارش';
+
+  @override
+  String get repairShopSelectCustomer => 'لطفاً مشتری را انتخاب کنید';
+
+  @override
+  String get repairShopCatalogProduct => 'کالا از کاتالوگ (اختیاری)';
+
+  @override
+  String get repairShopCatalogProductHint => 'جست‌وجو در کالاها';
+
+  @override
+  String get repairShopProductName => 'نام کالا/دستگاه';
+
+  @override
+  String get repairShopProductNameHint =>
+      'اگر کالا در کاتالوگ نیست، نام را دستی وارد کنید';
+
+  @override
+  String get repairShopProductNameRequired => 'نام کالا الزامی است';
+
+  @override
+  String get repairShopWarrantyCodeId => 'شناسه کد گارانتی (اختیاری)';
+
+  @override
+  String get repairShopWarrantyCodeHelper =>
+      'اگر دستگاه تحت گارانتی است، شناسه کد گارانتی را وارد کنید';
+
+  @override
+  String get repairShopSerialOptional => 'شماره سریال (اختیاری)';
+
+  @override
+  String get repairShopProblemDescription => 'شرح مشکل';
+
+  @override
+  String get repairShopProblemRequired => 'شرح مشکل الزامی است';
+
+  @override
+  String get repairShopCustomerNotesOptional => 'یادداشت مشتری (اختیاری)';
+
+  @override
+  String get repairShopTechnicianNotesOptional => 'یادداشت تعمیرکار (اختیاری)';
+
+  @override
+  String get repairShopEstimatedCostOptional => 'برآورد هزینه (اختیاری)';
+
+  @override
+  String get repairShopEstimatedCostHelper => 'به واحد ارز پیش‌فرض کسب‌وکار';
+
+  @override
+  String get repairShopEstimatedDeliveryOptional =>
+      'تاریخ تحویل تقریبی (اختیاری)';
+
+  @override
+  String get repairShopSaveChanges => 'ذخیره تغییرات';
+
+  @override
+  String get repairShopSubmitOrder => 'ثبت سفارش';
+
+  @override
+  String get repairShopOrderCreated => 'سفارش تعمیر با موفقیت ثبت شد';
+
+  @override
+  String get repairShopOrderUpdated => 'سفارش با موفقیت ویرایش شد';
+
+  @override
+  String get repairShopSelectNewStatus => 'انتخاب وضعیت جدید';
+
+  @override
+  String get repairShopCancelOrder => 'لغو سفارش';
+
+  @override
+  String get repairShopCancelOrderConfirm =>
+      'آیا مطمئن هستید که می‌خواهید این سفارش را لغو کنید؟';
+
+  @override
+  String get repairShopCancelYes => 'بله، لغو کن';
+
+  @override
+  String get repairShopOrderCancelled => 'سفارش لغو شد';
+
+  @override
+  String get repairShopNeedActiveTechnician =>
+      'ابتدا یک تعمیرکار فعال تعریف کنید';
+
+  @override
+  String get repairShopTechnicianAssigned => 'تعمیرکار اختصاص یافت';
+
+  @override
+  String repairShopChangeStatusTo(String status) {
+    return 'تغییر وضعیت به $status';
+  }
+
+  @override
+  String get repairShopStatusChanged => 'وضعیت با موفقیت تغییر کرد';
+
+  @override
+  String get repairShopCompleteFixedTitle => 'تکمیل تعمیر موفق';
+
+  @override
+  String get repairShopCompleteUnfixableTitle => 'تعمیر ناموفق';
+
+  @override
+  String get repairShopNotesHint => 'توضیحات...';
+
+  @override
+  String get repairShopRepairCompleted => 'تعمیر تکمیل شد';
+
+  @override
+  String get repairShopDeliverToCustomer => 'تحویل کالا به مشتری';
+
+  @override
+  String get repairShopDeliveryNotesHint => 'یادداشت تحویل (اختیاری)';
+
+  @override
+  String get repairShopItemDelivered => 'کالا تحویل داده شد';
+
+  @override
+  String get repairShopInvoiceRequiresCost =>
+      'قبل از صدور فاکتور، دستمزد یا قطعه را ثبت کنید';
+
+  @override
+  String get repairShopIssueInvoice => 'صدور فاکتور';
+
+  @override
+  String repairShopIssueInvoiceConfirm(String amount) {
+    return 'فاکتور فروش برای $amount صادر می‌شود. ادامه می‌دهید؟';
+  }
+
+  @override
+  String get repairShopIssueInvoiceYes => 'بله، صدور فاکتور';
+
+  @override
+  String get repairShopInvoiceIssued => 'فاکتور با موفقیت صادر شد';
+
+  @override
+  String repairShopInvoiceIssuedWithCode(String code) {
+    return 'فاکتور $code صادر شد';
+  }
+
+  @override
+  String get repairShopPartAdded => 'قطعه اضافه شد';
+
+  @override
+  String get repairShopDeletePart => 'حذف قطعه';
+
+  @override
+  String repairShopDeletePartConfirm(String name) {
+    return 'قطعه «$name» حذف شود؟';
+  }
+
+  @override
+  String get repairShopPartDeleted => 'قطعه حذف شد';
+
+  @override
+  String get repairShopLaborSaved => 'دستمزد ثبت شد';
+
+  @override
+  String get repairShopAttachmentType => 'نوع ضمیمه';
+
+  @override
+  String get repairShopAttachmentBefore => 'قبل از تعمیر';
+
+  @override
+  String get repairShopAttachmentDuring => 'حین تعمیر';
+
+  @override
+  String get repairShopAttachmentAfter => 'بعد از تعمیر';
+
+  @override
+  String get repairShopFileIdMissing => 'شناسه فایل پس از آپلود دریافت نشد';
+
+  @override
+  String get repairShopAttachmentAdded => 'ضمیمه اضافه شد';
+
+  @override
+  String get repairShopDeleteAttachment => 'حذف ضمیمه';
+
+  @override
+  String repairShopDeleteAttachmentConfirm(String name) {
+    return '«$name» حذف شود؟';
+  }
+
+  @override
+  String get repairShopOrderDetails => 'جزئیات سفارش';
+
+  @override
+  String get repairShopEditOrder => 'ویرایش سفارش';
+
+  @override
+  String get repairShopChangeStatus => 'تغییر وضعیت';
+
+  @override
+  String get repairShopOrderNotFound => 'سفارش یافت نشد';
+
+  @override
+  String repairShopInvoiceWithCode(String code) {
+    return 'فاکتور $code';
+  }
+
+  @override
+  String get repairShopInvoiceIssuedLabel => 'فاکتور صادر شده';
+
+  @override
+  String get repairShopCustomerInfo => 'اطلاعات مشتری';
+
+  @override
+  String get repairShopName => 'نام';
+
+  @override
+  String get repairShopProductInfo => 'اطلاعات کالا';
+
+  @override
+  String get repairShopProductNameLabel => 'نام کالا';
+
+  @override
+  String get repairShopSerial => 'سریال';
+
+  @override
+  String get repairShopWarrantyCode => 'کد گارانتی';
+
+  @override
+  String get repairShopProblemSection => 'شرح مشکل';
+
+  @override
+  String get repairShopCustomerNotesLabel => 'یادداشت مشتری:';
+
+  @override
+  String get repairShopTechnicianNotesLabel => 'یادداشت تعمیرکار:';
+
+  @override
+  String get repairShopTechnician => 'تعمیرکار';
+
+  @override
+  String get repairShopNoTechnicianAssigned => 'هنوز تعمیرکاری اختصاص نیافته';
+
+  @override
+  String get repairShopCosts => 'هزینه‌ها';
+
+  @override
+  String get repairShopLabor => 'دستمزد';
+
+  @override
+  String get repairShopParts => 'قطعات';
+
+  @override
+  String get repairShopTechnicianCommission => 'حق‌الزحمه تعمیرکار';
+
+  @override
+  String get repairShopGrandTotal => 'جمع کل';
+
+  @override
+  String get repairShopAttachments => 'ضمائم';
+
+  @override
+  String get repairShopNoAttachments => 'ضمیمه‌ای ثبت نشده است';
+
+  @override
+  String get repairShopAddPhotoOrFile => 'افزودن عکس یا فایل';
+
+  @override
+  String get repairShopUsedParts => 'قطعات استفاده شده';
+
+  @override
+  String get repairShopNoParts => 'قطعه‌ای ثبت نشده است';
+
+  @override
+  String repairShopPartQtyPrice(String qty, String price) {
+    return 'تعداد: $qty × $price';
+  }
+
+  @override
+  String get repairShopStatusHistory => 'تاریخچه وضعیت‌ها';
+
+  @override
+  String get repairShopDates => 'تاریخ‌ها';
+
+  @override
+  String get repairShopReceived => 'دریافت';
+
+  @override
+  String get repairShopEstimatedDelivery => 'تحویل تقریبی';
+
+  @override
+  String get repairShopCompletedAt => 'تکمیل تعمیر';
+
+  @override
+  String get repairShopDeliveredAt => 'تحویل شده';
+
+  @override
+  String get repairShopAssignTechnician => 'اختصاص تعمیرکار';
+
+  @override
+  String get repairShopChangeTechnician => 'تغییر تعمیرکار';
+
+  @override
+  String get repairShopStartRepair => 'شروع تعمیر';
+
+  @override
+  String get repairShopAddPart => 'افزودن قطعه';
+
+  @override
+  String get repairShopSetLabor => 'ثبت دستمزد';
+
+  @override
+  String get repairShopWaitingPart => 'منتظر قطعه';
+
+  @override
+  String get repairShopTest => 'تست';
+
+  @override
+  String get repairShopContinueRepair => 'ادامه تعمیر';
+
+  @override
+  String get repairShopReadyForPickupAction => 'آماده تحویل';
+
+  @override
+  String get repairShopDeliverToCustomerAction => 'تحویل به مشتری';
+
+  @override
+  String get repairShopOptionalNoteHint => 'یادداشت (اختیاری)';
+
+  @override
+  String get repairShopSelectTechnician => 'انتخاب تعمیرکار';
+
+  @override
+  String get repairShopSearchNameOrCode => 'جستجو نام یا کد...';
+
+  @override
+  String get repairShopNoTechnicianFound => 'تعمیرکاری یافت نشد';
+
+  @override
+  String get repairShopLaborTitle => 'دستمزد تعمیر';
+
+  @override
+  String get repairShopLaborAmount => 'مبلغ دستمزد';
+
+  @override
+  String get repairShopEnterValidAmount => 'مبلغ معتبر وارد کنید';
+
+  @override
+  String get repairShopRegister => 'ثبت';
+
+  @override
+  String get repairShopAddPartTitle => 'افزودن قطعه';
+
+  @override
+  String get repairShopPart => 'قطعه';
+
+  @override
+  String get repairShopSearchSelectPart => 'جست‌وجو و انتخاب قطعه';
+
+  @override
+  String get repairShopUnitPrice => 'قیمت واحد';
+
+  @override
+  String get repairShopSelectPart => 'قطعه را انتخاب کنید';
+
+  @override
+  String get repairShopEnterValidQty => 'تعداد معتبر وارد کنید';
+
+  @override
+  String get repairShopTechniciansTitle => 'مدیریت تعمیرکاران';
+
+  @override
+  String get repairShopDeactivateTechnician => 'غیرفعال کردن تعمیرکار';
+
+  @override
+  String repairShopDeactivateTechnicianConfirm(String name) {
+    return 'آیا مطمئن هستید که می‌خواهید «$name» را غیرفعال کنید؟';
+  }
+
+  @override
+  String get repairShopDeactivateYes => 'بله، غیرفعال کن';
+
+  @override
+  String get repairShopTechnicianDeactivated => 'تعمیرکار غیرفعال شد';
+
+  @override
+  String get repairShopHideInactive => 'مخفی کردن غیرفعال‌ها';
+
+  @override
+  String get repairShopShowInactive => 'نمایش غیرفعال‌ها';
+
+  @override
+  String get repairShopNoTechnicians => 'هنوز تعمیرکاری ثبت نشده است';
+
+  @override
+  String get repairShopAddTechnician => 'افزودن تعمیرکار';
+
+  @override
+  String get repairShopNewTechnician => 'تعمیرکار جدید';
+
+  @override
+  String get repairShopEditTechnician => 'ویرایش تعمیرکار';
+
+  @override
+  String repairShopCodeWithValue(String code) {
+    return 'کد: $code';
+  }
+
+  @override
+  String get repairShopSelectPerson => 'لطفاً فرد را انتخاب کنید';
+
+  @override
+  String get repairShopPersonHint => 'جست‌وجو و انتخاب شخص';
+
+  @override
+  String get repairShopTechnicianCodeOptional => 'کد تعمیرکار (اختیاری)';
+
+  @override
+  String get repairShopTechnicianCodeHelper =>
+      'در صورت خالی بودن، به‌صورت خودکار تولید می‌شود';
+
+  @override
+  String get repairShopCommissionType => 'نوع حق‌الزحمه';
+
+  @override
+  String get repairShopCommissionFixed => 'مبلغ ثابت';
+
+  @override
+  String get repairShopCommissionPercentage => 'درصدی';
+
+  @override
+  String get repairShopCommissionCaseByCase => 'موردی';
+
+  @override
+  String get repairShopCommissionPercentValue => 'درصد حق‌الزحمه';
+
+  @override
+  String get repairShopCommissionFixedValue => 'مبلغ حق‌الزحمه';
+
+  @override
+  String get repairShopCommissionPercentHelper => 'درصد از دستمزد تعمیر';
+
+  @override
+  String get repairShopCommissionFixedHelper =>
+      'مبلغ ثابت به واحد ارز پیش‌فرض کسب‌وکار';
+
+  @override
+  String get repairShopValueRequired => 'مقدار الزامی است';
+
+  @override
+  String get repairShopEnterValidNumber => 'عدد معتبر وارد کنید';
+
+  @override
+  String get repairShopTechnicianActive => 'تعمیرکار فعال برای اختصاص سفارش';
+
+  @override
+  String get repairShopSettingsSaved => 'تنظیمات با موفقیت ذخیره شد';
+
+  @override
+  String get repairShopNumberingSection => 'شماره‌گذاری سفارشات';
+
+  @override
+  String get repairShopNumberingFormat => 'فرمت شماره‌گذاری';
+
+  @override
+  String get repairShopNumberingFormatHelper =>
+      'ترتیبی: REC-2025-0001 | تصادفی: REC-A7B3C9';
+
+  @override
+  String get repairShopSequential => 'ترتیبی';
+
+  @override
+  String get repairShopRandom => 'تصادفی';
+
+  @override
+  String get repairShopCodePrefix => 'پیشوند کد';
+
+  @override
+  String get repairShopCodePrefixHelper => 'مثال: REC، REP، REPAIR';
+
+  @override
+  String get repairShopPrefixRequired => 'پیشوند الزامی است';
+
+  @override
+  String get repairShopPrefixMaxLength => 'حداکثر 10 کاراکتر';
+
+  @override
+  String get repairShopInvoiceWarehouseSection => 'پیش‌فرض‌های فاکتور و انبار';
+
+  @override
+  String get repairShopServiceProduct => 'محصول خدمات تعمیر';
+
+  @override
+  String get repairShopServiceProductHint =>
+      'خدمت پیش‌فرض برای ردیف دستمزد فاکتور';
+
+  @override
+  String get repairShopDefaultPartsWarehouse => 'انبار پیش‌فرض قطعات';
+
+  @override
+  String get repairShopDefaultPartsWarehouseHint => 'انبار خروج قطعات';
+
+  @override
+  String get repairShopServiceProductAutoCreate =>
+      'اگر محصول خدمات انتخاب نشود، سیستم هنگام صدور فاکتور یک خدمت «خدمات تعمیر» می‌سازد.';
+
+  @override
+  String get repairShopAutoNotifications => 'اعلان‌های خودکار';
+
+  @override
+  String get repairShopSmsOnReceive => 'پیامک دریافت سفارش';
+
+  @override
+  String get repairShopSmsOnReceiveHint =>
+      'ارسال خودکار پیامک هنگام دریافت سفارش جدید';
+
+  @override
+  String get repairShopSmsOnStatus => 'پیامک تغییر وضعیت';
+
+  @override
+  String get repairShopSmsOnStatusHint =>
+      'ارسال خودکار پیامک هنگام تغییر وضعیت';
+
+  @override
+  String get repairShopEmailOnReceive => 'ایمیل دریافت سفارش';
+
+  @override
+  String get repairShopEmailOnReceiveHint =>
+      'ارسال خودکار ایمیل هنگام دریافت سفارش جدید';
+
+  @override
+  String get repairShopEmailOnStatus => 'ایمیل تغییر وضعیت';
+
+  @override
+  String get repairShopEmailOnStatusHint =>
+      'ارسال خودکار ایمیل هنگام تغییر وضعیت';
+
+  @override
+  String get repairShopHelp => 'راهنما';
+
+  @override
+  String get repairShopHelpSequentialTitle => 'فرمت ترتیبی';
+
+  @override
+  String get repairShopHelpSequentialBody =>
+      'کدها به صورت REC-2025-0001، REC-2025-0002 و... تولید می‌شوند';
+
+  @override
+  String get repairShopHelpRandomTitle => 'فرمت تصادفی';
+
+  @override
+  String get repairShopHelpRandomBody =>
+      'کدها به صورت REC-A7B3C9، REC-XY4K2L و... تولید می‌شوند';
+
+  @override
+  String get repairShopHelpNotifyTitle => 'اعلان‌های خودکار';
+
+  @override
+  String get repairShopHelpNotifyBody =>
+      'برای استفاده از این قابلیت، ابتدا باید تنظیمات پیامک و ایمیل را در بخش تنظیمات کلی فعال کنید';
+
+  @override
+  String get repairShopSaveSettings => 'ذخیره تنظیمات';
+
+  @override
+  String get telephonyMenu => 'مرکز تماس';
+
+  @override
+  String get telephonySubtitle =>
+      'اتصال Issabel/Asterisk · Screen Pop · Click-to-Call';
+
+  @override
+  String get telephonyDialer => 'شماره‌گیر';
+
+  @override
+  String get telephonyLive => 'زنده';
+
+  @override
+  String get telephonyReports => 'گزارش';
+
+  @override
+  String get telephonyInboundToday => 'ورودی امروز';
+
+  @override
+  String get telephonyOutboundToday => 'خروجی امروز';
+
+  @override
+  String get telephonyAnswered => 'پاسخ‌داده‌شده';
+
+  @override
+  String get telephonyMissed => 'از دست‌رفته';
+
+  @override
+  String get telephonyActiveCall => 'تماس فعال';
+
+  @override
+  String get telephonyMyMissed => 'از دست‌رفته من';
+
+  @override
+  String get telephonyPbxStatusTitle => 'وضعیت مراکز تلفن';
+
+  @override
+  String get telephonyNoPbxConnected => 'هنوز مرکز تلفنی متصل نشده است.';
+
+  @override
+  String get telephonyConnectIssabel => 'اتصال Issabel';
+
+  @override
+  String get telephonyAskAdminMapExt =>
+      'از مدیر تلفن بخواهید مرکز تلفن را متصل کند و داخلی شما را واگذار کند.';
+
+  @override
+  String get telephonyOnline => 'آنلاین';
+
+  @override
+  String get telephonyOffline => 'آفلاین';
+
+  @override
+  String get telephonyCallHistoryTitle => 'تاریخچه تماس‌ها';
+
+  @override
+  String get telephonyCallHistoryShort => 'تاریخچه تماس';
+
+  @override
+  String get telephonySearchNumberOrNote => 'جستجوی شماره یا یادداشت';
+
+  @override
+  String get telephonyFilterSuccessful => 'موفق';
+
+  @override
+  String get telephonyCallDetails => 'جزئیات تماس';
+
+  @override
+  String get telephonyNote => 'یادداشت';
+
+  @override
+  String get telephonyCategoryHint => 'دسته‌بندی (فروش/پشتیبانی/مالی)';
+
+  @override
+  String get telephonyDefaultPbxName => 'مرکز تلفن اصلی';
+
+  @override
+  String get telephonyAddPbx => 'افزودن مرکز تلفن';
+
+  @override
+  String get telephonyPbxName => 'نام';
+
+  @override
+  String get telephonyCreatePbxFirst => 'ابتدا مرکز تلفن بسازید';
+
+  @override
+  String get telephonyAddExtension => 'افزودن داخلی';
+
+  @override
+  String get telephonyPbx => 'مرکز تلفن';
+
+  @override
+  String get telephonyExtensionNumber => 'شماره داخلی';
+
+  @override
+  String get telephonyDisplayName => 'نام نمایشی';
+
+  @override
+  String get telephonyTeamCode => 'کد تیم/بخش';
+
+  @override
+  String get telephonyTeamCodeHint => 'مثلاً sales';
+
+  @override
+  String get telephonyAllowSharedExt => 'اجازه اشتراک داخلی';
+
+  @override
+  String get telephonyAllowSharedExtHint => 'خاموش = هر داخلی فقط یک کاربر';
+
+  @override
+  String get telephonyCreateExtFirst => 'ابتدا داخلی تعریف کنید';
+
+  @override
+  String get telephonyMapExtSoftphone => 'نگاشت داخلی / Softphone';
+
+  @override
+  String get telephonyEditSoftphoneMapping => 'ویرایش نگاشت Softphone';
+
+  @override
+  String get telephonyBusinessUser => 'کاربر کسب‌وکار';
+
+  @override
+  String get telephonyExtension => 'داخلی';
+
+  @override
+  String get telephonyEndpointMode => 'حالت endpoint';
+
+  @override
+  String get telephonyEndpointModeHint =>
+      'relay = Softphone داخل اپ · desk = تلفن رومیزی · direct = PJSIP/WebRTC';
+
+  @override
+  String get telephonyEndpointRelay => 'Relay (Softphone داخل حسابیکس)';
+
+  @override
+  String get telephonyEndpointDesk => 'Desk (تلفن SIP خارجی)';
+
+  @override
+  String get telephonyEndpointDirect => 'Direct (رجیستر مستقیم اختیاری)';
+
+  @override
+  String get telephonyAllowFallback => 'اجازه fallback';
+
+  @override
+  String get telephonyAllowFallbackHint =>
+      'اگر حالت اصلی در دسترس نبود، حالت جایگزین';
+
+  @override
+  String get telephonyPrimaryExtension => 'داخلی اصلی';
+
+  @override
+  String get telephonyTeamSupervisor => 'سرپرست تیم این داخلی';
+
+  @override
+  String get telephonyTeamSupervisorHint =>
+      'اگر داخلی کد تیم داشته باشد، این کاربر گزارش و زنده همان تیم را می‌بیند';
+
+  @override
+  String get telephonyDirectSipHint => 'اختیاری — برای provision مستقیم';
+
+  @override
+  String get telephonySoftphoneRelayEnabled => 'فعال بودن Relay';
+
+  @override
+  String get telephonySoftphoneRelayHint =>
+      'صدا از طریق Connector بدون باز کردن PBX';
+
+  @override
+  String get telephonySoftphoneDirectEnabled => 'فعال بودن Direct';
+
+  @override
+  String get telephonySoftphoneDirectHint =>
+      'رجیستر مستقیم WebRTC/PJSIP (نیاز به دسترسی شبکه به PBX)';
+
+  @override
+  String get telephonyMaxSoftphoneSessions => 'سقف سشن همزمان Softphone';
+
+  @override
+  String get telephonyAudiosocketPort => 'پورت AudioSocket محلی Connector';
+
+  @override
+  String get telephonySoftphoneSettingsSaved => 'تنظیمات Softphone ذخیره شد';
+
+  @override
+  String get telephonySettingsTitle => 'تنظیمات مرکز تماس';
+
+  @override
+  String get telephonyManageOnlyHint =>
+      'فقط مدیر تلفن می‌تواند اتصال، داخلی و واگذاری را مدیریت کند.';
+
+  @override
+  String get telephonyConnectorTokenOnce =>
+      'توکن Connector (فقط یک‌بار نمایش داده می‌شود)';
+
+  @override
+  String get telephonyCopyToken => 'کپی توکن';
+
+  @override
+  String get telephonySetupStepsTitle => 'مراحل راه‌اندازی';
+
+  @override
+  String get telephonySetupSteps =>
+      '۱) مرکز تلفن بسازید و توکن را کپی کنید\n۲) روی سرور Issabel/Asterisk دستور نصب را اجرا کنید\n۳) داخلی‌ها را تعریف و به کاربران وصل کنید\n۴) برای Softphone داخل‌برنامه: حالت endpoint را روی Relay بگذارید';
+
+  @override
+  String get telephonyRelaySetupTitle => 'راه‌اندازی Softphone Relay';
+
+  @override
+  String get telephonyRelaySetupBody =>
+      'پس از نصب Connector، روی سرور تلفن:\n• pip install -r requirements-softphone.txt\n• MEDIA_TUNNEL_ENABLED=1 و AUDIOSOCKET_PORT=9092 در .env\n• hesabix-pbx restart\nسپس نگاشت کاربر را Relay کنید و از صفحه Softphone آنلاین شوید.';
+
+  @override
+  String get telephonyOpenSoftphone => 'باز کردن Softphone';
+
+  @override
+  String get telephonyOneLineIssabelInstall => 'نصب یک‌خطی روی Issabel';
+
+  @override
+  String get telephonyInstallCommandHelp =>
+      'این دستور کانکتور را از مخزن حسابیکس نصب می‌کند و دستور hesabix-pbx را می‌سازد. در ویزارد فقط کلید API (پروفایل ← کلیدهای API) را وارد کنید؛ کسب‌وکار و مرکز تلفن را از لیست انتخاب می‌کنید.';
+
+  @override
+  String get telephonyInstallCopied => 'دستور نصب کپی شد';
+
+  @override
+  String get telephonyCopyInstallCommand => 'کپی دستور نصب';
+
+  @override
+  String get telephonyManageCommandsCopied => 'دستورات مدیریت کپی شد';
+
+  @override
+  String get telephonyCopyManageCommands => 'کپی دستورات مدیریت';
+
+  @override
+  String get telephonyAfterInstallHint =>
+      'بعد از نصب: hesabix-pbx test  ·  به‌روزرسانی: hesabix-pbx update';
+
+  @override
+  String get telephonyScreenPopHint => 'نمایش اطلاعات تماس‌گیرنده هنگام زنگ';
+
+  @override
+  String get telephonyAutoCrmActivity => 'ساخت خودکار فعالیت CRM';
+
+  @override
+  String get telephonyAutoCrmActivityHint =>
+      'ثبت فعالیت تماس پس از پایان مکالمه';
+
+  @override
+  String get telephonyForcePostCallForm => 'فرم اجباری پس از تماس';
+
+  @override
+  String get telephonyForcePostCallFormHint =>
+      'اپراتور باید نتیجه تماس را ثبت کند';
+
+  @override
+  String get telephonyMissedCallTask => 'وظیفه برای تماس از دست‌رفته';
+
+  @override
+  String get telephonyMissedCallTaskHint =>
+      'ساخت تسک پیگیری پس از تماس بی‌پاسخ';
+
+  @override
+  String get telephonyFollowUpMinutes => 'مهلت پیگیری (دقیقه)';
+
+  @override
+  String get telephonyRecordingAccess => 'دسترسی به ضبط مکالمه';
+
+  @override
+  String get telephonyRecordingAccessAllOperatorsHint =>
+      'اپراتورها فقط ضبط تماس‌های مجاز خود/تیم';
+
+  @override
+  String get telephonyRecordingAccessOwnerHint => 'مالک تماس و سرپرست/مدیر';
+
+  @override
+  String get telephonyRecordingAccessPermissionHint =>
+      'مجوز listen_recordings در محدوده مجاز';
+
+  @override
+  String get telephonyRecordingAccessPermissionBased => 'مجوزمحور';
+
+  @override
+  String get telephonyRecordingAccessOwnerManagers => 'مالک و مدیران';
+
+  @override
+  String get telephonyRecordingAccessAllowedOps => 'اپراتورهای مجاز';
+
+  @override
+  String get telephonyMultiPbx => 'چند مرکز تلفن';
+
+  @override
+  String get telephonyMultiPbxHint =>
+      'اگر خاموش باشد فقط یک PBX برای کسب‌وکار مجاز است';
+
+  @override
+  String get telephonyPbxs => 'مراکز تلفن';
+
+  @override
+  String get telephonyNewToken => 'توکن جدید';
+
+  @override
+  String get telephonyExtensions => 'داخلی‌ها';
+
+  @override
+  String get telephonyExtensionsHint =>
+      'Connector در heartbeat فهرست داخلی‌ها را همگام می‌کند. پیش‌فرض هر داخلی انحصاری است.';
+
+  @override
+  String get telephonyShareable => 'قابل اشتراک';
+
+  @override
+  String get telephonyExclusive => 'انحصاری';
+
+  @override
+  String get telephonyUserExtMapping => 'نگاشت کاربر ↔ داخلی / Softphone';
+
+  @override
+  String get telephonyUserExtMappingHint =>
+      'هر داخلی پیش‌فرض مال یک کاربر است. از لیست کاربر کسب‌وکار انتخاب کنید.';
+
+  @override
+  String get telephonyAssignExtension => 'واگذاری داخلی';
+
+  @override
+  String get telephonyPrimary => 'اصلی';
+
+  @override
+  String get telephonySecondary => 'فرعی';
+
+  @override
+  String get telephonyNoFallback => 'بدون fallback';
+
+  @override
+  String get telephonyEditMapping => 'ویرایش نگاشت';
+
+  @override
+  String get telephonyOpsHealth => 'عملیات و سلامت';
+
+  @override
+  String get telephonyOpsHealthHint => 'متریک‌ها و صف خطاهای Connector';
+
+  @override
+  String get telephonyMetrics => 'متریک‌ها';
+
+  @override
+  String get telephonyResolved => 'حل شد';
+
+  @override
+  String get telephonyStatusMissed => 'از دست‌رفته';
+
+  @override
+  String get telephonyStatusCompleted => 'پایان‌یافته';
+
+  @override
+  String get telephonyStatusAnswered => 'پاسخ داده شد';
+
+  @override
+  String get telephonyStatusRinging => 'زنگ';
+
+  @override
+  String get telephonyStatusBusy => 'اشغال';
+
+  @override
+  String get telephonyStatusFailed => 'ناموفق';
+
+  @override
+  String get telephonyStatusActive => 'فعال';
+
+  @override
+  String get telephonyReportsTitle => 'گزارش تماس‌ها';
+
+  @override
+  String get telephonyReportsShort => 'گزارش تماس';
+
+  @override
+  String get telephonyReportsForbidden =>
+      'مجوز گزارش تماس برای محدوده خود/تیم را ندارید.';
+
+  @override
+  String get telephonyOperators => 'اپراتورها';
+
+  @override
+  String get telephonyTotal => 'کل';
+
+  @override
+  String get telephonyInbound => 'ورودی';
+
+  @override
+  String get telephonyOutbound => 'خروجی';
+
+  @override
+  String get telephonyAnswer => 'پاسخ';
+
+  @override
+  String get telephonyAnswerRate => 'نرخ پاسخ';
+
+  @override
+  String get telephonyAvgTalk => 'میانگین مکالمه';
+
+  @override
+  String get telephonyHourlyDistribution => 'توزیع ساعتی';
+
+  @override
+  String get telephonyLiveDashboardTitle => 'داشبورد زنده تماس';
+
+  @override
+  String get telephonyLiveForbidden =>
+      'مجوز مانیتورینگ زنده برای محدوده خود/تیم را ندارید.';
+
+  @override
+  String get telephonyLiveHeadline => 'مرکز تماس — لحظه‌ای';
+
+  @override
+  String get telephonyRefreshEvery3s => 'به‌روزرسانی هر ۳ ثانیه';
+
+  @override
+  String get telephonyWaiting => 'در انتظار';
+
+  @override
+  String get telephonyTalking => 'در مکالمه';
+
+  @override
+  String get telephonyMissedToday => 'از دست‌رفته امروز';
+
+  @override
+  String get telephonyOperatorsOnline => 'اپراتور آنلاین';
+
+  @override
+  String get telephonyBlfTitle => 'وضعیت داخلی‌ها (BLF)';
+
+  @override
+  String get telephonyActiveCalls => 'تماس‌های فعال';
+
+  @override
+  String get telephonyNoActiveCalls => 'تماسی در جریان نیست';
+
+  @override
+  String get telephonyHold => 'نگه داشتن';
+
+  @override
+  String get telephonyResume => 'ادامه';
+
+  @override
+  String get telephonyHangup => 'قطع';
+
+  @override
+  String get telephonyTransfer => 'انتقال';
+
+  @override
+  String get telephonyTransferCall => 'انتقال تماس';
+
+  @override
+  String get telephonyDestExtension => 'داخلی مقصد';
+
+  @override
+  String get telephonyQueues => 'صف‌ها';
+
+  @override
+  String get telephonySoftphoneTitle => 'سافت‌فون';
+
+  @override
+  String get telephonySoftphoneBranded => 'Softphone حسابیکس';
+
+  @override
+  String get telephonySoftphoneHelp =>
+      'رسانه از طریق افزونه Connector (Relay) منتقل می‌شود؛ نیازی به باز کردن پورت PBX به اینترنت نیست. میکروفون و پخش روی همین صفحه فعال می‌شود.';
+
+  @override
+  String get telephonyMode => 'حالت';
+
+  @override
+  String get telephonyMediaTunnel => 'تونل رسانه';
+
+  @override
+  String get telephonyDisconnected => 'قطع';
+
+  @override
+  String get telephonyAudioBridge => 'پل صوت';
+
+  @override
+  String get telephonyLocalAudio => 'صوت محلی';
+
+  @override
+  String get telephonyReady => 'آماده';
+
+  @override
+  String get telephonyOff => 'خاموش';
+
+  @override
+  String get telephonyInactive => 'غیرفعال';
+
+  @override
+  String get telephonyDisconnectSoftphone => 'قطع Softphone';
+
+  @override
+  String get telephonyGoOnlineRelay => 'آنلاین شدن (Relay)';
+
+  @override
+  String get telephonyDestinationNumber => 'شماره مقصد';
+
+  @override
+  String get telephonyCallAction => 'تماس';
+
+  @override
+  String get telephonyAnswerAction => 'پاسخ';
+
+  @override
+  String get telephonyMute => 'بی‌صدا';
+
+  @override
+  String get telephonyMicrophone => 'میکروفون';
+
+  @override
+  String get telephonyDeskDialer => 'شماره‌گیر Click-to-Call (حالت Desk)';
+
+  @override
+  String get telephonyConfigureExtSoftphone => 'تنظیم حالت داخلی / Softphone';
+
+  @override
+  String get telephonyBackToHub => 'بازگشت به مرکز تماس';
+
+  @override
+  String get telephonyConnIdle => 'آفلاین';
+
+  @override
+  String get telephonyConnConnecting => 'در حال اتصال…';
+
+  @override
+  String get telephonyConnRegistered => 'آماده پاسخگویی';
+
+  @override
+  String get telephonyConnRinging => 'زنگ';
+
+  @override
+  String get telephonyConnInCall => 'در حال مکالمه';
+
+  @override
+  String get telephonyConnReconnecting => 'اتصال مجدد…';
+
+  @override
+  String get telephonyConnError => 'خطا';
+
+  @override
+  String get telephonyConnEnded => 'پایان سشن';
+
+  @override
+  String get telephonyBarConnecting => 'Softphone در حال اتصال';
+
+  @override
+  String get telephonyBarReady => 'Softphone آماده';
+
+  @override
+  String get telephonyBarRinging => 'Softphone: زنگ';
+
+  @override
+  String get telephonyBarInCall => 'Softphone: مکالمه';
+
+  @override
+  String get telephonyBarReconnecting => 'Softphone: اتصال مجدد';
+
+  @override
+  String get telephonyBarError => 'Softphone: خطا';
+
+  @override
+  String get telephonyPresenceRinging => 'زنگ می‌خورد';
+
+  @override
+  String get telephonyPresenceTalking => 'در مکالمه';
+
+  @override
+  String get telephonyPresenceOffline => 'قطع از مرکز تلفن';
+
+  @override
+  String get telephonyPresenceNoExt => 'بدون داخلی';
+
+  @override
+  String get telephonyPresenceIdle => 'آزاد';
+
+  @override
+  String get telephonyPresenceUnknown => 'نامشخص';
+
+  @override
+  String get telephonyConfigureExtension => 'تنظیم داخلی';
+
+  @override
+  String get telephonyAnswerSoftphone => 'پاسخ Softphone';
+
+  @override
+  String get telephonyDeclineCall => 'رد تماس';
+
+  @override
+  String get telephonyUnmute => 'رفع بی‌صدایی';
+
+  @override
+  String get telephonySoftphoneOnline => 'Softphone آنلاین است';
+
+  @override
+  String get telephonyPluginInactiveTitle =>
+      'افزونه اتصال به استریسک و ایزابل فعال نیست';
+
+  @override
+  String get telephonyPluginInactiveBody =>
+      'برای Screen Pop، Click-to-Call و تاریخچه تماس، این افزونه را از بازار افزونه‌ها فعال کنید.';
+
+  @override
+  String get telephonyIncomingCall => 'تماس ورودی';
+
+  @override
+  String get telephonyInConversation => 'در مکالمه';
+
+  @override
+  String get telephonyCallEnded => 'تماس پایان یافت';
+
+  @override
+  String get telephonyCallMissed => 'تماس از دست‌رفته';
+
+  @override
+  String get telephonyUnknownNumber => 'شماره ناشناس';
+
+  @override
+  String get telephonyLeadCreated => 'سرنخ ایجاد شد';
+
+  @override
+  String get telephonyContactCreated => 'مخاطب ایجاد شد';
+
+  @override
+  String get telephonyNoteSaved => 'یادداشت ذخیره شد';
+
+  @override
+  String get telephonyHangupSent => 'دستور قطع تماس ارسال شد';
+
+  @override
+  String get telephonyOverdueChecks => 'چک‌های سررسید/معوق';
+
+  @override
+  String get telephonyOpenDeals => 'معاملات باز';
+
+  @override
+  String get telephonyRecentDocuments => 'آخرین اسناد';
+
+  @override
+  String get telephonyQuickNote => 'یادداشت سریع';
+
+  @override
+  String get telephonyCreateLead => 'ایجاد سرنخ';
+
+  @override
+  String get telephonyCreateContact => 'ایجاد مخاطب';
+
+  @override
+  String get telephonyCustomerFile => 'پرونده مشتری';
+
+  @override
+  String get telephonySaveNote => 'ذخیره یادداشت';
+
+  @override
+  String get telephonyHangupCall => 'قطع تماس';
+
+  @override
+  String get telephonyRecordingUnavailable => 'فایل ضبط در دسترس نیست';
+
+  @override
+  String get telephonyPlayRecording => 'پخش ضبط';
+
+  @override
+  String get telephonyPlayingRecording => 'در حال پخش…';
+
+  @override
+  String get telephonyPlayCallRecording => 'پخش ضبط مکالمه';
+
+  @override
+  String get telephonyPlacingCall => 'در حال برقراری تماس…';
+
+  @override
+  String get telephonyIncomingSoftphone => 'تماس ورودی Softphone';
+
+  @override
+  String get telephonyRingingNow => 'در حال زنگ خوردن…';
+
+  @override
+  String get telephonyDecline => 'رد';
+
+  @override
+  String get telephonyPostCallTitle => 'ثبت نتیجه تماس';
+
+  @override
+  String get telephonyCategory => 'دسته‌بندی';
+
+  @override
+  String get telephonyOutcome => 'نتیجه';
+
+  @override
+  String get telephonySaveAndClose => 'ذخیره و بستن';
+
+  @override
+  String get telephonyLater => 'بعداً';
+
+  @override
+  String get telephonyCategorySales => 'فروش';
+
+  @override
+  String get telephonyCategorySupport => 'پشتیبانی';
+
+  @override
+  String get telephonyCategoryFinance => 'مالی';
+
+  @override
+  String get telephonyCategoryOther => 'سایر';
+
+  @override
+  String get telephonyOutcomeCompleted => 'موفق';
+
+  @override
+  String get telephonyOutcomeCallback => 'نیاز به تماس مجدد';
+
+  @override
+  String get telephonyOutcomeNoAnswer => 'بدون پاسخ';
+
+  @override
+  String get telephonyOutcomeWrongNumber => 'شماره اشتباه';
+
+  @override
+  String get telephonyEnterNumber => 'شماره را وارد کنید';
+
+  @override
+  String get telephonyAudioReady => 'صوت آماده';
+
+  @override
+  String get telephonyBridgeActive => 'پل فعال';
+
+  @override
+  String get telephonyApiKeyMissing => 'کلید API یافت نشد';
+
+  @override
+  String get telephonyIncompleteSession => 'سشن Softphone ناقص برگشت';
+
+  @override
+  String get telephonyGoOnlineFirst => 'ابتدا Softphone را آنلاین کنید';
+
+  @override
+  String get telephonyChannelNotConnected =>
+      'کانال Softphone وصل نیست؛ دوباره آنلاین شوید';
+
+  @override
+  String get telephonyNoSession => 'سشن Softphone نیست';
+
+  @override
+  String get telephonyShowHesabix => 'نمایش حسابیکس';
+
+  @override
+  String get telephonyExit => 'خروج';
+
+  @override
+  String get telephonySoftphoneOnlineTooltip => 'Softphone آنلاین';
+
+  @override
+  String get telephonyIncomingChannelName => 'تماس ورودی Softphone';
+
+  @override
+  String get telephonyIncomingChannelDesc =>
+      'اعلان تمام‌صفحه تماس ورودی وقتی Softphone آنلاین است';
+
+  @override
+  String get telephonyMicDenied => 'دسترسی میکروفون داده نشد';
+
+  @override
+  String get telephonyAudioContextMissing => 'AudioContext آماده نیست';
+
+  @override
+  String get telephonyPermView => 'مشاهده مرکز تماس (فقط داخلی خود)';
+
+  @override
+  String get telephonyPermManage => 'مدیریت اتصال و داخلی‌ها';
+
+  @override
+  String get telephonyPermViewAll => 'مشاهده همه تماس‌های کسب‌وکار';
+
+  @override
+  String get telephonyPermSupervise => 'سرپرستی تیم/بخش';
+
+  @override
+  String get telephonyPermClickToCall => 'Click-to-Call';
+
+  @override
+  String get telephonyPermSoftphone => 'Softphone داخل‌برنامه';
+
+  @override
+  String get telephonyPermSoftphoneManage => 'مدیریت Softphone و حالت رسانه';
+
+  @override
+  String get telephonyPermSoftphoneQuality => 'مشاهده کیفیت Softphone';
+
+  @override
+  String get telephonyPermListen => 'پخش ضبط مکالمات در محدوده مجاز';
+
+  @override
+  String get telephonyPermLive => 'مانیتورینگ زنده (محدوده خود/تیم)';
+
+  @override
+  String get telephonyPermReports => 'گزارش‌های تماس در محدوده مجاز';
+
+  @override
+  String get telephonyPermControl => 'کنترل تماس در محدوده مجاز';
+
+  @override
+  String telephonyErrorWithDetails(String error) {
+    return 'خطا: $error';
+  }
+
+  @override
+  String telephonyCallListSubtitle(
+    String status,
+    String extension,
+    String seconds,
+  ) {
+    return '$status · داخلی $extension · $seconds ثانیه';
+  }
+
+  @override
+  String telephonyMappingSaved(String mode) {
+    return 'نگاشت ذخیره شد ($mode)';
+  }
+
+  @override
+  String telephonyUserId(String id) {
+    return 'کاربر $id';
+  }
+
+  @override
+  String telephonyCommandSent(String action) {
+    return 'دستور $action ارسال شد';
+  }
+
+  @override
+  String telephonyIncomingExt(String extension) {
+    return 'تماس ورودی · داخلی $extension';
+  }
+
+  @override
+  String telephonySoftphoneExt(String ext) {
+    return 'Softphone · داخلی $ext';
+  }
+
+  @override
+  String telephonyRingFrom(String from) {
+    return 'زنگ از $from';
+  }
+
+  @override
+  String telephonyAnswerFailed(String error) {
+    return 'پاسخ تماس ناموفق: $error';
+  }
+
+  @override
+  String telephonyMediaFailed(String error) {
+    return 'مدیا آماده نشد: $error';
+  }
+
+  @override
+  String telephonyMicFallback(String error) {
+    return 'میکروفون: $error — ارسال سکوت موقت';
+  }
+
+  @override
+  String telephonyHourCount(String hour, String count) {
+    return 'ساعت $hour: $count';
+  }
+
+  @override
+  String telephonyOperatorStats(
+    String total,
+    String answered,
+    String missed,
+    String outbound,
+  ) {
+    return 'کل $total · پاسخ $answered · از دست‌رفته $missed · خروجی $outbound';
+  }
+
+  @override
+  String telephonyQueueWaitTalk(String waiting, String talking) {
+    return 'انتظار: $waiting · مکالمه: $talking';
+  }
+
+  @override
+  String telephonyMediaFrames(String incoming, String outgoing) {
+    return 'فریم رسانه: ورود $incoming / خروج $outgoing';
+  }
+
+  @override
+  String telephonyExtensionValue(String extension) {
+    return 'داخلی $extension';
+  }
+
+  @override
+  String telephonyTeamValue(String team) {
+    return 'تیم $team';
+  }
+
+  @override
+  String telephonyUserToExtension(String user, String extension) {
+    return '$user → داخلی $extension';
+  }
+
+  @override
+  String telephonyOpenDlq(String count) {
+    return 'DLQ باز: $count';
+  }
+
+  @override
+  String telephonyMinutesValue(String minutes) {
+    return '$minutes دقیقه';
+  }
+
+  @override
+  String telephonyBalanceRemain(String amount, String status) {
+    return 'مانده: $amount · $status';
+  }
+
+  @override
+  String telephonyCheckNumber(String number) {
+    return 'چک $number';
+  }
+
+  @override
+  String telephonyMappingLine(
+    String role,
+    String mode,
+    String team,
+    String fallback,
+  ) {
+    return '$role · حالت $mode$team$fallback';
+  }
+
+  @override
+  String telephonySoftphoneForPbx(String name) {
+    return 'Softphone — $name';
+  }
+
+  @override
+  String get documentTypeManual => 'سند دستی';
+
+  @override
+  String get documentTypeExpense => 'هزینه';
+
+  @override
+  String get documentTypeIncome => 'درآمد';
+
+  @override
+  String get documentTypeReceipt => 'دریافت';
+
+  @override
+  String get documentTypePayment => 'پرداخت';
+
+  @override
+  String get documentTypeTransfer => 'انتقال';
+
+  @override
+  String get documentTypeInvoice => 'فاکتور';
+
+  @override
+  String get documentTypeSales => 'فروش';
+
+  @override
+  String get documentTypeSalesReturn => 'برگشت از فروش';
+
+  @override
+  String get documentTypePurchase => 'خرید';
+
+  @override
+  String get documentTypePurchaseReturn => 'برگشت از خرید';
+
+  @override
+  String get documentTypeDirectConsumption => 'مصرف مستقیم';
+
+  @override
+  String get documentTypeProduction => 'تولید';
+
+  @override
+  String get documentTypeWaste => 'ضایعات';
+
+  @override
+  String get documentTypeOpeningBalance => 'موجودی اولیه';
+
+  @override
+  String get documentTypeCheck => 'چک';
+
+  @override
+  String get documentStatusDraft => 'پیش‌نویس';
+
+  @override
+  String get documentStatusFinal => 'قطعی';
+
+  @override
+  String get documentProject => 'پروژه';
+
+  @override
+  String documentProjectValue(String id) {
+    return 'پروژه: $id';
+  }
+
+  @override
+  String get documentAllPersons => 'همه اشخاص';
+
+  @override
+  String get documentSearchPersons => 'جست‌وجو در اشخاص...';
+
+  @override
+  String get documentSelectedCurrency => 'ارز انتخاب‌شده';
+
+  @override
+  String get documentDefaultCurrency => 'ریال';
+
+  @override
+  String get documentOnlyManualEditable => 'فقط اسناد دستی قابل ویرایش هستند';
+
+  @override
+  String get documentOnlyManualDeletable => 'فقط اسناد دستی قابل حذف هستند';
+
+  @override
+  String documentLoadError(String error) {
+    return 'خطا در بارگذاری سند: $error';
+  }
+
+  @override
+  String documentDeleteError(String error) {
+    return 'خطا در حذف سند: $error';
+  }
+
+  @override
+  String documentBulkDeleteError(String error) {
+    return 'خطا در حذف گروهی: $error';
+  }
+
+  @override
+  String get documentDeleted => 'سند با موفقیت حذف شد';
+
+  @override
+  String documentDeletedCount(String count) {
+    return '$count سند با موفقیت حذف شد';
+  }
+
+  @override
+  String documentSkippedAutoCount(String count) {
+    return '$count سند اتوماتیک نادیده گرفته شد';
+  }
+
+  @override
+  String get documentConfirmDeleteTitle => 'تأیید حذف';
+
+  @override
+  String documentConfirmDeleteBody(String code) {
+    return 'آیا از حذف سند $code اطمینان دارید؟';
+  }
+
+  @override
+  String get documentConfirmBulkDeleteTitle => 'تأیید حذف گروهی';
+
+  @override
+  String documentConfirmBulkDeleteBody(String count) {
+    return 'آیا از حذف $count سند انتخاب شده اطمینان دارید؟\n\nتوجه: فقط اسناد دستی حذف خواهند شد.';
+  }
+
+  @override
+  String documentDeleteSelectedCount(String count) {
+    return 'حذف ($count)';
+  }
+
+  @override
+  String get documentNeedMinLines => 'سند باید حداقل 2 سطر داشته باشد';
+
+  @override
+  String documentLineNeedAmount(String n) {
+    return 'سطر $n باید مقدار بدهکار یا بستانکار داشته باشد';
+  }
+
+  @override
+  String documentLineBothSides(String n) {
+    return 'سطر $n نمی‌تواند همزمان بدهکار و بستانکار داشته باشد';
+  }
+
+  @override
+  String documentUnbalancedDiff(String diff) {
+    return 'سند متوازن نیست. تفاوت: $diff';
+  }
+
+  @override
+  String get documentCreateFailed => 'خطا در ایجاد سند';
+
+  @override
+  String get documentUpdateFailed => 'خطا در ویرایش سند';
+
+  @override
+  String get documentUnbalanced => 'سند متوازن نیست';
+
+  @override
+  String get documentSearchCodeDesc => 'جستجو در شماره سند و توضیحات…';
+
+  @override
+  String get documentEndOfList => 'پایان لیست';
+
+  @override
+  String documentLoadListError(String error) {
+    return 'خطا در بارگذاری: $error';
+  }
+
+  @override
+  String documentSelectedCount(String count) {
+    return '$count انتخاب شد';
+  }
+
+  @override
+  String documentCodeValue(String code) {
+    return 'سند $code';
+  }
+
+  @override
+  String documentTypeFilterValue(String type) {
+    return 'نوع: $type';
+  }
+
+  @override
+  String get documentCancelSelection => 'لغو انتخاب';
+
+  @override
+  String get documentDateOutsideFiscalYear =>
+      'تاریخ سند خارج از بازه سال مالی جاری است';
+
+  @override
+  String get documentCurrencyRequired => 'انتخاب ارز الزامی است';
+
+  @override
+  String documentLineNeedAccount(String n) {
+    return 'سطر $n باید حساب داشته باشد';
+  }
+
+  @override
+  String get documentLoadingFiscalYear => 'در حال دریافت سال مالی جاری...';
+
+  @override
+  String get documentCurrentFiscalYearMissing => 'سال مالی جاری یافت نشد';
+
+  @override
+  String get documentFiscalYearLoadError => 'خطا در دریافت سال مالی جاری';
+
+  @override
+  String get documentDateRequired => 'تاریخ سند الزامی است';
 }

@@ -8,6 +8,7 @@ import '../../services/telephony/telephony_session_controller.dart';
 import 'telephony_dialer_sheet.dart';
 import 'telephony_post_call_sheet.dart';
 import 'telephony_screen_pop.dart';
+import '../../l10n/app_localizations.dart';
 
 /// نوار تلفن داخل BusinessShell (بدون Screen Pop — Pop جداگانه Overlay می‌شود).
 class TelephonyPhoneBarHost extends StatefulWidget {
@@ -125,31 +126,33 @@ class _TelephonyPhoneBarHostState extends State<TelephonyPhoneBarHost> with Sing
 
   String _statusText() {
     final sf = _softphone?.state;
-    if (sf == SoftphoneConnectionState.connecting) return 'Softphone در حال اتصال';
-    if (sf == SoftphoneConnectionState.registered) return 'Softphone آماده';
+    final t = AppLocalizations.of(context);
+    if (sf == SoftphoneConnectionState.connecting) return t.telephonyBarConnecting;
+    if (sf == SoftphoneConnectionState.registered) return t.telephonyBarReady;
     if (sf == SoftphoneConnectionState.ringing) {
       final from = _softphone?.incomingCallerDisplay;
-      return from == null || from.isEmpty ? 'Softphone: زنگ' : 'زنگ از $from';
+      return from == null || from.isEmpty ? t.telephonyBarRinging : t.telephonyRingFrom(from);
     }
-    if (sf == SoftphoneConnectionState.inCall) return 'Softphone: مکالمه';
-    if (sf == SoftphoneConnectionState.reconnecting) return 'Softphone: اتصال مجدد';
-    if (sf == SoftphoneConnectionState.error) return 'Softphone: خطا';
+    if (sf == SoftphoneConnectionState.inCall) return t.telephonyBarInCall;
+    if (sf == SoftphoneConnectionState.reconnecting) return t.telephonyBarReconnecting;
+    if (sf == SoftphoneConnectionState.error) return t.telephonyBarError;
     switch (_session.presenceLabel) {
       case 'ringing':
-        return 'زنگ می‌خورد';
+        return t.telephonyPresenceRinging;
       case 'in_call':
-        return 'در مکالمه';
+        return t.telephonyPresenceTalking;
       case 'offline':
-        return 'قطع از مرکز تلفن';
+        return t.telephonyPresenceOffline;
       case 'no_extension':
-        return 'بدون داخلی';
+        return t.telephonyPresenceNoExt;
       default:
-        return 'آزاد';
+        return t.telephonyPresenceIdle;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     if (!widget.pluginActive) return const SizedBox.shrink();
 
     final scheme = Theme.of(context).colorScheme;
@@ -227,15 +230,15 @@ class _TelephonyPhoneBarHostState extends State<TelephonyPhoneBarHost> with Sing
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'مرکز تماس',
+                      t.telephonyMenu,
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       [
-                        if ((_session.primaryExtension ?? '').isNotEmpty) 'داخلی ${_session.primaryExtension}',
+                        if ((_session.primaryExtension ?? '').isNotEmpty) t.telephonyExtensionValue(_session.primaryExtension!),
                         _statusText(),
-                        if (_session.presenceLabel == 'no_extension') 'تنظیم داخلی',
+                        if (_session.presenceLabel == 'no_extension') t.telephonyConfigureExtension,
                       ].where((e) => e.isNotEmpty).join(' · '),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -250,7 +253,7 @@ class _TelephonyPhoneBarHostState extends State<TelephonyPhoneBarHost> with Sing
             if (inCall || ringing) ...[
               if (ringing && _softphone?.activeCallId != null)
                 IconButton(
-                  tooltip: 'پاسخ Softphone',
+                  tooltip: t.telephonyAnswerSoftphone,
                   onPressed: () async {
                     final id = _softphone!.activeCallId!;
                     await _softphone!.answer(id);
@@ -259,13 +262,13 @@ class _TelephonyPhoneBarHostState extends State<TelephonyPhoneBarHost> with Sing
                 ),
               if (ringing)
                 IconButton(
-                  tooltip: 'رد تماس',
+                  tooltip: t.telephonyDeclineCall,
                   onPressed: () => _softphone?.rejectIncoming(),
                   icon: Icon(Icons.call_end_rounded, color: scheme.error),
                 ),
               if (!ringing)
                 IconButton(
-                  tooltip: _softphone?.muted == true ? 'رفع بی‌صدایی' : 'بی‌صدا',
+                  tooltip: _softphone?.muted == true ? t.telephonyUnmute : t.telephonyMute,
                   onPressed: softReady ? () => _softphone!.setMuted(!(_softphone!.muted)) : null,
                   icon: Icon(
                     _softphone?.muted == true ? Icons.mic_off_rounded : Icons.mic_rounded,
@@ -274,13 +277,13 @@ class _TelephonyPhoneBarHostState extends State<TelephonyPhoneBarHost> with Sing
                 ),
               if (!ringing)
                 IconButton(
-                  tooltip: 'قطع',
+                  tooltip: t.telephonyHangup,
                   onPressed: softReady ? () => _softphone!.hangup() : () => _session.hangupActiveCall(),
                   icon: Icon(Icons.call_end_rounded, color: scheme.error),
                 ),
             ] else ...[
               IconButton(
-                tooltip: softReady ? 'Softphone آنلاین است' : 'Softphone',
+                tooltip: softReady ? t.telephonySoftphoneOnline : t.telephonySoftphoneTitle,
                 onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony/softphone')),
                 icon: Icon(
                   Icons.headset_mic_rounded,
@@ -299,7 +302,7 @@ class _TelephonyPhoneBarHostState extends State<TelephonyPhoneBarHost> with Sing
                   ),
                 ),
               IconButton(
-                tooltip: 'شماره‌گیر',
+                tooltip: t.telephonyDialer,
                 onPressed: () => showTelephonyDialerSheet(
                   context,
                   businessId: widget.businessId,
@@ -309,7 +312,7 @@ class _TelephonyPhoneBarHostState extends State<TelephonyPhoneBarHost> with Sing
               ),
               if (!compact)
                 IconButton(
-                  tooltip: 'تاریخچه',
+                  tooltip: t.history,
                   onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony/calls')),
                   icon: Icon(Icons.history_rounded, color: scheme.onSurfaceVariant),
                 ),

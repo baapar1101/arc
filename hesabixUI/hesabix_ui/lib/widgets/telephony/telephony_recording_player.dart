@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_sound/flutter_sound.dart';
 
 import '../../services/telephony/telephony_api.dart';
+import '../../l10n/app_localizations.dart';
 
 /// پخش‌کننده ضبط مکالمه — بارگذاری تنبل تا هر ردیف لیست باز نشود.
 class TelephonyRecordingPlayer extends StatefulWidget {
@@ -41,7 +42,7 @@ class _TelephonyRecordingPlayerState extends State<TelephonyRecordingPlayer> {
       final url = info['recording_url']?.toString();
       if (url == null || url.isEmpty) {
         setState(() {
-          _error = 'فایل ضبط در دسترس نیست';
+          _error = AppLocalizations.of(context).telephonyRecordingUnavailable;
           _loading = false;
         });
         return;
@@ -83,13 +84,14 @@ class _TelephonyRecordingPlayerState extends State<TelephonyRecordingPlayer> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
 
     if (!_expanded) {
       return TextButton.icon(
         onPressed: _ensureLoaded,
         icon: Icon(Icons.play_circle_outline_rounded, color: scheme.primary, size: 20),
-        label: const Text('پخش ضبط'),
+        label: Text(t.telephonyPlayRecording),
         style: TextButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
           visualDensity: VisualDensity.compact,
@@ -129,7 +131,7 @@ class _TelephonyRecordingPlayerState extends State<TelephonyRecordingPlayer> {
               ),
               const SizedBox(width: 4),
               Text(
-                _playing ? 'در حال پخش…' : 'پخش ضبط مکالمه',
+                _playing ? t.telephonyPlayingRecording : t.telephonyPlayCallRecording,
                 style: TextStyle(color: scheme.onPrimaryContainer, fontWeight: FontWeight.w600, fontSize: 12),
               ),
             ],

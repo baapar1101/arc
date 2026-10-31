@@ -89,17 +89,16 @@ class _DocumentsPageState extends State<DocumentsPage> {
     setState(() {});
   }
 
-  // انواع اسناد
-  final Map<String, String> _documentTypes = {
-    'all': 'همه',
-    'manual': 'سند دستی',
-    'expense': 'هزینه',
-    'income': 'درآمد',
-    'receipt': 'دریافت',
-    'payment': 'پرداخت',
-    'transfer': 'انتقال',
-    'invoice': 'فاکتور',
-  };
+  Map<String, String> _documentTypeLabels(AppLocalizations t) => {
+        'all': t.all,
+        'manual': t.documentTypeManual,
+        'expense': t.documentTypeExpense,
+        'income': t.documentTypeIncome,
+        'receipt': t.documentTypeReceipt,
+        'payment': t.documentTypePayment,
+        'transfer': t.documentTypeTransfer,
+        'invoice': t.documentTypeInvoice,
+      };
 
   @override
   void initState() {
@@ -140,6 +139,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
   /// بارگذاری لیست پروژه‌ها برای فیلتر
   Future<void> _loadProjects() async {
     if (!mounted) return;
+    final t = AppLocalizations.of(context);
     setState(() => _loadingProjects = true);
     
     try {
@@ -158,7 +158,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
           setState(() {
             _projectFilterOptions = projects.map((p) => FilterOption(
               value: p['id'].toString(),
-              label: p['name'] ?? 'پروژه ${p['id']}',
+              label: p['name'] ?? t.documentProjectValue('${p['id']}'),
               description: p['code'],
             )).toList();
             _loadingProjects = false;
@@ -322,7 +322,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
                 icon:
                     Icon(_showDesktopFilters ? Icons.expand_less : Icons.tune),
                 label:
-                    Text(_showDesktopFilters ? 'بستن فیلترها' : 'فیلترها'),
+                    Text(_showDesktopFilters ? t.hideFilters : t.filters),
               ),
               if (_hasExternalFiltersActive()) ...[
                 const SizedBox(width: 8),
@@ -371,7 +371,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
     if (_selectedDocumentType != null) {
       chips.add(Chip(
         label: Text(
-            _documentTypes[_selectedDocumentType] ?? _selectedDocumentType!),
+            _documentTypeLabels(t)[_selectedDocumentType] ?? _selectedDocumentType!),
         avatar: const Icon(Icons.category_outlined, size: 16),
       ));
     } else {
@@ -401,7 +401,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
           .cast<String?>()
           .firstWhere((e) => e != null && e!.isNotEmpty, orElse: () => null);
       chips.add(Chip(
-        label: Text(label ?? 'پروژه: $_selectedProjectId'),
+        label: Text(label ?? t.documentProjectValue('$_selectedProjectId')),
         avatar: const Icon(Icons.folder_open, size: 16),
       ));
     }
@@ -416,7 +416,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
     if (widget.authStore.isMultiCurrency && _currencyFilterTouched) {
       chips.add(Chip(
         label: Text(
-          _filterCurrencyId == null ? 'همه ارزها' : 'ارز انتخاب‌شده',
+          _filterCurrencyId == null ? t.allCurrencies : t.documentSelectedCurrency,
         ),
         avatar: const Icon(Icons.currency_exchange, size: 16),
       ));
@@ -452,13 +452,13 @@ class _DocumentsPageState extends State<DocumentsPage> {
           child: DropdownButtonFormField<String?>(
             value: _selectedDocumentType,
             decoration: InputDecoration(
-              labelText: 'نوع سند',
+              labelText: t.documentType,
               border: const OutlineInputBorder(),
               isDense: true,
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
             ),
-            items: _documentTypes.entries.map((entry) {
+            items: _documentTypeLabels(t).entries.map((entry) {
               return DropdownMenuItem<String?>(
                 value: entry.key == 'all' ? null : entry.key,
                 child: Text(entry.value),
@@ -515,7 +515,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
                 authStore: widget.authStore,
                 calendarController: widget.calendarController,
                 allowNull: true,
-                labelText: 'پروژه',
+                labelText: t.documentProject,
               ),
             ),
             SizedBox(
@@ -526,9 +526,9 @@ class _DocumentsPageState extends State<DocumentsPage> {
                 onChanged: (person) {
                   setState(() => _filterPerson = person);
                 },
-                label: 'شخص',
-                hintText: 'همه اشخاص',
-                searchHint: 'جست‌وجو در اشخاص...',
+                label: t.person,
+                hintText: t.documentAllPersons,
+                searchHint: t.documentSearchPersons,
               ),
             ),
             if (widget.authStore.isMultiCurrency)
@@ -597,16 +597,18 @@ class _DocumentsPageState extends State<DocumentsPage> {
       if (!mounted) return;
       final deletedCount = (result['deleted_count'] as int?) ?? 0;
       final skipped = (result['skipped_auto_documents'] as List?) ?? const [];
-      String message = '$deletedCount سند با موفقیت حذف شد';
+      final t = AppLocalizations.of(context);
+      String message = t.documentDeletedCount('$deletedCount');
       if (skipped.isNotEmpty) {
-        message += '\n${skipped.length} سند اتوماتیک نادیده گرفته شد';
+        message += '\n${t.documentSkippedAutoCount('${skipped.length}')}';
       }
       SnackBarHelper.show(context, message: message);
     } catch (e) {
       if (!mounted) return;
+      final t = AppLocalizations.of(context);
       SnackBarHelper.showError(
         context,
-        message: 'خطا در حذف گروهی: ${ErrorExtractor.forContext(e, context)}',
+        message: t.documentBulkDeleteError(ErrorExtractor.forContext(e, context)),
       );
     }
   }
@@ -642,7 +644,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
       customHeaderActions: [
         if (_selectedCount > 0)
           Tooltip(
-            message: 'حذف انتخاب‌شده‌ها',
+            message: t.deleteSelected,
             child: FilledButton.icon(
               onPressed: _handleBulkDelete,
               style: FilledButton.styleFrom(
@@ -650,7 +652,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
                 foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
               ),
               icon: const Icon(Icons.delete_forever),
-              label: Text('حذف ($_selectedCount)'),
+              label: Text(t.documentDeleteSelectedCount('$_selectedCount')),
             ),
           ),
       ],
@@ -681,7 +683,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
         // شماره سند
         TextColumn(
           'code',
-          'شماره سند',
+          t.documentCode,
           width: ColumnWidth.medium,
           formatter: (item) => item.code,
         ),
@@ -689,7 +691,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
         // نوع سند
         CustomColumn(
           'document_type',
-          'نوع',
+          t.type,
           width: ColumnWidth.medium,
           builder: (item, index) {
             final doc = item as DocumentModel;
@@ -704,7 +706,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
                 ),
               ),
               child: Text(
-                doc.getDocumentTypeName(),
+                doc.getDocumentTypeName(t),
                 style: TextStyle(
                   color: _getDocumentTypeColor(doc.documentType),
                   fontSize: 12,
@@ -718,7 +720,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
         // تاریخ سند
         TextColumn(
           'document_date',
-          'تاریخ',
+          t.documentDate,
           width: ColumnWidth.medium,
           // نمایش تاریخ بر اساس تقویم انتخاب‌شده‌ی کاربر در UI (نه متن برگشتی سرور).
           formatter: (item) =>
@@ -728,7 +730,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
         // سال مالی
         TextColumn(
           'fiscal_year_title',
-          'سال مالی',
+          t.fiscalYear,
           width: ColumnWidth.medium,
           formatter: (item) => item.fiscalYearTitle ?? '-',
         ),
@@ -736,23 +738,23 @@ class _DocumentsPageState extends State<DocumentsPage> {
         // بدهکار
         TextColumn(
           'total_debit',
-          'بدهکار',
+          t.debit,
           width: ColumnWidth.large,
-          formatter: (item) => '${formatWithThousands(item.totalDebit.toInt())} ${item.currencyCode ?? 'ریال'}',
+          formatter: (item) => '${formatWithThousands(item.totalDebit.toInt())} ${item.currencyCode ?? t.documentDefaultCurrency}',
         ),
 
         // بستانکار
         TextColumn(
           'total_credit',
-          'بستانکار',
+          t.credit,
           width: ColumnWidth.large,
-          formatter: (item) => '${formatWithThousands(item.totalCredit.toInt())} ${item.currencyCode ?? 'ریال'}',
+          formatter: (item) => '${formatWithThousands(item.totalCredit.toInt())} ${item.currencyCode ?? t.documentDefaultCurrency}',
         ),
 
         // وضعیت
         CustomColumn(
           'is_proforma',
-          'وضعیت',
+          t.status,
           width: ColumnWidth.small,
           builder: (item, index) {
             final doc = item as DocumentModel;
@@ -765,7 +767,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                doc.statusText,
+                doc.statusText(t),
                 style: TextStyle(
                   color: doc.isProforma ? SemanticColorResolver.warning(context) : SemanticColorResolver.positive(context),
                   fontSize: 11,
@@ -778,7 +780,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
         // توضیحات
         TextColumn(
           'description',
-          'توضیحات',
+          t.description,
           width: ColumnWidth.large,
           formatter: (item) => item.description ?? '-',
         ),
@@ -786,7 +788,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
         // پروژه
         TextColumn(
           'project_name',
-          'پروژه',
+          t.documentProject,
           width: ColumnWidth.medium,
           formatter: (item) => item.projectName ?? '-',
           searchable: true,
@@ -808,26 +810,26 @@ class _DocumentsPageState extends State<DocumentsPage> {
         // عملیات
         ActionColumn(
           'actions',
-          'عملیات',
+          t.actions,
           width: ColumnWidth.medium,
           actions: [
             // مشاهده - برای همه اسناد
             DataTableAction(
               icon: Icons.visibility,
-              label: 'مشاهده',
+              label: t.view,
               onTap: (item) => _showDocumentDetails(item as DocumentModel),
             ),
             // ویرایش - فقط برای manual
             DataTableAction(
               icon: Icons.edit,
-              label: 'ویرایش',
+              label: t.edit,
               onTap: (item) => _editDocument(item as DocumentModel),
               enabled: true,
             ),
             // حذف - فقط برای manual
             DataTableAction(
               icon: Icons.delete,
-              label: 'حذف',
+              label: t.delete,
               onTap: (item) => _deleteDocument(item as DocumentModel),
               isDestructive: true,
             ),
@@ -899,7 +901,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
   /// ویرایش سند
   Future<void> _editDocument(DocumentModel doc) async {
     if (!doc.isEditable) {
-      SnackBarHelper.show(context, message: 'فقط اسناد دستی قابل ویرایش هستند');
+      SnackBarHelper.show(context, message: AppLocalizations.of(context).documentOnlyManualEditable);
       return;
     }
 
@@ -930,7 +932,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
       if (mounted) {
         SnackBarHelper.showError(
           context,
-          message: 'خطا در بارگذاری سند: ${ErrorExtractor.forContext(e, context)}',
+          message: AppLocalizations.of(context).documentLoadError(ErrorExtractor.forContext(e, context)),
         );
       }
     }
@@ -939,19 +941,20 @@ class _DocumentsPageState extends State<DocumentsPage> {
   /// حذف سند
   Future<void> _deleteDocument(DocumentModel doc) async {
     if (!doc.isDeletable) {
-      SnackBarHelper.show(context, message: 'فقط اسناد دستی قابل حذف هستند');
+      SnackBarHelper.show(context, message: AppLocalizations.of(context).documentOnlyManualDeletable);
       return;
     }
 
+    final t = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('تأیید حذف'),
-        content: Text('آیا از حذف سند ${doc.code} اطمینان دارید؟'),
+        title: Text(t.documentConfirmDeleteTitle),
+        content: Text(t.documentConfirmDeleteBody(doc.code)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('انصراف'),
+            child: Text(t.cancel),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -959,7 +962,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
               backgroundColor: SemanticColorResolver.negative(context),
               foregroundColor: Colors.white,
             ),
-            child: const Text('حذف'),
+            child: Text(t.delete),
           ),
         ],
       ),
@@ -969,14 +972,14 @@ class _DocumentsPageState extends State<DocumentsPage> {
       try {
         await _service.deleteDocument(doc.id);
         if (mounted) {
-          SnackBarHelper.show(context, message: 'سند با موفقیت حذف شد');
+          SnackBarHelper.show(context, message: AppLocalizations.of(context).documentDeleted);
           _refreshData();
         }
       } catch (e) {
         if (mounted) {
           SnackBarHelper.showError(
             context,
-            message: 'خطا در حذف سند: ${ErrorExtractor.forContext(e, context)}',
+            message: AppLocalizations.of(context).documentDeleteError(ErrorExtractor.forContext(e, context)),
           );
         }
       }
@@ -985,16 +988,16 @@ class _DocumentsPageState extends State<DocumentsPage> {
 
   /// حذف گروهی اسناد
   Future<void> _handleBulkDelete() async {
+    final t = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('تأیید حذف گروهی'),
-        content: Text(
-            'آیا از حذف $_selectedCount سند انتخاب شده اطمینان دارید؟\n\nتوجه: فقط اسناد دستی حذف خواهند شد.'),
+        title: Text(t.documentConfirmBulkDeleteTitle),
+        content: Text(t.documentConfirmBulkDeleteBody('$_selectedCount')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('انصراف'),
+            child: Text(t.cancel),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -1002,7 +1005,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
               backgroundColor: SemanticColorResolver.negative(context),
               foregroundColor: Colors.white,
             ),
-            child: const Text('حذف'),
+            child: Text(t.delete),
           ),
         ],
       ),
@@ -1025,9 +1028,10 @@ class _DocumentsPageState extends State<DocumentsPage> {
               final deletedCount = result['deleted_count'] as int;
               final skipped = result['skipped_auto_documents'] as List;
 
-              String message = '$deletedCount سند با موفقیت حذف شد';
+              final t = AppLocalizations.of(context);
+              String message = t.documentDeletedCount('$deletedCount');
               if (skipped.isNotEmpty) {
-                message += '\n${skipped.length} سند اتوماتیک نادیده گرفته شد';
+                message += '\n${t.documentSkippedAutoCount('${skipped.length}')}';
               }
 
               SnackBarHelper.show(context, message: message);
@@ -1039,7 +1043,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
         if (mounted) {
           SnackBarHelper.showError(
             context,
-            message: 'خطا در حذف گروهی: ${ErrorExtractor.forContext(e, context)}',
+            message: AppLocalizations.of(context).documentBulkDeleteError(ErrorExtractor.forContext(e, context)),
           );
         }
       }

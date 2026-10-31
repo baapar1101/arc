@@ -473,7 +473,7 @@ msgstr "فاکتور"
 
 # Warranty
 msgid "PLUGIN_NOT_ACTIVE"
-msgstr "پلاگین گارانتی برای این کسب و کار فعال نیست"
+msgstr "افزونه مورد نیاز برای این کسب‌وکار فعال نیست"
 
 msgid "WARRANTY_CODE_NOT_FOUND"
 msgstr "کد گارانتی یافت نشد"
@@ -938,3 +938,359 @@ msgstr "شما عضو این کسب و کار نیستید."
 
 msgid "BUSINESS_USERS_LEAVE_FAILED"
 msgstr "خطا در خروج از کسب و کار."
+
+# Repair shop
+msgid "REPAIR_ORDER_NOT_FOUND"
+msgstr "سفارش تعمیر یافت نشد"
+
+msgid "TECHNICIAN_NOT_FOUND"
+msgstr "تعمیرکار یافت نشد"
+
+msgid "NO_ACTIVE_FISCAL_YEAR"
+msgstr "سال مالی فعالی یافت نشد"
+
+msgid "PERSON_ID_REQUIRED"
+msgstr "شناسه شخص الزامی است"
+
+msgid "PERSON_NOT_FOUND"
+msgstr "شخص یافت نشد"
+
+msgid "CODE_ALREADY_EXISTS"
+msgstr "کد تعمیرکار تکراری است"
+
+msgid "TECHNICIAN_HAS_ACTIVE_ORDERS"
+msgstr "این تعمیرکار سفارش فعال دارد. ابتدا سفارشات را تکمیل کنید."
+
+msgid "CUSTOMER_REQUIRED"
+msgstr "مشتری الزامی است"
+
+msgid "CUSTOMER_NOT_FOUND"
+msgstr "مشتری یافت نشد"
+
+msgid "PRODUCT_NOT_FOUND"
+msgstr "کالا یافت نشد"
+
+msgid "PRODUCT_NAME_REQUIRED"
+msgstr "نام کالا الزامی است"
+
+msgid "BUSINESS_NOT_FOUND"
+msgstr "کسب‌وکار یافت نشد"
+
+msgid "NO_DEFAULT_CURRENCY"
+msgstr "ارز پیش‌فرض برای این کسب‌وکار تنظیم نشده است"
+
+msgid "ORDER_NOT_EDITABLE"
+msgstr "این سفارش در وضعیت فعلی قابل ویرایش نیست"
+
+msgid "ORDER_NOT_DELETABLE"
+msgstr "سفارش تحویل داده شده قابل لغو نیست"
+
+msgid "ORDER_ALREADY_CANCELLED"
+msgstr "این سفارش قبلاً لغو شده است"
+
+msgid "ORDER_HAS_INVOICE"
+msgstr "این سفارش دارای فاکتور است و قابل لغو نیست. ابتدا فاکتور را حذف کنید."
+
+msgid "FILE_REQUIRED"
+msgstr "شناسه فایل الزامی است"
+
+msgid "INVALID_ATTACHMENT_TYPE"
+msgstr "نوع ضمیمه نامعتبر است"
+
+msgid "ATTACHMENT_NOT_FOUND"
+msgstr "ضمیمه یافت نشد"
+
+msgid "INVALID_STATUS"
+msgstr "وضعیت نامعتبر است"
+
+msgid "PARTS_REQUIRED"
+msgstr "حداقل یک قطعه باید اضافه شود"
+
+msgid "INVALID_PART_DATA"
+msgstr "اطلاعات قطعه نامعتبر است"
+
+msgid "WAREHOUSE_REQUIRED"
+msgstr "برای قطعه با کنترل موجودی، انتخاب انبار الزامی است"
+
+msgid "INSUFFICIENT_STOCK"
+msgstr "موجودی کافی نیست"
+
+msgid "PART_NOT_FOUND"
+msgstr "قطعه یافت نشد"
+
+msgid "INVALID_STATUS_FOR_COMPLETE"
+msgstr "سفارش تحویل‌شده یا لغوشده قابل تکمیل نیست"
+
+msgid "CANNOT_COMPLETE_REPAIR"
+msgstr "امکان تکمیل تعمیر وجود ندارد"
+
+msgid "INVALID_STATUS_FOR_DELIVERY"
+msgstr "سفارش در این وضعیت قابل تحویل نیست"
+
+msgid "INVOICE_CREATION_FAILED"
+msgstr "خطا در ایجاد فاکتور تعمیر"
+
+msgid "INVOICE_ALREADY_EXISTS"
+msgstr "فاکتور قبلاً برای این سفارش ایجاد شده است"
+
+msgid "INVALID_STATUS_FOR_INVOICE"
+msgstr "سفارش در این وضعیت قابل صدور فاکتور نیست. ابتدا تعمیر را تکمیل کنید."
+
+msgid "NO_INVOICE_LINES"
+msgstr "برای صدور فاکتور باید دستمزد یا حداقل یک قطعه ثبت شده باشد."
+
+msgid "NO_INVOICE_FOUND"
+msgstr "ابتدا باید فاکتور تعمیر ایجاد شود"
+
+msgid "ACCOUNT_REQUIRED"
+msgstr "حساب صندوق/بانک الزامی است"
+
+msgid "RECEIPT_CREATION_FAILED"
+msgstr "خطا در ایجاد سند دریافت"
+
+msgid "INVALID_PARAMETERS"
+msgstr "پارامترهای لازم یافت نشد"
+
+msgid "INVALID_DATE"
+msgstr "تاریخ نامعتبر است"
+
+msgid "TECHNICIAN_DEACTIVATED"
+msgstr "تعمیرکار با موفقیت غیرفعال شد"
+
+msgid "REPAIR_ORDER_CANCELLED"
+msgstr "سفارش تعمیر با موفقیت لغو شد"
+
+msgid "REPAIR_INVOICE_CREATED"
+msgstr "فاکتور تعمیر با موفقیت ثبت شد و اسناد حسابداری ایجاد گردید."
+
+msgid "PLUGIN_NOT_FOUND"
+msgstr "افزونه در سیستم یافت نشد"
+
+msgid "PLUGIN_NOT_PURCHASED"
+msgstr "افزونه خریداری نشده است"
+
+msgid "PLUGIN_ACTIVE"
+msgstr "افزونه فعال است"
+
+msgid "PLUGIN_EXPIRED"
+msgstr "افزونه منقضی شده است"
+
+
+msgid "PBX_NOT_FOUND"
+msgstr "مرکز تلفن یافت نشد"
+
+msgid "CALL_NOT_FOUND"
+msgstr "تماس یافت نشد"
+
+msgid "EXTENSION_NOT_FOUND"
+msgstr "داخلی یافت نشد"
+
+msgid "EXTENSION_MAPPING_NOT_FOUND"
+msgstr "نگاشت داخلی یافت نشد"
+
+msgid "COMMAND_NOT_FOUND"
+msgstr "دستور یافت نشد"
+
+msgid "TELEPHONY_USER_NOT_FOUND"
+msgstr "کاربر یافت نشد"
+
+msgid "DLQ_NOT_FOUND"
+msgstr "DLQ یافت نشد"
+
+msgid "SOFTPHONE_SESSION_NOT_FOUND"
+msgstr "سشن Softphone یافت نشد"
+
+msgid "RECORDING_NOT_FOUND"
+msgstr "ضبط تماس یافت نشد"
+
+msgid "PBX_NAME_REQUIRED"
+msgstr "نام مرکز تلفن الزامی است"
+
+msgid "PBX_ID_REQUIRED"
+msgstr "شناسه مرکز تلفن الزامی است"
+
+msgid "PBX_AND_EXTENSION_REQUIRED"
+msgstr "مرکز تلفن و داخلی الزامی است"
+
+msgid "USER_AND_EXTENSION_REQUIRED"
+msgstr "کاربر و داخلی الزامی است"
+
+msgid "INVALID_ENDPOINT_MODE"
+msgstr "حالت endpoint نامعتبر است"
+
+msgid "INVALID_ENDPOINT_MODE_VALUES"
+msgstr "حالت endpoint باید relay، direct یا desk باشد"
+
+msgid "DESTINATION_REQUIRED"
+msgstr "شماره مقصد الزامی است"
+
+msgid "INVALID_DESTINATION"
+msgstr "شماره مقصد نامعتبر است"
+
+msgid "EVENT_TYPE_REQUIRED"
+msgstr "نوع رویداد الزامی است"
+
+msgid "BUSINESS_AND_PBX_REQUIRED"
+msgstr "کسب‌وکار و مرکز تلفن الزامی است"
+
+msgid "INVALID_COMMAND_TYPE"
+msgstr "نوع دستور نامعتبر است"
+
+msgid "INVALID_RECORDING_ACCESS_MODE"
+msgstr "حالت دسترسی به ضبط نامعتبر است"
+
+msgid "INVALID_DTMF"
+msgstr "رقم DTMF نامعتبر است"
+
+msgid "SESSION_AND_DESTINATION_REQUIRED"
+msgstr "سشن و مقصد الزامی است"
+
+msgid "USER_NOT_ACTIVE_MEMBER"
+msgstr "کاربر عضو فعال این کسب‌وکار نیست"
+
+msgid "EXTENSION_OUT_OF_SCOPE"
+msgstr "داخلی در محدوده شما نیست"
+
+msgid "EXTENSION_IN_USE"
+msgstr "این داخلی به کاربر دیگری واگذار شده است. برای اشتراک، allow_shared را روی داخلی روشن کنید"
+
+msgid "MULTI_PBX_DISABLED"
+msgstr "چند مرکز تلفن برای این کسب‌وکار فعال نیست. ابتدا چند مرکز تلفن را در تنظیمات روشن کنید"
+
+msgid "NO_EXTENSION"
+msgstr "برای شما داخلی تعریف نشده است"
+
+msgid "PBX_OFFLINE"
+msgstr "مرکز تلفن در دسترس نیست"
+
+msgid "NO_LEAD_FUNNEL"
+msgstr "فانل سرنخ برای این کسب‌وکار تعریف نشده است"
+
+msgid "NO_LEAD_STAGE"
+msgstr "مرحله سرنخ یافت نشد"
+
+msgid "SOFTPHONE_NO_EXTENSION"
+msgstr "برای Softphone باید داخلی به کاربر نگاشت شده باشد"
+
+msgid "SOFTPHONE_DESK_MODE"
+msgstr "حالت این کاربر desk است؛ از Click-to-Call استفاده کنید یا حالت را به relay/direct تغییر دهید"
+
+msgid "SOFTPHONE_RELAY_DISABLED"
+msgstr "حالت رله روی این PBX غیرفعال است"
+
+msgid "SOFTPHONE_DIRECT_DISABLED"
+msgstr "حالت مستقیم روی این PBX غیرفعال است"
+
+msgid "SOFTPHONE_TUNNEL_OFFLINE"
+msgstr "تونل رسانه Connector قطع است. روی سرور تلفن Connector را به‌روز و سرویس را ری‌استارت کنید"
+
+msgid "SOFTPHONE_CAPACITY"
+msgstr "سقف سشن همزمان Softphone پر است"
+
+msgid "SOFTPHONE_SESSION_ENDED"
+msgstr "سشن Softphone پایان یافته است"
+
+msgid "SOFTPHONE_NO_SESSION"
+msgstr "سشن Softphone فعال نیست"
+
+msgid "SOFTPHONE_MODE"
+msgstr "خروجی relay فقط در حالت relay مجاز است"
+
+msgid "SOFTPHONE_SESSION_STATE"
+msgstr "سشن برای تماس آماده نیست. ابتدا Softphone را آنلاین کنید تا WebSocket وصل شود"
+
+msgid "SOFTPHONE_WS_REQUIRED"
+msgstr "کانال Softphone روی Media Edge ثبت نشده است. صفحه را رفرش کنید و دوباره آنلاین شوید"
+
+msgid "SOFTPHONE_INVALID_SESSION"
+msgstr "سشن نامعتبر است"
+
+msgid "SOFTPHONE_SESSION_EXPIRED"
+msgstr "سشن منقضی شده است"
+
+msgid "SOFTPHONE_INVALID_TICKET"
+msgstr "بلیت رسانه نامعتبر است"
+
+msgid "SOFTPHONE_MEDIA_EDGE_REQUIRED"
+msgstr "درخواست Softphone باید به Media Edge برسد. مسیر nginx برای /softphone و /ws/telephony را بررسی کنید"
+
+msgid "SOFTPHONE_FORBIDDEN"
+msgstr "دسترسی Softphone ندارید"
+
+msgid "RECORDING_LISTEN_FORBIDDEN"
+msgstr "مجوز گوش دادن به ضبط مکالمه را ندارید"
+
+msgid "TELEPHONY_INTERNAL_ONLY"
+msgstr "فقط دسترسی داخلی"
+
+msgid "TELEPHONY_PERMISSION_DENIED"
+msgstr "مجوز تلفن برای این عملیات را ندارید"
+
+msgid "CONNECTOR_AUTH_FAILED"
+msgstr "احراز هویت Connector ناموفق بود"
+
+msgid "INVALID_CONNECTOR_TOKEN"
+msgstr "توکن Connector نامعتبر است"
+
+msgid "MISSING_AUTHORIZATION"
+msgstr "هدر Authorization موجود نیست"
+
+msgid "INVALID_AUTHORIZATION"
+msgstr "هدر Authorization نامعتبر است"
+
+msgid "RATE_LIMITED"
+msgstr "محدودیت نرخ رویداد Connector رد شد"
+
+msgid "EVENT_PROCESSING_FAILED"
+msgstr "پردازش رویداد ناموفق بود"
+
+msgid "TELEPHONY_PLUGIN_NOT_ACTIVE"
+msgstr "افزونه اتصال استریسک/ایزابل برای این کسب‌وکار فعال نیست"
+
+msgid "INVALID_BUSINESS_ID"
+msgstr "شناسه کسب‌وکار نامعتبر است"
+
+msgid "CANNOT_DELETE_AUTO_DOCUMENT"
+msgstr "اسناد اتوماتیک قابل حذف نیستند. از منبع اصلی حذف کنید."
+
+msgid "CANNOT_EDIT_AUTO_DOCUMENT"
+msgstr "اسناد اتوماتیک قابل ویرایش نیستند. از منبع اصلی ویرایش کنید."
+
+msgid "DELETE_FAILED"
+msgstr "حذف سند ناموفق بود"
+
+msgid "PROJECT_NOT_FOUND"
+msgstr "پروژه یافت نشد یا غیرفعال است"
+
+msgid "FIXED_ASSET_DOCUMENT_DELETE_SOURCE_ONLY"
+msgstr "اسناد دارایی ثابت فقط از بخش کنترل اموال قابل حذف هستند"
+
+msgid "FIXED_ASSET_DOCUMENT_EDIT_SOURCE_ONLY"
+msgstr "اسناد دارایی ثابت فقط از بخش کنترل اموال قابل ویرایش هستند"
+
+msgid "LOAN_DOCUMENT_DELETE_SOURCE_ONLY"
+msgstr "اسناد تسهیلات فقط از بخش تسهیلات و اقساط قابل حذف هستند"
+
+msgid "LOAN_DOCUMENT_EDIT_SOURCE_ONLY"
+msgstr "اسناد تسهیلات فقط از بخش تسهیلات و اقساط قابل ویرایش هستند"
+
+msgid "LOAN_DOCUMENT_FISCAL_YEAR_LOCKED"
+msgstr "سند تسهیلات متعلق به سال مالی جاری نیست و قابل حذف یا ویرایش نمی‌باشد"
+
+msgid "OPENPYXL_NOT_INSTALLED"
+msgstr "کتابخانه openpyxl نصب نشده است"
+
+msgid "EXCEL_GENERATION_FAILED"
+msgstr "تولید فایل اکسل ناموفق بود"
+
+msgid "DOCUMENT_PDF_NOT_IMPLEMENTED"
+msgstr "خروجی PDF هنوز پیاده‌سازی نشده است"
+
+msgid "CREATE_DOCUMENT_FAILED"
+msgstr "ایجاد سند ناموفق بود"
+
+msgid "UPDATE_FAILED"
+msgstr "به‌روزرسانی سند ناموفق بود"
+
+msgid "UPDATE_DOCUMENT_FAILED"
+msgstr "به‌روزرسانی سند ناموفق بود"

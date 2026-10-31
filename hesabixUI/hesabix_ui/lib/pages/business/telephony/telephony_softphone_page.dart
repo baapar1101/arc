@@ -8,6 +8,8 @@ import '../../../services/telephony/softphone_engine.dart';
 import '../../../services/telephony/telephony_session_controller.dart';
 import '../../../widgets/telephony/telephony_dialer_sheet.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../../services/telephony/telephony_l10n.dart';
 
 /// Softphone سازمانی — حالت Relay از طریق Connector (بدون expose کردن PBX).
 class TelephonySoftphonePage extends StatefulWidget {
@@ -54,24 +56,7 @@ class _TelephonySoftphonePageState extends State<TelephonySoftphonePage> {
   }
 
   String _stateLabel(SoftphoneConnectionState s) {
-    switch (s) {
-      case SoftphoneConnectionState.idle:
-        return 'آفلاین';
-      case SoftphoneConnectionState.connecting:
-        return 'در حال اتصال…';
-      case SoftphoneConnectionState.registered:
-        return 'آماده پاسخگویی';
-      case SoftphoneConnectionState.ringing:
-        return 'زنگ';
-      case SoftphoneConnectionState.inCall:
-        return 'در حال مکالمه';
-      case SoftphoneConnectionState.reconnecting:
-        return 'اتصال مجدد…';
-      case SoftphoneConnectionState.error:
-        return 'خطا';
-      case SoftphoneConnectionState.ended:
-        return 'پایان سشن';
-    }
+    return telephonyConnectionStateLabel(AppLocalizations.of(context), s);
   }
 
   Color _stateColor(ColorScheme scheme, SoftphoneConnectionState s) {
@@ -113,6 +98,7 @@ class _TelephonySoftphonePageState extends State<TelephonySoftphonePage> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     final health = _engine.health;
     final tunnelOk = health?['tunnel'] is Map && (health!['tunnel'] as Map)['online'] == true;
@@ -145,7 +131,7 @@ class _TelephonySoftphonePageState extends State<TelephonySoftphonePage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          BrandConfig.rebrand('Softphone حسابیکس'),
+                          t.branded(t.telephonySoftphoneBranded),
                           style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
                         ),
                         const SizedBox(height: 4),
@@ -167,8 +153,7 @@ class _TelephonySoftphonePageState extends State<TelephonySoftphonePage> {
               ),
               const SizedBox(height: 16),
               Text(
-                'رسانه از طریق افزونه Connector (Relay) منتقل می‌شود؛ نیازی به باز کردن پورت PBX به اینترنت نیست. '
-                'میکروفون و پخش روی همین صفحه فعال می‌شود.',
+                t.telephonySoftphoneHelp,
                 style: TextStyle(color: scheme.onSurfaceVariant, height: 1.55),
               ),
               const SizedBox(height: 18),
@@ -176,11 +161,11 @@ class _TelephonySoftphonePageState extends State<TelephonySoftphonePage> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _chip(scheme, 'داخلی', extension.isEmpty ? '—' : extension),
-                  _chip(scheme, 'حالت', endpointMode.isEmpty ? '—' : endpointMode),
-                  _chip(scheme, 'تونل رسانه', tunnelOk ? 'آنلاین' : 'قطع'),
-                  _chip(scheme, 'پل صوت', _engine.bridgeActive ? 'فعال' : 'غیرفعال'),
-                  _chip(scheme, 'صوت محلی', _engine.mediaReady ? 'آماده' : 'خاموش'),
+                  _chip(scheme, t.telephonyExtension, extension.isEmpty ? '—' : extension),
+                  _chip(scheme, t.telephonyMode, endpointMode.isEmpty ? '—' : endpointMode),
+                  _chip(scheme, t.telephonyMediaTunnel, tunnelOk ? t.telephonyOnline : t.telephonyDisconnected),
+                  _chip(scheme, t.telephonyAudioBridge, _engine.bridgeActive ? t.active : t.telephonyInactive),
+                  _chip(scheme, t.telephonyLocalAudio, _engine.mediaReady ? t.telephonyReady : t.telephonyOff),
                 ],
               ),
               if (_engine.error != null) ...[
@@ -204,8 +189,8 @@ class _TelephonySoftphonePageState extends State<TelephonySoftphonePage> {
                 ),
                 label: Text(
                   _engine.isReady || _engine.state == SoftphoneConnectionState.connecting
-                      ? 'قطع Softphone'
-                      : 'آنلاین شدن (Relay)',
+                      ? t.telephonyDisconnectSoftphone
+                      : t.telephonyGoOnlineRelay,
                 ),
               ),
               const SizedBox(height: 12),
@@ -215,10 +200,10 @@ class _TelephonySoftphonePageState extends State<TelephonySoftphonePage> {
                     child: TextField(
                       controller: _destCtrl,
                       keyboardType: TextInputType.phone,
-                      decoration: const InputDecoration(
-                        labelText: 'شماره مقصد',
+                      decoration: InputDecoration(
+                        labelText: t.telephonyDestinationNumber,
                         hintText: '09xxxxxxxxx',
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
                       ),
                       onSubmitted: (_) => _dial(),
                     ),
@@ -227,7 +212,7 @@ class _TelephonySoftphonePageState extends State<TelephonySoftphonePage> {
                   FilledButton.tonalIcon(
                     onPressed: _engine.isReady ? _dial : null,
                     icon: const Icon(Icons.call_rounded),
-                    label: const Text('تماس'),
+                    label: Text(t.telephonyCallAction),
                   ),
                 ],
               ),
@@ -246,18 +231,18 @@ class _TelephonySoftphonePageState extends State<TelephonySoftphonePage> {
                           await _engine.answer(id);
                         },
                         icon: const Icon(Icons.call_rounded),
-                        label: const Text('پاسخ'),
+                        label: Text(t.telephonyAnswerAction),
                       ),
                     FilledButton.tonalIcon(
                       onPressed: () => _engine.setMuted(!_engine.muted),
                       icon: Icon(_engine.muted ? Icons.mic_off_rounded : Icons.mic_rounded),
-                      label: Text(_engine.muted ? 'بی‌صدا' : 'میکروفون'),
+                      label: Text(_engine.muted ? t.telephonyMute : t.telephonyMicrophone),
                     ),
                     FilledButton.icon(
                       style: FilledButton.styleFrom(backgroundColor: scheme.error),
                       onPressed: () => _engine.hangup(),
                       icon: const Icon(Icons.call_end_rounded),
-                      label: const Text('قطع'),
+                      label: Text(t.telephonyHangup),
                     ),
                   ],
                 ),
@@ -274,7 +259,7 @@ class _TelephonySoftphonePageState extends State<TelephonySoftphonePage> {
               ],
               const SizedBox(height: 18),
               Text(
-                'فریم رسانه: ورود ${_engine.incomingPcmFrames} / خروج ${_engine.outgoingPcmFrames}',
+                t.telephonyMediaFrames('${_engine.incomingPcmFrames}', '${_engine.outgoingPcmFrames}'),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
               ),
               const SizedBox(height: 18),
@@ -289,19 +274,19 @@ class _TelephonySoftphonePageState extends State<TelephonySoftphonePage> {
                   );
                 },
                 icon: const Icon(Icons.dialpad_rounded),
-                label: const Text('شماره‌گیر Click-to-Call (حالت Desk)'),
+                label: Text(t.telephonyDeskDialer),
               ),
               const SizedBox(height: 8),
               TextButton.icon(
                 onPressed: () =>
                     context.go(context.businessPanelUrl(widget.businessId, 'settings/telephony')),
                 icon: const Icon(Icons.settings_outlined),
-                label: const Text('تنظیم حالت داخلی / Softphone'),
+                label: Text(t.telephonyConfigureExtSoftphone),
               ),
               TextButton.icon(
                 onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony')),
                 icon: const Icon(Icons.phone_in_talk_outlined),
-                label: const Text('بازگشت به مرکز تماس'),
+                label: Text(t.telephonyBackToHub),
               ),
             ],
           ),

@@ -51,9 +51,9 @@ def is_business_member(db: Session, business_id: int, user_id: int) -> bool:
 def require_business_member(db: Session, business_id: int, user_id: int) -> User:
 	user = db.get(User, user_id)
 	if not user:
-		raise ApiError("NOT_FOUND", "کاربر یافت نشد.", http_status=404)
+		raise ApiError("TELEPHONY_USER_NOT_FOUND", "TELEPHONY_USER_NOT_FOUND", http_status=404)
 	if not is_business_member(db, business_id, user_id):
-		raise ApiError("VALIDATION_ERROR", "کاربر عضو فعال این کسب‌وکار نیست.", http_status=400)
+		raise ApiError("USER_NOT_ACTIVE_MEMBER", "USER_NOT_ACTIVE_MEMBER", http_status=400)
 	return user
 
 
@@ -183,10 +183,10 @@ def require_call_in_scope(
 		.first()
 	)
 	if not call:
-		raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
+		raise ApiError("CALL_NOT_FOUND", "CALL_NOT_FOUND", http_status=404)
 	resolved = scope or resolve_scope(db, auth_ctx, business_id)
 	if not resolved.allows_call(call):
-		raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
+		raise ApiError("CALL_NOT_FOUND", "CALL_NOT_FOUND", http_status=404)
 	return call
 
 

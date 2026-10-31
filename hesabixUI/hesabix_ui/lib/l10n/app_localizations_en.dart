@@ -12988,7 +12988,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fixedAssetsAcquisitionKind => 'Acquisition type';
 
   @override
-  String get fixedAssetsKindPurchase => 'Standalone purchase (no vendor invoice)';
+  String get fixedAssetsKindPurchase =>
+      'Standalone purchase (no vendor invoice)';
 
   @override
   String get invoiceLineFixedAsset => 'Fixed asset / PPE';
@@ -13212,7 +13213,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'These values default to Iranian Standard 11 and tax article 149. Change them here if the law or your accounting policy changes; posted journals are not rewritten.';
 
   @override
-  String get fixedAssetsTaxIdleMonths => 'Idle months before tax depreciation reduction';
+  String get fixedAssetsTaxIdleMonths =>
+      'Idle months before tax depreciation reduction';
 
   @override
   String get fixedAssetsTaxIdleReduction =>
@@ -13236,7 +13238,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fixedAssetsPlaquePrefix => 'Asset code prefix';
 
   @override
-  String get fixedAssetsRequireCustodian => 'Require a custodian before capitalization';
+  String get fixedAssetsRequireCustodian =>
+      'Require a custodian before capitalization';
 
   @override
   String get fixedAssetsOpenFullSettings => 'Open full plugin settings';
@@ -13346,7 +13349,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Standard 11 rollforward: opening, acquisitions, major repairs, depreciation, disposals, and closing by class.';
 
   @override
-  String get fixedAssetsReportClassSummarySubtitle => 'PPE movement note by class';
+  String get fixedAssetsReportClassSummarySubtitle =>
+      'PPE movement note by class';
 
   @override
   String get fixedAssetsReportDepreciation => 'Period depreciation';
@@ -13389,7 +13393,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Idle assets. Accounting depreciation continues; the tax factor falls only after the settings threshold.';
 
   @override
-  String get fixedAssetsReportIdleSubtitle => 'Idle status and tax depreciation factor';
+  String get fixedAssetsReportIdleSubtitle =>
+      'Idle status and tax depreciation factor';
 
   @override
   String get fixedAssetsReportLocations => 'Location and custodian';
@@ -13410,7 +13415,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Period repairs (expense) and major repairs (added to cost) in the selected range.';
 
   @override
-  String get fixedAssetsReportExpendituresSubtitle => 'Routine and major repairs';
+  String get fixedAssetsReportExpendituresSubtitle =>
+      'Routine and major repairs';
 
   @override
   String get fixedAssetsReportLiveCount => 'In use';
@@ -19438,13 +19444,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get barcodeLabelQtyFromPurchase => 'Qty from purchase';
 
   @override
-  String get barcodeLabelQtyNoneAvailable => 'No row has a quantity for this source.';
+  String get barcodeLabelQtyNoneAvailable =>
+      'No row has a quantity for this source.';
 
   @override
   String get barcodeLabelPrintFromInvoice => 'Print barcodes';
 
   @override
-  String get barcodeLabelPrintFromInvoiceEmpty => 'Add at least one product line first.';
+  String get barcodeLabelPrintFromInvoiceEmpty =>
+      'Add at least one product line first.';
 
   @override
   String get barcodeLabelPrintItems => 'Print items';
@@ -21442,4 +21450,1853 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get distributionWorkspaceOffice => 'Distribution — office';
+
+  @override
+  String get repairShopMenu => 'Repair shop';
+
+  @override
+  String get repairShopTitle => 'Repair shop';
+
+  @override
+  String get repairShopNewOrder => 'New order';
+
+  @override
+  String get repairShopEmptyOrders => 'No repair orders yet';
+
+  @override
+  String get repairShopEmptyOrdersHint =>
+      'Use the button below to register the first repair order';
+
+  @override
+  String get repairShopCreateFirstOrder => 'Create repair order';
+
+  @override
+  String get repairShopSearchHint =>
+      'Search (code, customer, phone, product)...';
+
+  @override
+  String get repairShopDateFilter => 'Received date filter';
+
+  @override
+  String get repairShopDateFrom => 'From date';
+
+  @override
+  String get repairShopDateTo => 'To date';
+
+  @override
+  String repairShopDateRange(String from, String to) {
+    return 'From $from to $to';
+  }
+
+  @override
+  String get repairShopStatusFilter => 'Status filter';
+
+  @override
+  String repairShopTotalCount(int count) {
+    return 'Total: $count';
+  }
+
+  @override
+  String repairShopReceivedOn(String date) {
+    return 'Received: $date';
+  }
+
+  @override
+  String repairShopLoadOrdersError(String error) {
+    return 'Could not load orders: $error';
+  }
+
+  @override
+  String repairShopLoadOrderError(String error) {
+    return 'Could not load the order: $error';
+  }
+
+  @override
+  String repairShopLoadSettingsError(String error) {
+    return 'Could not load settings: $error';
+  }
+
+  @override
+  String repairShopLoadTechniciansError(String error) {
+    return 'Could not load technicians: $error';
+  }
+
+  @override
+  String repairShopSaveOrderError(String error) {
+    return 'Could not save the order: $error';
+  }
+
+  @override
+  String repairShopSaveSettingsError(String error) {
+    return 'Could not save settings: $error';
+  }
+
+  @override
+  String repairShopErrorWithDetails(String error) {
+    return 'Error: $error';
+  }
+
+  @override
+  String get repairShopStatusReceived => 'Received';
+
+  @override
+  String get repairShopStatusAssigned => 'Assigned';
+
+  @override
+  String get repairShopStatusInProgress => 'In repair';
+
+  @override
+  String get repairShopStatusWaitingParts => 'Waiting for parts';
+
+  @override
+  String get repairShopStatusTesting => 'Testing';
+
+  @override
+  String get repairShopStatusCompletedFixed => 'Repaired';
+
+  @override
+  String get repairShopStatusCompletedUnfixable => 'Unrepairable';
+
+  @override
+  String get repairShopStatusReadyForPickup => 'Ready for pickup';
+
+  @override
+  String get repairShopStatusDelivered => 'Delivered';
+
+  @override
+  String get repairShopStatusCancelled => 'Cancelled';
+
+  @override
+  String get repairShopNewOrderTitle => 'New repair order';
+
+  @override
+  String get repairShopEditOrderTitle => 'Edit order';
+
+  @override
+  String get repairShopCustomer => 'Customer';
+
+  @override
+  String get repairShopCustomerHint => 'Search and select a customer';
+
+  @override
+  String get repairShopCustomerSearchHint =>
+      'Search by name, phone, or email...';
+
+  @override
+  String get repairShopCustomerSubtitle => 'Order customer';
+
+  @override
+  String get repairShopSelectCustomer => 'Please select a customer';
+
+  @override
+  String get repairShopCatalogProduct => 'Catalog item (optional)';
+
+  @override
+  String get repairShopCatalogProductHint => 'Search products';
+
+  @override
+  String get repairShopProductName => 'Item / device name';
+
+  @override
+  String get repairShopProductNameHint =>
+      'If the item is not in the catalog, type the name';
+
+  @override
+  String get repairShopProductNameRequired => 'Item name is required';
+
+  @override
+  String get repairShopWarrantyCodeId => 'Warranty code ID (optional)';
+
+  @override
+  String get repairShopWarrantyCodeHelper =>
+      'If the device is under warranty, enter the warranty code ID';
+
+  @override
+  String get repairShopSerialOptional => 'Serial number (optional)';
+
+  @override
+  String get repairShopProblemDescription => 'Problem description';
+
+  @override
+  String get repairShopProblemRequired => 'Problem description is required';
+
+  @override
+  String get repairShopCustomerNotesOptional => 'Customer notes (optional)';
+
+  @override
+  String get repairShopTechnicianNotesOptional => 'Technician notes (optional)';
+
+  @override
+  String get repairShopEstimatedCostOptional => 'Estimated cost (optional)';
+
+  @override
+  String get repairShopEstimatedCostHelper =>
+      'In the business default currency';
+
+  @override
+  String get repairShopEstimatedDeliveryOptional =>
+      'Estimated delivery date (optional)';
+
+  @override
+  String get repairShopSaveChanges => 'Save changes';
+
+  @override
+  String get repairShopSubmitOrder => 'Submit order';
+
+  @override
+  String get repairShopOrderCreated => 'Repair order registered successfully';
+
+  @override
+  String get repairShopOrderUpdated => 'Order updated successfully';
+
+  @override
+  String get repairShopSelectNewStatus => 'Select new status';
+
+  @override
+  String get repairShopCancelOrder => 'Cancel order';
+
+  @override
+  String get repairShopCancelOrderConfirm =>
+      'Are you sure you want to cancel this order?';
+
+  @override
+  String get repairShopCancelYes => 'Yes, cancel';
+
+  @override
+  String get repairShopOrderCancelled => 'Order cancelled';
+
+  @override
+  String get repairShopNeedActiveTechnician =>
+      'Define an active technician first';
+
+  @override
+  String get repairShopTechnicianAssigned => 'Technician assigned';
+
+  @override
+  String repairShopChangeStatusTo(String status) {
+    return 'Change status to $status';
+  }
+
+  @override
+  String get repairShopStatusChanged => 'Status updated';
+
+  @override
+  String get repairShopCompleteFixedTitle => 'Complete as repaired';
+
+  @override
+  String get repairShopCompleteUnfixableTitle => 'Unrepairable';
+
+  @override
+  String get repairShopNotesHint => 'Notes...';
+
+  @override
+  String get repairShopRepairCompleted => 'Repair completed';
+
+  @override
+  String get repairShopDeliverToCustomer => 'Deliver item to customer';
+
+  @override
+  String get repairShopDeliveryNotesHint => 'Delivery note (optional)';
+
+  @override
+  String get repairShopItemDelivered => 'Item delivered';
+
+  @override
+  String get repairShopInvoiceRequiresCost =>
+      'Register labor or a part before issuing an invoice';
+
+  @override
+  String get repairShopIssueInvoice => 'Issue invoice';
+
+  @override
+  String repairShopIssueInvoiceConfirm(String amount) {
+    return 'A sales invoice for $amount will be issued. Continue?';
+  }
+
+  @override
+  String get repairShopIssueInvoiceYes => 'Yes, issue invoice';
+
+  @override
+  String get repairShopInvoiceIssued => 'Invoice issued successfully';
+
+  @override
+  String repairShopInvoiceIssuedWithCode(String code) {
+    return 'Invoice $code issued';
+  }
+
+  @override
+  String get repairShopPartAdded => 'Part added';
+
+  @override
+  String get repairShopDeletePart => 'Delete part';
+
+  @override
+  String repairShopDeletePartConfirm(String name) {
+    return 'Delete part “$name”?';
+  }
+
+  @override
+  String get repairShopPartDeleted => 'Part deleted';
+
+  @override
+  String get repairShopLaborSaved => 'Labor saved';
+
+  @override
+  String get repairShopAttachmentType => 'Attachment type';
+
+  @override
+  String get repairShopAttachmentBefore => 'Before repair';
+
+  @override
+  String get repairShopAttachmentDuring => 'During repair';
+
+  @override
+  String get repairShopAttachmentAfter => 'After repair';
+
+  @override
+  String get repairShopFileIdMissing => 'File ID was not returned after upload';
+
+  @override
+  String get repairShopAttachmentAdded => 'Attachment added';
+
+  @override
+  String get repairShopDeleteAttachment => 'Delete attachment';
+
+  @override
+  String repairShopDeleteAttachmentConfirm(String name) {
+    return 'Delete “$name”?';
+  }
+
+  @override
+  String get repairShopOrderDetails => 'Order details';
+
+  @override
+  String get repairShopEditOrder => 'Edit order';
+
+  @override
+  String get repairShopChangeStatus => 'Change status';
+
+  @override
+  String get repairShopOrderNotFound => 'Order not found';
+
+  @override
+  String repairShopInvoiceWithCode(String code) {
+    return 'Invoice $code';
+  }
+
+  @override
+  String get repairShopInvoiceIssuedLabel => 'Invoice issued';
+
+  @override
+  String get repairShopCustomerInfo => 'Customer details';
+
+  @override
+  String get repairShopName => 'Name';
+
+  @override
+  String get repairShopProductInfo => 'Item details';
+
+  @override
+  String get repairShopProductNameLabel => 'Item name';
+
+  @override
+  String get repairShopSerial => 'Serial';
+
+  @override
+  String get repairShopWarrantyCode => 'Warranty code';
+
+  @override
+  String get repairShopProblemSection => 'Problem description';
+
+  @override
+  String get repairShopCustomerNotesLabel => 'Customer notes:';
+
+  @override
+  String get repairShopTechnicianNotesLabel => 'Technician notes:';
+
+  @override
+  String get repairShopTechnician => 'Technician';
+
+  @override
+  String get repairShopNoTechnicianAssigned => 'No technician assigned yet';
+
+  @override
+  String get repairShopCosts => 'Costs';
+
+  @override
+  String get repairShopLabor => 'Labor';
+
+  @override
+  String get repairShopParts => 'Parts';
+
+  @override
+  String get repairShopTechnicianCommission => 'Technician commission';
+
+  @override
+  String get repairShopGrandTotal => 'Total';
+
+  @override
+  String get repairShopAttachments => 'Attachments';
+
+  @override
+  String get repairShopNoAttachments => 'No attachments yet';
+
+  @override
+  String get repairShopAddPhotoOrFile => 'Add photo or file';
+
+  @override
+  String get repairShopUsedParts => 'Parts used';
+
+  @override
+  String get repairShopNoParts => 'No parts recorded';
+
+  @override
+  String repairShopPartQtyPrice(String qty, String price) {
+    return 'Qty: $qty × $price';
+  }
+
+  @override
+  String get repairShopStatusHistory => 'Status history';
+
+  @override
+  String get repairShopDates => 'Dates';
+
+  @override
+  String get repairShopReceived => 'Received';
+
+  @override
+  String get repairShopEstimatedDelivery => 'Estimated delivery';
+
+  @override
+  String get repairShopCompletedAt => 'Repair completed';
+
+  @override
+  String get repairShopDeliveredAt => 'Delivered';
+
+  @override
+  String get repairShopAssignTechnician => 'Assign technician';
+
+  @override
+  String get repairShopChangeTechnician => 'Change technician';
+
+  @override
+  String get repairShopStartRepair => 'Start repair';
+
+  @override
+  String get repairShopAddPart => 'Add part';
+
+  @override
+  String get repairShopSetLabor => 'Set labor';
+
+  @override
+  String get repairShopWaitingPart => 'Waiting for part';
+
+  @override
+  String get repairShopTest => 'Test';
+
+  @override
+  String get repairShopContinueRepair => 'Continue repair';
+
+  @override
+  String get repairShopReadyForPickupAction => 'Ready for pickup';
+
+  @override
+  String get repairShopDeliverToCustomerAction => 'Deliver to customer';
+
+  @override
+  String get repairShopOptionalNoteHint => 'Note (optional)';
+
+  @override
+  String get repairShopSelectTechnician => 'Select technician';
+
+  @override
+  String get repairShopSearchNameOrCode => 'Search name or code...';
+
+  @override
+  String get repairShopNoTechnicianFound => 'No technician found';
+
+  @override
+  String get repairShopLaborTitle => 'Repair labor';
+
+  @override
+  String get repairShopLaborAmount => 'Labor amount';
+
+  @override
+  String get repairShopEnterValidAmount => 'Enter a valid amount';
+
+  @override
+  String get repairShopRegister => 'Save';
+
+  @override
+  String get repairShopAddPartTitle => 'Add part';
+
+  @override
+  String get repairShopPart => 'Part';
+
+  @override
+  String get repairShopSearchSelectPart => 'Search and select a part';
+
+  @override
+  String get repairShopUnitPrice => 'Unit price';
+
+  @override
+  String get repairShopSelectPart => 'Select a part';
+
+  @override
+  String get repairShopEnterValidQty => 'Enter a valid quantity';
+
+  @override
+  String get repairShopTechniciansTitle => 'Technicians';
+
+  @override
+  String get repairShopDeactivateTechnician => 'Deactivate technician';
+
+  @override
+  String repairShopDeactivateTechnicianConfirm(String name) {
+    return 'Are you sure you want to deactivate “$name”?';
+  }
+
+  @override
+  String get repairShopDeactivateYes => 'Yes, deactivate';
+
+  @override
+  String get repairShopTechnicianDeactivated => 'Technician deactivated';
+
+  @override
+  String get repairShopHideInactive => 'Hide inactive';
+
+  @override
+  String get repairShopShowInactive => 'Show inactive';
+
+  @override
+  String get repairShopNoTechnicians => 'No technicians yet';
+
+  @override
+  String get repairShopAddTechnician => 'Add technician';
+
+  @override
+  String get repairShopNewTechnician => 'New technician';
+
+  @override
+  String get repairShopEditTechnician => 'Edit technician';
+
+  @override
+  String repairShopCodeWithValue(String code) {
+    return 'Code: $code';
+  }
+
+  @override
+  String get repairShopSelectPerson => 'Please select a person';
+
+  @override
+  String get repairShopPersonHint => 'Search and select a person';
+
+  @override
+  String get repairShopTechnicianCodeOptional => 'Technician code (optional)';
+
+  @override
+  String get repairShopTechnicianCodeHelper =>
+      'If empty, a code is generated automatically';
+
+  @override
+  String get repairShopCommissionType => 'Commission type';
+
+  @override
+  String get repairShopCommissionFixed => 'Fixed amount';
+
+  @override
+  String get repairShopCommissionPercentage => 'Percentage';
+
+  @override
+  String get repairShopCommissionCaseByCase => 'Case by case';
+
+  @override
+  String get repairShopCommissionPercentValue => 'Commission percent';
+
+  @override
+  String get repairShopCommissionFixedValue => 'Commission amount';
+
+  @override
+  String get repairShopCommissionPercentHelper => 'Percent of repair labor';
+
+  @override
+  String get repairShopCommissionFixedHelper =>
+      'Fixed amount in the business default currency';
+
+  @override
+  String get repairShopValueRequired => 'Value is required';
+
+  @override
+  String get repairShopEnterValidNumber => 'Enter a valid number';
+
+  @override
+  String get repairShopTechnicianActive =>
+      'Active technician available for assignment';
+
+  @override
+  String get repairShopSettingsSaved => 'Settings saved';
+
+  @override
+  String get repairShopNumberingSection => 'Order numbering';
+
+  @override
+  String get repairShopNumberingFormat => 'Numbering format';
+
+  @override
+  String get repairShopNumberingFormatHelper =>
+      'Sequential: REC-2025-0001 | Random: REC-A7B3C9';
+
+  @override
+  String get repairShopSequential => 'Sequential';
+
+  @override
+  String get repairShopRandom => 'Random';
+
+  @override
+  String get repairShopCodePrefix => 'Code prefix';
+
+  @override
+  String get repairShopCodePrefixHelper => 'Example: REC, REP, REPAIR';
+
+  @override
+  String get repairShopPrefixRequired => 'Prefix is required';
+
+  @override
+  String get repairShopPrefixMaxLength => 'Maximum 10 characters';
+
+  @override
+  String get repairShopInvoiceWarehouseSection =>
+      'Invoice and warehouse defaults';
+
+  @override
+  String get repairShopServiceProduct => 'Repair service product';
+
+  @override
+  String get repairShopServiceProductHint =>
+      'Default service for the labor invoice line';
+
+  @override
+  String get repairShopDefaultPartsWarehouse => 'Default parts warehouse';
+
+  @override
+  String get repairShopDefaultPartsWarehouseHint => 'Warehouse for parts issue';
+
+  @override
+  String get repairShopServiceProductAutoCreate =>
+      'If no service product is selected, the system creates a “Repair service” item when issuing the invoice.';
+
+  @override
+  String get repairShopAutoNotifications => 'Automatic notifications';
+
+  @override
+  String get repairShopSmsOnReceive => 'SMS on order receipt';
+
+  @override
+  String get repairShopSmsOnReceiveHint =>
+      'Send an SMS automatically when a new order is received';
+
+  @override
+  String get repairShopSmsOnStatus => 'SMS on status change';
+
+  @override
+  String get repairShopSmsOnStatusHint =>
+      'Send an SMS automatically when the status changes';
+
+  @override
+  String get repairShopEmailOnReceive => 'Email on order receipt';
+
+  @override
+  String get repairShopEmailOnReceiveHint =>
+      'Send an email automatically when a new order is received';
+
+  @override
+  String get repairShopEmailOnStatus => 'Email on status change';
+
+  @override
+  String get repairShopEmailOnStatusHint =>
+      'Send an email automatically when the status changes';
+
+  @override
+  String get repairShopHelp => 'Help';
+
+  @override
+  String get repairShopHelpSequentialTitle => 'Sequential format';
+
+  @override
+  String get repairShopHelpSequentialBody =>
+      'Codes are generated as REC-2025-0001, REC-2025-0002, and so on';
+
+  @override
+  String get repairShopHelpRandomTitle => 'Random format';
+
+  @override
+  String get repairShopHelpRandomBody =>
+      'Codes are generated as REC-A7B3C9, REC-XY4K2L, and so on';
+
+  @override
+  String get repairShopHelpNotifyTitle => 'Automatic notifications';
+
+  @override
+  String get repairShopHelpNotifyBody =>
+      'To use this, enable SMS and email settings in general settings first';
+
+  @override
+  String get repairShopSaveSettings => 'Save settings';
+
+  @override
+  String get telephonyMenu => 'Telephony';
+
+  @override
+  String get telephonySubtitle =>
+      'Issabel/Asterisk · Screen Pop · Click-to-Call';
+
+  @override
+  String get telephonyDialer => 'Dialer';
+
+  @override
+  String get telephonyLive => 'Live';
+
+  @override
+  String get telephonyReports => 'Reports';
+
+  @override
+  String get telephonyInboundToday => 'Inbound today';
+
+  @override
+  String get telephonyOutboundToday => 'Outbound today';
+
+  @override
+  String get telephonyAnswered => 'Answered';
+
+  @override
+  String get telephonyMissed => 'Missed';
+
+  @override
+  String get telephonyActiveCall => 'Active call';
+
+  @override
+  String get telephonyMyMissed => 'My missed';
+
+  @override
+  String get telephonyPbxStatusTitle => 'PBX status';
+
+  @override
+  String get telephonyNoPbxConnected => 'No phone system is connected yet.';
+
+  @override
+  String get telephonyConnectIssabel => 'Connect Issabel';
+
+  @override
+  String get telephonyAskAdminMapExt =>
+      'Ask the telephony admin to connect the PBX and assign your extension.';
+
+  @override
+  String get telephonyOnline => 'Online';
+
+  @override
+  String get telephonyOffline => 'Offline';
+
+  @override
+  String get telephonyCallHistoryTitle => 'Call history';
+
+  @override
+  String get telephonyCallHistoryShort => 'Call history';
+
+  @override
+  String get telephonySearchNumberOrNote => 'Search number or note';
+
+  @override
+  String get telephonyFilterSuccessful => 'Successful';
+
+  @override
+  String get telephonyCallDetails => 'Call details';
+
+  @override
+  String get telephonyNote => 'Note';
+
+  @override
+  String get telephonyCategoryHint => 'Category (sales/support/finance)';
+
+  @override
+  String get telephonyDefaultPbxName => 'Main PBX';
+
+  @override
+  String get telephonyAddPbx => 'Add PBX';
+
+  @override
+  String get telephonyPbxName => 'Name';
+
+  @override
+  String get telephonyCreatePbxFirst => 'Create a PBX first';
+
+  @override
+  String get telephonyAddExtension => 'Add extension';
+
+  @override
+  String get telephonyPbx => 'PBX';
+
+  @override
+  String get telephonyExtensionNumber => 'Extension number';
+
+  @override
+  String get telephonyDisplayName => 'Display name';
+
+  @override
+  String get telephonyTeamCode => 'Team/queue code';
+
+  @override
+  String get telephonyTeamCodeHint => 'e.g. sales';
+
+  @override
+  String get telephonyAllowSharedExt => 'Allow shared extension';
+
+  @override
+  String get telephonyAllowSharedExtHint =>
+      'Off = each extension belongs to one user';
+
+  @override
+  String get telephonyCreateExtFirst => 'Define an extension first';
+
+  @override
+  String get telephonyMapExtSoftphone => 'Map extension / Softphone';
+
+  @override
+  String get telephonyEditSoftphoneMapping => 'Edit Softphone mapping';
+
+  @override
+  String get telephonyBusinessUser => 'Business user';
+
+  @override
+  String get telephonyExtension => 'Extension';
+
+  @override
+  String get telephonyEndpointMode => 'Endpoint mode';
+
+  @override
+  String get telephonyEndpointModeHint =>
+      'relay = in-app Softphone · desk = desk phone · direct = PJSIP/WebRTC';
+
+  @override
+  String get telephonyEndpointRelay => 'Relay (Softphone inside Hesabix)';
+
+  @override
+  String get telephonyEndpointDesk => 'Desk (external SIP phone)';
+
+  @override
+  String get telephonyEndpointDirect => 'Direct (optional direct register)';
+
+  @override
+  String get telephonyAllowFallback => 'Allow fallback';
+
+  @override
+  String get telephonyAllowFallbackHint =>
+      'If the primary mode is unavailable, use the alternate mode';
+
+  @override
+  String get telephonyPrimaryExtension => 'Primary extension';
+
+  @override
+  String get telephonyTeamSupervisor => 'Team supervisor for this extension';
+
+  @override
+  String get telephonyTeamSupervisorHint =>
+      'If the extension has a team code, this user sees that team live and reports';
+
+  @override
+  String get telephonyDirectSipHint => 'Optional — for direct provision';
+
+  @override
+  String get telephonySoftphoneRelayEnabled => 'Relay enabled';
+
+  @override
+  String get telephonySoftphoneRelayHint =>
+      'Audio via Connector without exposing the PBX';
+
+  @override
+  String get telephonySoftphoneDirectEnabled => 'Direct enabled';
+
+  @override
+  String get telephonySoftphoneDirectHint =>
+      'Direct WebRTC/PJSIP register (needs network access to PBX)';
+
+  @override
+  String get telephonyMaxSoftphoneSessions =>
+      'Max concurrent Softphone sessions';
+
+  @override
+  String get telephonyAudiosocketPort => 'Local Connector AudioSocket port';
+
+  @override
+  String get telephonySoftphoneSettingsSaved => 'Softphone settings saved';
+
+  @override
+  String get telephonySettingsTitle => 'Telephony settings';
+
+  @override
+  String get telephonyManageOnlyHint =>
+      'Only the telephony admin can manage the connection, extensions, and assignments.';
+
+  @override
+  String get telephonyConnectorTokenOnce => 'Connector token (shown only once)';
+
+  @override
+  String get telephonyCopyToken => 'Copy token';
+
+  @override
+  String get telephonySetupStepsTitle => 'Setup steps';
+
+  @override
+  String get telephonySetupSteps =>
+      '1) Create a PBX and copy the token\n2) Run the install command on the Issabel/Asterisk server\n3) Define extensions and assign them to users\n4) For in-app Softphone: set endpoint mode to Relay';
+
+  @override
+  String get telephonyRelaySetupTitle => 'Softphone Relay setup';
+
+  @override
+  String get telephonyRelaySetupBody =>
+      'After installing the Connector, on the phone server:\n• pip install -r requirements-softphone.txt\n• MEDIA_TUNNEL_ENABLED=1 and AUDIOSOCKET_PORT=9092 in .env\n• hesabix-pbx restart\nThen set the user mapping to Relay and go online from the Softphone page.';
+
+  @override
+  String get telephonyOpenSoftphone => 'Open Softphone';
+
+  @override
+  String get telephonyOneLineIssabelInstall => 'One-line install on Issabel';
+
+  @override
+  String get telephonyInstallCommandHelp =>
+      'This command installs the Connector from the Hesabix repository and creates the hesabix-pbx command. In the wizard enter only the API key (Profile → API keys); then pick the business and PBX from the list.';
+
+  @override
+  String get telephonyInstallCopied => 'Install command copied';
+
+  @override
+  String get telephonyCopyInstallCommand => 'Copy install command';
+
+  @override
+  String get telephonyManageCommandsCopied => 'Management commands copied';
+
+  @override
+  String get telephonyCopyManageCommands => 'Copy management commands';
+
+  @override
+  String get telephonyAfterInstallHint =>
+      'After install: hesabix-pbx test  ·  update: hesabix-pbx update';
+
+  @override
+  String get telephonyScreenPopHint => 'Show caller info when ringing';
+
+  @override
+  String get telephonyAutoCrmActivity => 'Auto-create CRM activity';
+
+  @override
+  String get telephonyAutoCrmActivityHint =>
+      'Log a call activity after the conversation ends';
+
+  @override
+  String get telephonyForcePostCallForm => 'Required post-call form';
+
+  @override
+  String get telephonyForcePostCallFormHint =>
+      'The operator must record the call outcome';
+
+  @override
+  String get telephonyMissedCallTask => 'Task for missed calls';
+
+  @override
+  String get telephonyMissedCallTaskHint =>
+      'Create a follow-up task after an unanswered call';
+
+  @override
+  String get telephonyFollowUpMinutes => 'Follow-up due (minutes)';
+
+  @override
+  String get telephonyRecordingAccess => 'Call recording access';
+
+  @override
+  String get telephonyRecordingAccessAllOperatorsHint =>
+      'Operators only hear in-scope own/team recordings';
+
+  @override
+  String get telephonyRecordingAccessOwnerHint =>
+      'Call owner and supervisor/manager';
+
+  @override
+  String get telephonyRecordingAccessPermissionHint =>
+      'listen_recordings permission within allowed scope';
+
+  @override
+  String get telephonyRecordingAccessPermissionBased => 'Permission-based';
+
+  @override
+  String get telephonyRecordingAccessOwnerManagers => 'Owner and managers';
+
+  @override
+  String get telephonyRecordingAccessAllowedOps => 'Allowed operators';
+
+  @override
+  String get telephonyMultiPbx => 'Multiple PBXs';
+
+  @override
+  String get telephonyMultiPbxHint =>
+      'If off, only one PBX is allowed for the business';
+
+  @override
+  String get telephonyPbxs => 'Phone systems';
+
+  @override
+  String get telephonyNewToken => 'New token';
+
+  @override
+  String get telephonyExtensions => 'Extensions';
+
+  @override
+  String get telephonyExtensionsHint =>
+      'The Connector syncs the extension list on heartbeat. Each extension is exclusive by default.';
+
+  @override
+  String get telephonyShareable => 'Shareable';
+
+  @override
+  String get telephonyExclusive => 'Exclusive';
+
+  @override
+  String get telephonyUserExtMapping => 'User ↔ extension / Softphone mapping';
+
+  @override
+  String get telephonyUserExtMappingHint =>
+      'Each extension belongs to one user by default. Pick a business user from the list.';
+
+  @override
+  String get telephonyAssignExtension => 'Assign extension';
+
+  @override
+  String get telephonyPrimary => 'Primary';
+
+  @override
+  String get telephonySecondary => 'Secondary';
+
+  @override
+  String get telephonyNoFallback => 'no fallback';
+
+  @override
+  String get telephonyEditMapping => 'Edit mapping';
+
+  @override
+  String get telephonyOpsHealth => 'Operations and health';
+
+  @override
+  String get telephonyOpsHealthHint => 'Connector metrics and error queue';
+
+  @override
+  String get telephonyMetrics => 'Metrics';
+
+  @override
+  String get telephonyResolved => 'Resolved';
+
+  @override
+  String get telephonyStatusMissed => 'Missed';
+
+  @override
+  String get telephonyStatusCompleted => 'Completed';
+
+  @override
+  String get telephonyStatusAnswered => 'Answered';
+
+  @override
+  String get telephonyStatusRinging => 'Ringing';
+
+  @override
+  String get telephonyStatusBusy => 'Busy';
+
+  @override
+  String get telephonyStatusFailed => 'Failed';
+
+  @override
+  String get telephonyStatusActive => 'Active';
+
+  @override
+  String get telephonyReportsTitle => 'Call reports';
+
+  @override
+  String get telephonyReportsShort => 'Call report';
+
+  @override
+  String get telephonyReportsForbidden =>
+      'You do not have call-report permission for your own/team scope.';
+
+  @override
+  String get telephonyOperators => 'Operators';
+
+  @override
+  String get telephonyTotal => 'Total';
+
+  @override
+  String get telephonyInbound => 'Inbound';
+
+  @override
+  String get telephonyOutbound => 'Outbound';
+
+  @override
+  String get telephonyAnswer => 'Answer';
+
+  @override
+  String get telephonyAnswerRate => 'Answer rate';
+
+  @override
+  String get telephonyAvgTalk => 'Avg talk time';
+
+  @override
+  String get telephonyHourlyDistribution => 'Hourly distribution';
+
+  @override
+  String get telephonyLiveDashboardTitle => 'Live call dashboard';
+
+  @override
+  String get telephonyLiveForbidden =>
+      'You do not have live-monitor permission for your own/team scope.';
+
+  @override
+  String get telephonyLiveHeadline => 'Telephony — live';
+
+  @override
+  String get telephonyRefreshEvery3s => 'Refresh every 3 seconds';
+
+  @override
+  String get telephonyWaiting => 'Waiting';
+
+  @override
+  String get telephonyTalking => 'In conversation';
+
+  @override
+  String get telephonyMissedToday => 'Missed today';
+
+  @override
+  String get telephonyOperatorsOnline => 'Operators online';
+
+  @override
+  String get telephonyBlfTitle => 'Extension status (BLF)';
+
+  @override
+  String get telephonyActiveCalls => 'Active calls';
+
+  @override
+  String get telephonyNoActiveCalls => 'No call in progress';
+
+  @override
+  String get telephonyHold => 'Hold';
+
+  @override
+  String get telephonyResume => 'Resume';
+
+  @override
+  String get telephonyHangup => 'Hang up';
+
+  @override
+  String get telephonyTransfer => 'Transfer';
+
+  @override
+  String get telephonyTransferCall => 'Transfer call';
+
+  @override
+  String get telephonyDestExtension => 'Destination extension';
+
+  @override
+  String get telephonyQueues => 'Queues';
+
+  @override
+  String get telephonySoftphoneTitle => 'Softphone';
+
+  @override
+  String get telephonySoftphoneBranded => 'Hesabix Softphone';
+
+  @override
+  String get telephonySoftphoneHelp =>
+      'Media is relayed through the Connector add-on; you do not need to expose PBX ports to the internet. Microphone and playback are enabled on this page.';
+
+  @override
+  String get telephonyMode => 'Mode';
+
+  @override
+  String get telephonyMediaTunnel => 'Media tunnel';
+
+  @override
+  String get telephonyDisconnected => 'Disconnected';
+
+  @override
+  String get telephonyAudioBridge => 'Audio bridge';
+
+  @override
+  String get telephonyLocalAudio => 'Local audio';
+
+  @override
+  String get telephonyReady => 'Ready';
+
+  @override
+  String get telephonyOff => 'Off';
+
+  @override
+  String get telephonyInactive => 'Inactive';
+
+  @override
+  String get telephonyDisconnectSoftphone => 'Disconnect Softphone';
+
+  @override
+  String get telephonyGoOnlineRelay => 'Go online (Relay)';
+
+  @override
+  String get telephonyDestinationNumber => 'Destination number';
+
+  @override
+  String get telephonyCallAction => 'Call';
+
+  @override
+  String get telephonyAnswerAction => 'Answer';
+
+  @override
+  String get telephonyMute => 'Mute';
+
+  @override
+  String get telephonyMicrophone => 'Microphone';
+
+  @override
+  String get telephonyDeskDialer => 'Click-to-Call dialer (Desk mode)';
+
+  @override
+  String get telephonyConfigureExtSoftphone =>
+      'Configure extension / Softphone mode';
+
+  @override
+  String get telephonyBackToHub => 'Back to telephony';
+
+  @override
+  String get telephonyConnIdle => 'Offline';
+
+  @override
+  String get telephonyConnConnecting => 'Connecting…';
+
+  @override
+  String get telephonyConnRegistered => 'Ready to answer';
+
+  @override
+  String get telephonyConnRinging => 'Ringing';
+
+  @override
+  String get telephonyConnInCall => 'In a call';
+
+  @override
+  String get telephonyConnReconnecting => 'Reconnecting…';
+
+  @override
+  String get telephonyConnError => 'Error';
+
+  @override
+  String get telephonyConnEnded => 'Session ended';
+
+  @override
+  String get telephonyBarConnecting => 'Softphone connecting';
+
+  @override
+  String get telephonyBarReady => 'Softphone ready';
+
+  @override
+  String get telephonyBarRinging => 'Softphone: ringing';
+
+  @override
+  String get telephonyBarInCall => 'Softphone: in call';
+
+  @override
+  String get telephonyBarReconnecting => 'Softphone: reconnecting';
+
+  @override
+  String get telephonyBarError => 'Softphone: error';
+
+  @override
+  String get telephonyPresenceRinging => 'Ringing';
+
+  @override
+  String get telephonyPresenceTalking => 'In a call';
+
+  @override
+  String get telephonyPresenceOffline => 'Disconnected from PBX';
+
+  @override
+  String get telephonyPresenceNoExt => 'No extension';
+
+  @override
+  String get telephonyPresenceIdle => 'Idle';
+
+  @override
+  String get telephonyPresenceUnknown => 'Unknown';
+
+  @override
+  String get telephonyConfigureExtension => 'Set up extension';
+
+  @override
+  String get telephonyAnswerSoftphone => 'Answer Softphone';
+
+  @override
+  String get telephonyDeclineCall => 'Decline';
+
+  @override
+  String get telephonyUnmute => 'Unmute';
+
+  @override
+  String get telephonySoftphoneOnline => 'Softphone is online';
+
+  @override
+  String get telephonyPluginInactiveTitle =>
+      'The Asterisk/Issabel connector add-on is not active';
+
+  @override
+  String get telephonyPluginInactiveBody =>
+      'Activate this add-on from the plugin marketplace for Screen Pop, Click-to-Call, and call history.';
+
+  @override
+  String get telephonyIncomingCall => 'Incoming call';
+
+  @override
+  String get telephonyInConversation => 'In conversation';
+
+  @override
+  String get telephonyCallEnded => 'Call ended';
+
+  @override
+  String get telephonyCallMissed => 'Missed call';
+
+  @override
+  String get telephonyUnknownNumber => 'Unknown number';
+
+  @override
+  String get telephonyLeadCreated => 'Lead created';
+
+  @override
+  String get telephonyContactCreated => 'Contact created';
+
+  @override
+  String get telephonyNoteSaved => 'Note saved';
+
+  @override
+  String get telephonyHangupSent => 'Hangup command sent';
+
+  @override
+  String get telephonyOverdueChecks => 'Due/overdue checks';
+
+  @override
+  String get telephonyOpenDeals => 'Open deals';
+
+  @override
+  String get telephonyRecentDocuments => 'Recent documents';
+
+  @override
+  String get telephonyQuickNote => 'Quick note';
+
+  @override
+  String get telephonyCreateLead => 'Create lead';
+
+  @override
+  String get telephonyCreateContact => 'Create contact';
+
+  @override
+  String get telephonyCustomerFile => 'Customer file';
+
+  @override
+  String get telephonySaveNote => 'Save note';
+
+  @override
+  String get telephonyHangupCall => 'Hang up call';
+
+  @override
+  String get telephonyRecordingUnavailable => 'Recording file is not available';
+
+  @override
+  String get telephonyPlayRecording => 'Play recording';
+
+  @override
+  String get telephonyPlayingRecording => 'Playing…';
+
+  @override
+  String get telephonyPlayCallRecording => 'Play call recording';
+
+  @override
+  String get telephonyPlacingCall => 'Placing call…';
+
+  @override
+  String get telephonyIncomingSoftphone => 'Incoming Softphone call';
+
+  @override
+  String get telephonyRingingNow => 'Ringing…';
+
+  @override
+  String get telephonyDecline => 'Decline';
+
+  @override
+  String get telephonyPostCallTitle => 'Record call outcome';
+
+  @override
+  String get telephonyCategory => 'Category';
+
+  @override
+  String get telephonyOutcome => 'Outcome';
+
+  @override
+  String get telephonySaveAndClose => 'Save and close';
+
+  @override
+  String get telephonyLater => 'Later';
+
+  @override
+  String get telephonyCategorySales => 'Sales';
+
+  @override
+  String get telephonyCategorySupport => 'Support';
+
+  @override
+  String get telephonyCategoryFinance => 'Finance';
+
+  @override
+  String get telephonyCategoryOther => 'Other';
+
+  @override
+  String get telephonyOutcomeCompleted => 'Successful';
+
+  @override
+  String get telephonyOutcomeCallback => 'Needs callback';
+
+  @override
+  String get telephonyOutcomeNoAnswer => 'No answer';
+
+  @override
+  String get telephonyOutcomeWrongNumber => 'Wrong number';
+
+  @override
+  String get telephonyEnterNumber => 'Enter a number';
+
+  @override
+  String get telephonyAudioReady => 'Audio ready';
+
+  @override
+  String get telephonyBridgeActive => 'Bridge active';
+
+  @override
+  String get telephonyApiKeyMissing => 'API key not found';
+
+  @override
+  String get telephonyIncompleteSession =>
+      'Incomplete Softphone session returned';
+
+  @override
+  String get telephonyGoOnlineFirst => 'Go online with Softphone first';
+
+  @override
+  String get telephonyChannelNotConnected =>
+      'Softphone channel is not connected; go online again';
+
+  @override
+  String get telephonyNoSession => 'There is no Softphone session';
+
+  @override
+  String get telephonyShowHesabix => 'Show Hesabix';
+
+  @override
+  String get telephonyExit => 'Exit';
+
+  @override
+  String get telephonySoftphoneOnlineTooltip => 'Softphone online';
+
+  @override
+  String get telephonyIncomingChannelName => 'Incoming Softphone call';
+
+  @override
+  String get telephonyIncomingChannelDesc =>
+      'Full-screen incoming-call notification while Softphone is online';
+
+  @override
+  String get telephonyMicDenied => 'Microphone access was not granted';
+
+  @override
+  String get telephonyAudioContextMissing => 'AudioContext is not ready';
+
+  @override
+  String get telephonyPermView => 'View own telephony';
+
+  @override
+  String get telephonyPermManage => 'Manage PBX and extensions';
+
+  @override
+  String get telephonyPermViewAll => 'View all business calls';
+
+  @override
+  String get telephonyPermSupervise => 'Supervise team/queue';
+
+  @override
+  String get telephonyPermClickToCall => 'Click to call';
+
+  @override
+  String get telephonyPermSoftphone => 'In-app softphone';
+
+  @override
+  String get telephonyPermSoftphoneManage => 'Manage softphone media modes';
+
+  @override
+  String get telephonyPermSoftphoneQuality => 'View softphone quality';
+
+  @override
+  String get telephonyPermListen => 'Listen to in-scope recordings';
+
+  @override
+  String get telephonyPermLive => 'Live monitor (own/team)';
+
+  @override
+  String get telephonyPermReports => 'Call reports in scope';
+
+  @override
+  String get telephonyPermControl => 'Control in-scope calls';
+
+  @override
+  String telephonyErrorWithDetails(String error) {
+    return 'Error: $error';
+  }
+
+  @override
+  String telephonyCallListSubtitle(
+    String status,
+    String extension,
+    String seconds,
+  ) {
+    return '$status · ext $extension · $seconds sec';
+  }
+
+  @override
+  String telephonyMappingSaved(String mode) {
+    return 'Mapping saved ($mode)';
+  }
+
+  @override
+  String telephonyUserId(String id) {
+    return 'User $id';
+  }
+
+  @override
+  String telephonyCommandSent(String action) {
+    return 'Command $action sent';
+  }
+
+  @override
+  String telephonyIncomingExt(String extension) {
+    return 'Incoming call · ext $extension';
+  }
+
+  @override
+  String telephonySoftphoneExt(String ext) {
+    return 'Softphone · ext $ext';
+  }
+
+  @override
+  String telephonyRingFrom(String from) {
+    return 'Ringing from $from';
+  }
+
+  @override
+  String telephonyAnswerFailed(String error) {
+    return 'Answer failed: $error';
+  }
+
+  @override
+  String telephonyMediaFailed(String error) {
+    return 'Media failed to start: $error';
+  }
+
+  @override
+  String telephonyMicFallback(String error) {
+    return 'Microphone: $error — sending silence temporarily';
+  }
+
+  @override
+  String telephonyHourCount(String hour, String count) {
+    return 'Hour $hour: $count';
+  }
+
+  @override
+  String telephonyOperatorStats(
+    String total,
+    String answered,
+    String missed,
+    String outbound,
+  ) {
+    return 'Total $total · answered $answered · missed $missed · outbound $outbound';
+  }
+
+  @override
+  String telephonyQueueWaitTalk(String waiting, String talking) {
+    return 'Waiting: $waiting · talking: $talking';
+  }
+
+  @override
+  String telephonyMediaFrames(String incoming, String outgoing) {
+    return 'Media frames: in $incoming / out $outgoing';
+  }
+
+  @override
+  String telephonyExtensionValue(String extension) {
+    return 'Ext $extension';
+  }
+
+  @override
+  String telephonyTeamValue(String team) {
+    return 'Team $team';
+  }
+
+  @override
+  String telephonyUserToExtension(String user, String extension) {
+    return '$user → ext $extension';
+  }
+
+  @override
+  String telephonyOpenDlq(String count) {
+    return 'Open DLQ: $count';
+  }
+
+  @override
+  String telephonyMinutesValue(String minutes) {
+    return '$minutes minutes';
+  }
+
+  @override
+  String telephonyBalanceRemain(String amount, String status) {
+    return 'Remaining: $amount · $status';
+  }
+
+  @override
+  String telephonyCheckNumber(String number) {
+    return 'Check $number';
+  }
+
+  @override
+  String telephonyMappingLine(
+    String role,
+    String mode,
+    String team,
+    String fallback,
+  ) {
+    return '$role · mode $mode$team$fallback';
+  }
+
+  @override
+  String telephonySoftphoneForPbx(String name) {
+    return 'Softphone — $name';
+  }
+
+  @override
+  String get documentTypeManual => 'Manual document';
+
+  @override
+  String get documentTypeExpense => 'Expense';
+
+  @override
+  String get documentTypeIncome => 'Income';
+
+  @override
+  String get documentTypeReceipt => 'Receipt';
+
+  @override
+  String get documentTypePayment => 'Payment';
+
+  @override
+  String get documentTypeTransfer => 'Transfer';
+
+  @override
+  String get documentTypeInvoice => 'Invoice';
+
+  @override
+  String get documentTypeSales => 'Sales';
+
+  @override
+  String get documentTypeSalesReturn => 'Sales return';
+
+  @override
+  String get documentTypePurchase => 'Purchase';
+
+  @override
+  String get documentTypePurchaseReturn => 'Purchase return';
+
+  @override
+  String get documentTypeDirectConsumption => 'Direct consumption';
+
+  @override
+  String get documentTypeProduction => 'Production';
+
+  @override
+  String get documentTypeWaste => 'Waste';
+
+  @override
+  String get documentTypeOpeningBalance => 'Opening balance';
+
+  @override
+  String get documentTypeCheck => 'Check';
+
+  @override
+  String get documentStatusDraft => 'Draft';
+
+  @override
+  String get documentStatusFinal => 'Posted';
+
+  @override
+  String get documentProject => 'Project';
+
+  @override
+  String documentProjectValue(String id) {
+    return 'Project: $id';
+  }
+
+  @override
+  String get documentAllPersons => 'All persons';
+
+  @override
+  String get documentSearchPersons => 'Search persons...';
+
+  @override
+  String get documentSelectedCurrency => 'Selected currency';
+
+  @override
+  String get documentDefaultCurrency => 'IRR';
+
+  @override
+  String get documentOnlyManualEditable =>
+      'Only manual documents can be edited';
+
+  @override
+  String get documentOnlyManualDeletable =>
+      'Only manual documents can be deleted';
+
+  @override
+  String documentLoadError(String error) {
+    return 'Error loading document: $error';
+  }
+
+  @override
+  String documentDeleteError(String error) {
+    return 'Error deleting document: $error';
+  }
+
+  @override
+  String documentBulkDeleteError(String error) {
+    return 'Error in bulk delete: $error';
+  }
+
+  @override
+  String get documentDeleted => 'Document deleted';
+
+  @override
+  String documentDeletedCount(String count) {
+    return '$count document(s) deleted';
+  }
+
+  @override
+  String documentSkippedAutoCount(String count) {
+    return '$count automatic document(s) skipped';
+  }
+
+  @override
+  String get documentConfirmDeleteTitle => 'Confirm delete';
+
+  @override
+  String documentConfirmDeleteBody(String code) {
+    return 'Delete document $code?';
+  }
+
+  @override
+  String get documentConfirmBulkDeleteTitle => 'Confirm bulk delete';
+
+  @override
+  String documentConfirmBulkDeleteBody(String count) {
+    return 'Delete $count selected document(s)?\n\nNote: only manual documents will be deleted.';
+  }
+
+  @override
+  String documentDeleteSelectedCount(String count) {
+    return 'Delete ($count)';
+  }
+
+  @override
+  String get documentNeedMinLines => 'The document must have at least 2 lines';
+
+  @override
+  String documentLineNeedAmount(String n) {
+    return 'Line $n must have a debit or credit amount';
+  }
+
+  @override
+  String documentLineBothSides(String n) {
+    return 'Line $n cannot be both debit and credit';
+  }
+
+  @override
+  String documentUnbalancedDiff(String diff) {
+    return 'Document is not balanced. Difference: $diff';
+  }
+
+  @override
+  String get documentCreateFailed => 'Failed to create document';
+
+  @override
+  String get documentUpdateFailed => 'Failed to update document';
+
+  @override
+  String get documentUnbalanced => 'Document is not balanced';
+
+  @override
+  String get documentSearchCodeDesc =>
+      'Search document number and description…';
+
+  @override
+  String get documentEndOfList => 'End of list';
+
+  @override
+  String documentLoadListError(String error) {
+    return 'Error loading: $error';
+  }
+
+  @override
+  String documentSelectedCount(String count) {
+    return '$count selected';
+  }
+
+  @override
+  String documentCodeValue(String code) {
+    return 'Document $code';
+  }
+
+  @override
+  String documentTypeFilterValue(String type) {
+    return 'Type: $type';
+  }
+
+  @override
+  String get documentCancelSelection => 'Clear selection';
+
+  @override
+  String get documentDateOutsideFiscalYear =>
+      'Document date is outside the current fiscal year';
+
+  @override
+  String get documentCurrencyRequired => 'Currency is required';
+
+  @override
+  String documentLineNeedAccount(String n) {
+    return 'Line $n must have an account';
+  }
+
+  @override
+  String get documentLoadingFiscalYear => 'Loading the current fiscal year...';
+
+  @override
+  String get documentCurrentFiscalYearMissing =>
+      'Current fiscal year was not found';
+
+  @override
+  String get documentFiscalYearLoadError =>
+      'Failed to load the current fiscal year';
+
+  @override
+  String get documentDateRequired => 'Document date is required';
 }

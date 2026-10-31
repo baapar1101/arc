@@ -228,17 +228,17 @@ class _BusinessShellState extends State<BusinessShell> {
       case 'settings/fixed-assets':
         return t.fixedAssetsSettingsPageTitle;
       case 'telephony':
-        return 'مرکز تماس';
+        return t.telephonyMenu;
       case 'telephony/calls':
-        return 'تاریخچه تماس';
+        return t.telephonyCallHistoryShort;
       case 'telephony/live':
-        return 'داشبورد زنده تماس';
+        return t.telephonyLiveDashboardTitle;
       case 'telephony/reports':
-        return 'گزارش تماس‌ها';
+        return t.telephonyReportsTitle;
       case 'telephony/softphone':
-        return 'سافت‌فون';
+        return t.telephonySoftphoneTitle;
       case 'settings/telephony':
-        return 'تنظیمات مرکز تماس';
+        return t.telephonySettingsTitle;
       case 'distribution':
         return t.distributionMenu;
       case 'hscript':
@@ -247,7 +247,7 @@ class _BusinessShellState extends State<BusinessShell> {
         break;
     }
     if (pathTailBase.startsWith('telephony/')) {
-      return 'مرکز تماس';
+      return t.telephonyMenu;
     }
     if (pathTailBase.startsWith('payroll/')) {
       return t.payrollMenu;
@@ -2034,7 +2034,7 @@ class _BusinessShellState extends State<BusinessShell> {
       ),
       _MenuItem(
         key: 'repair-shop',
-        label: 'تعمیرگاه',
+        label: t.repairShopMenu,
         icon: Icons.build_circle_outlined,
         selectedIcon: Icons.build_circle,
         path: _bu('repair-shop'),
@@ -2070,7 +2070,7 @@ class _BusinessShellState extends State<BusinessShell> {
       ),
       _MenuItem(
         key: 'telephony',
-        label: 'مرکز تماس',
+        label: t.telephonyMenu,
         icon: Icons.phone_in_talk_outlined,
         selectedIcon: Icons.phone_in_talk,
         path: _bu('telephony'),
@@ -3971,7 +3971,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.settings) return 'settings';
     if (label == t.pluginMarketplace) return 'marketplace';
     if (label == t.warranty || label == 'گارانتی' || label == 'Warranty') return 'warranty';
-    if (label == 'تعمیرگاه' || label == 'Repair Shop') return 'repair_shop';
+    if (label == t.repairShopMenu || label == 'تعمیرگاه' || label == 'Repair Shop') return 'repair_shop';
     if (label == t.customerClubMenu || label == 'Customer Club') return 'customer_club';
     if (label == t.payrollMenu ||
         label == t.payrollTitle ||
@@ -3986,7 +3986,7 @@ class _BusinessShellState extends State<BusinessShell> {
       return 'fixed_assets';
     }
     if (label == t.distributionMenu || label == 'Field distribution') return 'distribution';
-    if (label == 'مرکز تماس' || label == 'Telephony') return 'telephony';
+    if (label == t.telephonyMenu || label == 'مرکز تماس' || label == 'Telephony') return 'telephony';
     if (label == t.basalamIntegrationMenuTitle) return 'basalam';
     if (label == t.woocommerceIntegrationMenuTitle) return 'woocommerce';
     if (label == 'هوش مصنوعی' || label == 'AI Tools') return 'ai';

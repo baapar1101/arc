@@ -7,6 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import 'softphone_pcm_media_stub.dart';
 import 'softphone_pcm_media_windows.dart';
+import 'telephony_l10n.dart';
 
 export 'softphone_pcm_media_stub.dart';
 
@@ -36,7 +37,7 @@ class IoSoftphonePcmMedia implements SoftphonePcmMedia {
     if (_ready) return;
     final mic = await Permission.microphone.request();
     if (!mic.isGranted) {
-      throw StateError('دسترسی میکروفون داده نشد');
+      throw StateError(telephonyL10n().telephonyMicDenied);
     }
     await _player.openPlayer();
     await _recorder.openRecorder();

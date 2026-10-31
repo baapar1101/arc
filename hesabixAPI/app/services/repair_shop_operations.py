@@ -36,9 +36,7 @@ _COMPLETED_STATUSES = {"completed_fixed", "completed_unfixable", "ready_for_pick
 
 def _check_plugin_active(db: Session, business_id: int) -> None:
     if not check_repair_shop_plugin_active(db, business_id):
-        raise ApiError(
-            "PLUGIN_NOT_ACTIVE",
-            "افزونه مدیریت تعمیرگاه فعال نیست",
+        raise ApiError("PLUGIN_NOT_ACTIVE", "PLUGIN_NOT_ACTIVE",
             http_status=403,
         )
 
@@ -75,12 +73,10 @@ def assign_technician_to_order(
     order = repo.get_by_id(repair_order_id, business_id)
 
     if not order:
-        raise ApiError("REPAIR_ORDER_NOT_FOUND", "سفارش تعمیر یافت نشد", http_status=404)
+        raise ApiError("REPAIR_ORDER_NOT_FOUND", "REPAIR_ORDER_NOT_FOUND", http_status=404)
 
     if order.status in _TERMINAL_STATUSES:
-        raise ApiError(
-            "ORDER_NOT_EDITABLE",
-            "سفارش تحویل‌شده یا لغوشده قابل اختصاص تعمیرکار نیست",
+        raise ApiError("ORDER_NOT_EDITABLE", "ORDER_NOT_EDITABLE",
             http_status=400,
         )
 
@@ -93,7 +89,7 @@ def assign_technician_to_order(
     ).first()
 
     if not technician:
-        raise ApiError("TECHNICIAN_NOT_FOUND", "تعمیرکار یافت نشد یا غیرفعال است", http_status=404)
+        raise ApiError("TECHNICIAN_NOT_FOUND", "TECHNICIAN_NOT_FOUND", http_status=404)
 
     previous_status = order.status
     order.assigned_technician_id = technician_id
@@ -137,18 +133,16 @@ def update_repair_order_status(
     from app.services.repair_shop_service import get_repair_order, VALID_STATUSES
 
     if new_status not in VALID_STATUSES:
-        raise ApiError("INVALID_STATUS", f"وضعیت نامعتبر: {new_status}", http_status=400)
+        raise ApiError("INVALID_STATUS", "INVALID_STATUS", http_status=400)
 
     repo = RepairOrderRepository(db)
     order = repo.get_by_id(repair_order_id, business_id)
 
     if not order:
-        raise ApiError("REPAIR_ORDER_NOT_FOUND", "سفارش تعمیر یافت نشد", http_status=404)
+        raise ApiError("REPAIR_ORDER_NOT_FOUND", "REPAIR_ORDER_NOT_FOUND", http_status=404)
 
     if order.status in _TERMINAL_STATUSES and new_status != order.status:
-        raise ApiError(
-            "ORDER_NOT_EDITABLE",
-            f"سفارش در وضعیت {order.status} قابل تغییر وضعیت نیست",
+        raise ApiError("ORDER_NOT_EDITABLE", "ORDER_NOT_EDITABLE",
             http_status=400,
         )
 
@@ -216,17 +210,15 @@ def add_parts_to_repair_order(
     order = repo.get_by_id(repair_order_id, business_id)
 
     if not order:
-        raise ApiError("REPAIR_ORDER_NOT_FOUND", "سفارش تعمیر یافت نشد", http_status=404)
+        raise ApiError("REPAIR_ORDER_NOT_FOUND", "REPAIR_ORDER_NOT_FOUND", http_status=404)
 
     if order.status in _TERMINAL_STATUSES:
-        raise ApiError(
-            "ORDER_NOT_EDITABLE",
-            "امکان افزودن قطعه به سفارش تحویل‌شده یا لغوشده وجود ندارد",
+        raise ApiError("ORDER_NOT_EDITABLE", "ORDER_NOT_EDITABLE",
             http_status=400,
         )
 
     if not parts:
-        raise ApiError("PARTS_REQUIRED", "حداقل یک قطعه باید اضافه شود", http_status=400)
+        raise ApiError("PARTS_REQUIRED", "PARTS_REQUIRED", http_status=400)
 
     settings_repo = RepairShopSettingsRepository(db)
     settings = settings_repo.get_by_business(business_id)
@@ -241,7 +233,7 @@ def add_parts_to_repair_order(
         warehouse_id = part.get("warehouse_id") or default_warehouse_id
 
         if not product_id or not quantity:
-            raise ApiError("INVALID_PART_DATA", "اطلاعات قطعه نامعتبر است", http_status=400)
+            raise ApiError("INVALID_PART_DATA", "INVALID_PART_DATA", http_status=400)
 
         product = db.query(Product).filter(
             and_(
@@ -251,24 +243,19 @@ def add_parts_to_repair_order(
         ).first()
 
         if not product:
-            raise ApiError("PRODUCT_NOT_FOUND", f"قطعه با ID {product_id} یافت نشد", http_status=404)
+            raise ApiError("PRODUCT_NOT_FOUND", "PRODUCT_NOT_FOUND", http_status=404)
 
         if product.track_inventory:
             if not warehouse_id:
-                raise ApiError(
-                    "WAREHOUSE_REQUIRED",
-                    f"برای قطعه «{product.name}» که کنترل موجودی دارد، انتخاب انبار الزامی است.",
+                raise ApiError("WAREHOUSE_REQUIRED", "WAREHOUSE_REQUIRED",
                     http_status=400,
                 )
             current_stock = get_physical_stock(db, business_id, product_id, warehouse_id)
 
             if current_stock < Decimal(str(quantity)):
-                from app.services.invoice_service import _format_quantity_for_user_message
-
                 raise ApiError(
                     "INSUFFICIENT_STOCK",
-                    f"موجودی کافی نیست. موجودی فعلی: {_format_quantity_for_user_message(current_stock)}، "
-                    f"مقدار درخواستی: {_format_quantity_for_user_message(quantity)}",
+                    "INSUFFICIENT_STOCK",
                     http_status=409,
                     details={
                         "product_id": product_id,
@@ -372,27 +359,23 @@ def remove_part_from_repair_order(
     repo = RepairOrderRepository(db)
     order = repo.get_by_id(repair_order_id, business_id)
     if not order:
-        raise ApiError("REPAIR_ORDER_NOT_FOUND", "سفارش تعمیر یافت نشد", http_status=404)
+        raise ApiError("REPAIR_ORDER_NOT_FOUND", "REPAIR_ORDER_NOT_FOUND", http_status=404)
 
     if order.status in _TERMINAL_STATUSES or order.status in _COMPLETED_STATUSES:
         extra = order.extra_info or {}
         if extra.get("invoice_document_id"):
-            raise ApiError(
-                "ORDER_NOT_EDITABLE",
-                "پس از صدور فاکتور امکان حذف قطعه وجود ندارد",
+            raise ApiError("ORDER_NOT_EDITABLE", "ORDER_NOT_EDITABLE",
                 http_status=400,
             )
         if order.status in _TERMINAL_STATUSES:
-            raise ApiError(
-                "ORDER_NOT_EDITABLE",
-                "امکان حذف قطعه از این سفارش وجود ندارد",
+            raise ApiError("ORDER_NOT_EDITABLE", "ORDER_NOT_EDITABLE",
                 http_status=400,
             )
 
     parts_repo = RepairOrderPartRepository(db)
     part = parts_repo.get_by_id(part_id, repair_order_id)
     if not part:
-        raise ApiError("PART_NOT_FOUND", "قطعه یافت نشد", http_status=404)
+        raise ApiError("PART_NOT_FOUND", "PART_NOT_FOUND", http_status=404)
 
     parts_repo.delete(part)
     _recalculate_parts_cost(db, order)
@@ -416,12 +399,10 @@ def calculate_repair_costs(
     order = repo.get_by_id(repair_order_id, business_id)
 
     if not order:
-        raise ApiError("REPAIR_ORDER_NOT_FOUND", "سفارش تعمیر یافت نشد", http_status=404)
+        raise ApiError("REPAIR_ORDER_NOT_FOUND", "REPAIR_ORDER_NOT_FOUND", http_status=404)
 
     if order.status in _TERMINAL_STATUSES:
-        raise ApiError(
-            "ORDER_NOT_EDITABLE",
-            "امکان تغییر هزینه سفارش تحویل‌شده یا لغوشده وجود ندارد",
+        raise ApiError("ORDER_NOT_EDITABLE", "ORDER_NOT_EDITABLE",
             http_status=400,
         )
 
@@ -473,12 +454,10 @@ def complete_repair_order(
     order = repo.get_by_id(repair_order_id, business_id)
 
     if not order:
-        raise ApiError("REPAIR_ORDER_NOT_FOUND", "سفارش تعمیر یافت نشد", http_status=404)
+        raise ApiError("REPAIR_ORDER_NOT_FOUND", "REPAIR_ORDER_NOT_FOUND", http_status=404)
 
     if order.status in _TERMINAL_STATUSES:
-        raise ApiError(
-            "INVALID_STATUS_FOR_COMPLETE",
-            "سفارش تحویل‌شده یا لغوشده قابل تکمیل نیست",
+        raise ApiError("INVALID_STATUS_FOR_COMPLETE", "INVALID_STATUS_FOR_COMPLETE",
             http_status=400,
         )
 
@@ -498,9 +477,7 @@ def complete_repair_order(
                 post_warehouse_document(db, warehouse_doc_id)
             except ApiError as e:
                 if e.code == "INSUFFICIENT_STOCK":
-                    raise ApiError(
-                        "CANNOT_COMPLETE_REPAIR",
-                        f"امکان تکمیل تعمیر وجود ندارد: {e.message}",
+                    raise ApiError("CANNOT_COMPLETE_REPAIR", "CANNOT_COMPLETE_REPAIR",
                         http_status=409,
                         details=getattr(e, "details", None),
                     ) from e
@@ -558,12 +535,10 @@ def deliver_repair_order(
     order = repo.get_by_id(repair_order_id, business_id)
 
     if not order:
-        raise ApiError("REPAIR_ORDER_NOT_FOUND", "سفارش تعمیر یافت نشد", http_status=404)
+        raise ApiError("REPAIR_ORDER_NOT_FOUND", "REPAIR_ORDER_NOT_FOUND", http_status=404)
 
     if order.status not in ["completed_fixed", "completed_unfixable", "ready_for_pickup"]:
-        raise ApiError(
-            "INVALID_STATUS_FOR_DELIVERY",
-            f"سفارش در وضعیت {order.status} قابل تحویل نیست",
+        raise ApiError("INVALID_STATUS_FOR_DELIVERY", "INVALID_STATUS_FOR_DELIVERY",
             http_status=400
         )
 

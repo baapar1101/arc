@@ -144,7 +144,7 @@ def enqueue_control_command(
 	session_id: Optional[str] = None,
 ) -> Dict[str, Any]:
 	if command_type not in ("hangup", "transfer", "hold", "resume"):
-		raise ApiError("VALIDATION_ERROR", "نوع دستور نامعتبر است.", http_status=400)
+		raise ApiError("INVALID_COMMAND_TYPE", "INVALID_COMMAND_TYPE", http_status=400)
 
 	call = None
 	scope = resolve_scope(db, auth_ctx, business_id) if auth_ctx is not None else None
@@ -158,11 +158,11 @@ def enqueue_control_command(
 				.first()
 			)
 			if not call:
-				raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
+				raise ApiError("CALL_NOT_FOUND", "CALL_NOT_FOUND", http_status=404)
 		pbx_id = call.pbx_id
 		extension = extension or call.extension
 	elif scope is not None and extension and not scope.allows_extension(extension):
-		raise ApiError("NOT_FOUND", "داخلی در محدوده شما نیست.", http_status=404)
+		raise ApiError("EXTENSION_OUT_OF_SCOPE", "EXTENSION_OUT_OF_SCOPE", http_status=404)
 
 	if not pbx_id:
 		# pick primary extension pbx for user
@@ -177,7 +177,7 @@ def enqueue_control_command(
 			.first()
 		)
 		if not link:
-			raise ApiError("NO_EXTENSION", "داخلی برای کنترل تماس تعریف نشده.", http_status=400)
+			raise ApiError("NO_EXTENSION", "NO_EXTENSION", http_status=400)
 		pbx_id = link.pbx_id
 		extension = extension or (link.extension_row.extension if link.extension_row else None)
 
@@ -187,7 +187,7 @@ def enqueue_control_command(
 		.first()
 	)
 	if not pbx or not pbx.is_active:
-		raise ApiError("PBX_OFFLINE", "مرکز تلفن در دسترس نیست.", http_status=400)
+		raise ApiError("PBX_OFFLINE", "PBX_OFFLINE", http_status=400)
 
 	command_id = str(uuid.uuid4())
 	extra = dict(call.extra_info or {}) if call else {}

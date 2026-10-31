@@ -1376,18 +1376,18 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'post': t.fixedAssetsPermissionPost,
       },
       'telephony': {
-        'view': t.localeName.startsWith('fa') ? 'مشاهده مرکز تماس (فقط داخلی خود)' : 'View own telephony',
-        'manage': t.localeName.startsWith('fa') ? 'مدیریت اتصال و داخلی‌ها' : 'Manage PBX & extensions',
-        'view_all_calls': t.localeName.startsWith('fa') ? 'مشاهده همه تماس‌های کسب‌وکار' : 'View all business calls',
-        'supervise': t.localeName.startsWith('fa') ? 'سرپرستی تیم/بخش' : 'Supervise team/queue',
-        'click_to_call': t.localeName.startsWith('fa') ? 'Click-to-Call' : 'Click to call',
-        'softphone': t.localeName.startsWith('fa') ? 'Softphone داخل‌برنامه' : 'In-app softphone',
-        'softphone_manage': t.localeName.startsWith('fa') ? 'مدیریت Softphone و حالت رسانه' : 'Manage softphone media modes',
-        'softphone_quality': t.localeName.startsWith('fa') ? 'مشاهده کیفیت Softphone' : 'View softphone quality',
-        'listen_recordings': t.localeName.startsWith('fa') ? 'پخش ضبط مکالمات در محدوده مجاز' : 'Listen to in-scope recordings',
-        'live_monitor': t.localeName.startsWith('fa') ? 'مانیتورینگ زنده (محدوده خود/تیم)' : 'Live monitor (own/team)',
-        'reports': t.localeName.startsWith('fa') ? 'گزارش‌های تماس در محدوده مجاز' : 'Call reports in scope',
-        'control_calls': t.localeName.startsWith('fa') ? 'کنترل تماس در محدوده مجاز' : 'Control in-scope calls',
+        'view': t.telephonyPermView,
+        'manage': t.telephonyPermManage,
+        'view_all_calls': t.telephonyPermViewAll,
+        'supervise': t.telephonyPermSupervise,
+        'click_to_call': t.telephonyPermClickToCall,
+        'softphone': t.telephonyPermSoftphone,
+        'softphone_manage': t.telephonyPermSoftphoneManage,
+        'softphone_quality': t.telephonyPermSoftphoneQuality,
+        'listen_recordings': t.telephonyPermListen,
+        'live_monitor': t.telephonyPermLive,
+        'reports': t.telephonyPermReports,
+        'control_calls': t.telephonyPermControl,
       },
       'basalam': {
         'view': t.localeName.startsWith('fa') ? 'مشاهدهٔ اتصال باسلام' : 'View Basalam integration',
@@ -1984,7 +1984,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'sections': ['fixed_assets'],
       },
       {
-        'title': t.localeName.startsWith('fa') ? 'مرکز تماس' : 'Telephony',
+        'title': t.telephonyMenu,
         'icon': Icons.phone_in_talk_outlined,
         'sections': ['telephony'],
       },
@@ -2159,7 +2159,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       case 'fixed_assets':
         return t.fixedAssetsMenu;
       case 'telephony':
-        return t.localeName.startsWith('fa') ? 'مرکز تماس' : 'Telephony';
+        return t.telephonyMenu;
       case 'basalam':
         return t.localeName.startsWith('fa') ? 'اتصال باسلام' : 'Basalam';
       case 'woocommerce':

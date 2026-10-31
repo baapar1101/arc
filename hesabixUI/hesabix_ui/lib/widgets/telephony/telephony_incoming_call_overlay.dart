@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/auth_store.dart';
 import '../../services/telephony/softphone_engine.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Overlay سراسری تماس ورودی Softphone — روی هر صفحهٔ BusinessShell.
 class TelephonyIncomingCallOverlay extends StatefulWidget {
@@ -73,7 +74,7 @@ class _TelephonyIncomingCallOverlayState extends State<TelephonyIncomingCallOver
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(content: Text('پاسخ تماس ناموفق: $e')),
+        SnackBar(content: Text(AppLocalizations.of(context).telephonyAnswerFailed('$e'))),
       );
     }
   }
@@ -86,6 +87,7 @@ class _TelephonyIncomingCallOverlayState extends State<TelephonyIncomingCallOver
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     if (!widget.pluginActive) return const SizedBox.shrink();
     final engine = _engine;
     if (engine == null || engine.state != SoftphoneConnectionState.ringing) {
@@ -137,7 +139,7 @@ class _TelephonyIncomingCallOverlayState extends State<TelephonyIncomingCallOver
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'تماس ورودی Softphone',
+                    t.telephonyIncomingSoftphone,
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                           color: const Color(0xFF6EE7B7),
                           fontWeight: FontWeight.w700,
@@ -171,7 +173,7 @@ class _TelephonyIncomingCallOverlayState extends State<TelephonyIncomingCallOver
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'در حال زنگ خوردن…',
+                    t.telephonyRingingNow,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: scheme.onSurfaceVariant,
                         ),
@@ -189,7 +191,7 @@ class _TelephonyIncomingCallOverlayState extends State<TelephonyIncomingCallOver
                           ),
                           onPressed: _reject,
                           icon: const Icon(Icons.call_end_rounded),
-                          label: const Text('رد'),
+                          label: Text(t.telephonyDecline),
                         ),
                       ),
                       const SizedBox(width: 14),
@@ -203,7 +205,7 @@ class _TelephonyIncomingCallOverlayState extends State<TelephonyIncomingCallOver
                           ),
                           onPressed: canAnswer ? _answer : null,
                           icon: const Icon(Icons.call_rounded),
-                          label: Text(canAnswer ? 'پاسخ' : '…'),
+                          label: Text(canAnswer ? t.telephonyAnswerAction : '…'),
                         ),
                       ),
                     ],

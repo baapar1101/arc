@@ -11,6 +11,7 @@ import '../../../widgets/date_input_field.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
 import 'repair_shop_calendar_utils.dart';
 import 'repair_shop_status.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// صفحه لیست سفارشات تعمیر
@@ -125,8 +126,9 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage =
-            'خطا در بارگذاری سفارشات: ${ErrorExtractor.forContext(e, context)}';
+        _errorMessage = AppLocalizations.of(context).repairShopLoadOrdersError(
+          ErrorExtractor.forContext(e, context),
+        );
         _isLoading = false;
         _loadingMore = false;
       });
@@ -157,19 +159,19 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'فیلتر تاریخ دریافت',
+                    AppLocalizations.of(context).repairShopDateFilter,
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 16),
                   DateInputField(
-                    labelText: 'از تاریخ',
+                    labelText: AppLocalizations.of(context).repairShopDateFrom,
                     value: fromDate,
                     calendarController: widget.calendarController,
                     onChanged: (value) => setModalState(() => fromDate = value),
                   ),
                   const SizedBox(height: 12),
                   DateInputField(
-                    labelText: 'تا تاریخ',
+                    labelText: AppLocalizations.of(context).repairShopDateTo,
                     value: toDate,
                     calendarController: widget.calendarController,
                     onChanged: (value) => setModalState(() => toDate = value),
@@ -184,12 +186,12 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
                             toDate = null;
                           });
                         },
-                        child: const Text('پاک کردن'),
+                        child: Text(AppLocalizations.of(context).clear),
                       ),
                       const Spacer(),
                       FilledButton(
                         onPressed: () => Navigator.pop(context, true),
-                        child: const Text('اعمال'),
+                        child: Text(AppLocalizations.of(context).apply),
                       ),
                     ],
                   ),
@@ -220,9 +222,10 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
         final theme = Theme.of(context);
         final colorScheme = theme.colorScheme;
 
+        final t = AppLocalizations.of(context);
         return Scaffold(
           appBar: AppBar(
-            title: const Text('مدیریت تعمیرگاه'),
+            title: Text(t.repairShopTitle),
             leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
             actions: [
               IconButton(
@@ -230,12 +233,12 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
                   Icons.date_range,
                   color: _hasDateFilter ? colorScheme.primary : null,
                 ),
-                tooltip: 'فیلتر تاریخ',
+                tooltip: t.repairShopDateFilter,
                 onPressed: _openDateFilterSheet,
               ),
               PopupMenuButton<String>(
                 icon: const Icon(Icons.filter_list),
-                tooltip: 'فیلتر وضعیت',
+                tooltip: t.repairShopStatusFilter,
                 onSelected: (status) {
                   setState(() {
                     _selectedStatus = status == 'all' ? null : status;
@@ -243,26 +246,26 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
                   _loadOrders(reset: true);
                 },
                 itemBuilder: (context) => [
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'all',
-                    child: Text('همه وضعیت‌ها'),
+                    child: Text(t.allStatuses),
                   ),
                   const PopupMenuDivider(),
-                  ...RepairShopStatus.labels.entries.map(
-                    (entry) => PopupMenuItem(
-                      value: entry.key,
+                  ...RepairShopStatus.codes.map(
+                    (code) => PopupMenuItem(
+                      value: code,
                       child: Row(
                         children: [
                           Container(
                             width: 12,
                             height: 12,
                             decoration: BoxDecoration(
-                              color: RepairShopStatus.color(context, entry.key),
+                              color: RepairShopStatus.color(context, code),
                               shape: BoxShape.circle,
                             ),
                           ),
                           const SizedBox(width: 8),
-                          Text(entry.value),
+                          Text(RepairShopStatus.label(code, t)),
                         ],
                       ),
                     ),
@@ -271,14 +274,14 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
               ),
               IconButton(
                 icon: const Icon(Icons.settings),
-                tooltip: 'تنظیمات تعمیرگاه',
+                tooltip: t.businessSettingsRepairShop,
                 onPressed: () {
                   context.push('/business/${widget.businessId}/repair-shop-settings');
                 },
               ),
               IconButton(
                 icon: const Icon(Icons.people),
-                tooltip: 'مدیریت تعمیرکاران',
+                tooltip: t.repairShopTechniciansTitle,
                 onPressed: () {
                   context.push('/business/${widget.businessId}/repair-shop-technicians');
                 },
@@ -289,7 +292,7 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
           floatingActionButton: FloatingActionButton.extended(
             onPressed: _createNewOrder,
             icon: const Icon(Icons.add),
-            label: const Text('سفارش جدید'),
+            label: Text(t.repairShopNewOrder),
           ),
         );
       },
@@ -297,6 +300,7 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
   }
 
   Widget _buildBody(ThemeData theme, ColorScheme colorScheme) {
+    final t = AppLocalizations.of(context);
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -317,7 +321,7 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
             ElevatedButton.icon(
               onPressed: () => _loadOrders(reset: true),
               icon: const Icon(Icons.refresh),
-              label: const Text('تلاش مجدد'),
+              label: Text(t.retry),
             ),
           ],
         ),
@@ -336,12 +340,12 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
             ),
             const SizedBox(height: 16),
             Text(
-              'هنوز سفارش تعمیری ثبت نشده است',
+              t.repairShopEmptyOrders,
               style: theme.textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
             Text(
-              'با دکمه زیر اولین سفارش تعمیر را ثبت کنید',
+              t.repairShopEmptyOrdersHint,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurface.withValues(alpha: 0.6),
               ),
@@ -350,7 +354,7 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
             ElevatedButton.icon(
               onPressed: _createNewOrder,
               icon: const Icon(Icons.add),
-              label: const Text('ثبت سفارش جدید'),
+              label: Text(t.repairShopCreateFirstOrder),
             ),
           ],
         ),
@@ -385,6 +389,7 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
   }
 
   Widget _buildSearchBar(ThemeData theme, ColorScheme colorScheme) {
+    final t = AppLocalizations.of(context);
     final isJalali = widget.calendarController.isJalali;
 
     return Container(
@@ -401,8 +406,10 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
                 Chip(
                   avatar: const Icon(Icons.date_range, size: 16),
                   label: Text(
-                    'از ${HesabixDateUtils.formatForDisplay(_fromDate, isJalali)} '
-                    'تا ${HesabixDateUtils.formatForDisplay(_toDate, isJalali)}',
+                    t.repairShopDateRange(
+                      HesabixDateUtils.formatForDisplay(_fromDate, isJalali),
+                      HesabixDateUtils.formatForDisplay(_toDate, isJalali),
+                    ),
                   ),
                   onDeleted: () {
                     setState(() {
@@ -426,7 +433,7 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
                       child: TextField(
                         controller: _searchController,
                         decoration: InputDecoration(
-                          hintText: 'جستجو (کد، مشتری، شماره تماس، کالا)...',
+                          hintText: t.repairShopSearchHint,
                           prefixIcon: const Icon(Icons.search),
                           filled: true,
                           border: OutlineInputBorder(
@@ -467,7 +474,7 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
               ),
               const SizedBox(width: 12),
               _buildStatChip(
-                'کل: $_totalOrders',
+                t.repairShopTotalCount(_totalOrders),
                 Icons.receipt_long,
                 colorScheme.primary,
               ),
@@ -492,8 +499,9 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
     ThemeData theme,
     ColorScheme colorScheme,
   ) {
+    final t = AppLocalizations.of(context);
     final status = order.status;
-    final statusLabel = RepairShopStatus.label(status);
+    final statusLabel = RepairShopStatus.label(status, t);
     final statusColor = RepairShopStatus.color(context, status);
     final isJalali = widget.calendarController.isJalali;
     final receivedLabel = RepairShopCalendarUtils.formatDateTime(
@@ -647,7 +655,7 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    'دریافت: $receivedLabel',
+                    t.repairShopReceivedOn(receivedLabel),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurface.withValues(alpha: 0.6),
                     ),

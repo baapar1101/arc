@@ -77,7 +77,7 @@ def resolve_dead_letter(db: Session, business_id: int, dlq_id: int) -> Dict[str,
 		.first()
 	)
 	if not row:
-		raise ApiError("NOT_FOUND", "DLQ یافت نشد.", http_status=404)
+		raise ApiError("DLQ_NOT_FOUND", "DLQ_NOT_FOUND", http_status=404)
 	row.resolved = True
 	row.resolved_at = datetime.utcnow()
 	db.commit()
@@ -121,12 +121,12 @@ def assert_can_listen(auth_ctx, db: Session, business_id: int, call: Optional[Te
 		if not has_business_permission_for_business(auth_ctx, db, business_id, "telephony", "listen_recordings") and not has_business_permission_for_business(
 			auth_ctx, db, business_id, "telephony", "view"
 		):
-			raise ApiError("FORBIDDEN", "مجوز گوش دادن به ضبط مکالمه را ندارید.", http_status=403)
+			raise ApiError("RECORDING_LISTEN_FORBIDDEN", "RECORDING_LISTEN_FORBIDDEN", http_status=403)
 		return
 	scope = resolve_scope(db, auth_ctx, business_id)
 	require_call_in_scope(db, auth_ctx, business_id, call.id, scope=scope)
 	if not can_listen_recording(auth_ctx, db, business_id, call, scope=scope):
-		raise ApiError("FORBIDDEN", "مجوز گوش دادن به ضبط مکالمه را ندارید.", http_status=403)
+		raise ApiError("RECORDING_LISTEN_FORBIDDEN", "RECORDING_LISTEN_FORBIDDEN", http_status=403)
 
 
 def recording_info(db: Session, business_id: int, call_id: int, *, auth_ctx=None) -> Dict[str, Any]:
@@ -135,7 +135,7 @@ def recording_info(db: Session, business_id: int, call_id: int, *, auth_ctx=None
 	if auth_ctx is not None:
 		call = require_call_in_scope(db, auth_ctx, business_id, call_id)
 		if not can_listen_recording(auth_ctx, db, business_id, call):
-			raise ApiError("FORBIDDEN", "مجوز گوش دادن به ضبط مکالمه را ندارید.", http_status=403)
+			raise ApiError("RECORDING_LISTEN_FORBIDDEN", "RECORDING_LISTEN_FORBIDDEN", http_status=403)
 		write_audit(
 			db,
 			business_id=business_id,
@@ -151,7 +151,7 @@ def recording_info(db: Session, business_id: int, call_id: int, *, auth_ctx=None
 			.first()
 		)
 		if not call:
-			raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
+			raise ApiError("CALL_NOT_FOUND", "CALL_NOT_FOUND", http_status=404)
 	return {
 		"call_id": call.id,
 		"recording_status": call.recording_status,

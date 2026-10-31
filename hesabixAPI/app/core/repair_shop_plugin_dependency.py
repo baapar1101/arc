@@ -80,19 +80,15 @@ def require_repair_shop_plugin(business_id_param: str = 'business_id'):
             db = kwargs.get('db')
             
             if not business_id or not db:
-                raise ApiError(
-                    "INVALID_PARAMETERS",
-                    "پارامترهای لازم یافت نشد",
+                raise ApiError("INVALID_PARAMETERS", "INVALID_PARAMETERS",
                     http_status=400
                 )
             
             # بررسی فعال بودن افزونه
             if not check_repair_shop_plugin_active(db, business_id):
-                raise ApiError(
-                    "PLUGIN_NOT_ACTIVE",
-                    "افزونه مدیریت تعمیرگاه فعال نیست. لطفاً ابتدا از بازار افزونه‌ها خریداری و فعال کنید.",
+                raise ApiError("PLUGIN_NOT_ACTIVE", "PLUGIN_NOT_ACTIVE",
                     http_status=403,
-                    extra_data={
+                    details={
                         "plugin_code": "repair_shop_management",
                         "required_action": "activate_plugin",
                         "marketplace_url": "/marketplace"
@@ -146,7 +142,7 @@ def get_business_plugin_status(db: Session, business_id: int) -> dict:
         return {
             "is_active": False,
             "status": "not_found",
-            "message": "افزونه در سیستم یافت نشد"
+            "message": "PLUGIN_NOT_FOUND"
         }
     
     license = db.query(BusinessPlugin).filter(
@@ -158,7 +154,7 @@ def get_business_plugin_status(db: Session, business_id: int) -> dict:
         return {
             "is_active": False,
             "status": "not_purchased",
-            "message": "افزونه خریداری نشده است",
+            "message": "PLUGIN_NOT_PURCHASED",
             "plugin_info": get_repair_shop_plugin_info(db)
         }
     
@@ -181,6 +177,6 @@ def get_business_plugin_status(db: Session, business_id: int) -> dict:
         "ends_at": license.ends_at,
         "is_expired": is_expired,
         "auto_renew": license.auto_renew,
-        "message": "افزونه فعال است" if (license.status == 'active' and not is_expired) else "افزونه منقضی شده است"
+        "message": "PLUGIN_ACTIVE" if (license.status == 'active' and not is_expired) else "PLUGIN_EXPIRED"
     }
 

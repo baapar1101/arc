@@ -8,6 +8,7 @@ import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
 import '../../../widgets/invoice/product_combobox_widget.dart';
 import '../../../widgets/invoice/warehouse_combobox_widget.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 
 /// صفحه تنظیمات تعمیرگاه
@@ -83,8 +84,9 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage =
-            'خطا در بارگذاری تنظیمات: ${ErrorExtractor.forContext(e, context)}';
+        _errorMessage = AppLocalizations.of(context).repairShopLoadSettingsError(
+          ErrorExtractor.forContext(e, context),
+        );
         _isLoading = false;
       });
     }
@@ -113,15 +115,19 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
       );
 
       if (mounted) {
-        SnackBarHelper.show(context, message: 'تنظیمات با موفقیت ذخیره شد');
+        SnackBarHelper.show(
+          context,
+          message: AppLocalizations.of(context).repairShopSettingsSaved,
+        );
         _loadSettings();
       }
     } catch (e) {
       if (mounted) {
         SnackBarHelper.show(
           context,
-          message:
-              'خطا در ذخیره تنظیمات: ${ErrorExtractor.forContext(e, context)}',
+          message: AppLocalizations.of(context).repairShopSaveSettingsError(
+            ErrorExtractor.forContext(e, context),
+          ),
         );
       }
     } finally {
@@ -135,10 +141,11 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final t = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('تنظیمات تعمیرگاه'),
+        title: Text(t.businessSettingsRepairShop),
         leading: businessSubpageBackLeading(context, widget.businessId),
         actions: [
           if (_isSaving)
@@ -154,7 +161,7 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
             IconButton(
               icon: const Icon(Icons.check),
               onPressed: _saveSettings,
-              tooltip: 'ذخیره',
+              tooltip: t.save,
             ),
         ],
       ),
@@ -171,7 +178,7 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
                       const SizedBox(height: 16),
                       ElevatedButton(
                         onPressed: _loadSettings,
-                        child: const Text('تلاش مجدد'),
+                        child: Text(t.retry),
                       ),
                     ],
                   ),
@@ -184,7 +191,7 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         // بخش شماره‌گذاری
-                        _buildSectionTitle('شماره‌گذاری سفارشات', Icons.numbers),
+                        _buildSectionTitle(t.repairShopNumberingSection, Icons.numbers),
                         Card(
                           child: Padding(
                             padding: const EdgeInsets.all(16),
@@ -193,21 +200,20 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
                                 // فرمت کد
                                 DropdownButtonFormField<String>(
                                   initialValue: _codeFormat,
-                                  decoration: const InputDecoration(
-                                    labelText: 'فرمت شماره‌گذاری',
-                                    border: OutlineInputBorder(),
-                                    prefixIcon: Icon(Icons.format_list_numbered),
-                                    helperText:
-                                        'ترتیبی: REC-2025-0001 | تصادفی: REC-A7B3C9',
+                                  decoration: InputDecoration(
+                                    labelText: t.repairShopNumberingFormat,
+                                    border: const OutlineInputBorder(),
+                                    prefixIcon: const Icon(Icons.format_list_numbered),
+                                    helperText: t.repairShopNumberingFormatHelper,
                                   ),
-                                  items: const [
+                                  items: [
                                     DropdownMenuItem(
                                       value: 'sequential',
-                                      child: Text('ترتیبی'),
+                                      child: Text(t.repairShopSequential),
                                     ),
                                     DropdownMenuItem(
                                       value: 'random',
-                                      child: Text('تصادفی'),
+                                      child: Text(t.repairShopRandom),
                                     ),
                                   ],
                                   onChanged: (value) {
@@ -220,18 +226,18 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
                                 // پیشوند کد
                                 TextFormField(
                                   controller: _prefixController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'پیشوند کد',
-                                    border: OutlineInputBorder(),
-                                    prefixIcon: Icon(Icons.label),
-                                    helperText: 'مثال: REC، REP، REPAIR',
+                                  decoration: InputDecoration(
+                                    labelText: t.repairShopCodePrefix,
+                                    border: const OutlineInputBorder(),
+                                    prefixIcon: const Icon(Icons.label),
+                                    helperText: t.repairShopCodePrefixHelper,
                                   ),
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
-                                      return 'پیشوند الزامی است';
+                                      return t.repairShopPrefixRequired;
                                     }
                                     if (value.length > 10) {
-                                      return 'حداکثر 10 کاراکتر';
+                                      return t.repairShopPrefixMaxLength;
                                     }
                                     return null;
                                   },
@@ -243,7 +249,7 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
 
                         const SizedBox(height: 24),
 
-                        _buildSectionTitle('پیش‌فرض‌های فاکتور و انبار', Icons.inventory_2),
+                        _buildSectionTitle(t.repairShopInvoiceWarehouseSection, Icons.inventory_2),
                         Card(
                           child: Padding(
                             padding: const EdgeInsets.all(16),
@@ -252,8 +258,8 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
                                 ProductComboboxWidget(
                                   businessId: widget.businessId,
                                   selectedProduct: _serviceProduct,
-                                  label: 'محصول خدمات تعمیر',
-                                  hintText: 'خدمت پیش‌فرض برای ردیف دستمزد فاکتور',
+                                  label: t.repairShopServiceProduct,
+                                  hintText: t.repairShopServiceProductHint,
                                   onChanged: (product) {
                                     setState(() => _serviceProduct = product);
                                   },
@@ -262,16 +268,16 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
                                 WarehouseComboboxWidget(
                                   businessId: widget.businessId,
                                   selectedWarehouseId: _defaultWarehouseId,
-                                  label: 'انبار پیش‌فرض قطعات',
-                                  hintText: 'انبار خروج قطعات',
+                                  label: t.repairShopDefaultPartsWarehouse,
+                                  hintText: t.repairShopDefaultPartsWarehouseHint,
                                   onChanged: (id) {
                                     setState(() => _defaultWarehouseId = id);
                                   },
                                 ),
                                 const SizedBox(height: 8),
-                                const Text(
-                                  'اگر محصول خدمات انتخاب نشود، سیستم هنگام صدور فاکتور یک خدمت «خدمات تعمیر» می‌سازد.',
-                                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                                Text(
+                                  t.repairShopServiceProductAutoCreate,
+                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
                                 ),
                               ],
                             ),
@@ -281,14 +287,13 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
                         const SizedBox(height: 24),
 
                         // بخش اعلان‌ها
-                        _buildSectionTitle('اعلان‌های خودکار', Icons.notifications),
+                        _buildSectionTitle(t.repairShopAutoNotifications, Icons.notifications),
                         Card(
                           child: Column(
                             children: [
                               SwitchListTile(
-                                title: const Text('پیامک دریافت سفارش'),
-                                subtitle: const Text(
-                                    'ارسال خودکار پیامک هنگام دریافت سفارش جدید'),
+                                title: Text(t.repairShopSmsOnReceive),
+                                subtitle: Text(t.repairShopSmsOnReceiveHint),
                                 value: _autoSmsOnReceive,
                                 onChanged: (value) {
                                   setState(() => _autoSmsOnReceive = value);
@@ -296,9 +301,8 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
                               ),
                               const Divider(height: 1),
                               SwitchListTile(
-                                title: const Text('پیامک تغییر وضعیت'),
-                                subtitle: const Text(
-                                    'ارسال خودکار پیامک هنگام تغییر وضعیت'),
+                                title: Text(t.repairShopSmsOnStatus),
+                                subtitle: Text(t.repairShopSmsOnStatusHint),
                                 value: _autoSmsOnStatusChange,
                                 onChanged: (value) {
                                   setState(() => _autoSmsOnStatusChange = value);
@@ -306,9 +310,8 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
                               ),
                               const Divider(height: 1),
                               SwitchListTile(
-                                title: const Text('ایمیل دریافت سفارش'),
-                                subtitle: const Text(
-                                    'ارسال خودکار ایمیل هنگام دریافت سفارش جدید'),
+                                title: Text(t.repairShopEmailOnReceive),
+                                subtitle: Text(t.repairShopEmailOnReceiveHint),
                                 value: _autoEmailOnReceive,
                                 onChanged: (value) {
                                   setState(() => _autoEmailOnReceive = value);
@@ -316,9 +319,8 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
                               ),
                               const Divider(height: 1),
                               SwitchListTile(
-                                title: const Text('ایمیل تغییر وضعیت'),
-                                subtitle: const Text(
-                                    'ارسال خودکار ایمیل هنگام تغییر وضعیت'),
+                                title: Text(t.repairShopEmailOnStatus),
+                                subtitle: Text(t.repairShopEmailOnStatusHint),
                                 value: _autoEmailOnStatusChange,
                                 onChanged: (value) {
                                   setState(
@@ -332,7 +334,7 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
                         const SizedBox(height: 24),
 
                         // بخش اطلاعات
-                        _buildSectionTitle('راهنما', Icons.info_outline),
+                        _buildSectionTitle(t.repairShopHelp, Icons.info_outline),
                         Card(
                           child: Padding(
                             padding: const EdgeInsets.all(16),
@@ -340,18 +342,18 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 _buildInfoRow(
-                                  '📋 فرمت ترتیبی',
-                                  'کدها به صورت REC-2025-0001، REC-2025-0002 و... تولید می‌شوند',
+                                  t.repairShopHelpSequentialTitle,
+                                  t.repairShopHelpSequentialBody,
                                 ),
                                 const SizedBox(height: 12),
                                 _buildInfoRow(
-                                  '🎲 فرمت تصادفی',
-                                  'کدها به صورت REC-A7B3C9، REC-XY4K2L و... تولید می‌شوند',
+                                  t.repairShopHelpRandomTitle,
+                                  t.repairShopHelpRandomBody,
                                 ),
                                 const SizedBox(height: 12),
                                 _buildInfoRow(
-                                  '📱 اعلان‌های خودکار',
-                                  'برای استفاده از این قابلیت، ابتدا باید تنظیمات پیامک و ایمیل را در بخش تنظیمات کلی فعال کنید',
+                                  t.repairShopHelpNotifyTitle,
+                                  t.repairShopHelpNotifyBody,
                                 ),
                               ],
                             ),
@@ -370,7 +372,7 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 )
                               : const Icon(Icons.check),
-                          label: Text(_isSaving ? 'در حال ذخیره...' : 'ذخیره تنظیمات'),
+                          label: Text(_isSaving ? t.saving : t.repairShopSaveSettings),
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.all(16),
                           ),

@@ -264,6 +264,17 @@ def test_recalculate_parts_cost_sums_all_rows() -> None:
     assert order.final_cost == Decimal("20")
 
 
+def test_repair_shop_catalog_keys_are_translated() -> None:
+    from app.core.i18n import Translator
+
+    fa = Translator("fa")
+    en = Translator("en")
+    assert fa.t("REPAIR_ORDER_NOT_FOUND") == "سفارش تعمیر یافت نشد"
+    assert en.t("REPAIR_ORDER_NOT_FOUND") == "Repair order not found"
+    assert fa.t("TECHNICIAN_DEACTIVATED") == "تعمیرکار با موفقیت غیرفعال شد"
+    assert en.t("PLUGIN_NOT_ACTIVE") == "The required plugin is not active for this business"
+
+
 def test_receipt_year_jalali_not_gregorian_in_autumn() -> None:
     year = service._receipt_year("jalali")
     gregorian = datetime.now().year

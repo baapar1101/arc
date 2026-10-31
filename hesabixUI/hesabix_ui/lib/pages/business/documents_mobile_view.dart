@@ -620,7 +620,7 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
     final theme = Theme.of(context);
     final t = AppLocalizations.of(context);
     final selected = _selectedIds.contains(doc.id);
-    final currency = doc.currencyCode ?? 'ریال';
+    final currency = doc.currencyCode ?? t.documentDefaultCurrency;
 
     return Card(
       color: selected ? theme.colorScheme.primary.withValues(alpha: 0.06) : null,
@@ -681,7 +681,7 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
                       border: Border.all(color: _typeColor(doc.documentType).withValues(alpha: 0.35)),
                     ),
                     child: Text(
-                      doc.getDocumentTypeName(),
+                      doc.getDocumentTypeName(t),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: _typeColor(doc.documentType),
                         fontWeight: FontWeight.w700,
@@ -695,7 +695,7 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
-                      doc.statusText,
+                      doc.statusText(t),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: doc.isProforma ? SemanticColorResolver.warning(context) : SemanticColorResolver.positive(context),
                         fontWeight: FontWeight.w700,

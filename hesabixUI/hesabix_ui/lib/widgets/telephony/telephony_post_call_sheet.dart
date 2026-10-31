@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/telephony/telephony_session_controller.dart';
+import '../../l10n/app_localizations.dart';
 
 Future<void> showTelephonyPostCallSheet(
   BuildContext context, {
@@ -17,18 +18,19 @@ Future<void> showTelephonyPostCallSheet(
   String category = '${call['category'] ?? 'support'}';
   String outcome = '${call['outcome'] ?? 'completed'}';
 
+  final t = AppLocalizations.of(context);
   final categories = {
-    'sales': 'فروش',
-    'support': 'پشتیبانی',
-    'finance': 'مالی',
-    'other': 'سایر',
+    'sales': t.telephonyCategorySales,
+    'support': t.telephonyCategorySupport,
+    'finance': t.telephonyCategoryFinance,
+    'other': t.telephonyCategoryOther,
   };
   final outcomes = {
-    'completed': 'موفق',
-    'callback': 'نیاز به تماس مجدد',
-    'no_answer': 'بدون پاسخ',
-    'wrong_number': 'شماره اشتباه',
-    'other': 'سایر',
+    'completed': t.telephonyOutcomeCompleted,
+    'callback': t.telephonyOutcomeCallback,
+    'no_answer': t.telephonyOutcomeNoAnswer,
+    'wrong_number': t.telephonyOutcomeWrongNumber,
+    'other': t.telephonyCategoryOther,
   };
 
   try {
@@ -51,7 +53,7 @@ Future<void> showTelephonyPostCallSheet(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'ثبت نتیجه تماس',
+                    t.telephonyPostCallTitle,
                     style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 6),
@@ -60,7 +62,7 @@ Future<void> showTelephonyPostCallSheet(
                     style: TextStyle(color: Theme.of(ctx).colorScheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: 16),
-                  Text('دسته‌بندی', style: Theme.of(ctx).textTheme.labelLarge),
+                  Text(t.telephonyCategory, style: Theme.of(ctx).textTheme.labelLarge),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
@@ -74,7 +76,7 @@ Future<void> showTelephonyPostCallSheet(
                     ],
                   ),
                   const SizedBox(height: 14),
-                  Text('نتیجه', style: Theme.of(ctx).textTheme.labelLarge),
+                  Text(t.telephonyOutcome, style: Theme.of(ctx).textTheme.labelLarge),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
@@ -93,7 +95,7 @@ Future<void> showTelephonyPostCallSheet(
                     minLines: 3,
                     maxLines: 5,
                     decoration: InputDecoration(
-                      labelText: 'یادداشت',
+                      labelText: t.telephonyNote,
                       filled: true,
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                     ),
@@ -110,14 +112,14 @@ Future<void> showTelephonyPostCallSheet(
                       session.clearPendingPostCall();
                       if (ctx.mounted) Navigator.pop(ctx);
                     },
-                    child: const Text('ذخیره و بستن'),
+                    child: Text(t.telephonySaveAndClose),
                   ),
                   TextButton(
                     onPressed: () {
                       session.clearPendingPostCall();
                       Navigator.pop(ctx);
                     },
-                    child: const Text('بعداً'),
+                    child: Text(t.telephonyLater),
                   ),
                 ],
               ),

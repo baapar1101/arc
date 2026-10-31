@@ -113,8 +113,8 @@ def update_settings(db: Session, business_id: int, payload: Dict[str, Any]) -> D
 				mode = str(payload[key] or "permission_based").strip()
 				if mode not in ("permission_based", "all_operators", "owner_and_managers"):
 					raise ApiError(
-						"VALIDATION_ERROR",
-						"recording_access_mode باید permission_based، owner_and_managers یا all_operators باشد.",
+						"INVALID_RECORDING_ACCESS_MODE",
+						"INVALID_RECORDING_ACCESS_MODE",
 						http_status=400,
 					)
 				setattr(row, key, mode)
@@ -167,7 +167,7 @@ def list_pbx(db: Session, business_id: int, *, include_token_hint: bool = True) 
 def create_pbx(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
 	name = (payload.get("name") or "").strip()
 	if not name:
-		raise ApiError("VALIDATION_ERROR", "نام مرکز تلفن الزامی است.", http_status=400)
+		raise ApiError("PBX_NAME_REQUIRED", "PBX_NAME_REQUIRED", http_status=400)
 	settings_row = get_or_create_settings(db, business_id)
 	existing_count = (
 		db.query(func.count(TelephonyPbxConnection.id))
@@ -178,7 +178,7 @@ def create_pbx(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[s
 	if existing_count and not settings_row.multi_pbx_enabled:
 		raise ApiError(
 			"MULTI_PBX_DISABLED",
-			"چند مرکز تلفن برای این کسب‌وکار فعال نیست. ابتدا multi_pbx را در تنظیمات روشن کنید.",
+			"MULTI_PBX_DISABLED",
 			http_status=400,
 		)
 	api_key, key_hash = generate_api_key(prefix="hsx_tel_", length=36)
@@ -224,7 +224,7 @@ def rotate_pbx_token(db: Session, business_id: int, pbx_id: int) -> Dict[str, An
 		.first()
 	)
 	if not row:
-		raise ApiError("NOT_FOUND", "مرکز تلفن یافت نشد.", http_status=404)
+		raise ApiError("PBX_NOT_FOUND", "PBX_NOT_FOUND", http_status=404)
 	api_key, key_hash = generate_api_key(prefix="hsx_tel_", length=36)
 	row.connector_token_hash = key_hash
 	row.connector_token_prefix = api_key[:12]
@@ -244,7 +244,7 @@ def update_pbx(db: Session, business_id: int, pbx_id: int, payload: Dict[str, An
 		.first()
 	)
 	if not row:
-		raise ApiError("NOT_FOUND", "مرکز تلفن یافت نشد.", http_status=404)
+		raise ApiError("PBX_NOT_FOUND", "PBX_NOT_FOUND", http_status=404)
 	for key in ("name", "pbx_type", "host_hint", "settings", "is_active"):
 		if key in payload:
 			setattr(row, key, payload[key])
@@ -258,7 +258,7 @@ def authenticate_connector(
 	db: Session, *, token: str, business_id: int, pbx_id: int
 ) -> TelephonyPbxConnection:
 	if not token or not check_telephony_plugin_active(db, business_id):
-		raise ApiError("UNAUTHORIZED", "Connector authentication failed.", http_status=401)
+		raise ApiError("CONNECTOR_AUTH_FAILED", "CONNECTOR_AUTH_FAILED", http_status=401)
 	token_hash = hash_api_key(token)
 	row = (
 		db.query(TelephonyPbxConnection)
@@ -271,7 +271,7 @@ def authenticate_connector(
 		.first()
 	)
 	if not row:
-		raise ApiError("UNAUTHORIZED", "Invalid connector token.", http_status=401)
+		raise ApiError("INVALID_CONNECTOR_TOKEN", "INVALID_CONNECTOR_TOKEN", http_status=401)
 	_rate_limit_connector(int(pbx_id))
 	return row
 
@@ -286,7 +286,7 @@ def _rate_limit_connector(pbx_id: int, *, max_per_sec: int = 50) -> None:
 	window = _CONNECTOR_HITS.setdefault(pbx_id, [])
 	window[:] = [t for t in window if now - t < 1.0]
 	if len(window) >= max_per_sec:
-		raise ApiError("RATE_LIMITED", "Connector event rate exceeded.", http_status=429)
+		raise ApiError("RATE_LIMITED", "RATE_LIMITED", http_status=429)
 	window.append(now)
 
 
@@ -352,14 +352,14 @@ def upsert_extension(db: Session, business_id: int, payload: Dict[str, Any]) -> 
 	pbx_id = int(payload.get("pbx_id") or 0)
 	ext = str(payload.get("extension") or "").strip()
 	if not pbx_id or not ext:
-		raise ApiError("VALIDATION_ERROR", "pbx_id و extension الزامی است.", http_status=400)
+		raise ApiError("PBX_AND_EXTENSION_REQUIRED", "PBX_AND_EXTENSION_REQUIRED", http_status=400)
 	pbx = (
 		db.query(TelephonyPbxConnection)
 		.filter(TelephonyPbxConnection.id == pbx_id, TelephonyPbxConnection.business_id == business_id)
 		.first()
 	)
 	if not pbx:
-		raise ApiError("NOT_FOUND", "مرکز تلفن یافت نشد.", http_status=404)
+		raise ApiError("PBX_NOT_FOUND", "PBX_NOT_FOUND", http_status=404)
 	row = (
 		db.query(TelephonyExtension)
 		.filter(TelephonyExtension.pbx_id == pbx_id, TelephonyExtension.extension == ext)
@@ -404,7 +404,7 @@ def sync_extensions(
 		.first()
 	)
 	if not pbx:
-		raise ApiError("NOT_FOUND", "مرکز تلفن یافت نشد.", http_status=404)
+		raise ApiError("PBX_NOT_FOUND", "PBX_NOT_FOUND", http_status=404)
 	upserted = 0
 	for raw in items:
 		if isinstance(raw, str):
@@ -527,14 +527,14 @@ def upsert_user_extension(db: Session, business_id: int, payload: Dict[str, Any]
 	user_id = int(payload.get("user_id") or 0)
 	extension_id = int(payload.get("extension_id") or 0)
 	if not user_id or not extension_id:
-		raise ApiError("VALIDATION_ERROR", "user_id و extension_id الزامی است.", http_status=400)
+		raise ApiError("USER_AND_EXTENSION_REQUIRED", "USER_AND_EXTENSION_REQUIRED", http_status=400)
 	ext = (
 		db.query(TelephonyExtension)
 		.filter(TelephonyExtension.id == extension_id, TelephonyExtension.business_id == business_id)
 		.first()
 	)
 	if not ext:
-		raise ApiError("NOT_FOUND", "داخلی یافت نشد.", http_status=404)
+		raise ApiError("EXTENSION_NOT_FOUND", "EXTENSION_NOT_FOUND", http_status=404)
 	user = require_business_member(db, business_id, user_id)
 	if payload.get("allow_shared") is not None:
 		ext.allow_shared = bool(payload.get("allow_shared"))
@@ -548,7 +548,7 @@ def upsert_user_extension(db: Session, business_id: int, payload: Dict[str, Any]
 	if taken:
 		raise ApiError(
 			"EXTENSION_IN_USE",
-			"این داخلی به کاربر دیگری واگذار شده است. برای اشتراک، allow_shared را روی داخلی روشن کنید.",
+			"EXTENSION_IN_USE",
 			http_status=409,
 		)
 
@@ -588,7 +588,7 @@ def upsert_user_extension(db: Session, business_id: int, payload: Dict[str, Any]
 	if "endpoint_mode" in payload:
 		mode = str(payload.get("endpoint_mode") or "desk").strip().lower()
 		if mode not in ("relay", "direct", "desk"):
-			raise ApiError("VALIDATION_ERROR", "endpoint_mode باید relay، direct یا desk باشد.", http_status=400)
+			raise ApiError("INVALID_ENDPOINT_MODE_VALUES", "INVALID_ENDPOINT_MODE_VALUES", http_status=400)
 		row.endpoint_mode = mode
 	if "allow_mode_fallback" in payload:
 		row.allow_mode_fallback = bool(payload.get("allow_mode_fallback"))
@@ -633,7 +633,7 @@ def delete_user_extension(db: Session, business_id: int, link_id: int) -> None:
 		.first()
 	)
 	if not row:
-		raise ApiError("NOT_FOUND", "نگاشت داخلی یافت نشد.", http_status=404)
+		raise ApiError("EXTENSION_MAPPING_NOT_FOUND", "EXTENSION_MAPPING_NOT_FOUND", http_status=404)
 	db.delete(row)
 	db.commit()
 
@@ -936,7 +936,7 @@ def get_call(db: Session, business_id: int, call_id: int, *, auth_ctx=None, scop
 			.first()
 		)
 		if not row:
-			raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
+			raise ApiError("CALL_NOT_FOUND", "CALL_NOT_FOUND", http_status=404)
 	data = call_to_dict(row)
 	events = (
 		db.query(TelephonyCallEvent)
@@ -976,7 +976,7 @@ def patch_call(
 			.first()
 		)
 		if not row:
-			raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
+			raise ApiError("CALL_NOT_FOUND", "CALL_NOT_FOUND", http_status=404)
 		resolved = None
 	keys = [
 		"note",
@@ -1115,7 +1115,7 @@ def process_connector_event(
 	event_type = str(payload.get("type") or payload.get("event_type") or "").strip()
 	uniqueid = str(payload.get("uniqueid") or "").strip()
 	if not event_type or not uniqueid:
-		raise ApiError("VALIDATION_ERROR", "type و uniqueid الزامی است.", http_status=400)
+		raise ApiError("EVENT_TYPE_REQUIRED", "EVENT_TYPE_REQUIRED", http_status=400)
 
 	occurred_at = _now()
 	raw_at = payload.get("pbx_event_at")
@@ -1481,7 +1481,7 @@ def screen_pop_context(db: Session, business_id: int, call_id: int, *, auth_ctx=
 			.first()
 		)
 		if not call:
-			raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
+			raise ApiError("CALL_NOT_FOUND", "CALL_NOT_FOUND", http_status=404)
 
 	match = (call.extra_info or {}).get("match") or match_caller(
 		db, business_id, call.from_number_raw if call.direction == "inbound" else call.to_number_raw
@@ -1591,11 +1591,11 @@ def click_to_call(
 ) -> Dict[str, Any]:
 	destination = str(payload.get("destination") or payload.get("number") or "").strip()
 	if not destination:
-		raise ApiError("VALIDATION_ERROR", "شماره مقصد الزامی است.", http_status=400)
+		raise ApiError("DESTINATION_REQUIRED", "DESTINATION_REQUIRED", http_status=400)
 	norm = normalize_iran_phone(destination)
 	dest_canonical = norm["canonical"] or extract_digits(destination)
 	if not dest_canonical:
-		raise ApiError("VALIDATION_ERROR", "شماره مقصد نامعتبر است.", http_status=400)
+		raise ApiError("INVALID_DESTINATION", "INVALID_DESTINATION", http_status=400)
 
 	links = (
 		db.query(TelephonyUserExtension)
@@ -1608,7 +1608,7 @@ def click_to_call(
 		.all()
 	)
 	if not links:
-		raise ApiError("NO_EXTENSION", "برای شما داخلی Click-to-Call تعریف نشده است.", http_status=400)
+		raise ApiError("NO_EXTENSION", "NO_EXTENSION", http_status=400)
 
 	link = None
 	wanted_ext_id = payload.get("extension_id")
@@ -1620,7 +1620,7 @@ def click_to_call(
 	ext = link.extension_row
 	pbx = db.get(TelephonyPbxConnection, link.pbx_id)
 	if not pbx or not pbx.is_active:
-		raise ApiError("PBX_OFFLINE", "مرکز تلفن فعال نیست.", http_status=400)
+		raise ApiError("PBX_OFFLINE", "PBX_OFFLINE", http_status=400)
 
 	settings_pbx = pbx.settings or {}
 	command_id = str(uuid.uuid4())
@@ -1715,7 +1715,7 @@ def ack_command(db: Session, pbx: TelephonyPbxConnection, command_id: str, paylo
 		.first()
 	)
 	if not row:
-		raise ApiError("NOT_FOUND", "دستور یافت نشد.", http_status=404)
+		raise ApiError("COMMAND_NOT_FOUND", "COMMAND_NOT_FOUND", http_status=404)
 	ok = bool(payload.get("accepted", True))
 	row.status = "acked" if ok else "failed"
 	row.result_payload = payload
@@ -1739,7 +1739,7 @@ def create_person_from_call(
 			.first()
 		)
 		if not call:
-			raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
+			raise ApiError("CALL_NOT_FOUND", "CALL_NOT_FOUND", http_status=404)
 
 	number = call.from_number_normalized if call.direction == "inbound" else call.to_number_normalized
 	number = number or call.from_number_raw or call.to_number_raw
@@ -1793,7 +1793,7 @@ def create_lead_from_call(
 			.first()
 		)
 		if not call:
-			raise ApiError("NOT_FOUND", "تماس یافت نشد.", http_status=404)
+			raise ApiError("CALL_NOT_FOUND", "CALL_NOT_FOUND", http_status=404)
 
 	process = (
 		db.query(CrmProcessDefinition)
@@ -1806,7 +1806,7 @@ def create_lead_from_call(
 		.first()
 	)
 	if not process:
-		raise ApiError("NO_LEAD_FUNNEL", "فانل سرنخ برای این کسب‌وکار تعریف نشده است.", http_status=400)
+		raise ApiError("NO_LEAD_FUNNEL", "NO_LEAD_FUNNEL", http_status=400)
 	stage = (
 		db.query(CrmProcessStage)
 		.filter(CrmProcessStage.process_definition_id == process.id)
@@ -1814,7 +1814,7 @@ def create_lead_from_call(
 		.first()
 	)
 	if not stage:
-		raise ApiError("NO_LEAD_STAGE", "مرحله سرنخ یافت نشد.", http_status=400)
+		raise ApiError("NO_LEAD_STAGE", "NO_LEAD_STAGE", http_status=400)
 
 	number = call.from_number_normalized if call.direction == "inbound" else call.to_number_normalized
 	number = number or call.from_number_raw or call.to_number_raw

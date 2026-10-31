@@ -1,3 +1,14 @@
+import 'package:flutter/widgets.dart';
+
+import '../core/api_client.dart';
+import '../l10n/app_localizations.dart';
+
+AppLocalizations _documentL10n() {
+  final loc = ApiClient.currentLocale;
+  if (loc != null) return lookupAppLocalizations(loc);
+  return lookupAppLocalizations(const Locale('fa'));
+}
+
 /// مدل سند حسابداری (Document)
 class DocumentModel {
   final int id;
@@ -163,50 +174,47 @@ class DocumentModel {
     };
   }
 
-  /// دریافت نام فارسی نوع سند
-  String getDocumentTypeName() {
-    // اگر document_type_name از سرور آمده باشد، از آن استفاده کن
-    if (documentTypeName != null && documentTypeName!.isNotEmpty) {
-      return documentTypeName!;
-    }
-    
-    // در غیر این صورت از switch case استفاده کن
+  /// Localized document type label.
+  String getDocumentTypeName([AppLocalizations? t]) {
+    final loc = t ?? _documentL10n();
     switch (documentType) {
       case 'expense':
-        return 'هزینه';
+        return loc.documentTypeExpense;
       case 'income':
-        return 'درآمد';
+        return loc.documentTypeIncome;
       case 'receipt':
-        return 'دریافت';
+        return loc.documentTypeReceipt;
       case 'payment':
-        return 'پرداخت';
+        return loc.documentTypePayment;
       case 'transfer':
-        return 'انتقال';
+        return loc.documentTypeTransfer;
       case 'manual':
-        return 'سند دستی';
+        return loc.documentTypeManual;
       case 'invoice':
-        return 'فاکتور';
+        return loc.documentTypeInvoice;
       case 'invoice_sales':
-        return 'فروش';
+        return loc.documentTypeSales;
       case 'invoice_sales_return':
-        return 'برگشت از فروش';
+        return loc.documentTypeSalesReturn;
       case 'invoice_purchase':
-        return 'خرید';
+        return loc.documentTypePurchase;
       case 'invoice_purchase_return':
-        return 'برگشت از خرید';
+        return loc.documentTypePurchaseReturn;
       case 'invoice_direct_consumption':
-        return 'مصرف مستقیم';
+        return loc.documentTypeDirectConsumption;
       case 'invoice_production':
-        return 'تولید';
-      case 'invoice_waste':
-        return 'ضایعات';
       case 'production':
-        return 'تولید';
+        return loc.documentTypeProduction;
+      case 'invoice_waste':
+        return loc.documentTypeWaste;
       case 'opening_balance':
-        return 'موجودی اولیه';
+        return loc.documentTypeOpeningBalance;
       case 'check':
-        return 'چک';
+        return loc.documentTypeCheck;
       default:
+        if (documentTypeName != null && documentTypeName!.isNotEmpty) {
+          return documentTypeName!;
+        }
         return documentType;
     }
   }
@@ -218,7 +226,10 @@ class DocumentModel {
   bool get isDeletable => documentType == 'manual';
 
   /// دریافت وضعیت سند
-  String get statusText => isProforma ? 'پیش‌نویس' : 'قطعی';
+  String statusText([AppLocalizations? t]) {
+    final loc = t ?? _documentL10n();
+    return isProforma ? loc.documentStatusDraft : loc.documentStatusFinal;
+  }
 
   /// Parse DateTime from various formats (prefers UTC ISO with Z from API *_raw fields).
   static DateTime _parseDateTime(dynamic value) {
@@ -461,9 +472,10 @@ class CreateManualDocumentRequest {
   }
 
   /// اعتبارسنجی درخواست
-  String? validate() {
+  String? validate([AppLocalizations? t]) {
+    final loc = t ?? _documentL10n();
     if (lines.length < 2) {
-      return 'سند باید حداقل 2 سطر داشته باشد';
+      return loc.documentNeedMinLines;
     }
 
     double totalDebit = 0;
@@ -474,12 +486,12 @@ class CreateManualDocumentRequest {
       
       // بررسی که هر سطر یا بدهکار یا بستانکار داشته باشد
       if (line.debit == 0 && line.credit == 0) {
-        return 'سطر ${i + 1} باید مقدار بدهکار یا بستانکار داشته باشد';
+        return loc.documentLineNeedAmount('${i + 1}');
       }
       
       // نمی‌تواند هم بدهکار هم بستانکار داشته باشد
       if (line.debit > 0 && line.credit > 0) {
-        return 'سطر ${i + 1} نمی‌تواند همزمان بدهکار و بستانکار داشته باشد';
+        return loc.documentLineBothSides('${i + 1}');
       }
       
       totalDebit += line.debit;
@@ -489,7 +501,7 @@ class CreateManualDocumentRequest {
     // بررسی متوازن بودن سند
     if ((totalDebit - totalCredit).abs() > 0.01) {
       final diff = totalDebit - totalCredit;
-      return 'سند متوازن نیست. تفاوت: ${diff.toStringAsFixed(2)}';
+      return loc.documentUnbalancedDiff(diff.toStringAsFixed(2));
     }
 
     return null; // اعتبارسنجی موفق
@@ -539,10 +551,11 @@ class UpdateManualDocumentRequest {
   }
 
   /// اعتبارسنجی درخواست
-  String? validate() {
+  String? validate([AppLocalizations? t]) {
+    final loc = t ?? _documentL10n();
     if (lines != null) {
       if (lines!.length < 2) {
-        return 'سند باید حداقل 2 سطر داشته باشد';
+        return loc.documentNeedMinLines;
       }
 
       double totalDebit = 0;
@@ -552,11 +565,11 @@ class UpdateManualDocumentRequest {
         final line = lines![i];
         
         if (line.debit == 0 && line.credit == 0) {
-          return 'سطر ${i + 1} باید مقدار بدهکار یا بستانکار داشته باشد';
+          return loc.documentLineNeedAmount('${i + 1}');
         }
         
         if (line.debit > 0 && line.credit > 0) {
-          return 'سطر ${i + 1} نمی‌تواند همزمان بدهکار و بستانکار داشته باشد';
+          return loc.documentLineBothSides('${i + 1}');
         }
         
         totalDebit += line.debit;
@@ -565,7 +578,7 @@ class UpdateManualDocumentRequest {
 
       if ((totalDebit - totalCredit).abs() > 0.01) {
         final diff = totalDebit - totalCredit;
-        return 'سند متوازن نیست. تفاوت: ${diff.toStringAsFixed(2)}';
+        return loc.documentUnbalancedDiff(diff.toStringAsFixed(2));
       }
     }
 

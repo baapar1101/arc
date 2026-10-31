@@ -25,9 +25,7 @@ logger = logging.getLogger(__name__)
 
 def _ensure_plugin_active(db: Session, business_id: int) -> None:
     if not check_repair_shop_plugin_active(db, business_id):
-        raise ApiError(
-            "PLUGIN_NOT_ACTIVE",
-            "افزونه مدیریت تعمیرگاه فعال نیست",
+        raise ApiError("PLUGIN_NOT_ACTIVE", "PLUGIN_NOT_ACTIVE",
             http_status=403,
         )
 
@@ -41,18 +39,14 @@ def _merge_extra_info(order: RepairOrder, updates: Dict[str, Any]) -> None:
 
 def _extract_invoice_id_and_code(result: Any) -> tuple[int, Optional[str]]:
     if not isinstance(result, dict):
-        raise ApiError(
-            "INVOICE_CREATION_FAILED",
-            "پاسخ ایجاد فاکتور نامعتبر است",
+        raise ApiError("INVOICE_CREATION_FAILED", "INVOICE_CREATION_FAILED",
             http_status=500,
         )
     data = result.get("data") if isinstance(result.get("data"), dict) else result
     if (not isinstance(data, dict) or data.get("id") is None) and isinstance(result.get("document"), dict):
         data = result["document"]
     if not isinstance(data, dict) or data.get("id") is None:
-        raise ApiError(
-            "INVOICE_CREATION_FAILED",
-            "شناسه فاکتور پس از ایجاد دریافت نشد",
+        raise ApiError("INVOICE_CREATION_FAILED", "INVOICE_CREATION_FAILED",
             http_status=500,
         )
     return int(data["id"]), data.get("code")
@@ -149,22 +143,18 @@ def create_repair_invoice_accounting(
     existing = invoice_repo.get_by_order(repair_order.id)
 
     if existing:
-        raise ApiError(
-            "INVOICE_ALREADY_EXISTS",
-            f"فاکتور قبلاً برای این سفارش ایجاد شده است (سند شماره: {existing.document_id})",
+        raise ApiError("INVOICE_ALREADY_EXISTS", "INVOICE_ALREADY_EXISTS",
             http_status=409
         )
 
     if repair_order.status not in ["completed_fixed", "ready_for_pickup", "delivered"]:
-        raise ApiError(
-            "INVALID_STATUS_FOR_INVOICE",
-            f"سفارش در وضعیت {repair_order.status} قابل صدور فاکتور نیست. ابتدا تعمیر را تکمیل کنید.",
+        raise ApiError("INVALID_STATUS_FOR_INVOICE", "INVALID_STATUS_FOR_INVOICE",
             http_status=400
         )
 
     business = db.query(Business).filter(Business.id == business_id).first()
     if not business:
-        raise ApiError("BUSINESS_NOT_FOUND", "کسب‌وکار یافت نشد", http_status=404)
+        raise ApiError("BUSINESS_NOT_FOUND", "BUSINESS_NOT_FOUND", http_status=404)
 
     fiscal_year = _get_current_fiscal_year(db, business_id)
 
@@ -239,9 +229,7 @@ def create_repair_invoice_accounting(
         invoice_payload["lines"].append(line)
 
     if not invoice_payload["lines"]:
-        raise ApiError(
-            "NO_INVOICE_LINES",
-            "برای صدور فاکتور باید دستمزد یا حداقل یک قطعه ثبت شده باشد.",
+        raise ApiError("NO_INVOICE_LINES", "NO_INVOICE_LINES",
             http_status=400,
         )
 
@@ -260,9 +248,7 @@ def create_repair_invoice_accounting(
         raise
     except Exception as e:
         logger.exception("خطا در ایجاد فاکتور تعمیر")
-        raise ApiError(
-            "INVOICE_CREATION_FAILED",
-            f"خطا در ایجاد فاکتور: {str(e)}",
+        raise ApiError("INVOICE_CREATION_FAILED", "INVOICE_CREATION_FAILED",
             http_status=500
         ) from e
 
@@ -298,7 +284,7 @@ def create_repair_invoice_accounting(
             "final_cost": float(repair_order.final_cost or 0),
             "technician_commission": float(repair_order.technician_commission or 0),
         },
-        "message": "فاکتور تعمیر با موفقیت ثبت شد و اسناد حسابداری ایجاد گردید."
+        "message": "REPAIR_INVOICE_CREATED"
     }
 
 
@@ -318,21 +304,19 @@ def create_receipt_for_repair_payment(
     repair_order = repo.get_by_id(repair_order_id, business_id)
 
     if not repair_order:
-        raise ApiError("REPAIR_ORDER_NOT_FOUND", "سفارش تعمیر یافت نشد", http_status=404)
+        raise ApiError("REPAIR_ORDER_NOT_FOUND", "REPAIR_ORDER_NOT_FOUND", http_status=404)
 
     invoice_repo = RepairInvoiceRepository(db)
     repair_invoice = invoice_repo.get_by_order(repair_order_id)
 
     if not repair_invoice:
-        raise ApiError(
-            "NO_INVOICE_FOUND",
-            "ابتدا باید فاکتور تعمیر ایجاد شود",
+        raise ApiError("NO_INVOICE_FOUND", "NO_INVOICE_FOUND",
             http_status=400
         )
 
     account_id = payment_data.get("account_id")
     if not account_id:
-        raise ApiError("ACCOUNT_REQUIRED", "حساب صندوق/بانک الزامی است", http_status=400)
+        raise ApiError("ACCOUNT_REQUIRED", "ACCOUNT_REQUIRED", http_status=400)
 
     payment_date = payment_data.get("payment_date", date.today())
     if isinstance(payment_date, datetime):
@@ -378,9 +362,7 @@ def create_receipt_for_repair_payment(
         raise
     except Exception as e:
         logger.exception("خطا در ایجاد سند دریافت تعمیر")
-        raise ApiError(
-            "RECEIPT_CREATION_FAILED",
-            f"خطا در ایجاد سند دریافت: {str(e)}",
+        raise ApiError("RECEIPT_CREATION_FAILED", "RECEIPT_CREATION_FAILED",
             http_status=500
         ) from e
 
@@ -401,7 +383,7 @@ def get_repair_accounting_summary(
     repair_order = repo.get_by_id(repair_order_id, business_id)
 
     if not repair_order:
-        raise ApiError("REPAIR_ORDER_NOT_FOUND", "سفارش تعمیر یافت نشد", http_status=404)
+        raise ApiError("REPAIR_ORDER_NOT_FOUND", "REPAIR_ORDER_NOT_FOUND", http_status=404)
 
     invoice_repo = RepairInvoiceRepository(db)
     repair_invoice = invoice_repo.get_by_order(repair_order_id)

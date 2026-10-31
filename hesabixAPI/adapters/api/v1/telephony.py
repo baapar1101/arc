@@ -28,11 +28,11 @@ def _resp(data: Any, request: Request, **kwargs) -> dict:
 
 def _bearer_token(authorization: Optional[str]) -> str:
 	if not authorization:
-		raise ApiError("UNAUTHORIZED", "Missing Authorization header.", http_status=401)
+		raise ApiError("MISSING_AUTHORIZATION", "MISSING_AUTHORIZATION", http_status=401)
 	parts = authorization.split()
 	if len(parts) == 2 and parts[0].lower() == "bearer":
 		return parts[1].strip()
-	raise ApiError("UNAUTHORIZED", "Invalid Authorization header.", http_status=401)
+	raise ApiError("INVALID_AUTHORIZATION", "INVALID_AUTHORIZATION", http_status=401)
 
 
 # ─── Settings / context ─────────────────────────────────────────────────────
@@ -209,7 +209,7 @@ def sync_extensions(
 	pbx_id = int(payload.get("pbx_id") or 0)
 	items = payload.get("items") or payload.get("extensions") or []
 	if not pbx_id:
-		raise ApiError("VALIDATION_ERROR", "pbx_id الزامی است.", http_status=400)
+		raise ApiError("PBX_ID_REQUIRED", "PBX_ID_REQUIRED", http_status=400)
 	return _resp(svc.sync_extensions(db, business_id, pbx_id, items), request)
 
 
@@ -450,7 +450,7 @@ def connector_heartbeat(
 	business_id = int(x_hesabix_business_id or payload.get("business_id") or 0)
 	pbx_id = int(x_hesabix_pbx_id or payload.get("pbx_id") or 0)
 	if not business_id or not pbx_id:
-		raise ApiError("VALIDATION_ERROR", "business_id and pbx_id required.", http_status=400)
+		raise ApiError("BUSINESS_AND_PBX_REQUIRED", "BUSINESS_AND_PBX_REQUIRED", http_status=400)
 	pbx = svc.authenticate_connector(db, token=token, business_id=business_id, pbx_id=pbx_id)
 	return _resp(svc.connector_heartbeat(db, pbx, payload), request)
 
@@ -470,7 +470,7 @@ def connector_events(
 	business_id = int(x_hesabix_business_id or payload.get("business_id") or 0)
 	pbx_id = int(x_hesabix_pbx_id or payload.get("pbx_id") or 0)
 	if not business_id or not pbx_id:
-		raise ApiError("VALIDATION_ERROR", "business_id and pbx_id required.", http_status=400)
+		raise ApiError("BUSINESS_AND_PBX_REQUIRED", "BUSINESS_AND_PBX_REQUIRED", http_status=400)
 	pbx = svc.authenticate_connector(db, token=token, business_id=business_id, pbx_id=pbx_id)
 	try:
 		result = svc.process_connector_event(db, pbx, payload)
@@ -485,7 +485,7 @@ def connector_events(
 			db.commit()
 		except Exception:
 			db.rollback()
-		raise ApiError("EVENT_PROCESSING_FAILED", str(e), http_status=500)
+		raise ApiError("EVENT_PROCESSING_FAILED", "EVENT_PROCESSING_FAILED", http_status=500)
 
 
 @router.get("/connector/commands/poll")
@@ -501,7 +501,7 @@ def connector_poll(
 	business_id = int(x_hesabix_business_id or 0)
 	pbx_id = int(x_hesabix_pbx_id or 0)
 	if not business_id or not pbx_id:
-		raise ApiError("VALIDATION_ERROR", "business_id and pbx_id required.", http_status=400)
+		raise ApiError("BUSINESS_AND_PBX_REQUIRED", "BUSINESS_AND_PBX_REQUIRED", http_status=400)
 	pbx = svc.authenticate_connector(db, token=token, business_id=business_id, pbx_id=pbx_id)
 	return _resp({"items": svc.poll_commands(db, pbx, limit=limit)}, request)
 
@@ -520,7 +520,7 @@ def connector_ack(
 	business_id = int(x_hesabix_business_id or 0)
 	pbx_id = int(x_hesabix_pbx_id or 0)
 	if not business_id or not pbx_id:
-		raise ApiError("VALIDATION_ERROR", "business_id and pbx_id required.", http_status=400)
+		raise ApiError("BUSINESS_AND_PBX_REQUIRED", "BUSINESS_AND_PBX_REQUIRED", http_status=400)
 	pbx = svc.authenticate_connector(db, token=token, business_id=business_id, pbx_id=pbx_id)
 	return _resp(svc.ack_command(db, pbx, command_id, payload or {}), request)
 
@@ -548,7 +548,7 @@ def connector_recording_meta(
 		.first()
 	)
 	if not call:
-		raise ApiError("NOT_FOUND", "Call not found for recording meta.", http_status=404)
+		raise ApiError("CALL_NOT_FOUND", "CALL_NOT_FOUND", http_status=404)
 	apply_recording_meta(db, call, payload)
 	bump_metric(db, business_id, "recordings_ready")
 	db.commit()
@@ -764,7 +764,7 @@ def _require_softphone_operator():
 			or has_business_permission_for_business(ctx, db, business_id, "telephony", "view")
 		)
 		if not uid_ok:
-			raise ApiError("FORBIDDEN", "دسترسی Softphone ندارید.", http_status=403)
+			raise ApiError("SOFTPHONE_FORBIDDEN", "SOFTPHONE_FORBIDDEN", http_status=403)
 
 	return _dep
 
@@ -793,9 +793,9 @@ def media_edge_internal_snapshot(
 	token_ok = bool(expected) and (x_hesabix_media_edge_token or "").strip() == expected
 	localhost_ok = client in ("127.0.0.1", "::1", "localhost")
 	if not (localhost_ok or token_ok):
-		raise ApiError("FORBIDDEN", "internal only", http_status=403)
+		raise ApiError("TELEPHONY_INTERNAL_ONLY", "TELEPHONY_INTERNAL_ONLY", http_status=403)
 	if not is_media_edge_process():
-		raise ApiError("SOFTPHONE_MEDIA_EDGE_REQUIRED", "این نود Media Edge نیست.", http_status=503)
+		raise ApiError("SOFTPHONE_MEDIA_EDGE_REQUIRED", "SOFTPHONE_MEDIA_EDGE_REQUIRED", http_status=503)
 	data: Dict[str, Any] = {
 		"process_role": process_role(),
 		"media_hub": media_hub.health(),

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, format_datetime_fields, ApiError
+from app.core.i18n import get_request_translator
 from app.core.date_input import normalize_date_range, DateParseError
 from app.core.repair_shop_plugin_dependency import (
     check_repair_shop_plugin_active,
@@ -40,9 +41,24 @@ from app.services import repair_shop_operations
 router = APIRouter(prefix="/repair-shop", tags=["Repair Shop"])
 
 
+def _localize_messages(data, translator):
+    if isinstance(data, list):
+        return [_localize_messages(item, translator) for item in data]
+    if isinstance(data, dict):
+        out = {}
+        for key, value in data.items():
+            if key == "message" and isinstance(value, str):
+                out[key] = translator.t(value, default=value)
+            else:
+                out[key] = _localize_messages(value, translator)
+        return out
+    return data
+
+
 def _format_response(data, request: Request):
-    """فرمت تاریخ‌ها مطابق تقویم انتخاب‌شده کاربر."""
-    return format_datetime_fields(data, request)
+    """فرمت تاریخ‌ها مطابق تقویم انتخاب‌شده کاربر و ترجمهٔ پیام‌های کلیدمحور."""
+    formatted = format_datetime_fields(data, request)
+    return _localize_messages(formatted, get_request_translator(request))
 
 
 # ========== Plugin Status ==========
@@ -56,7 +72,7 @@ def get_plugin_status(
 ):
     """دریافت وضعیت افزونه برای کسب‌وکار"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     status = get_business_plugin_status(db, business_id)
     return success_response(data=_format_response(status, request), request=request)
@@ -73,10 +89,10 @@ def get_settings(
 ):
     """دریافت تنظیمات تعمیرگاه"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "read"):
-        raise ApiError("FORBIDDEN", "دسترسی به بخش تعمیرگاه ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_service.get_repair_shop_settings(db, business_id)
     return success_response(data=_format_response(result, request), request=request)
@@ -92,10 +108,10 @@ def update_settings(
 ):
     """به‌روزرسانی تنظیمات تعمیرگاه"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "manage"):
-        raise ApiError("FORBIDDEN", "دسترسی مدیریت تعمیرگاه ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_service.update_repair_shop_settings(
         db, business_id, settings_data.dict(exclude_unset=True)
@@ -117,10 +133,10 @@ def list_technicians(
 ):
     """لیست تعمیرکاران"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "read"):
-        raise ApiError("FORBIDDEN", "دسترسی به بخش تعمیرگاه ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_service.list_technicians(db, business_id, only_active, offset, limit)
     return success_response(data=_format_response(result, request), request=request)
@@ -136,10 +152,10 @@ def get_technician(
 ):
     """دریافت اطلاعات یک تعمیرکار"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "read"):
-        raise ApiError("FORBIDDEN", "دسترسی به بخش تعمیرگاه ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_service.get_technician(db, business_id, technician_id)
     return success_response(data=_format_response(result, request), request=request)
@@ -155,10 +171,10 @@ def create_technician(
 ):
     """ایجاد تعمیرکار جدید"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "manage"):
-        raise ApiError("FORBIDDEN", "دسترسی مدیریت تعمیرگاه ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_service.create_technician(
         db, business_id, data.dict(), ctx.user.id
@@ -177,10 +193,10 @@ def update_technician(
 ):
     """به‌روزرسانی تعمیرکار"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "manage"):
-        raise ApiError("FORBIDDEN", "دسترسی مدیریت تعمیرگاه ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_service.update_technician(
         db, business_id, technician_id, data.dict(exclude_unset=True), ctx.user.id
@@ -198,10 +214,10 @@ def delete_technician(
 ):
     """حذف (غیرفعال کردن) تعمیرکار"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "delete"):
-        raise ApiError("FORBIDDEN", "دسترسی حذف ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_service.delete_technician(
         db, business_id, technician_id, ctx.user.id
@@ -229,10 +245,10 @@ def list_repair_orders(
 ):
     """لیست سفارشات تعمیر"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "read"):
-        raise ApiError("FORBIDDEN", "دسترسی به بخش تعمیرگاه ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     calendar_type = ctx.get_calendar_type()
     parsed_from = None
@@ -243,7 +259,7 @@ def list_repair_orders(
                 from_date, to_date, calendar_type=calendar_type
             )
         except (DateParseError, ValueError) as exc:
-            raise ApiError("INVALID_DATE", str(exc), http_status=400) from exc
+            raise ApiError("INVALID_DATE", "INVALID_DATE", http_status=400) from exc
     
     filters = {
         "status": status,
@@ -273,10 +289,10 @@ def get_repair_order(
 ):
     """دریافت اطلاعات کامل یک سفارش تعمیر"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "read"):
-        raise ApiError("FORBIDDEN", "دسترسی به بخش تعمیرگاه ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_service.get_repair_order(db, business_id, order_id)
     return success_response(data=_format_response(result, request), request=request)
@@ -292,10 +308,10 @@ def create_repair_order(
 ):
     """ایجاد سفارش تعمیر جدید"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "write"):
-        raise ApiError("FORBIDDEN", "دسترسی ثبت سفارش تعمیر ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_service.create_repair_order(
         db, business_id, data.dict(), ctx.user.id,
@@ -315,10 +331,10 @@ def update_repair_order(
 ):
     """به‌روزرسانی سفارش تعمیر"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "write"):
-        raise ApiError("FORBIDDEN", "دسترسی ویرایش سفارش تعمیر ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_service.update_repair_order(
         db, business_id, order_id, data.dict(exclude_unset=True), ctx.user.id
@@ -336,10 +352,10 @@ def delete_repair_order(
 ):
     """حذف (لغو) سفارش تعمیر"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "delete"):
-        raise ApiError("FORBIDDEN", "دسترسی حذف ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_service.delete_repair_order(
         db, business_id, order_id, ctx.user.id
@@ -360,10 +376,10 @@ def assign_technician(
 ):
     """اختصاص تعمیرکار به سفارش"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "write"):
-        raise ApiError("FORBIDDEN", "دسترسی ویرایش سفارش تعمیر ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_operations.assign_technician_to_order(
         db, business_id, order_id, data.technician_id, ctx.user.id
@@ -382,10 +398,10 @@ def update_status(
 ):
     """تغییر وضعیت سفارش"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "write"):
-        raise ApiError("FORBIDDEN", "دسترسی ویرایش سفارش تعمیر ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_operations.update_repair_order_status(
         db, business_id, order_id, data.status, data.notes, ctx.user.id, data.send_notification,
@@ -405,10 +421,10 @@ def add_parts(
 ):
     """افزودن قطعات به سفارش"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "write"):
-        raise ApiError("FORBIDDEN", "دسترسی ویرایش سفارش تعمیر ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     parts_list = [part.dict() for part in data.parts]
     result = repair_shop_operations.add_parts_to_repair_order(
@@ -428,10 +444,10 @@ def remove_part(
 ):
     """حذف قطعه از سفارش"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
 
     if not ctx.has_business_permission("repair_shop", "write"):
-        raise ApiError("FORBIDDEN", "دسترسی ویرایش سفارش تعمیر ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
 
     result = repair_shop_operations.remove_part_from_repair_order(
         db, business_id, order_id, part_id, ctx.user.id
@@ -450,10 +466,10 @@ def calculate_costs(
 ):
     """محاسبه هزینه‌های نهایی"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "write"):
-        raise ApiError("FORBIDDEN", "دسترسی ویرایش سفارش تعمیر ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_operations.calculate_repair_costs(
         db, business_id, order_id, data.labor_cost, ctx.user.id
@@ -472,10 +488,10 @@ def complete_repair(
 ):
     """اتمام تعمیر"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "write"):
-        raise ApiError("FORBIDDEN", "دسترسی ویرایش سفارش تعمیر ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_operations.complete_repair_order(
         db, business_id, order_id, data.is_fixed, ctx.user.id, data.notes,
@@ -495,10 +511,10 @@ def deliver_repair(
 ):
     """تحویل کالا به مشتری"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "write"):
-        raise ApiError("FORBIDDEN", "دسترسی ویرایش سفارش تعمیر ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_operations.deliver_repair_order(
         db, business_id, order_id, ctx.user.id, data.notes
@@ -518,10 +534,10 @@ def create_repair_invoice(
 ):
     """صدور فاکتور تعمیر و ثبت اسناد حسابداری"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "write"):
-        raise ApiError("FORBIDDEN", "دسترسی ویرایش سفارش تعمیر ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     from app.services.repair_shop_accounting import create_repair_invoice_accounting
     from adapters.db.repositories.repair_shop_repository import RepairOrderRepository
@@ -530,7 +546,7 @@ def create_repair_invoice(
     repair_order = repo.get_by_id(order_id, business_id)
     
     if not repair_order:
-        raise ApiError("REPAIR_ORDER_NOT_FOUND", "سفارش تعمیر یافت نشد", http_status=404)
+        raise ApiError("REPAIR_ORDER_NOT_FOUND", "REPAIR_ORDER_NOT_FOUND", http_status=404)
     
     result = create_repair_invoice_accounting(db, business_id, repair_order, ctx.user.id)
     db.commit()
@@ -548,10 +564,10 @@ def get_accounting_summary(
 ):
     """دریافت خلاصه حسابداری سفارش تعمیر"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "read"):
-        raise ApiError("FORBIDDEN", "دسترسی به بخش تعمیرگاه ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     from app.services.repair_shop_accounting import get_repair_accounting_summary
     
@@ -571,10 +587,10 @@ def get_warranty_repair_history(
 ):
     """تاریخچه تعمیرات براساس کد گارانتی"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     if not ctx.has_business_permission("repair_shop", "read"):
-        raise ApiError("FORBIDDEN", "دسترسی به بخش تعمیرگاه ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     
     result = repair_shop_operations.get_repair_history_by_warranty(
         db, business_id, warranty_code_id
@@ -593,9 +609,9 @@ def add_attachment(
 ):
     """افزودن ضمیمه به سفارش تعمیر"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     if not ctx.has_business_permission("repair_shop", "write"):
-        raise ApiError("FORBIDDEN", "دسترسی ویرایش سفارش تعمیر ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     result = repair_shop_service.add_repair_order_attachment(
         db, business_id, order_id, data.dict(), ctx.user.id
     )
@@ -613,9 +629,9 @@ def delete_attachment(
 ):
     """حذف ضمیمه سفارش تعمیر"""
     if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     if not ctx.has_business_permission("repair_shop", "write"):
-        raise ApiError("FORBIDDEN", "دسترسی ویرایش سفارش تعمیر ندارید", http_status=403)
+        raise ApiError("FORBIDDEN", "FORBIDDEN", http_status=403)
     result = repair_shop_service.delete_repair_order_attachment(
         db, business_id, order_id, attachment_id, ctx.user.id
     )

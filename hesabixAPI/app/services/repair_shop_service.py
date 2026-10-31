@@ -69,9 +69,7 @@ def _generate_random_code(length: int = 8) -> str:
 def _check_plugin_active(db: Session, business_id: int) -> None:
     """بررسی فعال بودن افزونه"""
     if not check_repair_shop_plugin_active(db, business_id):
-        raise ApiError(
-            "PLUGIN_NOT_ACTIVE",
-            "افزونه مدیریت تعمیرگاه فعال نیست",
+        raise ApiError("PLUGIN_NOT_ACTIVE", "PLUGIN_NOT_ACTIVE",
             http_status=403
         )
 
@@ -101,9 +99,7 @@ def _get_current_fiscal_year(db: Session, business_id: int) -> FiscalYear:
     ).first()
     
     if not fiscal_year:
-        raise ApiError(
-            "NO_ACTIVE_FISCAL_YEAR",
-            "سال مالی فعالی یافت نشد",
+        raise ApiError("NO_ACTIVE_FISCAL_YEAR", "NO_ACTIVE_FISCAL_YEAR",
             http_status=400
         )
     
@@ -209,7 +205,7 @@ def get_technician(
     tech = repo.get_by_id(technician_id, business_id)
     
     if not tech:
-        raise ApiError("TECHNICIAN_NOT_FOUND", "تعمیرکار یافت نشد", http_status=404)
+        raise ApiError("TECHNICIAN_NOT_FOUND", "TECHNICIAN_NOT_FOUND", http_status=404)
     
     # دریافت اطلاعات Person
     person = db.query(Person).filter(Person.id == tech.person_id).first()
@@ -239,7 +235,7 @@ def create_technician(
     # بررسی Person
     person_id = data.get("person_id")
     if not person_id:
-        raise ApiError("PERSON_ID_REQUIRED", "شناسه Person الزامی است", http_status=400)
+        raise ApiError("PERSON_ID_REQUIRED", "PERSON_ID_REQUIRED", http_status=400)
     
     person = db.query(Person).filter(
         and_(
@@ -249,7 +245,7 @@ def create_technician(
     ).first()
     
     if not person:
-        raise ApiError("PERSON_NOT_FOUND", "Person یافت نشد", http_status=404)
+        raise ApiError("PERSON_NOT_FOUND", "PERSON_NOT_FOUND", http_status=404)
     
     # تولید کد (اگر ارسال نشده باشد)
     code = data.get("code")
@@ -268,7 +264,7 @@ def create_technician(
     repo = RepairTechnicianRepository(db)
     existing = repo.get_by_code(code, business_id)
     if existing:
-        raise ApiError("CODE_ALREADY_EXISTS", "کد تعمیرکار تکراری است", http_status=409)
+        raise ApiError("CODE_ALREADY_EXISTS", "CODE_ALREADY_EXISTS", http_status=409)
     
     # ایجاد
     tech_data = {
@@ -301,13 +297,13 @@ def update_technician(
     tech = repo.get_by_id(technician_id, business_id)
     
     if not tech:
-        raise ApiError("TECHNICIAN_NOT_FOUND", "تعمیرکار یافت نشد", http_status=404)
+        raise ApiError("TECHNICIAN_NOT_FOUND", "TECHNICIAN_NOT_FOUND", http_status=404)
     
     # بررسی تکراری بودن کد (اگر تغییر کرده باشد)
     if "code" in data and data["code"] != tech.code:
         existing = repo.get_by_code(data["code"], business_id)
         if existing:
-            raise ApiError("CODE_ALREADY_EXISTS", "کد تعمیرکار تکراری است", http_status=409)
+            raise ApiError("CODE_ALREADY_EXISTS", "CODE_ALREADY_EXISTS", http_status=409)
     
     # به‌روزرسانی
     update_data = {}
@@ -341,7 +337,7 @@ def delete_technician(
     tech = repo.get_by_id(technician_id, business_id)
     
     if not tech:
-        raise ApiError("TECHNICIAN_NOT_FOUND", "تعمیرکار یافت نشد", http_status=404)
+        raise ApiError("TECHNICIAN_NOT_FOUND", "TECHNICIAN_NOT_FOUND", http_status=404)
     
     # بررسی اینکه آیا تعمیرکار سفارش فعالی دارد
     active_orders = db.query(RepairOrder).filter(
@@ -354,9 +350,7 @@ def delete_technician(
     ).count()
     
     if active_orders > 0:
-        raise ApiError(
-            "TECHNICIAN_HAS_ACTIVE_ORDERS",
-            f"این تعمیرکار {active_orders} سفارش فعال دارد. ابتدا سفارشات را تکمیل کنید.",
+        raise ApiError("TECHNICIAN_HAS_ACTIVE_ORDERS", "TECHNICIAN_HAS_ACTIVE_ORDERS",
             http_status=409
         )
     
@@ -364,7 +358,7 @@ def delete_technician(
     tech.is_active = False
     db.commit()
     
-    return {"message": "تعمیرکار با موفقیت غیرفعال شد"}
+    return {"message": "TECHNICIAN_DEACTIVATED"}
 
 
 # ========== سفارشات تعمیر ==========
@@ -510,7 +504,7 @@ def get_repair_order(
     order = repo.get_by_id(order_id, business_id)
     
     if not order:
-        raise ApiError("REPAIR_ORDER_NOT_FOUND", "سفارش تعمیر یافت نشد", http_status=404)
+        raise ApiError("REPAIR_ORDER_NOT_FOUND", "REPAIR_ORDER_NOT_FOUND", http_status=404)
     
     # دریافت اطلاعات مشتری
     customer = db.query(Person).filter(Person.id == order.customer_person_id).first()
@@ -635,7 +629,7 @@ def create_repair_order(
     # بررسی مشتری
     customer_person_id = data.get("customer_person_id")
     if not customer_person_id:
-        raise ApiError("CUSTOMER_REQUIRED", "مشتری الزامی است", http_status=400)
+        raise ApiError("CUSTOMER_REQUIRED", "CUSTOMER_REQUIRED", http_status=400)
     
     customer = db.query(Person).filter(
         and_(
@@ -645,7 +639,7 @@ def create_repair_order(
     ).first()
     
     if not customer:
-        raise ApiError("CUSTOMER_NOT_FOUND", "مشتری یافت نشد", http_status=404)
+        raise ApiError("CUSTOMER_NOT_FOUND", "CUSTOMER_NOT_FOUND", http_status=404)
     
     # بررسی کالا (اختیاری)
     product_id = data.get("product_id")
@@ -660,13 +654,13 @@ def create_repair_order(
         ).first()
         
         if not product:
-            raise ApiError("PRODUCT_NOT_FOUND", "کالا یافت نشد", http_status=404)
+            raise ApiError("PRODUCT_NOT_FOUND", "PRODUCT_NOT_FOUND", http_status=404)
         
         if not product_name:
             product_name = product.name
     
     if not product_name:
-        raise ApiError("PRODUCT_NAME_REQUIRED", "نام کالا الزامی است", http_status=400)
+        raise ApiError("PRODUCT_NAME_REQUIRED", "PRODUCT_NAME_REQUIRED", http_status=400)
     
     # دریافت سال مالی و ارز
     fiscal_year = _get_current_fiscal_year(db, business_id)
@@ -676,12 +670,10 @@ def create_repair_order(
         # استفاده از ارز پیش‌فرض کسب‌وکار
         business = db.query(Business).filter(Business.id == business_id).first()
         if not business:
-            raise ApiError("BUSINESS_NOT_FOUND", "کسب‌وکار یافت نشد", http_status=404)
+            raise ApiError("BUSINESS_NOT_FOUND", "BUSINESS_NOT_FOUND", http_status=404)
         
         if not business.default_currency_id:
-            raise ApiError(
-                "NO_DEFAULT_CURRENCY",
-                "ارز پیش‌فرض برای این کسب‌وکار تنظیم نشده است",
+            raise ApiError("NO_DEFAULT_CURRENCY", "NO_DEFAULT_CURRENCY",
                 http_status=400
             )
         
@@ -763,13 +755,11 @@ def update_repair_order(
     order = repo.get_by_id(order_id, business_id)
     
     if not order:
-        raise ApiError("REPAIR_ORDER_NOT_FOUND", "سفارش تعمیر یافت نشد", http_status=404)
+        raise ApiError("REPAIR_ORDER_NOT_FOUND", "REPAIR_ORDER_NOT_FOUND", http_status=404)
     
     # فقط سفارشات در وضعیت‌های خاص قابل ویرایش هستند
     if order.status in ["delivered", "cancelled"]:
-        raise ApiError(
-            "ORDER_NOT_EDITABLE",
-            f"سفارش در وضعیت {order.status} قابل ویرایش نیست",
+        raise ApiError("ORDER_NOT_EDITABLE", "ORDER_NOT_EDITABLE",
             http_status=400
         )
     
@@ -817,20 +807,16 @@ def delete_repair_order(
     order = repo.get_by_id(order_id, business_id)
     
     if not order:
-        raise ApiError("REPAIR_ORDER_NOT_FOUND", "سفارش تعمیر یافت نشد", http_status=404)
+        raise ApiError("REPAIR_ORDER_NOT_FOUND", "REPAIR_ORDER_NOT_FOUND", http_status=404)
     
     # بررسی وضعیت - فقط سفارشات خاص قابل لغو هستند
     if order.status in ["delivered"]:
-        raise ApiError(
-            "ORDER_NOT_DELETABLE",
-            "سفارش تحویل داده شده قابل لغو نیست",
+        raise ApiError("ORDER_NOT_DELETABLE", "ORDER_NOT_DELETABLE",
             http_status=400
         )
     
     if order.status == "cancelled":
-        raise ApiError(
-            "ORDER_ALREADY_CANCELLED",
-            "این سفارش قبلاً لغو شده است",
+        raise ApiError("ORDER_ALREADY_CANCELLED", "ORDER_ALREADY_CANCELLED",
             http_status=400
         )
     
@@ -839,9 +825,7 @@ def delete_repair_order(
     existing_invoice = invoice_repo.get_by_order(order_id)
     
     if existing_invoice:
-        raise ApiError(
-            "ORDER_HAS_INVOICE",
-            "این سفارش دارای فاکتور است و قابل لغو نیست. ابتدا فاکتور را حذف کنید.",
+        raise ApiError("ORDER_HAS_INVOICE", "ORDER_HAS_INVOICE",
             http_status=409
         )
     
@@ -861,7 +845,7 @@ def delete_repair_order(
     db.commit()
     
     return {
-        "message": "سفارش تعمیر با موفقیت لغو شد",
+        "message": "REPAIR_ORDER_CANCELLED",
         "order_id": order.id,
         "code": order.code
     }
@@ -878,15 +862,15 @@ def add_repair_order_attachment(
     repo = RepairOrderRepository(db)
     order = repo.get_by_id(order_id, business_id)
     if not order:
-        raise ApiError("REPAIR_ORDER_NOT_FOUND", "سفارش تعمیر یافت نشد", http_status=404)
+        raise ApiError("REPAIR_ORDER_NOT_FOUND", "REPAIR_ORDER_NOT_FOUND", http_status=404)
 
     file_storage_id = data.get("file_storage_id")
     if not file_storage_id:
-        raise ApiError("FILE_REQUIRED", "شناسه فایل الزامی است", http_status=400)
+        raise ApiError("FILE_REQUIRED", "FILE_REQUIRED", http_status=400)
 
     attachment_type = data.get("attachment_type") or "during_repair"
     if attachment_type not in {"before_repair", "during_repair", "after_repair"}:
-        raise ApiError("INVALID_ATTACHMENT_TYPE", "نوع ضمیمه نامعتبر است", http_status=400)
+        raise ApiError("INVALID_ATTACHMENT_TYPE", "INVALID_ATTACHMENT_TYPE", http_status=400)
 
     file_type = data.get("file_type") or "image"
     att_repo = RepairOrderAttachmentRepository(db)
@@ -913,12 +897,12 @@ def delete_repair_order_attachment(
     repo = RepairOrderRepository(db)
     order = repo.get_by_id(order_id, business_id)
     if not order:
-        raise ApiError("REPAIR_ORDER_NOT_FOUND", "سفارش تعمیر یافت نشد", http_status=404)
+        raise ApiError("REPAIR_ORDER_NOT_FOUND", "REPAIR_ORDER_NOT_FOUND", http_status=404)
 
     att_repo = RepairOrderAttachmentRepository(db)
     attachment = att_repo.get_by_id(attachment_id, order_id)
     if not attachment:
-        raise ApiError("ATTACHMENT_NOT_FOUND", "ضمیمه یافت نشد", http_status=404)
+        raise ApiError("ATTACHMENT_NOT_FOUND", "ATTACHMENT_NOT_FOUND", http_status=404)
     att_repo.delete(attachment)
     db.commit()
     return get_repair_order(db, business_id, order_id)

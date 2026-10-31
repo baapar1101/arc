@@ -55,23 +55,23 @@ def _is_fixed_asset_document(document: Any) -> bool:
 def _assert_not_fixed_asset_document(document: Any, *, action: str) -> None:
     if not _is_fixed_asset_document(document):
         return
-    verb = "حذف" if action == "delete" else "ویرایش"
-    raise ApiError(
-        "FIXED_ASSET_DOCUMENT_SOURCE_ONLY",
-        f"اسناد دارایی ثابت فقط از بخش کنترل اموال قابل {verb} هستند",
-        http_status=409,
+    code = (
+        "FIXED_ASSET_DOCUMENT_DELETE_SOURCE_ONLY"
+        if action == "delete"
+        else "FIXED_ASSET_DOCUMENT_EDIT_SOURCE_ONLY"
     )
+    raise ApiError(code, code, http_status=409)
 
 
 def _assert_not_received_loan_facility_document(document: Any, *, action: str) -> None:
     if not _is_received_loan_facility_manual_document(document):
         return
-    verb = "حذف" if action == "delete" else "ویرایش"
-    raise ApiError(
-        "RECEIVED_LOAN_DOCUMENT_SOURCE_ONLY",
-        f"اسناد تسهیلات فقط از بخش تسهیلات و اقساط قابل {verb} هستند",
-        http_status=409,
+    code = (
+        "LOAN_DOCUMENT_DELETE_SOURCE_ONLY"
+        if action == "delete"
+        else "LOAN_DOCUMENT_EDIT_SOURCE_ONLY"
     )
+    raise ApiError(code, code, http_status=409)
 
 
 def _assert_received_loan_manual_fiscal_year_editable(db: Session, document: Any) -> None:
@@ -85,8 +85,8 @@ def _assert_received_loan_manual_fiscal_year_editable(db: Session, document: Any
         return
     if getattr(fy, "is_last", False) is not True:
         raise ApiError(
-            "FISCAL_YEAR_LOCKED",
-            "سند تسهیلات متعلق به سال مالی جاری نیست و قابل حذف یا ویرایش نمی‌باشد",
+            "LOAN_DOCUMENT_FISCAL_YEAR_LOCKED",
+            "LOAN_DOCUMENT_FISCAL_YEAR_LOCKED",
             http_status=409,
         )
 
@@ -242,7 +242,7 @@ def delete_document(db: Session, document_id: int, *, commit: bool = True) -> bo
     if not document:
         raise ApiError(
             "DOCUMENT_NOT_FOUND",
-            "Document not found",
+            "DOCUMENT_NOT_FOUND",
             http_status=404
         )
 
@@ -253,7 +253,7 @@ def delete_document(db: Session, document_id: int, *, commit: bool = True) -> bo
     if document.document_type != "manual":
         raise ApiError(
             "CANNOT_DELETE_AUTO_DOCUMENT",
-            "Cannot delete automatically generated documents. Please delete from the original source.",
+            "CANNOT_DELETE_AUTO_DOCUMENT",
             http_status=400
         )
     
@@ -290,7 +290,7 @@ def delete_document(db: Session, document_id: int, *, commit: bool = True) -> bo
     if not success:
         raise ApiError(
             "DELETE_FAILED",
-            "Failed to delete document",
+            "DELETE_FAILED",
             http_status=500
         )
     
@@ -508,14 +508,14 @@ def export_documents_excel(
     except ImportError:
         raise ApiError(
             "OPENPYXL_NOT_INSTALLED",
-            "openpyxl library is not installed",
+            "OPENPYXL_NOT_INSTALLED",
             http_status=500
         )
     except Exception as e:
         logger.error(f"Error generating Excel: {str(e)}")
         raise ApiError(
             "EXCEL_GENERATION_FAILED",
-            f"Failed to generate Excel file: {str(e)}",
+            "EXCEL_GENERATION_FAILED",
             http_status=500
         )
 
@@ -539,8 +539,8 @@ def export_documents_pdf(
     # TODO: پیاده‌سازی export PDF
     # می‌توان از WeasyPrint یا ReportLab استفاده کرد
     raise ApiError(
-        "NOT_IMPLEMENTED",
-        "PDF export is not implemented yet",
+        "DOCUMENT_PDF_NOT_IMPLEMENTED",
+        "DOCUMENT_PDF_NOT_IMPLEMENTED",
         http_status=501
     )
 
@@ -619,7 +619,7 @@ def create_manual_document(
             and_(Project.id == project_id, Project.business_id == business_id, Project.is_active == True)
         ).first()
         if not project:
-            raise ApiError("PROJECT_NOT_FOUND", "پروژه یافت نشد یا غیرفعال است", http_status=404)
+            raise ApiError("PROJECT_NOT_FOUND", "PROJECT_NOT_FOUND", http_status=404)
     
     # آماده‌سازی داده‌های سند
     document_data = {
@@ -688,7 +688,7 @@ def create_manual_document(
         db.rollback()
         raise ApiError(
             "CREATE_DOCUMENT_FAILED",
-            f"Failed to create document: {str(e)}",
+            "CREATE_DOCUMENT_FAILED",
             http_status=500
         )
 
@@ -719,7 +719,7 @@ def update_manual_document(
     if not document:
         raise ApiError(
             "DOCUMENT_NOT_FOUND",
-            "Document not found",
+            "DOCUMENT_NOT_FOUND",
             http_status=404
         )
 
@@ -730,7 +730,7 @@ def update_manual_document(
     if document.document_type != "manual":
         raise ApiError(
             "CANNOT_EDIT_AUTO_DOCUMENT",
-            "Cannot edit automatically generated documents. Please edit from the original source.",
+            "CANNOT_EDIT_AUTO_DOCUMENT",
             http_status=400
         )
 
@@ -750,7 +750,7 @@ def update_manual_document(
             and_(Project.id == project_id, Project.business_id == document.business_id, Project.is_active == True)
         ).first()
         if not project:
-            raise ApiError("PROJECT_NOT_FOUND", "پروژه یافت نشد یا غیرفعال است", http_status=404)
+            raise ApiError("PROJECT_NOT_FOUND", "PROJECT_NOT_FOUND", http_status=404)
     
     # اگر سطرها ارسال شده، اعتبارسنجی کن
     if "lines" in data and data["lines"] is not None:
@@ -791,7 +791,7 @@ def update_manual_document(
         if not updated_document:
             raise ApiError(
                 "UPDATE_FAILED",
-                "Failed to update document",
+                "UPDATE_FAILED",
                 http_status=500
             )
         
@@ -827,7 +827,7 @@ def update_manual_document(
         db.rollback()
         raise ApiError(
             "UPDATE_DOCUMENT_FAILED",
-            f"Failed to update document: {str(e)}",
+            "UPDATE_DOCUMENT_FAILED",
             http_status=500
         )
 

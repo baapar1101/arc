@@ -1,3 +1,5 @@
+import 'package:hesabix_ui/l10n/app_localizations.dart';
+
 /// مدل تعمیرکار
 class RepairTechnician {
   final int id;
@@ -74,28 +76,30 @@ class RepairTechnician {
     );
   }
 
-  /// دریافت لیبل نوع حق‌الزحمه به فارسی
-  String get commissionTypeLabel {
+  String commissionTypeLabel(AppLocalizations t) {
     switch (commissionType) {
       case 'fixed':
-        return 'مبلغ ثابت';
+        return t.repairShopCommissionFixed;
       case 'percentage':
-        return 'درصدی';
+        return t.repairShopCommissionPercentage;
       case 'case_by_case':
-        return 'موردی';
+        return t.repairShopCommissionCaseByCase;
       default:
         return commissionType;
     }
   }
 
-  /// فرمت حق‌الزحمه برای نمایش (با واحد ارز)
-  String formattedCommission({String currencySymbol = 'تومان'}) {
+  String formattedCommission(
+    AppLocalizations t, {
+    String currencySymbol = '',
+  }) {
     if (commissionType == 'percentage') {
       return '$commissionValue%';
     } else if (commissionType == 'fixed') {
-      return '${commissionValue.toStringAsFixed(0)} $currencySymbol';
+      final amount = commissionValue.toStringAsFixed(0);
+      return currencySymbol.isEmpty ? amount : '$amount $currencySymbol';
     } else {
-      return 'موردی';
+      return t.repairShopCommissionCaseByCase;
     }
   }
 }

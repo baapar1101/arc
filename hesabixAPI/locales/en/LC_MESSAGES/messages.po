@@ -450,7 +450,7 @@ msgstr "Invoice"
 
 # Warranty
 msgid "PLUGIN_NOT_ACTIVE"
-msgstr "Warranty plugin is not active for this business"
+msgstr "The required plugin is not active for this business"
 
 msgid "WARRANTY_CODE_NOT_FOUND"
 msgstr "Warranty code not found"
@@ -915,3 +915,359 @@ msgstr "You are not a member of this business."
 
 msgid "BUSINESS_USERS_LEAVE_FAILED"
 msgstr "Could not leave the business. Please try again."
+
+# Repair shop
+msgid "REPAIR_ORDER_NOT_FOUND"
+msgstr "Repair order not found"
+
+msgid "TECHNICIAN_NOT_FOUND"
+msgstr "Technician not found"
+
+msgid "NO_ACTIVE_FISCAL_YEAR"
+msgstr "No active fiscal year found"
+
+msgid "PERSON_ID_REQUIRED"
+msgstr "Person ID is required"
+
+msgid "PERSON_NOT_FOUND"
+msgstr "Person not found"
+
+msgid "CODE_ALREADY_EXISTS"
+msgstr "Technician code already exists"
+
+msgid "TECHNICIAN_HAS_ACTIVE_ORDERS"
+msgstr "This technician has active orders. Complete them first."
+
+msgid "CUSTOMER_REQUIRED"
+msgstr "Customer is required"
+
+msgid "CUSTOMER_NOT_FOUND"
+msgstr "Customer not found"
+
+msgid "PRODUCT_NOT_FOUND"
+msgstr "Product not found"
+
+msgid "PRODUCT_NAME_REQUIRED"
+msgstr "Product name is required"
+
+msgid "BUSINESS_NOT_FOUND"
+msgstr "Business not found"
+
+msgid "NO_DEFAULT_CURRENCY"
+msgstr "Default currency is not set for this business"
+
+msgid "ORDER_NOT_EDITABLE"
+msgstr "This order cannot be edited in its current status"
+
+msgid "ORDER_NOT_DELETABLE"
+msgstr "A delivered order cannot be cancelled"
+
+msgid "ORDER_ALREADY_CANCELLED"
+msgstr "This order is already cancelled"
+
+msgid "ORDER_HAS_INVOICE"
+msgstr "This order has an invoice and cannot be cancelled. Delete the invoice first."
+
+msgid "FILE_REQUIRED"
+msgstr "File ID is required"
+
+msgid "INVALID_ATTACHMENT_TYPE"
+msgstr "Invalid attachment type"
+
+msgid "ATTACHMENT_NOT_FOUND"
+msgstr "Attachment not found"
+
+msgid "INVALID_STATUS"
+msgstr "Invalid status"
+
+msgid "PARTS_REQUIRED"
+msgstr "At least one part is required"
+
+msgid "INVALID_PART_DATA"
+msgstr "Invalid part data"
+
+msgid "WAREHOUSE_REQUIRED"
+msgstr "A warehouse is required for inventory-tracked parts"
+
+msgid "INSUFFICIENT_STOCK"
+msgstr "Insufficient stock"
+
+msgid "PART_NOT_FOUND"
+msgstr "Part not found"
+
+msgid "INVALID_STATUS_FOR_COMPLETE"
+msgstr "A delivered or cancelled order cannot be completed"
+
+msgid "CANNOT_COMPLETE_REPAIR"
+msgstr "The repair cannot be completed"
+
+msgid "INVALID_STATUS_FOR_DELIVERY"
+msgstr "This order cannot be delivered in its current status"
+
+msgid "INVOICE_CREATION_FAILED"
+msgstr "Could not create the repair invoice"
+
+msgid "INVOICE_ALREADY_EXISTS"
+msgstr "An invoice has already been created for this order"
+
+msgid "INVALID_STATUS_FOR_INVOICE"
+msgstr "This order cannot be invoiced in its current status. Complete the repair first."
+
+msgid "NO_INVOICE_LINES"
+msgstr "Register labor or at least one part before issuing an invoice."
+
+msgid "NO_INVOICE_FOUND"
+msgstr "Create the repair invoice first"
+
+msgid "ACCOUNT_REQUIRED"
+msgstr "A cash or bank account is required"
+
+msgid "RECEIPT_CREATION_FAILED"
+msgstr "Could not create the receipt document"
+
+msgid "INVALID_PARAMETERS"
+msgstr "Required parameters were not found"
+
+msgid "INVALID_DATE"
+msgstr "Invalid date"
+
+msgid "TECHNICIAN_DEACTIVATED"
+msgstr "Technician deactivated"
+
+msgid "REPAIR_ORDER_CANCELLED"
+msgstr "Repair order cancelled"
+
+msgid "REPAIR_INVOICE_CREATED"
+msgstr "Repair invoice registered and accounting documents created."
+
+msgid "PLUGIN_NOT_FOUND"
+msgstr "Plugin was not found in the system"
+
+msgid "PLUGIN_NOT_PURCHASED"
+msgstr "Plugin has not been purchased"
+
+msgid "PLUGIN_ACTIVE"
+msgstr "Plugin is active"
+
+msgid "PLUGIN_EXPIRED"
+msgstr "Plugin has expired"
+
+
+msgid "PBX_NOT_FOUND"
+msgstr "PBX was not found"
+
+msgid "CALL_NOT_FOUND"
+msgstr "Call was not found"
+
+msgid "EXTENSION_NOT_FOUND"
+msgstr "Extension was not found"
+
+msgid "EXTENSION_MAPPING_NOT_FOUND"
+msgstr "Extension mapping was not found"
+
+msgid "COMMAND_NOT_FOUND"
+msgstr "Command was not found"
+
+msgid "TELEPHONY_USER_NOT_FOUND"
+msgstr "User was not found"
+
+msgid "DLQ_NOT_FOUND"
+msgstr "Dead-letter item was not found"
+
+msgid "SOFTPHONE_SESSION_NOT_FOUND"
+msgstr "Softphone session was not found"
+
+msgid "RECORDING_NOT_FOUND"
+msgstr "Call recording was not found"
+
+msgid "PBX_NAME_REQUIRED"
+msgstr "PBX name is required"
+
+msgid "PBX_ID_REQUIRED"
+msgstr "PBX id is required"
+
+msgid "PBX_AND_EXTENSION_REQUIRED"
+msgstr "PBX and extension are required"
+
+msgid "USER_AND_EXTENSION_REQUIRED"
+msgstr "User and extension are required"
+
+msgid "INVALID_ENDPOINT_MODE"
+msgstr "Invalid endpoint mode"
+
+msgid "INVALID_ENDPOINT_MODE_VALUES"
+msgstr "endpoint_mode must be relay, direct, or desk"
+
+msgid "DESTINATION_REQUIRED"
+msgstr "Destination number is required"
+
+msgid "INVALID_DESTINATION"
+msgstr "Invalid destination number"
+
+msgid "EVENT_TYPE_REQUIRED"
+msgstr "Event type and uniqueid are required"
+
+msgid "BUSINESS_AND_PBX_REQUIRED"
+msgstr "business_id and pbx_id are required"
+
+msgid "INVALID_COMMAND_TYPE"
+msgstr "Invalid command type"
+
+msgid "INVALID_RECORDING_ACCESS_MODE"
+msgstr "Invalid recording access mode"
+
+msgid "INVALID_DTMF"
+msgstr "Invalid DTMF digit"
+
+msgid "SESSION_AND_DESTINATION_REQUIRED"
+msgstr "session_id and destination are required"
+
+msgid "USER_NOT_ACTIVE_MEMBER"
+msgstr "User is not an active member of this business"
+
+msgid "EXTENSION_OUT_OF_SCOPE"
+msgstr "Extension is outside your scope"
+
+msgid "EXTENSION_IN_USE"
+msgstr "This extension is already assigned to another user. Enable allow_shared to share it"
+
+msgid "MULTI_PBX_DISABLED"
+msgstr "Multiple PBXs are not enabled for this business. Turn on multi_pbx in settings first"
+
+msgid "NO_EXTENSION"
+msgstr "No extension is assigned to you"
+
+msgid "PBX_OFFLINE"
+msgstr "The PBX is not available"
+
+msgid "NO_LEAD_FUNNEL"
+msgstr "No lead funnel is defined for this business"
+
+msgid "NO_LEAD_STAGE"
+msgstr "Lead stage was not found"
+
+msgid "SOFTPHONE_NO_EXTENSION"
+msgstr "Softphone requires an extension mapped to the user"
+
+msgid "SOFTPHONE_DESK_MODE"
+msgstr "This user is in desk mode; use Click-to-Call or switch to relay/direct"
+
+msgid "SOFTPHONE_RELAY_DISABLED"
+msgstr "Relay mode is disabled on this PBX"
+
+msgid "SOFTPHONE_DIRECT_DISABLED"
+msgstr "Direct mode is disabled on this PBX"
+
+msgid "SOFTPHONE_TUNNEL_OFFLINE"
+msgstr "The Connector media tunnel is offline. Update the Connector on the phone server and restart the service"
+
+msgid "SOFTPHONE_CAPACITY"
+msgstr "Softphone concurrent session limit reached"
+
+msgid "SOFTPHONE_SESSION_ENDED"
+msgstr "The Softphone session has ended"
+
+msgid "SOFTPHONE_NO_SESSION"
+msgstr "There is no active Softphone session"
+
+msgid "SOFTPHONE_MODE"
+msgstr "Relay outbound is only allowed in relay mode"
+
+msgid "SOFTPHONE_SESSION_STATE"
+msgstr "The session is not ready for a call. Go online so the WebSocket connects"
+
+msgid "SOFTPHONE_WS_REQUIRED"
+msgstr "The Softphone channel is not registered on Media Edge. Refresh and go online again"
+
+msgid "SOFTPHONE_INVALID_SESSION"
+msgstr "Invalid session"
+
+msgid "SOFTPHONE_SESSION_EXPIRED"
+msgstr "The session has expired"
+
+msgid "SOFTPHONE_INVALID_TICKET"
+msgstr "Invalid media ticket"
+
+msgid "SOFTPHONE_MEDIA_EDGE_REQUIRED"
+msgstr "The Softphone request must reach Media Edge. Check the nginx route for /softphone and /ws/telephony"
+
+msgid "SOFTPHONE_FORBIDDEN"
+msgstr "You do not have Softphone access"
+
+msgid "RECORDING_LISTEN_FORBIDDEN"
+msgstr "You do not have permission to listen to this recording"
+
+msgid "TELEPHONY_INTERNAL_ONLY"
+msgstr "Internal access only"
+
+msgid "TELEPHONY_PERMISSION_DENIED"
+msgstr "You do not have the required telephony permission"
+
+msgid "CONNECTOR_AUTH_FAILED"
+msgstr "Connector authentication failed"
+
+msgid "INVALID_CONNECTOR_TOKEN"
+msgstr "Invalid connector token"
+
+msgid "MISSING_AUTHORIZATION"
+msgstr "Missing Authorization header"
+
+msgid "INVALID_AUTHORIZATION"
+msgstr "Invalid Authorization header"
+
+msgid "RATE_LIMITED"
+msgstr "Connector event rate exceeded"
+
+msgid "EVENT_PROCESSING_FAILED"
+msgstr "Event processing failed"
+
+msgid "TELEPHONY_PLUGIN_NOT_ACTIVE"
+msgstr "The Asterisk/Issabel telephony add-on is not active for this business"
+
+msgid "INVALID_BUSINESS_ID"
+msgstr "Invalid business identifier"
+
+msgid "CANNOT_DELETE_AUTO_DOCUMENT"
+msgstr "Automatically generated documents cannot be deleted. Delete them from the original source."
+
+msgid "CANNOT_EDIT_AUTO_DOCUMENT"
+msgstr "Automatically generated documents cannot be edited. Edit them from the original source."
+
+msgid "DELETE_FAILED"
+msgstr "Failed to delete the document"
+
+msgid "PROJECT_NOT_FOUND"
+msgstr "Project was not found or is inactive"
+
+msgid "FIXED_ASSET_DOCUMENT_DELETE_SOURCE_ONLY"
+msgstr "Fixed-asset documents can only be deleted from the assets module"
+
+msgid "FIXED_ASSET_DOCUMENT_EDIT_SOURCE_ONLY"
+msgstr "Fixed-asset documents can only be edited from the assets module"
+
+msgid "LOAN_DOCUMENT_DELETE_SOURCE_ONLY"
+msgstr "Loan documents can only be deleted from loans and installments"
+
+msgid "LOAN_DOCUMENT_EDIT_SOURCE_ONLY"
+msgstr "Loan documents can only be edited from loans and installments"
+
+msgid "LOAN_DOCUMENT_FISCAL_YEAR_LOCKED"
+msgstr "This loan document does not belong to the current fiscal year and cannot be deleted or edited"
+
+msgid "OPENPYXL_NOT_INSTALLED"
+msgstr "The openpyxl library is not installed"
+
+msgid "EXCEL_GENERATION_FAILED"
+msgstr "Failed to generate the Excel file"
+
+msgid "DOCUMENT_PDF_NOT_IMPLEMENTED"
+msgstr "PDF export is not implemented yet"
+
+msgid "CREATE_DOCUMENT_FAILED"
+msgstr "Failed to create the document"
+
+msgid "UPDATE_FAILED"
+msgstr "Failed to update the document"
+
+msgid "UPDATE_DOCUMENT_FAILED"
+msgstr "Failed to update the document"

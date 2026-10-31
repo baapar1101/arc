@@ -6,6 +6,7 @@ import 'package:web/web.dart' as web;
 
 import '../voice/voice_web_capture.dart';
 import 'softphone_pcm_media_stub.dart';
+import 'telephony_l10n.dart';
 
 export 'softphone_pcm_media_stub.dart';
 
@@ -59,7 +60,7 @@ class WebSoftphonePcmMedia implements SoftphonePcmMedia {
   Future<void> startMic(void Function(Uint8List pcm) onFrame) async {
     if (!_ready || _mic) return;
     final ctx = _ctx;
-    if (ctx == null) throw StateError('AudioContext آماده نیست');
+    if (ctx == null) throw StateError(telephonyL10n().telephonyAudioContextMissing);
     _capture = VoiceWebCapture(
       onPcmFrame: (pcm) {
         if (pcm.isNotEmpty) onFrame(pcm);

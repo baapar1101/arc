@@ -11,6 +11,7 @@ import '../../../widgets/date_input_field.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 class RepairOrderFormPage extends StatefulWidget {
   final int businessId;
@@ -113,7 +114,9 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
       setState(() => _isLoading = false);
       SnackBarHelper.show(
         context,
-        message: 'خطا در بارگذاری سفارش: ${ErrorExtractor.forContext(e, context)}',
+        message: AppLocalizations.of(context).repairShopLoadOrderError(
+          ErrorExtractor.forContext(e, context),
+        ),
       );
     }
   }
@@ -124,7 +127,10 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
     }
 
     if (!_isEdit && _selectedCustomer == null) {
-      SnackBarHelper.show(context, message: 'لطفاً مشتری را انتخاب کنید');
+      SnackBarHelper.show(
+        context,
+        message: AppLocalizations.of(context).repairShopSelectCustomer,
+      );
       return;
     }
 
@@ -172,11 +178,10 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
       }
 
       if (mounted) {
+        final t = AppLocalizations.of(context);
         SnackBarHelper.show(
           context,
-          message: _isEdit
-              ? 'سفارش با موفقیت ویرایش شد'
-              : 'سفارش تعمیر با موفقیت ثبت شد',
+          message: _isEdit ? t.repairShopOrderUpdated : t.repairShopOrderCreated,
         );
         Navigator.of(context).pop(true);
       }
@@ -184,8 +189,9 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
       if (mounted) {
         SnackBarHelper.show(
           context,
-          message:
-              'خطا در ذخیره سفارش: ${ErrorExtractor.forContext(e, context)}',
+          message: AppLocalizations.of(context).repairShopSaveOrderError(
+            ErrorExtractor.forContext(e, context),
+          ),
         );
       }
     } finally {
@@ -200,9 +206,10 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
     return ListenableBuilder(
       listenable: widget.calendarController,
       builder: (context, _) {
+        final t = AppLocalizations.of(context);
         return Scaffold(
           appBar: AppBar(
-            title: Text(_isEdit ? 'ویرایش سفارش' : 'سفارش تعمیر جدید'),
+            title: Text(_isEdit ? t.repairShopEditOrderTitle : t.repairShopNewOrderTitle),
             leading: hesabixBackAppBarLeading(context,
                 businessId: widget.businessId),
             actions: [
@@ -219,7 +226,7 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
                 IconButton(
                   icon: const Icon(Icons.check),
                   onPressed: _saveOrder,
-                  tooltip: 'ذخیره',
+                  tooltip: t.save,
                 ),
             ],
           ),
@@ -240,17 +247,17 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
                             onChanged: (person) {
                               setState(() => _selectedCustomer = person);
                             },
-                            label: 'مشتری',
-                            hintText: 'جست‌وجو و انتخاب مشتری',
+                            label: t.repairShopCustomer,
+                            hintText: t.repairShopCustomerHint,
                             isRequired: true,
-                            searchHint: 'جستجو بر اساس نام، تلفن یا ایمیل...',
+                            searchHint: t.repairShopCustomerSearchHint,
                           )
                         else if (_selectedCustomer != null)
                           Card(
                             child: ListTile(
                               leading: const Icon(Icons.person),
                               title: Text(_selectedCustomer!.displayName),
-                              subtitle: const Text('مشتری سفارش'),
+                              subtitle: Text(t.repairShopCustomerSubtitle),
                             ),
                           ),
                         const SizedBox(height: 24),
@@ -259,8 +266,8 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
                         ProductComboboxWidget(
                           businessId: widget.businessId,
                           selectedProduct: _selectedProduct,
-                          label: 'کالا از کاتالوگ (اختیاری)',
-                          hintText: 'جست‌وجو در کالاها',
+                          label: t.repairShopCatalogProduct,
+                          hintText: t.repairShopCatalogProductHint,
                           onChanged: (product) {
                             setState(() {
                               _selectedProduct = product;
@@ -274,16 +281,15 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _productNameController,
-                          decoration: const InputDecoration(
-                            labelText: 'نام کالا/دستگاه',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.devices),
-                            helperText:
-                                'اگر کالا در کاتالوگ نیست، نام را دستی وارد کنید',
+                          decoration: InputDecoration(
+                            labelText: t.repairShopProductName,
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.devices),
+                            helperText: t.repairShopProductNameHint,
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
-                              return 'نام کالا الزامی است';
+                              return t.repairShopProductNameRequired;
                             }
                             return null;
                           },
@@ -291,21 +297,21 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _warrantyCodeController,
-                          decoration: const InputDecoration(
-                            labelText: 'شناسه کد گارانتی (اختیاری)',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.verified_user_outlined),
-                            helperText: 'اگر دستگاه تحت گارانتی است، شناسه کد گارانتی را وارد کنید',
+                          decoration: InputDecoration(
+                            labelText: t.repairShopWarrantyCodeId,
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.verified_user_outlined),
+                            helperText: t.repairShopWarrantyCodeHelper,
                           ),
                           keyboardType: TextInputType.number,
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _productSerialController,
-                          decoration: const InputDecoration(
-                            labelText: 'شماره سریال (اختیاری)',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.qr_code),
+                          decoration: InputDecoration(
+                            labelText: t.repairShopSerialOptional,
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.qr_code),
                           ),
                         ),
                         const SizedBox(height: 24),
@@ -313,15 +319,15 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _problemController,
-                          decoration: const InputDecoration(
-                            labelText: 'شرح مشکل',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.report_problem),
+                          decoration: InputDecoration(
+                            labelText: t.repairShopProblemDescription,
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.report_problem),
                           ),
                           maxLines: 3,
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
-                              return 'شرح مشکل الزامی است';
+                              return t.repairShopProblemRequired;
                             }
                             return null;
                           },
@@ -329,10 +335,10 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _customerNotesController,
-                          decoration: const InputDecoration(
-                            labelText: 'یادداشت مشتری (اختیاری)',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.note),
+                          decoration: InputDecoration(
+                            labelText: t.repairShopCustomerNotesOptional,
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.note),
                           ),
                           maxLines: 2,
                         ),
@@ -340,10 +346,10 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
                           const SizedBox(height: 16),
                           TextFormField(
                             controller: _technicianNotesController,
-                            decoration: const InputDecoration(
-                              labelText: 'یادداشت تعمیرکار (اختیاری)',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.engineering),
+                            decoration: InputDecoration(
+                              labelText: t.repairShopTechnicianNotesOptional,
+                              border: const OutlineInputBorder(),
+                              prefixIcon: const Icon(Icons.engineering),
                             ),
                             maxLines: 2,
                           ),
@@ -351,17 +357,17 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _estimatedCostController,
-                          decoration: const InputDecoration(
-                            labelText: 'برآورد هزینه (اختیاری)',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.attach_money),
-                            helperText: 'به واحد ارز پیش‌فرض کسب‌وکار',
+                          decoration: InputDecoration(
+                            labelText: t.repairShopEstimatedCostOptional,
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.attach_money),
+                            helperText: t.repairShopEstimatedCostHelper,
                           ),
                           keyboardType: TextInputType.number,
                         ),
                         const SizedBox(height: 16),
                         DateInputField(
-                          labelText: 'تاریخ تحویل تقریبی (اختیاری)',
+                          labelText: t.repairShopEstimatedDeliveryOptional,
                           value: _estimatedDeliveryAt,
                           calendarController: widget.calendarController,
                           onChanged: (value) {
@@ -380,8 +386,8 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
                                 )
                               : const Icon(Icons.check),
                           label: Text(_isSaving
-                              ? 'در حال ذخیره...'
-                              : (_isEdit ? 'ذخیره تغییرات' : 'ثبت سفارش')),
+                              ? t.saving
+                              : (_isEdit ? t.repairShopSaveChanges : t.repairShopSubmitOrder)),
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.all(16),
                           ),

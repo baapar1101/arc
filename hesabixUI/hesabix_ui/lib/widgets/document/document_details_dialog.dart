@@ -1152,6 +1152,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog>
 
   /// ساخت هدر دیالوگ
   Widget _buildHeader(ThemeData theme, {bool dense = false}) {
+    final l10n = AppLocalizations.of(context);
     final formatter = NumberFormat('#,##0');
     final isInvoice = _document?.documentType.startsWith('invoice') ?? false;
     final balance =
@@ -1175,7 +1176,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog>
 
     final headerChips = <Widget>[
       if (_document != null)
-        _buildHeaderChip(_document!.getDocumentTypeName(), theme),
+        _buildHeaderChip(_document!.getDocumentTypeName(l10n), theme),
       if (_document?.documentDateDisplay != null)
         _buildHeaderChip(
           'تاریخ: ${_document!.documentDateDisplay}',
@@ -1189,9 +1190,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog>
           icon: Icons.attach_money,
           iconColor: balanceColor,
         ),
-      if (_document?.statusText != null)
+      if (_document != null)
         _buildHeaderChip(
-          'وضعیت: ${_document!.statusText}',
+          '${l10n.status}: ${_document!.statusText(l10n)}',
           theme,
           icon: Icons.circle,
           iconColor: documentStatusChipColor(theme),
@@ -1824,11 +1825,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog>
           _buildSectionHeader('مشخصات پایه'),
           _buildInfoGrid([
             _InfoRow('شماره سند', document.code),
-            _InfoRow('نوع سند', document.getDocumentTypeName()),
+            _InfoRow('نوع سند', document.getDocumentTypeName(AppLocalizations.of(context))),
             _InfoRow('تاریخ سند', document.documentDateDisplay ?? '-'),
             _InfoRow('سال مالی', document.fiscalYearTitle ?? '-'),
             _InfoRow('ارز', document.currencyCode ?? '-'),
-            _InfoRow('وضعیت', document.statusText),
+            _InfoRow('وضعیت', document.statusText(AppLocalizations.of(context))),
             _InfoRow('ایجادکننده', document.createdByName ?? '-'),
             if (document.description != null &&
                 document.description!.isNotEmpty)
