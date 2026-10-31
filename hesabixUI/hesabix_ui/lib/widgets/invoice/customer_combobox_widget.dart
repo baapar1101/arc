@@ -59,6 +59,8 @@ class CustomerComboboxWidget extends StatefulWidget {
   final bool showFinancialBalance;
   final bool dense;
   final bool enableQuickCreateOnSubmit;
+  final String? quickCreateHint;
+  final CustomerService? service;
 
   const CustomerComboboxWidget({
     super.key,
@@ -72,6 +74,8 @@ class CustomerComboboxWidget extends StatefulWidget {
     this.showFinancialBalance = false,
     this.dense = false,
     this.enableQuickCreateOnSubmit = false,
+    this.quickCreateHint,
+    this.service,
   });
 
   @override
@@ -79,7 +83,9 @@ class CustomerComboboxWidget extends StatefulWidget {
 }
 
 class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
-  final CustomerService _customerService = CustomerService(ApiClient());
+  late final CustomerService _customerService =
+      widget.service ?? CustomerService(ApiClient());
+  final ValueNotifier<bool> _quickResolvingNotifier = ValueNotifier(false);
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounceTimer;
   List<Customer> _customers = [];
@@ -165,6 +171,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
     _overlayScrollController.dispose();
     _searchController.dispose();
     _pickerStateNotifier.dispose();
+    _quickResolvingNotifier.dispose();
     super.dispose();
   }
 
@@ -684,6 +691,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
     // invalidates the response. Focus loss and display restoration do not.
     final requestGeneration = ++_searchGeneration;
     setState(() => _isQuickResolving = true);
+    _quickResolvingNotifier.value = true;
     _desktopOverlayEntry?.markNeedsBuild();
     try {
       final result = await _customerService.quickResolveCustomer(
@@ -750,6 +758,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
     } finally {
       if (mounted) {
         setState(() => _isQuickResolving = false);
+        _quickResolvingNotifier.value = false;
         _desktopOverlayEntry?.markNeedsBuild();
       }
     }
@@ -861,6 +870,9 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
           onSubmitted: () => unawaited(_submitField()),
           onLoadMore: _loadMoreCustomers,
           onAddNew: () => _addNewPerson(bottomSheetContext),
+          quickCreateEnabled: widget.enableQuickCreateOnSubmit,
+          quickCreateHint: widget.quickCreateHint,
+          resolving: _quickResolvingNotifier,
         );
       },
     ).whenComplete(() => _mobilePickerOpen = false);
@@ -1137,6 +1149,9 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
 }
 
 class _CustomerPickerBottomSheet extends StatefulWidget {
+  final bool quickCreateEnabled;
+  final String? quickCreateHint;
+  final ValueNotifier<bool> resolving;
   final ValueNotifier<_CustomerPickerState> pickerStateNotifier;
   final Customer? selectedCustomer;
   final Function(Customer) onCustomerSelected;
@@ -1155,6 +1170,9 @@ class _CustomerPickerBottomSheet extends StatefulWidget {
     required this.onSubmitted,
     required this.onLoadMore,
     this.onAddNew,
+    required this.quickCreateEnabled,
+    this.quickCreateHint,
+    required this.resolving,
   });
 
   @override
@@ -1194,85 +1212,147 @@ class _CustomerPickerBottomSheetState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.7,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Text(
-                'انتخاب طرف حساب',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const Spacer(),
-              if (widget.onAddNew != null)
-                IconButton(
-                  onPressed: widget.onAddNew,
-                  icon: const Icon(Icons.add),
-                  tooltip: 'افزودن شخص جدید',
-                  color: theme.colorScheme.primary,
-                ),
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: widget.searchController,
-                  focusNode: _searchFocus,
-                  selectAllOnFocus: true,
-                  decoration: InputDecoration(
-                    hintText: 'جست‌وجو در طرف حساب‌ها...',
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+    final media = MediaQuery.of(context);
+    return Padding(
+      padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height:
+              (media.size.height * 0.9 -
+                      media.viewInsets.bottom -
+                      media.padding.bottom)
+                  .clamp(0.0, media.size.height),
+          child: ValueListenableBuilder<bool>(
+            valueListenable: widget.resolving,
+            builder: (context, resolving, _) => Container(
+              padding: const EdgeInsets.all(16),
+              child: CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'انتخاب طرف حساب',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            if (widget.onAddNew != null)
+                              IconButton(
+                                onPressed: resolving ? null : widget.onAddNew,
+                                icon: const Icon(Icons.add),
+                                tooltip: 'افزودن شخص جدید',
+                                color: theme.colorScheme.primary,
+                              ),
+                            IconButton(
+                              onPressed: () => Navigator.pop(context),
+                              icon: const Icon(Icons.close),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: widget.searchController,
+                                focusNode: _searchFocus,
+                                selectAllOnFocus: true,
+                                textInputAction: TextInputAction.search,
+                                onEditingComplete: () {},
+                                decoration: InputDecoration(
+                                  hintText: widget.quickCreateEnabled
+                                      ? 'نام، موبایل یا هر دو'
+                                      : 'جست‌وجو در طرف حساب‌ها...',
+                                  prefixIcon: const Icon(Icons.search),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                onChanged: widget.onSearchChanged,
+                                onSubmitted: (_) {
+                                  if (!resolving) widget.onSubmitted();
+                                },
+                              ),
+                            ),
+                            SizedBox(
+                              width: 40,
+                              height: kMinInteractiveDimension,
+                              child:
+                                  ValueListenableBuilder<_CustomerPickerState>(
+                                    valueListenable: widget.pickerStateNotifier,
+                                    builder: (context, pickerState, _) {
+                                      if (!pickerState.isLoading &&
+                                          !resolving) {
+                                        return const SizedBox.shrink();
+                                      }
+                                      return const Padding(
+                                        padding: EdgeInsetsDirectional.only(
+                                          start: 8,
+                                          top: 12,
+                                        ),
+                                        child: SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                            ),
+                          ],
+                        ),
+                        if (widget.quickCreateEnabled) ...[
+                          const SizedBox(height: 8),
+                          if (widget.quickCreateHint != null)
+                            Text(
+                              widget.quickCreateHint!,
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          FilledButton.icon(
+                            onPressed: resolving ? null : widget.onSubmitted,
+                            icon: resolving
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.person_add_alt_1),
+                            label: Text(
+                              resolving
+                                  ? 'در حال یافتن / ثبت مشتری…'
+                                  : 'یافتن / ثبت و انتخاب',
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 16),
+                      ],
                     ),
                   ),
-                  onChanged: widget.onSearchChanged,
-                  onSubmitted: (_) => widget.onSubmitted(),
-                ),
+                  SliverFillRemaining(
+                    hasScrollBody: true,
+                    child: ValueListenableBuilder<_CustomerPickerState>(
+                      valueListenable: widget.pickerStateNotifier,
+                      builder: (context, pickerState, _) {
+                        return _buildCustomersList(context, pickerState);
+                      },
+                    ),
+                  ),
+                ],
               ),
-              SizedBox(
-                width: 40,
-                height: kMinInteractiveDimension,
-                child: ValueListenableBuilder<_CustomerPickerState>(
-                  valueListenable: widget.pickerStateNotifier,
-                  builder: (context, pickerState, _) {
-                    if (!pickerState.isLoading) {
-                      return const SizedBox.shrink();
-                    }
-                    return const Padding(
-                      padding: EdgeInsetsDirectional.only(start: 8, top: 12),
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: ValueListenableBuilder<_CustomerPickerState>(
-              valueListenable: widget.pickerStateNotifier,
-              builder: (context, pickerState, _) {
-                return _buildCustomersList(context, pickerState);
-              },
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1290,25 +1370,27 @@ class _CustomerPickerBottomSheetState
     }
 
     if (pickerState.customers.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.person_off,
-              size: 48,
-              color: colorScheme.onSurface.withValues(alpha: 0.5),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              pickerState.hasSearched
-                  ? 'طرف حسابی یافت نشد'
-                  : 'هیچ طرف حسابی ثبت نشده است',
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: colorScheme.onSurface.withValues(alpha: 0.7),
+      return SingleChildScrollView(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.person_off,
+                size: 48,
+                color: colorScheme.onSurface.withValues(alpha: 0.5),
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              Text(
+                pickerState.hasSearched
+                    ? 'طرف حسابی یافت نشد'
+                    : 'هیچ طرف حسابی ثبت نشده است',
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
