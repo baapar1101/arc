@@ -32,6 +32,12 @@ def test_capital_flag_parsing():
 	assert not invoice_line_skips_warehouse({})
 
 
+def test_capital_line_skips_warehouse_even_when_product_is_tracked():
+	assert invoice_line_skips_warehouse(
+		{"fixed_asset": True, "inventory_tracked": True, "warehouse_id": None}
+	)
+
+
 def test_mixed_invoice_splits_inventory_and_ppe_net_of_discount():
 	split = split_purchase_debit_amounts(
 		[

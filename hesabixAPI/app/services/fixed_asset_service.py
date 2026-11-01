@@ -362,6 +362,7 @@ def _seed_system_classes(db: Session, business_id: int) -> None:
 	}
 	for spec in SYSTEM_CLASSES:
 		row = existing.get(spec["code"])
+		life_default = spec.get("default_useful_life_months")
 		if row is None:
 			row = FixedAssetClass(
 				business_id=business_id,
@@ -372,12 +373,15 @@ def _seed_system_classes(db: Session, business_id: int) -> None:
 				accum_dep_account_code=spec["accum_dep_account_code"],
 				dep_expense_account_code=spec["dep_expense_account_code"],
 				default_method=spec["default_method"],
+				default_useful_life_months=int(life_default) if life_default else None,
 				is_system=True,
 				is_active=True,
 				sort_order=int(spec["sort_order"]),
 			)
 			db.add(row)
 			db.flush()
+		elif row.is_system and row.default_useful_life_months is None and life_default:
+			row.default_useful_life_months = int(life_default)
 		_bind_class_account_ids(db, row)
 
 
@@ -1092,6 +1096,10 @@ def prepare_invoice_capital_lines(
 		info[EXTRA_FLAG] = True
 		info["inventory_tracked"] = False
 		info["inventory_posted"] = False
+		if life is not None:
+			info["fixed_asset_useful_life_months"] = int(life)
+		if rate is not None:
+			info["fixed_asset_declining_annual_rate"] = str(rate)
 		ln["extra_info"] = info
 	return True
 

@@ -855,6 +855,32 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     return extra;
   }
 
+  Map<String, dynamic>? _fixedAssetClassById(int classId) {
+    for (final cls in _fixedAssetClasses) {
+      if (_toInt(cls['id']) == classId) return cls;
+    }
+    return null;
+  }
+
+  Map<String, dynamic> _capitalExtraForClass(InvoiceLineItem item, int classId) {
+    final extra = _lineExtraWith(item, {
+      'fixed_asset': true,
+      'fixed_asset_class_id': classId,
+    });
+    extra.remove('fixed_asset_useful_life_months');
+    extra.remove('fixed_asset_declining_annual_rate');
+    final cls = _fixedAssetClassById(classId);
+    final life = _toInt(cls?['default_useful_life_months']);
+    if (life != null && life > 0) {
+      extra['fixed_asset_useful_life_months'] = life;
+    }
+    final rateRaw = cls?['default_declining_rate'];
+    if (rateRaw != null && rateRaw.toString().trim().isNotEmpty) {
+      extra['fixed_asset_declining_annual_rate'] = rateRaw;
+    }
+    return extra;
+  }
+
   Future<void> _toggleFixedAssetCapital(int index, InvoiceLineItem item, bool enabled) async {
     if (!enabled) {
       _updateRow(index, item.copyWith(extraInfo: _lineExtraWithoutCapital(item)));
@@ -862,7 +888,14 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     }
     var classId = item.fixedAssetClassId;
     if (classId == null && _fixedAssetClasses.isNotEmpty) {
-      classId = _toInt(_fixedAssetClasses.first['id']);
+      Map<String, dynamic>? preferred;
+      for (final cls in _fixedAssetClasses) {
+        if (cls['depreciable'] == true) {
+          preferred = cls;
+          break;
+        }
+      }
+      classId = _toInt((preferred ?? _fixedAssetClasses.first)['id']);
     }
     if (classId == null) {
       if (!mounted) return;
@@ -873,12 +906,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     }
     _updateRow(
       index,
-      item.copyWith(
-        extraInfo: _lineExtraWith(item, {
-          'fixed_asset': true,
-          'fixed_asset_class_id': classId,
-        }),
-      ),
+      item.copyWith(extraInfo: _capitalExtraForClass(item, classId)),
     );
   }
 
@@ -886,12 +914,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     if (classId == null) return;
     _updateRow(
       index,
-      item.copyWith(
-        extraInfo: _lineExtraWith(item, {
-          'fixed_asset': true,
-          'fixed_asset_class_id': classId,
-        }),
-      ),
+      item.copyWith(extraInfo: _capitalExtraForClass(item, classId)),
     );
   }
 

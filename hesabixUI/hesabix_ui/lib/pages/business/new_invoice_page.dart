@@ -3345,8 +3345,9 @@ class _NewInvoicePageState extends State<NewInvoicePage>
       if (r.taxRate < 0 || r.taxRate > 100) {
         return 'درصد مالیات ردیف ${i + 1} باید بین 0 تا 100 باشد';
       }
-      // الزام انبار در حالت ثبت اسناد انبار و کالاهای تحت کنترل موجودی
-      if (_postInventory && r.trackInventory) {
+      // الزام انبار در حالت ثبت اسناد انبار و کالاهای تحت کنترل موجودی.
+      // سطر سرمایه‌ای اموال حواله/کاردکس ندارد؛ فیلد انبار هم مخفی می‌شود.
+      if (_postInventory && r.trackInventory && !r.isFixedAssetCapital) {
         final isOut =
             _selectedInvoiceType == InvoiceType.sales ||
             _selectedInvoiceType == InvoiceType.purchaseReturn ||

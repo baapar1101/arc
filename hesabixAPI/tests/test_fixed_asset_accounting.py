@@ -74,7 +74,11 @@ def test_system_classes_cover_land_and_furniture():
 	codes = {c["code"]: c for c in SYSTEM_CLASSES}
 	assert codes["land"]["depreciable"] is False
 	assert codes["land"]["cost_account_code"] == COST_LAND
+	assert codes["land"]["default_useful_life_months"] is None
 	assert codes["furniture"]["depreciable"] is True
 	assert codes["furniture"]["cost_account_code"] == COST_FURNITURE
 	assert codes["furniture"]["accum_dep_account_code"] == "10804"
 	assert codes["furniture"]["dep_expense_account_code"] == "70411"
+	assert codes["building"]["default_useful_life_months"] == 300
+	assert codes["vehicle"]["default_useful_life_months"] == 72
+	assert codes["furniture"]["default_useful_life_months"] == 120

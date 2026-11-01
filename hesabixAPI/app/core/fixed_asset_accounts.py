@@ -46,6 +46,7 @@ SYSTEM_CLASSES = (
 		"accum_dep_account_code": None,
 		"dep_expense_account_code": None,
 		"default_method": "straight_line",
+		"default_useful_life_months": None,
 		"sort_order": 1,
 	},
 	{
@@ -56,6 +57,7 @@ SYSTEM_CLASSES = (
 		"accum_dep_account_code": ACCUM_BUILDING,
 		"dep_expense_account_code": EXPENSE_BUILDING,
 		"default_method": "straight_line",
+		"default_useful_life_months": 300,
 		"sort_order": 2,
 	},
 	{
@@ -66,6 +68,7 @@ SYSTEM_CLASSES = (
 		"accum_dep_account_code": ACCUM_VEHICLE,
 		"dep_expense_account_code": EXPENSE_VEHICLE,
 		"default_method": "straight_line",
+		"default_useful_life_months": 72,
 		"sort_order": 3,
 	},
 	{
@@ -76,6 +79,7 @@ SYSTEM_CLASSES = (
 		"accum_dep_account_code": ACCUM_FURNITURE,
 		"dep_expense_account_code": EXPENSE_FURNITURE,
 		"default_method": "straight_line",
+		"default_useful_life_months": 120,
 		"sort_order": 4,
 	},
 )
