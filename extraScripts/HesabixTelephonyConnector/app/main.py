@@ -219,6 +219,9 @@ class AmiClient:
 			("Data", data),
 			("Timeout", str(timeout_ms)),
 			("Async", "true"),
+			# بدون EarlyMedia اپلیکیشن AudioSocket فقط بعد از Answer مقصد اجرا می‌شود
+			# و Softphone در حالت «در حال زنگ زدن» بی‌صدا می‌ماند.
+			("EarlyMedia", "true"),
 		]
 		if caller_id:
 			items.append(("CallerID", caller_id))

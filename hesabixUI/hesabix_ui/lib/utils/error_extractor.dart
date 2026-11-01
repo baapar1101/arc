@@ -146,6 +146,16 @@ class ErrorExtractor {
       case 'LEGACY_ACCPRO_REQUIRED':
         return t.branded(t.apiErrorLegacyAccproRequired);
 
+      case 'SOFTPHONE_WS_REQUIRED':
+      case 'SOFTPHONE_MEDIA_EDGE_REQUIRED':
+        return t.telephonyChannelNotConnected;
+      case 'SOFTPHONE_SESSION_STATE':
+      case 'SOFTPHONE_NO_SESSION':
+      case 'SOFTPHONE_SESSION_ENDED':
+      case 'SOFTPHONE_SESSION_EXPIRED':
+      case 'SOFTPHONE_INVALID_SESSION':
+        return t.telephonyGoOnlineFirst;
+
       default:
         return null;
     }
@@ -349,6 +359,12 @@ class ErrorExtractor {
   static String _userMessage(Object e, AppLocalizations t) {
     if (e is dio.DioException) {
       return _dioExceptionMessage(e, t);
+    }
+    if (e is ApiErrorDetails) {
+      final fromCode = _messageForKnownApiErrorCode(e.code, t);
+      if (fromCode != null) return fromCode;
+      final m = e.message;
+      if (m != null && m.isNotEmpty) return m;
     }
     if (e is DocumentPolicyException) {
       final msg = e.message.trim();

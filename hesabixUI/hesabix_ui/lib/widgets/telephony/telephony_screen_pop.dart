@@ -7,6 +7,7 @@ import '../../services/telephony/telephony_api.dart';
 import '../../services/telephony/telephony_session_controller.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/telephony/telephony_l10n.dart';
+import '../../utils/error_extractor.dart';
 
 class TelephonyScreenPopOverlay extends StatefulWidget {
   final int businessId;
@@ -57,7 +58,9 @@ class _TelephonyScreenPopOverlayState extends State<TelephonyScreenPopOverlay> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ErrorExtractor.forContext(e, context))),
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -76,7 +79,9 @@ class _TelephonyScreenPopOverlayState extends State<TelephonyScreenPopOverlay> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ErrorExtractor.forContext(e, context))),
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -94,7 +99,9 @@ class _TelephonyScreenPopOverlayState extends State<TelephonyScreenPopOverlay> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ErrorExtractor.forContext(e, context))),
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -110,7 +117,9 @@ class _TelephonyScreenPopOverlayState extends State<TelephonyScreenPopOverlay> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ErrorExtractor.forContext(e, context))),
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);

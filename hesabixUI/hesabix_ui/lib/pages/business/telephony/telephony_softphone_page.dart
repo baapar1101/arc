@@ -10,6 +10,7 @@ import '../../../widgets/telephony/telephony_dialer_sheet.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../services/telephony/telephony_l10n.dart';
+import '../../../utils/error_extractor.dart';
 
 /// Softphone سازمانی — حالت Relay از طریق Connector (بدون expose کردن PBX).
 class TelephonySoftphonePage extends StatefulWidget {
@@ -92,7 +93,9 @@ class _TelephonySoftphonePageState extends State<TelephonySoftphonePage> {
       await _engine.dial(dest);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ErrorExtractor.forContext(e, context))),
+      );
     }
   }
 

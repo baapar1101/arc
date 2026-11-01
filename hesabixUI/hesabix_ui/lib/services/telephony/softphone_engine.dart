@@ -11,6 +11,7 @@ import '../../config/brand_config.dart';
 import '../../core/android_notification_keepalive_platform.dart';
 import '../../core/auth_store.dart';
 import '../../core/windows_update_platform.dart';
+import '../../utils/error_extractor.dart';
 import '../android_notification_keepalive/android_notification_keepalive_service.dart';
 import '../errors/api_error.dart';
 import '../windows_desktop/windows_desktop_shell.dart';
@@ -185,7 +186,7 @@ class SoftphoneEngine extends ChangeNotifier with WidgetsBindingObserver {
         onJson: _onWsJson,
         onPcm: _onWsPcm,
         onError: (e) {
-          error = '$e';
+          error = _friendlyError(e);
           state = SoftphoneConnectionState.reconnecting;
           notifyListeners();
           _scheduleReconnect();
@@ -210,7 +211,7 @@ class SoftphoneEngine extends ChangeNotifier with WidgetsBindingObserver {
       await _enableWindowsPresence();
       unawaited(_consumePendingIncomingAction());
     } catch (e) {
-      error = '$e';
+      error = _friendlyError(e);
       state = SoftphoneConnectionState.error;
       mediaReady = false;
       notifyListeners();
@@ -391,6 +392,7 @@ class SoftphoneEngine extends ChangeNotifier with WidgetsBindingObserver {
     activeCall = result['call'] is Map ? Map<String, dynamic>.from(result['call'] as Map) : null;
     state = SoftphoneConnectionState.ringing;
     notifyListeners();
+    unawaited(_startRingtone());
   }
 
   Future<void> answer(int callId) async {
@@ -701,7 +703,7 @@ class SoftphoneEngine extends ChangeNotifier with WidgetsBindingObserver {
       onJson: _onWsJson,
       onPcm: _onWsPcm,
       onError: (e) {
-        error = '$e';
+        error = _friendlyError(e);
         state = SoftphoneConnectionState.reconnecting;
         notifyListeners();
         _scheduleReconnect();
@@ -798,6 +800,19 @@ class SoftphoneEngine extends ChangeNotifier with WidgetsBindingObserver {
     return null;
   }
 
+  String _friendlyError(Object error) {
+    final msg = ErrorExtractor.userMessage(error);
+    final lower = msg.toLowerCase();
+    if (lower.contains('bad response') || lower.contains('dioexception')) {
+      final code = _apiErrorCode(error);
+      if (isSoftphoneSessionGoneCode(code)) {
+        return telephonyL10n().telephonyGoOnlineFirst;
+      }
+      return telephonyL10n().telephonyChannelNotConnected;
+    }
+    return msg;
+  }
+
   void _onIncomingNotificationAction(Map<String, dynamic> action) {
     unawaited(_handleIncomingAction(action));
   }
@@ -830,7 +845,7 @@ class SoftphoneEngine extends ChangeNotifier with WidgetsBindingObserver {
           await answer(callId);
         }
       } catch (e) {
-        error = '$e';
+        error = _friendlyError(e);
         notifyListeners();
       }
     } else {

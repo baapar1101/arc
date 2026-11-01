@@ -1296,6 +1296,8 @@ def process_connector_event(
 			.first()
 		)
 	if not call:
+		from app.services.telephony.ami_channels import match_call_by_ami_ids, match_softphone_relay_call
+
 		recent = (
 			db.query(TelephonyCall)
 			.filter(
@@ -1308,17 +1310,32 @@ def process_connector_event(
 			.limit(25)
 			.all()
 		)
-		from app.services.telephony.ami_channels import match_softphone_relay_call
+		call = match_softphone_relay_call(recent, payload) or match_call_by_ami_ids(
+			recent, uniqueid, payload.get("linkedid")
+		)
 
-		call = match_softphone_relay_call(recent, payload)
+	from app.services.telephony.ami_channels import (
+		append_ami_uniqueid,
+		is_softphone_outbound_call,
+		should_create_call_from_ami_event,
+		should_ignore_softphone_outbound_hangup,
+		should_skip_unmatched_ami_event,
+	)
 
 	settings = get_or_create_settings(db, pbx.business_id)
+	soft_out = is_softphone_outbound_call(call) if call else False
 	direction = str(payload.get("direction") or (call.direction if call else "inbound")).lower()
-	extension = str(payload.get("extension") or (call.extension if call else "") or "").strip() or None
-	if extension:
-		_ensure_extension_catalog(db, pbx, extension)
-	from_raw = payload.get("from") or payload.get("from_number") or (call.from_number_raw if call else None)
-	to_raw = payload.get("to") or payload.get("to_number") or (call.to_number_raw if call else None)
+	if soft_out:
+		# رویداد AMI طرفین Originate را برعکس می‌کند؛ فیلدهای Softphone را نگه دار
+		extension = call.extension
+		from_raw = call.from_number_raw
+		to_raw = call.to_number_raw
+	else:
+		extension = str(payload.get("extension") or (call.extension if call else "") or "").strip() or None
+		from_raw = payload.get("from") or payload.get("from_number") or (call.from_number_raw if call else None)
+		to_raw = payload.get("to") or payload.get("to_number") or (call.to_number_raw if call else None)
+		if extension:
+			_ensure_extension_catalog(db, pbx, extension)
 	from_norm = normalize_iran_phone(from_raw)["canonical"]
 	to_norm = normalize_iran_phone(to_raw)["canonical"]
 
@@ -1326,6 +1343,10 @@ def process_connector_event(
 	if not call and event_type in ("call.answered", "answered"):
 		# Answer بدون تماس قبلی (مثلاً Local AudioSocket) نباید رکورد جعلی بسازد
 		return {"ok": True, "ignored": True, "reason": "answered_without_call"}
+	if not call and (
+		should_skip_unmatched_ami_event(event_type) or not should_create_call_from_ami_event(event_type)
+	):
+		return {"ok": True, "ignored": True, "reason": "event_without_call"}
 	if not call:
 		match = match_caller(
 			db,
@@ -1364,20 +1385,25 @@ def process_connector_event(
 		db.flush()
 		created = True
 	else:
-		if from_raw:
-			call.from_number_raw = str(from_raw)
-			call.from_number_normalized = from_norm
-		if to_raw:
-			call.to_number_raw = str(to_raw)
-			call.to_number_normalized = to_norm
-		if extension:
-			call.extension = extension
+		if not soft_out:
+			if from_raw:
+				call.from_number_raw = str(from_raw)
+				call.from_number_normalized = from_norm
+			if to_raw:
+				call.to_number_raw = str(to_raw)
+				call.to_number_normalized = to_norm
+			if extension:
+				call.extension = extension
 		if payload.get("queue"):
 			call.queue_code = payload.get("queue")
-		if payload.get("linkedid"):
-			call.asterisk_linkedid = payload.get("linkedid")
+		incoming_linkedid = str(payload.get("linkedid") or "").strip()
+		current_linkedid = str(call.asterisk_linkedid or "")
+		if incoming_linkedid and not current_linkedid.startswith("hsx-sf-"):
+			call.asterisk_linkedid = incoming_linkedid
 		# uniqueid ساختگی Softphone را به uniqueid واقعی Asterisk بچسبان تا Hangup بعدی پیدا شود
-		if call.asterisk_uniqueid != uniqueid:
+		extra_bind = append_ami_uniqueid(call.extra_info, uniqueid)
+		already_bound = bool(extra_bind.get("asterisk_uniqueid_bound"))
+		if call.asterisk_uniqueid != uniqueid and not already_bound:
 			taken = (
 				db.query(TelephonyCall.id)
 				.filter(
@@ -1391,19 +1417,26 @@ def process_connector_event(
 				try:
 					with db.begin_nested():
 						call.asterisk_uniqueid = uniqueid
-						extra_bind = dict(call.extra_info or {})
 						extra_bind["asterisk_uniqueid_bound"] = True
 						call.extra_info = extra_bind
 						db.flush()
 				except IntegrityError:
-					pass
+					call.extra_info = extra_bind
+			else:
+				call.extra_info = extra_bind
+		else:
+			call.extra_info = extra_bind
 
 	# state transitions
 	notify_type = None
-	if event_type in ("call.ringing", "ringing"):
+	skip_status = (not created) and should_ignore_softphone_outbound_hangup(call, payload, event_type)
+	if skip_status:
+		pass
+	elif event_type in ("call.ringing", "ringing"):
 		if call.status not in ("answered", "completed", "missed", "busy", "failed", "cancelled"):
 			call.status = "ringing"
-		notify_type = "telephony.incoming_call" if call.direction == "inbound" else "telephony.outbound_ringing"
+		if created or not is_softphone_outbound_call(call):
+			notify_type = "telephony.incoming_call" if call.direction == "inbound" else "telephony.outbound_ringing"
 	elif event_type in ("call.answered", "answered"):
 		call.status = "answered"
 		call.answered_at = call.answered_at or occurred_at

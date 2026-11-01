@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../services/telephony/telephony_api.dart';
 import '../../services/telephony/telephony_session_controller.dart';
 import '../../l10n/app_localizations.dart';
+import '../../utils/error_extractor.dart';
 
 Future<void> showTelephonyDialerSheet(
   BuildContext context, {
@@ -107,7 +108,9 @@ class _TelephonyDialerSheetState extends State<TelephonyDialerSheet> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ErrorExtractor.forContext(e, context))),
+        );
       }
     } finally {
       if (mounted) setState(() => _calling = false);
