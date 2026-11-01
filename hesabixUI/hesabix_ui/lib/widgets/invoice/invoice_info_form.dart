@@ -90,6 +90,8 @@ class InvoiceInfoForm extends StatelessWidget {
 
   final TextEditingController invoiceTitleController;
   final ValueChanged<String> onInvoiceTitleChanged;
+  final TextEditingController? loyaltyPointsController;
+  final TextEditingController? voucherCodeController;
 
   final bool showSellerCommissionSection;
   final bool enableTypeChange;
@@ -146,6 +148,8 @@ class InvoiceInfoForm extends StatelessWidget {
     required this.onInvoiceReferenceChanged,
     required this.invoiceTitleController,
     required this.onInvoiceTitleChanged,
+    this.loyaltyPointsController,
+    this.voucherCodeController,
     this.showSellerCommissionSection = true,
     this.enableTypeChange = true,
     this.allowedInvoiceTypes,
@@ -283,6 +287,18 @@ class InvoiceInfoForm extends StatelessWidget {
         isDense: true,
       ),
       if (counterparty != null) counterparty,
+      if (_isSalesFamily && loyaltyPointsController != null)
+        TextField(
+          controller: loyaltyPointsController,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: const InputDecoration(labelText: 'مصرف امتیاز باشگاه', hintText: 'اختیاری'),
+        ),
+      if (_isSalesFamily && voucherCodeController != null)
+        TextField(
+          controller: voucherCodeController,
+          textCapitalization: TextCapitalization.characters,
+          decoration: const InputDecoration(labelText: 'کد پاداش باشگاه', hintText: 'اختیاری'),
+        ),
       CurrencyPickerWidget(
         businessId: businessId,
         selectedCurrencyId: selectedCurrencyId,
