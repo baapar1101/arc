@@ -12,6 +12,7 @@ const Map<String, String> pluginSetupRouteByCode = {
   'product_warranty': 'business_warranty',
   'distribution': 'business_distribution',
   'woocommerce_hesabix': 'business_woocommerce',
+  'digipay_credit': 'business_digipay',
   'customer_club': 'business_customer_club',
   'payroll': 'business_payroll',
   'fixed_assets': 'business_fixed_assets',
