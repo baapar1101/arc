@@ -12864,6 +12864,240 @@ class AppLocalizationsFa extends AppLocalizations {
       'افزونه حقوق و دستمزد برای این کسب‌وکار فعال نیست. از بازار افزونه‌ها آن را فعال کنید.';
 
   @override
+  String get oaMenu => 'اتوماسیون اداری';
+
+  @override
+  String get oaPluginNotActive =>
+      'افزونه اتوماسیون اداری برای این کسب‌وکار فعال نیست. از بازار افزونه‌ها آن را فعال کنید.';
+
+  @override
+  String get oaPermissionCompose => 'ایجاد و ویرایش پیش‌نویس و پیوست نامه';
+
+  @override
+  String get oaPermissionRefer => 'ارجاع، پاراف، عودت و پیگیری نامه';
+
+  @override
+  String get oaPermissionSecretariat => 'ثبت نامه وارده و صادره در دبیرخانه';
+
+  @override
+  String get oaPermissionArchive => 'بایگانی نامه';
+
+  @override
+  String get oaPermissionAdmin => 'مدیریت سازمان، سمت، تصدی و تنظیمات';
+
+  @override
+  String get oaInbox => 'وارده';
+
+  @override
+  String get oaAction => 'جهت اقدام';
+
+  @override
+  String get oaCc => 'رونوشت';
+
+  @override
+  String get oaDrafts => 'پیش‌نویس';
+
+  @override
+  String get oaSent => 'ارسال‌شده';
+
+  @override
+  String get oaFollowUp => 'پیگیری';
+
+  @override
+  String get oaArchive => 'بایگانی';
+
+  @override
+  String get oaRegistry => 'دبیرخانه';
+
+  @override
+  String get oaNewLetter => 'نامه جدید';
+
+  @override
+  String get oaOrg => 'سازمان و سمت';
+
+  @override
+  String get oaSettings => 'تنظیمات اتوماسیون اداری';
+
+  @override
+  String get oaSubject => 'موضوع';
+
+  @override
+  String get oaBody => 'متن نامه';
+
+  @override
+  String get oaKindInternal => 'داخلی';
+
+  @override
+  String get oaKindIncoming => 'وارده';
+
+  @override
+  String get oaKindOutgoing => 'صادره';
+
+  @override
+  String get oaRegister => 'ثبت و شماره‌گذاری';
+
+  @override
+  String get oaRefer => 'ارجاع';
+
+  @override
+  String get oaParaph => 'پاراف';
+
+  @override
+  String get oaAttach => 'پیوست';
+
+  @override
+  String get oaComplete => 'اقدام شد';
+
+  @override
+  String get oaReturn => 'عودت';
+
+  @override
+  String get oaPosition => 'سمت فعال';
+
+  @override
+  String get oaNoPositions =>
+      'سمت فعالی ندارید. از مدیر بخواهید سمت را واگذار کند.';
+
+  @override
+  String get oaEmptyFolder => 'این پوشه خالی است.';
+
+  @override
+  String get oaUrgency => 'فوریت';
+
+  @override
+  String get oaConfidential => 'طبقه‌بندی';
+
+  @override
+  String get oaSaveDraft => 'ذخیره پیش‌نویس';
+
+  @override
+  String get oaLetterDate => 'تاریخ نامه';
+
+  @override
+  String get oaInstruction => 'دستور ارجاع';
+
+  @override
+  String get oaToPosition => 'سمت گیرنده';
+
+  @override
+  String get oaPrint => 'چاپ نامه';
+
+  @override
+  String get oaFollowUpDate => 'تاریخ پیگیری';
+
+  @override
+  String get oaDelegations => 'جانشینی';
+
+  @override
+  String get oaHolders => 'تصدی سمت';
+
+  @override
+  String get oaUnits => 'واحدها';
+
+  @override
+  String get oaPositions => 'سمت‌ها';
+
+  @override
+  String get oaAssign => 'واگذاری سمت';
+
+  @override
+  String get oaDelegate => 'جانشین';
+
+  @override
+  String get oaEnabled => 'فعال بودن اتوماسیون اداری';
+
+  @override
+  String get oaIncomingPrefix => 'پیشوند وارده';
+
+  @override
+  String get oaOutgoingPrefix => 'پیشوند صادره';
+
+  @override
+  String get oaInternalPrefix => 'پیشوند داخلی';
+
+  @override
+  String get oaNumberingCalendar => 'تقویم شماره‌گذاری';
+
+  @override
+  String get oaLetterKind => 'نوع نامه';
+
+  @override
+  String get oaReferralKind => 'نوع ارجاع';
+
+  @override
+  String get oaSignature => 'امضا';
+
+  @override
+  String get oaSender => 'فرستنده';
+
+  @override
+  String get oaReceiver => 'گیرنده';
+
+  @override
+  String get oaSenderOrg => 'سازمان فرستنده';
+
+  @override
+  String get oaReceiverOrg => 'سازمان گیرنده';
+
+  @override
+  String get oaCode => 'کد';
+
+  @override
+  String get oaLink => 'پیوند نامه';
+
+  @override
+  String get oaRelatedLetter => 'شناسه نامه مرتبط';
+
+  @override
+  String get oaLinkRelated => 'مرتبط';
+
+  @override
+  String get oaLinkReply => 'پاسخ';
+
+  @override
+  String get oaLinkFollowup => 'پیرو';
+
+  @override
+  String get oaUrgencyNormal => 'عادی';
+
+  @override
+  String get oaUrgencyUrgent => 'فوری';
+
+  @override
+  String get oaUrgencyImmediate => 'آنی';
+
+  @override
+  String get oaConfidentialNormal => 'عادی';
+
+  @override
+  String get oaConfidentialRestricted => 'محرمانه';
+
+  @override
+  String get oaSubtree => 'مشاهده زیرمجموعه سازمانی';
+
+  @override
+  String get oaParentUnit => 'واحد بالادست';
+
+  @override
+  String get oaNoParent => 'بدون واحد بالادست';
+
+  @override
+  String get oaJalali => 'شمسی';
+
+  @override
+  String get oaGregorian => 'میلادی';
+
+  @override
+  String get oaLetterhead => 'شناسه فایل سربرگ';
+
+  @override
+  String get businessSettingsOfficeAutomation => 'اتوماسیون اداری';
+
+  @override
+  String get businessSettingsOfficeAutomationDescription =>
+      'شماره‌گذاری نامه، سربرگ و پیشوند دبیرخانه';
+
+  @override
   String get fixedAssetsTitle => 'کنترل اموال و دارایی ثابت';
 
   @override
@@ -19110,6 +19344,189 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get businessSettingsInvoiceSharePaymentDescription =>
       'پیش‌فرض درگاه و فعال‌سازی برای لینک اشتراک عمومی';
+
+  @override
+  String get businessSettingsPayPage => 'لینک واریز کسب‌وکار';
+
+  @override
+  String get businessSettingsPayPageDescription =>
+      'نام کاربری یکتا، صفحه پرداخت عمومی و واریزهای دریافتی';
+
+  @override
+  String get payPageEnabled => 'فعال بودن لینک واریز عمومی';
+
+  @override
+  String get payPageEnabledHint =>
+      'در حالت خاموش صفحه دیده می‌شود ولی پرداخت انجام نمی‌شود';
+
+  @override
+  String get payPageUsername => 'نام کاربری';
+
+  @override
+  String get payPageUsernameHint =>
+      '۳ تا ۳۰ کاراکتر: حروف کوچک انگلیسی، رقم و خط تیره';
+
+  @override
+  String get payPageUsernameAvailable => 'این نام کاربری آزاد است';
+
+  @override
+  String get payPageUsernameTaken => 'این نام کاربری قبلاً انتخاب شده است';
+
+  @override
+  String get payPageUsernameReserved => 'این نام کاربری رزرو شده است';
+
+  @override
+  String get payPageUsernameInvalid => 'نام کاربری نامعتبر است';
+
+  @override
+  String get payPageDisplayTitle => 'عنوان صفحه';
+
+  @override
+  String get payPageDisplayTitleHint =>
+      'بالای صفحه عمومی به شکل «پرداخت به …» دیده می‌شود';
+
+  @override
+  String get payPageIntroText => 'متن راهنما';
+
+  @override
+  String get payPageShowLogo => 'نمایش لوگوی کسب‌وکار';
+
+  @override
+  String get payPageGateway => 'درگاه پرداخت';
+
+  @override
+  String get payPageMinAmount => 'حداقل مبلغ';
+
+  @override
+  String get payPageMaxAmount => 'حداکثر مبلغ (اختیاری)';
+
+  @override
+  String get payPageNotifyInApp => 'نوتیفیکیشن پنل پس از پرداخت موفق';
+
+  @override
+  String get payPageNotifySms => 'پیامک به مالک کسب‌وکار پس از پرداخت موفق';
+
+  @override
+  String get payPageNotifyRequired =>
+      'حداقل یکی از نوتیفیکیشن پنل یا پیامک باید روشن بماند';
+
+  @override
+  String get payPageCopyLink => 'کپی لینک';
+
+  @override
+  String get payPageLinkCopied => 'لینک واریز کپی شد';
+
+  @override
+  String get payPageOpenPreview => 'مشاهده صفحه عمومی';
+
+  @override
+  String get payPagePaymentsTab => 'واریزها';
+
+  @override
+  String get payPageSettingsTab => 'تنظیمات';
+
+  @override
+  String get payPagePayerName => 'نام واریزکننده';
+
+  @override
+  String get payPagePayerMobile => 'موبایل';
+
+  @override
+  String get payPagePayerNote => 'توضیح';
+
+  @override
+  String get payPagePaidAt => 'تاریخ و ساعت واریز';
+
+  @override
+  String payPagePayTo(String name) {
+    return 'پرداخت به $name';
+  }
+
+  @override
+  String get payPageAmount => 'مبلغ';
+
+  @override
+  String get payPageNameOptional => 'نام (اختیاری)';
+
+  @override
+  String get payPageInvalidName => 'نام فقط حروف است و حداکثر ۳۰ کاراکتر';
+
+  @override
+  String get payPageMobileOptional => 'موبایل (اختیاری)';
+
+  @override
+  String get payPageInvalidMobile => 'موبایل باید ۱۱ رقم و با ۰۹ شروع شود';
+
+  @override
+  String get payPageNoteOptional => 'توضیح کوتاه (اختیاری)';
+
+  @override
+  String get payPagePayButton => 'پرداخت';
+
+  @override
+  String get payPageDisabled => 'دریافت آنلاین فعلاً غیرفعال است';
+
+  @override
+  String get payPageNotFound => 'این صفحه پرداخت یافت نشد';
+
+  @override
+  String get payPageReceiptTitle => 'رسید پرداخت';
+
+  @override
+  String get payPageReceiptSuccess => 'پرداخت با موفقیت انجام شد';
+
+  @override
+  String get payPageReceiptFailed => 'پرداخت ناموفق بود یا توسط بانک تأیید نشد';
+
+  @override
+  String get payPageTrackingRef => 'شماره پیگیری';
+
+  @override
+  String payPageCurrencyHint(String currency) {
+    return 'مبلغ به $currency است';
+  }
+
+  @override
+  String get payPageNoGateway =>
+      'برای این کسب‌وکار درگاه پرداخت فعالی وجود ندارد';
+
+  @override
+  String get walletTypePublicPayLink => 'واریز لینک پرداخت';
+
+  @override
+  String get walletTypePublicInvoiceSharePay => 'پرداخت لینک فاکتور';
+
+  @override
+  String get payPageAnonymousCustomer => 'مشتری ناشناس';
+
+  @override
+  String get payPageCustomer => 'مشتری';
+
+  @override
+  String get payPageStatus => 'وضعیت';
+
+  @override
+  String get payPageStatusSucceeded => 'موفق';
+
+  @override
+  String get payPageStatusFailed => 'ناموفق';
+
+  @override
+  String get payPageStatusPending => 'در انتظار';
+
+  @override
+  String get payPageMatchCustomer => 'تطبیق مشتری موجود با موبایل';
+
+  @override
+  String get payPageMatchCustomerHint =>
+      'اگر مشتری با این موبایل وجود داشته باشد، سند روی حساب همان شخص ثبت می‌شود';
+
+  @override
+  String get payPageCreateCustomer => 'ایجاد مشتری در صورت جدید بودن موبایل';
+
+  @override
+  String get payPageUseAnonymous =>
+      'استفاده از مشتری ناشناس وقتی موبایل خالی است';
 
   @override
   String get businessSettingsTemplatesDescription =>

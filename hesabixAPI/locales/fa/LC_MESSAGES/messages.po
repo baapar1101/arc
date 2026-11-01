@@ -1432,3 +1432,75 @@ msgstr "تا اصلاح مانده منفی کالا، تفکیک موجودی �
 
 msgid "OPTION_LABEL_CONFLICT"
 msgstr "دو گزینه پس از نرمال‌سازی یکسان شدند و ادغام خودکار انجام نمی‌شود"
+
+msgid "OA_PLUGIN_NOT_ACTIVE"
+msgstr "افزونه اتوماسیون اداری برای این کسب‌وکار فعال نیست"
+
+msgid "OA_POSITION_REQUIRED"
+msgstr "سمت فعال لازم است"
+
+msgid "OA_POSITION_NOT_HELD"
+msgstr "در حال حاضر این سمت را تصدی نمی‌کنید"
+
+msgid "OA_LETTER_NOT_FOUND"
+msgstr "نامه پیدا نشد"
+
+msgid "OA_LETTER_NOT_DRAFT"
+msgstr "فقط پیش‌نویس قابل ویرایش است"
+
+msgid "OA_LETTER_FORBIDDEN"
+msgstr "به این نامه دسترسی ندارید"
+
+msgid "OA_SECRETARIAT_REQUIRED"
+msgstr "ثبت وارده و صادره فقط از سمت دبیرخانه مجاز است"
+
+msgid "OA_REFERRAL_NOT_FOUND"
+msgstr "ارجاع پیدا نشد"
+
+msgid "OA_ORG_UNIT_NOT_FOUND"
+msgstr "واحد سازمانی پیدا نشد"
+
+msgid "OA_POSITION_NOT_FOUND"
+msgstr "سمت پیدا نشد"
+
+msgid "OA_HOLDER_NOT_FOUND"
+msgstr "تصدی سمت پیدا نشد"
+
+msgid "OA_POSITION_INACTIVE"
+msgstr "این سمت غیرفعال است"
+
+msgid "OA_DELEGATION_VIEW_ONLY"
+msgstr "این جانشینی فقط اجازه مشاهده دارد"
+
+msgid "OA_DELEGATION_REFER_ONLY"
+msgstr "این جانشینی فقط اجازه ارجاع دارد"
+
+msgid "OA_DELEGATION_NOT_FOUND"
+msgstr "جانشینی پیدا نشد"
+
+msgid "OA_DISABLED"
+msgstr "اتوماسیون اداری در تنظیمات غیرفعال است"
+
+msgid "OA_LETTER_STILL_DRAFT"
+msgstr "قبل از ارجاع، نامه باید در دبیرخانه ثبت شود"
+
+msgid "OA_LETTER_ARCHIVED"
+msgstr "نامه بایگانی‌شده قابل ارجاع نیست"
+
+msgid "OA_REFERRAL_FORBIDDEN"
+msgstr "این ارجاع در کارتابل سمت فعال نیست"
+
+msgid "OA_REFERRAL_CLOSED"
+msgstr "این ارجاع قبلاً بسته شده است"
+
+msgid "OA_ATTACHMENT_NOT_FOUND"
+msgstr "پیوست پیدا نشد"
+
+msgid "OA_HOLDER_EXISTS"
+msgstr "این کاربر هم‌اکنون این سمت را تصدی می‌کند"
+
+msgid "OA_DELEGATION_EXISTS"
+msgstr "جانشینی فعال برای این کاربر و سمت از قبل وجود دارد"
+
+msgid "OA_ORG_UNIT_CYCLE"
+msgstr "واحد سازمانی نمی‌تواند زیرمجموعهٔ خودش باشد"

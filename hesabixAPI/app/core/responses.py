@@ -97,6 +97,7 @@ def _format_datetime_fields_impl(data: Any, request: Request, tz_name: str) -> A
 	DATE_ONLY_FIELDS = {
 		"issue_date",
 		"due_date",
+		"due_at",
 		"start_date",
 		"end_date",
 		"document_date",
@@ -104,6 +105,8 @@ def _format_datetime_fields_impl(data: Any, request: Request, tz_name: str) -> A
 		"run_date",
 		"hire_date",
 		"termination_date",
+		"letter_date",
+		"follow_up_at",
 	}
 
 	if isinstance(data, dict):

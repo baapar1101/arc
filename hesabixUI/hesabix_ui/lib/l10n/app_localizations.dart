@@ -23868,6 +23868,468 @@ abstract class AppLocalizations {
   /// **'The payroll add-on is not active for this business. Activate it from the plugin marketplace.'**
   String get payrollPluginNotActive;
 
+  /// No description provided for @oaMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Office automation'**
+  String get oaMenu;
+
+  /// No description provided for @oaPluginNotActive.
+  ///
+  /// In en, this message translates to:
+  /// **'The office automation add-on is not active for this business. Activate it from the plugin marketplace.'**
+  String get oaPluginNotActive;
+
+  /// No description provided for @oaPermissionCompose.
+  ///
+  /// In en, this message translates to:
+  /// **'Create and edit letter drafts and attachments'**
+  String get oaPermissionCompose;
+
+  /// No description provided for @oaPermissionRefer.
+  ///
+  /// In en, this message translates to:
+  /// **'Refer, paraph, return, and follow up letters'**
+  String get oaPermissionRefer;
+
+  /// No description provided for @oaPermissionSecretariat.
+  ///
+  /// In en, this message translates to:
+  /// **'Register incoming and outgoing letters'**
+  String get oaPermissionSecretariat;
+
+  /// No description provided for @oaPermissionArchive.
+  ///
+  /// In en, this message translates to:
+  /// **'Archive letters'**
+  String get oaPermissionArchive;
+
+  /// No description provided for @oaPermissionAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage organization, positions, occupancy, and settings'**
+  String get oaPermissionAdmin;
+
+  /// No description provided for @oaInbox.
+  ///
+  /// In en, this message translates to:
+  /// **'Inbox'**
+  String get oaInbox;
+
+  /// No description provided for @oaAction.
+  ///
+  /// In en, this message translates to:
+  /// **'For action'**
+  String get oaAction;
+
+  /// No description provided for @oaCc.
+  ///
+  /// In en, this message translates to:
+  /// **'CC'**
+  String get oaCc;
+
+  /// No description provided for @oaDrafts.
+  ///
+  /// In en, this message translates to:
+  /// **'Drafts'**
+  String get oaDrafts;
+
+  /// No description provided for @oaSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent'**
+  String get oaSent;
+
+  /// No description provided for @oaFollowUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow-up'**
+  String get oaFollowUp;
+
+  /// No description provided for @oaArchive.
+  ///
+  /// In en, this message translates to:
+  /// **'Archive'**
+  String get oaArchive;
+
+  /// No description provided for @oaRegistry.
+  ///
+  /// In en, this message translates to:
+  /// **'Registry'**
+  String get oaRegistry;
+
+  /// No description provided for @oaNewLetter.
+  ///
+  /// In en, this message translates to:
+  /// **'New letter'**
+  String get oaNewLetter;
+
+  /// No description provided for @oaOrg.
+  ///
+  /// In en, this message translates to:
+  /// **'Organization'**
+  String get oaOrg;
+
+  /// No description provided for @oaSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Office automation settings'**
+  String get oaSettings;
+
+  /// No description provided for @oaSubject.
+  ///
+  /// In en, this message translates to:
+  /// **'Subject'**
+  String get oaSubject;
+
+  /// No description provided for @oaBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Body'**
+  String get oaBody;
+
+  /// No description provided for @oaKindInternal.
+  ///
+  /// In en, this message translates to:
+  /// **'Internal'**
+  String get oaKindInternal;
+
+  /// No description provided for @oaKindIncoming.
+  ///
+  /// In en, this message translates to:
+  /// **'Incoming'**
+  String get oaKindIncoming;
+
+  /// No description provided for @oaKindOutgoing.
+  ///
+  /// In en, this message translates to:
+  /// **'Outgoing'**
+  String get oaKindOutgoing;
+
+  /// No description provided for @oaRegister.
+  ///
+  /// In en, this message translates to:
+  /// **'Register'**
+  String get oaRegister;
+
+  /// No description provided for @oaRefer.
+  ///
+  /// In en, this message translates to:
+  /// **'Refer'**
+  String get oaRefer;
+
+  /// No description provided for @oaParaph.
+  ///
+  /// In en, this message translates to:
+  /// **'Paraph'**
+  String get oaParaph;
+
+  /// No description provided for @oaAttach.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachment'**
+  String get oaAttach;
+
+  /// No description provided for @oaComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete'**
+  String get oaComplete;
+
+  /// No description provided for @oaReturn.
+  ///
+  /// In en, this message translates to:
+  /// **'Return'**
+  String get oaReturn;
+
+  /// No description provided for @oaPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'Acting position'**
+  String get oaPosition;
+
+  /// No description provided for @oaNoPositions.
+  ///
+  /// In en, this message translates to:
+  /// **'You have no active position. Ask an administrator to assign one.'**
+  String get oaNoPositions;
+
+  /// No description provided for @oaEmptyFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'This folder is empty.'**
+  String get oaEmptyFolder;
+
+  /// No description provided for @oaUrgency.
+  ///
+  /// In en, this message translates to:
+  /// **'Urgency'**
+  String get oaUrgency;
+
+  /// No description provided for @oaConfidential.
+  ///
+  /// In en, this message translates to:
+  /// **'Confidentiality'**
+  String get oaConfidential;
+
+  /// No description provided for @oaSaveDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Save draft'**
+  String get oaSaveDraft;
+
+  /// No description provided for @oaLetterDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Letter date'**
+  String get oaLetterDate;
+
+  /// No description provided for @oaInstruction.
+  ///
+  /// In en, this message translates to:
+  /// **'Instruction'**
+  String get oaInstruction;
+
+  /// No description provided for @oaToPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'To position'**
+  String get oaToPosition;
+
+  /// No description provided for @oaPrint.
+  ///
+  /// In en, this message translates to:
+  /// **'Print letter'**
+  String get oaPrint;
+
+  /// No description provided for @oaFollowUpDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow-up date'**
+  String get oaFollowUpDate;
+
+  /// No description provided for @oaDelegations.
+  ///
+  /// In en, this message translates to:
+  /// **'Delegations'**
+  String get oaDelegations;
+
+  /// No description provided for @oaHolders.
+  ///
+  /// In en, this message translates to:
+  /// **'Occupancy'**
+  String get oaHolders;
+
+  /// No description provided for @oaUnits.
+  ///
+  /// In en, this message translates to:
+  /// **'Units'**
+  String get oaUnits;
+
+  /// No description provided for @oaPositions.
+  ///
+  /// In en, this message translates to:
+  /// **'Positions'**
+  String get oaPositions;
+
+  /// No description provided for @oaAssign.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign position'**
+  String get oaAssign;
+
+  /// No description provided for @oaDelegate.
+  ///
+  /// In en, this message translates to:
+  /// **'Delegate'**
+  String get oaDelegate;
+
+  /// No description provided for @oaEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable office automation'**
+  String get oaEnabled;
+
+  /// No description provided for @oaIncomingPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Incoming prefix'**
+  String get oaIncomingPrefix;
+
+  /// No description provided for @oaOutgoingPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Outgoing prefix'**
+  String get oaOutgoingPrefix;
+
+  /// No description provided for @oaInternalPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Internal prefix'**
+  String get oaInternalPrefix;
+
+  /// No description provided for @oaNumberingCalendar.
+  ///
+  /// In en, this message translates to:
+  /// **'Numbering calendar'**
+  String get oaNumberingCalendar;
+
+  /// No description provided for @oaLetterKind.
+  ///
+  /// In en, this message translates to:
+  /// **'Letter type'**
+  String get oaLetterKind;
+
+  /// No description provided for @oaReferralKind.
+  ///
+  /// In en, this message translates to:
+  /// **'Referral type'**
+  String get oaReferralKind;
+
+  /// No description provided for @oaSignature.
+  ///
+  /// In en, this message translates to:
+  /// **'Signature'**
+  String get oaSignature;
+
+  /// No description provided for @oaSender.
+  ///
+  /// In en, this message translates to:
+  /// **'Sender'**
+  String get oaSender;
+
+  /// No description provided for @oaReceiver.
+  ///
+  /// In en, this message translates to:
+  /// **'Receiver'**
+  String get oaReceiver;
+
+  /// No description provided for @oaSenderOrg.
+  ///
+  /// In en, this message translates to:
+  /// **'Sender organization'**
+  String get oaSenderOrg;
+
+  /// No description provided for @oaReceiverOrg.
+  ///
+  /// In en, this message translates to:
+  /// **'Receiver organization'**
+  String get oaReceiverOrg;
+
+  /// No description provided for @oaCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get oaCode;
+
+  /// No description provided for @oaLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Link letter'**
+  String get oaLink;
+
+  /// No description provided for @oaRelatedLetter.
+  ///
+  /// In en, this message translates to:
+  /// **'Related letter ID'**
+  String get oaRelatedLetter;
+
+  /// No description provided for @oaLinkRelated.
+  ///
+  /// In en, this message translates to:
+  /// **'Related'**
+  String get oaLinkRelated;
+
+  /// No description provided for @oaLinkReply.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply'**
+  String get oaLinkReply;
+
+  /// No description provided for @oaLinkFollowup.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow-up'**
+  String get oaLinkFollowup;
+
+  /// No description provided for @oaUrgencyNormal.
+  ///
+  /// In en, this message translates to:
+  /// **'Normal'**
+  String get oaUrgencyNormal;
+
+  /// No description provided for @oaUrgencyUrgent.
+  ///
+  /// In en, this message translates to:
+  /// **'Urgent'**
+  String get oaUrgencyUrgent;
+
+  /// No description provided for @oaUrgencyImmediate.
+  ///
+  /// In en, this message translates to:
+  /// **'Immediate'**
+  String get oaUrgencyImmediate;
+
+  /// No description provided for @oaConfidentialNormal.
+  ///
+  /// In en, this message translates to:
+  /// **'Normal'**
+  String get oaConfidentialNormal;
+
+  /// No description provided for @oaConfidentialRestricted.
+  ///
+  /// In en, this message translates to:
+  /// **'Confidential'**
+  String get oaConfidentialRestricted;
+
+  /// No description provided for @oaSubtree.
+  ///
+  /// In en, this message translates to:
+  /// **'View organization subtree'**
+  String get oaSubtree;
+
+  /// No description provided for @oaParentUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'Parent unit'**
+  String get oaParentUnit;
+
+  /// No description provided for @oaNoParent.
+  ///
+  /// In en, this message translates to:
+  /// **'No parent unit'**
+  String get oaNoParent;
+
+  /// No description provided for @oaJalali.
+  ///
+  /// In en, this message translates to:
+  /// **'Jalali'**
+  String get oaJalali;
+
+  /// No description provided for @oaGregorian.
+  ///
+  /// In en, this message translates to:
+  /// **'Gregorian'**
+  String get oaGregorian;
+
+  /// No description provided for @oaLetterhead.
+  ///
+  /// In en, this message translates to:
+  /// **'Letterhead file ID'**
+  String get oaLetterhead;
+
+  /// No description provided for @businessSettingsOfficeAutomation.
+  ///
+  /// In en, this message translates to:
+  /// **'Office automation'**
+  String get businessSettingsOfficeAutomation;
+
+  /// No description provided for @businessSettingsOfficeAutomationDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Letter numbering, letterhead, and secretariat prefixes'**
+  String get businessSettingsOfficeAutomationDescription;
+
   /// No description provided for @fixedAssetsTitle.
   ///
   /// In en, this message translates to:
@@ -35177,6 +35639,348 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Default gateway and public share link payment'**
   String get businessSettingsInvoiceSharePaymentDescription;
+
+  /// No description provided for @businessSettingsPayPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Business pay link'**
+  String get businessSettingsPayPage;
+
+  /// No description provided for @businessSettingsPayPageDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Unique username, public pay page, and incoming transfers'**
+  String get businessSettingsPayPageDescription;
+
+  /// No description provided for @payPageEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable public pay link'**
+  String get payPageEnabled;
+
+  /// No description provided for @payPageEnabledHint.
+  ///
+  /// In en, this message translates to:
+  /// **'When off, the public page is visible but payment is blocked'**
+  String get payPageEnabledHint;
+
+  /// No description provided for @payPageUsername.
+  ///
+  /// In en, this message translates to:
+  /// **'Username'**
+  String get payPageUsername;
+
+  /// No description provided for @payPageUsernameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'3–30 characters: lowercase English letters, digits, hyphen'**
+  String get payPageUsernameHint;
+
+  /// No description provided for @payPageUsernameAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This username is available'**
+  String get payPageUsernameAvailable;
+
+  /// No description provided for @payPageUsernameTaken.
+  ///
+  /// In en, this message translates to:
+  /// **'This username is already taken'**
+  String get payPageUsernameTaken;
+
+  /// No description provided for @payPageUsernameReserved.
+  ///
+  /// In en, this message translates to:
+  /// **'This username is reserved'**
+  String get payPageUsernameReserved;
+
+  /// No description provided for @payPageUsernameInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid username'**
+  String get payPageUsernameInvalid;
+
+  /// No description provided for @payPageDisplayTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Page title'**
+  String get payPageDisplayTitle;
+
+  /// No description provided for @payPageDisplayTitleHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Shown as “Pay to …” at the top of the public page'**
+  String get payPageDisplayTitleHint;
+
+  /// No description provided for @payPageIntroText.
+  ///
+  /// In en, this message translates to:
+  /// **'Help text'**
+  String get payPageIntroText;
+
+  /// No description provided for @payPageShowLogo.
+  ///
+  /// In en, this message translates to:
+  /// **'Show business logo'**
+  String get payPageShowLogo;
+
+  /// No description provided for @payPageGateway.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment gateway'**
+  String get payPageGateway;
+
+  /// No description provided for @payPageMinAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum amount'**
+  String get payPageMinAmount;
+
+  /// No description provided for @payPageMaxAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum amount (optional)'**
+  String get payPageMaxAmount;
+
+  /// No description provided for @payPageNotifyInApp.
+  ///
+  /// In en, this message translates to:
+  /// **'In-app notification after successful payment'**
+  String get payPageNotifyInApp;
+
+  /// No description provided for @payPageNotifySms.
+  ///
+  /// In en, this message translates to:
+  /// **'SMS to business owner after successful payment'**
+  String get payPageNotifySms;
+
+  /// No description provided for @payPageNotifyRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'At least in-app notification or SMS must stay on'**
+  String get payPageNotifyRequired;
+
+  /// No description provided for @payPageCopyLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy link'**
+  String get payPageCopyLink;
+
+  /// No description provided for @payPageLinkCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay link copied'**
+  String get payPageLinkCopied;
+
+  /// No description provided for @payPageOpenPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Open public page'**
+  String get payPageOpenPreview;
+
+  /// No description provided for @payPagePaymentsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Incoming transfers'**
+  String get payPagePaymentsTab;
+
+  /// No description provided for @payPageSettingsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get payPageSettingsTab;
+
+  /// No description provided for @payPagePayerName.
+  ///
+  /// In en, this message translates to:
+  /// **'Payer name'**
+  String get payPagePayerName;
+
+  /// No description provided for @payPagePayerMobile.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile'**
+  String get payPagePayerMobile;
+
+  /// No description provided for @payPagePayerNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get payPagePayerNote;
+
+  /// No description provided for @payPagePaidAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid at'**
+  String get payPagePaidAt;
+
+  /// No description provided for @payPagePayTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay to {name}'**
+  String payPagePayTo(String name);
+
+  /// No description provided for @payPageAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get payPageAmount;
+
+  /// No description provided for @payPageNameOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Name (optional)'**
+  String get payPageNameOptional;
+
+  /// No description provided for @payPageInvalidName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name may only contain letters (max 30 characters)'**
+  String get payPageInvalidName;
+
+  /// No description provided for @payPageMobileOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile (optional)'**
+  String get payPageMobileOptional;
+
+  /// No description provided for @payPageInvalidMobile.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile must be 11 digits and start with 09'**
+  String get payPageInvalidMobile;
+
+  /// No description provided for @payPageNoteOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Short note (optional)'**
+  String get payPageNoteOptional;
+
+  /// No description provided for @payPagePayButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay'**
+  String get payPagePayButton;
+
+  /// No description provided for @payPageDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Online receiving is currently disabled'**
+  String get payPageDisabled;
+
+  /// No description provided for @payPageNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'This pay page was not found'**
+  String get payPageNotFound;
+
+  /// No description provided for @payPageReceiptTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment receipt'**
+  String get payPageReceiptTitle;
+
+  /// No description provided for @payPageReceiptSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment completed successfully'**
+  String get payPageReceiptSuccess;
+
+  /// No description provided for @payPageReceiptFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment failed or was not confirmed by the bank'**
+  String get payPageReceiptFailed;
+
+  /// No description provided for @payPageTrackingRef.
+  ///
+  /// In en, this message translates to:
+  /// **'Tracking number'**
+  String get payPageTrackingRef;
+
+  /// No description provided for @payPageCurrencyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount is in {currency}'**
+  String payPageCurrencyHint(String currency);
+
+  /// No description provided for @payPageNoGateway.
+  ///
+  /// In en, this message translates to:
+  /// **'No active payment gateway is available for this business'**
+  String get payPageNoGateway;
+
+  /// No description provided for @walletTypePublicPayLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay-link deposit'**
+  String get walletTypePublicPayLink;
+
+  /// No description provided for @walletTypePublicInvoiceSharePay.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice-link payment'**
+  String get walletTypePublicInvoiceSharePay;
+
+  /// No description provided for @payPageAnonymousCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Anonymous customer'**
+  String get payPageAnonymousCustomer;
+
+  /// No description provided for @payPageCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer'**
+  String get payPageCustomer;
+
+  /// No description provided for @payPageStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get payPageStatus;
+
+  /// No description provided for @payPageStatusSucceeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Succeeded'**
+  String get payPageStatusSucceeded;
+
+  /// No description provided for @payPageStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get payPageStatusFailed;
+
+  /// No description provided for @payPageStatusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get payPageStatusPending;
+
+  /// No description provided for @payPageMatchCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Match existing customer by mobile'**
+  String get payPageMatchCustomer;
+
+  /// No description provided for @payPageMatchCustomerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'If a customer with this mobile already exists, the receipt is posted to their account'**
+  String get payPageMatchCustomerHint;
+
+  /// No description provided for @payPageCreateCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Create customer when mobile is new'**
+  String get payPageCreateCustomer;
+
+  /// No description provided for @payPageUseAnonymous.
+  ///
+  /// In en, this message translates to:
+  /// **'Use anonymous customer when mobile is empty'**
+  String get payPageUseAnonymous;
 
   /// No description provided for @businessSettingsTemplatesDescription.
   ///

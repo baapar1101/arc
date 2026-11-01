@@ -29,6 +29,8 @@ class BusinessSettingsLocalizationHelper {
         return t.businessSettingsDocumentNumbering;
       case 'businessSettingsInvoiceSharePayment':
         return t.businessSettingsInvoiceSharePayment;
+      case 'businessSettingsPayPage':
+        return t.businessSettingsPayPage;
       case 'templates':
         return t.templates;
       case 'documentMonetizationTitle':
@@ -53,6 +55,8 @@ class BusinessSettingsLocalizationHelper {
         return t.distributionMenu;
       case 'businessSettingsPayroll':
         return t.businessSettingsPayroll;
+      case 'businessSettingsOfficeAutomation':
+        return t.businessSettingsOfficeAutomation;
       case 'businessSettingsFixedAssets':
         return t.businessSettingsFixedAssets;
       case 'usersAndPermissions':
@@ -110,6 +114,8 @@ class BusinessSettingsLocalizationHelper {
         return t.businessSettingsDocumentNumberingDescription;
       case 'businessSettingsInvoiceSharePaymentDescription':
         return t.businessSettingsInvoiceSharePaymentDescription;
+      case 'businessSettingsPayPageDescription':
+        return t.businessSettingsPayPageDescription;
       case 'businessSettingsTemplatesDescription':
         return t.businessSettingsTemplatesDescription;
       case 'documentMonetizationSubtitle':
@@ -134,6 +140,8 @@ class BusinessSettingsLocalizationHelper {
         return t.distributionSettingsSubtitle;
       case 'businessSettingsPayrollDescription':
         return t.businessSettingsPayrollDescription;
+      case 'businessSettingsOfficeAutomationDescription':
+        return t.businessSettingsOfficeAutomationDescription;
       case 'businessSettingsFixedAssetsDescription':
         return t.businessSettingsFixedAssetsDescription;
       case 'usersAndPermissionsDescription':

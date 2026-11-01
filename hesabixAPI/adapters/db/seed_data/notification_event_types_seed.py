@@ -39,6 +39,18 @@ WORKFLOW_EXTENSION_EVENT_CODES: frozenset[str] = frozenset(
 )
 
 INVOICE_SHARE_LINK_EVENT_CODES: frozenset[str] = frozenset({"invoice_share_link"})
+PAY_LINK_RECEIVED_EVENT_CODES: frozenset[str] = frozenset({"pay_link.received"})
+OFFICE_AUTOMATION_EVENT_CODES: frozenset[str] = frozenset(
+	{"office_automation.letter_referred", "office_automation.letter_returned"}
+)
+
+PAY_LINK_RECEIVED_TEMPLATE_VARIABLES: list[dict[str, str]] = [
+    {"key": "payer_name", "type": "string", "description": "نام واریزکننده"},
+    {"key": "amount", "type": "number", "description": "مبلغ واریز"},
+    {"key": "date_time", "type": "string", "description": "تاریخ و ساعت واریز"},
+    {"key": "business_name", "type": "string", "description": "نام کسب‌وکار"},
+    {"key": "username", "type": "string", "description": "نام کاربری لینک واریز"},
+]
 
 NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
     {
@@ -559,6 +571,28 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
         "requires_approval": True,
     },
     {
+        "code": "pay_link.received",
+        "name": "واریز از لینک پرداخت کسب‌وکار",
+        "description": "اعلان مالک پس از واریز موفق از صفحه عمومی /u/{username}",
+        "category": "sales",
+        "available_variables": list(PAY_LINK_RECEIVED_TEMPLATE_VARIABLES),
+        "default_sms_template": (
+            "واریز {{ amount }} توسط {{ payer_name }} در {{ date_time }} "
+            "از لینک {{ username }} — {{ business_name }}"
+        ),
+        "default_email_template": """واریز جدید از لینک پرداخت
+
+مبلغ: {{ amount }}
+واریزکننده: {{ payer_name }}
+تاریخ: {{ date_time }}
+لینک: {{ username }}
+
+{{ business_name }}""",
+        "default_email_subject": "واریز جدید از لینک پرداخت — {{ business_name }}",
+        "is_active": True,
+        "requires_approval": False,
+    },
+    {
         "code": "payroll.run.finalized",
         "name": "قطعی‌سازی اجرای حقوق",
         "description": "پس از قطعی‌سازی سند حقوق ماهانه",
@@ -590,6 +624,40 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
         "default_sms_template": "سند حسابداری حقوق {{ document_code }} برای {{ period_title }} ثبت شد. {{ business_name }}",
         "default_email_template": "سند حسابداری شماره {{ document_code }} برای اجرای حقوق {{ run_code }} ({{ period_title }}) ثبت شد.\n\n{{ business_name }}",
         "default_email_subject": "ثبت سند حسابداری حقوق — {{ document_code }}",
+        "is_active": True,
+        "requires_approval": False,
+    },
+    {
+        "code": "office_automation.letter_referred",
+        "name": "ارجاع نامه اتوماسیون اداری",
+        "description": "پس از ارجاع نامه به کارتابل سمت",
+        "category": "office_automation",
+        "available_variables": [
+            {"key": "subject", "type": "string", "description": "موضوع نامه"},
+            {"key": "number", "type": "string", "description": "شماره دبیرخانه"},
+            {"key": "letter_id", "type": "number", "description": "شناسه نامه"},
+            {"key": "business_name", "type": "string", "description": "نام کسب‌وکار"},
+        ],
+        "default_sms_template": "نامه «{{ subject }}» با شماره {{ number }} به کارتابل شما ارجاع شد. {{ business_name }}",
+        "default_email_template": "نامه «{{ subject }}» با شماره {{ number }} به کارتابل شما ارجاع شد.\nشناسه نامه: {{ letter_id }}\n\n{{ business_name }}",
+        "default_email_subject": "ارجاع نامه — {{ subject }}",
+        "is_active": True,
+        "requires_approval": False,
+    },
+    {
+        "code": "office_automation.letter_returned",
+        "name": "عودت نامه اتوماسیون اداری",
+        "description": "پس از عودت ارجاع نامه به سمت فرستنده",
+        "category": "office_automation",
+        "available_variables": [
+            {"key": "subject", "type": "string", "description": "موضوع نامه"},
+            {"key": "number", "type": "string", "description": "شماره دبیرخانه"},
+            {"key": "letter_id", "type": "number", "description": "شناسه نامه"},
+            {"key": "business_name", "type": "string", "description": "نام کسب‌وکار"},
+        ],
+        "default_sms_template": "نامه «{{ subject }}» با شماره {{ number }} به کارتابل شما عودت شد. {{ business_name }}",
+        "default_email_template": "نامه «{{ subject }}» با شماره {{ number }} به کارتابل شما عودت شد.\nشناسه نامه: {{ letter_id }}\n\n{{ business_name }}",
+        "default_email_subject": "عودت نامه — {{ subject }}",
         "is_active": True,
         "requires_approval": False,
     },

@@ -180,6 +180,11 @@ class AIFunctionRegistry:
         from app.services.ai.ai_function_extensions_mcp_payroll import register_mcp_payroll_functions
 
         register_mcp_payroll_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_office_automation import (
+            register_mcp_office_automation_functions,
+        )
+
+        register_mcp_office_automation_functions(self)
         from app.services.ai.ai_function_extensions_mcp_products_batch import register_mcp_products_batch_functions
 
         register_mcp_products_batch_functions(self)

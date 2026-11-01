@@ -97,6 +97,7 @@ from adapters.api.v1.marketplace import router as marketplace_router
 from adapters.api.v1.warranty import router as warranty_router
 from adapters.api.v1.customer_club import router as customer_club_router
 from adapters.api.v1.payroll import router as payroll_router
+from adapters.api.v1.office_automation import router as office_automation_router
 from adapters.api.v1.fixed_assets import router as fixed_assets_router
 from adapters.api.v1.barcode_labels import router as barcode_labels_router
 from adapters.api.v1.repair_shop import router as repair_shop_router
@@ -116,6 +117,8 @@ from adapters.api.v1.admin.notification_moderation import router as admin_notifi
 from adapters.api.v1.notifications_ws import router as notifications_ws_router
 from adapters.api.v1.ai.voice_ws import router as ai_voice_ws_router
 from adapters.api.v1.public_share_links import router as public_share_links_router
+from adapters.api.v1.public_pay_pages import router as public_pay_pages_router
+from adapters.api.v1.business_pay_pages import router as business_pay_pages_router
 from adapters.api.v1.public_storage_file_shares import router as public_storage_file_shares_router
 from adapters.api.v1.public_product_catalog import router as public_product_catalog_router
 from adapters.api.v1.business_backups import router as business_backups_router
@@ -1083,6 +1086,7 @@ def create_app() -> FastAPI:
     application.include_router(admin_fx_providers_router, prefix=settings.api_v1_prefix)
     application.include_router(report_templates_router, prefix=settings.api_v1_prefix)
     application.include_router(wallet_router, prefix=settings.api_v1_prefix)
+    application.include_router(business_pay_pages_router, prefix=settings.api_v1_prefix)
     application.include_router(zohal_router, prefix=settings.api_v1_prefix)
     application.include_router(wallet_webhook_router, prefix=settings.api_v1_prefix)
     application.include_router(credit_router, prefix=settings.api_v1_prefix)
@@ -1095,6 +1099,7 @@ def create_app() -> FastAPI:
     application.include_router(warranty_router, prefix=settings.api_v1_prefix)
     application.include_router(customer_club_router, prefix=settings.api_v1_prefix)
     application.include_router(payroll_router, prefix=settings.api_v1_prefix)
+    application.include_router(office_automation_router, prefix=settings.api_v1_prefix)
     application.include_router(fixed_assets_router, prefix=settings.api_v1_prefix)
     application.include_router(barcode_labels_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.distribution import router as distribution_router
@@ -1140,6 +1145,7 @@ def create_app() -> FastAPI:
     application.include_router(announcements_router, prefix=settings.api_v1_prefix)
     # Public share links (no prefix to allow short /p/{code})
     application.include_router(public_share_links_router)
+    application.include_router(public_pay_pages_router)
     application.include_router(public_storage_file_shares_router)
     application.include_router(public_product_catalog_router)
     

@@ -12933,6 +12933,244 @@ class AppLocalizationsEn extends AppLocalizations {
       'The payroll add-on is not active for this business. Activate it from the plugin marketplace.';
 
   @override
+  String get oaMenu => 'Office automation';
+
+  @override
+  String get oaPluginNotActive =>
+      'The office automation add-on is not active for this business. Activate it from the plugin marketplace.';
+
+  @override
+  String get oaPermissionCompose =>
+      'Create and edit letter drafts and attachments';
+
+  @override
+  String get oaPermissionRefer =>
+      'Refer, paraph, return, and follow up letters';
+
+  @override
+  String get oaPermissionSecretariat =>
+      'Register incoming and outgoing letters';
+
+  @override
+  String get oaPermissionArchive => 'Archive letters';
+
+  @override
+  String get oaPermissionAdmin =>
+      'Manage organization, positions, occupancy, and settings';
+
+  @override
+  String get oaInbox => 'Inbox';
+
+  @override
+  String get oaAction => 'For action';
+
+  @override
+  String get oaCc => 'CC';
+
+  @override
+  String get oaDrafts => 'Drafts';
+
+  @override
+  String get oaSent => 'Sent';
+
+  @override
+  String get oaFollowUp => 'Follow-up';
+
+  @override
+  String get oaArchive => 'Archive';
+
+  @override
+  String get oaRegistry => 'Registry';
+
+  @override
+  String get oaNewLetter => 'New letter';
+
+  @override
+  String get oaOrg => 'Organization';
+
+  @override
+  String get oaSettings => 'Office automation settings';
+
+  @override
+  String get oaSubject => 'Subject';
+
+  @override
+  String get oaBody => 'Body';
+
+  @override
+  String get oaKindInternal => 'Internal';
+
+  @override
+  String get oaKindIncoming => 'Incoming';
+
+  @override
+  String get oaKindOutgoing => 'Outgoing';
+
+  @override
+  String get oaRegister => 'Register';
+
+  @override
+  String get oaRefer => 'Refer';
+
+  @override
+  String get oaParaph => 'Paraph';
+
+  @override
+  String get oaAttach => 'Attachment';
+
+  @override
+  String get oaComplete => 'Complete';
+
+  @override
+  String get oaReturn => 'Return';
+
+  @override
+  String get oaPosition => 'Acting position';
+
+  @override
+  String get oaNoPositions =>
+      'You have no active position. Ask an administrator to assign one.';
+
+  @override
+  String get oaEmptyFolder => 'This folder is empty.';
+
+  @override
+  String get oaUrgency => 'Urgency';
+
+  @override
+  String get oaConfidential => 'Confidentiality';
+
+  @override
+  String get oaSaveDraft => 'Save draft';
+
+  @override
+  String get oaLetterDate => 'Letter date';
+
+  @override
+  String get oaInstruction => 'Instruction';
+
+  @override
+  String get oaToPosition => 'To position';
+
+  @override
+  String get oaPrint => 'Print letter';
+
+  @override
+  String get oaFollowUpDate => 'Follow-up date';
+
+  @override
+  String get oaDelegations => 'Delegations';
+
+  @override
+  String get oaHolders => 'Occupancy';
+
+  @override
+  String get oaUnits => 'Units';
+
+  @override
+  String get oaPositions => 'Positions';
+
+  @override
+  String get oaAssign => 'Assign position';
+
+  @override
+  String get oaDelegate => 'Delegate';
+
+  @override
+  String get oaEnabled => 'Enable office automation';
+
+  @override
+  String get oaIncomingPrefix => 'Incoming prefix';
+
+  @override
+  String get oaOutgoingPrefix => 'Outgoing prefix';
+
+  @override
+  String get oaInternalPrefix => 'Internal prefix';
+
+  @override
+  String get oaNumberingCalendar => 'Numbering calendar';
+
+  @override
+  String get oaLetterKind => 'Letter type';
+
+  @override
+  String get oaReferralKind => 'Referral type';
+
+  @override
+  String get oaSignature => 'Signature';
+
+  @override
+  String get oaSender => 'Sender';
+
+  @override
+  String get oaReceiver => 'Receiver';
+
+  @override
+  String get oaSenderOrg => 'Sender organization';
+
+  @override
+  String get oaReceiverOrg => 'Receiver organization';
+
+  @override
+  String get oaCode => 'Code';
+
+  @override
+  String get oaLink => 'Link letter';
+
+  @override
+  String get oaRelatedLetter => 'Related letter ID';
+
+  @override
+  String get oaLinkRelated => 'Related';
+
+  @override
+  String get oaLinkReply => 'Reply';
+
+  @override
+  String get oaLinkFollowup => 'Follow-up';
+
+  @override
+  String get oaUrgencyNormal => 'Normal';
+
+  @override
+  String get oaUrgencyUrgent => 'Urgent';
+
+  @override
+  String get oaUrgencyImmediate => 'Immediate';
+
+  @override
+  String get oaConfidentialNormal => 'Normal';
+
+  @override
+  String get oaConfidentialRestricted => 'Confidential';
+
+  @override
+  String get oaSubtree => 'View organization subtree';
+
+  @override
+  String get oaParentUnit => 'Parent unit';
+
+  @override
+  String get oaNoParent => 'No parent unit';
+
+  @override
+  String get oaJalali => 'Jalali';
+
+  @override
+  String get oaGregorian => 'Gregorian';
+
+  @override
+  String get oaLetterhead => 'Letterhead file ID';
+
+  @override
+  String get businessSettingsOfficeAutomation => 'Office automation';
+
+  @override
+  String get businessSettingsOfficeAutomationDescription =>
+      'Letter numbering, letterhead, and secretariat prefixes';
+
+  @override
   String get fixedAssetsTitle => 'Fixed assets';
 
   @override
@@ -19214,6 +19452,194 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get businessSettingsInvoiceSharePaymentDescription =>
       'Default gateway and public share link payment';
+
+  @override
+  String get businessSettingsPayPage => 'Business pay link';
+
+  @override
+  String get businessSettingsPayPageDescription =>
+      'Unique username, public pay page, and incoming transfers';
+
+  @override
+  String get payPageEnabled => 'Enable public pay link';
+
+  @override
+  String get payPageEnabledHint =>
+      'When off, the public page is visible but payment is blocked';
+
+  @override
+  String get payPageUsername => 'Username';
+
+  @override
+  String get payPageUsernameHint =>
+      '3–30 characters: lowercase English letters, digits, hyphen';
+
+  @override
+  String get payPageUsernameAvailable => 'This username is available';
+
+  @override
+  String get payPageUsernameTaken => 'This username is already taken';
+
+  @override
+  String get payPageUsernameReserved => 'This username is reserved';
+
+  @override
+  String get payPageUsernameInvalid => 'Invalid username';
+
+  @override
+  String get payPageDisplayTitle => 'Page title';
+
+  @override
+  String get payPageDisplayTitleHint =>
+      'Shown as “Pay to …” at the top of the public page';
+
+  @override
+  String get payPageIntroText => 'Help text';
+
+  @override
+  String get payPageShowLogo => 'Show business logo';
+
+  @override
+  String get payPageGateway => 'Payment gateway';
+
+  @override
+  String get payPageMinAmount => 'Minimum amount';
+
+  @override
+  String get payPageMaxAmount => 'Maximum amount (optional)';
+
+  @override
+  String get payPageNotifyInApp =>
+      'In-app notification after successful payment';
+
+  @override
+  String get payPageNotifySms =>
+      'SMS to business owner after successful payment';
+
+  @override
+  String get payPageNotifyRequired =>
+      'At least in-app notification or SMS must stay on';
+
+  @override
+  String get payPageCopyLink => 'Copy link';
+
+  @override
+  String get payPageLinkCopied => 'Pay link copied';
+
+  @override
+  String get payPageOpenPreview => 'Open public page';
+
+  @override
+  String get payPagePaymentsTab => 'Incoming transfers';
+
+  @override
+  String get payPageSettingsTab => 'Settings';
+
+  @override
+  String get payPagePayerName => 'Payer name';
+
+  @override
+  String get payPagePayerMobile => 'Mobile';
+
+  @override
+  String get payPagePayerNote => 'Note';
+
+  @override
+  String get payPagePaidAt => 'Paid at';
+
+  @override
+  String payPagePayTo(String name) {
+    return 'Pay to $name';
+  }
+
+  @override
+  String get payPageAmount => 'Amount';
+
+  @override
+  String get payPageNameOptional => 'Name (optional)';
+
+  @override
+  String get payPageInvalidName =>
+      'Name may only contain letters (max 30 characters)';
+
+  @override
+  String get payPageMobileOptional => 'Mobile (optional)';
+
+  @override
+  String get payPageInvalidMobile =>
+      'Mobile must be 11 digits and start with 09';
+
+  @override
+  String get payPageNoteOptional => 'Short note (optional)';
+
+  @override
+  String get payPagePayButton => 'Pay';
+
+  @override
+  String get payPageDisabled => 'Online receiving is currently disabled';
+
+  @override
+  String get payPageNotFound => 'This pay page was not found';
+
+  @override
+  String get payPageReceiptTitle => 'Payment receipt';
+
+  @override
+  String get payPageReceiptSuccess => 'Payment completed successfully';
+
+  @override
+  String get payPageReceiptFailed =>
+      'Payment failed or was not confirmed by the bank';
+
+  @override
+  String get payPageTrackingRef => 'Tracking number';
+
+  @override
+  String payPageCurrencyHint(String currency) {
+    return 'Amount is in $currency';
+  }
+
+  @override
+  String get payPageNoGateway =>
+      'No active payment gateway is available for this business';
+
+  @override
+  String get walletTypePublicPayLink => 'Pay-link deposit';
+
+  @override
+  String get walletTypePublicInvoiceSharePay => 'Invoice-link payment';
+
+  @override
+  String get payPageAnonymousCustomer => 'Anonymous customer';
+
+  @override
+  String get payPageCustomer => 'Customer';
+
+  @override
+  String get payPageStatus => 'Status';
+
+  @override
+  String get payPageStatusSucceeded => 'Succeeded';
+
+  @override
+  String get payPageStatusFailed => 'Failed';
+
+  @override
+  String get payPageStatusPending => 'Pending';
+
+  @override
+  String get payPageMatchCustomer => 'Match existing customer by mobile';
+
+  @override
+  String get payPageMatchCustomerHint =>
+      'If a customer with this mobile already exists, the receipt is posted to their account';
+
+  @override
+  String get payPageCreateCustomer => 'Create customer when mobile is new';
+
+  @override
+  String get payPageUseAnonymous =>
+      'Use anonymous customer when mobile is empty';
 
   @override
   String get businessSettingsTemplatesDescription =>

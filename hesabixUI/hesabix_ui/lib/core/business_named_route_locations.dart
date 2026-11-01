@@ -154,6 +154,7 @@ abstract final class BusinessNamedRoutes {
     'business_settings_fiscal_year': 'settings/fiscal-year',
     'business_settings_print': 'settings/print',
     'business_settings_invoice_share_payment': 'settings/invoice-share-payment',
+    'business_settings_pay_page': 'settings/pay-page',
     'business_settings_installments': 'settings/installments',
     'business_document_monetization': 'document-monetization',
     'business_product_attributes': 'product-attributes',

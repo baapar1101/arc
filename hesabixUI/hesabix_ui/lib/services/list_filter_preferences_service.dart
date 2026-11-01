@@ -39,6 +39,7 @@ abstract class ListFilterPageIds {
 
   static const String kardexLinesTable = 'kardex_lines_table';
   static const String walletTransactionsTable = 'wallet_transactions_table';
+  static const String payPagePaymentsTable = 'pay_page_payments_table';
   static const String documentMonetizationChargesTable =
       'document_monetization_charges_table';
   static const String checkReconciliationSelectTable =

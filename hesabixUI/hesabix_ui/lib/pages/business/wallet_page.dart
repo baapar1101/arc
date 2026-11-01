@@ -50,6 +50,10 @@ class _WalletPageState extends State<WalletPage> {
         return l.walletTypeTopUp;
       case 'customer_payment':
         return l.walletTypeCustomerPayment;
+      case 'public_pay_link':
+        return l.walletTypePublicPayLink;
+      case 'public_invoice_share_pay':
+        return l.walletTypePublicInvoiceSharePay;
       case 'payout_request':
         return l.walletTypePayoutRequest;
       case 'payout_settlement':

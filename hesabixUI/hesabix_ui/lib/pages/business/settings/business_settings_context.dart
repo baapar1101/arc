@@ -122,6 +122,13 @@ class BusinessSettingsContext {
         authStore.hasBusinessPermission('payroll', 'manage');
   }
 
+  bool get canAccessOfficeAutomation {
+    if (!pluginActive('office_automation')) return false;
+    if (isOwner) return true;
+    return authStore.hasBusinessPermission('office_automation', 'view') ||
+        authStore.hasBusinessPermission('office_automation', 'admin');
+  }
+
   bool get canAccessFixedAssets {
     if (!pluginActive('fixed_assets')) return false;
     if (isOwner) return true;

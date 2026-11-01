@@ -1054,6 +1054,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
     'customer_club': 'customer_club',
     'distribution': 'distribution',
     'payroll': 'payroll',
+    'office_automation': 'office_automation',
     'fixed_assets': 'fixed_assets',
     'telephony': 'asterisk_issabel_connector',
     'basalam': 'basalam_connector',
@@ -1369,6 +1370,14 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'operate': t.payrollPermissionOperate,
         'post': t.payrollPermissionPost,
         'approve': t.payrollPermissionApprove,
+      },
+      'office_automation': {
+        'view': '${t.view} ${t.oaMenu}',
+        'compose': t.oaPermissionCompose,
+        'refer': t.oaPermissionRefer,
+        'secretariat': t.oaPermissionSecretariat,
+        'archive': t.oaPermissionArchive,
+        'admin': t.oaPermissionAdmin,
       },
       'fixed_assets': {
         'view': '${t.view} ${t.fixedAssetsMenu}',
@@ -1985,6 +1994,11 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'sections': ['payroll'],
       },
       {
+        'title': t.oaMenu,
+        'icon': Icons.mark_email_unread_outlined,
+        'sections': ['office_automation'],
+      },
+      {
         'title': t.fixedAssetsMenu,
         'icon': Icons.chair_alt_outlined,
         'sections': ['fixed_assets'],
@@ -2162,6 +2176,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.distributionMenu;
       case 'payroll':
         return t.payrollMenu;
+      case 'office_automation':
+        return t.oaMenu;
       case 'fixed_assets':
         return t.fixedAssetsMenu;
       case 'telephony':
@@ -2274,6 +2290,16 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
           return t.fixedAssetsPermissionManage;
         }
         return t.manage;
+      case 'compose':
+        return t.oaPermissionCompose;
+      case 'refer':
+        return t.oaPermissionRefer;
+      case 'secretariat':
+        return t.oaPermissionSecretariat;
+      case 'archive':
+        return sectionKey == 'office_automation' ? t.oaPermissionArchive : action;
+      case 'admin':
+        return sectionKey == 'office_automation' ? t.oaPermissionAdmin : action;
       case 'design':
         return sectionKey == 'barcode_labels' ? t.barcodeLabelPermissionDesign : action;
       case 'print':

@@ -262,6 +262,17 @@ class BusinessSettingsCategorizationService {
         ),
       if (ctx.canJoinSettings)
         _item(
+          id: 'pay_page',
+          title: 'businessSettingsPayPage',
+          description: 'businessSettingsPayPageDescription',
+          icon: Icons.link_outlined,
+          color: const Color(0xFF00695C),
+          route: ctx.panelRoute('settings/pay-page'),
+          categoryId: 'sales_documents',
+          order: 6,
+        ),
+      if (ctx.canJoinSettings)
+        _item(
           id: 'report_templates',
           title: 'templates',
           description: 'businessSettingsTemplatesDescription',
@@ -269,7 +280,7 @@ class BusinessSettingsCategorizationService {
           color: const Color(0xFFC62828),
           route: ctx.panelRoute('report-templates'),
           categoryId: 'sales_documents',
-          order: 6,
+          order: 7,
         ),
       if (ctx.canJoinSettings)
         _item(
@@ -280,7 +291,7 @@ class BusinessSettingsCategorizationService {
           color: const Color(0xFF6A1B9A),
           route: ctx.panelRoute('document-monetization'),
           categoryId: 'sales_documents',
-          order: 7,
+          order: 8,
         ),
     ];
 
@@ -451,6 +462,17 @@ class BusinessSettingsCategorizationService {
           icon: Icons.payments_outlined,
           color: const Color(0xFF283593),
           route: ctx.panelRoute('settings/payroll'),
+          categoryId: 'modules',
+          order: 5,
+        ),
+      if (ctx.canAccessOfficeAutomation)
+        _item(
+          id: 'office_automation',
+          title: 'businessSettingsOfficeAutomation',
+          description: 'businessSettingsOfficeAutomationDescription',
+          icon: Icons.mark_email_unread_outlined,
+          color: const Color(0xFF37474F),
+          route: ctx.panelRoute('settings/office-automation'),
           categoryId: 'modules',
           order: 5,
         ),

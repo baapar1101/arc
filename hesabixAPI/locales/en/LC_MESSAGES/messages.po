@@ -1409,3 +1409,75 @@ msgstr "Negative stock must be corrected before enabling inventory split"
 
 msgid "OPTION_LABEL_CONFLICT"
 msgstr "Two options normalize to the same label and are not auto-merged"
+
+msgid "OA_PLUGIN_NOT_ACTIVE"
+msgstr "Office automation add-on is not active for this business"
+
+msgid "OA_POSITION_REQUIRED"
+msgstr "Active position is required"
+
+msgid "OA_POSITION_NOT_HELD"
+msgstr "You do not currently occupy this position"
+
+msgid "OA_LETTER_NOT_FOUND"
+msgstr "Letter was not found"
+
+msgid "OA_LETTER_NOT_DRAFT"
+msgstr "Only draft letters can be edited"
+
+msgid "OA_LETTER_FORBIDDEN"
+msgstr "You cannot view this letter"
+
+msgid "OA_SECRETARIAT_REQUIRED"
+msgstr "Incoming and outgoing letters require a secretariat position"
+
+msgid "OA_REFERRAL_NOT_FOUND"
+msgstr "Referral was not found"
+
+msgid "OA_ORG_UNIT_NOT_FOUND"
+msgstr "Organization unit was not found"
+
+msgid "OA_POSITION_NOT_FOUND"
+msgstr "Position was not found"
+
+msgid "OA_HOLDER_NOT_FOUND"
+msgstr "Position occupancy was not found"
+
+msgid "OA_POSITION_INACTIVE"
+msgstr "This position is inactive"
+
+msgid "OA_DELEGATION_VIEW_ONLY"
+msgstr "This delegation is view-only"
+
+msgid "OA_DELEGATION_REFER_ONLY"
+msgstr "This delegation only allows referrals"
+
+msgid "OA_DELEGATION_NOT_FOUND"
+msgstr "Delegation was not found"
+
+msgid "OA_DISABLED"
+msgstr "Office automation is disabled in settings"
+
+msgid "OA_LETTER_STILL_DRAFT"
+msgstr "Register the letter before referring it"
+
+msgid "OA_LETTER_ARCHIVED"
+msgstr "Archived letters cannot be referred"
+
+msgid "OA_REFERRAL_FORBIDDEN"
+msgstr "This referral is not in the active position cartable"
+
+msgid "OA_REFERRAL_CLOSED"
+msgstr "This referral is already closed"
+
+msgid "OA_ATTACHMENT_NOT_FOUND"
+msgstr "Attachment was not found"
+
+msgid "OA_HOLDER_EXISTS"
+msgstr "This user already occupies this position"
+
+msgid "OA_DELEGATION_EXISTS"
+msgstr "An active delegation already exists for this user and position"
+
+msgid "OA_ORG_UNIT_CYCLE"
+msgstr "An organization unit cannot be nested under its own descendant"

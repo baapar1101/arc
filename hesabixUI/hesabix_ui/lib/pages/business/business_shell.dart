@@ -223,6 +223,12 @@ class _BusinessShellState extends State<BusinessShell> {
         return t.businessPanelTabRouteRepairShopSettings;
       case 'payroll':
         return t.payrollMenu;
+      case 'office-automation':
+        return t.oaMenu;
+      case 'office-automation/org':
+        return t.oaOrg;
+      case 'settings/office-automation':
+        return t.oaSettings;
       case 'fixed-assets':
         return t.fixedAssetsMenu;
       case 'settings/fixed-assets':
@@ -255,6 +261,9 @@ class _BusinessShellState extends State<BusinessShell> {
     }
     if (pathTailBase.startsWith('payroll/')) {
       return t.payrollMenu;
+    }
+    if (pathTailBase.startsWith('office-automation')) {
+      return t.oaMenu;
     }
     if (pathTailBase.startsWith('hscript')) {
       return 'گزارش‌ساز اسکریپتی';
@@ -1284,6 +1293,8 @@ class _BusinessShellState extends State<BusinessShell> {
 
   bool _isPayrollPluginActive() => _isPluginCodeLicensed('payroll');
 
+  bool _isOfficeAutomationPluginActive() => _isPluginCodeLicensed('office_automation');
+
   bool _isFixedAssetsPluginActive() => _isPluginCodeLicensed('fixed_assets');
 
   bool _isTelephonyPluginActive() => _isPluginCodeLicensed('asterisk_issabel_connector');
@@ -2073,6 +2084,15 @@ class _BusinessShellState extends State<BusinessShell> {
         path: _bu('payroll'),
         type: _MenuItemType.simple,
         hasAddButton: true,
+      ),
+      _MenuItem(
+        key: 'office-automation',
+        label: t.oaMenu,
+        icon: Icons.mark_email_unread_outlined,
+        selectedIcon: Icons.mark_email_unread,
+        path: _bu('office-automation'),
+        type: _MenuItemType.simple,
+        hasAddButton: false,
       ),
       _MenuItem(
         key: 'fixed-assets',
@@ -3805,6 +3825,12 @@ class _BusinessShellState extends State<BusinessShell> {
       }
     }
 
+    if (section == 'office_automation') {
+      if (!_showPluginGatedMenu(_isOfficeAutomationPluginActive())) {
+        return false;
+      }
+    }
+
     if (section == 'fixed_assets') {
       if (!_showPluginGatedMenu(_isFixedAssetsPluginActive())) {
         return false;
@@ -3905,6 +3931,8 @@ class _BusinessShellState extends State<BusinessShell> {
         return 'reports';
       case 'payroll':
         return 'payroll';
+      case 'office-automation':
+        return 'office_automation';
       case 'fixed-assets':
         return 'fixed_assets';
       case 'barcode-labels':
@@ -3928,6 +3956,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (path != null) {
       if (path.contains('/hscript')) return 'reports';
       if (path.contains('/payroll')) return 'payroll';
+      if (path.contains('/office-automation')) return 'office_automation';
       if (path.contains('/fixed-assets')) return 'fixed_assets';
       if (path.contains('/barcode-labels')) return 'barcode_labels';
       if (path.contains('/telephony')) return 'telephony';
@@ -4003,6 +4032,12 @@ class _BusinessShellState extends State<BusinessShell> {
         label == 'Payroll' ||
         label == 'حقوق و دستمزد') {
       return 'payroll';
+    }
+    if (label == t.oaMenu ||
+        label == t.oaOrg ||
+        label == 'Office automation' ||
+        label == 'اتوماسیون اداری') {
+      return 'office_automation';
     }
     if (label == t.fixedAssetsMenu ||
         label == t.fixedAssetsTitle ||

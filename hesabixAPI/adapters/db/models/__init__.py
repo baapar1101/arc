@@ -133,6 +133,8 @@ from .document_monetization import (  # noqa: F401
 )
 # Wallet models
 from .wallet import WalletAccount, WalletTransaction, WalletPayout, WalletSetting  # noqa: F401
+from .payment_gateway import PaymentGateway  # noqa: F401
+from .business_pay_page import BusinessPayPage, BusinessPayPageUsernameHistory  # noqa: F401
 from .business_backup_import_log import BusinessBackupImportLog  # noqa: F401
 # AI models
 from .ai_config import AIConfig, AIProvider  # noqa: F401
@@ -275,6 +277,20 @@ from .distribution import (  # noqa: F401
 	DistributionDailyPlanLock,
 )
 from .digipay import DigipaySettings, DigipayPurchase, DigipaySettlement  # noqa: F401
+from .office_automation import (  # noqa: F401
+	OaSettings,
+	OaOrgUnit,
+	OaPosition,
+	OaPositionHolder,
+	OaDelegation,
+	OaLetter,
+	OaLetterNumberCounter,
+	OaReferral,
+	OaParaph,
+	OaLetterAttachment,
+	OaLetterLink,
+	OaAuditLog,
+)
 from .telephony import (  # noqa: F401
 	TelephonySettings,
 	TelephonyPbxConnection,

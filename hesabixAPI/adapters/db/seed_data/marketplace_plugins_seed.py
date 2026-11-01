@@ -208,6 +208,19 @@ _DEFAULT_PLUGINS: Tuple[_PluginSeed, ...] = (
 		plans=(("monthly", 250_000), ("yearly", 2_500_000)),
 	),
 	_PluginSeed(
+		code="office_automation",
+		name="اتوماسیون اداری",
+		description=(
+			"کارتابل سمت‌محور: نامه داخلی، وارده و صادره، پیش‌نویس، ارجاع، پاراف، "
+			"پیوست، دبیرخانه، جانشین و چند سمت برای هر کاربر."
+		),
+		category="operations",
+		icon_url=None,
+		trial_days=14,
+		trial_allowed=True,
+		plans=(("monthly", 280_000), ("yearly", 2_800_000)),
+	),
+	_PluginSeed(
 		code="barcode_label_studio",
 		name="طراحی و چاپ برچسب بارکد",
 		description=(

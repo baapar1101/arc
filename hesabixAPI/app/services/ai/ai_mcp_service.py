@@ -28,6 +28,7 @@ _PROMPT_CATALOG = {
     "receivables_review": ("مرور مطالبات", "financial", "مانده حساب مشتریان و دریافت‌های ثبت‌شده را بر اساس ابزارهای مجاز بررسی کن."),
     "payables_review": ("مرور بدهی‌ها", "financial", "مانده حساب تأمین‌کنندگان و پرداخت‌های ثبت‌شده را بر اساس ابزارهای مجاز بررسی کن."),
     "payroll_review": ("مرور حقوق و دستمزد", "payroll", "وضعیت دوره‌ها و اجراهای حقوق، جمع ناخالص/کسورات/خالص و وضعیت تأیید یا ثبت را فقط از ابزارهای مجاز همین کسب‌وکار بررسی کن. داده بانکی، شناسه مالیاتی یا جزئیات فردی را فقط وقتی درخواست شده و برای پاسخ لازم است نمایش بده؛ هیچ اجرا را تأیید، قطعی یا پرداخت نکن مگر کاربر همان عملیات را صریحاً درخواست کند."),
+    "office_automation_review": ("مرور کارتابل اتوماسیون اداری", "office_automation", "کارتابل سمت فعال، پیش‌نویس، ارجاع، پاراف، پیوست و دبیرخانه را فقط با ابزارهای مجاز همین کسب‌وکار بررسی کن. نامه را فقط وقتی درخواست شده ثبت، ارجاع، پاراف یا بایگانی کن؛ سمت فعال را از list_my_oa_positions بگیر و as_position_id را در هر عملیات بنویس."),
     "crm_review": ("مرور CRM", "crm", "سرنخ‌ها، فرصت‌ها، فعالیت‌ها، توالی‌های پیگیری و قیف فروش را مرور کن؛ ثبت‌نام یا تغییر توالی را فقط در صورت درخواست روشن انجام بده."),
     "repair_review": ("مرور تعمیرگاه", "repair", "سفارش‌های تعمیر و وضعیت، تعمیرکار، قطعات و هزینه را از ابزارهای مجاز کسب‌وکار بررسی کن. پیش از تغییر وضعیت، اعلان به مشتری، مصرف قطعه، اتمام/تحویل یا صدور فاکتور، اثر عملیات و سفارش دقیق را بیان کن و تأیید صریح بگیر."),
     "warranty_review": ("مرور گارانتی", "warranty", "کدها و وضعیت گارانتی را فقط از ابزارهای مجاز همین کسب‌وکار بررسی کن. اطلاعات تماس مشتری و کد لینک رهگیری را در پاسخ عادی نمایش نده. پیش از تولید کد، تغییر تنظیمات یا حذف، دامنه اثر را شرح بده و تأیید صریح بگیر؛ فعال‌سازی عمومی گارانتی را از طرف مشتری انجام نده."),
@@ -48,7 +49,7 @@ def _prompt_category_available(category: str, visible: set[str]) -> bool:
 
 def _prompt_content(name: str, title: str, goal: str, user_request: str, catalog: list[dict[str, Any]]) -> str:
     categories = sorted({item["category"] for item in catalog})
-    tools = [item for item in catalog if item["category"] in {"general", "query", "business", "reports", "financial", "payroll", "repair", "production", "warranty", "distribution", "invoices", "warehouse", "crm", "products", "persons"}]
+    tools = [item for item in catalog if item["category"] in {"general", "query", "business", "reports", "financial", "payroll", "office_automation", "repair", "production", "warranty", "distribution", "invoices", "warehouse", "crm", "products", "persons"}]
     tool_names = ", ".join(item["name"] for item in tools[:100]) or "هیچ ابزار دامنه‌ای در این اتصال مجاز نیست"
     text = (
         f"{title}. {goal}\n"

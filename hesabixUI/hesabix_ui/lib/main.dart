@@ -153,6 +153,10 @@ import 'pages/business/repair_shop/repair_settings_page.dart';
 import 'pages/business/customer_club/customer_club_main_page.dart';
 import 'pages/business/customer_club/customer_club_settings_page.dart';
 import 'pages/business/payroll/payroll_main_page.dart';
+import 'pages/business/office_automation/oa_cartable_page.dart';
+import 'pages/business/office_automation/oa_letter_page.dart';
+import 'pages/business/office_automation/oa_org_page.dart';
+import 'pages/business/office_automation/oa_settings_page.dart';
 import 'pages/business/fixed_assets/fixed_assets_main_page.dart';
 import 'pages/business/fixed_assets/fixed_assets_reports_page.dart';
 import 'pages/business/fixed_assets/fixed_assets_settings_page.dart';
@@ -166,6 +170,7 @@ import 'pages/business/telephony/telephony_softphone_page.dart';
 import 'pages/business/distribution/distribution_main_page.dart';
 import 'widgets/marketplace/distribution_plugin_gate.dart';
 import 'widgets/marketplace/payroll_plugin_gate.dart';
+import 'widgets/marketplace/office_automation_plugin_gate.dart';
 import 'widgets/marketplace/fixed_assets_plugin_gate.dart';
 import 'widgets/marketplace/telephony_plugin_gate.dart';
 import 'widgets/marketplace/barcode_label_plugin_gate.dart';
@@ -214,6 +219,7 @@ import 'pages/business/quick_sales_page.dart';
 import 'pages/business/document_numbering_settings_page.dart';
 import 'pages/business/print_settings_page.dart';
 import 'pages/business/invoice_share_payment_settings_page.dart';
+import 'pages/business/pay_page_settings_page.dart';
 import 'pages/business/tax_settings_page.dart';
 import 'pages/business/fiscal_year_settings_page.dart';
 import 'pages/business/installment_plans_page.dart';
@@ -270,6 +276,7 @@ import 'pages/profile/delete_business_page.dart';
 import 'pages/business/fiscal_year_rollback_page.dart';
 import 'pages/public/public_person_share_link_page.dart';
 import 'pages/public/public_invoice_share_link_page.dart';
+import 'pages/public/public_pay_page.dart';
 import 'pages/public/public_storage_file_share_page.dart';
 import 'pages/admin/ai_settings_page.dart';
 import 'pages/admin/ai_plans_admin_page.dart';
@@ -933,7 +940,9 @@ class _MyAppState extends State<MyApp> {
         final currentPath = state.uri.path;
         final isPublicRoute = currentPath.startsWith('/public');
         final isShortPublicSharePath =
-            currentPath.startsWith('/i/') || currentPath.startsWith('/p/');
+            currentPath.startsWith('/i/') ||
+            currentPath.startsWith('/p/') ||
+            currentPath.startsWith('/u/');
 
         // SMS bank notification deep links map to /capture — not a real page.
         if (SmsBankLaunchNavigation.shouldRedirectAwayFromCapture(state.uri)) {
@@ -1053,6 +1062,25 @@ class _MyAppState extends State<MyApp> {
               return '/';
             }
             return '/public/invoice-link/${Uri.encodeComponent(c)}';
+          },
+        ),
+        GoRoute(
+          path: '/public/pay/:username',
+          name: 'public_pay_page',
+          builder: (context, state) => PublicPayPage(
+            username: state.pathParameters['username'] ?? '',
+            paymentReturnQuery: state.uri.queryParameters,
+          ),
+        ),
+        GoRoute(
+          path: '/u/:username',
+          name: 'short_pay_page_redirect',
+          redirect: (context, state) {
+            final u = state.pathParameters['username'] ?? '';
+            if (u.isEmpty) {
+              return '/';
+            }
+            return '/public/pay/${Uri.encodeComponent(u)}';
           },
         ),
         GoRoute(
@@ -2838,6 +2866,91 @@ class _MyAppState extends State<MyApp> {
                                     businessId: businessId,
                                     authStore: _authStore!,
                                     calendarController: _calendarController!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'office-automation',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                OfficeAutomationPluginGate(
+                                  businessId: businessId,
+                                  child: OaCartablePage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    calendarController: _calendarController!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'office-automation/new',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              final extra = state.extra;
+                              final positionId = extra is Map ? extra['positionId'] as int? : null;
+                              return hesabixNoTransitionPage(
+                                state,
+                                OfficeAutomationPluginGate(
+                                  businessId: businessId,
+                                  child: OaLetterPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    calendarController: _calendarController!,
+                                    positionId: positionId,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'office-automation/org',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                OfficeAutomationPluginGate(
+                                  businessId: businessId,
+                                  child: OaOrgPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'office-automation/letters/:letter_id',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              final letterId = int.parse(
+                                state.pathParameters['letter_id']!,
+                              );
+                              final extra = state.extra;
+                              final positionId = extra is Map ? extra['positionId'] as int? : null;
+                              return hesabixNoTransitionPage(
+                                state,
+                                OfficeAutomationPluginGate(
+                                  businessId: businessId,
+                                  child: OaLetterPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    calendarController: _calendarController!,
+                                    letterId: letterId,
+                                    positionId: positionId,
                                   ),
                                 ),
                               );
@@ -5061,6 +5174,49 @@ class _MyAppState extends State<MyApp> {
                             },
                           ),
                           GoRoute(
+                            path: 'settings/office-automation',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              if (!_authStore!.hasBusinessPermission(
+                                'settings',
+                                'join',
+                              )) {
+                                return hesabixNoTransitionPage(
+                                  state,
+                                  PermissionGuard.buildAccessDeniedPage(),
+                                );
+                              }
+                              final isOwner =
+                                  _authStore!.currentBusiness?.id ==
+                                      businessId &&
+                                  _authStore!.currentBusiness?.isOwner == true;
+                              final canAccess =
+                                  isOwner ||
+                                  _authStore!.hasBusinessPermission(
+                                    'office_automation',
+                                    'admin',
+                                  );
+                              if (!canAccess) {
+                                return hesabixNoTransitionPage(
+                                  state,
+                                  PermissionGuard.buildAccessDeniedPage(),
+                                );
+                              }
+                              return hesabixNoTransitionPage(
+                                state,
+                                OfficeAutomationPluginGate(
+                                  businessId: businessId,
+                                  child: OaSettingsPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
                             path: 'settings/fixed-assets',
                             pageBuilder: (context, state) {
                               final businessId = int.parse(
@@ -5216,6 +5372,29 @@ class _MyAppState extends State<MyApp> {
                               return hesabixNoTransitionPage(
                                 state,
                                 InvoiceSharePaymentSettingsPage(
+                                  businessId: businessId,
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'settings/pay-page',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              if (!_authStore!.hasBusinessPermission(
+                                'settings',
+                                'join',
+                              )) {
+                                return hesabixNoTransitionPage(
+                                  state,
+                                  PermissionGuard.buildAccessDeniedPage(),
+                                );
+                              }
+                              return hesabixNoTransitionPage(
+                                state,
+                                PayPageSettingsPage(
                                   businessId: businessId,
                                 ),
                               );

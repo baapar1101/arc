@@ -842,6 +842,13 @@ def confirm_top_up(db: Session, tx_id: int, success: bool, external_ref: str | N
 		return confirm_public_invoice_share_payment(
 			db, tx, success=success, external_ref=external_ref, user_id=user_id
 		)
+	# واریز آزاد از لینک عمومی کسب‌وکار (سند دریافت؛ بدون تغییر کیف‌پول SaaS)
+	if (tx.type or "") == "public_pay_link":
+		from app.services.public_pay_page_payment_service import confirm_public_pay_page_payment
+
+		return confirm_public_pay_page_payment(
+			db, tx, success=success, external_ref=external_ref, user_id=user_id
+		)
 	if tx.type != "top_up":
 		logger.error("confirm_top_up_tx_not_found", tx_id=tx_id)
 		raise ApiError("TX_NOT_FOUND", "تراکنش افزایش اعتبار یافت نشد", http_status=404)
@@ -1662,7 +1669,9 @@ def check_document_has_wallet_transactions(db: Session, document_id: int) -> Dic
 		"refund",                   # بازگشت وجه
 		"fee",                      # کارمزد
 		"chargeback",               # برگشت تراکنش
-		"reversal"                  # معکوس کردن تراکنش
+		"reversal",                 # معکوس کردن تراکنش
+		"public_invoice_share_pay", # دریافت لینک فاکتور
+		"public_pay_link",          # واریز لینک عمومی کسب‌وکار
 	]
 	
 	has_protected = any(tx.type in protected_types for tx in transactions)

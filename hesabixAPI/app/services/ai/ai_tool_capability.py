@@ -68,6 +68,8 @@ TOOL_CAPABILITIES: frozenset[str] = frozenset({
     "reports.templates",
     "tax.moadian",
     "misc.general",
+    "office_automation.correspondence",
+    "payroll.payroll",
 })
 
 # نام دقیق → capability (منبع حقیقت)

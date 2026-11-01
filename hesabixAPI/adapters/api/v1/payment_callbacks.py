@@ -9,6 +9,7 @@ from adapters.db.session import get_db
 from app.core.responses import success_response
 from app.services.payment_service import verify_payment_callback
 from app.services.public_invoice_share_payment_service import maybe_redirect_public_invoice_share_payment_return
+from app.services.public_pay_page_payment_service import maybe_redirect_public_pay_page_payment_return
 from app.core.payment_response import (
 	render_payment_success,
 	render_payment_failed,
@@ -134,6 +135,9 @@ def zarinpal_callback(
 	redir = maybe_redirect_public_invoice_share_payment_return(db, tx_id=tx_id, verify_data=data)
 	if redir is not None:
 		return redir
+	redir = maybe_redirect_public_pay_page_payment_return(db, tx_id=tx_id, verify_data=data)
+	if redir is not None:
+		return redir
 
 	detected_source = detect_source(request, source)
 
@@ -191,6 +195,9 @@ async def parsian_callback(
 	redir = maybe_redirect_public_invoice_share_payment_return(db, tx_id=tx_id, verify_data=data)
 	if redir is not None:
 		return redir
+	redir = maybe_redirect_public_pay_page_payment_return(db, tx_id=tx_id, verify_data=data)
+	if redir is not None:
+		return redir
 
 	detected_source = detect_source(request, source)
 
@@ -220,6 +227,9 @@ def bitpay_callback(
 	data = verify_payment_callback(db, "bitpay", params)
 
 	redir = maybe_redirect_public_invoice_share_payment_return(db, tx_id=tx_id, verify_data=data)
+	if redir is not None:
+		return redir
+	redir = maybe_redirect_public_pay_page_payment_return(db, tx_id=tx_id, verify_data=data)
 	if redir is not None:
 		return redir
 

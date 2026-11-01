@@ -148,6 +148,21 @@ ${API_SSL_BLOCK}
     proxy_send_timeout 30;
   }
 
+  # Public business pay page: /u/{username} → backend (307 → Flutter /public/pay/...)
+  location /u/ {
+    proxy_pass http://127.0.0.1:8000/u/;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+    proxy_set_header X-Forwarded-Port \$server_port;
+    proxy_read_timeout 30;
+    proxy_connect_timeout 10;
+    proxy_send_timeout 30;
+  }
+
   # وقتی API و UI روی یک دامنه هستند: مسیرهای /public/ را از روت UI سرو کن (SPA)
   location /public/ {
     root /var/www/${UI_DOMAIN};
@@ -365,6 +380,21 @@ ${UI_SSL_BLOCK}
   # Public invoice share: /i/{code} → backend (307 to /public/invoice-link/{code})
   location /i/ {
     proxy_pass http://127.0.0.1:8000/i/;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+    proxy_set_header X-Forwarded-Port \$server_port;
+    proxy_read_timeout 30;
+    proxy_connect_timeout 10;
+    proxy_send_timeout 30;
+  }
+
+  # Public business pay page: /u/{username} → backend (307 to /public/pay/{username})
+  location /u/ {
+    proxy_pass http://127.0.0.1:8000/u/;
     proxy_http_version 1.1;
     proxy_set_header Host \$host;
     proxy_set_header X-Real-IP \$remote_addr;
