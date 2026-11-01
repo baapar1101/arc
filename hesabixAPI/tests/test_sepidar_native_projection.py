@@ -30,7 +30,7 @@ from adapters.db.models.distribution import DistributionTerritory,DistributionRo
 from adapters.db.models.price_list import PriceList,PriceItem
 from adapters.db.models.system_setting import SystemSetting
 from adapters.db.models.customer_club import CustomerClubSettings,CustomerClubBalance,CustomerClubLedger,CustomerClubInvoiceSnapshot,CustomerClubTier,CustomerClubRfmSnapshot
-from adapters.db.models.sepidar_live_import import SepidarImportSetting, SepidarImportRow, SepidarImportRun, SepidarNativeMap
+from adapters.db.models.sepidar_live_import import SepidarImportSetting, SepidarImportRow, SepidarImportRun, SepidarNativeMap, SepidarReconciliationAudit
 from app.services.sepidar_native_service import NativeConversionError, fingerprint, project_native, assert_document_editable, Projector
 from app.services.sepidar_native_service import account_report_prefix
 from app.services.balance_sheet_account_classification import balance_sheet_subsection
@@ -48,7 +48,7 @@ def native_db():
     metadata = MetaData()
     models = (User, Currency, Business, BusinessCurrency, Person, Product, Account, Document, DocumentLine,
               FiscalYear, InvoiceItemLine, Warehouse, WarehouseDocument, WarehouseDocumentLine, BankAccount, CashRegister,
-              SepidarImportSetting, SepidarImportRow, SepidarImportRun, SepidarNativeMap,
+              SepidarImportSetting, SepidarImportRow, SepidarImportRun, SepidarNativeMap, SepidarReconciliationAudit,
               MarketplacePlugin,MarketplacePluginPlan,BusinessPlugin,PayrollSettings,DistributionTerritory,DistributionRoute,PriceList,PriceItem,SystemSetting,
               CustomerClubSettings,CustomerClubBalance,CustomerClubLedger,CustomerClubInvoiceSnapshot,CustomerClubTier,CustomerClubRfmSnapshot,
               AdvancedPluginSetting,AdvancedPluginRecord,AdvancedPluginAudit)

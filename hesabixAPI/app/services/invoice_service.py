@@ -8274,6 +8274,8 @@ def invoice_document_to_dict(
     persist_link_cleanup: bool = True,
     include_tags: bool = True,
 ) -> Dict[str, Any]:
+    if document.document_type == 'sepidar_archived':
+        raise ApiError('SEPIDAR_SOURCE_ARCHIVED', 'این سند پس از حذف در سپیدار از اسناد فعال خارج شده است.', http_status=410)
     # اقلام فاکتور از جدول مجزا خوانده می‌شوند
     item_rows = (
         db.query(InvoiceItemLine, Product)

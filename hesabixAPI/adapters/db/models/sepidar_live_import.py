@@ -83,4 +83,20 @@ class SepidarNativeMap(Base):
     target_table: Mapped[str] = mapped_column(String(64), nullable=False)
     target_id: Mapped[int] = mapped_column(Integer, nullable=False)
     source_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    retired_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class SepidarReconciliationAudit(Base):
+    """Immutable before-images for explicitly reviewed source deletions/relinks."""
+    __tablename__ = 'sepidar_reconciliation_audits'
+    __table_args__ = (UniqueConstraint('business_id','database_name','plan_hash',name='uq_sepidar_reconciliation_plan'),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    business_id: Mapped[int] = mapped_column(ForeignKey('businesses.id',ondelete='RESTRICT'),index=True)
+    database_name: Mapped[str] = mapped_column(String(255),nullable=False)
+    plan_hash: Mapped[str] = mapped_column(String(64),nullable=False)
+    approved_by_user_id: Mapped[int] = mapped_column(ForeignKey('users.id',ondelete='RESTRICT'),nullable=False)
+    reason: Mapped[str] = mapped_column(Text,nullable=False)
+    before_images: Mapped[dict] = mapped_column(JSONB,nullable=False)
+    summary: Mapped[dict] = mapped_column(JSONB,nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime,default=datetime.utcnow,nullable=False)

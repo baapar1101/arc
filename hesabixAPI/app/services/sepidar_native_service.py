@@ -160,8 +160,9 @@ class Projector:
             ids = [str(row[id_field]) for row in self.data[table]]
             if len(ids) != len(set(ids)):
                 raise NativeConversionError(f"Duplicate source identity: {table}")
-        self.maps = {(m.source_table, m.source_id): m for m in db.scalars(select(SepidarNativeMap).where(
-            SepidarNativeMap.business_id == self.bid, SepidarNativeMap.database_name == setting.database_name))}
+        all_maps = list(db.scalars(select(SepidarNativeMap).where(
+            SepidarNativeMap.business_id == self.bid, SepidarNativeMap.database_name == setting.database_name)))
+        self.maps = {(m.source_table, m.source_id): m for m in all_maps if m.retired_at is None}
         self.targets = {model.__tablename__: {obj.id: obj for obj in db.scalars(select(model).where(model.business_id == self.bid))}
                         for model in (Person, Product, Account, FiscalYear, Warehouse, Document, WarehouseDocument, BankAccount, CashRegister)}
         self.stats: dict[str, dict[str, int]] = defaultdict(lambda: {"created": 0, "updated": 0, "unchanged": 0})
@@ -172,6 +173,9 @@ class Projector:
         # requires an explicit correction in Sepidar rather than deleting ledgers here.
         source_ids = {**SOURCE_IDS, **(OPERATION_IDS if setting.operations_enabled else {})}
         source_id_sets = {table: {str(r[key]) for r in self.data[table]} for table, key in source_ids.items()}
+        for mapping in all_maps:
+            if mapping.retired_at and mapping.source_id in source_id_sets.get(mapping.source_table,set()):
+                raise NativeConversionError(f'Retired source identity reappeared; review required: {mapping.source_table}/{mapping.source_id}')
         for (table, source_id), mapping in self.maps.items():
             if table in source_ids and source_id not in source_id_sets[table]:
                 raise NativeConversionError(f"Source identity missing; reconciliation required: {table}/{source_id}")
@@ -344,6 +348,20 @@ class Projector:
         by_voucher = defaultdict(list)
         for row in self.data["ACC.VoucherItem"]:
             by_voucher[row["VoucherRef"]].append(row)
+        # Source invoices/receipts can be synchronized before their voucher is
+        # posted in Sepidar. Attach that later original voucher to the same
+        # empty native document, rather than creating a competing identity.
+        candidates=defaultdict(list)
+        for spec in INVOICES:
+            if not spec[7]:continue
+            for source in self.data[spec[0]]:
+                if source.get(spec[7]):candidates[source[spec[7]]].append((spec[0],str(source[spec[1]]),source))
+        if self.setting.operations_enabled:
+            for table,key in [('RPA.ReceiptHeader','ReceiptHeaderId'),('RPA.PaymentHeader','PaymentHeaderId')]:
+                for source in self.data[table]:
+                    if source.get('VoucherRef'):candidates[source['VoucherRef']].append((table,str(source[key]),source))
+        financial_targets={m.target_id for (table,_),m in self.maps.items() if table=='ACC.Voucher'}
+        nonempty_targets=set(self.db.scalars(select(DocumentLine.document_id).join(Document).where(Document.business_id==self.bid)))
         for sid, row in self.vouchers.items():
             lines = sorted(by_voucher[sid], key=lambda r: r["VoucherItemId"])
             validate_voucher(lines)
@@ -352,6 +370,19 @@ class Projector:
             if not year.start_date <= day <= year.end_date:
                 raise NativeConversionError(f"Voucher date outside fiscal year: ACC.Voucher/{sid}")
             existing = self.target("ACC.Voucher", sid) if ("ACC.Voucher", str(sid)) in self.maps else None
+            reuse=None
+            if existing is None and len(candidates[sid])==1:
+                table,source_id,header=candidates[sid][0]
+                mapping=self.maps.get((table,source_id))
+                if mapping:
+                    candidate=self.target(table,source_id)
+                    if (candidate.id not in financial_targets and candidate.id not in nonempty_targets
+                        and candidate.document_date==day and candidate.fiscal_year_id==year.id
+                        and candidate.currency_id==self.base_currency
+                        and source_date(header['Date'])==day
+                        and not (candidate.extra_info or {}).get('sepidar',{}).get('ledger_document_id')):
+                        existing=reuse=candidate
+                        financial_targets.add(candidate.id)
             extra = self.meta(existing, voucher_id=sid, voucher_number=row["Number"], voucher_state=row.get("State"))
             original = {"header": row, "lines": lines}
             self.voucher_hashes[sid] = fingerprint(original)
@@ -360,7 +391,7 @@ class Projector:
                 "code": existing.code if existing and (extra["sepidar"].get("invoice_table") or extra['sepidar'].get('operational_table')) else f"SPD-V-{row['FiscalYearRef']}-{row['Number']}-{sid}",
                 "document_type": existing.document_type if existing and (extra["sepidar"].get("invoice_table") or extra['sepidar'].get('operational_table')) else "manual",
                 "description": row.get("Description"), "is_proforma": False, "extra_info": extra}
-            document, changed = self.upsert("ACC.Voucher", sid, Document, original, fields)
+            document, changed = self.upsert("ACC.Voucher", sid, Document, original, fields,reuse=reuse)
             if changed:
                 self.db.execute(delete(DocumentLine).where(DocumentLine.document_id == document.id))
                 for line in lines:
@@ -480,10 +511,14 @@ def project_native(db: Session, business_id: int) -> dict:
         setting.native_last_error = str(exc)[:500] if isinstance(exc, NativeConversionError) else f"Native projection failed ({type(exc).__name__})"
         db.commit()
         raise
+    invalidate_native_cache(business_id)
+    return summary
+
+
+def invalidate_native_cache(business_id: int) -> None:
     from app.core.cache import get_cache
     cache = get_cache()
     if cache.enabled:
         # Source updates affect entity lists, invoice totals, person balances and reports.
         for pattern in (f"*:{business_id}:*", f"*:{business_id}", "user_businesses:*"):
             cache.delete_pattern(pattern)
-    return summary
