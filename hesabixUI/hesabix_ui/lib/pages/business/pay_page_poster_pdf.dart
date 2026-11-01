@@ -63,6 +63,8 @@ Future<Uint8List> buildPayPagePosterPdf({
     pw.Page(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.symmetric(horizontal: 36, vertical: 40),
+      // شکل‌دهی فارسی با shapePdfPersianText برای نقاشی LTR است؛ RTL دوباره bidi می‌زند.
+      textDirection: pw.TextDirection.ltr,
       build: (context) {
         return pw.Center(
           child: pw.Container(
