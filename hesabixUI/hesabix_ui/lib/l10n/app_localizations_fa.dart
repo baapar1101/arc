@@ -19395,6 +19395,10 @@ class AppLocalizationsFa extends AppLocalizations {
   String get payPageGateway => 'درگاه پرداخت';
 
   @override
+  String get payPageGatewayRequired =>
+      'برای فعال‌سازی لینک واریز باید درگاه پرداخت را انتخاب کنید';
+
+  @override
   String get payPageMinAmount => 'حداقل مبلغ';
 
   @override
@@ -19418,6 +19422,34 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get payPageOpenPreview => 'مشاهده صفحه عمومی';
+
+  @override
+  String get payPagePrintPoster => 'چاپ پوستر';
+
+  @override
+  String get payPagePrintPosterHint =>
+      'صفحه‌ای با کد QR و نشانی پرداخت چاپ کنید و در محل کسب نصب کنید';
+
+  @override
+  String get payPagePosterScanTitle => 'اسکن کنید و پرداخت کنید';
+
+  @override
+  String get payPagePosterScanHint =>
+      'دوربین گوشی را روی این کد بگیرید، یا نشانی زیر را وارد کنید';
+
+  @override
+  String get payPagePosterUrlLabel => 'نشانی پرداخت';
+
+  @override
+  String get payPagePosterFooter =>
+      'کد را اسکن کنید یا نشانی را کپی کنید تا پرداخت آنلاین انجام شود';
+
+  @override
+  String get payPagePrintNeedLink =>
+      'ابتدا نام کاربری را ذخیره کنید تا لینک واریز قابل چاپ باشد';
+
+  @override
+  String get payPagePrintFailed => 'چاپ پوستر انجام نشد';
 
   @override
   String get payPagePaymentsTab => 'واریزها';

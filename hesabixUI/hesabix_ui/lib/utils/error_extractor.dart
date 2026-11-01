@@ -91,6 +91,13 @@ class ErrorExtractor {
       case 'HAS_PAYMENTS':
         return t.apiErrorLoanFacilityHasPayments;
 
+      case 'GATEWAY_NOT_CONFIGURED':
+      case 'INVALID_GATEWAY_ID':
+        return t.payPageGatewayRequired;
+      case 'GATEWAY_NOT_FOUND':
+      case 'GATEWAY_NOT_LINKED':
+        return t.payPageNoGateway;
+
       case 'INVALID_CURRENCY':
         return t.apiErrorLoanInvalidCurrency;
       case 'INVALID_PRINCIPAL':

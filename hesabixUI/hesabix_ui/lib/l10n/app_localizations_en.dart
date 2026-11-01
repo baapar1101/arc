@@ -19503,6 +19503,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get payPageGateway => 'Payment gateway';
 
   @override
+  String get payPageGatewayRequired =>
+      'Select a payment gateway to enable the pay link';
+
+  @override
   String get payPageMinAmount => 'Minimum amount';
 
   @override
@@ -19528,6 +19532,34 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get payPageOpenPreview => 'Open public page';
+
+  @override
+  String get payPagePrintPoster => 'Print poster';
+
+  @override
+  String get payPagePrintPosterHint =>
+      'Print a page with the QR code and payment address to hang at your store';
+
+  @override
+  String get payPagePosterScanTitle => 'Scan to pay';
+
+  @override
+  String get payPagePosterScanHint =>
+      'Point your camera at this code, or type the address below';
+
+  @override
+  String get payPagePosterUrlLabel => 'Payment address';
+
+  @override
+  String get payPagePosterFooter =>
+      'Scan the code or copy the address to pay online';
+
+  @override
+  String get payPagePrintNeedLink =>
+      'Save a username first so the pay link can be printed';
+
+  @override
+  String get payPagePrintFailed => 'Could not print the poster';
 
   @override
   String get payPagePaymentsTab => 'Incoming transfers';

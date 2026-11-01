@@ -35730,6 +35730,12 @@ abstract class AppLocalizations {
   /// **'Payment gateway'**
   String get payPageGateway;
 
+  /// No description provided for @payPageGatewayRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a payment gateway to enable the pay link'**
+  String get payPageGatewayRequired;
+
   /// No description provided for @payPageMinAmount.
   ///
   /// In en, this message translates to:
@@ -35777,6 +35783,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open public page'**
   String get payPageOpenPreview;
+
+  /// No description provided for @payPagePrintPoster.
+  ///
+  /// In en, this message translates to:
+  /// **'Print poster'**
+  String get payPagePrintPoster;
+
+  /// No description provided for @payPagePrintPosterHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Print a page with the QR code and payment address to hang at your store'**
+  String get payPagePrintPosterHint;
+
+  /// No description provided for @payPagePosterScanTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan to pay'**
+  String get payPagePosterScanTitle;
+
+  /// No description provided for @payPagePosterScanHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Point your camera at this code, or type the address below'**
+  String get payPagePosterScanHint;
+
+  /// No description provided for @payPagePosterUrlLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment address'**
+  String get payPagePosterUrlLabel;
+
+  /// No description provided for @payPagePosterFooter.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan the code or copy the address to pay online'**
+  String get payPagePosterFooter;
+
+  /// No description provided for @payPagePrintNeedLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Save a username first so the pay link can be printed'**
+  String get payPagePrintNeedLink;
+
+  /// No description provided for @payPagePrintFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not print the poster'**
+  String get payPagePrintFailed;
 
   /// No description provided for @payPagePaymentsTab.
   ///

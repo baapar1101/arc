@@ -1,14 +1,18 @@
 import 'dart:async';
+import 'dart:typed_data';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/business_named_route_locations.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/pages/business/pay_page_poster_pdf.dart';
 import 'package:hesabix_ui/services/business_pay_page_service.dart';
 import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/services/payment_gateway_service.dart';
+import 'package:hesabix_ui/services/pdf_output_service.dart';
 import 'package:hesabix_ui/utils/api_datetime_display.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart';
@@ -43,6 +47,7 @@ class _PayPageSettingsPageState extends State<PayPageSettingsPage>
   late final TabController _tabs;
   bool _loading = true;
   bool _saving = false;
+  bool _printing = false;
   String? _error;
   bool _enabled = false;
   bool _showLogo = true;
@@ -85,9 +90,10 @@ class _PayPageSettingsPageState extends State<PayPageSettingsPage>
       final gateways = await _gatewayService.listBusinessGateways(widget.businessId);
       final s = await _service.getSettings(widget.businessId);
       if (!mounted) return;
+      _gateways = gateways;
       _applySettings(s);
+      _ensureGatewaySelection();
       setState(() {
-        _gateways = gateways;
         _loading = false;
       });
     } catch (e) {
@@ -115,13 +121,26 @@ class _PayPageSettingsPageState extends State<PayPageSettingsPage>
     _minCtrl.text = formatNumberForInput(minAmt);
     final maxAmt = (s['max_amount'] as num?)?.toDouble();
     _maxCtrl.text = maxAmt == null ? '' : formatNumberForInput(maxAmt);
-    final g = s['gateway_id'];
-    if (g is int) {
-      _gatewayId = g;
-    } else if (g is num) {
-      _gatewayId = g.toInt();
-    } else {
-      _gatewayId = int.tryParse(g?.toString() ?? '');
+    _gatewayId = _asInt(s['gateway_id']);
+  }
+
+  int? _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
+  }
+
+  List<int> get _gatewayIds =>
+      _gateways.map((g) => _asInt(g['id'])).whereType<int>().toList();
+
+  void _ensureGatewaySelection() {
+    final ids = _gatewayIds;
+    if (ids.isEmpty) {
+      _gatewayId = null;
+      return;
+    }
+    if (_gatewayId == null || !ids.contains(_gatewayId)) {
+      _gatewayId = ids.first;
     }
   }
 
@@ -162,12 +181,13 @@ class _PayPageSettingsPageState extends State<PayPageSettingsPage>
         SnackBarHelper.showError(context, message: t.payPageUsernameInvalid);
         return;
       }
-      if (_gateways.isEmpty) {
+      if (_gateways.isEmpty || _gatewayIds.isEmpty) {
         SnackBarHelper.showError(context, message: t.payPageNoGateway);
         return;
       }
+      _ensureGatewaySelection();
       if (_gatewayId == null) {
-        SnackBarHelper.showError(context, message: t.payPageGateway);
+        SnackBarHelper.showError(context, message: t.payPageGatewayRequired);
         return;
       }
       if (!_notifyInApp && !_notifySms) {
@@ -196,6 +216,7 @@ class _PayPageSettingsPageState extends State<PayPageSettingsPage>
       });
       if (!mounted) return;
       _applySettings(saved);
+      _ensureGatewaySelection();
       SnackBarHelper.showSuccess(context, message: t.settingsSavedSuccessfully);
       setState(() {});
     } catch (e) {
@@ -220,6 +241,65 @@ class _PayPageSettingsPageState extends State<PayPageSettingsPage>
     await Clipboard.setData(ClipboardData(text: url));
     if (!mounted) return;
     SnackBarHelper.showSuccess(context, message: AppLocalizations.of(context).payPageLinkCopied);
+  }
+
+  Future<Uint8List?> _loadLogoBytes() async {
+    if (_settings['show_logo'] != true || _settings['has_logo'] != true) return null;
+    final username = (_settings['username'] ?? '').toString().trim();
+    if (username.isEmpty) return null;
+    try {
+      final response = await ApiClient().get<List<int>>(
+        '/api/v1/public/pay/${Uri.encodeComponent(username)}/logo',
+        responseType: ResponseType.bytes,
+      );
+      final data = response.data;
+      if (data == null || data.isEmpty) return null;
+      return Uint8List.fromList(data);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _printPoster() async {
+    final t = AppLocalizations.of(context);
+    final url = _publicUrl;
+    if (url == null || url.isEmpty) {
+      SnackBarHelper.showError(context, message: t.payPagePrintNeedLink);
+      return;
+    }
+    setState(() => _printing = true);
+    try {
+      final title = _titleCtrl.text.trim().isNotEmpty
+          ? _titleCtrl.text.trim()
+          : (_settings['display_title'] ?? _settings['business_name'] ?? '').toString();
+      final bytes = await buildPayPagePosterPdf(
+        title: title.isEmpty ? t.businessSettingsPayPage : title,
+        url: url,
+        scanTitle: t.payPagePosterScanTitle,
+        scanHint: t.payPagePosterScanHint,
+        urlLabel: t.payPagePosterUrlLabel,
+        footer: t.payPagePosterFooter,
+        introText: _introCtrl.text.trim().isEmpty ? null : _introCtrl.text.trim(),
+        logoBytes: await _loadLogoBytes(),
+        isPersian: Localizations.localeOf(context).languageCode == 'fa',
+      );
+      if (!mounted) return;
+      await PdfOutputService.deliverPdf(
+        context: context,
+        bytes: bytes,
+        filename: 'pay-link-poster',
+        businessId: widget.businessId,
+        paperSize: 'A4',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: '${t.payPagePrintFailed}: ${ErrorExtractor.forContext(e, context)}',
+      );
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
   }
 
   @override
@@ -269,7 +349,7 @@ class _PayPageSettingsPageState extends State<PayPageSettingsPage>
 
   Widget _buildSettings(AppLocalizations t) {
     final theme = Theme.of(context);
-    final gatewayIds = _gateways.map((g) => (g['id'] as num?)?.toInt()).whereType<int>().toSet();
+    final gatewayIds = _gatewayIds.toSet();
     final dropdownValue = _gatewayId != null && gatewayIds.contains(_gatewayId) ? _gatewayId : null;
     final url = _publicUrl;
     final currency = (_settings['currency_title'] ?? _settings['currency_code'] ?? '').toString();
@@ -283,7 +363,14 @@ class _PayPageSettingsPageState extends State<PayPageSettingsPage>
           title: Text(t.payPageEnabled),
           subtitle: Text(t.payPageEnabledHint),
           value: _enabled,
-          onChanged: _saving ? null : (v) => setState(() => _enabled = v),
+          onChanged: _saving
+              ? null
+              : (v) {
+                  setState(() {
+                    _enabled = v;
+                    if (v) _ensureGatewaySelection();
+                  });
+                },
         ),
         const SizedBox(height: 12),
         TextField(
@@ -345,10 +432,11 @@ class _PayPageSettingsPageState extends State<PayPageSettingsPage>
             ),
             items: [
               for (final g in _gateways)
-                DropdownMenuItem<int?>(
-                  value: (g['id'] as num?)?.toInt(),
-                  child: Text('${g['display_name'] ?? g['provider'] ?? g['id']}'),
-                ),
+                if (_asInt(g['id']) != null)
+                  DropdownMenuItem<int?>(
+                    value: _asInt(g['id']),
+                    child: Text('${g['display_name'] ?? g['provider'] ?? g['id']}'),
+                  ),
             ],
             onChanged: _saving ? null : (v) => setState(() => _gatewayId = v),
           ),
@@ -417,27 +505,64 @@ class _PayPageSettingsPageState extends State<PayPageSettingsPage>
           onChanged: _saving ? null : (v) => setState(() => _useAnonymous = v),
         ),
         if (url != null) ...[
-          const SizedBox(height: 8),
-          SelectableText(url, style: theme.textTheme.bodySmall),
-          const SizedBox(height: 8),
-          Center(
-            child: QrImageView(data: url, size: 140),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            children: [
-              FilledButton.tonalIcon(
-                onPressed: _copyLink,
-                icon: const Icon(Icons.copy),
-                label: Text(t.payPageCopyLink),
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Text(
+                    t.payPagePosterScanTitle,
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    t.payPagePrintPosterHint,
+                    style: theme.textTheme.bodySmall,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  QrImageView(data: url, size: 180),
+                  const SizedBox(height: 8),
+                  SelectableText(
+                    url,
+                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                    textAlign: TextAlign.center,
+                    textDirection: TextDirection.ltr,
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      FilledButton.tonalIcon(
+                        onPressed: _copyLink,
+                        icon: const Icon(Icons.copy),
+                        label: Text(t.payPageCopyLink),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+                        icon: const Icon(Icons.open_in_new),
+                        label: Text(t.payPageOpenPreview),
+                      ),
+                      FilledButton.icon(
+                        onPressed: _printing ? null : _printPoster,
+                        icon: _printing
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.print_outlined),
+                        label: Text(t.payPagePrintPoster),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              OutlinedButton.icon(
-                onPressed: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
-                icon: const Icon(Icons.open_in_new),
-                label: Text(t.payPageOpenPreview),
-              ),
-            ],
+            ),
           ),
         ],
         const SizedBox(height: 24),
