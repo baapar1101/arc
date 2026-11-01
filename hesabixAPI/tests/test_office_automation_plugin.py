@@ -176,6 +176,22 @@ def test_position_occupancy_numbering_paraph_and_referral(_plugin):
 	bid = 1
 
 	unit = svc.create_org_unit(db, bid, {"code": "hq", "name_i18n": {"fa": "ستاد", "en": "HQ"}}, owner.id)
+	auto_unit = svc.create_org_unit(db, bid, {"name_i18n": {"fa": "واحد خودکار"}}, owner.id)
+	assert auto_unit["code"].startswith("u")
+	with pytest.raises(ApiError) as dup_code:
+		svc.create_org_unit(
+			db, bid,
+			{"code": "hq", "name_i18n": {"fa": "تکراری"}, "auto_generate_code": False},
+			owner.id,
+		)
+	assert dup_code.value.code == "OA_CODE_EXISTS"
+	with pytest.raises(ApiError) as missing_code:
+		svc.create_org_unit(
+			db, bid,
+			{"name_i18n": {"fa": "بدون کد"}, "auto_generate_code": False},
+			owner.id,
+		)
+	assert missing_code.value.code == "VALIDATION_ERROR"
 	mgr = svc.create_position(
 		db, bid,
 		{"code": "mgr", "org_unit_id": unit["id"], "name_i18n": {"fa": "مدیر", "en": "Manager"}, "is_secretariat": True},
@@ -186,6 +202,19 @@ def test_position_occupancy_numbering_paraph_and_referral(_plugin):
 		{"code": "exp", "org_unit_id": unit["id"], "name_i18n": {"fa": "کارشناس", "en": "Expert"}},
 		owner.id,
 	)
+	auto_pos = svc.create_position(
+		db, bid,
+		{"org_unit_id": unit["id"], "name_i18n": {"fa": "سمت خودکار"}},
+		owner.id,
+	)
+	assert auto_pos["code"].startswith("p")
+	with pytest.raises(ApiError) as dup_pos:
+		svc.create_position(
+			db, bid,
+			{"code": "mgr", "org_unit_id": unit["id"], "name_i18n": {"fa": "تکراری"}, "auto_generate_code": False},
+			owner.id,
+		)
+	assert dup_pos.value.code == "OA_CODE_EXISTS"
 	svc.assign_position_holder(db, bid, {"position_id": mgr["id"], "user_id": owner.id, "is_primary": True}, owner.id)
 	svc.assign_position_holder(db, bid, {"position_id": exp["id"], "user_id": clerk.id, "is_primary": True}, owner.id)
 

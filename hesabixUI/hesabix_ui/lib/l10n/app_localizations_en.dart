@@ -13155,6 +13155,37 @@ class AppLocalizationsEn extends AppLocalizations {
   String get oaNoParent => 'No parent unit';
 
   @override
+  String get oaCodeFormat =>
+      'Start with a letter; then letters, digits, or underscore (max 64).';
+
+  @override
+  String get oaCodeExists => 'This code is already used.';
+
+  @override
+  String get oaNameRequired => 'Enter a name in Persian or English.';
+
+  @override
+  String get oaSelectUnit => 'Select a unit.';
+
+  @override
+  String get oaSelectPosition => 'Select a position.';
+
+  @override
+  String get oaSelectUser => 'Select a user.';
+
+  @override
+  String get oaAddChild => 'Add child unit';
+
+  @override
+  String get oaAddPosition => 'Add position';
+
+  @override
+  String get oaEmptyUnits => 'No units yet.';
+
+  @override
+  String get oaEmptyPositions => 'No positions yet.';
+
+  @override
   String get oaJalali => 'Jalali';
 
   @override

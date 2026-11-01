@@ -1481,3 +1481,6 @@ msgstr "An active delegation already exists for this user and position"
 
 msgid "OA_ORG_UNIT_CYCLE"
 msgstr "An organization unit cannot be nested under its own descendant"
+
+msgid "OA_CODE_EXISTS"
+msgstr "This code is already used"

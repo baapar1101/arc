@@ -13082,6 +13082,37 @@ class AppLocalizationsFa extends AppLocalizations {
   String get oaNoParent => 'بدون واحد بالادست';
 
   @override
+  String get oaCodeFormat =>
+      'با حرف شروع شود و فقط حروف، رقم یا زیرخط باشد (حداکثر ۶۴).';
+
+  @override
+  String get oaCodeExists => 'این کد قبلاً استفاده شده است.';
+
+  @override
+  String get oaNameRequired => 'نام فارسی یا انگلیسی را وارد کنید.';
+
+  @override
+  String get oaSelectUnit => 'یک واحد انتخاب کنید.';
+
+  @override
+  String get oaSelectPosition => 'یک سمت انتخاب کنید.';
+
+  @override
+  String get oaSelectUser => 'یک کاربر انتخاب کنید.';
+
+  @override
+  String get oaAddChild => 'افزودن واحد زیرمجموعه';
+
+  @override
+  String get oaAddPosition => 'افزودن سمت';
+
+  @override
+  String get oaEmptyUnits => 'هنوز واحدی تعریف نشده است.';
+
+  @override
+  String get oaEmptyPositions => 'هنوز سمتی تعریف نشده است.';
+
+  @override
   String get oaJalali => 'شمسی';
 
   @override

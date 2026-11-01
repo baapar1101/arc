@@ -142,6 +142,59 @@ def _code(value: Any) -> str:
 	return code.lower()
 
 
+def _allocate_oa_code(db: Session, business_id: int, model: Any, prefix: str) -> str:
+	rows = db.query(model.code).filter(model.business_id == business_id).all()
+	used = {str(code or "").strip().lower() for (code,) in rows}
+	seq = 1
+	while seq <= 99999:
+		candidate = f"{prefix}{seq:04d}"
+		if candidate not in used:
+			return candidate
+		seq += 1
+	raise ApiError("VALIDATION_ERROR", "Could not allocate a unique code.", http_status=400)
+
+
+def _ensure_unique_code(
+	db: Session,
+	business_id: int,
+	model: Any,
+	code: str,
+	*,
+	exclude_id: Optional[int] = None,
+) -> None:
+	q = db.query(model.id).filter(model.business_id == business_id, model.code == code)
+	if exclude_id:
+		q = q.filter(model.id != exclude_id)
+	if q.first():
+		raise ApiError("OA_CODE_EXISTS", "This code is already used.", http_status=400)
+
+
+def _resolve_create_code(db: Session, business_id: int, payload: dict, model: Any, prefix: str) -> str:
+	raw = str(payload.get("code") or "").strip()
+	explicit_auto = payload.get("auto_generate_code")
+	if explicit_auto is False:
+		if not raw:
+			raise ApiError("VALIDATION_ERROR", "Code is required.", http_status=400)
+		code = _code(raw)
+		_ensure_unique_code(db, business_id, model, code)
+		return code
+	if explicit_auto is True or not raw:
+		return _allocate_oa_code(db, business_id, model, prefix)
+	code = _code(raw)
+	_ensure_unique_code(db, business_id, model, code)
+	return code
+
+
+def _apply_code_update(db: Session, business_id: int, payload: dict, row: Any, model: Any, prefix: str) -> None:
+	if payload.get("auto_generate_code") is True:
+		row.code = _allocate_oa_code(db, business_id, model, prefix)
+		return
+	if payload.get("code"):
+		code = _code(payload["code"])
+		_ensure_unique_code(db, business_id, model, code, exclude_id=row.id)
+		row.code = code
+
+
 def _audit(
 	db: Session,
 	*,
@@ -283,7 +336,7 @@ def create_org_unit(db: Session, business_id: int, payload: dict, user_id: int, 
 	row = OaOrgUnit(
 		business_id=business_id,
 		parent_id=int(parent_id) if parent_id else None,
-		code=_code(payload.get("code")),
+		code=_resolve_create_code(db, business_id, payload, OaOrgUnit, "u"),
 		name_i18n=_normalize_i18n(payload.get("name_i18n") or payload.get("name")),
 		sort_order=int(payload.get("sort_order") or 0),
 		is_active=bool(payload.get("is_active", True)),
@@ -296,7 +349,7 @@ def create_org_unit(db: Session, business_id: int, payload: dict, user_id: int, 
 		db.commit()
 	except Exception as exc:
 		db.rollback()
-		raise ApiError("VALIDATION_ERROR", "Organization unit code already exists.", http_status=400) from exc
+		raise ApiError("OA_CODE_EXISTS", "This code is already used.", http_status=400) from exc
 	db.refresh(row)
 	return _unit_dict(row, lang)
 
@@ -320,8 +373,7 @@ def update_org_unit(db: Session, business_id: int, unit_id: int, payload: dict, 
 		descendants = _descendant_unit_ids(db, business_id, row.id)
 		if row.parent_id in descendants:
 			raise ApiError("OA_ORG_UNIT_CYCLE", "An organization unit cannot be nested under its own descendant.", http_status=400)
-	if payload.get("code"):
-		row.code = _code(payload["code"])
+	_apply_code_update(db, business_id, payload, row, OaOrgUnit, "u")
 	if payload.get("name_i18n") or payload.get("name"):
 		row.name_i18n = _normalize_i18n(payload.get("name_i18n") or payload.get("name"))
 	if "sort_order" in payload:
@@ -366,7 +418,7 @@ def create_position(db: Session, business_id: int, payload: dict, user_id: int, 
 	row = OaPosition(
 		business_id=business_id,
 		org_unit_id=unit.id,
-		code=_code(payload.get("code")),
+		code=_resolve_create_code(db, business_id, payload, OaPosition, "p"),
 		name_i18n=_normalize_i18n(payload.get("name_i18n") or payload.get("name")),
 		is_secretariat=bool(payload.get("is_secretariat", False)),
 		can_view_subtree=bool(payload.get("can_view_subtree", False)),
@@ -381,7 +433,7 @@ def create_position(db: Session, business_id: int, payload: dict, user_id: int, 
 		db.commit()
 	except Exception as exc:
 		db.rollback()
-		raise ApiError("VALIDATION_ERROR", "Position code already exists.", http_status=400) from exc
+		raise ApiError("OA_CODE_EXISTS", "This code is already used.", http_status=400) from exc
 	db.refresh(row)
 	return _position_dict(row, lang, unit)
 
@@ -396,8 +448,7 @@ def update_position(db: Session, business_id: int, position_id: int, payload: di
 		if not unit:
 			raise ApiError("OA_ORG_UNIT_NOT_FOUND", "Organization unit was not found.", http_status=404)
 		row.org_unit_id = unit.id
-	if payload.get("code"):
-		row.code = _code(payload["code"])
+	_apply_code_update(db, business_id, payload, row, OaPosition, "p")
 	if payload.get("name_i18n") or payload.get("name"):
 		row.name_i18n = _normalize_i18n(payload.get("name_i18n") or payload.get("name"))
 	if "is_secretariat" in payload:

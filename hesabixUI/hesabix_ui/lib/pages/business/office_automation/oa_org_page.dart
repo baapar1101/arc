@@ -6,6 +6,8 @@ import '../../../services/office_automation_service.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 
+final _oaCodeRe = RegExp(r'^[a-zA-Z][a-zA-Z0-9_]{0,63}$');
+
 class OaOrgPage extends StatefulWidget {
   final int businessId;
   final AuthStore authStore;
@@ -65,59 +67,287 @@ class _OaOrgPageState extends State<OaOrgPage> with SingleTickerProviderStateMix
     }
   }
 
+  bool _codeTaken(String code, {required bool forUnit, int? excludeId}) {
+    final needle = code.trim().toLowerCase();
+    final rows = forUnit ? _units : _positions;
+    for (final row in rows) {
+      if (oaId(row['id']) == excludeId) continue;
+      if ((row['code'] ?? '').toString().trim().toLowerCase() == needle) return true;
+    }
+    return false;
+  }
+
+  List<Map<String, dynamic>> _unitForest() {
+    final byId = <int, Map<String, dynamic>>{
+      for (final u in _units)
+        if (oaId(u['id']) != null) oaId(u['id'])!: u,
+    };
+    final children = <int?, List<Map<String, dynamic>>>{};
+    for (final u in _units) {
+      final parentId = oaId(u['parent_id']);
+      final key = parentId != null && byId.containsKey(parentId) ? parentId : null;
+      children.putIfAbsent(key, () => []).add(u);
+    }
+    List<Map<String, dynamic>> attach(int? parentId) {
+      return [
+        for (final node in children[parentId] ?? const <Map<String, dynamic>>[])
+          {...node, 'children': attach(oaId(node['id']))},
+      ];
+    }
+
+    return attach(null);
+  }
+
   Future<void> _editI18n({
     required String title,
     Map<String, dynamic>? existing,
+    Map<String, dynamic>? seed,
     required Future<void> Function(Map<String, dynamic> payload) onSave,
     List<Widget> Function(Map<String, dynamic> draft, void Function(void Function()) setLocal)? extra,
+    required bool forUnit,
+    bool requireUnit = false,
   }) async {
-    final t = AppLocalizations.of(context);
-    final draft = Map<String, dynamic>.from(existing ?? {});
-    final code = TextEditingController(text: '${draft['code'] ?? ''}');
+    final isCreate = oaId(existing?['id']) == null;
+    final draft = Map<String, dynamic>.from(existing ?? seed ?? {});
+    final formKey = GlobalKey<FormState>();
+    final code = TextEditingController(text: isCreate ? '' : '${draft['code'] ?? ''}');
     final fa = TextEditingController(text: '${(draft['name_i18n'] as Map?)?['fa'] ?? draft['title'] ?? ''}');
     final en = TextEditingController(text: '${(draft['name_i18n'] as Map?)?['en'] ?? ''}');
+    var autoCode = isCreate;
+    String? errorText;
+    var saving = false;
     try {
       final ok = await showDialog<bool>(
         context: context,
+        barrierDismissible: false,
         builder: (ctx) => StatefulBuilder(
-          builder: (ctx, setLocal) => AlertDialog(
-            title: Text(title),
-            content: SizedBox(
-              width: 420,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(controller: code, decoration: InputDecoration(labelText: t.oaCode)),
-                    TextField(controller: fa, decoration: const InputDecoration(labelText: 'fa')),
-                    TextField(controller: en, decoration: const InputDecoration(labelText: 'en')),
-                    ...?extra?.call(draft, setLocal),
-                  ],
+          builder: (ctx, setLocal) {
+            final loc = AppLocalizations.of(ctx);
+            return AlertDialog(
+              title: Text(title),
+              content: SizedBox(
+                width: 420,
+                child: Form(
+                  key: formKey,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextFormField(
+                          controller: code,
+                          enabled: !saving,
+                          readOnly: autoCode,
+                          decoration: InputDecoration(
+                            labelText: loc.oaCode,
+                            hintText: autoCode ? loc.automatic : loc.oaCode,
+                            suffixIconConstraints: const BoxConstraints(minHeight: 36, minWidth: 140),
+                            suffixIcon: isCreate
+                                ? Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+                                    child: ToggleButtons(
+                                      isSelected: [autoCode, !autoCode],
+                                      borderRadius: BorderRadius.circular(6),
+                                      constraints: const BoxConstraints(minHeight: 32, minWidth: 64),
+                                      onPressed: saving
+                                          ? null
+                                          : (index) {
+                                              setLocal(() {
+                                                autoCode = index == 0;
+                                                errorText = null;
+                                                if (autoCode) code.clear();
+                                              });
+                                            },
+                                      children: [
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                                          child: Text(loc.automatic),
+                                        ),
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                                          child: Text(loc.manual),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          validator: (value) {
+                            if (autoCode) return null;
+                            final trimmed = (value ?? '').trim();
+                            if (trimmed.isEmpty) return loc.codeRequired;
+                            if (!_oaCodeRe.hasMatch(trimmed)) return loc.oaCodeFormat;
+                            if (_codeTaken(trimmed, forUnit: forUnit, excludeId: oaId(existing?['id']))) {
+                              return loc.oaCodeExists;
+                            }
+                            return null;
+                          },
+                        ),
+                        TextFormField(
+                          controller: fa,
+                          enabled: !saving,
+                          decoration: const InputDecoration(labelText: 'fa'),
+                          validator: (value) {
+                            if ((value ?? '').trim().isEmpty && en.text.trim().isEmpty) {
+                              return loc.oaNameRequired;
+                            }
+                            return null;
+                          },
+                        ),
+                        TextFormField(
+                          controller: en,
+                          enabled: !saving,
+                          decoration: const InputDecoration(labelText: 'en'),
+                        ),
+                        ...?extra?.call(draft, setLocal),
+                        if (errorText != null) ...[
+                          const SizedBox(height: 12),
+                          Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: Text(
+                              errorText!,
+                              style: TextStyle(color: Theme.of(ctx).colorScheme.error),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
-              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.save)),
-            ],
-          ),
+              actions: [
+                TextButton(
+                  onPressed: saving ? null : () => Navigator.pop(ctx, false),
+                  child: Text(loc.cancel),
+                ),
+                FilledButton(
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          setLocal(() => errorText = null);
+                          if (!(formKey.currentState?.validate() ?? false)) return;
+                          if (requireUnit && oaId(draft['org_unit_id']) == null) {
+                            setLocal(() => errorText = loc.oaSelectUnit);
+                            return;
+                          }
+                          setLocal(() => saving = true);
+                          final payload = <String, dynamic>{
+                            if (autoCode) 'auto_generate_code': true,
+                            if (!autoCode) ...{
+                              'auto_generate_code': false,
+                              'code': code.text.trim(),
+                            },
+                            'name_i18n': {'fa': fa.text.trim(), 'en': en.text.trim()},
+                          };
+                          if (forUnit) {
+                            payload['parent_id'] = draft['parent_id'];
+                          } else {
+                            payload['org_unit_id'] = draft['org_unit_id'];
+                            payload['is_secretariat'] = draft['is_secretariat'] == true;
+                            payload['can_view_subtree'] = draft['can_view_subtree'] == true;
+                          }
+                          try {
+                            await onSave(payload);
+                            if (ctx.mounted) Navigator.pop(ctx, true);
+                          } catch (e) {
+                            setLocal(() {
+                              saving = false;
+                              errorText = ErrorExtractor.forContext(e, ctx);
+                            });
+                          }
+                        },
+                  child: saving
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : Text(loc.save),
+                ),
+              ],
+            );
+          },
         ),
       );
-      if (ok != true) return;
-      await onSave({
-        ...draft,
-        'code': code.text.trim(),
-        'name_i18n': {'fa': fa.text.trim(), 'en': en.text.trim()},
-      });
-      await _load();
-    } catch (e) {
-      if (!context.mounted) return;
-      SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+      if (ok == true) await _load();
     } finally {
       code.dispose();
       fa.dispose();
       en.dispose();
     }
+  }
+
+  Future<void> _editUnit({Map<String, dynamic>? existing, int? parentId}) {
+    final t = AppLocalizations.of(context);
+    return _editI18n(
+      title: existing == null ? t.oaUnits : t.edit,
+      existing: existing,
+      seed: parentId != null ? {'parent_id': parentId} : null,
+      forUnit: true,
+      extra: (draft, setLocal) {
+        final loc = AppLocalizations.of(context);
+        return [
+          DropdownButtonFormField<int?>(
+            initialValue: oaId(draft['parent_id']),
+            decoration: InputDecoration(labelText: loc.oaParentUnit),
+            items: [
+              DropdownMenuItem<int?>(value: null, child: Text(loc.oaNoParent)),
+              for (final u in _units.where((u) => oaId(u['id']) != oaId(existing?['id'])))
+                DropdownMenuItem<int?>(value: oaId(u['id']), child: Text('${u['title'] ?? u['code']}')),
+            ],
+            onChanged: (v) => setLocal(() => draft['parent_id'] = v),
+          ),
+        ];
+      },
+      onSave: (p) async {
+        final id = oaId(existing?['id']);
+        if (id == null) {
+          await _svc.createOrgUnit(businessId: widget.businessId, payload: p);
+        } else {
+          await _svc.updateOrgUnit(businessId: widget.businessId, unitId: id, payload: p);
+        }
+      },
+    );
+  }
+
+  Future<void> _editPosition({Map<String, dynamic>? existing, int? unitId}) {
+    final t = AppLocalizations.of(context);
+    return _editI18n(
+      title: existing == null ? t.oaPositions : t.edit,
+      existing: existing,
+      seed: unitId != null ? {'org_unit_id': unitId} : null,
+      forUnit: false,
+      requireUnit: true,
+      extra: (draft, setLocal) {
+        final loc = AppLocalizations.of(context);
+        return [
+          DropdownButtonFormField<int>(
+            initialValue: oaId(draft['org_unit_id']),
+            decoration: InputDecoration(labelText: loc.oaUnits),
+            items: [
+              for (final u in _units)
+                if (oaId(u['id']) != null)
+                  DropdownMenuItem(value: oaId(u['id']), child: Text('${u['title'] ?? u['code']}')),
+            ],
+            onChanged: (v) => setLocal(() => draft['org_unit_id'] = v),
+            validator: (v) => v == null ? loc.oaSelectUnit : null,
+          ),
+          SwitchListTile(
+            title: Text(loc.oaRegistry),
+            value: draft['is_secretariat'] == true,
+            onChanged: (v) => setLocal(() => draft['is_secretariat'] = v),
+          ),
+          SwitchListTile(
+            title: Text(loc.oaSubtree),
+            value: draft['can_view_subtree'] == true,
+            onChanged: (v) => setLocal(() => draft['can_view_subtree'] = v),
+          ),
+        ];
+      },
+      onSave: (p) async {
+        final id = oaId(existing?['id']);
+        if (id == null) {
+          await _svc.createPosition(businessId: widget.businessId, payload: p);
+        } else {
+          await _svc.updatePosition(businessId: widget.businessId, positionId: id, payload: p);
+        }
+      },
+    );
   }
 
   int? _userIdOf(Map row) => oaId(row['user_id'] ?? row['id']);
@@ -129,280 +359,301 @@ class _OaOrgPageState extends State<OaOrgPage> with SingleTickerProviderStateMix
     return email;
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Future<void> _assignHolder() async {
     final t = AppLocalizations.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(t.oaOrg),
-        bottom: TabBar(
-          controller: _tabs,
-          isScrollable: true,
-          tabs: [
-            Tab(text: t.oaUnits),
-            Tab(text: t.oaPositions),
-            Tab(text: t.oaHolders),
-            Tab(text: t.oaDelegations),
-          ],
-        ),
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : TabBarView(
-              controller: _tabs,
+    int? positionId;
+    int? userId;
+    String? errorText;
+    var saving = false;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(t.oaAssign),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                _list(
-                  _units,
-                  title: (r) => '${r['title'] ?? r['code']}',
-                  onAdd: () => _editI18n(
-                    title: t.oaUnits,
-                    extra: (draft, setLocal) => [
-                      DropdownButtonFormField<int?>(
-                        value: oaId(draft['parent_id']),
-                        decoration: InputDecoration(labelText: t.oaParentUnit),
-                        items: [
-                          DropdownMenuItem<int?>(value: null, child: Text(t.oaNoParent)),
-                          for (final u in _units)
-                            DropdownMenuItem<int?>(value: oaId(u['id']), child: Text('${u['title'] ?? u['code']}')),
-                        ],
-                        onChanged: (v) => setLocal(() => draft['parent_id'] = v),
-                      ),
-                    ],
-                    onSave: (p) => _svc.createOrgUnit(businessId: widget.businessId, payload: p),
-                  ),
-                  onTap: (r) => _editI18n(
-                    title: t.oaUnits,
-                    existing: r,
-                    extra: (draft, setLocal) => [
-                      DropdownButtonFormField<int?>(
-                        value: oaId(draft['parent_id']),
-                        decoration: InputDecoration(labelText: t.oaParentUnit),
-                        items: [
-                          DropdownMenuItem<int?>(value: null, child: Text(t.oaNoParent)),
-                          for (final u in _units.where((u) => u['id'] != r['id']))
-                            DropdownMenuItem<int?>(value: oaId(u['id']), child: Text('${u['title'] ?? u['code']}')),
-                        ],
-                        onChanged: (v) => setLocal(() => draft['parent_id'] = v),
-                      ),
-                    ],
-                    onSave: (p) => _svc.updateOrgUnit(businessId: widget.businessId, unitId: oaId(r['id'])!, payload: p),
-                  ),
+                DropdownButtonFormField<int>(
+                  decoration: InputDecoration(labelText: t.oaPositions),
+                  items: [
+                    for (final p in _positions)
+                      if (oaId(p['id']) != null)
+                        DropdownMenuItem(value: oaId(p['id']), child: Text('${p['title'] ?? p['code']}')),
+                  ],
+                  onChanged: (v) => setLocal(() {
+                    positionId = v;
+                    errorText = null;
+                  }),
                 ),
-                _list(
-                  _positions,
-                  title: (r) => '${r['title'] ?? r['code']} ${r['is_secretariat'] == true ? '· ${t.oaRegistry}' : ''}',
-                  onAdd: () => _editI18n(
-                    title: t.oaPositions,
-                    extra: (draft, setLocal) => [
-                      DropdownButtonFormField<int>(
-                        value: oaId(draft['org_unit_id']),
-                        decoration: InputDecoration(labelText: t.oaUnits),
-                        items: [
-                          for (final u in _units)
-                            DropdownMenuItem(value: oaId(u['id']), child: Text('${u['title'] ?? u['code']}')),
-                        ],
-                        onChanged: (v) => setLocal(() => draft['org_unit_id'] = v),
-                      ),
-                      SwitchListTile(
-                        title: Text(t.oaRegistry),
-                        value: draft['is_secretariat'] == true,
-                        onChanged: (v) => setLocal(() => draft['is_secretariat'] = v),
-                      ),
-                      SwitchListTile(
-                        title: Text(t.oaSubtree),
-                        value: draft['can_view_subtree'] == true,
-                        onChanged: (v) => setLocal(() => draft['can_view_subtree'] = v),
-                      ),
-                    ],
-                    onSave: (p) => _svc.createPosition(businessId: widget.businessId, payload: p),
-                  ),
-                  onTap: (r) => _editI18n(
-                    title: t.oaPositions,
-                    existing: r,
-                    extra: (draft, setLocal) => [
-                      DropdownButtonFormField<int>(
-                        value: oaId(draft['org_unit_id']),
-                        decoration: InputDecoration(labelText: t.oaUnits),
-                        items: [
-                          for (final u in _units)
-                            DropdownMenuItem(value: oaId(u['id']), child: Text('${u['title'] ?? u['code']}')),
-                        ],
-                        onChanged: (v) => setLocal(() => draft['org_unit_id'] = v),
-                      ),
-                      SwitchListTile(
-                        title: Text(t.oaRegistry),
-                        value: draft['is_secretariat'] == true,
-                        onChanged: (v) => setLocal(() => draft['is_secretariat'] = v),
-                      ),
-                      SwitchListTile(
-                        title: Text(t.oaSubtree),
-                        value: draft['can_view_subtree'] == true,
-                        onChanged: (v) => setLocal(() => draft['can_view_subtree'] = v),
-                      ),
-                    ],
-                    onSave: (p) => _svc.updatePosition(businessId: widget.businessId, positionId: oaId(r['id'])!, payload: p),
-                  ),
+                DropdownButtonFormField<int>(
+                  decoration: InputDecoration(labelText: t.users),
+                  items: [
+                    for (final u in _users)
+                      DropdownMenuItem(value: _userIdOf(u), child: Text(_userLabel(u))),
+                  ],
+                  onChanged: (v) => setLocal(() {
+                    userId = v;
+                    errorText = null;
+                  }),
                 ),
-                _list(
-                  _holders,
-                  title: (r) => '${r['user_name'] ?? r['user_id']} · ${r['position_title'] ?? r['position_id']}',
-                  onAdd: () async {
-                    int? positionId;
-                    int? userId;
-                    final t = AppLocalizations.of(context);
-                    final ok = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: Text(t.oaAssign),
-                        content: SizedBox(
-                          width: 420,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              DropdownButtonFormField<int>(
-                                decoration: InputDecoration(labelText: t.oaPositions),
-                                items: [
-                                  for (final p in _positions)
-                                    DropdownMenuItem(value: oaId(p['id']), child: Text('${p['title'] ?? p['code']}')),
-                                ],
-                                onChanged: (v) => positionId = v,
-                              ),
-                              DropdownButtonFormField<int>(
-                                decoration: InputDecoration(labelText: t.users),
-                                items: [
-                                  for (final u in _users)
-                                    DropdownMenuItem(value: _userIdOf(u), child: Text(_userLabel(u))),
-                                ],
-                                onChanged: (v) => userId = v,
-                              ),
-                            ],
-                          ),
-                        ),
-                        actions: [
-                          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
-                          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.oaAssign)),
-                        ],
-                      ),
-                    );
-                    if (ok == true && positionId != null && userId != null) {
+                if (errorText != null) ...[
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(errorText!, style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: saving ? null : () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+            FilledButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      if (positionId == null) {
+                        setLocal(() => errorText = t.oaSelectPosition);
+                        return;
+                      }
+                      if (userId == null) {
+                        setLocal(() => errorText = t.oaSelectUser);
+                        return;
+                      }
+                      setLocal(() {
+                        saving = true;
+                        errorText = null;
+                      });
                       try {
                         await _svc.assignHolder(
                           businessId: widget.businessId,
                           payload: {'position_id': positionId, 'user_id': userId, 'is_primary': true},
                         );
-                        await _load();
+                        if (ctx.mounted) Navigator.pop(ctx, true);
                       } catch (e) {
-                        if (!context.mounted) return;
-                        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
-                      }
-                    }
-                  },
-                  trailing: (r) => IconButton(
-                    icon: const Icon(Icons.person_off_outlined),
-                    onPressed: () async {
-                      final holderId = oaId(r['id']);
-                      if (holderId == null) return;
-                      try {
-                        await _svc.endHolder(businessId: widget.businessId, holderId: holderId);
-                        await _load();
-                      } catch (e) {
-                        if (!context.mounted) return;
-                        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+                        setLocal(() {
+                          saving = false;
+                          errorText = ErrorExtractor.forContext(e, ctx);
+                        });
                       }
                     },
-                  ),
+              child: Text(t.oaAssign),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok == true) await _load();
+  }
+
+  Future<void> _createDelegation() async {
+    final t = AppLocalizations.of(context);
+    int? positionId;
+    int? userId;
+    var scope = 'full';
+    String? errorText;
+    var saving = false;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(t.oaDelegate),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<int>(
+                  decoration: InputDecoration(labelText: t.oaPositions),
+                  items: [
+                    for (final p in _positions)
+                      if (oaId(p['id']) != null)
+                        DropdownMenuItem(value: oaId(p['id']), child: Text('${p['title'] ?? p['code']}')),
+                  ],
+                  onChanged: (v) => setLocal(() {
+                    positionId = v;
+                    errorText = null;
+                  }),
                 ),
-                _list(
-                  _delegations,
-                  title: (r) => '${r['delegate_name'] ?? r['delegate_user_id']} · ${r['position_title'] ?? ''} · ${r['scope']}',
-                  onAdd: () async {
-                    int? positionId;
-                    int? userId;
-                    String scope = 'full';
-                    final t = AppLocalizations.of(context);
-                    final ok = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => StatefulBuilder(
-                        builder: (ctx, setLocal) => AlertDialog(
-                          title: Text(t.oaDelegate),
-                          content: SizedBox(
-                            width: 420,
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                DropdownButtonFormField<int>(
-                                  decoration: InputDecoration(labelText: t.oaPositions),
-                                  items: [
-                                    for (final p in _positions)
-                                      DropdownMenuItem(value: oaId(p['id']), child: Text('${p['title'] ?? p['code']}')),
-                                  ],
-                                  onChanged: (v) => positionId = v,
-                                ),
-                                DropdownButtonFormField<int>(
-                                  decoration: InputDecoration(labelText: t.users),
-                                  items: [
-                                    for (final u in _users)
-                                      DropdownMenuItem(value: _userIdOf(u), child: Text(_userLabel(u))),
-                                  ],
-                                  onChanged: (v) => userId = v,
-                                ),
-                                DropdownButtonFormField<String>(
-                                  value: scope,
-                                  items: const [
-                                    DropdownMenuItem(value: 'full', child: Text('full')),
-                                    DropdownMenuItem(value: 'view', child: Text('view')),
-                                    DropdownMenuItem(value: 'refer', child: Text('refer')),
-                                  ],
-                                  onChanged: (v) => setLocal(() => scope = v ?? 'full'),
-                                ),
-                              ],
-                            ),
-                          ),
-                          actions: [
-                            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
-                            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.oaDelegate)),
-                          ],
-                        ),
-                      ),
-                    );
-                    if (ok == true && positionId != null && userId != null) {
+                DropdownButtonFormField<int>(
+                  decoration: InputDecoration(labelText: t.users),
+                  items: [
+                    for (final u in _users)
+                      DropdownMenuItem(value: _userIdOf(u), child: Text(_userLabel(u))),
+                  ],
+                  onChanged: (v) => setLocal(() {
+                    userId = v;
+                    errorText = null;
+                  }),
+                ),
+                DropdownButtonFormField<String>(
+                  initialValue: scope,
+                  items: const [
+                    DropdownMenuItem(value: 'full', child: Text('full')),
+                    DropdownMenuItem(value: 'view', child: Text('view')),
+                    DropdownMenuItem(value: 'refer', child: Text('refer')),
+                  ],
+                  onChanged: (v) => setLocal(() => scope = v ?? 'full'),
+                ),
+                if (errorText != null) ...[
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(errorText!, style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: saving ? null : () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+            FilledButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      if (positionId == null) {
+                        setLocal(() => errorText = t.oaSelectPosition);
+                        return;
+                      }
+                      if (userId == null) {
+                        setLocal(() => errorText = t.oaSelectUser);
+                        return;
+                      }
+                      setLocal(() {
+                        saving = true;
+                        errorText = null;
+                      });
                       try {
                         await _svc.createDelegation(
                           businessId: widget.businessId,
                           payload: {'position_id': positionId, 'delegate_user_id': userId, 'scope': scope},
                         );
-                        await _load();
+                        if (ctx.mounted) Navigator.pop(ctx, true);
                       } catch (e) {
-                        if (!context.mounted) return;
-                        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
-                      }
-                    }
-                  },
-                  trailing: (r) => IconButton(
-                    icon: const Icon(Icons.stop_circle_outlined),
-                    onPressed: () async {
-                      final delegationId = oaId(r['id']);
-                      if (delegationId == null) return;
-                      try {
-                        await _svc.endDelegation(businessId: widget.businessId, delegationId: delegationId);
-                        await _load();
-                      } catch (e) {
-                        if (!context.mounted) return;
-                        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+                        setLocal(() {
+                          saving = false;
+                          errorText = ErrorExtractor.forContext(e, ctx);
+                        });
                       }
                     },
-                  ),
-                ),
-              ],
+              child: Text(t.oaDelegate),
             ),
+          ],
+        ),
+      ),
+    );
+    if (ok == true) await _load();
+  }
+
+  Widget _treePane({
+    required String emptyText,
+    required VoidCallback onAddRoot,
+    required List<Widget> children,
+  }) {
+    return Column(
+      children: [
+        Align(
+          alignment: AlignmentDirectional.centerEnd,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: FilledButton.icon(
+              onPressed: onAddRoot,
+              icon: const Icon(Icons.add),
+              label: Text(AppLocalizations.of(context).add),
+            ),
+          ),
+        ),
+        Expanded(
+          child: children.isEmpty
+              ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(emptyText, textAlign: TextAlign.center)))
+              : ListView(padding: const EdgeInsets.only(bottom: 24), children: children),
+        ),
+      ],
     );
   }
 
-  Widget _list(
+  Widget _unitNode(Map<String, dynamic> node, {int depth = 0}) {
+    final t = AppLocalizations.of(context);
+    final children = List<Map<String, dynamic>>.from(node['children'] as List? ?? const []);
+    final id = oaId(node['id']);
+    return ExpansionTile(
+      key: PageStorageKey('unit-$id'),
+      initiallyExpanded: depth == 0,
+      childrenPadding: const EdgeInsetsDirectional.only(start: 12),
+      leading: const Icon(Icons.account_tree_outlined),
+      title: Text('${node['title'] ?? node['code']}'),
+      subtitle: Text('${node['code'] ?? ''}'),
+      children: [
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 12, bottom: 8),
+            child: Wrap(
+              spacing: 8,
+              children: [
+                TextButton.icon(
+                  onPressed: id == null ? null : () => _editUnit(parentId: id),
+                  icon: const Icon(Icons.subdirectory_arrow_right, size: 18),
+                  label: Text(t.oaAddChild),
+                ),
+                TextButton.icon(
+                  onPressed: () => _editUnit(existing: node),
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  label: Text(t.edit),
+                ),
+              ],
+            ),
+          ),
+          for (final child in children) _unitNode(child, depth: depth + 1),
+        ],
+    );
+  }
+
+  Widget _positionUnitNode(Map<String, dynamic> node, {int depth = 0}) {
+    final t = AppLocalizations.of(context);
+    final unitId = oaId(node['id']);
+    final childUnits = List<Map<String, dynamic>>.from(node['children'] as List? ?? const []);
+    final positions = _positions.where((p) => oaId(p['org_unit_id']) == unitId).toList();
+    return ExpansionTile(
+      key: PageStorageKey('pos-unit-$unitId'),
+      initiallyExpanded: depth == 0,
+      childrenPadding: const EdgeInsetsDirectional.only(start: 12),
+      leading: const Icon(Icons.apartment_outlined),
+      title: Text('${node['title'] ?? node['code']}'),
+      subtitle: Text('${positions.length} · ${node['code'] ?? ''}'),
+      children: [
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 12, bottom: 8),
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton.icon(
+                onPressed: unitId == null ? null : () => _editPosition(unitId: unitId),
+                icon: const Icon(Icons.badge_outlined, size: 18),
+                label: Text(t.oaAddPosition),
+              ),
+            ),
+          ),
+          for (final p in positions)
+            ListTile(
+              leading: Icon(p['is_secretariat'] == true ? Icons.verified_outlined : Icons.badge_outlined),
+              title: Text('${p['title'] ?? p['code']}'),
+              subtitle: Text(
+                [
+                  p['code'] ?? '',
+                  if (p['is_secretariat'] == true) t.oaRegistry,
+                ].where((s) => s.toString().isNotEmpty).join(' · '),
+              ),
+              onTap: () => _editPosition(existing: p),
+            ),
+          for (final child in childUnits) _positionUnitNode(child, depth: depth + 1),
+        ],
+    );
+  }
+
+  Widget _flatList(
     List<Map<String, dynamic>> rows, {
     required String Function(Map<String, dynamic>) title,
-    VoidCallback? onAdd,
-    void Function(Map<String, dynamic>)? onTap,
+    required VoidCallback onAdd,
     Widget Function(Map<String, dynamic>)? trailing,
   }) {
     return Column(
@@ -422,13 +673,88 @@ class _OaOrgPageState extends State<OaOrgPage> with SingleTickerProviderStateMix
               final row = rows[i];
               return ListTile(
                 title: Text(title(row)),
-                onTap: onTap == null ? null : () => onTap(row),
                 trailing: trailing?.call(row),
               );
             },
           ),
         ),
       ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final forest = _unitForest();
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(t.oaOrg),
+        bottom: TabBar(
+          controller: _tabs,
+          isScrollable: true,
+          tabs: [
+            Tab(text: t.oaUnits),
+            Tab(text: t.oaPositions),
+            Tab(text: t.oaHolders),
+            Tab(text: t.oaDelegations),
+          ],
+        ),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : TabBarView(
+              controller: _tabs,
+              children: [
+                _treePane(
+                  emptyText: t.oaEmptyUnits,
+                  onAddRoot: () => _editUnit(),
+                  children: [for (final node in forest) _unitNode(node)],
+                ),
+                _treePane(
+                  emptyText: t.oaEmptyPositions,
+                  onAddRoot: _units.isEmpty ? () => _editUnit() : () => _editPosition(),
+                  children: [for (final node in forest) _positionUnitNode(node)],
+                ),
+                _flatList(
+                  _holders,
+                  title: (r) => '${r['user_name'] ?? r['user_id']} · ${r['position_title'] ?? r['position_id']}',
+                  onAdd: _assignHolder,
+                  trailing: (r) => IconButton(
+                    icon: const Icon(Icons.person_off_outlined),
+                    onPressed: () async {
+                      final holderId = oaId(r['id']);
+                      if (holderId == null) return;
+                      try {
+                        await _svc.endHolder(businessId: widget.businessId, holderId: holderId);
+                        await _load();
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+                      }
+                    },
+                  ),
+                ),
+                _flatList(
+                  _delegations,
+                  title: (r) => '${r['delegate_name'] ?? r['delegate_user_id']} · ${r['position_title'] ?? ''} · ${r['scope']}',
+                  onAdd: _createDelegation,
+                  trailing: (r) => IconButton(
+                    icon: const Icon(Icons.stop_circle_outlined),
+                    onPressed: () async {
+                      final delegationId = oaId(r['id']);
+                      if (delegationId == null) return;
+                      try {
+                        await _svc.endDelegation(businessId: widget.businessId, delegationId: delegationId);
+                        await _load();
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }

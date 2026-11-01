@@ -24300,6 +24300,66 @@ abstract class AppLocalizations {
   /// **'No parent unit'**
   String get oaNoParent;
 
+  /// No description provided for @oaCodeFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Start with a letter; then letters, digits, or underscore (max 64).'**
+  String get oaCodeFormat;
+
+  /// No description provided for @oaCodeExists.
+  ///
+  /// In en, this message translates to:
+  /// **'This code is already used.'**
+  String get oaCodeExists;
+
+  /// No description provided for @oaNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name in Persian or English.'**
+  String get oaNameRequired;
+
+  /// No description provided for @oaSelectUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a unit.'**
+  String get oaSelectUnit;
+
+  /// No description provided for @oaSelectPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a position.'**
+  String get oaSelectPosition;
+
+  /// No description provided for @oaSelectUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a user.'**
+  String get oaSelectUser;
+
+  /// No description provided for @oaAddChild.
+  ///
+  /// In en, this message translates to:
+  /// **'Add child unit'**
+  String get oaAddChild;
+
+  /// No description provided for @oaAddPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'Add position'**
+  String get oaAddPosition;
+
+  /// No description provided for @oaEmptyUnits.
+  ///
+  /// In en, this message translates to:
+  /// **'No units yet.'**
+  String get oaEmptyUnits;
+
+  /// No description provided for @oaEmptyPositions.
+  ///
+  /// In en, this message translates to:
+  /// **'No positions yet.'**
+  String get oaEmptyPositions;
+
   /// No description provided for @oaJalali.
   ///
   /// In en, this message translates to:

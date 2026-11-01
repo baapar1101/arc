@@ -80,8 +80,8 @@ def register_mcp_office_automation_functions(registry) -> None:
 		_schema({"include_inactive": {"type": "boolean"}}),
 		lambda a, c: {"items": _svc().list_org_units(c["db"], int(c["business_id"]), include_inactive=bool(a.get("include_inactive", False)), lang=_ctx(c)[3])},
 		"office_automation.view")
-	_register(registry, "create_oa_org_unit", "ساخت واحد سازمانی. نیازمند تأیید.",
-		_schema({"payload": {"type": "object", "properties": {"code": {"type": "string"}, "name_i18n": {"type": "object"}, "parent_id": {"type": ["integer", "null"]}, "sort_order": {"type": "integer"}}, "required": ["code"]}}, ["payload"]),
+	_register(registry, "create_oa_org_unit", "ساخت واحد سازمانی. اگر code خالی باشد کد یکتا ساخته می‌شود. نیازمند تأیید.",
+		_schema({"payload": {"type": "object", "properties": {"code": {"type": "string"}, "auto_generate_code": {"type": "boolean"}, "name_i18n": {"type": "object"}, "parent_id": {"type": ["integer", "null"]}, "sort_order": {"type": "integer"}}}}, ["payload"]),
 		lambda a, c: _svc().create_org_unit(c["db"], int(c["business_id"]), a["payload"], c["user_context"].get_user_id(), lang=_ctx(c)[3]),
 		"office_automation.admin", write=True)
 	_register(registry, "update_oa_org_unit", "ویرایش واحد سازمانی. نیازمند تأیید.",
@@ -93,8 +93,8 @@ def register_mcp_office_automation_functions(registry) -> None:
 		_schema({"include_inactive": {"type": "boolean"}}),
 		lambda a, c: {"items": _svc().list_positions(c["db"], int(c["business_id"]), include_inactive=bool(a.get("include_inactive", False)), lang=_ctx(c)[3])},
 		"office_automation.view")
-	_register(registry, "create_oa_position", "ساخت سمت سازمانی. نیازمند تأیید.",
-		_schema({"payload": {"type": "object", "properties": {"code": {"type": "string"}, "org_unit_id": {"type": "integer"}, "name_i18n": {"type": "object"}, "is_secretariat": {"type": "boolean"}, "can_view_subtree": {"type": "boolean"}}, "required": ["code", "org_unit_id"]}}, ["payload"]),
+	_register(registry, "create_oa_position", "ساخت سمت سازمانی. اگر code خالی باشد کد یکتا ساخته می‌شود. نیازمند تأیید.",
+		_schema({"payload": {"type": "object", "properties": {"code": {"type": "string"}, "auto_generate_code": {"type": "boolean"}, "org_unit_id": {"type": "integer"}, "name_i18n": {"type": "object"}, "is_secretariat": {"type": "boolean"}, "can_view_subtree": {"type": "boolean"}}, "required": ["org_unit_id"]}}, ["payload"]),
 		lambda a, c: _svc().create_position(c["db"], int(c["business_id"]), a["payload"], c["user_context"].get_user_id(), lang=_ctx(c)[3]),
 		"office_automation.admin", write=True)
 	_register(registry, "update_oa_position", "ویرایش سمت سازمانی. نیازمند تأیید.",

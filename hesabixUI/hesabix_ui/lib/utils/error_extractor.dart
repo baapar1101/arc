@@ -97,6 +97,8 @@ class ErrorExtractor {
       case 'GATEWAY_NOT_FOUND':
       case 'GATEWAY_NOT_LINKED':
         return t.payPageNoGateway;
+      case 'OA_CODE_EXISTS':
+        return t.oaCodeExists;
 
       case 'INVALID_CURRENCY':
         return t.apiErrorLoanInvalidCurrency;
