@@ -13,6 +13,9 @@ class BrandLogoAssets {
   /// لوگوی آبی کلاسیک (سازگاری با وب/لودر؛ ترجیحاً از [BrandLogo] استفاده کنید).
   static const String classicBlue = 'assets/images/logo-blue.png';
 
+  /// انیمیشن کاشی‌پیکسلی لوگو برای حالت loading.
+  static const String pixelLoading = 'assets/images/hesabix_pixel_loading.gif';
+
   /// مسیر مناسب برای حالت روشن/تیره بدون tint.
   static String assetForBrightness({required bool isDark}) =>
       isDark ? lightSilhouette : classicBlue;
@@ -66,6 +69,25 @@ class BrandLogo extends StatelessWidget {
     return ColorFiltered(
       colorFilter: ColorFilter.mode(primary, BlendMode.srcIn),
       child: image,
+    );
+  }
+}
+
+/// لوگوی حسابیکس به‌صورت کاشی پیکسلیِ در حال بارگذاری.
+class BrandPixelLoading extends StatelessWidget {
+  final double size;
+
+  const BrandPixelLoading({super.key, this.size = 72});
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      BrandLogoAssets.pixelLoading,
+      width: size,
+      height: size,
+      filterQuality: FilterQuality.none,
+      isAntiAlias: false,
+      gaplessPlayback: true,
     );
   }
 }
