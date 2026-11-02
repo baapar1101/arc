@@ -154,8 +154,10 @@ def test_public_pay_html_template_renders_title():
 		}
 	)
 	assert html.status_code == 200
-	assert "پرداخت به فروشگاه علی" in html.body.decode("utf-8")
-	assert 'name="amount"' in html.body.decode("utf-8")
+	body = html.body.decode("utf-8")
+	assert "پرداخت به فروشگاه علی" in body
+	assert 'name="amount"' in body
+	assert "YekanBakhFaNum" in body
 
 
 def test_short_pay_page_serves_backend_html_not_flutter_redirect():
@@ -355,3 +357,74 @@ def test_persist_gateway_verify_keeps_payer_fields():
 	stored = json.loads(tx.extra_info or "{}")
 	assert stored["gateway_verify"]["card_num"] == "603799******1234"
 	assert stored["gateway_verify"]["trans_id"] == "bit-1"
+
+
+def test_pay_page_html_loads_persian_font_and_brand_name():
+	html = render_public_business_pay_page(
+		{
+			"app_name": "آرک حسابداری",
+			"username": "shop-ali",
+			"page_title": "فروشگاه علی",
+			"heading": "پرداخت به فروشگاه علی",
+			"display_title": "فروشگاه علی",
+			"intro_text": "",
+			"show_logo": False,
+			"logo_url": "",
+			"is_enabled": True,
+			"not_found": False,
+			"not_found_message": "",
+			"disabled_message": "",
+			"error_message": "",
+			"payment_status": "",
+			"receipt_title": "",
+			"receipt_success": "",
+			"receipt_failed": "",
+			"tracking_label": "",
+			"receipt_ref": "",
+			"receipt_tx": "",
+			"amount_label": "مبلغ",
+			"name_label": "نام",
+			"mobile_label": "موبایل",
+			"note_label": "توضیح",
+			"pay_button": "پرداخت",
+			"currency_hint": "",
+			"min_amount_hint": "",
+			"form_amount": "",
+			"form_name": "",
+			"form_mobile": "",
+			"form_note": "",
+			"business_rows": [],
+		}
+	)
+	body = html.body.decode("utf-8")
+	assert "YekanBakhFaNum" in body
+	assert "/api/v1/public/pay-fonts/YekanBakhFaNum-Regular.woff2" in body
+	assert "آرک حسابداری مبلغ را برای این کسب‌وکار دریافت می‌کند" in body
+	assert "حسابیکس مبلغ" not in body
+
+
+def test_pay_page_font_endpoint_serves_yekan():
+	client = _public_pay_html_client()
+	res = client.get("/api/v1/public/pay-fonts/YekanBakhFaNum-Regular.woff2")
+	assert res.status_code == 200
+	assert "font" in (res.headers.get("content-type") or "")
+	assert len(res.content) > 1000
+	missing = client.get("/api/v1/public/pay-fonts/not-a-font.woff2")
+	assert missing.status_code == 404
+
+
+def test_resolve_payment_display_name_uses_rebrand_fa(monkeypatch, tmp_path):
+	from app.core.payment_response import resolve_payment_display_name, rebrand_product_text
+
+	env_file = tmp_path / "deploy.env"
+	env_file.write_text(
+		"BRANDING_MODE=custom\nAPP_NAME_FA=فروشگاه آرک\nAPP_NAME_EN=Arc Shop\n",
+		encoding="utf-8",
+	)
+	monkeypatch.setenv("HESABIX_DEPLOY_ENV", str(env_file))
+	monkeypatch.delenv("APP_NAME_FA", raising=False)
+	monkeypatch.delenv("APP_NAME_EN", raising=False)
+	monkeypatch.delenv("BRANDING_MODE", raising=False)
+	with patch("app.services.system_settings_service.get_app_name", return_value="Hesabix API"):
+		assert resolve_payment_display_name(MagicMock()) == "فروشگاه آرک"
+	assert rebrand_product_text("پرداخت با حسابیکس", "فروشگاه آرک") == "پرداخت با فروشگاه آرک"

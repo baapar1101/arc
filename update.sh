@@ -470,6 +470,43 @@ hesabix_nginx_bin() {
   fi
   return 1
 }
+ensure_public_pay_u_location() {
+  local conf="$1"
+  [[ -f "$conf" ]] || return 0
+  if grep -q 'location /u/' "$conf"; then
+    return 0
+  fi
+  python3 - "$conf" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text()
+if "location /u/" in text:
+    raise SystemExit(0)
+needle = "  location /i/ {"
+if needle not in text:
+    raise SystemExit(0)
+block = """
+  # Public business pay page: /u/{username} -> backend HTML (no Flutter)
+  location /u/ {
+    proxy_pass http://127.0.0.1:8000/u/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Port $server_port;
+    proxy_read_timeout 30;
+    proxy_connect_timeout 10;
+    proxy_send_timeout 30;
+  }
+
+"""
+path.write_text(text.replace(needle, block + needle))
+PY
+}
 ensure_ai_chat_sse_location() {
   local conf="$1"
   [[ -f "$conf" ]] || return 0
@@ -519,6 +556,9 @@ fi
 ensure_ai_chat_sse_location /etc/nginx/sites-available/hesabix-api.conf
 ensure_ai_chat_sse_location /etc/nginx/sites-available/hesabix-ui.conf
 log_info "Ensured AI chat SSE nginx location (no proxy buffering)."
+ensure_public_pay_u_location /etc/nginx/sites-available/hesabix-api.conf
+ensure_public_pay_u_location /etc/nginx/sites-available/hesabix-ui.conf
+log_info "Ensured public pay-page nginx location (/u/ -> backend HTML)."
 ensure_voice_ws_nginx() {
   local conf="$1"
   [[ -f "$conf" ]] || return 0

@@ -680,10 +680,13 @@ def get_public_pay_receipt(db: Session, username: str, token: str, *, request_ba
 
 
 def render_public_pay_receipt_pdf(context: Dict[str, Any]) -> bytes:
-	from app.core.payment_response import jinja_env
+	from app.core.payment_response import jinja_env, pay_page_font_file_uri
 	from app.core.weasyprint_runtime import load_weasyprint
 
-	html = jinja_env.get_template("pdf/public_pay_receipt.html").render(**context)
+	pdf_ctx = dict(context)
+	pdf_ctx.setdefault("fa_font_url_regular", pay_page_font_file_uri("YekanBakhFaNum-Regular.ttf"))
+	pdf_ctx.setdefault("fa_font_url_bold", pay_page_font_file_uri("YekanBakhFaNum-Bold.ttf"))
+	html = jinja_env.get_template("pdf/public_pay_receipt.html").render(**pdf_ctx)
 	runtime = load_weasyprint()
 	font_config = runtime.FontConfiguration()
 	return runtime.HTML(string=html).write_pdf(font_config=font_config)

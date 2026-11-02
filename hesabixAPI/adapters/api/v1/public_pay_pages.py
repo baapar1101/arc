@@ -6,12 +6,16 @@ from typing import Any, Optional
 from urllib.parse import quote
 
 from fastapi import APIRouter, Body, Depends, Form, HTTPException, Request
-from fastapi.responses import RedirectResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
-from app.core.payment_response import render_public_business_pay_page, resolve_payment_display_name
+from app.core.payment_response import (
+	pay_page_font_path,
+	render_public_business_pay_page,
+	resolve_payment_display_name,
+)
 from app.core.responses import ApiError, format_datetime_fields, success_response
 from app.services.business_pay_page_service import get_public_pay_page, public_business_contact_rows
 from app.services.file_storage_service import FileStorageService
@@ -24,6 +28,23 @@ from app.services.public_pay_page_payment_service import (
 )
 
 router = APIRouter(tags=["public-pay-page"])
+
+_FONT_MEDIA_TYPES = {
+	".woff2": "font/woff2",
+	".ttf": "font/ttf",
+}
+
+
+@router.get("/api/v1/public/pay-fonts/{font_name}", include_in_schema=False)
+def public_pay_page_font(font_name: str):
+	path = pay_page_font_path(font_name)
+	if path is None:
+		raise HTTPException(status_code=404, detail="فونت یافت نشد")
+	return FileResponse(
+		path,
+		media_type=_FONT_MEDIA_TYPES.get(path.suffix.lower(), "application/octet-stream"),
+		headers={"Cache-Control": "public, max-age=31536000, immutable"},
+	)
 
 
 class PublicPayStartBody(BaseModel):

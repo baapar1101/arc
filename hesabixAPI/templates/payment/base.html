@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}نتیجه پرداخت — {{ app_name | default('حسابیکس') }}{% endblock %}</title>
+    {% include "public/_persian_fonts.html" %}
     <style>
         * {
             margin: 0;
@@ -11,8 +12,12 @@
             box-sizing: border-box;
         }
 
+        button, input, textarea, select {
+            font-family: inherit;
+        }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif, 'Vazir', 'Sahel';
+            font-family: 'YekanBakhFaNum', Tahoma, 'Segoe UI', sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
