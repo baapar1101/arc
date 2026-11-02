@@ -10,6 +10,7 @@ import '../../widgets/invoice/line_items_table.dart';
 import '../../widgets/invoice/invoice_transactions_widget.dart';
 import '../../widgets/invoice/invoice_fx_dual_totals_banner.dart';
 import '../../widgets/invoice/product_bundle_picker_dialog.dart';
+import '../../widgets/barcode_label/label_print_from_invoice.dart';
 import '../../utils/number_formatters.dart';
 import '../../models/invoice_type_model.dart';
 import '../../models/customer_model.dart';
@@ -84,6 +85,8 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   List<int> _selectedTagIds = [];
   String? _invoiceTitle;
   final TextEditingController _invoiceTitleController = TextEditingController();
+  final TextEditingController _loyaltyPointsController = TextEditingController();
+  final TextEditingController _clubVoucherCodeController = TextEditingController();
   bool _isProforma = false; // وضعیت پیش‌فاکتور (قابل تغییر)
   bool _persistedIsProforma = false;
   /// none | draft | posted
@@ -415,6 +418,8 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     _tabController.dispose();
     _globalDiscountValueController.dispose();
     _invoiceTitleController.dispose();
+    _loyaltyPointsController.dispose();
+    _clubVoucherCodeController.dispose();
     super.dispose();
   }
 
@@ -469,6 +474,9 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
 
       // extra_info
       _originalExtraInfo = Map<String, dynamic>.from(item['extra_info'] ?? const {});
+      final clubInfo = _originalExtraInfo['customer_club'];
+      _loyaltyPointsController.text = clubInfo is Map ? (clubInfo['redeem_points_requested'] ?? '').toString() : '';
+      _clubVoucherCodeController.text = clubInfo is Map ? (clubInfo['voucher_code'] ?? '').toString() : '';
       _manualFxRateId = null;
       final fxx0 = _originalExtraInfo['fx'];
       if (fxx0 is Map && fxx0['mode']?.toString() == 'selected') {
@@ -805,6 +813,21 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
         title: Text(t.editInvoiceTitle),
         leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
+          if (_selectedInvoiceType == InvoiceType.purchase)
+            IconButton(
+              tooltip: t.localeName.startsWith('fa')
+                  ? 'چاپ بارکد کالاهای فاکتور'
+                  : 'Print product barcode labels',
+              onPressed: (_loading || _isSaving)
+                  ? null
+                  : () => showBarcodePrintFromInvoiceLines(
+                        context: context,
+                        businessId: widget.businessId,
+                        authStore: widget.authStore,
+                        lines: _lineItems,
+                      ),
+              icon: const Icon(Icons.qr_code_2),
+            ),
           IconButton(
             tooltip: t.saveChangesTooltip,
             onPressed: (_loading || _isSaving) ? null : _saveChanges,
@@ -998,6 +1021,8 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                 _invoiceTitle = value.trim().isEmpty ? null : value.trim();
               });
             },
+            loyaltyPointsController: _loyaltyPointsController,
+            voucherCodeController: _clubVoucherCodeController,
               ),
               const SizedBox(height: 12),
               EntityLinkedTasksCard(
@@ -1534,6 +1559,33 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       mergedExtra['person_id'] = _selectedSupplier!.id;
     }
 
+    // Preserve other customer-club metadata while updating the redemption request.
+    final clubInfo = Map<String, dynamic>.from(
+      mergedExtra['customer_club'] is Map
+          ? mergedExtra['customer_club'] as Map
+          : const {},
+    );
+    final points = _loyaltyPointsController.text.replaceAll(',', '').trim();
+    if (points.isEmpty) {
+      clubInfo.remove('redeem_points_requested');
+      clubInfo.remove('redeem_discount_amount');
+    } else {
+      clubInfo['redeem_points_requested'] = double.tryParse(points) ?? 0;
+    }
+    final voucher = _clubVoucherCodeController.text.trim().toUpperCase();
+    if (voucher.isEmpty) {
+      clubInfo.remove('voucher_code');
+      clubInfo.remove('voucher_id');
+      clubInfo.remove('voucher_discount_amount');
+    } else {
+      clubInfo['voucher_code'] = voucher;
+    }
+    if (clubInfo.isEmpty) {
+      mergedExtra.remove('customer_club');
+    } else {
+      mergedExtra['customer_club'] = clubInfo;
+    }
+
     if (_invoiceTypeSupportsAdjustments) {
       final adjPayload = buildAdjustmentsPayloadList(_adjustmentRows);
       if (adjPayload.isNotEmpty) {
@@ -1559,6 +1611,10 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       'tag_ids': _selectedTagIds,
       if (_showInvoiceFxField && _manualFxRateId != null) 'fx_rate_id': _manualFxRateId,
       'lines': _lineItems.map((e) => _serializeLineItem(e)).toList(),
+      if (_loyaltyPointsController.text.trim().isNotEmpty)
+        'loyalty_redemption_points': double.tryParse(_loyaltyPointsController.text.replaceAll(',', '').trim()) ?? 0,
+      if (_clubVoucherCodeController.text.trim().isNotEmpty)
+        'customer_club_voucher_code': _clubVoucherCodeController.text.trim().toUpperCase(),
     };
     
     // تراکنش‌های پرداخت برای فاکتور قطعی؛ همیشه آرایه بفرست تا حذف همهٔ تراکنش‌ها در سرور اعمال شود
@@ -1622,10 +1678,13 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       extraInfoMap['selected_instance_ids'] = e.selectedInstanceIds;
     }
 
+    // Preserve allocation metadata for inventory/warehouse validation.
+    final allocations = extraInfoMap['allocations'];
     return <String, dynamic>{
       'product_id': e.productId,
       'quantity': e.quantity,
       if ((e.description ?? '').isNotEmpty) 'description': e.description,
+      if (allocations is List && allocations.isNotEmpty) 'allocations': allocations,
       'extra_info': extraInfoMap,
     };
   }

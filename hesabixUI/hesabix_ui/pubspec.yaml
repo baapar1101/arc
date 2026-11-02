@@ -94,6 +94,8 @@ dev_dependencies:
   flutter_launcher_icons: ^0.14.4
 
 dependency_overrides:
+  # Upstream compatibility fix for archive/ZLibDecoder; keep existing desktop pins.
+  image: 4.10.1
   intl: ^0.20.2
   desktop_drop:
     path: third_party/desktop_drop
