@@ -100,12 +100,7 @@ class _BusinessShellState extends State<BusinessShell> {
   static const double _kBizTabMaxWidth = 188;
 
   int _hoverIndex = -1;
-  bool _isProductsAndServicesExpanded = false;
-  bool _isBankingExpanded = false;
-  bool _isAccountingMenuExpanded = false;
-  bool _isWarehouseManagementExpanded = false;
-  bool _isAIExpanded = false;
-  bool _isCrmExpanded = false;
+  final Map<String, bool> _expandedMenuByKey = {};
   final BusinessDashboardService _businessService = BusinessDashboardService(ApiClient());
   final MarketplaceService _marketplaceService = MarketplaceService();
   List<Map<String, dynamic>> _businessPlugins = [];
@@ -2222,13 +2217,7 @@ class _BusinessShellState extends State<BusinessShell> {
           if (child.path != null &&
               _businessMenuPathMatchesLocation(location, child.path!, widget.businessId)) {
             selectedIndex = i;
-            // تنظیم وضعیت باز بودن منو بر اساس برچسب آیتم
-            if (item.label == t.productsAndServices) _isProductsAndServicesExpanded = true;
-            if (item.label == t.banking) _isBankingExpanded = true;
-            if (item.label == t.accountingMenu) _isAccountingMenuExpanded = true;
-            if (item.label == t.warehouseManagement) _isWarehouseManagementExpanded = true;
-            if (item.label == 'هوش مصنوعی') _isAIExpanded = true;
-            if (item.label == 'CRM') _isCrmExpanded = true;
+            _setExpandableMenuOpen(item, true);
             break;
           }
         }
@@ -2305,15 +2294,7 @@ class _BusinessShellState extends State<BusinessShell> {
             }
         }
       } else if (item.type == _MenuItemType.expandable) {
-        // تغییر وضعیت باز/بسته بودن منو
-        setState(() {
-          if (item.label == t.productsAndServices) _isProductsAndServicesExpanded = !_isProductsAndServicesExpanded;
-          if (item.label == t.banking) _isBankingExpanded = !_isBankingExpanded;
-          if (item.label == t.accountingMenu) _isAccountingMenuExpanded = !_isAccountingMenuExpanded;
-          if (item.label == t.warehouseManagement) _isWarehouseManagementExpanded = !_isWarehouseManagementExpanded;
-          if (item.label == 'هوش مصنوعی') _isAIExpanded = !_isAIExpanded;
-          if (item.label == 'CRM') _isCrmExpanded = !_isCrmExpanded;
-        });
+        setState(() => _toggleExpandableMenu(item));
       }
     }
 
@@ -2557,15 +2538,7 @@ class _BusinessShellState extends State<BusinessShell> {
   }
 
 
-    bool isExpanded(_MenuItem item) {
-      if (item.label == t.productsAndServices) return _isProductsAndServicesExpanded;
-      if (item.label == t.banking) return _isBankingExpanded;
-      if (item.label == t.accountingMenu) return _isAccountingMenuExpanded;
-      if (item.label == t.warehouseManagement) return _isWarehouseManagementExpanded;
-      if (item.label == 'هوش مصنوعی') return _isAIExpanded;
-      if (item.label == 'CRM') return _isCrmExpanded;
-      return false;
-    }
+    bool isExpanded(_MenuItem item) => _isExpandableMenuOpen(item);
 
     int getTotalMenuItemsCount() {
       int count = 0;
@@ -3191,15 +3164,7 @@ class _BusinessShellState extends State<BusinessShell> {
                           borderRadius: br,
                           onTap: () {
                             if (item.type == _MenuItemType.expandable) {
-                              // در همه حالت‌ها (Rail و Extended) expand/collapse می‌کنیم
-                              setState(() {
-                                if (item.label == t.productsAndServices) _isProductsAndServicesExpanded = !_isProductsAndServicesExpanded;
-                                if (item.label == t.banking) _isBankingExpanded = !_isBankingExpanded;
-                                if (item.label == t.accountingMenu) _isAccountingMenuExpanded = !_isAccountingMenuExpanded;
-                                if (item.label == t.warehouseManagement) _isWarehouseManagementExpanded = !_isWarehouseManagementExpanded;
-                                if (item.label == 'هوش مصنوعی') _isAIExpanded = !_isAIExpanded;
-                                if (item.label == 'CRM') _isCrmExpanded = !_isCrmExpanded;
-                              });
+                              setState(() => _toggleExpandableMenu(item));
                             } else {
                               onSelect(menuIndex, longPress: false);
                             }
@@ -3490,14 +3455,7 @@ class _BusinessShellState extends State<BusinessShell> {
                       title: Text(item.label, style: TextStyle(color: sideFg)),
                       initiallyExpanded: isExpanded(item),
                       onExpansionChanged: (expanded) {
-                        setState(() {
-                          if (item.label == t.productsAndServices) _isProductsAndServicesExpanded = expanded;
-                          if (item.label == t.banking) _isBankingExpanded = expanded;
-                          if (item.label == t.accountingMenu) _isAccountingMenuExpanded = expanded;
-                          if (item.label == t.warehouseManagement) _isWarehouseManagementExpanded = expanded;
-                          if (item.label == 'هوش مصنوعی') _isAIExpanded = expanded;
-                          if (item.label == 'CRM') _isCrmExpanded = expanded;
-                        });
+                        setState(() => _setExpandableMenuOpen(item, expanded));
                       },
                       children: visibleChildren.map((child) {
                         final childSection = _sectionForLabel(child.label, t);
@@ -3681,6 +3639,24 @@ class _BusinessShellState extends State<BusinessShell> {
     } finally {
       dismissLoader();
     }
+  }
+
+  String _expandableMenuKey(_MenuItem item) {
+    final key = item.key?.trim();
+    if (key != null && key.isNotEmpty) return key;
+    return item.label;
+  }
+
+  bool _isExpandableMenuOpen(_MenuItem item) =>
+      _expandedMenuByKey[_expandableMenuKey(item)] ?? false;
+
+  void _setExpandableMenuOpen(_MenuItem item, bool open) {
+    _expandedMenuByKey[_expandableMenuKey(item)] = open;
+  }
+
+  void _toggleExpandableMenu(_MenuItem item) {
+    final key = _expandableMenuKey(item);
+    _expandedMenuByKey[key] = !(_expandedMenuByKey[key] ?? false);
   }
 
   Widget _buildSidebarMenuIcon(
@@ -3980,6 +3956,7 @@ class _BusinessShellState extends State<BusinessShell> {
       case 'payroll':
         return 'payroll';
       case 'office-automation':
+      case 'group:office-automation':
         return 'office_automation';
       case 'fixed-assets':
         return 'fixed_assets';
