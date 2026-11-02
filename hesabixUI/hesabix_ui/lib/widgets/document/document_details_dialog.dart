@@ -36,7 +36,9 @@ import 'package:hesabix_ui/widgets/invoice/petty_cash_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/check_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/account_tree_combobox_widget.dart';
+import 'package:hesabix_ui/widgets/document/detail_selector_widget.dart';
 import 'package:hesabix_ui/models/person_model.dart';
+import 'package:hesabix_ui/models/account_model.dart';
 import 'package:hesabix_ui/models/account_tree_node.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart'
@@ -5830,6 +5832,7 @@ class _ReceiptPaymentTransactionDialogState
   String? _selectedCheckId;
   String? _selectedCheckNumber;
   AccountTreeNode? _selectedAccount;
+  Map<String, dynamic>? _selectedDetail;
 
   // اقساط
   Map<int, double> _installmentAllocations = {}; // seq -> amount
@@ -5871,7 +5874,13 @@ class _ReceiptPaymentTransactionDialogState
           _selectedCheckNumber = firstLine.extraInfo?['check_number']
               ?.toString();
         } else if (_selectedTransactionMethod == 'account') {
-          // باید account را از account_id پیدا کنیم
+          _selectedAccount = AccountTreeNode(
+            id: firstLine.accountId,
+            code: firstLine.accountCode,
+            name: firstLine.accountName,
+            accountType: firstLine.accountType,
+          );
+          _selectedDetail = _detailMapFromExtra(firstLine.extraInfo);
         }
       }
 
@@ -6202,6 +6211,7 @@ class _ReceiptPaymentTransactionDialogState
                         _selectedPettyCashId = null;
                         _selectedCheckId = null;
                         _selectedAccount = null;
+                        _selectedDetail = null;
                       });
                     },
                   ),
@@ -6271,28 +6281,7 @@ class _ReceiptPaymentTransactionDialogState
                       authStore: null, // اختیاری است
                     ),
                   if (_selectedTransactionMethod == 'account')
-                    AccountTreeComboboxWidget(
-                      businessId: widget.document.businessId,
-                      selectedAccount: _selectedAccount?.toAccount(),
-                      onChanged: (account) {
-                        setState(() {
-                          if (account != null) {
-                            _selectedAccount = AccountTreeNode(
-                              id: account.id!,
-                              code: account.code,
-                              name: account.name,
-                              accountType: account.accountType,
-                              parentId: account.parentId,
-                            );
-                          } else {
-                            _selectedAccount = null;
-                          }
-                        });
-                      },
-                      label: 'حساب *',
-                      hintText: 'انتخاب حساب',
-                      isRequired: true,
-                    ),
+                    _buildAccountFields(),
 
                   if (_selectedTransactionMethod != null)
                     const SizedBox(height: 16),
@@ -6519,6 +6508,122 @@ class _ReceiptPaymentTransactionDialogState
     return (adjustedTotal + amount) <= maxAllowed;
   }
 
+  Widget _buildAccountFields() {
+    final detailType = _accountDetailType(_selectedAccount?.toAccount());
+    final detailIdKey = detailType == null ? null : _detailIdKey(detailType);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AccountTreeComboboxWidget(
+          businessId: widget.document.businessId,
+          selectedAccount: _selectedAccount?.toAccount(),
+          onChanged: (account) {
+            setState(() {
+              if (account != null) {
+                _selectedAccount = AccountTreeNode(
+                  id: account.id!,
+                  code: account.code,
+                  name: account.name,
+                  accountType: account.accountType,
+                  parentId: account.parentId,
+                );
+              } else {
+                _selectedAccount = null;
+              }
+              _selectedDetail = null;
+            });
+          },
+          label: 'حساب *',
+          hintText: 'انتخاب حساب',
+          isRequired: true,
+        ),
+        if (detailType != null && detailIdKey != null) ...[
+          const SizedBox(height: 12),
+          DetailSelectorWidget(
+            key: ValueKey(
+              'invoice-dialog-account-detail-${_selectedAccount?.id}-$detailType',
+            ),
+            businessId: widget.document.businessId,
+            selectedAccount: _selectedAccount?.toAccount(),
+            detailType: detailType,
+            selectedDetailId: _selectedDetail?[detailIdKey] is num
+                ? (_selectedDetail![detailIdKey] as num).toInt()
+                : int.tryParse(
+                    _selectedDetail?[detailIdKey]?.toString() ?? '',
+                  ),
+            onChanged: (detail) => setState(() => _selectedDetail = detail),
+            label: 'تفصیل',
+            isRequired: true,
+          ),
+        ],
+      ],
+    );
+  }
+
+  String? _detailIdKey(String type) => switch (type) {
+    'person' => 'person_id',
+    'product' => 'product_id',
+    'bank_account' => 'bank_account_id',
+    'cash_register' => 'cash_register_id',
+    'petty_cash' => 'petty_cash_id',
+    'check' => 'check_id',
+    _ => null,
+  };
+
+  String? _accountDetailType(Account? account) {
+    if (account == null) return null;
+    if (account.accountType == 'product') return 'product';
+    final name = account.name.toLowerCase();
+    if (name.contains('دریافتنی') ||
+        name.contains('پرداختنی') ||
+        name.contains('مشتری') ||
+        name.contains('تامین')) {
+      return 'person';
+    }
+    if (name.contains('موجودی') ||
+        name.contains('کالا') ||
+        name.contains('انبار')) {
+      return 'product';
+    }
+    if (account.accountType == 'bank' || name.contains('بانک')) {
+      return 'bank_account';
+    }
+    if (account.accountType == 'cash_register' || name.contains('صندوق')) {
+      return 'cash_register';
+    }
+    if (account.accountType == 'petty_cash' || name.contains('تنخواه')) {
+      return 'petty_cash';
+    }
+    if (account.accountType == 'check' || name.contains('چک')) return 'check';
+    if (account.accountType == 'person') return 'person';
+    return null;
+  }
+
+  Map<String, dynamic>? _detailMapFromExtra(Map<String, dynamic>? extra) {
+    if (extra == null || extra.isEmpty) return null;
+    final detail = <String, dynamic>{};
+    for (final key in [
+      'person_id',
+      'product_id',
+      'bank_account_id',
+      'cash_register_id',
+      'petty_cash_id',
+      'check_id',
+      'detail_name',
+      'person_name',
+      'product_name',
+      'bank_account_name',
+      'cash_register_name',
+      'petty_cash_name',
+      'check_number',
+    ]) {
+      if (extra[key] != null) {
+        detail[key] = extra[key];
+      }
+    }
+    return detail.isEmpty ? null : detail;
+  }
+
   /// ذخیره تراکنش
   Future<void> _saveTransaction() async {
     if (!_formKey.currentState!.validate()) return;
@@ -6557,6 +6662,17 @@ class _ReceiptPaymentTransactionDialogState
     if (_selectedTransactionMethod == 'account' && _selectedAccount == null) {
       SnackBarHelper.showError(context, message: 'انتخاب حساب الزامی است');
       return;
+    }
+    if (_selectedTransactionMethod == 'account' && _selectedAccount != null) {
+      final detailType = _accountDetailType(_selectedAccount!.toAccount());
+      final detailKey = detailType == null ? null : _detailIdKey(detailType);
+      if (detailKey != null && _selectedDetail?[detailKey] == null) {
+        SnackBarHelper.showError(
+          context,
+          message: 'انتخاب تفصیل حساب الزامی است',
+        );
+        return;
+      }
     }
 
     // اعتبارسنجی اقساط
@@ -6638,6 +6754,25 @@ class _ReceiptPaymentTransactionDialogState
       } else if (_selectedTransactionMethod == 'account' &&
           _selectedAccount != null) {
         accountLine['account_id'] = _selectedAccount!.id;
+        final detailType = _accountDetailType(_selectedAccount!.toAccount());
+        final detailKey = detailType == null ? null : _detailIdKey(detailType);
+        if (detailType != null) {
+          accountLine['detail_type'] = detailType;
+        }
+        if (detailKey != null && _selectedDetail?[detailKey] != null) {
+          accountLine[detailKey] = _selectedDetail![detailKey];
+        }
+        final detailName =
+            _selectedDetail?['detail_name']?.toString() ??
+            _selectedDetail?['person_name']?.toString() ??
+            _selectedDetail?['product_name']?.toString() ??
+            _selectedDetail?['bank_account_name']?.toString() ??
+            _selectedDetail?['cash_register_name']?.toString() ??
+            _selectedDetail?['petty_cash_name']?.toString() ??
+            _selectedDetail?['check_number']?.toString();
+        if (detailName != null && detailName.isNotEmpty) {
+          accountLine['detail_name'] = detailName;
+        }
       }
 
       accountLines.add(accountLine);
