@@ -311,7 +311,7 @@ ${API_SSL_BLOCK}
     proxy_set_header Connection "upgrade";
   }
 
-  location /api/ {
+  location ^~ /api/ {
     limit_req zone=api_limit burst=120 nodelay;
     proxy_pass http://127.0.0.1:8000/api/;
     proxy_http_version 1.1;
@@ -408,7 +408,7 @@ ${UI_SSL_BLOCK}
   }
 
   # Proxy /api/ and /ws/ to backend (when API and UI share same domain)
-  location /api/ {
+  location ^~ /api/ {
     proxy_pass http://127.0.0.1:8000/api/;
     proxy_http_version 1.1;
     proxy_set_header Host \$host;

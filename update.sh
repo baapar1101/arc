@@ -507,6 +507,21 @@ block = """
 path.write_text(text.replace(needle, block + needle))
 PY
 }
+ensure_api_prefix_wins_static() {
+  local conf="$1"
+  [[ -f "$conf" ]] || return 0
+  python3 - "$conf" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text()
+updated = text.replace("  location /api/ {", "  location ^~ /api/ {")
+if updated == text:
+    raise SystemExit(0)
+path.write_text(updated)
+PY
+}
 ensure_ai_chat_sse_location() {
   local conf="$1"
   [[ -f "$conf" ]] || return 0
@@ -519,8 +534,8 @@ import sys
 
 path = Path(sys.argv[1])
 text = path.read_text()
-needle = "  location /api/ {\n"
-if "location ^~ /api/v1/ai/chat/" in text or needle not in text:
+needle = next((n for n in ("  location ^~ /api/ {\n", "  location /api/ {\n") if n in text), None)
+if "location ^~ /api/v1/ai/chat/" in text or needle is None:
     raise SystemExit(0)
 block = """  # AI chat SSE: stream chunks immediately (no proxy buffering)
   location ^~ /api/v1/ai/chat/ {
@@ -559,6 +574,9 @@ log_info "Ensured AI chat SSE nginx location (no proxy buffering)."
 ensure_public_pay_u_location /etc/nginx/sites-available/hesabix-api.conf
 ensure_public_pay_u_location /etc/nginx/sites-available/hesabix-ui.conf
 log_info "Ensured public pay-page nginx location (/u/ -> backend HTML)."
+ensure_api_prefix_wins_static /etc/nginx/sites-available/hesabix-api.conf
+ensure_api_prefix_wins_static /etc/nginx/sites-available/hesabix-ui.conf
+log_info "Ensured nginx /api/ prefix wins over static font/css regex."
 ensure_voice_ws_nginx() {
   local conf="$1"
   [[ -f "$conf" ]] || return 0
@@ -590,8 +608,8 @@ block = """
     proxy_send_timeout 86400;
   }
 """
-needle = "  location /api/ {\n"
-if needle not in text:
+needle = next((n for n in ("  location ^~ /api/ {\n", "  location /api/ {\n") if n in text), None)
+if needle is None:
     raise SystemExit(0)
 path.write_text(text.replace(needle, block + needle, 1))
 PY

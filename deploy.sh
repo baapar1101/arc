@@ -3299,7 +3299,7 @@ server {
     add_header X-Accel-Buffering no always;
   }
 
-  location /api/ {
+  location ^~ /api/ {
     limit_req zone=api_limit burst=120 nodelay;
     proxy_pass http://127.0.0.1:8000/api/;
     proxy_http_version 1.1;
@@ -3443,7 +3443,7 @@ server {
     add_header X-Accel-Buffering no always;
   }
 
-  location /api/ {
+  location ^~ /api/ {
     proxy_pass http://127.0.0.1:8000/api/;
     proxy_http_version 1.1;
     proxy_set_header Host \$host;
