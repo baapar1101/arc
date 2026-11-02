@@ -76,12 +76,15 @@ def _pay_page_html_context(
 	form_note: str = "",
 	report_submitted: bool = False,
 	report_open: bool = False,
+	report_error: str = "",
 	report_details: str = "",
 	report_name: str = "",
 	report_mobile: str = "",
 ) -> dict[str, Any]:
 	app_name = resolve_payment_display_name(db)
 	data = payload or {}
+	page_proto, page_host, page_origin = _public_origin(request)
+	expected_page_url = f"{page_origin}/u/{username}" if page_host else ""
 	title = str(data.get("display_title") or data.get("business_name") or username or app_name)
 	currency = str(
 		data.get("currency_title") or data.get("currency_code") or data.get("currency_symbol") or ""
@@ -139,8 +142,12 @@ def _pay_page_html_context(
 		"form_mobile": form_mobile,
 		"form_note": form_note,
 		"business_rows": public_business_contact_rows(identity) if not not_found else [],
+		"expected_host": page_host,
+		"expected_page_url": expected_page_url,
+		"page_is_https": page_proto == "https",
 		"report_submitted": report_submitted,
 		"report_open": report_open,
+		"report_error": report_error,
 		"report_details": report_details,
 		"report_name": report_name,
 		"report_mobile": report_mobile,
@@ -283,7 +290,25 @@ def _request_ip(request: Request) -> str | None:
 
 
 def _request_base(request: Request) -> str:
-	return f"{request.url.scheme}://{request.url.netloc}".rstrip("/")
+	return _public_origin(request)[2]
+
+
+def _public_origin(request: Request) -> tuple[str, str, str]:
+	proto = (
+		(request.headers.get("x-forwarded-proto") or request.url.scheme or "https")
+		.split(",")[0]
+		.strip()
+		.lower()
+	)
+	if proto not in ("http", "https"):
+		proto = "https"
+	host = (
+		request.headers.get("x-forwarded-host")
+		or request.headers.get("host")
+		or request.url.netloc
+		or ""
+	).split(",")[0].strip()
+	return proto, host, f"{proto}://{host}".rstrip("/") if host else ""
 
 
 @router.post("/u/{username}/report", include_in_schema=False)
@@ -325,7 +350,7 @@ def public_pay_page_report(
 				request=request,
 				username=canonical,
 				payload=payload,
-				error_message=_api_error_text(exc),
+				report_error=_api_error_text(exc),
 				report_open=True,
 				report_details=details,
 				report_name=reporter_name,

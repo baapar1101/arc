@@ -181,6 +181,10 @@ def test_short_pay_page_serves_backend_html_not_flutter_redirect():
 	assert "فیشینگ" in res.text
 	assert "گزارش تخلف" in res.text
 	assert "قبل از واریز" in res.text
+	assert "https" in res.text
+	assert "مراجع قضایی" in res.text
+	assert "لینک را فقط از خود فروشنده" in res.text
+	assert 'class="brand"' not in res.text
 
 
 def test_short_pay_page_unknown_username_is_html_404():
@@ -308,6 +312,8 @@ def test_short_pay_page_abuse_report_is_recorded():
 		)
 	assert res.status_code == 200
 	assert "گزارش شما ثبت شد" in res.text
+	assert "سپاسگزاریم" in res.text
+	assert 'id="thanks-dialog"' in res.text
 	assert submit.called
 
 
@@ -399,8 +405,12 @@ def test_pay_page_html_loads_persian_font_and_brand_name():
 	body = html.body.decode("utf-8")
 	assert "YekanBakhFaNum" in body
 	assert "/api/v1/public/pay-fonts/YekanBakhFaNum-Regular.woff2" in body
-	assert "آرک حسابداری مبلغ را برای این کسب‌وکار دریافت می‌کند" in body
-	assert "حسابیکس مبلغ" not in body
+	assert "font-family: 'YekanBakhFaNum'" in body
+	assert 'id="pay-btn"' in body
+	assert 'class="brand"' not in body
+	assert "آرک حسابداری" not in body
+	assert "حسابیکس" not in body
+	assert "مراجع قضایی" in body
 
 
 def test_pay_page_font_endpoint_serves_yekan():
