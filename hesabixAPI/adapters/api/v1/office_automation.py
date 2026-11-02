@@ -13,6 +13,7 @@ from app.core.i18n import locale_dependency, negotiate_locale
 from app.core.office_automation_plugin_dependency import require_office_automation_plugin_active
 from app.core.permissions import require_business_access_dep, require_business_permission_dep
 from app.core.responses import ApiError, format_datetime_fields, success_response
+from app.services import office_automation_extended_service as ext
 from app.services import office_automation_service as svc
 from app.services.file_storage_service import FileStorageService
 
@@ -797,3 +798,584 @@ def link_letters(
 ) -> dict:
 	pid = _position_id(request, as_position_id or payload.get("as_position_id"))
 	return _ok(svc.link_letters(db, business_id, letter_id, payload, ctx.get_user_id(), pid), request)
+
+
+@router.get("/public/track/{token}")
+def public_track_letter(
+	request: Request,
+	token: str,
+	_: None = Depends(locale_dependency),
+	db: Session = Depends(get_db),
+) -> dict:
+	return _ok(ext.public_track(db, token), request)
+
+
+@router.get("/business/{business_id}/secretariats")
+def list_secretariats(
+	request: Request,
+	business_id: int,
+	include_inactive: bool = Query(False),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "view")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+) -> dict:
+	return _ok({"items": ext.list_secretariats(db, business_id, include_inactive=include_inactive, lang=_lang(request))}, request)
+
+
+@router.post("/business/{business_id}/secretariats")
+def create_secretariat(
+	request: Request,
+	business_id: int,
+	payload: dict = Body(...),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "admin")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	return _ok(ext.create_secretariat(db, business_id, payload, ctx.get_user_id(), lang=_lang(request)), request)
+
+
+@router.put("/business/{business_id}/secretariats/{secretariat_id}")
+def update_secretariat(
+	request: Request,
+	business_id: int,
+	secretariat_id: int,
+	payload: dict = Body(...),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "admin")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	return _ok(ext.update_secretariat(db, business_id, secretariat_id, payload, ctx.get_user_id(), lang=_lang(request)), request)
+
+
+@router.get("/business/{business_id}/external-orgs")
+def list_external_orgs(
+	request: Request,
+	business_id: int,
+	q: Optional[str] = Query(None),
+	include_inactive: bool = Query(False),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "view")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+) -> dict:
+	return _ok({"items": ext.list_external_orgs(db, business_id, q=q, include_inactive=include_inactive, lang=_lang(request))}, request)
+
+
+@router.post("/business/{business_id}/external-orgs")
+def create_external_org(
+	request: Request,
+	business_id: int,
+	payload: dict = Body(...),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "admin")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	return _ok(ext.create_external_org(db, business_id, payload, ctx.get_user_id(), lang=_lang(request)), request)
+
+
+@router.put("/business/{business_id}/external-orgs/{org_id}")
+def update_external_org(
+	request: Request,
+	business_id: int,
+	org_id: int,
+	payload: dict = Body(...),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "admin")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	return _ok(ext.update_external_org(db, business_id, org_id, payload, ctx.get_user_id(), lang=_lang(request)), request)
+
+
+@router.get("/business/{business_id}/signatures")
+def list_signatures(
+	request: Request,
+	business_id: int,
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "view")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	return _ok({"items": ext.list_signatures(db, business_id, ctx.get_user_id())}, request)
+
+
+@router.post("/business/{business_id}/signatures")
+def upsert_signature(
+	request: Request,
+	business_id: int,
+	payload: dict = Body(...),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "view")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	return _ok(ext.upsert_signature(db, business_id, ctx.get_user_id(), payload), request)
+
+
+@router.get("/business/{business_id}/sign-paths")
+def list_sign_paths(
+	request: Request,
+	business_id: int,
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "view")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+) -> dict:
+	return _ok({"items": ext.list_sign_path_templates(db, business_id, lang=_lang(request))}, request)
+
+
+@router.post("/business/{business_id}/sign-paths")
+def save_sign_path(
+	request: Request,
+	business_id: int,
+	payload: dict = Body(...),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "admin")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	return _ok(ext.save_sign_path_template(db, business_id, payload, ctx.get_user_id(), lang=_lang(request)), request)
+
+
+@router.post("/business/{business_id}/letters/{letter_id}/sign-path")
+def start_sign_path(
+	request: Request,
+	business_id: int,
+	letter_id: int,
+	payload: dict = Body(...),
+	as_position_id: Optional[int] = Query(None),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "compose")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	pid = _position_id(request, as_position_id or payload.get("as_position_id"))
+	return _ok(ext.start_sign_path(db, business_id, letter_id, payload, ctx.get_user_id(), pid, lang=_lang(request)), request)
+
+
+@router.post("/business/{business_id}/letters/{letter_id}/sign")
+def sign_letter(
+	request: Request,
+	business_id: int,
+	letter_id: int,
+	payload: dict = Body(default={}),
+	as_position_id: Optional[int] = Query(None),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "refer")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	pid = _position_id(request, as_position_id or (payload or {}).get("as_position_id"))
+	return _ok(ext.sign_letter_step(db, business_id, letter_id, payload or {}, ctx.get_user_id(), pid, lang=_lang(request)), request)
+
+
+@router.post("/business/{business_id}/letters/{letter_id}/sign/reject")
+def reject_sign(
+	request: Request,
+	business_id: int,
+	letter_id: int,
+	payload: dict = Body(default={}),
+	as_position_id: Optional[int] = Query(None),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "refer")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	pid = _position_id(request, as_position_id or (payload or {}).get("as_position_id"))
+	return _ok(ext.reject_sign_step(db, business_id, letter_id, payload or {}, ctx.get_user_id(), pid, lang=_lang(request)), request)
+
+
+@router.post("/business/{business_id}/letters/{letter_id}/dispatch")
+def dispatch_letter(
+	request: Request,
+	business_id: int,
+	letter_id: int,
+	payload: dict = Body(...),
+	as_position_id: Optional[int] = Query(None),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "refer")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	pid = _position_id(request, as_position_id or payload.get("as_position_id"))
+	return _ok(
+		ext.dispatch_letter(db, business_id, letter_id, payload, ctx.get_user_id(), pid, lang=_lang(request), calendar_type=_cal(request)),
+		request,
+	)
+
+
+@router.post("/business/{business_id}/dispatches/{dispatch_id}/acknowledge")
+def acknowledge_dispatch(
+	request: Request,
+	business_id: int,
+	dispatch_id: int,
+	as_position_id: Optional[int] = Query(None),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "refer")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	pid = _position_id(request, as_position_id)
+	return _ok(ext.acknowledge_dispatch(db, business_id, dispatch_id, ctx.get_user_id(), pid, lang=_lang(request)), request)
+
+
+@router.post("/business/{business_id}/referrals/{referral_id}/cancel")
+def cancel_referral(
+	request: Request,
+	business_id: int,
+	referral_id: int,
+	payload: dict = Body(default={}),
+	as_position_id: Optional[int] = Query(None),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "refer")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	pid = _position_id(request, as_position_id)
+	return _ok(ext.cancel_referral(db, business_id, referral_id, payload or {}, ctx.get_user_id(), pid, lang=_lang(request)), request)
+
+
+@router.post("/business/{business_id}/letters/{letter_id}/unarchive")
+def unarchive_letter(
+	request: Request,
+	business_id: int,
+	letter_id: int,
+	as_position_id: Optional[int] = Query(None),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "archive")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	pid = _position_id(request, as_position_id)
+	return _ok(ext.unarchive_letter(db, business_id, letter_id, ctx.get_user_id(), pid, lang=_lang(request)), request)
+
+
+@router.get("/business/{business_id}/letters/{letter_id}/versions")
+def list_letter_versions(
+	request: Request,
+	business_id: int,
+	letter_id: int,
+	as_position_id: Optional[int] = Query(None),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "view")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	pid = _optional_position_id(request, as_position_id)
+	return _ok(
+		{"items": ext.list_letter_versions(db, business_id, letter_id, ctx.get_user_id(), pid, lang=_lang(request), is_admin=_is_admin(ctx, business_id))},
+		request,
+	)
+
+
+@router.post("/business/{business_id}/letters/{letter_id}/ece/export")
+def export_ece(
+	request: Request,
+	business_id: int,
+	letter_id: int,
+	as_position_id: Optional[int] = Query(None),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "secretariat")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	pid = _position_id(request, as_position_id)
+	return _ok(ext.export_ece(db, business_id, letter_id, ctx.get_user_id(), pid, lang=_lang(request), calendar_type=_cal(request)), request)
+
+
+@router.post("/business/{business_id}/letters/{letter_id}/ece/send")
+def send_ece(
+	request: Request,
+	business_id: int,
+	letter_id: int,
+	payload: dict = Body(default={}),
+	as_position_id: Optional[int] = Query(None),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "secretariat")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	pid = _position_id(request, as_position_id or (payload or {}).get("as_position_id"))
+	return _ok(ext.send_ece(db, business_id, letter_id, payload or {}, ctx.get_user_id(), pid, lang=_lang(request), calendar_type=_cal(request)), request)
+
+
+@router.post("/business/{business_id}/ece/import")
+def import_ece(
+	request: Request,
+	business_id: int,
+	payload: dict = Body(...),
+	as_position_id: Optional[int] = Query(None),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "secretariat")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	pid = _position_id(request, as_position_id or payload.get("as_position_id"))
+	return _ok(ext.import_ece(db, business_id, payload, ctx.get_user_id(), pid, lang=_lang(request), calendar_type=_cal(request)), request)
+
+
+@router.get("/business/{business_id}/ece")
+def list_ece(
+	request: Request,
+	business_id: int,
+	direction: Optional[str] = Query(None),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "view")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+) -> dict:
+	return _ok({"items": ext.list_ece_messages(db, business_id, direction=direction)}, request)
+
+
+@router.get("/business/{business_id}/cartable-rules")
+def list_cartable_rules(
+	request: Request,
+	business_id: int,
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "admin")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+) -> dict:
+	return _ok({"items": ext.list_cartable_rules(db, business_id)}, request)
+
+
+@router.post("/business/{business_id}/cartable-rules")
+def save_cartable_rule(
+	request: Request,
+	business_id: int,
+	payload: dict = Body(...),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "admin")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	return _ok(ext.save_cartable_rule(db, business_id, payload, ctx.get_user_id()), request)
+
+
+@router.delete("/business/{business_id}/cartable-rules/{rule_id}")
+def delete_cartable_rule(
+	request: Request,
+	business_id: int,
+	rule_id: int,
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "admin")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	return _ok(ext.delete_cartable_rule(db, business_id, rule_id, ctx.get_user_id()), request)
+
+
+@router.get("/business/{business_id}/archive-folders")
+def list_archive_folders(
+	request: Request,
+	business_id: int,
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "view")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+) -> dict:
+	return _ok({"items": ext.list_archive_folders(db, business_id, lang=_lang(request))}, request)
+
+
+@router.post("/business/{business_id}/archive-folders")
+def save_archive_folder(
+	request: Request,
+	business_id: int,
+	payload: dict = Body(...),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "archive")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	return _ok(ext.save_archive_folder(db, business_id, payload, ctx.get_user_id(), lang=_lang(request)), request)
+
+
+@router.post("/business/{business_id}/letters/{letter_id}/archive-to-folder")
+def archive_to_folder(
+	request: Request,
+	business_id: int,
+	letter_id: int,
+	payload: dict = Body(...),
+	as_position_id: Optional[int] = Query(None),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "archive")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	pid = _position_id(request, as_position_id or payload.get("as_position_id"))
+	return _ok(ext.archive_to_folder(db, business_id, letter_id, payload, ctx.get_user_id(), pid, lang=_lang(request)), request)
+
+
+@router.get("/business/{business_id}/reports/delay")
+def delay_report(
+	request: Request,
+	business_id: int,
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "view")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+) -> dict:
+	return _ok(ext.delay_report(db, business_id, lang=_lang(request)), request)
+
+
+@router.get("/business/{business_id}/reports/volume")
+def volume_report(
+	request: Request,
+	business_id: int,
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "view")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+) -> dict:
+	return _ok(ext.volume_report(db, business_id), request)
+
+
+@router.get("/business/{business_id}/reports/performance")
+def performance_report(
+	request: Request,
+	business_id: int,
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "view")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+) -> dict:
+	return _ok(ext.performance_report(db, business_id, lang=_lang(request)), request)
+
+
+@router.post("/business/{business_id}/mailbox/import")
+def import_email(
+	request: Request,
+	business_id: int,
+	payload: dict = Body(...),
+	as_position_id: Optional[int] = Query(None),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "compose")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	pid = _position_id(request, as_position_id or payload.get("as_position_id"))
+	return _ok(ext.import_email_as_letter(db, business_id, payload, ctx.get_user_id(), pid, lang=_lang(request), calendar_type=_cal(request)), request)
+
+
+@router.post("/business/{business_id}/letters/{letter_id}/email")
+def send_letter_email(
+	request: Request,
+	business_id: int,
+	letter_id: int,
+	payload: dict = Body(...),
+	as_position_id: Optional[int] = Query(None),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "refer")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	pid = _position_id(request, as_position_id or payload.get("as_position_id"))
+	return _ok(ext.send_letter_email(db, business_id, letter_id, payload, ctx.get_user_id(), pid, lang=_lang(request)), request)
+
+
+@router.post("/business/{business_id}/letters/{letter_id}/ocr")
+def ocr_letter(
+	request: Request,
+	business_id: int,
+	letter_id: int,
+	as_position_id: Optional[int] = Query(None),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "compose")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	pid = _position_id(request, as_position_id)
+	return _ok(ext.ocr_letter_attachments(db, business_id, letter_id, ctx.get_user_id(), pid, lang=_lang(request)), request)
+
+
+@router.post("/business/{business_id}/letters/{letter_id}/ai-summary")
+def summarize_letter(
+	request: Request,
+	business_id: int,
+	letter_id: int,
+	as_position_id: Optional[int] = Query(None),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "view")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	pid = _position_id(request, as_position_id)
+	return _ok(ext.summarize_letter(db, business_id, letter_id, ctx.get_user_id(), pid, lang=_lang(request)), request)
+
+
+@router.post("/business/{business_id}/follow-ups/notify")
+def notify_followups(
+	request: Request,
+	business_id: int,
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "admin")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+) -> dict:
+	return _ok(ext.notify_due_followups(db, business_id), request)

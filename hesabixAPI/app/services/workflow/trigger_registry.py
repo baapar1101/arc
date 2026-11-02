@@ -165,3 +165,17 @@ class TriggerRegistry:
         self.register("basalam.order.paid", BasalamOrderPaidTrigger())
         self.register("basalam.chat.message.received", BasalamChatMessageReceivedTrigger())
 
+        from app.services.workflow.triggers.office_automation_triggers import (
+            OaLetterArchivedTrigger,
+            OaLetterDispatchedTrigger,
+            OaLetterReferredTrigger,
+            OaLetterRegisteredTrigger,
+            OaLetterSignedTrigger,
+        )
+
+        self.register("office_automation.letter_registered", OaLetterRegisteredTrigger())
+        self.register("office_automation.letter_referred", OaLetterReferredTrigger())
+        self.register("office_automation.letter_archived", OaLetterArchivedTrigger())
+        self.register("office_automation.letter_dispatched", OaLetterDispatchedTrigger())
+        self.register("office_automation.letter_signed", OaLetterSignedTrigger())
+

@@ -29,11 +29,12 @@ class _OaOrgPageState extends State<OaOrgPage> with SingleTickerProviderStateMix
   List<Map<String, dynamic>> _holders = [];
   List<Map<String, dynamic>> _delegations = [];
   List<Map<String, dynamic>> _users = [];
+  List<Map<String, dynamic>> _secretariats = [];
 
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 4, vsync: this);
+    _tabs = TabController(length: 5, vsync: this);
     _load();
   }
 
@@ -52,6 +53,7 @@ class _OaOrgPageState extends State<OaOrgPage> with SingleTickerProviderStateMix
         _svc.listHolders(businessId: widget.businessId),
         _svc.listDelegations(businessId: widget.businessId),
         _svc.listBusinessUsers(businessId: widget.businessId),
+        _svc.listSecretariats(businessId: widget.businessId, includeInactive: true),
       ]);
       if (!mounted) return;
       setState(() {
@@ -60,6 +62,7 @@ class _OaOrgPageState extends State<OaOrgPage> with SingleTickerProviderStateMix
         _holders = results[2];
         _delegations = results[3];
         _users = results[4];
+        _secretariats = results[5];
         _loading = false;
       });
     } catch (e) {
@@ -375,6 +378,16 @@ class _OaOrgPageState extends State<OaOrgPage> with SingleTickerProviderStateMix
             title: Text(loc.oaSubtree),
             value: draft['can_view_subtree'] == true,
             onChanged: (v) => setLocal(() => draft['can_view_subtree'] = v),
+          ),
+          DropdownButtonFormField<int?>(
+            initialValue: oaId(draft['secretariat_id']),
+            decoration: InputDecoration(labelText: loc.oaSecretariat),
+            items: [
+              DropdownMenuItem(value: null, child: Text(loc.oaNoParent)),
+              for (final s in _secretariats)
+                DropdownMenuItem(value: oaId(s['id']), child: Text('${s['title'] ?? s['code']}')),
+            ],
+            onChanged: (v) => setLocal(() => draft['secretariat_id'] = v),
           ),
         ];
       },
@@ -734,6 +747,7 @@ class _OaOrgPageState extends State<OaOrgPage> with SingleTickerProviderStateMix
             Tab(text: t.oaPositions),
             Tab(text: t.oaHolders),
             Tab(text: t.oaDelegations),
+            Tab(text: t.oaSecretariats),
           ],
         ),
       ),
@@ -790,8 +804,98 @@ class _OaOrgPageState extends State<OaOrgPage> with SingleTickerProviderStateMix
                     },
                   ),
                 ),
+                _flatList(
+                  _secretariats,
+                  title: (r) => '${r['title'] ?? r['code']} · ${r['incoming_prefix']}/${r['outgoing_prefix']}/${r['internal_prefix']}',
+                  onAdd: () => _editSecretariat(),
+                  trailing: (r) => IconButton(
+                    icon: const Icon(Icons.edit_outlined),
+                    onPressed: () => _editSecretariat(existing: r),
+                  ),
+                ),
               ],
             ),
     );
+  }
+
+  Future<void> _editSecretariat({Map<String, dynamic>? existing}) async {
+    final t = AppLocalizations.of(context);
+    final fa = TextEditingController(text: '${(existing?['name_i18n'] as Map?)?['fa'] ?? existing?['title'] ?? ''}');
+    final en = TextEditingController(text: '${(existing?['name_i18n'] as Map?)?['en'] ?? ''}');
+    final code = TextEditingController(text: '${existing?['code'] ?? ''}');
+    final incoming = TextEditingController(text: '${existing?['incoming_prefix'] ?? 'IN'}');
+    final outgoing = TextEditingController(text: '${existing?['outgoing_prefix'] ?? 'OUT'}');
+    final internal = TextEditingController(text: '${existing?['internal_prefix'] ?? 'INT'}');
+    final eceEmail = TextEditingController(text: '${existing?['ece_email'] ?? ''}');
+    var isDefault = existing?['is_default'] == true;
+    var ece = existing?['ece_enabled'] == true;
+    var confidential = existing?['is_confidential'] == true;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(existing == null ? t.oaNewSecretariat : t.oaSecretariats),
+          content: SizedBox(
+            width: 460,
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  TextField(controller: fa, decoration: InputDecoration(labelText: t.persian)),
+                  const SizedBox(height: 8),
+                  TextField(controller: en, decoration: InputDecoration(labelText: t.english)),
+                  const SizedBox(height: 8),
+                  TextField(controller: code, decoration: InputDecoration(labelText: t.oaCode)),
+                  const SizedBox(height: 8),
+                  TextField(controller: incoming, decoration: InputDecoration(labelText: t.oaIncomingPrefix)),
+                  const SizedBox(height: 8),
+                  TextField(controller: outgoing, decoration: InputDecoration(labelText: t.oaOutgoingPrefix)),
+                  const SizedBox(height: 8),
+                  TextField(controller: internal, decoration: InputDecoration(labelText: t.oaInternalPrefix)),
+                  const SizedBox(height: 8),
+                  TextField(controller: eceEmail, decoration: InputDecoration(labelText: t.oaEceEmail)),
+                  SwitchListTile(title: Text(t.oaMakeDefault), value: isDefault, onChanged: (v) => setLocal(() => isDefault = v)),
+                  SwitchListTile(title: Text(t.oaEceEnabled), value: ece, onChanged: (v) => setLocal(() => ece = v)),
+                  SwitchListTile(title: Text(t.oaConfidentialSecretariat), value: confidential, onChanged: (v) => setLocal(() => confidential = v)),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.save)),
+          ],
+        ),
+      ),
+    );
+    final payload = {
+      'name_i18n': {'fa': fa.text.trim(), 'en': en.text.trim()},
+      if (code.text.trim().isNotEmpty) 'code': code.text.trim(),
+      'incoming_prefix': incoming.text.trim(),
+      'outgoing_prefix': outgoing.text.trim(),
+      'internal_prefix': internal.text.trim(),
+      'ece_email': eceEmail.text.trim(),
+      'is_default': isDefault,
+      'ece_enabled': ece,
+      'is_confidential': confidential,
+    };
+    fa.dispose();
+    en.dispose();
+    code.dispose();
+    incoming.dispose();
+    outgoing.dispose();
+    internal.dispose();
+    eceEmail.dispose();
+    if (ok != true) return;
+    try {
+      final id = oaId(existing?['id']);
+      if (id == null) {
+        await _svc.createSecretariat(businessId: widget.businessId, payload: payload);
+      } else {
+        await _svc.updateSecretariat(businessId: widget.businessId, secretariatId: id, payload: payload);
+      }
+      await _load();
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
   }
 }

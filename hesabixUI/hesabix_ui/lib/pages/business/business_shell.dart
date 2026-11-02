@@ -224,9 +224,15 @@ class _BusinessShellState extends State<BusinessShell> {
       case 'payroll':
         return t.payrollMenu;
       case 'office-automation':
-        return t.oaMenu;
+        return t.oaCartable;
       case 'office-automation/org':
         return t.oaOrg;
+      case 'office-automation/external-orgs':
+        return t.oaExternalOrgs;
+      case 'office-automation/archive':
+        return t.oaArchiveTree;
+      case 'office-automation/reports':
+        return t.oaReports;
       case 'settings/office-automation':
         return t.oaSettings;
       case 'fixed-assets':
@@ -2086,13 +2092,55 @@ class _BusinessShellState extends State<BusinessShell> {
         hasAddButton: true,
       ),
       _MenuItem(
-        key: 'office-automation',
+        key: 'group:office-automation',
         label: t.oaMenu,
         icon: Icons.mark_email_unread_outlined,
         selectedIcon: Icons.mark_email_unread,
-        path: _bu('office-automation'),
-        type: _MenuItemType.simple,
-        hasAddButton: false,
+        path: null,
+        type: _MenuItemType.expandable,
+        children: [
+          _MenuItem(
+            key: 'office-automation',
+            label: t.oaCartable,
+            icon: Icons.inbox_outlined,
+            selectedIcon: Icons.inbox,
+            path: _bu('office-automation'),
+            type: _MenuItemType.simple,
+            hasAddButton: true,
+          ),
+          _MenuItem(
+            key: 'office-automation/org',
+            label: t.oaOrg,
+            icon: Icons.account_tree_outlined,
+            selectedIcon: Icons.account_tree,
+            path: _bu('office-automation/org'),
+            type: _MenuItemType.simple,
+          ),
+          _MenuItem(
+            key: 'office-automation/external-orgs',
+            label: t.oaExternalOrgs,
+            icon: Icons.apartment_outlined,
+            selectedIcon: Icons.apartment,
+            path: _bu('office-automation/external-orgs'),
+            type: _MenuItemType.simple,
+          ),
+          _MenuItem(
+            key: 'office-automation/archive',
+            label: t.oaArchiveTree,
+            icon: Icons.inventory_2_outlined,
+            selectedIcon: Icons.inventory_2,
+            path: _bu('office-automation/archive'),
+            type: _MenuItemType.simple,
+          ),
+          _MenuItem(
+            key: 'office-automation/reports',
+            label: t.oaReports,
+            icon: Icons.bar_chart_outlined,
+            selectedIcon: Icons.bar_chart,
+            path: _bu('office-automation/reports'),
+            type: _MenuItemType.simple,
+          ),
+        ],
       ),
       _MenuItem(
         key: 'fixed-assets',
@@ -4035,6 +4083,10 @@ class _BusinessShellState extends State<BusinessShell> {
     }
     if (label == t.oaMenu ||
         label == t.oaOrg ||
+        label == t.oaCartable ||
+        label == t.oaExternalOrgs ||
+        label == t.oaArchiveTree ||
+        label == t.oaReports ||
         label == 'Office automation' ||
         label == 'اتوماسیون اداری') {
       return 'office_automation';

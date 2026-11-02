@@ -1623,6 +1623,22 @@ TOOL_MANIFEST: Dict[str, Dict[str, Any]] = {
     'create_oa_letter_template': {'domains': ('office_automation',), 'intent_write': True, 'aliases': ('قالب نامه',)},
     'update_oa_letter_template': {'domains': ('office_automation',), 'intent_write': True},
     'delete_oa_letter_template': {'domains': ('office_automation',), 'intent_write': True, 'always_confirm': True},
+    'list_oa_secretariats': {'domains': ('office_automation',), 'aliases': ('دبیرخانه', 'اندیکاتور')},
+    'create_oa_secretariat': {'domains': ('office_automation',), 'intent_write': True, 'aliases': ('دبیرخانه جدید',)},
+    'list_oa_external_orgs': {'domains': ('office_automation',), 'aliases': ('سازمان خارجی', 'مخاطب خارجی')},
+    'create_oa_external_org': {'domains': ('office_automation',), 'intent_write': True},
+    'start_oa_sign_path': {'domains': ('office_automation',), 'intent_write': True, 'aliases': ('مسیر امضا',)},
+    'sign_oa_letter': {'domains': ('office_automation',), 'intent_write': True, 'always_confirm': True, 'aliases': ('امضای نامه',)},
+    'dispatch_oa_letter': {'domains': ('office_automation',), 'intent_write': True, 'aliases': ('ابلاغ نامه',)},
+    'export_oa_ece': {'domains': ('office_automation',), 'aliases': ('صادرات ECE', 'ECE')},
+    'import_oa_ece': {'domains': ('office_automation',), 'intent_write': True, 'always_confirm': True, 'aliases': ('ورود ECE',)},
+    'summarize_oa_letter': {'domains': ('office_automation',), 'aliases': ('خلاصه نامه',)},
+    'list_oa_archive_folders': {'domains': ('office_automation',), 'aliases': ('بایگانی', 'پوشه بایگانی')},
+    'get_oa_delay_report': {'domains': ('office_automation',), 'aliases': ('گزارش تأخیر',)},
+    'import_oa_email_letter': {'domains': ('office_automation',), 'intent_write': True, 'aliases': ('ورود ایمیل',)},
+    'ocr_oa_letter': {'domains': ('office_automation',), 'intent_write': True, 'aliases': ('OCR نامه',)},
+    'send_oa_ece': {'domains': ('office_automation',), 'intent_write': True, 'always_confirm': True, 'aliases': ('ارسال ECE',)},
+    'send_oa_email_letter': {'domains': ('office_automation',), 'intent_write': True, 'always_confirm': True, 'aliases': ('ارسال ایمیل نامه',)},
 }
 
 

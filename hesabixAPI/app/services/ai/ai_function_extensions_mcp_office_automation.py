@@ -253,3 +253,73 @@ def register_mcp_office_automation_functions(registry) -> None:
 		_schema({"template_id": {"type": "integer", "minimum": 1}}, ["template_id"]),
 		lambda a, c: _svc().delete_letter_template(c["db"], int(c["business_id"]), int(a["template_id"]), c["user_context"].get_user_id()),
 		"office_automation.admin", write=True, high=True)
+
+	from app.services import office_automation_extended_service as ext
+
+	def _ext():
+		return ext
+
+	_register(registry, "list_oa_secretariats", "فهرست دبیرخانه‌ها و دفتر اندیکاتور.",
+		_schema({"include_inactive": {"type": "boolean"}}),
+		lambda a, c: {"items": _ext().list_secretariats(c["db"], int(c["business_id"]), include_inactive=bool(a.get("include_inactive", False)), lang=_ctx(c)[3])},
+		"office_automation.view")
+	_register(registry, "create_oa_secretariat", "ایجاد دبیرخانه جدید. نیازمند تأیید.",
+		_schema({"payload": {"type": "object"}}, ["payload"]),
+		lambda a, c: _ext().create_secretariat(c["db"], int(c["business_id"]), a["payload"], c["user_context"].get_user_id(), lang=_ctx(c)[3]),
+		"office_automation.admin", write=True)
+	_register(registry, "list_oa_external_orgs", "فهرست سازمان‌های خارجی مکاتبات.",
+		_schema({"q": {"type": "string"}}),
+		lambda a, c: {"items": _ext().list_external_orgs(c["db"], int(c["business_id"]), q=a.get("q"), lang=_ctx(c)[3])},
+		"office_automation.view")
+	_register(registry, "create_oa_external_org", "ثبت سازمان خارجی. نیازمند تأیید.",
+		_schema({"payload": {"type": "object"}}, ["payload"]),
+		lambda a, c: _ext().create_external_org(c["db"], int(c["business_id"]), a["payload"], c["user_context"].get_user_id(), lang=_ctx(c)[3]),
+		"office_automation.admin", write=True)
+	_register(registry, "start_oa_sign_path", "شروع مسیر امضای نامه. نیازمند تأیید.",
+		_schema({**letter_id, "payload": {"type": "object"}}, ["letter_id", "payload"]),
+		lambda a, c: _ext().start_sign_path(c["db"], int(c["business_id"]), int(a["letter_id"]), a.get("payload") or {}, c["user_context"].get_user_id(), _pid(a), lang=_ctx(c)[3]),
+		"office_automation.compose", write=True)
+	_register(registry, "sign_oa_letter", "امضای مرحله جاری نامه. نیازمند تأیید.",
+		_schema({**letter_id, "note": {"type": "string"}, "signature_id": {"type": "integer"}}, ["letter_id"]),
+		lambda a, c: _ext().sign_letter_step(c["db"], int(c["business_id"]), int(a["letter_id"]), a, c["user_context"].get_user_id(), _pid(a), lang=_ctx(c)[3]),
+		"office_automation.refer", write=True, high=True)
+	_register(registry, "dispatch_oa_letter", "ابلاغ نامه به سمت مخاطب. نیازمند تأیید.",
+		_schema({**letter_id, "to_position_id": {"type": "integer", "minimum": 1}, "instruction": {"type": "string"}}, ["letter_id", "to_position_id"]),
+		lambda a, c: _ext().dispatch_letter(c["db"], int(c["business_id"]), int(a["letter_id"]), a, c["user_context"].get_user_id(), _pid(a), lang=_ctx(c)[3], calendar_type=_cal(c)),
+		"office_automation.refer", write=True)
+	_register(registry, "export_oa_ece", "صدور XML پروتکل ECE نامه.",
+		_schema({**letter_id}, ["letter_id"]),
+		lambda a, c: _ext().export_ece(c["db"], int(c["business_id"]), int(a["letter_id"]), c["user_context"].get_user_id(), _pid(a), lang=_ctx(c)[3], calendar_type=_cal(c)),
+		"office_automation.secretariat")
+	_register(registry, "import_oa_ece", "ورود نامه از XML پروتکل ECE. نیازمند تأیید.",
+		_schema({**pos, "xml": {"type": "string"}, "from_email": {"type": "string"}}, ["xml"]),
+		lambda a, c: _ext().import_ece(c["db"], int(c["business_id"]), a, c["user_context"].get_user_id(), _pid(a), lang=_ctx(c)[3], calendar_type=_cal(c)),
+		"office_automation.secretariat", write=True, high=True)
+	_register(registry, "summarize_oa_letter", "خلاصه هوشمند متن نامه.",
+		_schema({**letter_id}, ["letter_id"]),
+		lambda a, c: _ext().summarize_letter(c["db"], int(c["business_id"]), int(a["letter_id"]), c["user_context"].get_user_id(), _pid(a), lang=_ctx(c)[3]),
+		"office_automation.view")
+	_register(registry, "list_oa_archive_folders", "درخت پوشه‌های بایگانی.",
+		_schema(),
+		lambda a, c: {"items": _ext().list_archive_folders(c["db"], int(c["business_id"]), lang=_ctx(c)[3])},
+		"office_automation.view")
+	_register(registry, "get_oa_delay_report", "گزارش تأخیر ارجاع‌های کارتابل.",
+		_schema(),
+		lambda a, c: _ext().delay_report(c["db"], int(c["business_id"]), lang=_ctx(c)[3]),
+		"office_automation.view")
+	_register(registry, "import_oa_email_letter", "ورود ایمیل به‌عنوان نامه وارده. نیازمند تأیید.",
+		_schema({**pos, "subject": {"type": "string"}, "body": {"type": "string"}, "from_email": {"type": "string"}}, ["subject"]),
+		lambda a, c: _ext().import_email_as_letter(c["db"], int(c["business_id"]), a, c["user_context"].get_user_id(), _pid(a), lang=_ctx(c)[3], calendar_type=_cal(c)),
+		"office_automation.compose", write=True)
+	_register(registry, "ocr_oa_letter", "استخراج متن پیوست‌های اسکن‌شده نامه.",
+		_schema({**letter_id}, ["letter_id"]),
+		lambda a, c: _ext().ocr_letter_attachments(c["db"], int(c["business_id"]), int(a["letter_id"]), c["user_context"].get_user_id(), _pid(a), lang=_ctx(c)[3]),
+		"office_automation.compose", write=True)
+	_register(registry, "send_oa_ece", "ارسال XML پروتکل ECE نامه از طریق ایمیل. نیازمند تأیید.",
+		_schema({**letter_id, "to_email": {"type": "string"}}, ["letter_id"]),
+		lambda a, c: _ext().send_ece(c["db"], int(c["business_id"]), int(a["letter_id"]), a, c["user_context"].get_user_id(), _pid(a), lang=_ctx(c)[3], calendar_type=_cal(c)),
+		"office_automation.secretariat", write=True, high=True)
+	_register(registry, "send_oa_email_letter", "ارسال نامه به‌صورت ایمیل سازمانی. نیازمند تأیید.",
+		_schema({**letter_id, "to_email": {"type": "string"}}, ["letter_id", "to_email"]),
+		lambda a, c: _ext().send_letter_email(c["db"], int(c["business_id"]), int(a["letter_id"]), a, c["user_context"].get_user_id(), _pid(a), lang=_ctx(c)[3]),
+		"office_automation.refer", write=True)

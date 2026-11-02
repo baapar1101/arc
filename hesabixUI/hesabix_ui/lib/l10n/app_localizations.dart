@@ -24870,6 +24870,414 @@ abstract class AppLocalizations {
   /// **'{title} · {holder}'**
   String oaPositionWithHolder(String title, String holder);
 
+  /// No description provided for @oaConfidentialHighly.
+  ///
+  /// In en, this message translates to:
+  /// **'Highly confidential'**
+  String get oaConfidentialHighly;
+
+  /// No description provided for @oaConfidentialSecret.
+  ///
+  /// In en, this message translates to:
+  /// **'Secret'**
+  String get oaConfidentialSecret;
+
+  /// No description provided for @oaSecretariats.
+  ///
+  /// In en, this message translates to:
+  /// **'Secretariats'**
+  String get oaSecretariats;
+
+  /// No description provided for @oaNewSecretariat.
+  ///
+  /// In en, this message translates to:
+  /// **'New secretariat'**
+  String get oaNewSecretariat;
+
+  /// No description provided for @oaSecretariat.
+  ///
+  /// In en, this message translates to:
+  /// **'Secretariat'**
+  String get oaSecretariat;
+
+  /// No description provided for @oaExternalOrgs.
+  ///
+  /// In en, this message translates to:
+  /// **'External organizations'**
+  String get oaExternalOrgs;
+
+  /// No description provided for @oaNewExternalOrg.
+  ///
+  /// In en, this message translates to:
+  /// **'New organization'**
+  String get oaNewExternalOrg;
+
+  /// No description provided for @oaEmptyExternalOrgs.
+  ///
+  /// In en, this message translates to:
+  /// **'No external organizations yet.'**
+  String get oaEmptyExternalOrgs;
+
+  /// No description provided for @oaExternalOrgsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by name, code, or ECE email'**
+  String get oaExternalOrgsHint;
+
+  /// No description provided for @oaEceEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'ECE email'**
+  String get oaEceEmail;
+
+  /// No description provided for @oaNationalId.
+  ///
+  /// In en, this message translates to:
+  /// **'National ID'**
+  String get oaNationalId;
+
+  /// No description provided for @oaArchiveTree.
+  ///
+  /// In en, this message translates to:
+  /// **'Archive filing'**
+  String get oaArchiveTree;
+
+  /// No description provided for @oaArchiveFolders.
+  ///
+  /// In en, this message translates to:
+  /// **'Archive folders'**
+  String get oaArchiveFolders;
+
+  /// No description provided for @oaNewArchiveFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'New folder'**
+  String get oaNewArchiveFolder;
+
+  /// No description provided for @oaParentFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Parent folder'**
+  String get oaParentFolder;
+
+  /// No description provided for @oaAllLetters.
+  ///
+  /// In en, this message translates to:
+  /// **'All letters'**
+  String get oaAllLetters;
+
+  /// No description provided for @oaReports.
+  ///
+  /// In en, this message translates to:
+  /// **'Correspondence reports'**
+  String get oaReports;
+
+  /// No description provided for @oaDelayReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Delays'**
+  String get oaDelayReport;
+
+  /// No description provided for @oaVolumeReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Volume'**
+  String get oaVolumeReport;
+
+  /// No description provided for @oaPerformanceReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Performance'**
+  String get oaPerformanceReport;
+
+  /// No description provided for @oaAvgDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Average days'**
+  String get oaAvgDays;
+
+  /// No description provided for @oaPublicTrack.
+  ///
+  /// In en, this message translates to:
+  /// **'Letter tracking'**
+  String get oaPublicTrack;
+
+  /// No description provided for @oaPublicTrackHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the tracking token printed on the registration receipt.'**
+  String get oaPublicTrackHint;
+
+  /// No description provided for @oaPublicTrackResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Letter status'**
+  String get oaPublicTrackResult;
+
+  /// No description provided for @oaTrackingToken.
+  ///
+  /// In en, this message translates to:
+  /// **'Tracking token'**
+  String get oaTrackingToken;
+
+  /// No description provided for @oaStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get oaStatus;
+
+  /// No description provided for @oaSignatures.
+  ///
+  /// In en, this message translates to:
+  /// **'Signatures'**
+  String get oaSignatures;
+
+  /// No description provided for @oaEmptySignatures.
+  ///
+  /// In en, this message translates to:
+  /// **'No signature images yet.'**
+  String get oaEmptySignatures;
+
+  /// No description provided for @oaSignatureImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Signature image'**
+  String get oaSignatureImage;
+
+  /// No description provided for @oaSignPath.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign path'**
+  String get oaSignPath;
+
+  /// No description provided for @oaEmptySignPaths.
+  ///
+  /// In en, this message translates to:
+  /// **'No sign paths yet.'**
+  String get oaEmptySignPaths;
+
+  /// No description provided for @oaRequireBeforeRegister.
+  ///
+  /// In en, this message translates to:
+  /// **'Required before registering outgoing letters'**
+  String get oaRequireBeforeRegister;
+
+  /// No description provided for @oaCartableRules.
+  ///
+  /// In en, this message translates to:
+  /// **'Inbox rules'**
+  String get oaCartableRules;
+
+  /// No description provided for @oaEmptyRules.
+  ///
+  /// In en, this message translates to:
+  /// **'No inbox rules yet.'**
+  String get oaEmptyRules;
+
+  /// No description provided for @oaSubjectContains.
+  ///
+  /// In en, this message translates to:
+  /// **'Subject contains'**
+  String get oaSubjectContains;
+
+  /// No description provided for @oaMarkSeen.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as seen automatically'**
+  String get oaMarkSeen;
+
+  /// No description provided for @oaEce.
+  ///
+  /// In en, this message translates to:
+  /// **'ECE exchange'**
+  String get oaEce;
+
+  /// No description provided for @oaEmptyEce.
+  ///
+  /// In en, this message translates to:
+  /// **'No ECE messages yet.'**
+  String get oaEmptyEce;
+
+  /// No description provided for @oaImportEce.
+  ///
+  /// In en, this message translates to:
+  /// **'Import ECE XML'**
+  String get oaImportEce;
+
+  /// No description provided for @oaEceXml.
+  ///
+  /// In en, this message translates to:
+  /// **'ECE XML'**
+  String get oaEceXml;
+
+  /// No description provided for @oaExportEce.
+  ///
+  /// In en, this message translates to:
+  /// **'Export ECE'**
+  String get oaExportEce;
+
+  /// No description provided for @oaEceEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable ECE for this secretariat'**
+  String get oaEceEnabled;
+
+  /// No description provided for @oaSign.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign'**
+  String get oaSign;
+
+  /// No description provided for @oaDispatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Dispatch'**
+  String get oaDispatch;
+
+  /// No description provided for @oaAcknowledge.
+  ///
+  /// In en, this message translates to:
+  /// **'Acknowledge'**
+  String get oaAcknowledge;
+
+  /// No description provided for @oaVersions.
+  ///
+  /// In en, this message translates to:
+  /// **'Body versions'**
+  String get oaVersions;
+
+  /// No description provided for @oaAiSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'AI summary'**
+  String get oaAiSummary;
+
+  /// No description provided for @oaOcr.
+  ///
+  /// In en, this message translates to:
+  /// **'Extract text (OCR)'**
+  String get oaOcr;
+
+  /// No description provided for @oaPerson.
+  ///
+  /// In en, this message translates to:
+  /// **'Related person'**
+  String get oaPerson;
+
+  /// No description provided for @oaKeywords.
+  ///
+  /// In en, this message translates to:
+  /// **'Keywords'**
+  String get oaKeywords;
+
+  /// No description provided for @oaReceiptNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'External receipt number'**
+  String get oaReceiptNumber;
+
+  /// No description provided for @oaReceiptDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipt date'**
+  String get oaReceiptDate;
+
+  /// No description provided for @oaSendEce.
+  ///
+  /// In en, this message translates to:
+  /// **'Send ECE by email'**
+  String get oaSendEce;
+
+  /// No description provided for @oaSendEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Send as email'**
+  String get oaSendEmail;
+
+  /// No description provided for @oaToEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Destination email'**
+  String get oaToEmail;
+
+  /// No description provided for @oaCopies.
+  ///
+  /// In en, this message translates to:
+  /// **'CC / copies'**
+  String get oaCopies;
+
+  /// No description provided for @oaPublicTrackUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Public tracking link'**
+  String get oaPublicTrackUrl;
+
+  /// No description provided for @oaConfidentialSecretariat.
+  ///
+  /// In en, this message translates to:
+  /// **'Confidential secretariat'**
+  String get oaConfidentialSecretariat;
+
+  /// No description provided for @oaAutoSecretariat.
+  ///
+  /// In en, this message translates to:
+  /// **'Default secretariat'**
+  String get oaAutoSecretariat;
+
+  /// No description provided for @oaDaysLate.
+  ///
+  /// In en, this message translates to:
+  /// **'{days} days late'**
+  String oaDaysLate(int days);
+
+  /// No description provided for @oaSignStatusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting'**
+  String get oaSignStatusPending;
+
+  /// No description provided for @oaSignStatusCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to sign'**
+  String get oaSignStatusCurrent;
+
+  /// No description provided for @oaSignStatusSigned.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed'**
+  String get oaSignStatusSigned;
+
+  /// No description provided for @oaSignStatusRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejected'**
+  String get oaSignStatusRejected;
+
+  /// No description provided for @oaStatusDispatched.
+  ///
+  /// In en, this message translates to:
+  /// **'Dispatched'**
+  String get oaStatusDispatched;
+
+  /// No description provided for @oaStatusAcknowledged.
+  ///
+  /// In en, this message translates to:
+  /// **'Acknowledged'**
+  String get oaStatusAcknowledged;
+
+  /// No description provided for @oaSentSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent successfully'**
+  String get oaSentSuccessfully;
+
+  /// No description provided for @oaMorePages.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get oaMorePages;
+
   /// No description provided for @businessSettingsOfficeAutomation.
   ///
   /// In en, this message translates to:

@@ -107,6 +107,7 @@ def _format_datetime_fields_impl(data: Any, request: Request, tz_name: str) -> A
 		"termination_date",
 		"letter_date",
 		"follow_up_at",
+		"receipt_date",
 	}
 
 	if isinstance(data, dict):

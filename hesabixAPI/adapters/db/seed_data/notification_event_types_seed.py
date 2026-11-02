@@ -41,7 +41,13 @@ WORKFLOW_EXTENSION_EVENT_CODES: frozenset[str] = frozenset(
 INVOICE_SHARE_LINK_EVENT_CODES: frozenset[str] = frozenset({"invoice_share_link"})
 PAY_LINK_RECEIVED_EVENT_CODES: frozenset[str] = frozenset({"pay_link.received"})
 OFFICE_AUTOMATION_EVENT_CODES: frozenset[str] = frozenset(
-	{"office_automation.letter_referred", "office_automation.letter_returned"}
+	{
+		"office_automation.letter_referred",
+		"office_automation.letter_returned",
+		"office_automation.letter_dispatched",
+		"office_automation.letter_followup_due",
+		"office_automation.letter_signed",
+	}
 )
 
 PAY_LINK_RECEIVED_TEMPLATE_VARIABLES: list[dict[str, str]] = [
@@ -658,6 +664,57 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
         "default_sms_template": "نامه «{{ subject }}» با شماره {{ number }} به کارتابل شما عودت شد. {{ business_name }}",
         "default_email_template": "نامه «{{ subject }}» با شماره {{ number }} به کارتابل شما عودت شد.\nشناسه نامه: {{ letter_id }}\n\n{{ business_name }}",
         "default_email_subject": "عودت نامه — {{ subject }}",
+        "is_active": True,
+        "requires_approval": False,
+    },
+    {
+        "code": "office_automation.letter_dispatched",
+        "name": "ابلاغ نامه اتوماسیون اداری",
+        "description": "پس از ابلاغ نامه به سمت مخاطب",
+        "category": "office_automation",
+        "available_variables": [
+            {"key": "subject", "type": "string", "description": "موضوع نامه"},
+            {"key": "number", "type": "string", "description": "شماره دبیرخانه"},
+            {"key": "letter_id", "type": "number", "description": "شناسه نامه"},
+            {"key": "business_name", "type": "string", "description": "نام کسب‌وکار"},
+        ],
+        "default_sms_template": "نامه «{{ subject }}» با شماره {{ number }} به شما ابلاغ شد. {{ business_name }}",
+        "default_email_template": "نامه «{{ subject }}» با شماره {{ number }} به شما ابلاغ شد.\nشناسه نامه: {{ letter_id }}\n\n{{ business_name }}",
+        "default_email_subject": "ابلاغ نامه — {{ subject }}",
+        "is_active": True,
+        "requires_approval": False,
+    },
+    {
+        "code": "office_automation.letter_followup_due",
+        "name": "سررسید پیگیری نامه",
+        "description": "هشدار سررسید تاریخ پیگیری نامه",
+        "category": "office_automation",
+        "available_variables": [
+            {"key": "subject", "type": "string", "description": "موضوع نامه"},
+            {"key": "number", "type": "string", "description": "شماره دبیرخانه"},
+            {"key": "letter_id", "type": "number", "description": "شناسه نامه"},
+            {"key": "business_name", "type": "string", "description": "نام کسب‌وکار"},
+        ],
+        "default_sms_template": "پیگیری نامه «{{ subject }}» با شماره {{ number }} امروز سررسید شده است. {{ business_name }}",
+        "default_email_template": "پیگیری نامه «{{ subject }}» با شماره {{ number }} امروز سررسید شده است.\nشناسه نامه: {{ letter_id }}\n\n{{ business_name }}",
+        "default_email_subject": "سررسید پیگیری نامه — {{ subject }}",
+        "is_active": True,
+        "requires_approval": False,
+    },
+    {
+        "code": "office_automation.letter_signed",
+        "name": "امضای نامه اتوماسیون اداری",
+        "description": "پس از امضای یک مرحله از مسیر امضا",
+        "category": "office_automation",
+        "available_variables": [
+            {"key": "subject", "type": "string", "description": "موضوع نامه"},
+            {"key": "number", "type": "string", "description": "شماره دبیرخانه"},
+            {"key": "letter_id", "type": "number", "description": "شناسه نامه"},
+            {"key": "business_name", "type": "string", "description": "نام کسب‌وکار"},
+        ],
+        "default_sms_template": "نامه «{{ subject }}» با شماره {{ number }} امضا شد. {{ business_name }}",
+        "default_email_template": "نامه «{{ subject }}» با شماره {{ number }} امضا شد.\nشناسه نامه: {{ letter_id }}\n\n{{ business_name }}",
+        "default_email_subject": "امضای نامه — {{ subject }}",
         "is_active": True,
         "requires_approval": False,
     },

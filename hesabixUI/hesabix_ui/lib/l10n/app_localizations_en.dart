@@ -13445,6 +13445,214 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get oaConfidentialHighly => 'Highly confidential';
+
+  @override
+  String get oaConfidentialSecret => 'Secret';
+
+  @override
+  String get oaSecretariats => 'Secretariats';
+
+  @override
+  String get oaNewSecretariat => 'New secretariat';
+
+  @override
+  String get oaSecretariat => 'Secretariat';
+
+  @override
+  String get oaExternalOrgs => 'External organizations';
+
+  @override
+  String get oaNewExternalOrg => 'New organization';
+
+  @override
+  String get oaEmptyExternalOrgs => 'No external organizations yet.';
+
+  @override
+  String get oaExternalOrgsHint => 'Search by name, code, or ECE email';
+
+  @override
+  String get oaEceEmail => 'ECE email';
+
+  @override
+  String get oaNationalId => 'National ID';
+
+  @override
+  String get oaArchiveTree => 'Archive filing';
+
+  @override
+  String get oaArchiveFolders => 'Archive folders';
+
+  @override
+  String get oaNewArchiveFolder => 'New folder';
+
+  @override
+  String get oaParentFolder => 'Parent folder';
+
+  @override
+  String get oaAllLetters => 'All letters';
+
+  @override
+  String get oaReports => 'Correspondence reports';
+
+  @override
+  String get oaDelayReport => 'Delays';
+
+  @override
+  String get oaVolumeReport => 'Volume';
+
+  @override
+  String get oaPerformanceReport => 'Performance';
+
+  @override
+  String get oaAvgDays => 'Average days';
+
+  @override
+  String get oaPublicTrack => 'Letter tracking';
+
+  @override
+  String get oaPublicTrackHint =>
+      'Enter the tracking token printed on the registration receipt.';
+
+  @override
+  String get oaPublicTrackResult => 'Letter status';
+
+  @override
+  String get oaTrackingToken => 'Tracking token';
+
+  @override
+  String get oaStatus => 'Status';
+
+  @override
+  String get oaSignatures => 'Signatures';
+
+  @override
+  String get oaEmptySignatures => 'No signature images yet.';
+
+  @override
+  String get oaSignatureImage => 'Signature image';
+
+  @override
+  String get oaSignPath => 'Sign path';
+
+  @override
+  String get oaEmptySignPaths => 'No sign paths yet.';
+
+  @override
+  String get oaRequireBeforeRegister =>
+      'Required before registering outgoing letters';
+
+  @override
+  String get oaCartableRules => 'Inbox rules';
+
+  @override
+  String get oaEmptyRules => 'No inbox rules yet.';
+
+  @override
+  String get oaSubjectContains => 'Subject contains';
+
+  @override
+  String get oaMarkSeen => 'Mark as seen automatically';
+
+  @override
+  String get oaEce => 'ECE exchange';
+
+  @override
+  String get oaEmptyEce => 'No ECE messages yet.';
+
+  @override
+  String get oaImportEce => 'Import ECE XML';
+
+  @override
+  String get oaEceXml => 'ECE XML';
+
+  @override
+  String get oaExportEce => 'Export ECE';
+
+  @override
+  String get oaEceEnabled => 'Enable ECE for this secretariat';
+
+  @override
+  String get oaSign => 'Sign';
+
+  @override
+  String get oaDispatch => 'Dispatch';
+
+  @override
+  String get oaAcknowledge => 'Acknowledge';
+
+  @override
+  String get oaVersions => 'Body versions';
+
+  @override
+  String get oaAiSummary => 'AI summary';
+
+  @override
+  String get oaOcr => 'Extract text (OCR)';
+
+  @override
+  String get oaPerson => 'Related person';
+
+  @override
+  String get oaKeywords => 'Keywords';
+
+  @override
+  String get oaReceiptNumber => 'External receipt number';
+
+  @override
+  String get oaReceiptDate => 'Receipt date';
+
+  @override
+  String get oaSendEce => 'Send ECE by email';
+
+  @override
+  String get oaSendEmail => 'Send as email';
+
+  @override
+  String get oaToEmail => 'Destination email';
+
+  @override
+  String get oaCopies => 'CC / copies';
+
+  @override
+  String get oaPublicTrackUrl => 'Public tracking link';
+
+  @override
+  String get oaConfidentialSecretariat => 'Confidential secretariat';
+
+  @override
+  String get oaAutoSecretariat => 'Default secretariat';
+
+  @override
+  String oaDaysLate(int days) {
+    return '$days days late';
+  }
+
+  @override
+  String get oaSignStatusPending => 'Waiting';
+
+  @override
+  String get oaSignStatusCurrent => 'Ready to sign';
+
+  @override
+  String get oaSignStatusSigned => 'Signed';
+
+  @override
+  String get oaSignStatusRejected => 'Rejected';
+
+  @override
+  String get oaStatusDispatched => 'Dispatched';
+
+  @override
+  String get oaStatusAcknowledged => 'Acknowledged';
+
+  @override
+  String get oaSentSuccessfully => 'Sent successfully';
+
+  @override
+  String get oaMorePages => 'More';
+
+  @override
   String get businessSettingsOfficeAutomation => 'Office automation';
 
   @override

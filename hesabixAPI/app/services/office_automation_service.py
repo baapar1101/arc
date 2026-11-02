@@ -24,6 +24,7 @@ from adapters.db.models.office_automation import (
 	OaPosition,
 	OaPositionHolder,
 	OaReferral,
+	OaSecretariat,
 	OaSettings,
 )
 from adapters.db.models.user import User
@@ -39,7 +40,7 @@ _CODE_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]{0,63}$")
 _LETTER_KINDS = frozenset({"internal", "incoming", "outgoing"})
 _LETTER_STATUSES = frozenset({"draft", "registered", "in_circulation", "closed", "archived"})
 _URGENCY = frozenset({"normal", "urgent", "immediate"})
-_CONFIDENTIALITY = frozenset({"normal", "confidential"})
+_CONFIDENTIALITY = frozenset({"normal", "confidential", "highly_confidential", "secret"})
 _REFERRAL_KINDS = frozenset({"action", "info", "signature", "return"})
 _REFERRAL_STATUSES = frozenset({"pending", "seen", "done", "returned", "cancelled"})
 _DELEGATION_SCOPES = frozenset({"full", "view", "refer"})
@@ -344,6 +345,7 @@ def _position_dict(row: OaPosition, lang: str, unit: Optional[OaOrgUnit] = None)
 		"name_i18n": row.name_i18n,
 		"title": resolve_i18n(row.name_i18n, lang),
 		"is_secretariat": row.is_secretariat,
+		"secretariat_id": row.secretariat_id,
 		"can_view_subtree": row.can_view_subtree,
 		"sort_order": row.sort_order,
 		"is_active": row.is_active,
@@ -507,6 +509,10 @@ def _validate_letter_refs(db: Session, business_id: int, row: OaLetter) -> None:
 		).first()
 		if not tpl:
 			raise ApiError("OA_TEMPLATE_NOT_FOUND", "Letter template was not found.", http_status=404)
+	if row.person_id:
+		from app.services.office_automation_extended_service import validate_person_id
+
+		validate_person_id(db, business_id, row.person_id)
 
 
 def _margin(value: Any, default: int = 20) -> int:
@@ -794,7 +800,16 @@ def search_letters(
 				)
 			)
 		else:
-			query = query.filter(or_(OaLetter.subject.ilike(like), OaLetter.secretariat_number.ilike(like)))
+			query = query.filter(
+				or_(
+					OaLetter.subject.ilike(like),
+					OaLetter.secretariat_number.ilike(like),
+					OaLetter.body.ilike(like),
+					OaLetter.search_text.ilike(like),
+					OaLetter.ocr_text.ilike(like),
+					OaLetter.keywords.ilike(like),
+				)
+			)
 	rows = query.order_by(OaLetter.id.desc()).limit(max(1, min(int(limit or 20), 50))).all()
 	items = []
 	for row in rows:
@@ -877,6 +892,7 @@ def create_position(db: Session, business_id: int, payload: dict, user_id: int, 
 		code=_resolve_create_code(db, business_id, payload, OaPosition, "p"),
 		name_i18n=_normalize_i18n(payload.get("name_i18n") or payload.get("name")),
 		is_secretariat=bool(payload.get("is_secretariat", False)),
+		secretariat_id=int(payload["secretariat_id"]) if payload.get("secretariat_id") else None,
 		can_view_subtree=bool(payload.get("can_view_subtree", False)),
 		sort_order=int(payload.get("sort_order") or 0),
 		is_active=bool(payload.get("is_active", True)),
@@ -909,6 +925,8 @@ def update_position(db: Session, business_id: int, position_id: int, payload: di
 		row.name_i18n = _normalize_i18n(payload.get("name_i18n") or payload.get("name"))
 	if "is_secretariat" in payload:
 		row.is_secretariat = bool(payload["is_secretariat"])
+	if "secretariat_id" in payload:
+		row.secretariat_id = int(payload["secretariat_id"]) if payload.get("secretariat_id") else None
 	if "can_view_subtree" in payload:
 		row.can_view_subtree = bool(payload["can_view_subtree"])
 	if "sort_order" in payload:
@@ -1205,26 +1223,41 @@ def _numbering_year(letter_date: date, calendar: str) -> int:
 	return letter_date.year
 
 
-def _allocate_number(db: Session, settings: OaSettings, kind: str, letter_date: date) -> Tuple[str, int, int]:
+def _allocate_number(
+	db: Session,
+	settings: OaSettings,
+	kind: str,
+	letter_date: date,
+	secretariat: Optional[OaSecretariat] = None,
+) -> Tuple[str, int, int]:
 	year = _numbering_year(letter_date, settings.numbering_calendar)
+	sec_id = int(secretariat.id) if secretariat is not None else 0
 	counter = (
 		db.query(OaLetterNumberCounter)
 		.filter(
 			OaLetterNumberCounter.business_id == settings.business_id,
 			OaLetterNumberCounter.letter_kind == kind,
 			OaLetterNumberCounter.year == year,
+			OaLetterNumberCounter.secretariat_id == sec_id,
 		)
 		.with_for_update()
 		.first()
 	)
 	if not counter:
 		counter = OaLetterNumberCounter(
-			business_id=settings.business_id, letter_kind=kind, year=year, last_seq=0
+			business_id=settings.business_id,
+			letter_kind=kind,
+			year=year,
+			secretariat_id=sec_id,
+			last_seq=0,
 		)
 		db.add(counter)
 		db.flush()
 	counter.last_seq += 1
-	prefix = getattr(settings, _PREFIX_BY_KIND[kind])
+	if secretariat is not None:
+		prefix = getattr(secretariat, _PREFIX_BY_KIND[kind], None) or getattr(settings, _PREFIX_BY_KIND[kind])
+	else:
+		prefix = getattr(settings, _PREFIX_BY_KIND[kind])
 	number = f"{prefix}-{year}/{counter.last_seq:04d}"
 	return number, year, counter.last_seq
 
@@ -1265,6 +1298,15 @@ def _letter_dict(
 		"secretariat_seq": row.secretariat_seq,
 		"follow_up_at": row.follow_up_at,
 		"person_id": row.person_id,
+		"secretariat_id": row.secretariat_id,
+		"external_org_id": row.external_org_id,
+		"archive_folder_id": row.archive_folder_id,
+		"tracking_token": row.tracking_token,
+		"receipt_number": row.receipt_number,
+		"receipt_date": row.receipt_date,
+		"sign_status": getattr(row, "sign_status", None) or "none",
+		"keywords": getattr(row, "keywords", None),
+		"ai_summary": getattr(row, "ai_summary", None),
 		"created_at": row.created_at,
 		"updated_at": row.updated_at,
 	}
@@ -1405,6 +1447,16 @@ def _apply_letter_payload(row: OaLetter, payload: dict, calendar_type: CalendarT
 		row.letter_date = _parse_date(payload["letter_date"], calendar_type) or row.letter_date
 	if "follow_up_at" in payload:
 		row.follow_up_at = _parse_date(payload.get("follow_up_at"), calendar_type)
+	if "secretariat_id" in payload:
+		row.secretariat_id = int(payload["secretariat_id"]) if payload.get("secretariat_id") else None
+	if "external_org_id" in payload:
+		row.external_org_id = int(payload["external_org_id"]) if payload.get("external_org_id") else None
+	if "keywords" in payload:
+		row.keywords = (str(payload.get("keywords") or "").strip()[:500] or None)
+	if "receipt_number" in payload:
+		row.receipt_number = (str(payload.get("receipt_number") or "").strip()[:64] or None)
+	if "receipt_date" in payload:
+		row.receipt_date = _parse_date(payload.get("receipt_date"), calendar_type)
 
 
 def create_letter_draft(
@@ -1446,6 +1498,11 @@ def create_letter_draft(
 		origin_position_id=position.id,
 		created_by_user_id=user_id,
 		person_id=int(payload["person_id"]) if payload.get("person_id") else None,
+		secretariat_id=int(payload["secretariat_id"]) if payload.get("secretariat_id") else None,
+		external_org_id=int(payload["external_org_id"]) if payload.get("external_org_id") else None,
+		keywords=(str(payload.get("keywords") or "").strip()[:500] or None),
+		receipt_number=(str(payload.get("receipt_number") or "").strip()[:64] or None),
+		receipt_date=_parse_date(payload.get("receipt_date"), calendar_type),
 		follow_up_at=_parse_date(payload.get("follow_up_at"), calendar_type),
 		created_at=_now(),
 		updated_at=_now(),
@@ -1477,6 +1534,10 @@ def update_letter_draft(
 		raise ApiError("OA_LETTER_FORBIDDEN", "This draft does not belong to the active position.", http_status=403)
 	_apply_letter_payload(row, payload, calendar_type)
 	_validate_letter_refs(db, business_id, row)
+	from app.services.office_automation_extended_service import refresh_letter_search_text, snapshot_letter_version
+
+	snapshot_letter_version(db, row, user_id)
+	refresh_letter_search_text(db, row)
 	row.updated_at = _now()
 	_audit(db, business_id=business_id, user_id=user_id, action="letter.update_draft", letter_id=row.id, position_id=position.id)
 	db.commit()
@@ -1524,12 +1585,31 @@ def register_letter(
 	settings = get_or_create_settings(db, business_id)
 	if not settings.enabled:
 		raise ApiError("OA_DISABLED", "Office automation is disabled in settings.", http_status=400)
+	from app.services.office_automation_extended_service import (
+		ensure_tracking_token,
+		refresh_letter_search_text,
+		required_signs_complete,
+		resolve_letter_secretariat,
+		snapshot_letter_version,
+	)
+
+	if kind == "outgoing" and not required_signs_complete(db, row):
+		raise ApiError(
+			"OA_SIGNATURE_REQUIRED",
+			"Required signature steps must be completed before registering an outgoing letter.",
+			http_status=400,
+		)
 	_apply_letter_payload(row, payload, calendar_type)
 	row.letter_kind = kind
-	number, year, seq = _allocate_number(db, settings, kind, row.letter_date)
+	secretariat = resolve_letter_secretariat(db, business_id, position, payload, confidentiality=row.confidentiality)
+	row.secretariat_id = secretariat.id
+	number, year, seq = _allocate_number(db, settings, kind, row.letter_date, secretariat)
 	row.secretariat_number = number
 	row.secretariat_year = year
 	row.secretariat_seq = seq
+	ensure_tracking_token(row)
+	snapshot_letter_version(db, row, user_id)
+	refresh_letter_search_text(db, row)
 	row.registered_at = _now()
 	row.registered_by_user_id = user_id
 	row.registered_by_position_id = position.id
@@ -1554,6 +1634,10 @@ def register_letter(
 		)
 	if created_referrals:
 		row.status = "in_circulation"
+		from app.services.office_automation_extended_service import apply_cartable_rules
+
+		for ref in created_referrals:
+			apply_cartable_rules(db, business_id, row, ref)
 	_audit(
 		db,
 		business_id=business_id,
@@ -1566,6 +1650,11 @@ def register_letter(
 	db.commit()
 	db.refresh(row)
 	_notify_referral_recipients(db, business_id, created_referrals, row)
+	from app.services.office_automation_extended_service import fire_oa_workflow
+
+	fire_oa_workflow(db, business_id, "office_automation.letter_registered", row, user_id)
+	if created_referrals:
+		fire_oa_workflow(db, business_id, "office_automation.letter_referred", row, user_id, extra={"referral_count": len(created_referrals)})
 	return get_letter(db, business_id, row.id, user_id, position_id, lang=lang, is_admin=True)
 
 
@@ -1647,7 +1736,7 @@ def _notify_referral_recipients(db: Session, business_id: int, referrals: Sequen
 								db.query(Business.name).filter(Business.id == business_id).scalar() or ""
 							),
 						},
-						preferred_channels=["inapp"],
+						preferred_channels=["inapp", "sms", "email"],
 					)
 				except Exception:
 					logger.debug("OA referral notify failed for user %s", uid, exc_info=True)
@@ -1696,9 +1785,16 @@ def refer_letter(
 	if row.status == "registered":
 		row.status = "in_circulation"
 		row.updated_at = _now()
+	from app.services.office_automation_extended_service import apply_cartable_rules
+
+	for ref in created:
+		apply_cartable_rules(db, business_id, row, ref)
 	_audit(db, business_id=business_id, user_id=user_id, action="letter.refer", letter_id=row.id, position_id=position.id)
 	db.commit()
 	_notify_referral_recipients(db, business_id, created, row)
+	from app.services.office_automation_extended_service import fire_oa_workflow
+
+	fire_oa_workflow(db, business_id, "office_automation.letter_referred", row, user_id, extra={"referral_count": len(created)})
 	return get_letter(db, business_id, row.id, user_id, position_id, lang=lang, is_admin=True)
 
 
@@ -1855,6 +1951,14 @@ def add_attachment(
 		created_at=_now(),
 	)
 	db.add(row)
+	db.flush()
+	try:
+		from app.services.office_automation_extended_service import extract_attachment_text, refresh_letter_search_text
+
+		row.ocr_text = extract_attachment_text(storage) or None
+		refresh_letter_search_text(db, letter)
+	except Exception:
+		logger.debug("OA attachment OCR skipped", exc_info=True)
 	_audit(db, business_id=business_id, user_id=user_id, action="letter.attach", letter_id=letter.id, position_id=position.id)
 	db.commit()
 	db.refresh(row)
@@ -1863,6 +1967,7 @@ def add_attachment(
 		"letter_id": row.letter_id,
 		"file_storage_id": row.file_storage_id,
 		"title": row.title,
+		"ocr_text": row.ocr_text,
 		"original_name": storage.original_name,
 		"mime_type": storage.mime_type,
 		"file_size": storage.file_size,
@@ -1897,6 +2002,9 @@ def archive_letter(db: Session, business_id: int, letter_id: int, user_id: int, 
 	row.updated_at = _now()
 	_audit(db, business_id=business_id, user_id=user_id, action="letter.archive", letter_id=row.id, position_id=position.id)
 	db.commit()
+	from app.services.office_automation_extended_service import fire_oa_workflow
+
+	fire_oa_workflow(db, business_id, "office_automation.letter_archived", row, user_id)
 	return get_letter(db, business_id, row.id, user_id, position_id, lang=lang, is_admin=True)
 
 
@@ -2101,7 +2209,9 @@ def get_letter(
 		{"id": a.id, "action": a.action, "user_id": a.user_id, "position_id": a.position_id, "payload": a.payload, "created_at": a.created_at}
 		for a in audit
 	]
-	return data
+	from app.services.office_automation_extended_service import enrich_letter_payload
+
+	return enrich_letter_payload(db, data, row, lang)
 
 
 def get_letter_print(
@@ -2134,6 +2244,22 @@ def get_letter_print(
 		"outgoing_prefix": settings.get("outgoing_prefix"),
 		"internal_prefix": settings.get("internal_prefix"),
 		"body_format": data.get("body_format") or "markdown",
+		"copies_label": "رونوشت" if str(lang).startswith("fa") else "Copies",
+		"copies": [
+			r.get("to_position_title")
+			for r in (data.get("referrals") or [])
+			if r.get("kind") == "info" and r.get("to_position_title")
+		],
+		"signatures": [
+			{
+				"title": s.get("position_title"),
+				"image_file_id": s.get("image_file_id"),
+				"note": s.get("note"),
+				"signed_at": s.get("signed_at"),
+			}
+			for s in (data.get("sign_steps") or [])
+			if s.get("status") == "signed"
+		],
 	}
 	return data
 
@@ -2164,9 +2290,14 @@ def list_cartable(
 	def _apply_search(query, *, include_body: bool = True):
 		if q:
 			like = f"%{q.strip()}%"
-			filters = [OaLetter.subject.ilike(like), OaLetter.secretariat_number.ilike(like)]
+			filters = [
+				OaLetter.subject.ilike(like),
+				OaLetter.secretariat_number.ilike(like),
+				OaLetter.search_text.ilike(like),
+				OaLetter.keywords.ilike(like),
+			]
 			if include_body:
-				filters.append(OaLetter.body.ilike(like))
+				filters.extend([OaLetter.body.ilike(like), OaLetter.ocr_text.ilike(like)])
 			query = query.filter(or_(*filters))
 		if from_d:
 			query = query.filter(OaLetter.letter_date >= from_d)

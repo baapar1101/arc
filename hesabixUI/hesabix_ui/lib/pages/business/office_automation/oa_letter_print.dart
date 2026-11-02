@@ -55,6 +55,18 @@ Future<void> oaPrintLetter({
     fallback: '',
   );
   final paraphs = List<Map>.from(data['paraphs'] as List? ?? const []);
+  final copies = List.from(print['copies'] as List? ?? const []);
+  final signatures = List<Map>.from(print['signatures'] as List? ?? const []);
+  final signatureImages = <pw.ImageProvider?>[];
+  for (final sig in signatures) {
+    final fileId = (sig['image_file_id'] ?? '').toString();
+    if (fileId.isEmpty) {
+      signatureImages.add(null);
+      continue;
+    }
+    final bytes = await storage.downloadFile(businessId: businessId, fileId: fileId);
+    signatureImages.add(bytes.isNotEmpty ? pw.MemoryImage(Uint8List.fromList(bytes)) : null);
+  }
   final body = _plainBody((data['body'] ?? '').toString(), (data['body_format'] ?? print['body_format'] ?? 'markdown').toString());
   final doc = pw.Document();
   doc.addPage(
@@ -105,6 +117,34 @@ Future<void> oaPrintLetter({
                       style: pw.TextStyle(font: font, fontSize: 10),
                     ),
                   ),
+                if (signatureImages.isNotEmpty) ...[
+                  pw.SizedBox(height: 18),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+                    children: [
+                      for (var i = 0; i < signatures.length; i++)
+                        pw.Column(
+                          children: [
+                            if (signatureImages[i] != null)
+                              pw.Image(signatureImages[i]!, height: 42)
+                            else
+                              pw.SizedBox(height: 28),
+                            pw.Text(
+                              '${signatures[i]['title'] ?? ''}',
+                              style: pw.TextStyle(font: font, fontSize: 9),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ],
+                if (copies.isNotEmpty) ...[
+                  pw.SizedBox(height: 12),
+                  pw.Text(
+                    '${print['copies_label'] ?? ''}: ${copies.map((c) => '$c').join(' ، ')}',
+                    style: pw.TextStyle(font: font, fontSize: 9),
+                  ),
+                ],
                 pw.Spacer(),
                 if ((print['footer_text'] ?? '').toString().isNotEmpty)
                   pw.Align(

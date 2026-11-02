@@ -65,6 +65,41 @@ String oaUrgencyLabel(AppLocalizations t, String value) {
   }
 }
 
+String oaConfidentialityLabel(AppLocalizations t, String value) {
+  switch (value) {
+    case 'confidential':
+      return t.oaConfidentialRestricted;
+    case 'highly_confidential':
+      return t.oaConfidentialHighly;
+    case 'secret':
+      return t.oaConfidentialSecret;
+    default:
+      return t.oaConfidentialNormal;
+  }
+}
+
+String oaSignStatusLabel(AppLocalizations t, String value) {
+  switch (value) {
+    case 'current':
+      return t.oaSignStatusCurrent;
+    case 'signed':
+      return t.oaSignStatusSigned;
+    case 'rejected':
+      return t.oaSignStatusRejected;
+    default:
+      return t.oaSignStatusPending;
+  }
+}
+
+String oaDispatchStatusLabel(AppLocalizations t, String value) {
+  switch (value) {
+    case 'acknowledged':
+      return t.oaStatusAcknowledged;
+    default:
+      return t.oaStatusDispatched;
+  }
+}
+
 Color oaUrgencyColor(ColorScheme cs, String value) {
   switch (value) {
     case 'urgent':

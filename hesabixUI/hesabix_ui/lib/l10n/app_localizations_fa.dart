@@ -13371,6 +13371,213 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
+  String get oaConfidentialHighly => 'خیلی محرمانه';
+
+  @override
+  String get oaConfidentialSecret => 'سری';
+
+  @override
+  String get oaSecretariats => 'دبیرخانه‌ها';
+
+  @override
+  String get oaNewSecretariat => 'دبیرخانه جدید';
+
+  @override
+  String get oaSecretariat => 'دبیرخانه';
+
+  @override
+  String get oaExternalOrgs => 'سازمان‌های خارجی';
+
+  @override
+  String get oaNewExternalOrg => 'سازمان جدید';
+
+  @override
+  String get oaEmptyExternalOrgs => 'هنوز سازمان خارجی ثبت نشده است.';
+
+  @override
+  String get oaExternalOrgsHint => 'جست‌وجو بر اساس نام، کد یا ایمیل ECE';
+
+  @override
+  String get oaEceEmail => 'ایمیل ECE';
+
+  @override
+  String get oaNationalId => 'شناسه ملی';
+
+  @override
+  String get oaArchiveTree => 'طبقه‌بندی بایگانی';
+
+  @override
+  String get oaArchiveFolders => 'پوشه‌های بایگانی';
+
+  @override
+  String get oaNewArchiveFolder => 'پوشه جدید';
+
+  @override
+  String get oaParentFolder => 'پوشه والد';
+
+  @override
+  String get oaAllLetters => 'همه نامه‌ها';
+
+  @override
+  String get oaReports => 'گزارش مکاتبات';
+
+  @override
+  String get oaDelayReport => 'تأخیرها';
+
+  @override
+  String get oaVolumeReport => 'حجم مکاتبات';
+
+  @override
+  String get oaPerformanceReport => 'عملکرد';
+
+  @override
+  String get oaAvgDays => 'میانگین روز';
+
+  @override
+  String get oaPublicTrack => 'رهگیری نامه';
+
+  @override
+  String get oaPublicTrackHint =>
+      'رمز رهگیری درج‌شده روی رسید ثبت را وارد کنید.';
+
+  @override
+  String get oaPublicTrackResult => 'وضعیت نامه';
+
+  @override
+  String get oaTrackingToken => 'رمز رهگیری';
+
+  @override
+  String get oaStatus => 'وضعیت';
+
+  @override
+  String get oaSignatures => 'امضاها';
+
+  @override
+  String get oaEmptySignatures => 'هنوز تصویر امضا ثبت نشده است.';
+
+  @override
+  String get oaSignatureImage => 'تصویر امضا';
+
+  @override
+  String get oaSignPath => 'مسیر امضا';
+
+  @override
+  String get oaEmptySignPaths => 'هنوز مسیر امضا تعریف نشده است.';
+
+  @override
+  String get oaRequireBeforeRegister => 'الزامی قبل از ثبت صادره';
+
+  @override
+  String get oaCartableRules => 'قوانین کارتابل';
+
+  @override
+  String get oaEmptyRules => 'هنوز قانونی ثبت نشده است.';
+
+  @override
+  String get oaSubjectContains => 'موضوع شامل';
+
+  @override
+  String get oaMarkSeen => 'علامت‌گذاری خودکار به‌عنوان دیده‌شده';
+
+  @override
+  String get oaEce => 'تبادل ECE';
+
+  @override
+  String get oaEmptyEce => 'هنوز پیام ECE وجود ندارد.';
+
+  @override
+  String get oaImportEce => 'ورود XML پروتکل ECE';
+
+  @override
+  String get oaEceXml => 'XML پروتکل ECE';
+
+  @override
+  String get oaExportEce => 'صدور ECE';
+
+  @override
+  String get oaEceEnabled => 'فعال‌سازی ECE برای این دبیرخانه';
+
+  @override
+  String get oaSign => 'امضا';
+
+  @override
+  String get oaDispatch => 'ابلاغ';
+
+  @override
+  String get oaAcknowledge => 'رؤیت ابلاغ';
+
+  @override
+  String get oaVersions => 'نسخه‌های متن';
+
+  @override
+  String get oaAiSummary => 'خلاصه هوشمند';
+
+  @override
+  String get oaOcr => 'استخراج متن (OCR)';
+
+  @override
+  String get oaPerson => 'شخص مرتبط';
+
+  @override
+  String get oaKeywords => 'کلیدواژه';
+
+  @override
+  String get oaReceiptNumber => 'شماره رسید خارجی';
+
+  @override
+  String get oaReceiptDate => 'تاریخ رسید';
+
+  @override
+  String get oaSendEce => 'ارسال ECE با ایمیل';
+
+  @override
+  String get oaSendEmail => 'ارسال به‌صورت ایمیل';
+
+  @override
+  String get oaToEmail => 'ایمیل مقصد';
+
+  @override
+  String get oaCopies => 'رونوشت';
+
+  @override
+  String get oaPublicTrackUrl => 'لینک رهگیری عمومی';
+
+  @override
+  String get oaConfidentialSecretariat => 'دبیرخانه محرمانه';
+
+  @override
+  String get oaAutoSecretariat => 'دبیرخانه پیش‌فرض';
+
+  @override
+  String oaDaysLate(int days) {
+    return '$days روز تأخیر';
+  }
+
+  @override
+  String get oaSignStatusPending => 'در انتظار';
+
+  @override
+  String get oaSignStatusCurrent => 'آماده امضا';
+
+  @override
+  String get oaSignStatusSigned => 'امضا شده';
+
+  @override
+  String get oaSignStatusRejected => 'رد شده';
+
+  @override
+  String get oaStatusDispatched => 'ابلاغ‌شده';
+
+  @override
+  String get oaStatusAcknowledged => 'رؤیت‌شده';
+
+  @override
+  String get oaSentSuccessfully => 'با موفقیت ارسال شد';
+
+  @override
+  String get oaMorePages => 'بیشتر';
+
+  @override
   String get businessSettingsOfficeAutomation => 'اتوماسیون اداری';
 
   @override

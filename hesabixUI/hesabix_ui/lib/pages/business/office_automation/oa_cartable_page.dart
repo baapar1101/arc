@@ -204,17 +204,45 @@ class _OaCartablePageState extends State<OaCartablePage> {
       appBar: AppBar(
         title: Text(t.oaCartable),
         actions: [
-          if (_canAdmin)
+          if (wide) ...[
+            if (_canAdmin)
+              IconButton(
+                tooltip: t.oaOrg,
+                icon: const Icon(Icons.account_tree_outlined),
+                onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'office-automation/org')),
+              ),
             IconButton(
-              tooltip: t.oaOrg,
-              icon: const Icon(Icons.account_tree_outlined),
-              onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'office-automation/org')),
+              tooltip: t.oaExternalOrgs,
+              icon: const Icon(Icons.apartment_outlined),
+              onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'office-automation/external-orgs')),
             ),
-          if (_canAdmin)
             IconButton(
-              tooltip: t.oaSettings,
-              icon: const Icon(Icons.settings_outlined),
-              onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'settings/office-automation')),
+              tooltip: t.oaArchiveTree,
+              icon: const Icon(Icons.inventory_2_outlined),
+              onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'office-automation/archive')),
+            ),
+            IconButton(
+              tooltip: t.oaReports,
+              icon: const Icon(Icons.bar_chart_outlined),
+              onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'office-automation/reports')),
+            ),
+            if (_canAdmin)
+              IconButton(
+                tooltip: t.oaSettings,
+                icon: const Icon(Icons.settings_outlined),
+                onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'settings/office-automation')),
+              ),
+          ] else
+            PopupMenuButton<String>(
+              tooltip: t.oaMorePages,
+              onSelected: (path) => context.go(context.businessPanelUrl(widget.businessId, path)),
+              itemBuilder: (ctx) => [
+                if (_canAdmin) PopupMenuItem(value: 'office-automation/org', child: Text(t.oaOrg)),
+                PopupMenuItem(value: 'office-automation/external-orgs', child: Text(t.oaExternalOrgs)),
+                PopupMenuItem(value: 'office-automation/archive', child: Text(t.oaArchiveTree)),
+                PopupMenuItem(value: 'office-automation/reports', child: Text(t.oaReports)),
+                if (_canAdmin) PopupMenuItem(value: 'settings/office-automation', child: Text(t.oaSettings)),
+              ],
             ),
           IconButton(tooltip: t.refresh, icon: const Icon(Icons.refresh), onPressed: _bootstrap),
         ],

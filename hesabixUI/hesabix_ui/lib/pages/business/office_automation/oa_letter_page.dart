@@ -15,7 +15,9 @@ import '../../../services/office_automation_service.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/responsive_helper.dart';
 import '../../../utils/snackbar_helper.dart';
+import '../../../models/person_model.dart';
 import '../../../widgets/date_input_field.dart';
+import '../../../widgets/invoice/person_combobox_widget.dart';
 import '../../../widgets/office_automation/oa_letter_editor.dart';
 import '../../../widgets/office_automation/oa_letter_paper.dart';
 import '../../../widgets/office_automation/oa_searchable_field.dart';
@@ -51,6 +53,8 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
   final _senderOrg = TextEditingController();
   final _receiver = TextEditingController();
   final _receiverOrg = TextEditingController();
+  final _keywords = TextEditingController();
+  final _receiptNumber = TextEditingController();
 
   TabController? _mobileTabs;
   bool _loading = true;
@@ -58,7 +62,17 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
   List<Map<String, dynamic>> _positions = [];
   List<Map<String, dynamic>> _templates = [];
   List<Map<String, dynamic>> _formats = [];
+  List<Map<String, dynamic>> _secretariats = [];
+  List<Map<String, dynamic>> _externalOrgs = [];
+  List<Map<String, dynamic>> _archiveFolders = [];
+  List<Map<String, dynamic>> _signPaths = [];
+  List<Map<String, dynamic>> _versions = [];
   Map<String, dynamic> _settings = const {};
+  int? _secretariatId;
+  int? _externalOrgId;
+  int? _personId;
+  String? _personTitle;
+  DateTime? _receiptDate;
   int? _positionId;
   int? _senderPositionId;
   int? _receiverPositionId;
@@ -89,6 +103,8 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
   bool get _canAdmin =>
       widget.authStore.currentBusiness?.isOwner == true ||
       widget.authStore.hasBusinessPermission('office_automation', 'admin');
+  bool get _canSecretariat =>
+      _canAdmin || widget.authStore.hasBusinessPermission('office_automation', 'secretariat');
 
   @override
   void initState() {
@@ -112,6 +128,8 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
     _senderOrg.dispose();
     _receiver.dispose();
     _receiverOrg.dispose();
+    _keywords.dispose();
+    _receiptNumber.dispose();
     super.dispose();
   }
 
@@ -159,11 +177,19 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
         _svc.listTemplates(businessId: widget.businessId),
         _svc.listFormats(businessId: widget.businessId),
         _svc.getSettings(businessId: widget.businessId),
+        _svc.listSecretariats(businessId: widget.businessId),
+        _svc.listExternalOrgs(businessId: widget.businessId),
+        _svc.listArchiveFolders(businessId: widget.businessId),
+        _svc.listSignPaths(businessId: widget.businessId),
       ]);
       _positions = results[0] as List<Map<String, dynamic>>;
       _templates = results[1] as List<Map<String, dynamic>>;
       _formats = results[2] as List<Map<String, dynamic>>;
       _settings = results[3] as Map<String, dynamic>;
+      _secretariats = results[4] as List<Map<String, dynamic>>;
+      _externalOrgs = results[5] as List<Map<String, dynamic>>;
+      _archiveFolders = results[6] as List<Map<String, dynamic>>;
+      _signPaths = results[7] as List<Map<String, dynamic>>;
       _positionId ??= _positions.isNotEmpty ? oaId(_positions.first['id']) : null;
       _bodyFormat = (_settings['default_body_format'] ?? 'markdown').toString();
       _formatId ??= oaId(_settings['default_format_id']);
@@ -213,6 +239,20 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
         _letterDate = HesabixDateUtils.parseApiDate(_letter['letter_date'], rawValue: _letter['letter_date_raw']) ??
             _letterDate;
         _followUpAt = HesabixDateUtils.parseApiDate(_letter['follow_up_at'], rawValue: _letter['follow_up_at_raw']);
+        _secretariatId = oaId(_letter['secretariat_id']);
+        _externalOrgId = oaId(_letter['external_org_id']);
+        _personId = oaId(_letter['person_id']);
+        _personTitle = (_letter['person_title'] ?? '').toString();
+        _keywords.text = (_letter['keywords'] ?? '').toString();
+        _receiptNumber.text = (_letter['receipt_number'] ?? '').toString();
+        _receiptDate = HesabixDateUtils.parseApiDate(_letter['receipt_date'], rawValue: _letter['receipt_date_raw']);
+        if (widget.letterId != null) {
+          _versions = await _svc.listLetterVersions(
+            businessId: widget.businessId,
+            letterId: widget.letterId!,
+            positionId: _positionId,
+          );
+        }
       }
       await _loadStationeryImages();
     } catch (e) {
@@ -242,7 +282,13 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
         'receiver_position_id': _receiverPositionId,
         'format_id': _formatId,
         'template_id': _templateId,
+        'secretariat_id': _secretariatId,
+        'external_org_id': _externalOrgId,
+        'person_id': _personId,
+        'keywords': _keywords.text.trim(),
+        'receipt_number': _receiptNumber.text.trim(),
         if (_letterDate != null) 'letter_date': HesabixDateUtils.formatForApiDate(_letterDate!),
+        if (_receiptDate != null) 'receipt_date': HesabixDateUtils.formatForApiDate(_receiptDate!),
       };
 
   void _applyTemplate(Map<String, dynamic> tpl) {
@@ -731,6 +777,8 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
                       items: [
                         DropdownMenuItem(value: 'normal', child: Text(t.oaConfidentialNormal)),
                         DropdownMenuItem(value: 'confidential', child: Text(t.oaConfidentialRestricted)),
+                        DropdownMenuItem(value: 'highly_confidential', child: Text(t.oaConfidentialHighly)),
+                        DropdownMenuItem(value: 'secret', child: Text(t.oaConfidentialSecret)),
                       ],
                       onChanged: _isDraft ? (v) => setState(() => _confidentiality = v ?? 'normal') : null,
                     ),
@@ -745,8 +793,82 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
                       enabled: _isDraft,
                     ),
                   ),
+                  SizedBox(
+                    width: 220,
+                    child: DropdownButtonFormField<int?>(
+                      initialValue: _secretariats.any((e) => oaId(e['id']) == _secretariatId) ? _secretariatId : null,
+                      decoration: InputDecoration(labelText: t.oaSecretariat, border: const OutlineInputBorder()),
+                      items: [
+                        DropdownMenuItem(value: null, child: Text(t.oaAutoSecretariat)),
+                        for (final s in _secretariats)
+                          DropdownMenuItem(value: oaId(s['id']), child: Text('${s['title'] ?? s['code']}')),
+                      ],
+                      onChanged: _isDraft ? (v) => setState(() => _secretariatId = v) : null,
+                    ),
+                  ),
+                  SizedBox(
+                    width: 220,
+                    child: DropdownButtonFormField<int?>(
+                      initialValue: _externalOrgs.any((e) => oaId(e['id']) == _externalOrgId) ? _externalOrgId : null,
+                      decoration: InputDecoration(labelText: t.oaExternalOrgs, border: const OutlineInputBorder()),
+                      items: [
+                        DropdownMenuItem(value: null, child: Text(t.oaCustomParty)),
+                        for (final o in _externalOrgs)
+                          DropdownMenuItem(value: oaId(o['id']), child: Text('${o['title'] ?? o['code']}')),
+                      ],
+                      onChanged: _isDraft ? (v) => setState(() => _externalOrgId = v) : null,
+                    ),
+                  ),
                 ],
               ),
+              const SizedBox(height: 12),
+              IgnorePointer(
+                ignoring: !_isDraft,
+                child: Opacity(
+                  opacity: _isDraft ? 1 : 0.65,
+                  child: PersonComboboxWidget(
+                    businessId: widget.businessId,
+                    selectedPerson: _personId == null
+                        ? null
+                        : Person(
+                            id: _personId,
+                            businessId: widget.businessId,
+                            aliasName: _personTitle?.isNotEmpty == true ? _personTitle! : '$_personId',
+                            personTypes: const <PersonType>[],
+                            createdAt: DateTime.now(),
+                            updatedAt: DateTime.now(),
+                          ),
+                    onChanged: (p) => setState(() {
+                      _personId = p?.id;
+                      _personTitle = p?.aliasName;
+                    }),
+                    label: t.oaPerson,
+                    dense: true,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _keywords,
+                enabled: _isDraft,
+                decoration: InputDecoration(labelText: t.oaKeywords, border: const OutlineInputBorder()),
+              ),
+              if (_kind == 'incoming') ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _receiptNumber,
+                  enabled: _isDraft,
+                  decoration: InputDecoration(labelText: t.oaReceiptNumber, border: const OutlineInputBorder()),
+                ),
+                const SizedBox(height: 12),
+                DateInputField(
+                  value: _receiptDate,
+                  onChanged: _isDraft ? (v) => setState(() => _receiptDate = v) : null,
+                  labelText: t.oaReceiptDate,
+                  calendarController: widget.calendarController,
+                  enabled: _isDraft,
+                ),
+              ],
             ],
           ),
         ),
@@ -887,6 +1009,247 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
     );
   }
 
+  Future<void> _sign() async {
+    if (_positionId == null || widget.letterId == null) return;
+    try {
+      await _svc.signLetter(businessId: widget.businessId, letterId: widget.letterId!, positionId: _positionId!);
+      await _load();
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
+
+  Future<void> _dispatch() async {
+    final t = AppLocalizations.of(context);
+    int? toId;
+    final instruction = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(t.oaDispatch),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                OaPositionPicker(
+                  businessId: widget.businessId,
+                  label: t.oaToPosition,
+                  onChanged: (v) => setLocal(() => toId = oaId(v?['id'])),
+                ),
+                TextField(controller: instruction, decoration: InputDecoration(labelText: t.oaInstruction)),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.oaDispatch)),
+          ],
+        ),
+      ),
+    );
+    final text = instruction.text.trim();
+    instruction.dispose();
+    if (ok != true || toId == null || _positionId == null || widget.letterId == null) return;
+    try {
+      await _svc.dispatchLetter(
+        businessId: widget.businessId,
+        letterId: widget.letterId!,
+        positionId: _positionId!,
+        toPositionId: toId!,
+        instruction: text,
+      );
+      await _load();
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
+
+  Future<void> _startSignPath() async {
+    final t = AppLocalizations.of(context);
+    int? templateId = _signPaths.isNotEmpty ? oaId(_signPaths.first['id']) : null;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(t.oaSignPath),
+          content: DropdownButtonFormField<int?>(
+            initialValue: templateId,
+            items: [
+              for (final p in _signPaths)
+                DropdownMenuItem(value: oaId(p['id']), child: Text('${p['name']}')),
+            ],
+            onChanged: (v) => setLocal(() => templateId = v),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.save)),
+          ],
+        ),
+      ),
+    );
+    if (ok != true || templateId == null || _positionId == null || widget.letterId == null) return;
+    try {
+      await _svc.startSignPath(
+        businessId: widget.businessId,
+        letterId: widget.letterId!,
+        positionId: _positionId!,
+        payload: {'template_id': templateId},
+      );
+      await _load();
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
+
+  Future<void> _exportEce() async {
+    if (_positionId == null || widget.letterId == null) return;
+    try {
+      final data = await _svc.exportEce(businessId: widget.businessId, letterId: widget.letterId!, positionId: _positionId!);
+      if (!mounted) return;
+      final t = AppLocalizations.of(context);
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(t.oaExportEce),
+          content: SizedBox(width: 520, child: SelectableText('${data['xml'] ?? ''}')),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.close)),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _sendEce();
+              },
+              child: Text(t.oaSendEce),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
+
+  Future<void> _sendEce() async {
+    if (_positionId == null || widget.letterId == null) return;
+    final t = AppLocalizations.of(context);
+    final email = TextEditingController(text: '${_letter['external_org_ece_email'] ?? ''}');
+    try {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(t.oaSendEce),
+          content: TextField(controller: email, decoration: InputDecoration(labelText: t.oaToEmail)),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.oaSendEce)),
+          ],
+        ),
+      );
+      if (ok != true) return;
+      await _svc.sendEce(
+        businessId: widget.businessId,
+        letterId: widget.letterId!,
+        positionId: _positionId!,
+        toEmail: email.text.trim().isEmpty ? null : email.text.trim(),
+      );
+      if (mounted) SnackBarHelper.showSuccess(context, message: t.oaSentSuccessfully);
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    } finally {
+      email.dispose();
+    }
+  }
+
+  Future<void> _sendEmail() async {
+    if (_positionId == null || widget.letterId == null) return;
+    final t = AppLocalizations.of(context);
+    final email = TextEditingController(text: '${_letter['external_org_ece_email'] ?? ''}');
+    try {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(t.oaSendEmail),
+          content: TextField(controller: email, decoration: InputDecoration(labelText: t.oaToEmail)),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.oaSendEmail)),
+          ],
+        ),
+      );
+      if (ok != true || email.text.trim().isEmpty) return;
+      await _svc.sendLetterEmail(
+        businessId: widget.businessId,
+        letterId: widget.letterId!,
+        positionId: _positionId!,
+        toEmail: email.text.trim(),
+      );
+      if (mounted) SnackBarHelper.showSuccess(context, message: t.oaSentSuccessfully);
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    } finally {
+      email.dispose();
+    }
+  }
+
+  Future<void> _aiSummary() async {
+    if (_positionId == null || widget.letterId == null) return;
+    try {
+      await _svc.summarizeLetter(businessId: widget.businessId, letterId: widget.letterId!, positionId: _positionId!);
+      await _load();
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
+
+  Future<void> _runOcr() async {
+    if (_positionId == null || widget.letterId == null) return;
+    try {
+      await _svc.ocrLetter(businessId: widget.businessId, letterId: widget.letterId!, positionId: _positionId!);
+      await _load();
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
+
+  Future<void> _archiveToFolder() async {
+    final t = AppLocalizations.of(context);
+    int? folderId = _archiveFolders.isNotEmpty ? oaId(_archiveFolders.first['id']) : null;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(t.oaArchiveTree),
+          content: DropdownButtonFormField<int?>(
+            initialValue: folderId,
+            items: [
+              for (final f in _archiveFolders)
+                DropdownMenuItem(value: oaId(f['id']), child: Text('${f['title'] ?? f['code']}')),
+            ],
+            onChanged: (v) => setLocal(() => folderId = v),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.oaArchive)),
+          ],
+        ),
+      ),
+    );
+    if (ok != true || folderId == null || _positionId == null || widget.letterId == null) return;
+    try {
+      await _svc.archiveToFolder(
+        businessId: widget.businessId,
+        letterId: widget.letterId!,
+        positionId: _positionId!,
+        folderId: folderId!,
+      );
+      await _load();
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
+
   List<Widget> _actionButtons(AppLocalizations t) {
     return [
       if (_isDraft && _canCompose)
@@ -909,6 +1272,28 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
         OutlinedButton.icon(onPressed: _setFollowUp, icon: const Icon(Icons.event_outlined), label: Text(t.oaFollowUp)),
       if (!_isDraft && !_isArchived && _canRefer)
         OutlinedButton.icon(onPressed: _linkRelated, icon: const Icon(Icons.link), label: Text(t.oaLink)),
+      if (!_isDraft && !_isArchived && _canRefer)
+        FilledButton.tonalIcon(onPressed: _sign, icon: const Icon(Icons.draw), label: Text(t.oaSign)),
+      if (!_isDraft && !_isArchived && _canRefer)
+        OutlinedButton.icon(onPressed: _dispatch, icon: const Icon(Icons.campaign_outlined), label: Text(t.oaDispatch)),
+      if (!_isDraft && _canAdmin)
+        OutlinedButton.icon(onPressed: _startSignPath, icon: const Icon(Icons.account_tree_outlined), label: Text(t.oaSignPath)),
+      if (!_isDraft && _canSecretariat)
+        OutlinedButton.icon(onPressed: _exportEce, icon: const Icon(Icons.outbox_outlined), label: Text(t.oaExportEce)),
+      if (!_isDraft && _canSecretariat)
+        OutlinedButton.icon(onPressed: _sendEce, icon: const Icon(Icons.outgoing_mail), label: Text(t.oaSendEce)),
+      if (!_isDraft && _canRefer)
+        OutlinedButton.icon(onPressed: _sendEmail, icon: const Icon(Icons.email_outlined), label: Text(t.oaSendEmail)),
+      if (!_isDraft && _canRefer)
+        OutlinedButton.icon(onPressed: _aiSummary, icon: const Icon(Icons.auto_awesome), label: Text(t.oaAiSummary)),
+      if (!_isDraft && _canCompose)
+        OutlinedButton.icon(onPressed: _runOcr, icon: const Icon(Icons.document_scanner_outlined), label: Text(t.oaOcr)),
+      if (!_isDraft && !_isArchived && _canArchive)
+        OutlinedButton.icon(
+          onPressed: _archiveToFolder,
+          icon: const Icon(Icons.folder_outlined),
+          label: Text(t.oaArchiveTree),
+        ),
       if (!_isDraft && !_isArchived && _canArchive)
         OutlinedButton.icon(
           onPressed: () async {
@@ -959,6 +1344,99 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
     final timeline = List<Map>.from(_letter['timeline'] as List? ?? const []);
     return Column(
       children: [
+        if ((_letter['ai_summary'] ?? '').toString().isNotEmpty)
+          OaSectionCard(
+            title: t.oaAiSummary,
+            child: Text('${_letter['ai_summary']}'),
+          ),
+        if ((_letter['ai_summary'] ?? '').toString().isNotEmpty) const SizedBox(height: 12),
+        if ((_letter['tracking_token'] ?? '').toString().isNotEmpty)
+          OaSectionCard(
+            title: t.oaPublicTrack,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SelectableText('${_letter['tracking_token']}'),
+                const SizedBox(height: 8),
+                Text(t.oaPublicTrackUrl, style: Theme.of(context).textTheme.bodySmall),
+                SelectableText('/public/office-automation/track/${_letter['tracking_token']}'),
+              ],
+            ),
+          ),
+        if ((_letter['tracking_token'] ?? '').toString().isNotEmpty) const SizedBox(height: 12),
+        OaSectionCard(
+          title: t.oaSignPath,
+          child: List<Map>.from(_letter['sign_steps'] as List? ?? const []).isEmpty
+              ? Text(t.oaEmptyFolder)
+              : Column(
+                  children: [
+                    for (final s in List<Map>.from(_letter['sign_steps'] as List? ?? const []))
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(s['status'] == 'signed' ? Icons.verified : Icons.pending_outlined),
+                        title: Text('${s['position_title'] ?? s['position_id']}'),
+                        subtitle: Text(
+                          [oaSignStatusLabel(t, '${s['status'] ?? ''}'), s['note'] ?? '']
+                              .where((e) => e.toString().trim().isNotEmpty)
+                              .join(' · '),
+                        ),
+                      ),
+                  ],
+                ),
+        ),
+        const SizedBox(height: 12),
+        OaSectionCard(
+          title: t.oaDispatch,
+          child: List<Map>.from(_letter['dispatches'] as List? ?? const []).isEmpty
+              ? Text(t.oaEmptyFolder)
+              : Column(
+                  children: [
+                    for (final d in List<Map>.from(_letter['dispatches'] as List? ?? const []))
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(oaDispatchStatusLabel(t, '${d['status'] ?? ''}')),
+                        subtitle: Text('${d['instruction'] ?? ''}'),
+                        trailing: d['status'] == 'dispatched' && _canRefer
+                            ? TextButton(
+                                onPressed: () async {
+                                  final id = oaId(d['id']);
+                                  if (id == null || _positionId == null) return;
+                                  try {
+                                    await _svc.acknowledgeDispatch(
+                                      businessId: widget.businessId,
+                                      dispatchId: id,
+                                      positionId: _positionId!,
+                                    );
+                                    await _load();
+                                  } catch (e) {
+                                    if (!mounted) return;
+                                    SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+                                  }
+                                },
+                                child: Text(t.oaAcknowledge),
+                              )
+                            : null,
+                      ),
+                  ],
+                ),
+        ),
+        const SizedBox(height: 12),
+        OaSectionCard(
+          title: t.oaVersions,
+          child: _versions.isEmpty
+              ? Text(t.oaEmptyFolder)
+              : Column(
+                  children: [
+                    for (final v in _versions)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Text('v${v['version_no']}'),
+                        title: Text('${v['subject']}'),
+                      ),
+                  ],
+                ),
+        ),
+        const SizedBox(height: 12),
         OaSectionCard(
           title: t.oaParaph,
           child: paraphs.isEmpty

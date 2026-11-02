@@ -38,11 +38,16 @@ class _OaSettingsPageState extends State<OaSettingsPage> with SingleTickerProvid
   int? _defaultFormatId;
   List<Map<String, dynamic>> _formats = [];
   List<Map<String, dynamic>> _templates = [];
+  List<Map<String, dynamic>> _signatures = [];
+  List<Map<String, dynamic>> _signPaths = [];
+  List<Map<String, dynamic>> _rules = [];
+  List<Map<String, dynamic>> _ece = [];
+  List<Map<String, dynamic>> _positions = [];
 
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 4, vsync: this);
+    _tabs = TabController(length: 8, vsync: this);
     _load();
   }
 
@@ -62,6 +67,11 @@ class _OaSettingsPageState extends State<OaSettingsPage> with SingleTickerProvid
       final data = await _svc.getSettings(businessId: widget.businessId);
       _formats = await _svc.listFormats(businessId: widget.businessId, includeInactive: true);
       _templates = await _svc.listTemplates(businessId: widget.businessId, includeInactive: true);
+      _signatures = await _svc.listSignatures(businessId: widget.businessId);
+      _signPaths = await _svc.listSignPaths(businessId: widget.businessId);
+      _rules = await _svc.listCartableRules(businessId: widget.businessId);
+      _ece = await _svc.listEce(businessId: widget.businessId);
+      _positions = await _svc.listPositions(businessId: widget.businessId, includeInactive: true);
       _enabled = data['enabled'] != false;
       _calendar = (data['numbering_calendar'] ?? 'jalali').toString();
       _incoming.text = (data['incoming_prefix'] ?? 'IN').toString();
@@ -340,6 +350,10 @@ class _OaSettingsPageState extends State<OaSettingsPage> with SingleTickerProvid
             Tab(text: t.oaStationery),
             Tab(text: t.oaFormats),
             Tab(text: t.oaTemplates),
+            Tab(text: t.oaSignatures),
+            Tab(text: t.oaSignPath),
+            Tab(text: t.oaCartableRules),
+            Tab(text: t.oaEce),
           ],
         ),
       ),
@@ -514,9 +528,281 @@ class _OaSettingsPageState extends State<OaSettingsPage> with SingleTickerProvid
                       ),
                   ],
                 ),
+                _listPane(
+                  empty: t.oaEmptySignatures,
+                  onAdd: () => _editSignature(),
+                  children: [
+                    for (final s in _signatures)
+                      ListTile(
+                        leading: Icon(s['is_default'] == true ? Icons.draw : Icons.draw_outlined),
+                        title: Text('${s['title']}'),
+                        subtitle: Text(s['is_default'] == true ? t.oaMakeDefault : ''),
+                        onTap: () => _editSignature(existing: s),
+                      ),
+                  ],
+                ),
+                _listPane(
+                  empty: t.oaEmptySignPaths,
+                  onAdd: () => _editSignPath(),
+                  children: [
+                    for (final p in _signPaths)
+                      ListTile(
+                        leading: const Icon(Icons.account_tree_outlined),
+                        title: Text('${p['name']}'),
+                        subtitle: Text('${p['letter_kind'] ?? t.oaAllKinds} · ${(p['steps'] as List? ?? const []).length}'),
+                        onTap: () => _editSignPath(existing: p),
+                      ),
+                  ],
+                ),
+                _listPane(
+                  empty: t.oaEmptyRules,
+                  onAdd: () => _editRule(),
+                  children: [
+                    for (final r in _rules)
+                      ListTile(
+                        leading: const Icon(Icons.rule_outlined),
+                        title: Text('${r['name']}'),
+                        subtitle: Text('${r['conditions'] ?? ''}'),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete_outline),
+                          onPressed: () async {
+                            final id = oaId(r['id']);
+                            if (id == null) return;
+                            try {
+                              await _svc.deleteCartableRule(businessId: widget.businessId, ruleId: id);
+                              await _load();
+                            } catch (e) {
+                              if (!context.mounted) return;
+                              SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+                            }
+                          },
+                        ),
+                        onTap: () => _editRule(existing: r),
+                      ),
+                  ],
+                ),
+                _listPane(
+                  empty: t.oaEmptyEce,
+                  onAdd: _importEceDialog,
+                  children: [
+                    for (final m in _ece)
+                      ListTile(
+                        leading: Icon(m['direction'] == 'in' ? Icons.call_received : Icons.call_made),
+                        title: Text('${m['receipt_number'] ?? m['to_email'] ?? m['from_email'] ?? m['id']}'),
+                        subtitle: Text(
+                          [
+                            m['direction'] == 'in' ? t.oaKindIncoming : t.oaKindOutgoing,
+                            '${m['status'] ?? ''}',
+                          ].join(' · '),
+                        ),
+                      ),
+                  ],
+                ),
               ],
             ),
     );
+  }
+
+  Future<void> _editSignature({Map<String, dynamic>? existing}) async {
+    final t = AppLocalizations.of(context);
+    final title = TextEditingController(text: '${existing?['title'] ?? t.oaSignature}');
+    var isDefault = existing?['is_default'] == true;
+    String? fileId = existing?['image_file_id']?.toString();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(t.oaSignatures),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: title, decoration: InputDecoration(labelText: t.oaFormatName)),
+                SwitchListTile(title: Text(t.oaMakeDefault), value: isDefault, onChanged: (v) => setLocal(() => isDefault = v)),
+                OaFileImageField(
+                  businessId: widget.businessId,
+                  label: t.oaSignatureImage,
+                  fileId: fileId,
+                  onChanged: (id) => setLocal(() => fileId = id),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.save)),
+          ],
+        ),
+      ),
+    );
+    final payload = {
+      if (oaId(existing?['id']) != null) 'id': oaId(existing?['id']),
+      'title': title.text.trim(),
+      'is_default': isDefault,
+      'image_file_id': fileId,
+    };
+    title.dispose();
+    if (ok != true) return;
+    try {
+      await _svc.upsertSignature(businessId: widget.businessId, payload: payload);
+      await _load();
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
+
+  Future<void> _editSignPath({Map<String, dynamic>? existing}) async {
+    final t = AppLocalizations.of(context);
+    final name = TextEditingController(text: '${existing?['name'] ?? ''}');
+    var kind = (existing?['letter_kind'] as String?) ?? 'outgoing';
+    var requireBefore = existing?['require_before_register'] == true;
+    final steps = List<Map<String, dynamic>>.from((existing?['steps'] as List? ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
+    if (steps.isEmpty) steps.add({'position_id': null, 'is_required': true});
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(t.oaSignPath),
+          content: SizedBox(
+            width: 480,
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  TextField(controller: name, decoration: InputDecoration(labelText: t.oaTemplateName)),
+                  DropdownButtonFormField<String>(
+                    initialValue: kind,
+                    decoration: InputDecoration(labelText: t.oaLetterKind),
+                    items: [
+                      DropdownMenuItem(value: 'outgoing', child: Text(t.oaKindOutgoing)),
+                      DropdownMenuItem(value: 'internal', child: Text(t.oaKindInternal)),
+                      DropdownMenuItem(value: 'incoming', child: Text(t.oaKindIncoming)),
+                    ],
+                    onChanged: (v) => setLocal(() => kind = v ?? 'outgoing'),
+                  ),
+                  SwitchListTile(title: Text(t.oaRequireBeforeRegister), value: requireBefore, onChanged: (v) => setLocal(() => requireBefore = v)),
+                  for (var i = 0; i < steps.length; i++)
+                    DropdownButtonFormField<int?>(
+                      initialValue: oaId(steps[i]['position_id']),
+                      decoration: InputDecoration(labelText: '${t.oaToPosition} ${i + 1}'),
+                      items: [
+                        for (final p in _positions)
+                          DropdownMenuItem(value: oaId(p['id']), child: Text('${p['title'] ?? p['code']}')),
+                      ],
+                      onChanged: (v) => setLocal(() => steps[i]['position_id'] = v),
+                    ),
+                  TextButton.icon(
+                    onPressed: () => setLocal(() => steps.add({'position_id': null, 'is_required': true})),
+                    icon: const Icon(Icons.add),
+                    label: Text(t.add),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.save)),
+          ],
+        ),
+      ),
+    );
+    final payload = {
+      if (oaId(existing?['id']) != null) 'id': oaId(existing?['id']),
+      'name': name.text.trim(),
+      'letter_kind': kind,
+      'require_before_register': requireBefore,
+      'steps': [
+        for (var i = 0; i < steps.length; i++)
+          if (oaId(steps[i]['position_id']) != null)
+            {'position_id': oaId(steps[i]['position_id']), 'sort_order': i, 'is_required': true},
+      ],
+    };
+    name.dispose();
+    if (ok != true || (payload['name'] as String).isEmpty) return;
+    try {
+      await _svc.saveSignPath(businessId: widget.businessId, payload: payload);
+      await _load();
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
+
+  Future<void> _editRule({Map<String, dynamic>? existing}) async {
+    final t = AppLocalizations.of(context);
+    final name = TextEditingController(text: '${existing?['name'] ?? ''}');
+    final needle = TextEditingController(text: '${(existing?['conditions'] as Map?)?['subject_contains'] ?? ''}');
+    var markSeen = (existing?['actions'] as Map?)?['mark_seen'] == true;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(t.oaCartableRules),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: name, decoration: InputDecoration(labelText: t.oaTemplateName)),
+                const SizedBox(height: 8),
+                TextField(controller: needle, decoration: InputDecoration(labelText: t.oaSubjectContains)),
+                SwitchListTile(title: Text(t.oaMarkSeen), value: markSeen, onChanged: (v) => setLocal(() => markSeen = v)),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.save)),
+          ],
+        ),
+      ),
+    );
+    final payload = {
+      if (oaId(existing?['id']) != null) 'id': oaId(existing?['id']),
+      'name': name.text.trim(),
+      'conditions': {if (needle.text.trim().isNotEmpty) 'subject_contains': needle.text.trim()},
+      'actions': {'mark_seen': markSeen},
+    };
+    name.dispose();
+    needle.dispose();
+    if (ok != true || (payload['name'] as String).isEmpty) return;
+    try {
+      await _svc.saveCartableRule(businessId: widget.businessId, payload: payload);
+      await _load();
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
+
+  Future<void> _importEceDialog() async {
+    final t = AppLocalizations.of(context);
+    final xml = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.oaImportEce),
+        content: SizedBox(
+          width: 520,
+          child: TextField(controller: xml, maxLines: 12, decoration: InputDecoration(labelText: t.oaEceXml, border: const OutlineInputBorder())),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.oaImportEce)),
+        ],
+      ),
+    );
+    final text = xml.text.trim();
+    xml.dispose();
+    if (ok != true || text.isEmpty) return;
+    try {
+      final positions = await _svc.listMyPositions(businessId: widget.businessId);
+      final pid = oaId(positions.isNotEmpty ? positions.first['id'] : null);
+      if (pid == null) throw Exception(t.oaNoPositions);
+      await _svc.importEce(businessId: widget.businessId, positionId: pid, xml: text);
+      await _load();
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
   }
 
   Widget _listPane({required String empty, required VoidCallback onAdd, required List<Widget> children}) {

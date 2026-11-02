@@ -1332,6 +1332,10 @@ def create_app() -> FastAPI:
         from app.services.crm_background_jobs import crm_automation_background_loop
         asyncio.create_task(crm_automation_background_loop(60))
 
+        # اتوماسیون اداری: هشدار سررسید پیگیری و مهلت ارجاع (پیامک/ایمیل/درون‌برنامه)
+        from app.services.oa_background_jobs import oa_automation_background_loop
+        asyncio.create_task(oa_automation_background_loop(300))
+
         # Customer club: expire points that reached their configured due date.
         from app.services.customer_club_background_jobs import customer_club_background_loop
         asyncio.create_task(customer_club_background_loop(300))

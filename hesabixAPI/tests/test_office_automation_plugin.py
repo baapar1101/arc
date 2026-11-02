@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -12,28 +12,42 @@ from sqlalchemy.orm import sessionmaker
 
 from adapters.db.models.file_storage import FileStorage
 from adapters.db.models.office_automation import (
+	OaArchiveFolder,
 	OaAuditLog,
+	OaCartableRule,
 	OaDelegation,
+	OaDispatch,
+	OaEceMessage,
+	OaExternalOrg,
 	OaLetter,
 	OaLetterAttachment,
 	OaLetterFormat,
 	OaLetterLink,
 	OaLetterNumberCounter,
+	OaLetterSignStep,
 	OaLetterTemplate,
+	OaLetterVersion,
+	OaMailboxMessage,
 	OaOrgUnit,
 	OaParaph,
 	OaPosition,
 	OaPositionHolder,
 	OaReferral,
+	OaSecretariat,
 	OaSettings,
+	OaSignPathTemplate,
+	OaSignPathTemplateStep,
+	OaUserSignature,
 )
 from adapters.db.models.user import User
 from adapters.db.session import Base
 from adapters.db.seed_data.notification_event_types_seed import OFFICE_AUTOMATION_EVENT_CODES
 from app.core.office_automation_plugin_dependency import PLUGIN_CODE, check_office_automation_plugin_active
 from app.core.responses import ApiError
+from app.services import office_automation_extended_service as ext
 from app.services import office_automation_service as svc
 from app.services.ai.ai_tool_manifest import get_manifest_entry
+from app.services.office_automation_ece import build_ece_xml, parse_ece_xml
 
 
 def _mock_db_with_license(*, plugin_active: bool = True, business_active: bool = True, expired: bool = False):
@@ -82,6 +96,8 @@ def test_plugin_code_constant():
 	assert PLUGIN_CODE == "office_automation"
 	assert "office_automation.letter_referred" in OFFICE_AUTOMATION_EVENT_CODES
 	assert "office_automation.letter_returned" in OFFICE_AUTOMATION_EVENT_CODES
+	assert "office_automation.letter_dispatched" in OFFICE_AUTOMATION_EVENT_CODES
+	assert "office_automation.letter_followup_due" in OFFICE_AUTOMATION_EVENT_CODES
 
 
 OA_TOOLS = (
@@ -126,6 +142,22 @@ OA_TOOLS = (
 	"create_oa_letter_template",
 	"update_oa_letter_template",
 	"delete_oa_letter_template",
+	"list_oa_secretariats",
+	"create_oa_secretariat",
+	"list_oa_external_orgs",
+	"create_oa_external_org",
+	"start_oa_sign_path",
+	"sign_oa_letter",
+	"dispatch_oa_letter",
+	"export_oa_ece",
+	"import_oa_ece",
+	"summarize_oa_letter",
+	"list_oa_archive_folders",
+	"get_oa_delay_report",
+	"import_oa_email_letter",
+	"ocr_oa_letter",
+	"send_oa_ece",
+	"send_oa_email_letter",
 )
 
 
@@ -168,6 +200,18 @@ def _session():
 			OaLetterAttachment.__table__,
 			OaLetterLink.__table__,
 			OaAuditLog.__table__,
+			OaSecretariat.__table__,
+			OaExternalOrg.__table__,
+			OaArchiveFolder.__table__,
+			OaUserSignature.__table__,
+			OaSignPathTemplate.__table__,
+			OaSignPathTemplateStep.__table__,
+			OaLetterSignStep.__table__,
+			OaLetterVersion.__table__,
+			OaDispatch.__table__,
+			OaEceMessage.__table__,
+			OaCartableRule.__table__,
+			OaMailboxMessage.__table__,
 		],
 	)
 	return sessionmaker(bind=engine)()
@@ -495,4 +539,231 @@ def test_letter_templates_formats_search_and_rich_body(_plugin):
 	assert updated["default_body_format"] == "html"
 	svc.delete_letter_template(db, bid, tpl["id"], owner.id)
 	svc.delete_letter_format(db, bid, fmt["id"], owner.id)
+	db.close()
+
+
+def test_ece_xml_roundtrip_jalali_and_classification():
+	from datetime import date
+
+	xml = build_ece_xml(
+		sender={"name": "دبیرخانه", "organization": "شرکت نمونه", "position": "مدیر", "department": "ستاد"},
+		receiver={"name": "سازمان الف", "organization": "سازمان الف"},
+		letter_no="OUT-1404-000001",
+		letter_date=date(2025, 10, 31),
+		subject="درخواست استعلام",
+		urgency="urgent",
+		confidentiality="highly_confidential",
+		keywords="استعلام",
+		body="متن نامه برای ECE",
+		calendar_label="jalali",
+	)
+	assert "<letter" in xml
+	assert "Protocol" in xml
+	parsed = parse_ece_xml(xml)
+	assert parsed["subject"] == "درخواست استعلام"
+	assert parsed["urgency"] == "urgent"
+	assert parsed["confidentiality"] == "highly_confidential"
+	assert parsed["letter_no"] == "OUT-1404-000001"
+	assert parsed["show_as"] == "jalali"
+	assert "متن نامه" in (parsed.get("body") or "")
+
+
+@patch("app.services.office_automation_service.check_office_automation_plugin_active", return_value=True)
+def test_commercial_upgrade_secretariats_sign_ece_track_archive(_plugin):
+	db = _session()
+	owner = _user(db, "oa-pro@example.com", "oa4")
+	clerk = _user(db, "oa-clerk@example.com", "oa5")
+	bid = 1
+	unit = svc.create_org_unit(db, bid, {"code": "hq", "name_i18n": {"fa": "ستاد", "en": "HQ"}}, owner.id)
+	mgr = svc.create_position(
+		db, bid,
+		{"code": "mgr", "org_unit_id": unit["id"], "name_i18n": {"fa": "مدیر", "en": "Manager"}, "is_secretariat": True},
+		owner.id,
+	)
+	exp = svc.create_position(
+		db, bid,
+		{"code": "exp", "org_unit_id": unit["id"], "name_i18n": {"fa": "کارشناس", "en": "Expert"}},
+		owner.id,
+	)
+	svc.assign_position_holder(db, bid, {"position_id": mgr["id"], "user_id": owner.id, "is_primary": True}, owner.id)
+	svc.assign_position_holder(db, bid, {"position_id": exp["id"], "user_id": clerk.id, "is_primary": True}, owner.id)
+
+	main_row = ext.ensure_default_secretariat(db, bid)
+	db.commit()
+	main = {"id": main_row.id}
+	branch = ext.create_secretariat(
+		db, bid,
+		{"code": "branch", "name_i18n": {"fa": "دبیرخانه شعبه", "en": "Branch secretariat"}, "outgoing_prefix": "BR"},
+		owner.id,
+	)
+	assert main["id"] != branch["id"]
+	secs = ext.list_secretariats(db, bid, lang="en")
+	assert any(s["title"] == "Central secretariat" for s in secs)
+
+	org = ext.create_external_org(
+		db, bid,
+		{"code": "org-a", "name_i18n": {"fa": "سازمان الف", "en": "Org A"}, "ece_email": "ece@org-a.test"},
+		owner.id, lang="fa",
+	)
+	assert org["ece_email"] == "ece@org-a.test"
+
+	folder = ext.save_archive_folder(db, bid, {"code": "legal", "name_i18n": {"fa": "حقوقی", "en": "Legal"}}, owner.id)
+	assert folder["code"] == "legal"
+
+	ext.save_cartable_rule(
+		db, bid,
+		{"name": "رونوشت خودکار", "conditions": {"subject_contains": "رونوشت"}, "actions": {"mark_seen": True}},
+		owner.id,
+	)
+
+	incoming = svc.create_letter_draft(
+		db, bid,
+		{
+			"subject": "وارده محرمانه با کلیدواژه",
+			"body": "متن کامل برای جستجوی تمام‌متن",
+			"letter_kind": "incoming",
+			"confidentiality": "secret",
+			"keywords": "قرارداد",
+			"external_org_id": org["id"],
+			"receipt_number": "EXT-99",
+			"letter_date": "1404/08/12",
+		},
+		owner.id, mgr["id"], calendar_type="jalali",
+	)
+	assert incoming["confidentiality"] == "secret"
+	incoming_reg = svc.register_letter(db, bid, incoming["id"], {"letter_kind": "incoming"}, owner.id, mgr["id"])
+	assert incoming_reg["tracking_token"]
+	assert incoming_reg["secretariat_id"] == main["id"]
+	assert incoming_reg["receipt_number"] == "EXT-99"
+	track = ext.public_track(db, incoming_reg["tracking_token"])
+	assert track["number"] == incoming_reg["secretariat_number"]
+	assert track["subject"] is None
+
+	hits = svc.search_letters(db, bid, owner.id, q="تمام‌متن", is_admin=True)
+	assert any(item["id"] == incoming_reg["id"] for item in hits)
+	key_hits = svc.search_letters(db, bid, owner.id, q="قرارداد", is_admin=True)
+	assert any(item["id"] == incoming_reg["id"] for item in key_hits)
+
+	outgoing = svc.create_letter_draft(
+		db, bid,
+		{"subject": "صادره نیازمند امضا", "letter_kind": "outgoing", "letter_date": "2025-11-02"},
+		owner.id, mgr["id"], calendar_type="gregorian",
+	)
+	ext.start_sign_path(
+		db, bid, outgoing["id"],
+		{"steps": [{"position_id": mgr["id"], "is_required": True}, {"position_id": exp["id"], "is_required": True}]},
+		owner.id, mgr["id"],
+	)
+	with pytest.raises(ApiError) as early:
+		ext.sign_letter_step(db, bid, outgoing["id"], {}, clerk.id, exp["id"])
+	assert early.value.code == "OA_SIGN_STEP_NOT_FOUND"
+	with pytest.raises(ApiError) as blocked:
+		svc.register_letter(db, bid, outgoing["id"], {"letter_kind": "outgoing"}, owner.id, mgr["id"])
+	assert blocked.value.code == "OA_SIGNATURE_REQUIRED"
+	ext.sign_letter_step(db, bid, outgoing["id"], {"note": "امضا شد"}, owner.id, mgr["id"])
+	ext.sign_letter_step(db, bid, outgoing["id"], {}, clerk.id, exp["id"])
+	signed = svc.get_letter(db, bid, outgoing["id"], owner.id, mgr["id"], is_admin=True)
+	assert signed["sign_status"] == "signed"
+	out_reg = svc.register_letter(
+		db, bid, outgoing["id"],
+		{"letter_kind": "outgoing", "secretariat_id": branch["id"]},
+		owner.id, mgr["id"], calendar_type="gregorian",
+	)
+	assert out_reg["secretariat_id"] == branch["id"]
+	assert out_reg["secretariat_number"].startswith("BR-")
+	assert out_reg["tracking_token"]
+
+	versions = ext.list_letter_versions(db, bid, outgoing["id"], owner.id, mgr["id"], is_admin=True)
+	assert versions
+
+	xml_data = ext.export_ece(db, bid, out_reg["id"], owner.id, mgr["id"])
+	assert "<letter" in xml_data["xml"]
+	imported = ext.import_ece(db, bid, {"xml": xml_data["xml"], "from_email": "ece@org-a.test"}, owner.id, mgr["id"])
+	assert imported["letter_kind"] == "incoming"
+	assert imported["subject"] == "صادره نیازمند امضا"
+
+	dispatched = ext.dispatch_letter(
+		db, bid, incoming_reg["id"],
+		{"to_position_id": exp["id"], "instruction": "ابلاغ جهت اجرا"},
+		owner.id, mgr["id"],
+	)
+	assert dispatched["dispatches"]
+	ack = ext.acknowledge_dispatch(db, bid, dispatched["dispatches"][0]["id"], clerk.id, exp["id"])
+	assert any(d["status"] == "acknowledged" for d in ack["dispatches"])
+
+	filed = ext.archive_to_folder(db, bid, incoming_reg["id"], {"folder_id": folder["id"]}, owner.id, mgr["id"])
+	assert filed["status"] == "archived"
+	assert filed["archive_folder_id"] == folder["id"]
+
+	mail = ext.import_email_as_letter(
+		db, bid,
+		{"subject": "ایمیل وارده", "body": "متن ایمیل", "from_email": "a@b.test", "letter_date": "1404/08/01"},
+		owner.id, mgr["id"], calendar_type="jalali",
+	)
+	assert mail["letter_kind"] == "incoming"
+	assert mail["subject"] == "ایمیل وارده"
+
+	rule_letter = svc.create_letter_draft(db, bid, {"subject": "نامه رونوشت خودکار", "letter_kind": "internal"}, owner.id, mgr["id"])
+	ruled = svc.register_letter(
+		db, bid, rule_letter["id"],
+		{"recipients": [{"to_position_id": exp["id"], "kind": "action"}]},
+		owner.id, mgr["id"],
+	)
+	assert any(r["status"] == "seen" for r in ruled["referrals"])
+
+	delay = ext.delay_report(db, bid)
+	volume = ext.volume_report(db, bid)
+	perf = ext.performance_report(db, bid)
+	assert "items" in delay and "by_kind" in volume and "items" in perf
+
+	summary = ext.summarize_letter(db, bid, out_reg["id"], owner.id, mgr["id"])
+	assert summary["ai_summary"]
+
+	conf_sec = ext.create_secretariat(
+		db, bid,
+		{"code": "secret", "name_i18n": {"fa": "دبیرخانه محرمانه", "en": "Confidential secretariat"}, "is_confidential": True, "incoming_prefix": "SEC"},
+		owner.id,
+	)
+	secret_draft = svc.create_letter_draft(
+		db, bid,
+		{"subject": "نامه سری برای دبیرخانه محرمانه", "letter_kind": "incoming", "confidentiality": "secret"},
+		owner.id, mgr["id"],
+	)
+	secret_reg = svc.register_letter(db, bid, secret_draft["id"], {"letter_kind": "incoming"}, owner.id, mgr["id"])
+	assert secret_reg["secretariat_id"] == conf_sec["id"]
+	assert secret_reg["secretariat_number"].startswith("SEC-")
+	with pytest.raises(ApiError) as classified:
+		blocked_draft = svc.create_letter_draft(
+			db, bid,
+			{"subject": "انتخاب دبیرخانه عادی برای سری", "letter_kind": "incoming", "confidentiality": "highly_confidential"},
+			owner.id, mgr["id"],
+		)
+		svc.register_letter(
+			db, bid, blocked_draft["id"],
+			{"letter_kind": "incoming", "secretariat_id": main["id"]},
+			owner.id, mgr["id"],
+		)
+	assert classified.value.code == "OA_CONFIDENTIAL_SECRETARIAT_REQUIRED"
+
+	printed = svc.get_letter_print(db, bid, out_reg["id"], owner.id, mgr["id"], is_admin=True)
+	assert "signatures" in printed["print"]
+	assert printed["print"]["copies_label"] in {"Copies", "رونوشت"}
+
+	reg_src = (Path(__file__).resolve().parents[1] / "app" / "services" / "workflow" / "trigger_registry.py").read_text(encoding="utf-8")
+	assert 'self.register("office_automation.letter_registered"' in reg_src
+	assert 'self.register("office_automation.letter_referred"' in reg_src
+	assert 'self.register("office_automation.letter_archived"' in reg_src
+	main_src = (Path(__file__).resolve().parents[1] / "app" / "main.py").read_text(encoding="utf-8")
+	assert "oa_automation_background_loop" in main_src
+
+	due_letter = svc.create_letter_draft(db, bid, {"subject": "پیگیری سررسید", "letter_kind": "internal"}, owner.id, mgr["id"])
+	due_reg = svc.register_letter(db, bid, due_letter["id"], {}, owner.id, mgr["id"])
+	row = db.query(OaLetter).filter(OaLetter.id == due_reg["id"]).one()
+	row.follow_up_at = date.today()
+	db.commit()
+	stats = ext.notify_due_followups(db, bid)
+	assert stats["due_letters"] >= 1
+	db.commit()
+	again = ext.notify_due_followups(db, bid)
+	assert again["due_letters"] == 0
 	db.close()

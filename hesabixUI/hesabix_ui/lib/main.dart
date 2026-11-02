@@ -154,10 +154,14 @@ import 'pages/business/repair_shop/repair_settings_page.dart';
 import 'pages/business/customer_club/customer_club_main_page.dart';
 import 'pages/business/customer_club/customer_club_settings_page.dart';
 import 'pages/business/payroll/payroll_main_page.dart';
+import 'pages/business/office_automation/oa_archive_page.dart';
 import 'pages/business/office_automation/oa_cartable_page.dart';
+import 'pages/business/office_automation/oa_external_orgs_page.dart';
 import 'pages/business/office_automation/oa_letter_page.dart';
 import 'pages/business/office_automation/oa_org_page.dart';
+import 'pages/business/office_automation/oa_reports_page.dart';
 import 'pages/business/office_automation/oa_settings_page.dart';
+import 'pages/public/public_oa_track_page.dart';
 import 'pages/business/fixed_assets/fixed_assets_main_page.dart';
 import 'pages/business/fixed_assets/fixed_assets_reports_page.dart';
 import 'pages/business/fixed_assets/fixed_assets_settings_page.dart';
@@ -1133,6 +1137,22 @@ class _MyAppState extends State<MyApp> {
           builder: (context, state) {
             final linkCode = state.pathParameters['linkCode'] ?? '';
             return PublicWarrantyTrackingPage(linkCode: linkCode);
+          },
+        ),
+        GoRoute(
+          path: '/public/office-automation/track',
+          name: 'public_oa_track',
+          builder: (context, state) {
+            final token = state.uri.queryParameters['token'];
+            return PublicOaTrackPage(token: token);
+          },
+        ),
+        GoRoute(
+          path: '/public/office-automation/track/:token',
+          name: 'public_oa_track_token',
+          builder: (context, state) {
+            final token = state.pathParameters['token'] ?? '';
+            return PublicOaTrackPage(token: token);
           },
         ),
         GoRoute(
@@ -2941,6 +2961,60 @@ class _MyAppState extends State<MyApp> {
                                 OfficeAutomationPluginGate(
                                   businessId: businessId,
                                   child: OaOrgPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'office-automation/external-orgs',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                OfficeAutomationPluginGate(
+                                  businessId: businessId,
+                                  child: OaExternalOrgsPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'office-automation/archive',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                OfficeAutomationPluginGate(
+                                  businessId: businessId,
+                                  child: OaArchivePage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'office-automation/reports',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                OfficeAutomationPluginGate(
+                                  businessId: businessId,
+                                  child: OaReportsPage(
                                     businessId: businessId,
                                     authStore: _authStore!,
                                   ),
