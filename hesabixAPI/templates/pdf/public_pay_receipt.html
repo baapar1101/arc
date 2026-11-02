@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>رسید پرداخت</title>
+    <style>
+        @page { size: A5; margin: 16mm; }
+        body { font-family: Tahoma, DejaVu Sans, sans-serif; color: #111; font-size: 12px; }
+        h1 { font-size: 18px; margin: 0 0 6px; text-align: center; }
+        .sub { text-align: center; color: #444; margin-bottom: 16px; }
+        .badge { text-align: center; font-weight: 700; margin-bottom: 14px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+        th, td { border: 1px solid #222; padding: 7px 8px; text-align: right; }
+        th { width: 38%; background: #f3f3f3; font-weight: 700; }
+        .qr { text-align: center; margin-top: 12px; }
+        .qr img { width: 110px; height: 110px; }
+        .foot { margin-top: 16px; font-size: 10px; color: #555; text-align: center; }
+        .url { direction: ltr; font-size: 9px; word-break: break-all; text-align: center; margin-top: 6px; }
+    </style>
+</head>
+<body>
+    <h1>رسید پرداخت</h1>
+    <div class="sub">{{ display_title }}</div>
+    <div class="badge">وضعیت: {{ status_label }}</div>
+    <table>
+        <tr><th>مبلغ</th><td>{{ amount_formatted }} {% if currency_title %}{{ currency_title }}{% endif %}</td></tr>
+        {% if paid_at %}<tr><th>تاریخ</th><td>{{ paid_at }}</td></tr>{% endif %}
+        {% if external_ref %}<tr><th>شماره پیگیری بانک</th><td>{{ external_ref }}</td></tr>{% endif %}
+        <tr><th>شماره تراکنش</th><td>{{ transaction_id }}</td></tr>
+        {% if payer_name %}<tr><th>پرداخت‌کننده</th><td>{{ payer_name }}</td></tr>{% endif %}
+        {% for row in business_rows %}
+        <tr><th>{{ row.label }}</th><td>{{ row.value }}</td></tr>
+        {% endfor %}
+    </table>
+    {% if qr_data_uri %}
+    <div class="qr"><img src="{{ qr_data_uri }}" alt="QR"></div>
+    {% endif %}
+    <div class="url">{{ receipt_url }}</div>
+    <div class="foot">این رسید برای ارائه به فروشنده صادر شده است. {{ app_name }}</div>
+</body>
+</html>

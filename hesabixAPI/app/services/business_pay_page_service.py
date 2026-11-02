@@ -443,6 +443,7 @@ def get_public_pay_page(db: Session, username: str) -> Dict[str, Any]:
 	if min_amt < GATEWAY_MIN_AMOUNT:
 		min_amt = GATEWAY_MIN_AMOUNT
 	max_amt = Decimal(str(page.max_amount)) if page.max_amount is not None else None
+	identity = public_business_identity(business)
 	return {
 		"username": page.username,
 		"redirect_to": redirect_to,
@@ -457,6 +458,96 @@ def get_public_pay_page(db: Session, username: str) -> Dict[str, Any]:
 		"currency_code": wallet.get("wallet_base_currency_code"),
 		"currency_title": wallet.get("wallet_base_currency_title"),
 		"currency_symbol": wallet.get("wallet_base_currency_symbol"),
+		**identity,
+	}
+
+
+def _clean_public_text(value: Any) -> str | None:
+	text = str(value).strip() if value is not None else ""
+	return text or None
+
+
+def public_business_identity(business: Business) -> Dict[str, Any]:
+	"""فیلدهای عمومی کسب‌وکار برای نمایش در صفحه واریز (فقط اگر ثبت شده باشند)."""
+	kind = getattr(business, "business_type", None)
+	kind_label = getattr(kind, "value", None) or (str(kind) if kind else None)
+	province = _clean_public_text(getattr(business, "province", None))
+	city = _clean_public_text(getattr(business, "city", None))
+	address = _clean_public_text(getattr(business, "address", None))
+	location_parts = [p for p in (province, city, address) if p]
+	return {
+		"business_type": _clean_public_text(kind_label),
+		"phone": _clean_public_text(getattr(business, "phone", None)),
+		"mobile": _clean_public_text(getattr(business, "mobile", None)),
+		"postal_code": _clean_public_text(getattr(business, "postal_code", None)),
+		"address": "، ".join(location_parts) if location_parts else None,
+		"national_id": _clean_public_text(getattr(business, "national_id", None)),
+		"economic_id": _clean_public_text(getattr(business, "economic_id", None)),
+		"registration_number": _clean_public_text(getattr(business, "registration_number", None)),
+	}
+
+
+def public_business_contact_rows(identity: Dict[str, Any]) -> list[Dict[str, str]]:
+	labels = (
+		("business_name", "نام کسب‌وکار"),
+		("business_type", "نوع"),
+		("phone", "تلفن"),
+		("mobile", "موبایل"),
+		("address", "نشانی"),
+		("postal_code", "کد پستی"),
+		("national_id", "شناسه ملی"),
+		("economic_id", "کد اقتصادی"),
+		("registration_number", "شماره ثبت"),
+	)
+	rows: list[Dict[str, str]] = []
+	for key, label in labels:
+		value = _clean_public_text(identity.get(key))
+		if value:
+			rows.append({"label": label, "value": value})
+	return rows
+
+
+def gateway_tracking_from_extra(extra: Dict[str, Any] | None) -> Dict[str, Any]:
+	"""شماره کارت و پیگیری‌های درگاه را از extra_info تراکنش واریز استخراج می‌کند."""
+	ex = extra if isinstance(extra, dict) else {}
+	verify = ex.get("gateway_verify") if isinstance(ex.get("gateway_verify"), dict) else {}
+
+	def _first(*values: Any) -> str | None:
+		for value in values:
+			if value is None:
+				continue
+			text = str(value).strip()
+			if text:
+				return text
+		return None
+
+	card_num = _first(
+		ex.get("card_num"),
+		ex.get("card_pan"),
+		ex.get("parsian_card"),
+		ex.get("cardNum"),
+		verify.get("card_num"),
+		verify.get("card_pan"),
+		verify.get("cardNum"),
+	)
+	gateway_ref_id = _first(
+		ex.get("gateway_ref_id"),
+		ex.get("parsian_rrn"),
+		ex.get("ref_id"),
+		verify.get("ref_id"),
+		verify.get("rrn"),
+		verify.get("gateway_ref_id"),
+	)
+	factor_id = _first(ex.get("factor_id"), verify.get("factor_id"), verify.get("factorId"))
+	card_hash = _first(ex.get("card_hash"), verify.get("card_hash"))
+	return {
+		"card_num": card_num,
+		"gateway_ref_id": gateway_ref_id,
+		"factor_id": factor_id,
+		"card_hash": card_hash,
+		"receipt_token": _first(ex.get("receipt_token")),
+		"provider": _first(ex.get("provider")),
+		"gateway_verify": verify or None,
 	}
 
 
@@ -489,9 +580,23 @@ def list_pay_page_payments(
 		payer_name = extra.get("payer_name")
 		payer_mobile = extra.get("payer_mobile")
 		note = extra.get("payer_note")
+		tracking = gateway_tracking_from_extra(extra)
 		if needle:
 			blob = " ".join(
-				str(x or "") for x in (payer_name, payer_mobile, note, tx.description, tx.external_ref)
+				str(x or "")
+				for x in (
+					payer_name,
+					payer_mobile,
+					note,
+					tx.description,
+					tx.external_ref,
+					tracking.get("card_num"),
+					tracking.get("gateway_ref_id"),
+					tracking.get("factor_id"),
+					tracking.get("receipt_token"),
+					extra.get("parsian_card"),
+					extra.get("parsian_rrn"),
+				)
 			)
 			if needle not in blob:
 				continue
@@ -520,6 +625,13 @@ def list_pay_page_payments(
 				"person_name": person_label,
 				"currency_id": extra.get("currency_id"),
 				"currency_code": extra.get("currency_code"),
+				"card_num": tracking.get("card_num"),
+				"gateway_ref_id": tracking.get("gateway_ref_id"),
+				"factor_id": tracking.get("factor_id"),
+				"card_hash": tracking.get("card_hash"),
+				"receipt_token": tracking.get("receipt_token"),
+				"provider": tracking.get("provider"),
+				"gateway_verify": tracking.get("gateway_verify"),
 			}
 		)
 	total = len(rows)

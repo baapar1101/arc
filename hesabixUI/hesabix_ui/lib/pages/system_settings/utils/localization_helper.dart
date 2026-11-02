@@ -46,6 +46,8 @@ class LocalizationHelper {
         return 'آمار پشتیبانی غیر رایگان';
       case 'settingsPaymentGateways':
         return t.settingsPaymentGateways;
+      case 'settingsPayPageAbuseReports':
+        return t.settingsPayPageAbuseReports;
       case 'settingsBusinessesManagement':
         return t.settingsBusinessesManagement;
       case 'settingsAnnouncements':
@@ -138,6 +140,8 @@ class LocalizationHelper {
         return 'گزارش درآمد، اشتراک فعال و صورت‌حساب‌های پشتیبانی';
       case 'settingsPaymentGatewaysDescription':
         return t.settingsPaymentGatewaysDescription;
+      case 'settingsPayPageAbuseReportsDescription':
+        return t.settingsPayPageAbuseReportsDescription;
       case 'settingsBusinessesManagementDescription':
         return t.settingsBusinessesManagementDescription;
       case 'settingsAnnouncementsDescription':

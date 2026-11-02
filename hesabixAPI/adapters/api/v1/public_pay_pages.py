@@ -6,17 +6,20 @@ from typing import Any, Optional
 from urllib.parse import quote
 
 from fastapi import APIRouter, Body, Depends, Form, HTTPException, Request
-from fastapi.responses import RedirectResponse, StreamingResponse
+from fastapi.responses import RedirectResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
 from app.core.payment_response import render_public_business_pay_page, resolve_payment_display_name
 from app.core.responses import ApiError, format_datetime_fields, success_response
-from app.services.business_pay_page_service import get_public_pay_page
+from app.services.business_pay_page_service import get_public_pay_page, public_business_contact_rows
 from app.services.file_storage_service import FileStorageService
+from app.services.public_pay_page_abuse_service import submit_pay_page_abuse_report
 from app.services.public_pay_page_payment_service import (
 	business_logo_file_id_for_pay_page,
+	get_public_pay_receipt,
+	render_public_pay_receipt_pdf,
 	start_public_pay_page_payment,
 )
 
@@ -50,6 +53,11 @@ def _pay_page_html_context(
 	form_name: str = "",
 	form_mobile: str = "",
 	form_note: str = "",
+	report_submitted: bool = False,
+	report_open: bool = False,
+	report_details: str = "",
+	report_name: str = "",
+	report_mobile: str = "",
 ) -> dict[str, Any]:
 	app_name = resolve_payment_display_name(db)
 	data = payload or {}
@@ -66,6 +74,17 @@ def _pay_page_html_context(
 	if payment_status not in ("success", "failed"):
 		payment_status = ""
 	show_logo = bool(data.get("show_logo")) and not not_found
+	identity = {
+		"business_name": data.get("business_name") or title if not not_found else None,
+		"business_type": data.get("business_type"),
+		"phone": data.get("phone"),
+		"mobile": data.get("mobile"),
+		"postal_code": data.get("postal_code"),
+		"address": data.get("address"),
+		"national_id": data.get("national_id"),
+		"economic_id": data.get("economic_id"),
+		"registration_number": data.get("registration_number"),
+	}
 	return {
 		"app_name": app_name,
 		"username": username,
@@ -98,6 +117,12 @@ def _pay_page_html_context(
 		"form_name": form_name,
 		"form_mobile": form_mobile,
 		"form_note": form_note,
+		"business_rows": public_business_contact_rows(identity) if not not_found else [],
+		"report_submitted": report_submitted,
+		"report_open": report_open,
+		"report_details": report_details,
+		"report_name": report_name,
+		"report_mobile": report_mobile,
 	}
 
 
@@ -141,6 +166,7 @@ def public_pay_page_html_submit(
 	name: str = Form(""),
 	mobile: str = Form(""),
 	note: str = Form(""),
+	confirm_business: str = Form(""),
 ):
 	try:
 		payload = get_public_pay_page(db, username)
@@ -155,6 +181,21 @@ def public_pay_page_html_submit(
 	redir = _canonical_redirect(request, canonical)
 	if redir is not None:
 		return redir
+	if confirm_business != "1":
+		return render_public_business_pay_page(
+			_pay_page_html_context(
+				db=db,
+				request=request,
+				username=canonical,
+				payload=payload,
+				error_message="برای ادامه، تأیید کنید که کسب‌وکار را بررسی کرده‌اید.",
+				form_amount=amount,
+				form_name=name,
+				form_mobile=mobile,
+				form_note=note,
+			),
+			status_code=400,
+		)
 	if not payload.get("is_enabled"):
 		return render_public_business_pay_page(
 			_pay_page_html_context(
@@ -211,6 +252,121 @@ def public_pay_page_html_submit(
 			status_code=502,
 		)
 	return RedirectResponse(url=payment_url, status_code=303)
+
+
+def _request_ip(request: Request) -> str | None:
+	forwarded = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+	if forwarded:
+		return forwarded
+	return request.client.host if request.client else None
+
+
+def _request_base(request: Request) -> str:
+	return f"{request.url.scheme}://{request.url.netloc}".rstrip("/")
+
+
+@router.post("/u/{username}/report", include_in_schema=False)
+def public_pay_page_report(
+	username: str,
+	request: Request,
+	db: Session = Depends(get_db),
+	reason: str = Form(""),
+	details: str = Form(""),
+	reporter_name: str = Form(""),
+	reporter_mobile: str = Form(""),
+):
+	try:
+		payload = get_public_pay_page(db, username)
+	except ApiError as exc:
+		if getattr(exc, "status_code", 404) == 404:
+			return render_public_business_pay_page(
+				_pay_page_html_context(db=db, request=request, username=username, payload=None, not_found=True),
+				status_code=404,
+			)
+		raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+	canonical = _canonical_username(payload, username)
+	try:
+		submit_pay_page_abuse_report(
+			db,
+			username=canonical,
+			reason=reason,
+			details=details,
+			reporter_name=reporter_name or None,
+			reporter_mobile=reporter_mobile or None,
+			page_url=str(request.url.replace(path=f"/u/{canonical}")),
+			ip_address=_request_ip(request),
+			user_agent=(request.headers.get("user-agent") or "")[:400],
+		)
+	except ApiError as exc:
+		return render_public_business_pay_page(
+			_pay_page_html_context(
+				db=db,
+				request=request,
+				username=canonical,
+				payload=payload,
+				error_message=_api_error_text(exc),
+				report_open=True,
+				report_details=details,
+				report_name=reporter_name,
+				report_mobile=reporter_mobile,
+			),
+			status_code=exc.status_code if 400 <= int(exc.status_code) < 500 else 400,
+		)
+	return render_public_business_pay_page(
+		_pay_page_html_context(
+			db=db,
+			request=request,
+			username=canonical,
+			payload=payload,
+			report_submitted=True,
+		)
+	)
+
+
+def _receipt_html_context(db, request: Request, username: str, data: dict[str, Any]) -> dict[str, Any]:
+	return {
+		"app_name": resolve_payment_display_name(db),
+		"username": username,
+		"display_title": data.get("display_title") or data.get("business_name") or username,
+		"show_logo": bool(data.get("show_logo")),
+		"logo_url": f"/api/v1/public/pay/{quote(username, safe='')}/logo" if data.get("show_logo") else "",
+		**data,
+	}
+
+
+@router.get("/u/{username}/r/{token}/pdf", include_in_schema=False)
+def public_pay_receipt_pdf(username: str, token: str, request: Request, db: Session = Depends(get_db)):
+	try:
+		data = get_public_pay_receipt(db, username, token, request_base=_request_base(request))
+	except ApiError as exc:
+		raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+	ctx = _receipt_html_context(db, request, data.get("username") or username, data)
+	try:
+		pdf = render_public_pay_receipt_pdf(ctx)
+	except Exception as exc:
+		raise HTTPException(status_code=502, detail="ساخت PDF رسید انجام نشد") from exc
+	return Response(
+		content=pdf,
+		media_type="application/pdf",
+		headers={"Content-Disposition": 'inline; filename="pay-receipt.pdf"'},
+	)
+
+
+@router.get("/u/{username}/r/{token}", include_in_schema=False)
+def public_pay_receipt_html(username: str, token: str, request: Request, db: Session = Depends(get_db)):
+	try:
+		data = get_public_pay_receipt(db, username, token, request_base=_request_base(request))
+	except ApiError as exc:
+		if getattr(exc, "status_code", 404) == 404:
+			return render_public_business_pay_page(
+				_pay_page_html_context(db=db, request=request, username=username, payload=None, not_found=True),
+				status_code=404,
+			)
+		raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+	return render_public_business_pay_page(
+		_receipt_html_context(db, request, data.get("username") or username, data),
+		template_name="public/pay_receipt.html",
+	)
 
 
 @router.get(

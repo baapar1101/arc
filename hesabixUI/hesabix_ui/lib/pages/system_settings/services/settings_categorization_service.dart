@@ -173,6 +173,16 @@ class SettingsCategorizationService {
             categoryId: 'financial_payment',
             order: 5,
           ),
+          SettingsItem(
+            id: 'pay_page_abuse_reports',
+            title: 'settingsPayPageAbuseReports',
+            description: 'settingsPayPageAbuseReportsDescription',
+            icon: Icons.report_gmailerrorred_outlined,
+            color: const Color(0xFFC62828),
+            route: '/user/profile/system-settings/pay-page-abuse',
+            categoryId: 'financial_payment',
+            order: 6,
+          ),
         ],
       ),
 

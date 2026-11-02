@@ -5,9 +5,9 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/core/api_client.dart';
-import 'package:hesabix_ui/core/business_named_route_locations.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/pages/business/pay_page_payment_details_dialog.dart';
 import 'package:hesabix_ui/pages/business/pay_page_poster_pdf.dart';
 import 'package:hesabix_ui/services/business_pay_page_service.dart';
 import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
@@ -609,6 +609,21 @@ class _PayPageSettingsPageState extends State<PayPageSettingsPage>
             ),
             TextColumn('payer_name', t.payPagePayerName, formatter: (it) => (it['payer_name'] ?? '').toString()),
             TextColumn('payer_mobile', t.payPagePayerMobile, formatter: (it) => (it['payer_mobile'] ?? '').toString()),
+            TextColumn(
+              'card_num',
+              t.cardNumber,
+              formatter: (it) => (it['card_num'] ?? '').toString(),
+            ),
+            TextColumn(
+              'external_ref',
+              t.payPageTrackingRef,
+              formatter: (it) => (it['external_ref'] ?? it['gateway_ref_id'] ?? '').toString(),
+            ),
+            TextColumn(
+              'gateway_ref_id',
+              t.payPageGatewayRef,
+              formatter: (it) => (it['gateway_ref_id'] ?? '').toString(),
+            ),
             TextColumn('payer_note', t.payPagePayerNote, overflow: true, maxLines: 2, formatter: (it) => (it['payer_note'] ?? '').toString()),
             NumberColumn(
               'amount',
@@ -641,15 +656,12 @@ class _PayPageSettingsPageState extends State<PayPageSettingsPage>
             ),
           ],
           onRowTap: (row) async {
-            final docId = row['document_id'];
-            if (docId == null) return;
             if (!mounted) return;
-            await BusinessNamedRoutes.pushNamed(
-              context,
-              businessId: widget.businessId,
-              routeName: 'business_documents',
-              pathParameters: {'business_id': widget.businessId.toString()},
-              extra: {'focus_document_id': docId},
+            await showDialog<void>(
+              context: context,
+              builder: (_) => PayPagePaymentDetailsDialog(
+                payment: Map<String, dynamic>.from(row),
+              ),
             );
           },
         ),

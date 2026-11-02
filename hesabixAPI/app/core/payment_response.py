@@ -285,9 +285,10 @@ def render_public_business_pay_page(
     context: Dict[str, Any],
     *,
     status_code: int = 200,
+    template_name: str = "public/pay_page.html",
 ) -> HTMLResponse:
     """صفحهٔ HTML عمومی لینک واریز کسب‌وکار (/u/{username}) بدون بارگذاری Flutter."""
-    template = jinja_env.get_template("public/pay_page.html")
+    template = jinja_env.get_template(template_name)
     html_content = template.render(**context)
     return HTMLResponse(
         content=html_content,

@@ -12383,6 +12383,31 @@ class AppLocalizationsEn extends AppLocalizations {
       'Manage and configure payment gateways';
 
   @override
+  String get settingsPayPageAbuseReports => 'Pay-link abuse reports';
+
+  @override
+  String get settingsPayPageAbuseReportsDescription =>
+      'Phishing and abuse reports from public payment pages';
+
+  @override
+  String get payPageAbuseStatusNew => 'New';
+
+  @override
+  String get payPageAbuseStatusReviewed => 'Reviewed';
+
+  @override
+  String get payPageAbuseStatusDismissed => 'Dismissed';
+
+  @override
+  String get payPageAbuseEmpty => 'No reports yet';
+
+  @override
+  String get payPageAbuseReviewTitle => 'Review abuse report';
+
+  @override
+  String get payPageAbuseAdminNote => 'Admin note';
+
+  @override
   String get settingsBusinessesManagement => 'Businesses Management';
 
   @override
@@ -19928,6 +19953,22 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get payPageUseAnonymous =>
       'Use anonymous customer when mobile is empty';
+
+  @override
+  String get payPagePaymentDetails => 'Deposit details';
+
+  @override
+  String get payPageGatewayRef => 'Gateway reference';
+
+  @override
+  String get payPageFactorId => 'Gateway invoice number';
+
+  @override
+  String get payPageReceiptToken => 'Receipt code';
+
+  @override
+  String get payPageNoAccountingDocument =>
+      'No accounting document was recorded for this deposit';
 
   @override
   String get businessSettingsTemplatesDescription =>

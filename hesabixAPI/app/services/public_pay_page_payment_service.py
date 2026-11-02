@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import secrets
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Dict, Optional
@@ -21,7 +22,7 @@ from sqlalchemy.orm import Session
 
 from adapters.api.v1.schema_models.person import PersonCreateRequest, PersonType
 from adapters.db.models.business import Business
-from adapters.db.models.business_pay_page import BusinessPayPage
+from adapters.db.models.business_pay_page import BusinessPayPage, PublicPayPageReceipt
 from adapters.db.models.person import Person
 from adapters.db.models.wallet import WalletTransaction
 from app.core.responses import ApiError
@@ -29,7 +30,9 @@ from app.services.business_pay_page_service import (
 	GATEWAY_MIN_AMOUNT,
 	WALLET_TX_TYPE_PUBLIC_PAY_LINK,
 	find_pay_page_by_username,
+	gateway_tracking_from_extra,
 	parse_pay_amount,
+	public_business_contact_rows,
 	validate_payer_mobile,
 	validate_payer_name,
 	validate_payer_note,
@@ -255,6 +258,10 @@ def start_public_pay_page_payment(
 	)
 	db.add(tx)
 	db.flush()
+	token = ensure_public_pay_receipt_token(db, tx, username=str(page.username or ""))
+	extra_info["receipt_token"] = token
+	tx.extra_info = json.dumps(extra_info, ensure_ascii=False)
+	db.flush()
 
 	try:
 		init_res = initiate_payment(
@@ -381,6 +388,7 @@ def confirm_public_pay_page_payment(
 	if note:
 		desc_parts.append(note[:200])
 	doc_desc = " — ".join(desc_parts)
+	tracking = gateway_tracking_from_extra(ex)
 
 	account_line: Dict[str, Any] = {
 		"transaction_type": "wallet",
@@ -413,6 +421,11 @@ def confirm_public_pay_page_payment(
 			"payer_mobile": ex.get("payer_mobile"),
 			"payer_note": ex.get("payer_note"),
 			"username": ex.get("username"),
+			"card_num": tracking.get("card_num"),
+			"gateway_ref_id": tracking.get("gateway_ref_id"),
+			"factor_id": tracking.get("factor_id"),
+			"external_ref": external_ref,
+			"provider": tracking.get("provider"),
 		},
 	}
 
@@ -516,7 +529,7 @@ def maybe_redirect_public_pay_page_payment_return(
 	tx_id: int,
 	verify_data: Dict[str, Any],
 ):
-	from urllib.parse import quote, urlencode
+	from urllib.parse import quote
 
 	from fastapi.responses import RedirectResponse
 
@@ -530,17 +543,150 @@ def maybe_redirect_public_pay_page_payment_return(
 	base = (resolve_public_app_base_url_for_public_links(db) or "").strip().rstrip("/")
 	if not base:
 		return None
-	success = bool(verify_data.get("success"))
-	ref = verify_data.get("external_ref") or ""
-	q = urlencode(
-		{
-			"payment_status": "success" if success else "failed",
-			"tx_id": str(tx_id),
-			"ref": str(ref),
-		}
-	)
+	token = (ex.get("receipt_token") or "").strip()
+	if not token:
+		token = ensure_public_pay_receipt_token(db, tx, username=username)
 	enc = quote(username, safe="")
-	return RedirectResponse(url=f"{base}/u/{enc}?{q}", status_code=302)
+	return RedirectResponse(url=f"{base}/u/{enc}/r/{quote(token, safe='')}", status_code=302)
+
+
+def ensure_public_pay_receipt_token(db: Session, tx: WalletTransaction, *, username: str) -> str:
+	existing = (
+		db.query(PublicPayPageReceipt)
+		.filter(PublicPayPageReceipt.wallet_transaction_id == int(tx.id))
+		.first()
+	)
+	if existing:
+		return existing.token
+	ex = _parse_extra(tx)
+	token = (ex.get("receipt_token") or "").strip() or secrets.token_urlsafe(16)
+	row = PublicPayPageReceipt(
+		token=token,
+		wallet_transaction_id=int(tx.id),
+		username=(username or ex.get("username") or "")[:30],
+	)
+	db.add(row)
+	ex["receipt_token"] = token
+	tx.extra_info = json.dumps(ex, ensure_ascii=False)
+	db.flush()
+	return token
+
+
+def _status_label(status: str) -> str:
+	value = (status or "").strip().lower()
+	if value in ("succeeded", "success"):
+		return "موفق"
+	if value in ("failed", "fail"):
+		return "ناموفق"
+	return "در انتظار تأیید"
+
+
+def public_pay_receipt_url(db: Session, *, username: str, token: str, request_base: str | None = None) -> str:
+	from urllib.parse import quote
+
+	from app.core.payment_response import join_frontend_url
+
+	base = (resolve_public_app_base_url_for_public_links(db) or "").strip().rstrip("/")
+	if not base:
+		base = (request_base or "").rstrip("/")
+	path = f"/u/{quote(username, safe='')}/r/{quote(token, safe='')}"
+	return join_frontend_url(base, path)
+
+
+def qr_png_data_uri(payload: str) -> str:
+	import base64
+	import io
+
+	import qrcode
+	from qrcode.constants import ERROR_CORRECT_M
+
+	buf = io.BytesIO()
+	qr = qrcode.QRCode(version=1, error_correction=ERROR_CORRECT_M, box_size=4, border=2)
+	qr.add_data(payload)
+	qr.make(fit=True)
+	img = qr.make_image(fill_color="black", back_color="white")
+	img.save(buf, format="PNG")
+	return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+def get_public_pay_receipt(db: Session, username: str, token: str, *, request_base: str | None = None) -> Dict[str, Any]:
+	from app.core.calendar import CalendarConverter
+	from app.services.business_pay_page_service import get_public_pay_page, normalize_username
+
+	token = (token or "").strip()
+	if not token:
+		raise ApiError("RECEIPT_NOT_FOUND", "رسید یافت نشد", http_status=404)
+	row = db.query(PublicPayPageReceipt).filter(PublicPayPageReceipt.token == token).first()
+	if not row:
+		raise ApiError("RECEIPT_NOT_FOUND", "رسید یافت نشد", http_status=404)
+	tx = db.query(WalletTransaction).filter(WalletTransaction.id == int(row.wallet_transaction_id)).first()
+	if not tx or (tx.type or "").strip() != WALLET_TX_TYPE_PUBLIC_PAY_LINK:
+		raise ApiError("RECEIPT_NOT_FOUND", "رسید یافت نشد", http_status=404)
+	page_payload = get_public_pay_page(db, username)
+	canonical = str(page_payload.get("username") or username)
+	wanted = normalize_username(username)
+	if normalize_username(row.username) not in {wanted, normalize_username(canonical)}:
+		raise ApiError("RECEIPT_NOT_FOUND", "رسید یافت نشد", http_status=404)
+	ex = _parse_extra(tx)
+	when = tx.updated_at or tx.created_at or datetime.utcnow()
+	jalali = CalendarConverter.to_jalali(when) or {}
+	status = (tx.status or "").strip().lower()
+	success = status in ("succeeded", "success")
+	failed = status in ("failed", "fail")
+	amount = float(tx.amount or 0)
+	currency = str(ex.get("currency_code") or page_payload.get("currency_code") or "").strip()
+	identity = {
+		"business_name": page_payload.get("business_name") or page_payload.get("display_title"),
+		"business_type": page_payload.get("business_type"),
+		"phone": page_payload.get("phone"),
+		"mobile": page_payload.get("mobile"),
+		"postal_code": page_payload.get("postal_code"),
+		"address": page_payload.get("address"),
+		"national_id": page_payload.get("national_id"),
+		"economic_id": page_payload.get("economic_id"),
+		"registration_number": page_payload.get("registration_number"),
+	}
+	url = public_pay_receipt_url(db, username=canonical, token=token, request_base=request_base)
+	try:
+		qr_uri = qr_png_data_uri(url)
+	except Exception:
+		logger.exception("public_pay_receipt_qr_failed")
+		qr_uri = ""
+	return {
+		"token": token,
+		"username": canonical,
+		"receipt_url": url,
+		"pdf_url": f"{url}/pdf",
+		"qr_data_uri": qr_uri,
+		"status": status or "pending",
+		"status_label": _status_label(status),
+		"success": success,
+		"failed": failed,
+		"amount": amount,
+		"amount_formatted": f"{int(amount):,}" if amount == int(amount) else f"{amount:,.2f}",
+		"currency_code": currency,
+		"currency_title": page_payload.get("currency_title") or currency,
+		"external_ref": tx.external_ref or "",
+		"transaction_id": int(tx.id),
+		"paid_at": jalali.get("formatted") or (when.strftime("%Y/%m/%d %H:%M") if when else ""),
+		"payer_name": ex.get("payer_name") or "",
+		"payer_mobile": ex.get("payer_mobile") or "",
+		"payer_note": ex.get("payer_note") or "",
+		"display_title": page_payload.get("display_title"),
+		"show_logo": bool(page_payload.get("show_logo")),
+		"business_rows": public_business_contact_rows(identity),
+		**identity,
+	}
+
+
+def render_public_pay_receipt_pdf(context: Dict[str, Any]) -> bytes:
+	from app.core.payment_response import jinja_env
+	from app.core.weasyprint_runtime import load_weasyprint
+
+	html = jinja_env.get_template("pdf/public_pay_receipt.html").render(**context)
+	runtime = load_weasyprint()
+	font_config = runtime.FontConfiguration()
+	return runtime.HTML(string=html).write_pdf(font_config=font_config)
 
 
 def business_logo_file_id_for_pay_page(db: Session, username: str) -> Optional[UUID]:

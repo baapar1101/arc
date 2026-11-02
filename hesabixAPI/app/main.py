@@ -1183,6 +1183,8 @@ def create_app() -> FastAPI:
     application.include_router(admin_scripts_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.admin.payment_gateways import router as admin_payment_gateways_router
     application.include_router(admin_payment_gateways_router, prefix=settings.api_v1_prefix)
+    from adapters.api.v1.admin.pay_page_abuse_reports import router as admin_pay_page_abuse_router
+    application.include_router(admin_pay_page_abuse_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_announcements_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_notification_templates_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_notification_event_types_router, prefix=settings.api_v1_prefix)

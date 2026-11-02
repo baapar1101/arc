@@ -109,6 +109,9 @@ def _enabled_page_payload(**overrides):
 		"intro_text": "خوش آمدید",
 		"min_amount": 50000,
 		"currency_title": "ریال",
+		"phone": "02112345678",
+		"mobile": "09121234567",
+		"postal_code": "1234567890",
 	}
 	data.update(overrides)
 	return data
@@ -170,6 +173,12 @@ def test_short_pay_page_serves_backend_html_not_flutter_redirect():
 	assert "پرداخت به فروشگاه علی" in res.text
 	assert "/public/pay/" not in (res.headers.get("location") or "")
 	assert 'action="/u/shop-ali"' in res.text
+	assert "02112345678" in res.text
+	assert "09121234567" in res.text
+	assert "1234567890" in res.text
+	assert "فیشینگ" in res.text
+	assert "گزارش تخلف" in res.text
+	assert "قبل از واریز" in res.text
 
 
 def test_short_pay_page_unknown_username_is_html_404():
@@ -209,7 +218,11 @@ def test_short_pay_page_form_post_redirects_to_gateway():
 		"adapters.api.v1.public_pay_pages.resolve_payment_display_name",
 		return_value="حسابیکس",
 	):
-		res = client.post("/u/shop-ali", data={"amount": "100000"}, follow_redirects=False)
+		res = client.post(
+			"/u/shop-ali",
+			data={"amount": "100000", "confirm_business": "1"},
+			follow_redirects=False,
+		)
 	assert res.status_code == 303
 	assert res.headers["location"] == "https://bank.example/pay"
 
@@ -222,7 +235,7 @@ def test_gateway_return_redirects_to_backend_short_url():
 		status="pending",
 		amount=100000,
 	)
-	tx.extra_info = '{"username": "ali"}'
+	tx.extra_info = '{"username": "ali", "receipt_token": "tok123"}'
 	db.query.return_value.filter.return_value.first.return_value = tx
 	with patch(
 		"app.services.public_pay_page_payment_service.resolve_public_app_base_url_for_public_links",
@@ -236,6 +249,109 @@ def test_gateway_return_redirects_to_backend_short_url():
 	assert resp is not None
 	assert resp.status_code == 302
 	location = resp.headers["location"]
-	assert location.startswith("https://app.example/u/ali?")
-	assert "payment_status=success" in location
+	assert location == "https://app.example/u/ali/r/tok123"
 	assert "/public/pay/" not in location
+
+
+def test_public_business_contact_rows_skip_empty():
+	from app.services.business_pay_page_service import public_business_contact_rows
+
+	rows = public_business_contact_rows(
+		{
+			"business_name": "فروشگاه علی",
+			"phone": "0211",
+			"mobile": None,
+			"postal_code": "  ",
+		}
+	)
+	labels = {r["label"] for r in rows}
+	assert "نام کسب‌وکار" in labels
+	assert "تلفن" in labels
+	assert "موبایل" not in labels
+	assert "کد پستی" not in labels
+
+
+def test_short_pay_page_requires_business_confirm():
+	client = _public_pay_html_client()
+	with patch(
+		"adapters.api.v1.public_pay_pages.get_public_pay_page",
+		return_value=_enabled_page_payload(),
+	), patch(
+		"adapters.api.v1.public_pay_pages.resolve_payment_display_name",
+		return_value="حسابیکس",
+	):
+		res = client.post("/u/shop-ali", data={"amount": "100000"}, follow_redirects=False)
+	assert res.status_code == 400
+	assert "بررسی" in res.text
+
+
+def test_short_pay_page_abuse_report_is_recorded():
+	client = _public_pay_html_client()
+	with patch(
+		"adapters.api.v1.public_pay_pages.get_public_pay_page",
+		return_value=_enabled_page_payload(),
+	), patch(
+		"adapters.api.v1.public_pay_pages.submit_pay_page_abuse_report",
+		return_value={"id": 1},
+	) as submit, patch(
+		"adapters.api.v1.public_pay_pages.resolve_payment_display_name",
+		return_value="حسابیکس",
+	):
+		res = client.post(
+			"/u/shop-ali/report",
+			data={
+				"reason": "phishing",
+				"details": "این صفحه با کسب‌وکار واقعی همخوانی ندارد و مشکوک است",
+			},
+		)
+	assert res.status_code == 200
+	assert "گزارش شما ثبت شد" in res.text
+	assert submit.called
+
+
+def test_gateway_tracking_reads_legacy_and_unified_fields():
+	from app.services.business_pay_page_service import gateway_tracking_from_extra
+
+	legacy = gateway_tracking_from_extra(
+		{"parsian_card": "6037-****-1234", "parsian_rrn": "998877", "receipt_token": "tok"}
+	)
+	assert legacy["card_num"] == "6037-****-1234"
+	assert legacy["gateway_ref_id"] == "998877"
+	assert legacy["receipt_token"] == "tok"
+
+	unified = gateway_tracking_from_extra(
+		{
+			"card_num": "5022****8899",
+			"gateway_ref_id": "ref-1",
+			"factor_id": "44",
+			"gateway_verify": {"card_num": "ignored", "trans_id": "t9"},
+		}
+	)
+	assert unified["card_num"] == "5022****8899"
+	assert unified["gateway_ref_id"] == "ref-1"
+	assert unified["factor_id"] == "44"
+	assert unified["gateway_verify"]["trans_id"] == "t9"
+
+
+def test_persist_gateway_verify_keeps_payer_fields():
+	import json
+
+	from app.services.payment_service import persist_gateway_verify_on_tx
+
+	tx = WalletTransaction()
+	extra = {"payer_name": "علی", "payer_mobile": "09121234567"}
+	persist_gateway_verify_on_tx(
+		tx,
+		extra,
+		card_num=" 603799******1234 ",
+		ref_id=987654,
+		factor_id="12",
+		extra_fields={"trans_id": "bit-1", "status": 1},
+	)
+	assert extra["payer_name"] == "علی"
+	assert extra["card_num"] == "603799******1234"
+	assert extra["gateway_ref_id"] == "987654"
+	assert extra["factor_id"] == "12"
+	stored = json.loads(tx.extra_info or "{}")
+	assert stored["gateway_verify"]["card_num"] == "603799******1234"
+	assert stored["gateway_verify"]["trans_id"] == "bit-1"

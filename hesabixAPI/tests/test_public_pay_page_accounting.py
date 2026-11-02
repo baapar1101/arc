@@ -33,7 +33,8 @@ def test_confirm_success_posts_receipt_wallet_line_not_saas_balance():
 	tx.id = 3
 	tx.extra_info = (
 		'{"gateway_id": 1, "currency_id": 1, "created_by_user_id": 4, '
-		'"payer_name": "علی", "username": "ali"}'
+		'"payer_name": "علی", "username": "ali", "card_num": "6037****1234", '
+		'"gateway_ref_id": "ZP-99"}'
 	)
 
 	business = SimpleNamespace(id=7, owner_id=4, name="فروشگاه علی", deleted_at=None)
@@ -77,3 +78,6 @@ def test_confirm_success_posts_receipt_wallet_line_not_saas_balance():
 	assert data["person_lines"][0]["person_id"] == 88
 	assert data["extra_info"]["person_is_receivable"] is True
 	assert data["extra_info"]["source"] == "public_pay_link"
+	assert data["extra_info"]["card_num"] == "6037****1234"
+	assert data["extra_info"]["gateway_ref_id"] == "ZP-99"
+	assert data["extra_info"]["external_ref"] == "REF1"

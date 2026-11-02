@@ -12317,6 +12317,31 @@ class AppLocalizationsFa extends AppLocalizations {
   String get settingsPaymentGatewaysDescription => 'مدیریت و پیکربندی درگاه‌ها';
 
   @override
+  String get settingsPayPageAbuseReports => 'گزارش تخلف لینک واریز';
+
+  @override
+  String get settingsPayPageAbuseReportsDescription =>
+      'گزارش‌های فیشینگ و تخلف صفحات پرداخت عمومی';
+
+  @override
+  String get payPageAbuseStatusNew => 'جدید';
+
+  @override
+  String get payPageAbuseStatusReviewed => 'بررسی‌شده';
+
+  @override
+  String get payPageAbuseStatusDismissed => 'رد شده';
+
+  @override
+  String get payPageAbuseEmpty => 'گزارشی ثبت نشده است';
+
+  @override
+  String get payPageAbuseReviewTitle => 'بررسی گزارش تخلف';
+
+  @override
+  String get payPageAbuseAdminNote => 'یادداشت ادمین';
+
+  @override
   String get settingsBusinessesManagement => 'مدیریت کسب و کارها';
 
   @override
@@ -19814,6 +19839,22 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get payPageUseAnonymous =>
       'استفاده از مشتری ناشناس وقتی موبایل خالی است';
+
+  @override
+  String get payPagePaymentDetails => 'جزئیات واریز';
+
+  @override
+  String get payPageGatewayRef => 'شماره مرجع درگاه';
+
+  @override
+  String get payPageFactorId => 'شماره فاکتور درگاه';
+
+  @override
+  String get payPageReceiptToken => 'کد رسید';
+
+  @override
+  String get payPageNoAccountingDocument =>
+      'برای این واریز سند حسابداری ثبت نشده است';
 
   @override
   String get businessSettingsTemplatesDescription =>

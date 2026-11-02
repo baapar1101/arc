@@ -22866,6 +22866,54 @@ abstract class AppLocalizations {
   /// **'Manage and configure payment gateways'**
   String get settingsPaymentGatewaysDescription;
 
+  /// No description provided for @settingsPayPageAbuseReports.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay-link abuse reports'**
+  String get settingsPayPageAbuseReports;
+
+  /// No description provided for @settingsPayPageAbuseReportsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Phishing and abuse reports from public payment pages'**
+  String get settingsPayPageAbuseReportsDescription;
+
+  /// No description provided for @payPageAbuseStatusNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New'**
+  String get payPageAbuseStatusNew;
+
+  /// No description provided for @payPageAbuseStatusReviewed.
+  ///
+  /// In en, this message translates to:
+  /// **'Reviewed'**
+  String get payPageAbuseStatusReviewed;
+
+  /// No description provided for @payPageAbuseStatusDismissed.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismissed'**
+  String get payPageAbuseStatusDismissed;
+
+  /// No description provided for @payPageAbuseEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No reports yet'**
+  String get payPageAbuseEmpty;
+
+  /// No description provided for @payPageAbuseReviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Review abuse report'**
+  String get payPageAbuseReviewTitle;
+
+  /// No description provided for @payPageAbuseAdminNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin note'**
+  String get payPageAbuseAdminNote;
+
   /// No description provided for @settingsBusinessesManagement.
   ///
   /// In en, this message translates to:
@@ -36539,6 +36587,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Use anonymous customer when mobile is empty'**
   String get payPageUseAnonymous;
+
+  /// No description provided for @payPagePaymentDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Deposit details'**
+  String get payPagePaymentDetails;
+
+  /// No description provided for @payPageGatewayRef.
+  ///
+  /// In en, this message translates to:
+  /// **'Gateway reference'**
+  String get payPageGatewayRef;
+
+  /// No description provided for @payPageFactorId.
+  ///
+  /// In en, this message translates to:
+  /// **'Gateway invoice number'**
+  String get payPageFactorId;
+
+  /// No description provided for @payPageReceiptToken.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipt code'**
+  String get payPageReceiptToken;
+
+  /// No description provided for @payPageNoAccountingDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'No accounting document was recorded for this deposit'**
+  String get payPageNoAccountingDocument;
 
   /// No description provided for @businessSettingsTemplatesDescription.
   ///

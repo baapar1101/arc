@@ -139,7 +139,21 @@ def pay_page_payments_export(
 	buf = io.StringIO()
 	writer = csv.writer(buf)
 	writer.writerow(
-		["id", "created_at", "status", "amount", "payer_name", "payer_mobile", "payer_note", "document_id", "person_id"]
+		[
+			"id",
+			"created_at",
+			"status",
+			"amount",
+			"payer_name",
+			"payer_mobile",
+			"payer_note",
+			"card_num",
+			"external_ref",
+			"gateway_ref_id",
+			"factor_id",
+			"document_id",
+			"person_id",
+		]
 	)
 	for it in data.get("items") or []:
 		writer.writerow(
@@ -151,6 +165,10 @@ def pay_page_payments_export(
 				it.get("payer_name") or "",
 				it.get("payer_mobile") or "",
 				it.get("payer_note") or "",
+				it.get("card_num") or "",
+				it.get("external_ref") or "",
+				it.get("gateway_ref_id") or "",
+				it.get("factor_id") or "",
 				it.get("document_id") or "",
 				it.get("person_id") or "",
 			]

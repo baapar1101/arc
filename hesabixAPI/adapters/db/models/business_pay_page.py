@@ -80,3 +80,53 @@ class BusinessPayPageUsernameHistory(Base):
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
 	business = relationship("Business")
+
+
+class PublicPayPageReceipt(Base):
+	"""توکن عمومی رسید واریز لینک پرداخت برای پیگیری مشتری و فروشنده."""
+
+	__tablename__ = "public_pay_page_receipts"
+	__table_args__ = (
+		UniqueConstraint("wallet_transaction_id", name="uq_public_pay_page_receipts_tx"),
+		Index("ix_public_pay_page_receipts_username", "username"),
+	)
+
+	token: Mapped[str] = mapped_column(String(48), primary_key=True)
+	wallet_transaction_id: Mapped[int] = mapped_column(
+		Integer, ForeignKey("wallet_transactions.id", ondelete="CASCADE"), nullable=False
+	)
+	username: Mapped[str] = mapped_column(String(30), nullable=False)
+	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class PublicPayPageAbuseReport(Base):
+	"""گزارش تخلف/فیشینگ صفحه واریز عمومی؛ در تنظیمات سیستم بررسی می‌شود."""
+
+	__tablename__ = "public_pay_page_abuse_reports"
+	__table_args__ = (
+		Index("ix_pay_page_abuse_created_at", "created_at"),
+		Index("ix_pay_page_abuse_status", "status"),
+		Index("ix_pay_page_abuse_business", "business_id"),
+	)
+
+	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+	business_id: Mapped[int | None] = mapped_column(
+		Integer, ForeignKey("businesses.id", ondelete="SET NULL"), nullable=True
+	)
+	username: Mapped[str] = mapped_column(String(30), nullable=False)
+	reason: Mapped[str] = mapped_column(String(40), nullable=False)
+	details: Mapped[str] = mapped_column(Text, nullable=False)
+	reporter_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
+	reporter_mobile: Mapped[str | None] = mapped_column(String(20), nullable=True)
+	page_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+	ip_address: Mapped[str | None] = mapped_column(String(64), nullable=True)
+	user_agent: Mapped[str | None] = mapped_column(String(400), nullable=True)
+	status: Mapped[str] = mapped_column(String(20), nullable=False, default="new", server_default="new")
+	admin_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+	reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+	reviewed_by: Mapped[int | None] = mapped_column(
+		Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+	)
+
+	business = relationship("Business")
