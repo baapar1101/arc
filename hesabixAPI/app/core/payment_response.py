@@ -281,6 +281,21 @@ def render_payment_failed(
     return HTMLResponse(content=html_content, status_code=200)
 
 
+def render_public_business_pay_page(
+    context: Dict[str, Any],
+    *,
+    status_code: int = 200,
+) -> HTMLResponse:
+    """صفحهٔ HTML عمومی لینک واریز کسب‌وکار (/u/{username}) بدون بارگذاری Flutter."""
+    template = jinja_env.get_template("public/pay_page.html")
+    html_content = template.render(**context)
+    return HTMLResponse(
+        content=html_content,
+        status_code=status_code,
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+    )
+
+
 def should_return_json(request: Request) -> bool:
     """
     تشخیص اینکه باید JSON برگردونیم یا HTML

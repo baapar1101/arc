@@ -540,7 +540,7 @@ def maybe_redirect_public_pay_page_payment_return(
 		}
 	)
 	enc = quote(username, safe="")
-	return RedirectResponse(url=f"{base}/public/pay/{enc}?{q}", status_code=302)
+	return RedirectResponse(url=f"{base}/u/{enc}?{q}", status_code=302)
 
 
 def business_logo_file_id_for_pay_page(db: Session, username: str) -> Optional[UUID]:

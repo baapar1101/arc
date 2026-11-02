@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0f766e">
+    <meta name="robots" content="noindex,nofollow">
+    <title>{{ page_title }} — {{ app_name }}</title>
+    <style>
+        :root {
+            --teal: #0f766e;
+            --teal-dark: #115e59;
+            --teal-soft: #ccfbf1;
+            --ink: #0f172a;
+            --muted: #64748b;
+            --line: #e2e8f0;
+            --bg: #f0fdfa;
+            --card: #ffffff;
+            --danger: #dc2626;
+            --ok: #059669;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            min-height: 100vh;
+            font-family: Tahoma, "Segoe UI", Vazir, Sahel, sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(1200px 500px at 100% -10%, #99f6e4 0%, transparent 55%),
+                radial-gradient(900px 400px at -10% 110%, #5eead4 0%, transparent 50%),
+                linear-gradient(180deg, #ecfdf5 0%, var(--bg) 40%, #e2e8f0 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 24px 16px 32px;
+        }
+        .wrap {
+            width: 100%;
+            max-width: 440px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .brand {
+            text-align: center;
+            color: var(--teal-dark);
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 16px;
+            font-size: 15px;
+        }
+        .card {
+            background: var(--card);
+            border-radius: 24px;
+            box-shadow: 0 24px 60px rgba(15, 118, 110, 0.16), 0 2px 8px rgba(15, 23, 42, 0.06);
+            overflow: hidden;
+            animation: rise 0.45s ease-out;
+        }
+        @keyframes rise {
+            from { opacity: 0; transform: translateY(18px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .hero {
+            background: linear-gradient(135deg, #0f766e 0%, #0e7490 100%);
+            color: #fff;
+            text-align: center;
+            padding: 28px 24px 32px;
+        }
+        .logo {
+            width: 84px;
+            height: 84px;
+            border-radius: 22px;
+            object-fit: cover;
+            background: #fff;
+            margin: 0 auto 14px;
+            display: block;
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+        }
+        .logo-fallback {
+            width: 84px;
+            height: 84px;
+            border-radius: 22px;
+            margin: 0 auto 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.16);
+            font-size: 34px;
+        }
+        .hero h1 {
+            font-size: 22px;
+            font-weight: 800;
+            line-height: 1.4;
+        }
+        .intro {
+            margin-top: 8px;
+            font-size: 14px;
+            line-height: 1.7;
+            color: rgba(255, 255, 255, 0.88);
+        }
+        .body { padding: 22px 20px 24px; }
+        .hint {
+            font-size: 13px;
+            color: var(--muted);
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        .alert {
+            border-radius: 14px;
+            padding: 12px 14px;
+            margin-bottom: 16px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .alert-error { background: #fef2f2; color: #991b1b; }
+        .alert-info { background: #f1f5f9; color: #334155; }
+        .receipt {
+            text-align: center;
+            padding: 8px 4px 4px;
+        }
+        .receipt .icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        .receipt.ok .icon { background: #d1fae5; color: var(--ok); }
+        .receipt.bad .icon { background: #fee2e2; color: var(--danger); }
+        .receipt h2 { font-size: 18px; margin-bottom: 6px; }
+        .receipt p { color: var(--muted); font-size: 14px; line-height: 1.7; }
+        .meta {
+            margin-top: 16px;
+            background: #f8fafc;
+            border-radius: 14px;
+            text-align: right;
+            overflow: hidden;
+        }
+        .meta-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--line);
+            font-size: 13px;
+        }
+        .meta-row:last-child { border-bottom: 0; }
+        .meta-row span:first-child { color: var(--muted); }
+        .meta-row span:last-child { font-weight: 700; word-break: break-all; }
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 700;
+            margin: 12px 0 6px;
+            color: #334155;
+        }
+        input, textarea {
+            width: 100%;
+            border: 1.5px solid var(--line);
+            border-radius: 12px;
+            padding: 12px 14px;
+            font-size: 16px;
+            font-family: inherit;
+            background: #fff;
+            color: var(--ink);
+            outline: none;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        input:focus, textarea:focus {
+            border-color: var(--teal);
+            box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.12);
+        }
+        textarea { min-height: 84px; resize: vertical; }
+        .btn {
+            display: block;
+            width: 100%;
+            margin-top: 18px;
+            border: 0;
+            border-radius: 14px;
+            padding: 14px 16px;
+            font-size: 16px;
+            font-weight: 800;
+            cursor: pointer;
+            background: linear-gradient(135deg, var(--teal) 0%, #0e7490 100%);
+            color: #fff;
+            text-decoration: none;
+            text-align: center;
+            box-shadow: 0 10px 24px rgba(15, 118, 110, 0.28);
+        }
+        .btn:disabled { opacity: 0.65; cursor: wait; }
+        .btn-ghost {
+            margin-top: 10px;
+            background: #f1f5f9;
+            color: #334155;
+            box-shadow: none;
+        }
+        .trust {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 14px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 18px;
+            color: #64748b;
+            font-size: 12px;
+        }
+        @media (max-width: 420px) {
+            .hero { padding: 24px 18px 28px; }
+            .hero h1 { font-size: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="brand">{{ app_name }}</div>
+        <div class="card">
+            <div class="hero">
+                {% if show_logo and logo_url %}
+                <img class="logo" src="{{ logo_url }}" alt="{{ display_title }}" onerror="this.style.display='none'">
+                {% else %}
+                <div class="logo-fallback" aria-hidden="true">💳</div>
+                {% endif %}
+                <h1>{{ heading }}</h1>
+                {% if intro_text %}
+                <p class="intro">{{ intro_text }}</p>
+                {% endif %}
+            </div>
+            <div class="body">
+                {% if not_found %}
+                <div class="alert alert-error">{{ not_found_message }}</div>
+                {% elif payment_status == 'success' %}
+                <div class="receipt ok">
+                    <div class="icon">✓</div>
+                    <h2>{{ receipt_success }}</h2>
+                    <p>{{ receipt_title }}</p>
+                    <div class="meta">
+                        {% if receipt_ref %}
+                        <div class="meta-row"><span>{{ tracking_label }}</span><span>{{ receipt_ref }}</span></div>
+                        {% endif %}
+                        {% if receipt_tx %}
+                        <div class="meta-row"><span>شماره تراکنش</span><span>{{ receipt_tx }}</span></div>
+                        {% endif %}
+                    </div>
+                    <a class="btn btn-ghost" href="/u/{{ username }}">پرداخت جدید</a>
+                </div>
+                {% elif payment_status == 'failed' %}
+                <div class="receipt bad">
+                    <div class="icon">!</div>
+                    <h2>{{ receipt_failed }}</h2>
+                    <p>{{ receipt_title }}</p>
+                    <div class="meta">
+                        {% if receipt_ref %}
+                        <div class="meta-row"><span>{{ tracking_label }}</span><span>{{ receipt_ref }}</span></div>
+                        {% endif %}
+                        {% if receipt_tx %}
+                        <div class="meta-row"><span>شماره تراکنش</span><span>{{ receipt_tx }}</span></div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if error_message %}
+                <div class="alert alert-error">{{ error_message }}</div>
+                {% endif %}
+
+                {% if not not_found and is_enabled and payment_status != 'success' %}
+                {% if currency_hint %}
+                <p class="hint">{{ currency_hint }}</p>
+                {% endif %}
+                <form method="post" action="/u/{{ username }}" id="pay-form" novalidate>
+                    <label for="amount">{{ amount_label }}</label>
+                    <input
+                        id="amount"
+                        name="amount"
+                        inputmode="numeric"
+                        autocomplete="off"
+                        required
+                        placeholder="{{ min_amount_hint }}"
+                        value="{{ form_amount }}"
+                    >
+                    <label for="name">{{ name_label }}</label>
+                    <input id="name" name="name" maxlength="30" value="{{ form_name }}" autocomplete="name">
+                    <label for="mobile">{{ mobile_label }}</label>
+                    <input id="mobile" name="mobile" inputmode="numeric" maxlength="11" placeholder="09xxxxxxxxx" value="{{ form_mobile }}" autocomplete="tel">
+                    <label for="note">{{ note_label }}</label>
+                    <textarea id="note" name="note" maxlength="1000">{{ form_note }}</textarea>
+                    <button class="btn" type="submit" id="pay-btn">{{ pay_button }}</button>
+                </form>
+                <div class="trust">
+                    <span aria-hidden="true">🔒</span>
+                    <span>پرداخت امن از طریق درگاه بانکی</span>
+                </div>
+                {% elif not not_found and not is_enabled and payment_status != 'success' %}
+                <div class="alert alert-info">{{ disabled_message }}</div>
+                {% endif %}
+            </div>
+        </div>
+        <p class="footer">{{ app_name }}</p>
+    </div>
+    <script>
+        (function () {
+            var input = document.getElementById('amount');
+            if (!input) return;
+            var form = document.getElementById('pay-form');
+            var btn = document.getElementById('pay-btn');
+            function toEn(s) {
+                var fa = '۰۱۲۳۴۵۶۷۸۹';
+                var ar = '٠١٢٣٤٥٦٧٨٩';
+                return String(s || '').replace(/[۰-۹]/g, function (ch) { return fa.indexOf(ch); })
+                    .replace(/[٠-٩]/g, function (ch) { return ar.indexOf(ch); });
+            }
+            function format(s) {
+                var digits = toEn(s).replace(/[^\d]/g, '');
+                if (!digits) return '';
+                return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            }
+            input.addEventListener('input', function () {
+                var pos = input.selectionStart;
+                var before = input.value.length;
+                input.value = format(input.value);
+                var after = input.value.length;
+                try { input.setSelectionRange(pos + (after - before), pos + (after - before)); } catch (e) {}
+            });
+            if (input.value) input.value = format(input.value);
+            if (form) {
+                form.addEventListener('submit', function () {
+                    input.value = toEn(input.value).replace(/[^\d]/g, '');
+                    if (btn) {
+                        btn.disabled = true;
+                        btn.textContent = 'در حال انتقال به درگاه…';
+                    }
+                });
+            }
+        })();
+    </script>
+</body>
+</html>

@@ -3110,7 +3110,7 @@ server {
     proxy_send_timeout 30;
   }
 
-  # Public business pay page: /u/{username} → backend (307 to /public/pay/)
+  # Public business pay page: /u/{username} → backend HTML (no Flutter)
   location /u/ {
     proxy_pass http://127.0.0.1:8000/u/;
     proxy_http_version 1.1;
@@ -3408,7 +3408,7 @@ server {
     proxy_send_timeout 30;
   }
 
-  # Public business pay page: /u/{username} → backend (307 to /public/pay/)
+  # Public business pay page: /u/{username} → backend HTML (no Flutter)
   location /u/ {
     proxy_pass http://127.0.0.1:8000/u/;
     proxy_http_version 1.1;

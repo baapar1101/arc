@@ -148,7 +148,7 @@ ${API_SSL_BLOCK}
     proxy_send_timeout 30;
   }
 
-  # Public business pay page: /u/{username} → backend (307 → Flutter /public/pay/...)
+  # Public business pay page: /u/{username} → backend HTML (no Flutter)
   location /u/ {
     proxy_pass http://127.0.0.1:8000/u/;
     proxy_http_version 1.1;
@@ -392,7 +392,7 @@ ${UI_SSL_BLOCK}
     proxy_send_timeout 30;
   }
 
-  # Public business pay page: /u/{username} → backend (307 to /public/pay/{username})
+  # Public business pay page: /u/{username} → backend HTML (no Flutter)
   location /u/ {
     proxy_pass http://127.0.0.1:8000/u/;
     proxy_http_version 1.1;
