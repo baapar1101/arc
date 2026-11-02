@@ -1,6 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -18,6 +19,8 @@ from app.services.invoice_product_price_sync_service import (
 from app.services.invoice_purchase_price_snapshot_service import (
     _snapshot_value_for_line,
     purchase_price_unit_cost_base_from_snapshot,
+    preview_purchase_price_unit_cost_base,
+    resolve_catalog_purchase_price_main_base,
     resolve_missing_purchase_price_unit_cost,
 )
 from app.services.invoice_unit_conversion_service import (
@@ -123,6 +126,39 @@ def test_older_purchase_invoice_cannot_replace_newer_synced_source():
     )
     assert _source_is_newer_than_document(product, older) is True
     assert _source_is_newer_than_document(product, same_source) is False
+
+
+def test_catalog_falls_back_to_fx_purchase_price_converted_to_base(monkeypatch):
+    product = SimpleNamespace(
+        main_unit="کارتن",
+        secondary_unit="عدد",
+        unit_conversion_factor=Decimal("20"),
+        base_purchase_price=None,
+        purchase_price_fx=Decimal("10"),
+        price_fx_currency_id=2,
+    )
+    db = MagicMock()
+    db.get.return_value = SimpleNamespace(default_currency_id=1)
+
+    def fake_rate(_db, _bid, _cid, _when):
+        return {"rate": Decimal("150000")}
+
+    monkeypatch.setattr(
+        "app.services.business_currency_rate_service.resolve_rate_to_base",
+        fake_rate,
+    )
+    main, source = resolve_catalog_purchase_price_main_base(db, 9, product, date(2026, 1, 1))
+    assert main == Decimal("1500000")
+    assert source == "product_purchase_price_fx"
+    preview_fx = preview_purchase_price_unit_cost_base(
+        product,
+        _line(unit="عدد"),
+        missing_policy="zero_cost",
+        db=db,
+        business_id=9,
+        as_of=date(2026, 1, 1),
+    )
+    assert preview_fx == Decimal("75000")
 
 
 def test_business_settings_validate_new_policies():

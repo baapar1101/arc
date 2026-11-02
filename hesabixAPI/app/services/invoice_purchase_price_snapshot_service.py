@@ -57,10 +57,56 @@ def resolve_missing_purchase_price_unit_cost(line: Any, policy: str) -> Decimal:
     return _missing_cost_for_line(line, policy)[0]
 
 
+def resolve_catalog_purchase_price_main_base(
+    db: Session | None,
+    business_id: int | None,
+    product: Product,
+    as_of=None,
+) -> tuple[Decimal | None, str | None]:
+    """Catalog purchase cost on the product main unit, in business base currency.
+
+    Prefers ``base_purchase_price``. If it is missing, converts ``purchase_price_fx``
+    with the rate of ``price_fx_currency_id`` at ``as_of``.
+    """
+    if getattr(product, "base_purchase_price", None) is not None:
+        return Decimal(str(product.base_purchase_price)), "product_base_purchase_price"
+    fx = getattr(product, "purchase_price_fx", None)
+    fx_cur = getattr(product, "price_fx_currency_id", None)
+    if fx is None or fx_cur is None or db is None or business_id is None:
+        return None, None
+    biz = db.get(Business, int(business_id))
+    if not biz or biz.default_currency_id is None:
+        return None, None
+    if int(fx_cur) == int(biz.default_currency_id):
+        return Decimal(str(fx)), "product_purchase_price_fx"
+    from datetime import datetime, time, timezone
+
+    from app.core.responses import ApiError as RateApiError
+    from app.services.business_currency_rate_service import resolve_rate_to_base
+
+    if as_of is None:
+        when = datetime.now(timezone.utc)
+    elif isinstance(as_of, datetime):
+        when = as_of if as_of.tzinfo else as_of.replace(tzinfo=timezone.utc)
+    else:
+        when = datetime.combine(as_of, time(23, 59, 59, 999999), tzinfo=timezone.utc)
+    try:
+        res = resolve_rate_to_base(db, int(business_id), int(fx_cur), when)
+        rate = Decimal(str(res["rate"]))
+    except (RateApiError, Exception):
+        return None, None
+    if rate <= 0:
+        return None, None
+    return Decimal(str(fx)) * rate, "product_purchase_price_fx"
+
+
 def _snapshot_value_for_line(
     product: Product,
     line: InvoiceItemLine,
     policy: str,
+    *,
+    catalog_main_base: Decimal | None = None,
+    catalog_source: str | None = None,
 ) -> tuple[Decimal, str, str | None, Decimal]:
     info = dict(line.extra_info or {})
     line_unit = effective_line_unit(product, info.get("unit"))
@@ -76,12 +122,18 @@ def _snapshot_value_for_line(
     else:
         factor = Decimal(1)
 
-    if product.base_purchase_price is None:
-        value, source = _missing_cost_for_line(line, policy)
-        return value, source, line_unit, factor
+    main = catalog_main_base
+    source = catalog_source
+    if main is None:
+        if product.base_purchase_price is not None:
+            main = Decimal(str(product.base_purchase_price))
+            source = "product_base_purchase_price"
+        else:
+            value, source = _missing_cost_for_line(line, policy)
+            return value, source, line_unit, factor
 
-    value = price_main_to_line(product.base_purchase_price, product, line_unit)
-    return value, "product_base_purchase_price", line_unit, factor
+    value = price_main_to_line(main, product, line_unit)
+    return value, source or "product_base_purchase_price", line_unit, factor
 
 
 def stamp_document_purchase_price_snapshots(
@@ -128,7 +180,19 @@ def stamp_document_purchase_price_snapshots(
         product = products.get(int(line.product_id))
         if product is None:
             raise ApiError("PRODUCT_NOT_FOUND", "محصول ردیف فاکتور یافت نشد", http_status=409)
-        value, source, unit, factor = _snapshot_value_for_line(product, line, policy)
+        catalog_main, catalog_source = resolve_catalog_purchase_price_main_base(
+            db,
+            int(document.business_id),
+            product,
+            getattr(document, "document_date", None) or captured_at,
+        )
+        value, source, unit, factor = _snapshot_value_for_line(
+            product,
+            line,
+            policy,
+            catalog_main_base=catalog_main,
+            catalog_source=catalog_source,
+        )
         line.purchase_price_snapshot_unit_cost_base = value
         line.purchase_price_snapshot_currency_id = int(business.default_currency_id)
         line.purchase_price_snapshot_unit = unit
@@ -178,8 +242,14 @@ def preview_purchase_price_unit_cost_base(
     line: Any,
     *,
     missing_policy: str,
+    db: Session | None = None,
+    business_id: int | None = None,
+    as_of=None,
 ) -> Decimal:
-    if product.base_purchase_price is None:
+    catalog_main, _source = resolve_catalog_purchase_price_main_base(
+        db, business_id, product, as_of
+    )
+    if catalog_main is None:
         return resolve_missing_purchase_price_unit_cost(line, missing_policy)
     info = dict(getattr(line, "extra_info", None) or {})
-    return price_main_to_line(product.base_purchase_price, product, info.get("unit"))
+    return price_main_to_line(catalog_main, product, info.get("unit"))

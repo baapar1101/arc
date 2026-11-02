@@ -1,7 +1,12 @@
 from datetime import datetime
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+from app.services.invoice_profit_costing import (
+    inventory_line_unit_cost_main_base,
+    stamp_sales_return_in_layer_costs,
+)
 from app.services.invoice_service import (
     _allocate_global_discount_to_lines,
     _build_cost_layers_from_movements,
@@ -9,12 +14,14 @@ from app.services.invoice_service import (
     _document_adjustments_net_for_profit,
     _document_global_discount_amount_for_profit,
     _invoice_line_net_before_global_discount,
+    _main_cost_to_line_unit,
     _movement_sort_key,
     _normalize_invoice_profit_basis,
     _normalize_invoice_profit_fifo_shortage_mode,
     _normalize_invoice_profit_method,
     _normalize_invoice_profit_overhead_type,
     _normalize_invoice_profit_type,
+    _unit_cost_at_target_outbound_line,
     _unit_cost_fifo_jbfn_at_target_outbound_line,
     _unit_wma_cost_at_target_outbound_line,
 )
@@ -330,3 +337,138 @@ def test_document_global_discount_amount_from_totals_minus_lines() -> None:
     ln1 = MagicMock(extra_info={"line_discount": 30})
     ln2 = MagicMock(extra_info={"line_discount": 0})
     assert _document_global_discount_amount_for_profit(doc, [ln1, ln2]) == Decimal("100")
+
+
+def _carton_product():
+    return SimpleNamespace(
+        main_unit="کارتن",
+        secondary_unit="عدد",
+        unit_conversion_factor=Decimal("20"),
+    )
+
+
+def test_purchase_line_cost_converts_document_currency_and_secondary_unit() -> None:
+    """۲۰ عدد با فی ۱۰ دلار (هر عدد) و نرخ ۱۵۰٬۰۰۰ → بهای هر کارتن ۳۰٬۰۰۰٬۰۰۰ پایه."""
+    product = _carton_product()
+    unit = inventory_line_unit_cost_main_base(
+        product,
+        {"unit": "عدد", "unit_price": "10"},
+        Decimal("20"),
+        document_type="invoice_purchase",
+        fx_rate=Decimal("150000"),
+        movement="in",
+    )
+    assert unit == Decimal("30000000")
+    sale_line = SimpleNamespace(extra_info={"unit": "عدد"})
+    line_unit_cost = _main_cost_to_line_unit(unit, product, sale_line)
+    assert line_unit_cost == Decimal("1500000")
+    assert Decimal("20") * line_unit_cost == Decimal("30000000")
+
+
+def test_purchase_carton_in_usd_converts_to_base_main_unit() -> None:
+    product = _carton_product()
+    unit = inventory_line_unit_cost_main_base(
+        product,
+        {"unit": "کارتن", "unit_price": "10"},
+        Decimal("1"),
+        document_type="invoice_purchase",
+        fx_rate=Decimal("150000"),
+        movement="in",
+    )
+    assert unit == Decimal("1500000")
+    sale_line = SimpleNamespace(extra_info={"unit": "عدد"})
+    assert _main_cost_to_line_unit(unit, product, sale_line) == Decimal("75000")
+    assert Decimal("20") * _main_cost_to_line_unit(unit, product, sale_line) == Decimal("1500000")
+
+
+def test_sales_return_does_not_use_selling_price_as_inventory_cost() -> None:
+    product = _carton_product()
+    assert inventory_line_unit_cost_main_base(
+        product,
+        {"unit": "کارتن", "unit_price": "2000000"},
+        Decimal("1"),
+        document_type="invoice_sales_return",
+        fx_rate=Decimal("1"),
+        movement="in",
+    ) is None
+    assert inventory_line_unit_cost_main_base(
+        product,
+        {"unit": "کارتن", "unit_price": "2000000"},
+        Decimal("1"),
+        document_type="invoice_sales",
+        fx_rate=Decimal("1"),
+        movement="out",
+    ) is None
+
+
+def test_explicit_cost_price_on_purchase_is_converted_by_fx() -> None:
+    product = _carton_product()
+    unit = inventory_line_unit_cost_main_base(
+        product,
+        {"unit": "کارتن", "cost_price": "10"},
+        Decimal("1"),
+        document_type="invoice_purchase",
+        fx_rate=Decimal("150000"),
+        movement="in",
+    )
+    assert unit == Decimal("1500000")
+
+
+def test_sales_return_layer_restores_prior_sale_fifo_cost() -> None:
+    movements = [
+        {
+            "document_id": 1,
+            "document_date": "2026-01-01",
+            "registered_at": datetime(2026, 1, 1),
+            "invoice_item_line_id": 1,
+            "document_type": "invoice_purchase",
+            "movement": "in",
+            "quantity": Decimal("10"),
+            "cost_price": Decimal("100"),
+        },
+        {
+            "document_id": 2,
+            "document_date": "2026-01-02",
+            "registered_at": datetime(2026, 1, 2),
+            "invoice_item_line_id": 2,
+            "document_type": "invoice_sales",
+            "movement": "out",
+            "quantity": Decimal("4"),
+            "cost_price": None,
+        },
+        {
+            "document_id": 3,
+            "document_date": "2026-01-03",
+            "registered_at": datetime(2026, 1, 3),
+            "invoice_item_line_id": 3,
+            "document_type": "invoice_sales_return",
+            "movement": "in",
+            "quantity": Decimal("2"),
+            "cost_price": None,
+        },
+        {
+            "document_id": 4,
+            "document_date": "2026-01-04",
+            "registered_at": datetime(2026, 1, 4),
+            "invoice_item_line_id": 4,
+            "document_type": "invoice_sales",
+            "movement": "out",
+            "quantity": Decimal("8"),
+            "cost_price": None,
+        },
+    ]
+    stamp_sales_return_in_layer_costs(movements, reverse=False)
+    assert movements[2]["cost_price"] == Decimal("100")
+    unit = _unit_cost_at_target_outbound_line(
+        movements, Decimal("8"), 4, 4, reverse=False
+    )
+    assert unit == Decimal("100")
+
+
+def test_fifo_after_fx_purchase_and_piece_sale() -> None:
+    """لایه خرید تسعیرشده به ارز پایه، برای خروج بعدی همان بها را می‌دهد."""
+    movements = [
+        _movement(1, "2026-01-01", "in", "1", "1500000"),
+    ]
+    layers = _build_cost_layers_from_movements(movements, reverse=False)
+    assert _consume_cost_layers_for_quantity(layers, Decimal("1")) == Decimal("1500000")

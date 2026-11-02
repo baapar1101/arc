@@ -43,6 +43,11 @@ from app.services.invoice_unit_conversion_service import (
     price_main_to_line,
     quantity_line_to_main,
 )
+from app.services.invoice_profit_costing import (
+    document_rate_to_base,
+    inventory_line_unit_cost_main_base,
+    stamp_sales_return_in_layer_costs,
+)
 import jdatetime
 import io
 import csv
@@ -2414,6 +2419,22 @@ def _extract_cogs_total(lines: List[Dict[str, Any]]) -> Decimal:
     return total
 
 
+def _sync_payload_cost_price_to_item_lines(
+    created_invoice_lines: List[tuple[InvoiceItemLine, Dict[str, Any]]],
+) -> None:
+    """Copy stamped extra_info.cost_price from payload dicts onto persisted invoice lines."""
+    for item_line, payload in created_invoice_lines:
+        pextra = extra_info_dict(payload.get("extra_info") if isinstance(payload, dict) else None)
+        if pextra.get("cost_price") is None:
+            continue
+        info = dict(item_line.extra_info or {})
+        if info.get("cost_price") == pextra.get("cost_price"):
+            continue
+        info["cost_price"] = pextra.get("cost_price")
+        item_line.extra_info = info
+        flag_modified(item_line, "extra_info")
+
+
 def _extract_cogs_total_for_invoice(lines: List[Dict[str, Any]]) -> Decimal:
     """
     محاسبه COGS برای فاکتورها (بدون بررسی inventory_posted).
@@ -4600,10 +4621,7 @@ def _calculate_average_purchase_cost(
     product_id: int,
     as_of_date: date
 ) -> Decimal:
-    """
-    محاسبه میانگین قیمت خرید محصول از تاریخچه
-    """
-    # دریافت تمام ردیف‌های خرید از جدول اقلام فاکتور تا تاریخ مشخص
+    """میانگین قیمت خرید تا تاریخ سند، به واحد اصلی و ارز پایه."""
     purchase_lines = (
         db.query(InvoiceItemLine, Document)
         .join(Document, Document.id == InvoiceItemLine.document_id)
@@ -4625,22 +4643,26 @@ def _calculate_average_purchase_cost(
     from app.services.fixed_asset_capital_purchase import invoice_line_skips_inventory_kardex
 
     avg_product = db.get(Product, int(product_id))
-    for line, _doc in purchase_lines:
+    business = db.get(Business, int(business_id))
+    rate_cache: Dict[int, Decimal] = {}
+    for line, doc in purchase_lines:
         extra_info = extra_info_dict(line.extra_info)
         if invoice_line_skips_inventory_kardex(extra_info):
             continue
         qty = inventory_quantity_to_main(line.quantity, avg_product, extra_info, strict=False)
         if qty <= 0:
             continue
-        cost_per_unit = Decimal(0)
-        if extra_info.get("cost_price") is not None:
-            cost_per_unit = inventory_price_to_main(
-                extra_info.get("cost_price"), avg_product, extra_info, strict=False
-            )
-        elif extra_info.get("unit_price") is not None:
-            cost_per_unit = inventory_price_to_main(
-                extra_info.get("unit_price"), avg_product, extra_info, strict=False
-            )
+        rate = document_rate_to_base(db, doc, business=business, cache=rate_cache)
+        cost_per_unit = inventory_line_unit_cost_main_base(
+            avg_product,
+            extra_info,
+            line.quantity,
+            document_type=str(doc.document_type or ""),
+            fx_rate=rate,
+            movement="in",
+        )
+        if cost_per_unit is None:
+            cost_per_unit = Decimal(0)
         total_cost += qty * cost_per_unit
         total_qty += qty
     
@@ -4686,6 +4708,8 @@ def _iter_profit_movements_from_invoice_lines(
     from app.services.fixed_asset_capital_purchase import invoice_line_skips_inventory_kardex
 
     movement_product = db.get(Product, int(product_id))
+    business = db.get(Business, int(business_id))
+    rate_cache: Dict[int, Decimal] = {}
     for line, doc in rows:
         info = extra_info_dict(line.extra_info)
         if invoice_line_skips_inventory_kardex(info):
@@ -4711,20 +4735,15 @@ def _iter_profit_movements_from_invoice_lines(
         if warehouse_id is not None:
             if wh_id is None or int(wh_id) != int(warehouse_id):
                 continue
-        cost_price = None
-        if info.get("cogs_amount") is not None and qty > 0 and movement == "out":
-            try:
-                cost_price = Decimal(str(info.get("cogs_amount"))) / qty
-            except Exception:
-                cost_price = None
-        if cost_price is None and info.get("cost_price") is not None:
-            cost_price = inventory_price_to_main(
-                info.get("cost_price"), movement_product, info, strict=False
-            )
-        if cost_price is None and info.get("unit_price") is not None:
-            cost_price = inventory_price_to_main(
-                info.get("unit_price"), movement_product, info, strict=False
-            )
+        rate = document_rate_to_base(db, doc, business=business, cache=rate_cache)
+        cost_price = inventory_line_unit_cost_main_base(
+            movement_product,
+            info,
+            line.quantity,
+            document_type=str(doc.document_type or ""),
+            fx_rate=rate,
+            movement=movement,
+        )
         movements.append(
             {
                 "document_id": int(doc.id),
@@ -4859,7 +4878,13 @@ def _historical_sale_line_unit_cost(
             return inventory_price_to_main(
                 extra_info.get("cost_price"), product, extra_info, strict=False
             )
-        return Decimal(str(product.base_purchase_price or 0))
+        from app.services.invoice_purchase_price_snapshot_service import (
+            resolve_catalog_purchase_price_main_base,
+        )
+        catalog_main, _src = resolve_catalog_purchase_price_main_base(
+            db, business_id, product, sale_document_date
+        )
+        return catalog_main if catalog_main is not None else Decimal(0)
 
     if nb == "actual_cost":
         if extra_info.get("cost_price") is not None:
@@ -4867,8 +4892,16 @@ def _historical_sale_line_unit_cost(
                 extra_info.get("cost_price"), product, extra_info, strict=False
             )
         if extra_info.get("cogs_amount") is not None and qty > 0:
-            return Decimal(str(extra_info.get("cogs_amount"))) / qty
-        return Decimal(str(product.base_purchase_price or 0))
+            sale_doc = db.get(Document, int(ln.document_id)) if ln.document_id else None
+            rate = document_rate_to_base(db, sale_doc) if sale_doc is not None else Decimal(1)
+            return (Decimal(str(extra_info.get("cogs_amount"))) / qty) * rate
+        from app.services.invoice_purchase_price_snapshot_service import (
+            resolve_catalog_purchase_price_main_base,
+        )
+        catalog_main, _src = resolve_catalog_purchase_price_main_base(
+            db, business_id, product, sale_document_date
+        )
+        return catalog_main if catalog_main is not None else Decimal(0)
 
     if nb == "average_cost":
         return _calculate_average_purchase_cost(db, business_id, product.id, sale_document_date)
@@ -4931,9 +4964,21 @@ def _historical_sale_line_unit_cost(
     if nb == "standard_cost":
         if extra_info.get("standard_cost") is not None:
             return Decimal(str(extra_info.get("standard_cost")))
-        return Decimal(str(product.base_purchase_price or 0))
+        from app.services.invoice_purchase_price_snapshot_service import (
+            resolve_catalog_purchase_price_main_base,
+        )
+        catalog_main, _src = resolve_catalog_purchase_price_main_base(
+            db, business_id, product, sale_document_date
+        )
+        return catalog_main if catalog_main is not None else Decimal(0)
 
-    return Decimal(str(product.base_purchase_price or 0))
+    from app.services.invoice_purchase_price_snapshot_service import (
+        resolve_catalog_purchase_price_main_base,
+    )
+    catalog_main, _src = resolve_catalog_purchase_price_main_base(
+        db, business_id, product, sale_document_date
+    )
+    return catalog_main if catalog_main is not None else Decimal(0)
 
 
 def _movement_warehouse_matches(a: Any, b: Any) -> bool:
@@ -5125,6 +5170,7 @@ def _calculate_fifo_cost(
         as_of_date=as_of_date,
         warehouse_id=warehouse_id,
     )
+    stamp_sales_return_in_layer_costs(movements, reverse=False)
     qty = Decimal(str(quantity or 0))
     if document_id is not None and invoice_item_line_id is not None:
         avg_for_short: Optional[Decimal] = None
@@ -5294,6 +5340,7 @@ def _calculate_fifo_jbfn_cost(
         as_of_date=as_of_date,
         warehouse_id=warehouse_id,
     )
+    stamp_sales_return_in_layer_costs(movements, reverse=False)
     qty = Decimal(str(quantity or 0))
     if document_id is not None and invoice_item_line_id is not None:
         avg_for_short: Optional[Decimal] = None
@@ -5336,6 +5383,7 @@ def _calculate_lifo_cost(
         as_of_date=as_of_date,
         warehouse_id=warehouse_id,
     )
+    stamp_sales_return_in_layer_costs(movements, reverse=True)
     qty = Decimal(str(quantity or 0))
     if document_id is not None and invoice_item_line_id is not None:
         avg_for_short: Optional[Decimal] = None
@@ -5379,6 +5427,7 @@ def _calculate_moving_weighted_average_cost(
         as_of_date=as_of_date,
         warehouse_id=warehouse_id,
     )
+    stamp_sales_return_in_layer_costs(movements, wma=True)
     qty = Decimal(str(quantity or 0))
     if document_id is not None and invoice_item_line_id is not None:
         avg_for_short: Optional[Decimal] = None
@@ -5420,14 +5469,24 @@ def _main_cost_to_line_unit(cost_main: Decimal, product: Product, line: Any) -> 
     return price_main_to_line(cost_main, product, extra.get("unit"), strict=False)
 
 
-def _base_purchase_as_line_unit(product: Product, line: Any) -> Decimal:
+def _base_purchase_as_line_unit(
+    product: Product,
+    line: Any,
+    db: Optional[Session] = None,
+    business_id: Optional[int] = None,
+    as_of_date: Optional[date] = None,
+) -> Decimal:
     extra = extra_info_dict(getattr(line, "extra_info", None))
-    return price_main_to_line(
-        Decimal(str(product.base_purchase_price or 0)),
-        product,
-        extra.get("unit"),
-        strict=False,
+    from app.services.invoice_purchase_price_snapshot_service import (
+        resolve_catalog_purchase_price_main_base,
     )
+
+    main, _source = resolve_catalog_purchase_price_main_base(
+        db, business_id, product, as_of_date
+    )
+    if main is None:
+        main = Decimal(0)
+    return price_main_to_line(main, product, extra.get("unit"), strict=False)
 
 
 def _get_cost_per_unit_by_basis(
@@ -5440,6 +5499,7 @@ def _get_cost_per_unit_by_basis(
     warehouse_id: Optional[int] = None,
     *,
     fifo_shortage_mode: str = "perpetual_mixed",
+    document_fx_rate: Optional[Decimal] = None,
 ) -> Decimal:
     """
     محاسبه هزینه هر واحد بر اساس مبنای انتخاب شده
@@ -5448,6 +5508,7 @@ def _get_cost_per_unit_by_basis(
     normalized_basis = _normalize_invoice_profit_basis(calculation_basis)
     sm = _normalize_invoice_profit_fifo_shortage_mode(fifo_shortage_mode)
     qty_main = _invoice_line_qty_main(product, line)
+    catalog_kwargs = dict(db=db, business_id=business_id, as_of_date=document_date)
     
     if normalized_basis == "purchase_price":
         from app.services.invoice_purchase_price_snapshot_service import (
@@ -5469,15 +5530,18 @@ def _get_cost_per_unit_by_basis(
     
     elif normalized_basis == "cost_price":
         if extra_info.get("cost_price") is not None:
+            # قرارداد: extra_info.cost_price روی ردیف فروش به ارز پایه و واحد ردیف است.
             return Decimal(str(extra_info.get("cost_price")))
-        return _base_purchase_as_line_unit(product, line)
+        return _base_purchase_as_line_unit(product, line, **catalog_kwargs)
     
     elif normalized_basis == "actual_cost":
         if extra_info.get("cost_price") is not None:
             return Decimal(str(extra_info.get("cost_price")))
         if extra_info.get("cogs_amount") is not None and line.quantity > 0:
-            return Decimal(str(extra_info.get("cogs_amount"))) / Decimal(str(line.quantity))
-        return _base_purchase_as_line_unit(product, line)
+            unit_doc = Decimal(str(extra_info.get("cogs_amount"))) / Decimal(str(line.quantity))
+            rate = document_fx_rate if document_fx_rate is not None and document_fx_rate > 0 else Decimal(1)
+            return unit_doc * rate
+        return _base_purchase_as_line_unit(product, line, **catalog_kwargs)
     
     elif normalized_basis == "average_cost":
         return _main_cost_to_line_unit(
@@ -5572,10 +5636,10 @@ def _get_cost_per_unit_by_basis(
     elif normalized_basis == "standard_cost":
         if extra_info.get("standard_cost") is not None:
             return Decimal(str(extra_info.get("standard_cost")))
-        return _base_purchase_as_line_unit(product, line)
+        return _base_purchase_as_line_unit(product, line, **catalog_kwargs)
     
     else:
-        return _base_purchase_as_line_unit(product, line)
+        return _base_purchase_as_line_unit(product, line, **catalog_kwargs)
 
 
 def _calculate_overhead_cost(
@@ -5623,6 +5687,7 @@ def _invoice_profit_line_sale_cost_per_unit(
     missing_purchase_price_policy: str = "zero_cost",
     allow_current_purchase_price_preview: bool = False,
     expected_base_currency_id: int | None = None,
+    document_fx_rate: Optional[Decimal] = None,
 ) -> Decimal:
     """بهای هر واحد در ردیف فاکتور فروش یا خدمت (مسیر عمومی)، بدون منطق خاص بازگشت کالای ورودی."""
     extra_info = extra_info_dict(item_line.extra_info)
@@ -5639,6 +5704,9 @@ def _invoice_profit_line_sale_cost_per_unit(
                 product,
                 item_line,
                 missing_policy=missing_purchase_price_policy,
+                db=db,
+                business_id=business_id,
+                as_of=document_date,
             )
         return purchase_price_unit_cost_base_from_snapshot(
             item_line,
@@ -5647,17 +5715,20 @@ def _invoice_profit_line_sale_cost_per_unit(
             expected_base_currency_id=expected_base_currency_id,
         )
 
+    catalog_kwargs = dict(db=db, business_id=business_id, as_of_date=document_date)
     if normalized_basis == "cost_price":
         if extra_info.get("cost_price") is not None:
             return Decimal(str(extra_info.get("cost_price")))
-        return _base_purchase_as_line_unit(product, item_line)
+        return _base_purchase_as_line_unit(product, item_line, **catalog_kwargs)
 
     if normalized_basis == "actual_cost":
         if extra_info.get("cost_price") is not None:
             return Decimal(str(extra_info.get("cost_price")))
         if extra_info.get("cogs_amount") is not None and qty > 0:
-            return Decimal(str(extra_info.get("cogs_amount"))) / qty
-        return _base_purchase_as_line_unit(product, item_line)
+            unit_doc = Decimal(str(extra_info.get("cogs_amount"))) / qty
+            rate = document_fx_rate if document_fx_rate is not None and document_fx_rate > 0 else Decimal(1)
+            return unit_doc * rate
+        return _base_purchase_as_line_unit(product, item_line, **catalog_kwargs)
 
     if normalized_basis == "average_cost":
         return _main_cost_to_line_unit(
@@ -5744,9 +5815,9 @@ def _invoice_profit_line_sale_cost_per_unit(
     if normalized_basis == "standard_cost":
         if extra_info.get("standard_cost") is not None:
             return Decimal(str(extra_info.get("standard_cost")))
-        return _base_purchase_as_line_unit(product, item_line)
+        return _base_purchase_as_line_unit(product, item_line, **catalog_kwargs)
 
-    return _base_purchase_as_line_unit(product, item_line)
+    return _base_purchase_as_line_unit(product, item_line, **catalog_kwargs)
 
 
 def _invoice_line_net_before_global_discount(item_line: Any) -> Decimal:
@@ -5945,11 +6016,12 @@ def _calculate_invoice_profit(
                 db, business_id, product, line, normalized_basis,
                 document.document_date, line_warehouse_id,
                 fifo_shortage_mode=fifo_sm,
+                document_fx_rate=profit_fx_rate,
             )
             total_materials_cost += qty * cost_per_unit
 
         extra_info = document.extra_info or {}
-        operations_total = Decimal(str(extra_info.get("production_operations_total", 0) or 0))
+        operations_total = Decimal(str(extra_info.get("production_operations_total", 0) or 0)) * profit_fx_rate
 
         total_production_cost = total_materials_cost + operations_total
 
@@ -5969,9 +6041,11 @@ def _calculate_invoice_profit(
             pname = (product.name if product else None) or (line.description or "").strip() or "—"
             pcode = product.code if product else None
             pid_i = int(product.id) if product else (int(line.product_id) if line.product_id else None)
+            qty_main = _invoice_line_qty_main(product, line) if product is not None else qty
             out_specs.append({
                 "line": line,
                 "qty": qty,
+                "qty_main": qty_main,
                 "unit_price": unit_price,
                 "unit_price_base": unit_price * profit_fx_rate,
                 "sales_amount_document": sales_amt_document,
@@ -5982,6 +6056,7 @@ def _calculate_invoice_profit(
             })
 
         weight_sum = sum(s["sales_amount"] for s in out_specs)
+        qty_main_sum = sum((s.get("qty_main") or Decimal(0)) for s in out_specs)
         n_out = len(out_specs)
 
         for spec in out_specs:
@@ -5991,6 +6066,8 @@ def _calculate_invoice_profit(
             sales_amount = spec["sales_amount"]
             if weight_sum > 0:
                 line_cost = total_production_cost * (sales_amount / weight_sum)
+            elif qty_main_sum > 0:
+                line_cost = total_production_cost * (spec["qty_main"] / qty_main_sum)
             elif n_out > 0:
                 line_cost = total_production_cost / Decimal(n_out)
             else:
@@ -6183,6 +6260,7 @@ def _calculate_invoice_profit(
                         missing_purchase_price_policy=missing_purchase_price_policy,
                         allow_current_purchase_price_preview=bool(document.is_proforma),
                         expected_base_currency_id=int(business.default_currency_id),
+                        document_fx_rate=profit_fx_rate,
                     )
                     total_line_cost = qty * cost_per_unit
                     line_gross_profit = sales_amount - total_line_cost
@@ -7077,11 +7155,13 @@ def create_invoice(
                     cost_per_unit = remaining_cost / remaining_quantity if remaining_quantity > 0 else Decimal(0)
                     
                     for line in in_lines:
-                        extra_info = line.get("extra_info") or {}
+                        extra_info = dict(line.get("extra_info") or {})
                         qty = Decimal(str(line.get("quantity", 0) or 0))
                         if qty > 0 and extra_info.get("cost_price") is None:
                             cost_line = qty * cost_per_unit
                             total_finished_cost += cost_line
+                            extra_info["cost_price"] = float(cost_per_unit)
+                            line["extra_info"] = extra_info
                 
                 # مرحله 3: اعتبارسنجی توازن WIP
                 # اگر همه خطوط cost_price دستی دارند، باید بررسی کنیم که توازن برقرار است
@@ -7101,6 +7181,9 @@ def create_invoice(
                             qty = Decimal(str(line.get("quantity", 0) or 0))
                             if qty > 0:
                                 total_finished_cost += qty * cost_per_unit
+                                extra_info = dict(line.get("extra_info") or {})
+                                extra_info["cost_price"] = float(cost_per_unit)
+                                line["extra_info"] = extra_info
                 
                 # اعتبارسنجی نهایی توازن WIP
                 total_wip_debit = total_materials_cost + operations_total
@@ -7174,6 +7257,7 @@ def create_invoice(
                         credit=total_finished_cost,
                         description="انتقال محصول نهایی از WIP",
                     ))
+                _sync_payload_cost_price_to_item_lines(created_invoice_lines)
 
         # --- پورسانت فروشنده/بازاریاب (تکمیلی پس از ثبت خطوط انواع فاکتور) ---
         if invoice_type in (INVOICE_SALES, INVOICE_SALES_RETURN):
@@ -8288,11 +8372,13 @@ def update_invoice(
                 cost_per_unit = remaining_cost / remaining_quantity if remaining_quantity > 0 else Decimal(0)
                 
                 for line in in_lines:
-                    extra_info = line.get("extra_info") or {}
+                    extra_info = dict(line.get("extra_info") or {})
                     qty = Decimal(str(line.get("quantity", 0) or 0))
                     if qty > 0 and extra_info.get("cost_price") is None:
                         cost_line = qty * cost_per_unit
                         total_finished_cost += cost_line
+                        extra_info["cost_price"] = float(cost_per_unit)
+                        line["extra_info"] = extra_info
             
             # مرحله 3: اعتبارسنجی توازن WIP
             # اگر همه خطوط cost_price دستی دارند، باید بررسی کنیم که توازن برقرار است
@@ -8312,6 +8398,9 @@ def update_invoice(
                         qty = Decimal(str(line.get("quantity", 0) or 0))
                         if qty > 0:
                             total_finished_cost += qty * cost_per_unit
+                            extra_info = dict(line.get("extra_info") or {})
+                            extra_info["cost_price"] = float(cost_per_unit)
+                            line["extra_info"] = extra_info
             
             # اعتبارسنجی نهایی توازن WIP
             total_wip_debit = total_materials_cost + operations_total
@@ -8385,6 +8474,7 @@ def update_invoice(
                     credit=total_finished_cost,
                     description="انتقال محصول نهایی از WIP",
                 ))
+            _sync_payload_cost_price_to_item_lines(created_invoice_lines)
 
         # --- پورسانت فروشنده/بازاریاب (به‌صورت تکمیلی) ---
         if inv_type in (INVOICE_SALES, INVOICE_SALES_RETURN):
