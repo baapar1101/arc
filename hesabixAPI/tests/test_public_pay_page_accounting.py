@@ -3,7 +3,10 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from adapters.db.models.wallet import WalletTransaction
-from app.services.public_pay_page_payment_service import confirm_public_pay_page_payment
+from app.services.public_pay_page_payment_service import (
+	_person_id_from_create_result,
+	confirm_public_pay_page_payment,
+)
 
 
 def test_failed_gateway_does_not_create_receipt():
@@ -81,3 +84,46 @@ def test_confirm_success_posts_receipt_wallet_line_not_saas_balance():
 	assert data["extra_info"]["card_num"] == "6037****1234"
 	assert data["extra_info"]["gateway_ref_id"] == "ZP-99"
 	assert data["extra_info"]["external_ref"] == "REF1"
+
+
+def test_person_id_from_create_result_reads_wrapped_success_response():
+	assert _person_id_from_create_result({"success": True, "data": {"id": 44}, "message": "ok"}) == 44
+	assert _person_id_from_create_result({"id": 9}) == 9
+	assert _person_id_from_create_result({"success": True, "data": {}}) is None
+	assert _person_id_from_create_result(None) is None
+
+
+def test_resolve_pay_link_person_does_not_fail_on_create_person_wrapper():
+	from app.services.public_pay_page_payment_service import resolve_pay_link_person
+
+	db = MagicMock()
+	page = SimpleNamespace(
+		match_customer_by_mobile=True,
+		create_customer_if_missing=True,
+		use_anonymous_if_no_mobile=True,
+	)
+	business = SimpleNamespace(id=7)
+	created_person = SimpleNamespace(id=91, alias_name="علی")
+	db.query.return_value.filter.return_value.first.return_value = created_person
+
+	with patch(
+		"app.services.public_pay_page_payment_service.get_business_default_phone_region",
+		return_value="IR",
+	), patch(
+		"app.services.public_pay_page_payment_service.normalize_customer_mobile",
+		return_value="09121234567",
+	), patch(
+		"app.services.public_pay_page_payment_service.load_quick_customer_mobile_matches",
+		return_value=[],
+	), patch(
+		"app.services.public_pay_page_payment_service.create_person",
+		return_value={"success": True, "data": {"id": 91}, "message": "شخص با موفقیت ایجاد شد"},
+	):
+		person = resolve_pay_link_person(
+			db,
+			page=page,
+			business=business,
+			payer_name="علی",
+			payer_mobile="09121234567",
+		)
+	assert person.id == 91

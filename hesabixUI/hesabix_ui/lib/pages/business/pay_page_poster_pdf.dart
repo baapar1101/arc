@@ -7,6 +7,20 @@ import 'package:pdf/widgets.dart' as pw;
 
 import 'package:hesabix_ui/widgets/product/product_label_pdf_text.dart';
 
+/// متن خوانا روی پوستر: بدون https و بدون مسیر /u/ تا از فاصله دیده شود.
+String payPagePosterDisplayUrl(String url) {
+  var value = url.trim();
+  value = value.replaceFirst(RegExp(r'^https?://', caseSensitive: false), '');
+  final slash = value.indexOf('/');
+  if (slash <= 0) return value;
+  final host = value.substring(0, slash);
+  var path = value.substring(slash);
+  if (path.startsWith('/u/')) {
+    path = path.substring(2);
+  }
+  return '$host$path';
+}
+
 Future<Uint8List> buildPayPagePosterPdf({
   required String title,
   required String url,
@@ -109,20 +123,20 @@ Future<Uint8List> buildPayPagePosterPdf({
                   width: 220,
                   height: 220,
                 ),
-                pw.SizedBox(height: 18),
+                pw.SizedBox(height: 22),
                 pw.Text(
                   t(urlLabel),
                   textAlign: pw.TextAlign.center,
                   textDirection: pw.TextDirection.ltr,
-                  style: style(11, bold: true),
+                  style: style(14, bold: true),
                 ),
-                pw.SizedBox(height: 6),
+                pw.SizedBox(height: 10),
                 pw.Directionality(
                   textDirection: pw.TextDirection.ltr,
                   child: pw.Text(
-                    url,
+                    payPagePosterDisplayUrl(url),
                     textAlign: pw.TextAlign.center,
-                    style: style(12, bold: true),
+                    style: style(28, bold: true),
                   ),
                 ),
                 if (intro.isNotEmpty) ...[

@@ -80,6 +80,8 @@
                     {% if external_ref %}<div class="row"><span>شماره پیگیری بانک</span><span>{{ external_ref }}</span></div>{% endif %}
                     <div class="row"><span>شماره تراکنش</span><span>{{ transaction_id }}</span></div>
                     {% if payer_name %}<div class="row"><span>پرداخت‌کننده</span><span>{{ payer_name }}</span></div>{% endif %}
+                    {% if payer_mobile %}<div class="row"><span>موبایل پرداخت‌کننده</span><span>{{ payer_mobile }}</span></div>{% endif %}
+                    {% if payer_note %}<div class="row"><span>توضیح</span><span>{{ payer_note }}</span></div>{% endif %}
                     {% for row in business_rows %}
                     <div class="row"><span>{{ row.label }}</span><span>{{ row.value }}</span></div>
                     {% endfor %}

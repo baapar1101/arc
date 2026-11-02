@@ -44,6 +44,8 @@
         {% if external_ref %}<tr><th>شماره پیگیری بانک</th><td>{{ external_ref }}</td></tr>{% endif %}
         <tr><th>شماره تراکنش</th><td>{{ transaction_id }}</td></tr>
         {% if payer_name %}<tr><th>پرداخت‌کننده</th><td>{{ payer_name }}</td></tr>{% endif %}
+        {% if payer_mobile %}<tr><th>موبایل پرداخت‌کننده</th><td>{{ payer_mobile }}</td></tr>{% endif %}
+        {% if payer_note %}<tr><th>توضیح</th><td>{{ payer_note }}</td></tr>{% endif %}
         {% for row in business_rows %}
         <tr><th>{{ row.label }}</th><td>{{ row.value }}</td></tr>
         {% endfor %}

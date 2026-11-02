@@ -25,6 +25,11 @@ from adapters.db.models.business import Business
 from adapters.db.models.business_pay_page import BusinessPayPage, PublicPayPageReceipt
 from adapters.db.models.person import Person
 from adapters.db.models.wallet import WalletTransaction
+from app.core.datetime_utils import (
+	localize_assumed_utc_naive_for_display,
+	resolve_display_timezone_name,
+	utc_now,
+)
 from app.core.responses import ApiError
 from app.services.business_pay_page_service import (
 	GATEWAY_MIN_AMOUNT,
@@ -62,6 +67,39 @@ def _parse_extra(tx: WalletTransaction) -> Dict[str, Any]:
 		return json.loads(tx.extra_info or "{}") if tx.extra_info else {}
 	except Exception:
 		return {}
+
+
+def _person_id_from_create_result(created: Any) -> Optional[int]:
+	if not isinstance(created, dict):
+		return None
+	raw = created.get("id")
+	if raw is None and isinstance(created.get("data"), dict):
+		raw = created["data"].get("id")
+	try:
+		pid = int(raw)
+	except (TypeError, ValueError):
+		return None
+	return pid if pid > 0 else None
+
+
+def _person_from_create_result(db: Session, created: Any) -> Optional[Person]:
+	pid = _person_id_from_create_result(created)
+	if not pid:
+		return None
+	return db.query(Person).filter(Person.id == pid).first()
+
+
+def _local_paid_at(when: datetime, business_id: int | None) -> datetime:
+	tz_name = resolve_display_timezone_name(int(business_id) if business_id else None)
+	return localize_assumed_utc_naive_for_display(when, tz_name)
+
+
+def _format_paid_at_display(when: datetime, business_id: int | None) -> str:
+	from app.core.calendar import CalendarConverter
+
+	local = _local_paid_at(when, business_id)
+	jalali = CalendarConverter.to_jalali(local) or {}
+	return str(jalali.get("formatted") or local.strftime("%Y/%m/%d %H:%M"))
 
 
 def _active_page_or_error(db: Session, username: str) -> tuple[BusinessPayPage, Business]:
@@ -114,7 +152,7 @@ def _ensure_anonymous_customer(db: Session, business_id: int) -> Person:
 		PersonCreateRequest(alias_name=str(name_fa), person_types=[PersonType.CUSTOMER]),
 		commit=False,
 	)
-	person = db.query(Person).filter(Person.id == int(created["id"])).first()
+	person = _person_from_create_result(db, created)
 	if not person:
 		raise ApiError("ANONYMOUS_CUSTOMER_FAILED", "ایجاد مشتری ناشناس ناموفق بود", http_status=500)
 	if row is None:
@@ -160,7 +198,7 @@ def resolve_pay_link_person(
 				),
 				commit=False,
 			)
-			person = db.query(Person).filter(Person.id == int(created["id"])).first()
+			person = _person_from_create_result(db, created)
 			if person:
 				return person
 			raise ApiError("CUSTOMER_CREATE_FAILED", "ثبت مشتری ناموفق بود", http_status=500)
@@ -375,7 +413,9 @@ def confirm_public_pay_page_payment(
 	if commission > gross:
 		commission = gross
 
-	paid_at = datetime.utcnow()
+	paid_at = utc_now()
+	local_paid = _local_paid_at(paid_at, int(tx.business_id))
+	doc_date = local_paid.date().isoformat()
 	doc_user_id = user_id if user_id and user_id > 0 else int(ex.get("created_by_user_id") or 0)
 	if doc_user_id <= 0:
 		doc_user_id = int(getattr(business, "owner_id", 0) or 0)
@@ -393,7 +433,7 @@ def confirm_public_pay_page_payment(
 	account_line: Dict[str, Any] = {
 		"transaction_type": "wallet",
 		"amount": float(gross),
-		"transaction_date": paid_at.date().isoformat(),
+		"transaction_date": doc_date,
 		"description": doc_desc[:500],
 	}
 	if commission > 0:
@@ -401,7 +441,7 @@ def confirm_public_pay_page_payment(
 
 	rp_data: Dict[str, Any] = {
 		"document_type": "receipt",
-		"document_date": paid_at.date().isoformat(),
+		"document_date": doc_date,
 		"currency_id": int(currency_id),
 		"description": doc_desc[:500],
 		"person_lines": [
@@ -479,7 +519,6 @@ def _notify_owner_after_payment(
 	extra: Dict[str, Any],
 	paid_at: datetime,
 ) -> None:
-	from app.core.calendar import CalendarConverter
 	from app.services.notification_service import NotificationService
 
 	if not bool(page.notify_inapp) and not bool(page.notify_sms):
@@ -490,9 +529,7 @@ def _notify_owner_after_payment(
 
 	payer_name = extra.get("payer_name") or getattr(person, "alias_name", None) or "پرداخت‌کننده"
 	amount = float(tx.amount or 0)
-	jalali = CalendarConverter.to_jalali(paid_at) or {}
-	gregorian = CalendarConverter.to_gregorian(paid_at) or {}
-	date_time = jalali.get("formatted") or gregorian.get("formatted") or paid_at.isoformat()
+	date_time = _format_paid_at_display(paid_at, int(getattr(business, "id", 0) or 0))
 	amount_fmt = f"{amount:,.0f}"
 	message = (
 		f"در تاریخ و ساعت {date_time} مبلغ {amount_fmt} توسط {payer_name} "
@@ -610,7 +647,6 @@ def qr_png_data_uri(payload: str) -> str:
 
 
 def get_public_pay_receipt(db: Session, username: str, token: str, *, request_base: str | None = None) -> Dict[str, Any]:
-	from app.core.calendar import CalendarConverter
 	from app.services.business_pay_page_service import get_public_pay_page, normalize_username
 
 	token = (token or "").strip()
@@ -628,8 +664,7 @@ def get_public_pay_receipt(db: Session, username: str, token: str, *, request_ba
 	if normalize_username(row.username) not in {wanted, normalize_username(canonical)}:
 		raise ApiError("RECEIPT_NOT_FOUND", "رسید یافت نشد", http_status=404)
 	ex = _parse_extra(tx)
-	when = tx.updated_at or tx.created_at or datetime.utcnow()
-	jalali = CalendarConverter.to_jalali(when) or {}
+	when = tx.updated_at or tx.created_at or utc_now()
 	status = (tx.status or "").strip().lower()
 	success = status in ("succeeded", "success")
 	failed = status in ("failed", "fail")
@@ -668,7 +703,7 @@ def get_public_pay_receipt(db: Session, username: str, token: str, *, request_ba
 		"currency_title": page_payload.get("currency_title") or currency,
 		"external_ref": tx.external_ref or "",
 		"transaction_id": int(tx.id),
-		"paid_at": jalali.get("formatted") or (when.strftime("%Y/%m/%d %H:%M") if when else ""),
+		"paid_at": _format_paid_at_display(when, int(tx.business_id) if tx.business_id else None),
 		"payer_name": ex.get("payer_name") or "",
 		"payer_mobile": ex.get("payer_mobile") or "",
 		"payer_note": ex.get("payer_note") or "",
