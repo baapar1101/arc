@@ -13119,14 +13119,238 @@ class AppLocalizationsFa extends AppLocalizations {
   String get oaGregorian => 'میلادی';
 
   @override
-  String get oaLetterhead => 'شناسه فایل سربرگ';
+  String get oaLetterhead => 'سربرگ';
+
+  @override
+  String get oaSearchPosition => 'جست‌وجو و انتخاب سمت';
+
+  @override
+  String get oaSearchPositionHint => 'نام سمت، واحد یا متصدی را بنویسید';
+
+  @override
+  String get oaNoSearchResults => 'نتیجه‌ای پیدا نشد.';
+
+  @override
+  String get oaInCirculation => 'در گردش';
+
+  @override
+  String get oaClosed => 'بسته‌شده';
+
+  @override
+  String get oaMarkdown => 'Markdown';
+
+  @override
+  String get oaHtml => 'HTML';
+
+  @override
+  String get oaEdit => 'ویرایش';
+
+  @override
+  String get oaPreview => 'پیش‌نمایش';
+
+  @override
+  String get oaBold => 'ضخیم';
+
+  @override
+  String get oaItalic => 'کج';
+
+  @override
+  String get oaUnderline => 'زیرخط';
+
+  @override
+  String get oaHeading => 'عنوان';
+
+  @override
+  String get oaBullet => 'فهرست';
+
+  @override
+  String get oaQuote => 'نقل‌قول';
+
+  @override
+  String get oaInsertLink => 'درج پیوند';
+
+  @override
+  String get oaLinkLabel => 'متن نمایشی';
+
+  @override
+  String get oaLinkUrl => 'نشانی';
+
+  @override
+  String get oaInsert => 'درج';
+
+  @override
+  String get oaBodyHint => 'متن نامه را با قالب‌بندی بنویسید…';
+
+  @override
+  String get oaUploadImage => 'بارگذاری تصویر';
+
+  @override
+  String get oaSearchLetter => 'جست‌وجوی نامه مرتبط';
+
+  @override
+  String get oaLetterFormat => 'فرمت نامه';
+
+  @override
+  String get oaLetterTemplate => 'قالب نامه';
+
+  @override
+  String get oaStationery => 'سربرگ و کاغذ';
+
+  @override
+  String get oaBackground => 'پس‌زمینه نامه';
+
+  @override
+  String get oaFooter => 'پاورقی';
+
+  @override
+  String get oaPaperSize => 'اندازه کاغذ';
+
+  @override
+  String get oaPaperOrientation => 'جهت کاغذ';
+
+  @override
+  String get oaPortrait => 'عمودی';
+
+  @override
+  String get oaLandscape => 'افقی';
+
+  @override
+  String get oaMargins => 'حاشیه (میلی‌متر)';
+
+  @override
+  String get oaMarginTop => 'بالا';
+
+  @override
+  String get oaMarginRight => 'راست';
+
+  @override
+  String get oaMarginBottom => 'پایین';
+
+  @override
+  String get oaMarginLeft => 'چپ';
+
+  @override
+  String get oaDefaultFormat => 'فرمت پیش‌فرض';
+
+  @override
+  String get oaApplyTemplate => 'اعمال قالب';
+
+  @override
+  String get oaSaveAsTemplate => 'ذخیره به‌عنوان قالب';
+
+  @override
+  String get oaNewFormat => 'فرمت جدید';
+
+  @override
+  String get oaNewTemplate => 'قالب جدید';
+
+  @override
+  String get oaFormatName => 'نام فرمت';
+
+  @override
+  String get oaTemplateName => 'نام قالب';
+
+  @override
+  String get oaAllKinds => 'همه انواع';
+
+  @override
+  String get oaCartable => 'کارتابل';
+
+  @override
+  String get oaActingAs => 'از سمت';
+
+  @override
+  String get oaDocument => 'سند نامه';
+
+  @override
+  String get oaTimeline => 'سابقه';
+
+  @override
+  String get oaCirculation => 'گردش ارجاع';
+
+  @override
+  String get oaMetadata => 'مشخصات نامه';
+
+  @override
+  String get oaCustomParty => 'ورود دستی';
+
+  @override
+  String get oaPartyFromPosition => 'انتخاب از سمت‌های سازمان';
+
+  @override
+  String get oaLetterPreview => 'پیش‌نمایش نامه';
+
+  @override
+  String get oaPaperA4 => 'A4';
+
+  @override
+  String get oaPaperA5 => 'A5';
+
+  @override
+  String get oaPaperLetter => 'Letter';
+
+  @override
+  String get oaDefaultBodyFormat => 'قالب پیش‌فرض متن';
+
+  @override
+  String get oaMakeDefault => 'پیش‌فرض';
+
+  @override
+  String get oaEmptyTemplates => 'هنوز قالبی تعریف نشده است.';
+
+  @override
+  String get oaEmptyFormats => 'هنوز فرمت کاغذی تعریف نشده است.';
+
+  @override
+  String get oaAddRecipient => 'افزودن گیرنده';
+
+  @override
+  String get oaCompose => 'نگارش';
+
+  @override
+  String get oaViewLetter => 'نمایش نامه';
+
+  @override
+  String get oaMoreActions => 'اقدام‌های بیشتر';
+
+  @override
+  String get oaNumbering => 'شماره‌گذاری';
+
+  @override
+  String get oaTemplates => 'قالب‌ها';
+
+  @override
+  String get oaFormats => 'فرمت‌ها';
+
+  @override
+  String get oaSelectTemplate => 'انتخاب قالب آماده';
+
+  @override
+  String get oaSelectFormat => 'انتخاب فرمت کاغذ و سربرگ';
+
+  @override
+  String get oaHeaderHtml => 'سربرگ متنی';
+
+  @override
+  String get oaDefaultBodyHint => 'Markdown یا HTML';
+
+  @override
+  String get oaInboxHint => 'نامه‌های ارجاع‌شده به سمت فعال';
+
+  @override
+  String get oaNewLetterHint => 'نگارش نامه با قالب، سربرگ و جست‌وجوی سمت';
+
+  @override
+  String oaPositionWithHolder(String title, String holder) {
+    return '$title · $holder';
+  }
 
   @override
   String get businessSettingsOfficeAutomation => 'اتوماسیون اداری';
 
   @override
   String get businessSettingsOfficeAutomationDescription =>
-      'شماره‌گذاری نامه، سربرگ و پیشوند دبیرخانه';
+      'شماره‌گذاری، سربرگ، قالب و فرمت نامه';
 
   @override
   String get fixedAssetsTitle => 'کنترل اموال و دارایی ثابت';

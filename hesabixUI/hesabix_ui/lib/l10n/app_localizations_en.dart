@@ -13192,14 +13192,239 @@ class AppLocalizationsEn extends AppLocalizations {
   String get oaGregorian => 'Gregorian';
 
   @override
-  String get oaLetterhead => 'Letterhead file ID';
+  String get oaLetterhead => 'Letterhead';
+
+  @override
+  String get oaSearchPosition => 'Search and select a position';
+
+  @override
+  String get oaSearchPositionHint => 'Type a position, unit, or occupant name';
+
+  @override
+  String get oaNoSearchResults => 'No results found.';
+
+  @override
+  String get oaInCirculation => 'In circulation';
+
+  @override
+  String get oaClosed => 'Closed';
+
+  @override
+  String get oaMarkdown => 'Markdown';
+
+  @override
+  String get oaHtml => 'HTML';
+
+  @override
+  String get oaEdit => 'Edit';
+
+  @override
+  String get oaPreview => 'Preview';
+
+  @override
+  String get oaBold => 'Bold';
+
+  @override
+  String get oaItalic => 'Italic';
+
+  @override
+  String get oaUnderline => 'Underline';
+
+  @override
+  String get oaHeading => 'Heading';
+
+  @override
+  String get oaBullet => 'List';
+
+  @override
+  String get oaQuote => 'Quote';
+
+  @override
+  String get oaInsertLink => 'Insert link';
+
+  @override
+  String get oaLinkLabel => 'Label';
+
+  @override
+  String get oaLinkUrl => 'URL';
+
+  @override
+  String get oaInsert => 'Insert';
+
+  @override
+  String get oaBodyHint => 'Write the letter with formatting…';
+
+  @override
+  String get oaUploadImage => 'Upload image';
+
+  @override
+  String get oaSearchLetter => 'Search related letter';
+
+  @override
+  String get oaLetterFormat => 'Letter format';
+
+  @override
+  String get oaLetterTemplate => 'Letter template';
+
+  @override
+  String get oaStationery => 'Letterhead & paper';
+
+  @override
+  String get oaBackground => 'Letter background';
+
+  @override
+  String get oaFooter => 'Footer';
+
+  @override
+  String get oaPaperSize => 'Paper size';
+
+  @override
+  String get oaPaperOrientation => 'Orientation';
+
+  @override
+  String get oaPortrait => 'Portrait';
+
+  @override
+  String get oaLandscape => 'Landscape';
+
+  @override
+  String get oaMargins => 'Margins (mm)';
+
+  @override
+  String get oaMarginTop => 'Top';
+
+  @override
+  String get oaMarginRight => 'Right';
+
+  @override
+  String get oaMarginBottom => 'Bottom';
+
+  @override
+  String get oaMarginLeft => 'Left';
+
+  @override
+  String get oaDefaultFormat => 'Default format';
+
+  @override
+  String get oaApplyTemplate => 'Apply template';
+
+  @override
+  String get oaSaveAsTemplate => 'Save as template';
+
+  @override
+  String get oaNewFormat => 'New format';
+
+  @override
+  String get oaNewTemplate => 'New template';
+
+  @override
+  String get oaFormatName => 'Format name';
+
+  @override
+  String get oaTemplateName => 'Template name';
+
+  @override
+  String get oaAllKinds => 'All types';
+
+  @override
+  String get oaCartable => 'Inbox';
+
+  @override
+  String get oaActingAs => 'Acting as';
+
+  @override
+  String get oaDocument => 'Letter document';
+
+  @override
+  String get oaTimeline => 'Timeline';
+
+  @override
+  String get oaCirculation => 'Circulation';
+
+  @override
+  String get oaMetadata => 'Letter details';
+
+  @override
+  String get oaCustomParty => 'Enter manually';
+
+  @override
+  String get oaPartyFromPosition => 'Pick from organization positions';
+
+  @override
+  String get oaLetterPreview => 'Letter preview';
+
+  @override
+  String get oaPaperA4 => 'A4';
+
+  @override
+  String get oaPaperA5 => 'A5';
+
+  @override
+  String get oaPaperLetter => 'Letter';
+
+  @override
+  String get oaDefaultBodyFormat => 'Default body format';
+
+  @override
+  String get oaMakeDefault => 'Default';
+
+  @override
+  String get oaEmptyTemplates => 'No templates yet.';
+
+  @override
+  String get oaEmptyFormats => 'No paper formats yet.';
+
+  @override
+  String get oaAddRecipient => 'Add recipient';
+
+  @override
+  String get oaCompose => 'Compose';
+
+  @override
+  String get oaViewLetter => 'View letter';
+
+  @override
+  String get oaMoreActions => 'More actions';
+
+  @override
+  String get oaNumbering => 'Numbering';
+
+  @override
+  String get oaTemplates => 'Templates';
+
+  @override
+  String get oaFormats => 'Formats';
+
+  @override
+  String get oaSelectTemplate => 'Choose a ready template';
+
+  @override
+  String get oaSelectFormat => 'Choose paper format and letterhead';
+
+  @override
+  String get oaHeaderHtml => 'Header text';
+
+  @override
+  String get oaDefaultBodyHint => 'Markdown or HTML';
+
+  @override
+  String get oaInboxHint => 'Letters referred to the active position';
+
+  @override
+  String get oaNewLetterHint =>
+      'Compose with templates, letterhead, and searchable positions';
+
+  @override
+  String oaPositionWithHolder(String title, String holder) {
+    return '$title · $holder';
+  }
 
   @override
   String get businessSettingsOfficeAutomation => 'Office automation';
 
   @override
   String get businessSettingsOfficeAutomationDescription =>
-      'Letter numbering, letterhead, and secretariat prefixes';
+      'Numbering, letterhead, templates, and letter formats';
 
   @override
   String get fixedAssetsTitle => 'Fixed assets';

@@ -16,8 +16,10 @@ from adapters.db.models.office_automation import (
 	OaDelegation,
 	OaLetter,
 	OaLetterAttachment,
+	OaLetterFormat,
 	OaLetterLink,
 	OaLetterNumberCounter,
+	OaLetterTemplate,
 	OaOrgUnit,
 	OaParaph,
 	OaPosition,
@@ -115,6 +117,15 @@ OA_TOOLS = (
 	"archive_oa_letter",
 	"set_oa_follow_up",
 	"link_oa_letters",
+	"search_oa_letters",
+	"list_oa_letter_formats",
+	"create_oa_letter_format",
+	"update_oa_letter_format",
+	"delete_oa_letter_format",
+	"list_oa_letter_templates",
+	"create_oa_letter_template",
+	"update_oa_letter_template",
+	"delete_oa_letter_template",
 )
 
 
@@ -148,6 +159,8 @@ def _session():
 			OaPosition.__table__,
 			OaPositionHolder.__table__,
 			OaDelegation.__table__,
+			OaLetterFormat.__table__,
+			OaLetterTemplate.__table__,
 			OaLetter.__table__,
 			OaLetterNumberCounter.__table__,
 			OaReferral.__table__,
@@ -403,4 +416,83 @@ def test_position_occupancy_numbering_paraph_and_referral(_plugin):
 	throwaway = svc.create_letter_draft(db, bid, {"subject": "حذف شود"}, owner.id, mgr["id"])
 	deleted = svc.delete_letter_draft(db, bid, throwaway["id"], owner.id, mgr["id"])
 	assert deleted["deleted"] is True
+	db.close()
+
+
+@patch("app.services.office_automation_service.check_office_automation_plugin_active", return_value=True)
+def test_letter_templates_formats_search_and_rich_body(_plugin):
+	db = _session()
+	owner = _user(db, "fmt@example.com", "oa3")
+	bid = 1
+	unit = svc.create_org_unit(db, bid, {"code": "hq", "name_i18n": {"fa": "ستاد"}}, owner.id)
+	mgr = svc.create_position(
+		db, bid,
+		{"code": "mgr", "org_unit_id": unit["id"], "name_i18n": {"fa": "مدیر بازرگانی"}},
+		owner.id,
+	)
+	exp = svc.create_position(
+		db, bid,
+		{"code": "exp", "org_unit_id": unit["id"], "name_i18n": {"fa": "کارشناس مالی"}},
+		owner.id,
+	)
+	svc.assign_position_holder(db, bid, {"position_id": mgr["id"], "user_id": owner.id, "is_primary": True}, owner.id)
+
+	fmt = svc.create_letter_format(
+		db, bid,
+		{"name": "رسمی A4", "paper_size": "a4", "footer_text": "شرکت نمونه", "is_default": True, "margin_top": 25},
+		owner.id,
+	)
+	assert fmt["is_default"] is True
+	assert fmt["margin_top"] == 25
+	settings = svc.get_settings(db, bid)
+	assert settings["default_format_id"] == fmt["id"]
+	assert settings["paper_size"] == "a4"
+
+	tpl = svc.create_letter_template(
+		db, bid,
+		{
+			"name": "درخواست مرخصی",
+			"letter_kind": "internal",
+			"subject": "درخواست مرخصی استحقاقی",
+			"body": "## درخواست\nبا سلام",
+			"body_format": "markdown",
+			"format_id": fmt["id"],
+			"is_default": True,
+		},
+		owner.id,
+	)
+	assert tpl["body_format"] == "markdown"
+	found = svc.list_positions(db, bid, q="بازرگانی")
+	assert any(p["id"] == mgr["id"] for p in found)
+	miss = svc.list_positions(db, bid, q="ناموجودxyz")
+	assert miss == []
+
+	draft = svc.create_letter_draft(
+		db, bid,
+		{
+			"subject": tpl["subject"],
+			"body": tpl["body"],
+			"body_format": "markdown",
+			"letter_kind": "internal",
+			"sender_position_id": mgr["id"],
+			"receiver_position_id": exp["id"],
+			"format_id": fmt["id"],
+			"template_id": tpl["id"],
+		},
+		owner.id, mgr["id"],
+	)
+	assert draft["body_format"] == "markdown"
+	assert draft["format_id"] == fmt["id"]
+	registered = svc.register_letter(db, bid, draft["id"], {}, owner.id, mgr["id"])
+	printed = svc.get_letter_print(db, bid, registered["id"], owner.id, mgr["id"], is_admin=True)
+	assert printed["print"]["footer_text"] == "شرکت نمونه"
+	assert printed["print"]["paper_size"] == "a4"
+	assert printed["sender_position_title"] == "مدیر بازرگانی"
+	hits = svc.search_letters(db, bid, owner.id, q="مرخصی", is_admin=True)
+	assert any(item["id"] == registered["id"] for item in hits)
+	svc.update_settings(db, bid, {"background_file_id": None, "default_body_format": "html", "footer_text": "پاورقی"}, owner.id)
+	updated = svc.get_settings(db, bid)
+	assert updated["default_body_format"] == "html"
+	svc.delete_letter_template(db, bid, tpl["id"], owner.id)
+	svc.delete_letter_format(db, bid, fmt["id"], owner.id)
 	db.close()

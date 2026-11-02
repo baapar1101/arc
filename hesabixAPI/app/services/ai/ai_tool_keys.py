@@ -375,6 +375,15 @@ TOOL_L10N_KEYS: Dict[str, str] = {
     "archive_oa_letter": "aiToolArchiveOaLetter",
     "set_oa_follow_up": "aiToolSetOaFollowUp",
     "link_oa_letters": "aiToolLinkOaLetters",
+    "search_oa_letters": "aiToolSearchOaLetters",
+    "list_oa_letter_formats": "aiToolListOaLetterFormats",
+    "create_oa_letter_format": "aiToolCreateOaLetterFormat",
+    "update_oa_letter_format": "aiToolUpdateOaLetterFormat",
+    "delete_oa_letter_format": "aiToolDeleteOaLetterFormat",
+    "list_oa_letter_templates": "aiToolListOaLetterTemplates",
+    "create_oa_letter_template": "aiToolCreateOaLetterTemplate",
+    "update_oa_letter_template": "aiToolUpdateOaLetterTemplate",
+    "delete_oa_letter_template": "aiToolDeleteOaLetterTemplate",
 }
 
 # برچسب فارسی fallback برای پیام‌های سیستمی (تأیید نوشتن و غیره)
@@ -750,6 +759,15 @@ TOOL_LABELS_FA: Dict[str, str] = {
     "archive_oa_letter": "بایگانی نامه",
     "set_oa_follow_up": "تعیین پیگیری نامه",
     "link_oa_letters": "پیوند نامه‌ها",
+    "search_oa_letters": "جستجوی نامه",
+    "list_oa_letter_formats": "فرمت‌های نامه",
+    "create_oa_letter_format": "ساخت فرمت نامه",
+    "update_oa_letter_format": "ویرایش فرمت نامه",
+    "delete_oa_letter_format": "حذف فرمت نامه",
+    "list_oa_letter_templates": "قالب‌های نامه",
+    "create_oa_letter_template": "ساخت قالب نامه",
+    "update_oa_letter_template": "ویرایش قالب نامه",
+    "delete_oa_letter_template": "حذف قالب نامه",
 }
 
 

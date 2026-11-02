@@ -92,10 +92,16 @@ class OfficeAutomationService {
   Future<List<Map<String, dynamic>>> listPositions({
     required int businessId,
     bool includeInactive = false,
+    String? q,
+    int? limit,
   }) async {
     final res = await _api.get<Map<String, dynamic>>(
       '/api/v1/office-automation/business/$businessId/positions',
-      query: {'include_inactive': '$includeInactive'},
+      query: {
+        'include_inactive': '$includeInactive',
+        if (q != null && q.trim().isNotEmpty) 'q': q.trim(),
+        if (limit != null) 'limit': limit,
+      },
     );
     return _asMapList(_extractData(res.data)['items']);
   }
@@ -441,6 +447,113 @@ class OfficeAutomationService {
       options: _opts(positionId),
     );
     return _extractData(res.data);
+  }
+
+  Future<List<Map<String, dynamic>>> listFormats({
+    required int businessId,
+    bool includeInactive = false,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/formats',
+      query: {'include_inactive': '$includeInactive'},
+    );
+    return _asMapList(_extractData(res.data)['items']);
+  }
+
+  Future<Map<String, dynamic>> createFormat({
+    required int businessId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/formats',
+      data: payload,
+    );
+    return _extractData(res.data);
+  }
+
+  Future<Map<String, dynamic>> updateFormat({
+    required int businessId,
+    required int formatId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/formats/$formatId',
+      data: payload,
+    );
+    return _extractData(res.data);
+  }
+
+  Future<Map<String, dynamic>> deleteFormat({
+    required int businessId,
+    required int formatId,
+  }) async {
+    final res = await _api.delete<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/formats/$formatId',
+    );
+    return _extractData(res.data);
+  }
+
+  Future<List<Map<String, dynamic>>> listTemplates({
+    required int businessId,
+    bool includeInactive = false,
+    String? letterKind,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/templates',
+      query: {
+        'include_inactive': '$includeInactive',
+        if (letterKind != null && letterKind.isNotEmpty) 'letter_kind': letterKind,
+      },
+    );
+    return _asMapList(_extractData(res.data)['items']);
+  }
+
+  Future<Map<String, dynamic>> createTemplate({
+    required int businessId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/templates',
+      data: payload,
+    );
+    return _extractData(res.data);
+  }
+
+  Future<Map<String, dynamic>> updateTemplate({
+    required int businessId,
+    required int templateId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/templates/$templateId',
+      data: payload,
+    );
+    return _extractData(res.data);
+  }
+
+  Future<Map<String, dynamic>> deleteTemplate({
+    required int businessId,
+    required int templateId,
+  }) async {
+    final res = await _api.delete<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/templates/$templateId',
+    );
+    return _extractData(res.data);
+  }
+
+  Future<List<Map<String, dynamic>>> searchLetters({
+    required int businessId,
+    String? q,
+    int limit = 20,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/letters/search',
+      query: {
+        if (q != null && q.trim().isNotEmpty) 'q': q.trim(),
+        'limit': limit,
+      },
+    );
+    return _asMapList(_extractData(res.data)['items']);
   }
 
   Future<List<Map<String, dynamic>>> listBusinessUsers({required int businessId}) async {

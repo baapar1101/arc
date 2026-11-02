@@ -9,7 +9,10 @@ import '../../../core/calendar_controller.dart';
 import '../../../core/date_utils.dart';
 import '../../../services/office_automation_service.dart';
 import '../../../utils/error_extractor.dart';
+import '../../../utils/responsive_helper.dart';
 import '../../../utils/snackbar_helper.dart';
+import '../../../widgets/office_automation/oa_searchable_field.dart';
+import '../../../widgets/office_automation/oa_ui.dart';
 
 class OaCartablePage extends StatefulWidget {
   final int businessId;
@@ -27,17 +30,17 @@ class OaCartablePage extends StatefulWidget {
   State<OaCartablePage> createState() => _OaCartablePageState();
 }
 
-class _OaCartablePageState extends State<OaCartablePage> with SingleTickerProviderStateMixin {
+class _OaCartablePageState extends State<OaCartablePage> {
   final OfficeAutomationService _svc = OfficeAutomationService();
   final TextEditingController _search = TextEditingController();
 
-  late TabController _tabs;
   bool _loading = true;
   List<Map<String, dynamic>> _positions = [];
   int? _positionId;
   Map<String, dynamic> _counts = const {};
   List<Map<String, dynamic>> _items = [];
   int _total = 0;
+  String _folder = 'inbox';
 
   static const _folders = ['inbox', 'action', 'cc', 'drafts', 'sent', 'followup', 'archive', 'registry'];
 
@@ -60,16 +63,11 @@ class _OaCartablePageState extends State<OaCartablePage> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: _folders.length, vsync: this);
-    _tabs.addListener(() {
-      if (!_tabs.indexIsChanging) _loadFolder();
-    });
     _bootstrap();
   }
 
   @override
   void dispose() {
-    _tabs.dispose();
     _search.dispose();
     super.dispose();
   }
@@ -106,8 +104,7 @@ class _OaCartablePageState extends State<OaCartablePage> with SingleTickerProvid
 
   Future<void> _loadFolder() async {
     if (_positionId == null) return;
-    final folder = _folders[_tabs.index];
-    if (folder == 'registry' && !_secretariat) {
+    if (_folder == 'registry' && !_secretariat) {
       setState(() {
         _items = [];
         _total = 0;
@@ -120,7 +117,7 @@ class _OaCartablePageState extends State<OaCartablePage> with SingleTickerProvid
       final data = await _svc.listCartable(
         businessId: widget.businessId,
         positionId: _positionId!,
-        folder: folder,
+        folder: _folder,
         q: _search.text.trim().isEmpty ? null : _search.text.trim(),
       );
       final dash = await _svc.getDashboard(businessId: widget.businessId, positionId: _positionId);
@@ -161,6 +158,29 @@ class _OaCartablePageState extends State<OaCartablePage> with SingleTickerProvid
     }
   }
 
+  IconData _folderIcon(String folder) {
+    switch (folder) {
+      case 'inbox':
+        return Icons.inbox_outlined;
+      case 'action':
+        return Icons.task_alt_outlined;
+      case 'cc':
+        return Icons.copy_all_outlined;
+      case 'drafts':
+        return Icons.edit_note;
+      case 'sent':
+        return Icons.send_outlined;
+      case 'followup':
+        return Icons.event_outlined;
+      case 'archive':
+        return Icons.inventory_2_outlined;
+      case 'registry':
+        return Icons.verified_outlined;
+      default:
+        return Icons.folder_outlined;
+    }
+  }
+
   Future<void> _switchPosition(int? id) async {
     if (id == null) return;
     final prefs = await SharedPreferences.getInstance();
@@ -169,12 +189,20 @@ class _OaCartablePageState extends State<OaCartablePage> with SingleTickerProvid
     await _loadFolder();
   }
 
+  Map<String, dynamic>? get _activePosition {
+    for (final p in _positions) {
+      if (oaId(p['id']) == _positionId) return p;
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final wide = ResponsiveHelper.widthOf(context) >= 980;
     return Scaffold(
       appBar: AppBar(
-        title: Text(t.oaMenu),
+        title: Text(t.oaCartable),
         actions: [
           if (_canAdmin)
             IconButton(
@@ -190,16 +218,6 @@ class _OaCartablePageState extends State<OaCartablePage> with SingleTickerProvid
             ),
           IconButton(tooltip: t.refresh, icon: const Icon(Icons.refresh), onPressed: _bootstrap),
         ],
-        bottom: TabBar(
-          controller: _tabs,
-          isScrollable: true,
-          tabs: [
-            for (final folder in _folders)
-              Tab(
-                text: '${_folderLabel(t, folder)}${_countSuffix(folder)}',
-              ),
-          ],
-        ),
       ),
       floatingActionButton: _canCompose && _positionId != null
           ? FloatingActionButton.extended(
@@ -215,85 +233,202 @@ class _OaCartablePageState extends State<OaCartablePage> with SingleTickerProvid
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<int>(
-                    value: _positionId,
-                    decoration: InputDecoration(
-                      labelText: t.oaPosition,
-                      border: const OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    items: [
-                      for (final p in _positions)
-                        if (oaId(p['id']) != null)
-                          DropdownMenuItem(
-                            value: oaId(p['id']),
-                            child: Text('${p['title'] ?? p['code']}${p['occupancy_kind'] == 'delegate' ? ' (${t.oaDelegate})' : ''}'),
-                          ),
+            child: wide
+                ? Row(
+                    children: [
+                      Expanded(child: _positionField(t)),
+                      const SizedBox(width: 12),
+                      Expanded(child: _searchField(t)),
                     ],
-                    onChanged: _switchPosition,
+                  )
+                : Column(
+                    children: [
+                      _positionField(t),
+                      const SizedBox(height: 8),
+                      _searchField(t),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _search,
-                    decoration: InputDecoration(
-                      labelText: t.search,
-                      border: const OutlineInputBorder(),
-                      isDense: true,
-                      suffixIcon: IconButton(icon: const Icon(Icons.search), onPressed: _loadFolder),
-                    ),
-                    onSubmitted: (_) => _loadFolder(),
-                  ),
-                ),
-              ],
-            ),
           ),
-          if (_positions.isEmpty)
-            Expanded(child: Center(child: Text(t.oaNoPositions)))
-          else if (_loading)
-            const Expanded(child: Center(child: CircularProgressIndicator()))
-          else if (_total == 0 || _items.isEmpty)
-            Expanded(child: Center(child: Text(t.oaEmptyFolder)))
-          else
-            Expanded(
-              child: ListView.separated(
-                itemCount: _items.length,
-                separatorBuilder: (_, _) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  final row = _items[index];
-                  final number = (row['secretariat_number'] ?? '').toString();
-                  final subject = (row['subject'] ?? '').toString();
-                  final status = (row['status'] ?? '').toString();
-                  return ListTile(
-                    leading: Icon(_statusIcon(status)),
-                    title: Text(subject),
-                    subtitle: Text([
-                      if (number.isNotEmpty) number,
-                      status,
-                      if (row['referral_kind'] != null) row['referral_kind'].toString(),
-                    ].join(' · ')),
-                    trailing: Text(
-                      HesabixDateUtils.formatApiDateForDisplay(
-                        row['letter_date'],
-                        widget.calendarController.isJalali,
-                        rawValue: row['letter_date_raw'],
-                        fallback: '',
+          if (!wide)
+            SizedBox(
+              height: 52,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                children: [
+                  for (final folder in _folders)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: ChoiceChip(
+                        avatar: Icon(_folderIcon(folder), size: 16),
+                        label: Text('${_folderLabel(t, folder)}${_countSuffix(folder)}'),
+                        selected: _folder == folder,
+                        onSelected: (_) {
+                          setState(() => _folder = folder);
+                          _loadFolder();
+                        },
                       ),
                     ),
-                    onTap: () => context.go(
-                      context.businessPanelUrl(widget.businessId, 'office-automation/letters/${row['id']}'),
-                      extra: {'positionId': _positionId},
-                    ),
-                  );
-                },
+                ],
               ),
             ),
+          Expanded(
+            child: wide
+                ? Row(
+                    children: [
+                      SizedBox(width: 240, child: _folderRail(t)),
+                      const VerticalDivider(width: 1),
+                      Expanded(child: _list(t)),
+                    ],
+                  )
+                : _list(t),
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _positionField(AppLocalizations t) {
+    final active = _activePosition;
+    return OaSearchableField(
+      label: t.oaActingAs,
+      hint: t.oaSearchPosition,
+      emptyText: t.oaNoPositions,
+      prefixIcon: Icons.badge_outlined,
+      value: active == null ? null : oaPositionItem(active),
+      onChanged: (item) => _switchPosition(item == null ? null : int.tryParse(item.id)),
+      onSearch: (q) async {
+        final needle = q.trim().toLowerCase();
+        final rows = needle.isEmpty
+            ? _positions
+            : _positions.where((p) => oaPositionLabel(p).toLowerCase().contains(needle)).toList();
+        return [
+          for (final p in rows)
+            oaPositionItem({
+              ...p,
+              'title': p['occupancy_kind'] == 'delegate' ? '${p['title'] ?? p['code']} (${t.oaDelegate})' : p['title'],
+            }),
+        ];
+      },
+    );
+  }
+
+  Widget _searchField(AppLocalizations t) {
+    return TextField(
+      controller: _search,
+      decoration: InputDecoration(
+        labelText: t.search,
+        hintText: t.oaInboxHint,
+        border: const OutlineInputBorder(),
+        prefixIcon: const Icon(Icons.search),
+        suffixIcon: IconButton(icon: const Icon(Icons.tune), onPressed: _loadFolder),
+      ),
+      onSubmitted: (_) => _loadFolder(),
+    );
+  }
+
+  Widget _folderRail(AppLocalizations t) {
+    return ListView(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: Text(t.oaCartable, style: Theme.of(context).textTheme.titleSmall),
+        ),
+        for (final folder in _folders)
+          ListTile(
+            selected: _folder == folder,
+            leading: Icon(_folderIcon(folder)),
+            title: Text(_folderLabel(t, folder)),
+            trailing: _countBadge(folder),
+            onTap: () {
+              setState(() => _folder = folder);
+              _loadFolder();
+            },
+          ),
+      ],
+    );
+  }
+
+  Widget? _countBadge(String folder) {
+    final n = _counts[folder];
+    if (n is! num || n <= 0) return null;
+    return CircleAvatar(
+      radius: 12,
+      child: Text('${n.toInt()}', style: const TextStyle(fontSize: 11)),
+    );
+  }
+
+  Widget _list(AppLocalizations t) {
+    if (_positions.isEmpty) return Center(child: Text(t.oaNoPositions));
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_total == 0 || _items.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(_folderIcon(_folder), size: 48, color: Theme.of(context).colorScheme.outline),
+            const SizedBox(height: 12),
+            Text(t.oaEmptyFolder),
+          ],
+        ),
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 88),
+      itemCount: _items.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final row = _items[index];
+        final number = (row['secretariat_number'] ?? '').toString();
+        final subject = (row['subject'] ?? '').toString();
+        final status = (row['status'] ?? '').toString();
+        final urgency = (row['urgency'] ?? 'normal').toString();
+        final kind = (row['letter_kind'] ?? '').toString();
+        return Card(
+          elevation: 0,
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.7)),
+          ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: CircleAvatar(
+              backgroundColor: oaUrgencyColor(Theme.of(context).colorScheme, urgency).withValues(alpha: 0.12),
+              child: Icon(_statusIcon(status), color: oaUrgencyColor(Theme.of(context).colorScheme, urgency)),
+            ),
+            title: Text(subject, maxLines: 1, overflow: TextOverflow.ellipsis),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  if (number.isNotEmpty) OaStatusChip(label: number, icon: Icons.tag),
+                  OaStatusChip(label: oaStatusLabel(t, status)),
+                  if (kind.isNotEmpty) OaStatusChip(label: oaKindLabel(t, kind)),
+                  if (urgency != 'normal') OaStatusChip(label: oaUrgencyLabel(t, urgency), color: oaUrgencyColor(Theme.of(context).colorScheme, urgency)),
+                  if (row['referral_kind'] != null) OaStatusChip(label: '${row['referral_kind']}'),
+                ],
+              ),
+            ),
+            trailing: Text(
+              HesabixDateUtils.formatApiDateForDisplay(
+                row['letter_date'],
+                widget.calendarController.isJalali,
+                rawValue: row['letter_date_raw'],
+                fallback: '',
+              ),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            onTap: () => context.go(
+              context.businessPanelUrl(widget.businessId, 'office-automation/letters/${row['id']}'),
+              extra: {'positionId': _positionId},
+            ),
+          ),
+        );
+      },
     );
   }
 

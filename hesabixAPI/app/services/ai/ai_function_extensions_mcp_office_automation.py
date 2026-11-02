@@ -89,9 +89,9 @@ def register_mcp_office_automation_functions(registry) -> None:
 		lambda a, c: _svc().update_org_unit(c["db"], int(c["business_id"]), int(a["unit_id"]), a["payload"], c["user_context"].get_user_id(), lang=_ctx(c)[3]),
 		"office_automation.admin", write=True)
 
-	_register(registry, "list_oa_positions", "فهرست سمت‌های سازمانی.",
-		_schema({"include_inactive": {"type": "boolean"}}),
-		lambda a, c: {"items": _svc().list_positions(c["db"], int(c["business_id"]), include_inactive=bool(a.get("include_inactive", False)), lang=_ctx(c)[3])},
+	_register(registry, "list_oa_positions", "فهرست و جستجوی سمت‌های سازمانی.",
+		_schema({"include_inactive": {"type": "boolean"}, "q": {"type": "string"}, "limit": {"type": "integer", "minimum": 1, "maximum": 200}}),
+		lambda a, c: {"items": _svc().list_positions(c["db"], int(c["business_id"]), include_inactive=bool(a.get("include_inactive", False)), lang=_ctx(c)[3], q=a.get("q"), limit=a.get("limit"))},
 		"office_automation.view")
 	_register(registry, "create_oa_position", "ساخت سمت سازمانی. اگر code خالی باشد کد یکتا ساخته می‌شود. نیازمند تأیید.",
 		_schema({"payload": {"type": "object", "properties": {"code": {"type": "string"}, "auto_generate_code": {"type": "boolean"}, "org_unit_id": {"type": "integer"}, "name_i18n": {"type": "object"}, "is_secretariat": {"type": "boolean"}, "can_view_subtree": {"type": "boolean"}}, "required": ["org_unit_id"]}}, ["payload"]),
@@ -148,11 +148,14 @@ def register_mcp_office_automation_functions(registry) -> None:
 		"office_automation.view")
 
 	draft_payload = {"type": "object", "properties": {
-		"subject": {"type": "string"}, "body": {"type": "string"}, "letter_kind": {"type": "string", "enum": _KIND},
+		"subject": {"type": "string"}, "body": {"type": "string"}, "body_format": {"type": "string", "enum": ["markdown", "html", "plain"]},
+		"letter_kind": {"type": "string", "enum": _KIND},
 		"letter_date": {"type": "string"}, "urgency": {"type": "string", "enum": _URGENCY},
 		"confidentiality": {"type": "string", "enum": ["normal", "confidential"]},
 		"sender_name": {"type": "string"}, "sender_org": {"type": "string"}, "receiver_name": {"type": "string"},
-		"receiver_org": {"type": "string"}, "locale": {"type": "string", "enum": ["fa", "en"]},
+		"receiver_org": {"type": "string"}, "sender_position_id": {"type": ["integer", "null"]},
+		"receiver_position_id": {"type": ["integer", "null"]}, "format_id": {"type": ["integer", "null"]},
+		"template_id": {"type": ["integer", "null"]}, "locale": {"type": "string", "enum": ["fa", "en"]},
 		"person_id": {"type": ["integer", "null"]}, "follow_up_at": {"type": ["string", "null"]},
 	}}
 	_register(registry, "create_oa_letter_draft", "ساخت پیش‌نویس نامه از سمت فعال. نیازمند تأیید.",
@@ -213,3 +216,40 @@ def register_mcp_office_automation_functions(registry) -> None:
 		_schema({**letter_id, "related_letter_id": {"type": "integer", "minimum": 1}, "link_kind": {"type": "string", "enum": ["related", "reply", "followup"]}}, ["as_position_id", "letter_id", "related_letter_id"]),
 		lambda a, c: _svc().link_letters(c["db"], int(c["business_id"]), int(a["letter_id"]), {"related_letter_id": a["related_letter_id"], "link_kind": a.get("link_kind") or "related"}, c["user_context"].get_user_id(), _pid(a)),
 		"office_automation.refer", write=True)
+
+	_register(registry, "search_oa_letters", "جستجوی نامه‌های ثبت‌شده بر اساس موضوع، شماره یا شناسه.",
+		_schema({"q": {"type": "string"}, "limit": {"type": "integer", "minimum": 1, "maximum": 50}}),
+		lambda a, c: {"items": _svc().search_letters(c["db"], int(c["business_id"]), c["user_context"].get_user_id(), q=a.get("q"), limit=int(a.get("limit") or 20), lang=_ctx(c)[3], is_admin=c["user_context"].has_business_permission("office_automation", "admin"))},
+		"office_automation.view")
+	_register(registry, "list_oa_letter_formats", "فهرست فرمت‌های کاغذ و سربرگ نامه.",
+		_schema({"include_inactive": {"type": "boolean"}}),
+		lambda a, c: {"items": _svc().list_letter_formats(c["db"], int(c["business_id"]), include_inactive=bool(a.get("include_inactive", False)))},
+		"office_automation.view")
+	_register(registry, "create_oa_letter_format", "ساخت فرمت کاغذ، حاشیه، سربرگ و پس‌زمینه نامه. نیازمند تأیید.",
+		_schema({"payload": {"type": "object"}}, ["payload"]),
+		lambda a, c: _svc().create_letter_format(c["db"], int(c["business_id"]), a["payload"], c["user_context"].get_user_id()),
+		"office_automation.admin", write=True)
+	_register(registry, "update_oa_letter_format", "ویرایش فرمت نامه. نیازمند تأیید.",
+		_schema({"format_id": {"type": "integer", "minimum": 1}, "payload": {"type": "object"}}, ["format_id", "payload"]),
+		lambda a, c: _svc().update_letter_format(c["db"], int(c["business_id"]), int(a["format_id"]), a["payload"], c["user_context"].get_user_id()),
+		"office_automation.admin", write=True)
+	_register(registry, "delete_oa_letter_format", "حذف فرمت نامه. نیازمند تأیید.",
+		_schema({"format_id": {"type": "integer", "minimum": 1}}, ["format_id"]),
+		lambda a, c: _svc().delete_letter_format(c["db"], int(c["business_id"]), int(a["format_id"]), c["user_context"].get_user_id()),
+		"office_automation.admin", write=True, high=True)
+	_register(registry, "list_oa_letter_templates", "فهرست قالب‌های آماده نامه.",
+		_schema({"include_inactive": {"type": "boolean"}, "letter_kind": {"type": "string", "enum": _KIND}}),
+		lambda a, c: {"items": _svc().list_letter_templates(c["db"], int(c["business_id"]), include_inactive=bool(a.get("include_inactive", False)), letter_kind=a.get("letter_kind"))},
+		"office_automation.view")
+	_register(registry, "create_oa_letter_template", "ساخت قالب نامه آماده. نیازمند تأیید.",
+		_schema({"payload": {"type": "object"}}, ["payload"]),
+		lambda a, c: _svc().create_letter_template(c["db"], int(c["business_id"]), a["payload"], c["user_context"].get_user_id()),
+		"office_automation.admin", write=True)
+	_register(registry, "update_oa_letter_template", "ویرایش قالب نامه. نیازمند تأیید.",
+		_schema({"template_id": {"type": "integer", "minimum": 1}, "payload": {"type": "object"}}, ["template_id", "payload"]),
+		lambda a, c: _svc().update_letter_template(c["db"], int(c["business_id"]), int(a["template_id"]), a["payload"], c["user_context"].get_user_id()),
+		"office_automation.admin", write=True)
+	_register(registry, "delete_oa_letter_template", "حذف قالب نامه. نیازمند تأیید.",
+		_schema({"template_id": {"type": "integer", "minimum": 1}}, ["template_id"]),
+		lambda a, c: _svc().delete_letter_template(c["db"], int(c["business_id"]), int(a["template_id"]), c["user_context"].get_user_id()),
+		"office_automation.admin", write=True, high=True)

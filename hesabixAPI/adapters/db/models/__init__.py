@@ -283,6 +283,8 @@ from .office_automation import (  # noqa: F401
 	OaPosition,
 	OaPositionHolder,
 	OaDelegation,
+	OaLetterFormat,
+	OaLetterTemplate,
 	OaLetter,
 	OaLetterNumberCounter,
 	OaReferral,

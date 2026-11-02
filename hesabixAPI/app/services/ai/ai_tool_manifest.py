@@ -1614,6 +1614,15 @@ TOOL_MANIFEST: Dict[str, Dict[str, Any]] = {
     'archive_oa_letter': {'domains': ('office_automation',), 'intent_write': True, 'aliases': ('بایگانی نامه',)},
     'set_oa_follow_up': {'domains': ('office_automation',), 'intent_write': True},
     'link_oa_letters': {'domains': ('office_automation',), 'intent_write': True},
+    'search_oa_letters': {'domains': ('office_automation',), 'aliases': ('جستجوی نامه',)},
+    'list_oa_letter_formats': {'domains': ('office_automation',), 'companion_tools': ('create_oa_letter_format',)},
+    'create_oa_letter_format': {'domains': ('office_automation',), 'intent_write': True, 'aliases': ('فرمت نامه', 'سربرگ')},
+    'update_oa_letter_format': {'domains': ('office_automation',), 'intent_write': True},
+    'delete_oa_letter_format': {'domains': ('office_automation',), 'intent_write': True, 'always_confirm': True},
+    'list_oa_letter_templates': {'domains': ('office_automation',), 'companion_tools': ('create_oa_letter_template',)},
+    'create_oa_letter_template': {'domains': ('office_automation',), 'intent_write': True, 'aliases': ('قالب نامه',)},
+    'update_oa_letter_template': {'domains': ('office_automation',), 'intent_write': True},
+    'delete_oa_letter_template': {'domains': ('office_automation',), 'intent_write': True, 'always_confirm': True},
 }
 
 

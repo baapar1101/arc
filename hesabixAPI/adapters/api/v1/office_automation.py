@@ -158,13 +158,18 @@ def list_positions(
 	request: Request,
 	business_id: int,
 	include_inactive: bool = Query(False),
+	q: Optional[str] = Query(None),
+	limit: Optional[int] = Query(None),
 	_: None = Depends(locale_dependency),
 	__: None = _ACCESS,
 	___: None = Depends(require_business_permission_dep("office_automation", "view")),
 	____: None = _PLUGIN,
 	db: Session = Depends(get_db),
 ) -> dict:
-	return _ok({"items": svc.list_positions(db, business_id, include_inactive=include_inactive, lang=_lang(request))}, request)
+	return _ok(
+		{"items": svc.list_positions(db, business_id, include_inactive=include_inactive, lang=_lang(request), q=q, limit=limit)},
+		request,
+	)
 
 
 @router.post("/business/{business_id}/positions")
@@ -326,6 +331,153 @@ def cartable(
 			folder=folder, q=q, limit=limit, skip=skip, lang=_lang(request),
 			calendar_type=_cal(request), date_from=date_from, date_to=date_to,
 		),
+		request,
+	)
+
+
+@router.get("/business/{business_id}/formats")
+def list_formats(
+	request: Request,
+	business_id: int,
+	include_inactive: bool = Query(False),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "view")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+) -> dict:
+	return _ok({"items": svc.list_letter_formats(db, business_id, include_inactive=include_inactive)}, request)
+
+
+@router.post("/business/{business_id}/formats")
+def create_format(
+	request: Request,
+	business_id: int,
+	payload: dict = Body(...),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "admin")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	return _ok(svc.create_letter_format(db, business_id, payload, ctx.get_user_id()), request)
+
+
+@router.put("/business/{business_id}/formats/{format_id}")
+def update_format(
+	request: Request,
+	business_id: int,
+	format_id: int,
+	payload: dict = Body(...),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "admin")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	return _ok(svc.update_letter_format(db, business_id, format_id, payload, ctx.get_user_id()), request)
+
+
+@router.delete("/business/{business_id}/formats/{format_id}")
+def delete_format(
+	request: Request,
+	business_id: int,
+	format_id: int,
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "admin")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	return _ok(svc.delete_letter_format(db, business_id, format_id, ctx.get_user_id()), request)
+
+
+@router.get("/business/{business_id}/templates")
+def list_templates(
+	request: Request,
+	business_id: int,
+	include_inactive: bool = Query(False),
+	letter_kind: Optional[str] = Query(None),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "view")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+) -> dict:
+	return _ok(
+		{"items": svc.list_letter_templates(db, business_id, include_inactive=include_inactive, letter_kind=letter_kind)},
+		request,
+	)
+
+
+@router.post("/business/{business_id}/templates")
+def create_template(
+	request: Request,
+	business_id: int,
+	payload: dict = Body(...),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "admin")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	return _ok(svc.create_letter_template(db, business_id, payload, ctx.get_user_id()), request)
+
+
+@router.put("/business/{business_id}/templates/{template_id}")
+def update_template(
+	request: Request,
+	business_id: int,
+	template_id: int,
+	payload: dict = Body(...),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "admin")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	return _ok(svc.update_letter_template(db, business_id, template_id, payload, ctx.get_user_id()), request)
+
+
+@router.delete("/business/{business_id}/templates/{template_id}")
+def delete_template(
+	request: Request,
+	business_id: int,
+	template_id: int,
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "admin")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	return _ok(svc.delete_letter_template(db, business_id, template_id, ctx.get_user_id()), request)
+
+
+@router.get("/business/{business_id}/letters/search")
+def search_letters(
+	request: Request,
+	business_id: int,
+	q: Optional[str] = Query(None),
+	limit: int = Query(20),
+	_: None = Depends(locale_dependency),
+	__: None = _ACCESS,
+	___: None = Depends(require_business_permission_dep("office_automation", "view")),
+	____: None = _PLUGIN,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	return _ok(
+		{
+			"items": svc.search_letters(
+				db, business_id, ctx.get_user_id(), q=q, limit=limit, lang=_lang(request), is_admin=_is_admin(ctx, business_id)
+			)
+		},
 		request,
 	)
 

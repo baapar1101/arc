@@ -15,8 +15,10 @@ from adapters.db.models.office_automation import (
 	OaDelegation,
 	OaLetter,
 	OaLetterAttachment,
+	OaLetterFormat,
 	OaLetterLink,
 	OaLetterNumberCounter,
+	OaLetterTemplate,
 	OaOrgUnit,
 	OaParaph,
 	OaPosition,
@@ -44,6 +46,9 @@ _DELEGATION_SCOPES = frozenset({"full", "view", "refer"})
 _LINK_KINDS = frozenset({"related", "reply", "followup"})
 _CARTABLE_FOLDERS = frozenset({"inbox", "action", "cc", "drafts", "sent", "followup", "archive", "registry"})
 _PREFIX_BY_KIND = {"internal": "internal_prefix", "incoming": "incoming_prefix", "outgoing": "outgoing_prefix"}
+_BODY_FORMATS = frozenset({"markdown", "html", "plain"})
+_PAPER_SIZES = frozenset({"a4", "a5", "letter"})
+_PAPER_ORIENTATIONS = frozenset({"portrait", "landscape"})
 
 
 def _ensure_plugin(db: Session, business_id: int) -> None:
@@ -260,6 +265,28 @@ def update_settings(db: Session, business_id: int, payload: dict, user_id: int) 
 			setattr(row, field, str(payload[field]).strip()[:16])
 	if "letterhead_file_id" in payload:
 		row.letterhead_file_id = payload.get("letterhead_file_id") or None
+	if "background_file_id" in payload:
+		row.background_file_id = payload.get("background_file_id") or None
+	if "footer_text" in payload:
+		row.footer_text = (str(payload.get("footer_text") or "").strip() or None)
+	if payload.get("paper_size") in _PAPER_SIZES:
+		row.paper_size = payload["paper_size"]
+	if payload.get("paper_orientation") in _PAPER_ORIENTATIONS:
+		row.paper_orientation = payload["paper_orientation"]
+	for field in ("margin_top", "margin_right", "margin_bottom", "margin_left"):
+		if field in payload and payload.get(field) is not None:
+			setattr(row, field, max(0, min(int(payload[field]), 80)))
+	if payload.get("default_body_format") in _BODY_FORMATS:
+		row.default_body_format = payload["default_body_format"]
+	if "default_format_id" in payload:
+		fmt_id = payload.get("default_format_id")
+		row.default_format_id = int(fmt_id) if fmt_id else None
+		if row.default_format_id:
+			fmt = db.query(OaLetterFormat).filter(
+				OaLetterFormat.id == row.default_format_id, OaLetterFormat.business_id == business_id
+			).first()
+			if not fmt:
+				raise ApiError("OA_FORMAT_NOT_FOUND", "Letter format was not found.", http_status=404)
 	if "extra_settings" in payload and payload["extra_settings"] is not None:
 		row.extra_settings = payload["extra_settings"]
 	row.updated_at = _now()
@@ -279,6 +306,16 @@ def _settings_dict(row: OaSettings) -> dict:
 		"outgoing_prefix": row.outgoing_prefix,
 		"internal_prefix": row.internal_prefix,
 		"letterhead_file_id": row.letterhead_file_id,
+		"background_file_id": row.background_file_id,
+		"footer_text": row.footer_text,
+		"paper_size": row.paper_size or "a4",
+		"paper_orientation": row.paper_orientation or "portrait",
+		"margin_top": row.margin_top if row.margin_top is not None else 20,
+		"margin_right": row.margin_right if row.margin_right is not None else 20,
+		"margin_bottom": row.margin_bottom if row.margin_bottom is not None else 20,
+		"margin_left": row.margin_left if row.margin_left is not None else 20,
+		"default_body_format": row.default_body_format or "markdown",
+		"default_format_id": row.default_format_id,
 		"extra_settings": row.extra_settings or {},
 		"created_at": row.created_at,
 		"updated_at": row.updated_at,
@@ -387,17 +424,436 @@ def update_org_unit(db: Session, business_id: int, unit_id: int, payload: dict, 
 	return _unit_dict(row, lang)
 
 
-def list_positions(db: Session, business_id: int, *, include_inactive: bool = False, lang: str = "fa") -> List[dict]:
+def list_positions(
+	db: Session,
+	business_id: int,
+	*,
+	include_inactive: bool = False,
+	lang: str = "fa",
+	q: Optional[str] = None,
+	limit: Optional[int] = None,
+) -> List[dict]:
 	_ensure_plugin(db, business_id)
-	q = (
+	query = (
 		db.query(OaPosition, OaOrgUnit)
 		.join(OaOrgUnit, OaOrgUnit.id == OaPosition.org_unit_id)
 		.filter(OaPosition.business_id == business_id)
 	)
 	if not include_inactive:
-		q = q.filter(OaPosition.is_active == True)  # noqa: E712
-	rows = q.order_by(OaPosition.sort_order, OaPosition.id).all()
-	return [_position_dict(pos, lang, unit) for pos, unit in rows]
+		query = query.filter(OaPosition.is_active == True)  # noqa: E712
+	rows = query.order_by(OaPosition.sort_order, OaPosition.id).all()
+	items = [_position_dict(pos, lang, unit) for pos, unit in rows]
+	_attach_position_holders(db, business_id, items)
+	needle = (q or "").strip().lower()
+	if needle:
+		def _matches(item: dict) -> bool:
+			blob = " ".join(
+				str(part or "")
+				for part in (
+					item.get("title"),
+					item.get("code"),
+					item.get("org_unit_title"),
+					item.get("org_unit_code"),
+					item.get("holder_name"),
+					" ".join(item.get("holder_names") or []),
+					str(item.get("name_i18n") or ""),
+				)
+			).lower()
+			return needle in blob
+
+		items = [item for item in items if _matches(item)]
+	if limit:
+		items = items[: max(1, min(int(limit), 200))]
+	return items
+
+
+def _attach_position_holders(db: Session, business_id: int, items: List[dict]) -> None:
+	ids = [int(item["id"]) for item in items if item.get("id")]
+	if not ids:
+		return
+	now = _now()
+	rows = (
+		db.query(OaPositionHolder, User)
+		.join(User, User.id == OaPositionHolder.user_id)
+		.filter(OaPositionHolder.business_id == business_id, OaPositionHolder.position_id.in_(ids))
+		.filter(_occupancy_filter(now))
+		.order_by(OaPositionHolder.is_primary.desc(), OaPositionHolder.id)
+		.all()
+	)
+	by_pos: Dict[int, List[str]] = {}
+	for holder, user in rows:
+		name = _user_display_name(user)
+		if name:
+			by_pos.setdefault(holder.position_id, []).append(name)
+	for item in items:
+		names = by_pos.get(int(item["id"]), [])
+		item["holder_names"] = names
+		item["holder_name"] = names[0] if names else ""
+
+
+def _validate_letter_refs(db: Session, business_id: int, row: OaLetter) -> None:
+	for pid in (row.sender_position_id, row.receiver_position_id):
+		if pid:
+			_get_position(db, business_id, int(pid))
+	if row.format_id:
+		fmt = db.query(OaLetterFormat).filter(
+			OaLetterFormat.id == int(row.format_id), OaLetterFormat.business_id == business_id
+		).first()
+		if not fmt:
+			raise ApiError("OA_FORMAT_NOT_FOUND", "Letter format was not found.", http_status=404)
+	if row.template_id:
+		tpl = db.query(OaLetterTemplate).filter(
+			OaLetterTemplate.id == int(row.template_id), OaLetterTemplate.business_id == business_id
+		).first()
+		if not tpl:
+			raise ApiError("OA_TEMPLATE_NOT_FOUND", "Letter template was not found.", http_status=404)
+
+
+def _margin(value: Any, default: int = 20) -> int:
+	try:
+		return max(0, min(int(value if value is not None else default), 80))
+	except (TypeError, ValueError):
+		return default
+
+
+def _format_dict(row: OaLetterFormat) -> dict:
+	return {
+		"id": row.id,
+		"business_id": row.business_id,
+		"name": row.name,
+		"paper_size": row.paper_size or "a4",
+		"paper_orientation": row.paper_orientation or "portrait",
+		"margin_top": row.margin_top if row.margin_top is not None else 20,
+		"margin_right": row.margin_right if row.margin_right is not None else 20,
+		"margin_bottom": row.margin_bottom if row.margin_bottom is not None else 20,
+		"margin_left": row.margin_left if row.margin_left is not None else 20,
+		"letterhead_file_id": row.letterhead_file_id,
+		"background_file_id": row.background_file_id,
+		"footer_text": row.footer_text,
+		"header_html": row.header_html,
+		"is_default": bool(row.is_default),
+		"is_active": bool(row.is_active),
+		"sort_order": row.sort_order or 0,
+	}
+
+
+def _template_dict(row: OaLetterTemplate) -> dict:
+	return {
+		"id": row.id,
+		"business_id": row.business_id,
+		"name": row.name,
+		"letter_kind": row.letter_kind,
+		"subject": row.subject,
+		"body": row.body,
+		"body_format": row.body_format or "markdown",
+		"format_id": row.format_id,
+		"is_default": bool(row.is_default),
+		"is_active": bool(row.is_active),
+		"sort_order": row.sort_order or 0,
+	}
+
+
+def _clear_default_formats(db: Session, business_id: int, except_id: Optional[int] = None) -> None:
+	q = db.query(OaLetterFormat).filter(OaLetterFormat.business_id == business_id, OaLetterFormat.is_default == True)  # noqa: E712
+	if except_id:
+		q = q.filter(OaLetterFormat.id != except_id)
+	for row in q.all():
+		row.is_default = False
+
+
+def _clear_default_templates(db: Session, business_id: int, except_id: Optional[int] = None) -> None:
+	q = db.query(OaLetterTemplate).filter(OaLetterTemplate.business_id == business_id, OaLetterTemplate.is_default == True)  # noqa: E712
+	if except_id:
+		q = q.filter(OaLetterTemplate.id != except_id)
+	for row in q.all():
+		row.is_default = False
+
+
+def list_letter_formats(db: Session, business_id: int, *, include_inactive: bool = False) -> List[dict]:
+	_ensure_plugin(db, business_id)
+	q = db.query(OaLetterFormat).filter(OaLetterFormat.business_id == business_id)
+	if not include_inactive:
+		q = q.filter(OaLetterFormat.is_active == True)  # noqa: E712
+	rows = q.order_by(OaLetterFormat.is_default.desc(), OaLetterFormat.sort_order, OaLetterFormat.id).all()
+	return [_format_dict(r) for r in rows]
+
+
+def create_letter_format(db: Session, business_id: int, payload: dict, user_id: int) -> dict:
+	_ensure_plugin(db, business_id)
+	name = str(payload.get("name") or "").strip()
+	if not name:
+		raise ApiError("VALIDATION_ERROR", "Format name is required.", http_status=400)
+	row = OaLetterFormat(
+		business_id=business_id,
+		name=name[:120],
+		paper_size=payload.get("paper_size") if payload.get("paper_size") in _PAPER_SIZES else "a4",
+		paper_orientation=payload.get("paper_orientation") if payload.get("paper_orientation") in _PAPER_ORIENTATIONS else "portrait",
+		margin_top=_margin(payload.get("margin_top")),
+		margin_right=_margin(payload.get("margin_right")),
+		margin_bottom=_margin(payload.get("margin_bottom")),
+		margin_left=_margin(payload.get("margin_left")),
+		letterhead_file_id=payload.get("letterhead_file_id") or None,
+		background_file_id=payload.get("background_file_id") or None,
+		footer_text=(str(payload.get("footer_text") or "").strip() or None),
+		header_html=(str(payload.get("header_html") or "").strip() or None),
+		is_default=bool(payload.get("is_default")),
+		is_active=bool(payload.get("is_active", True)),
+		sort_order=int(payload.get("sort_order") or 0),
+		created_at=_now(),
+		updated_at=_now(),
+	)
+	if row.is_default:
+		_clear_default_formats(db, business_id)
+	db.add(row)
+	db.flush()
+	if row.is_default:
+		settings = get_or_create_settings(db, business_id)
+		settings.default_format_id = row.id
+	_audit(db, business_id=business_id, user_id=user_id, action="format.create", payload={"id": row.id})
+	db.commit()
+	db.refresh(row)
+	return _format_dict(row)
+
+
+def update_letter_format(db: Session, business_id: int, format_id: int, payload: dict, user_id: int) -> dict:
+	_ensure_plugin(db, business_id)
+	row = db.query(OaLetterFormat).filter(OaLetterFormat.id == format_id, OaLetterFormat.business_id == business_id).first()
+	if not row:
+		raise ApiError("OA_FORMAT_NOT_FOUND", "Letter format was not found.", http_status=404)
+	if payload.get("name"):
+		row.name = str(payload["name"]).strip()[:120]
+	if payload.get("paper_size") in _PAPER_SIZES:
+		row.paper_size = payload["paper_size"]
+	if payload.get("paper_orientation") in _PAPER_ORIENTATIONS:
+		row.paper_orientation = payload["paper_orientation"]
+	for field in ("margin_top", "margin_right", "margin_bottom", "margin_left"):
+		if field in payload:
+			setattr(row, field, _margin(payload.get(field)))
+	if "letterhead_file_id" in payload:
+		row.letterhead_file_id = payload.get("letterhead_file_id") or None
+	if "background_file_id" in payload:
+		row.background_file_id = payload.get("background_file_id") or None
+	if "footer_text" in payload:
+		row.footer_text = (str(payload.get("footer_text") or "").strip() or None)
+	if "header_html" in payload:
+		row.header_html = (str(payload.get("header_html") or "").strip() or None)
+	if "is_active" in payload:
+		row.is_active = bool(payload["is_active"])
+	if "sort_order" in payload:
+		row.sort_order = int(payload.get("sort_order") or 0)
+	if "is_default" in payload:
+		row.is_default = bool(payload["is_default"])
+		if row.is_default:
+			_clear_default_formats(db, business_id, except_id=row.id)
+			settings = get_or_create_settings(db, business_id)
+			settings.default_format_id = row.id
+	row.updated_at = _now()
+	_audit(db, business_id=business_id, user_id=user_id, action="format.update", payload={"id": row.id})
+	db.commit()
+	db.refresh(row)
+	return _format_dict(row)
+
+
+def delete_letter_format(db: Session, business_id: int, format_id: int, user_id: int) -> dict:
+	_ensure_plugin(db, business_id)
+	row = db.query(OaLetterFormat).filter(OaLetterFormat.id == format_id, OaLetterFormat.business_id == business_id).first()
+	if not row:
+		raise ApiError("OA_FORMAT_NOT_FOUND", "Letter format was not found.", http_status=404)
+	db.query(OaLetter).filter(OaLetter.format_id == row.id).update({"format_id": None})
+	db.query(OaLetterTemplate).filter(OaLetterTemplate.format_id == row.id).update({"format_id": None})
+	settings = get_or_create_settings(db, business_id)
+	if settings.default_format_id == row.id:
+		settings.default_format_id = None
+	db.delete(row)
+	_audit(db, business_id=business_id, user_id=user_id, action="format.delete", payload={"id": format_id})
+	db.commit()
+	return {"id": format_id, "deleted": True}
+
+
+def list_letter_templates(db: Session, business_id: int, *, include_inactive: bool = False, letter_kind: Optional[str] = None) -> List[dict]:
+	_ensure_plugin(db, business_id)
+	q = db.query(OaLetterTemplate).filter(OaLetterTemplate.business_id == business_id)
+	if not include_inactive:
+		q = q.filter(OaLetterTemplate.is_active == True)  # noqa: E712
+	if letter_kind:
+		q = q.filter(or_(OaLetterTemplate.letter_kind == letter_kind, OaLetterTemplate.letter_kind.is_(None)))
+	rows = q.order_by(OaLetterTemplate.is_default.desc(), OaLetterTemplate.sort_order, OaLetterTemplate.id).all()
+	return [_template_dict(r) for r in rows]
+
+
+def create_letter_template(db: Session, business_id: int, payload: dict, user_id: int) -> dict:
+	_ensure_plugin(db, business_id)
+	name = str(payload.get("name") or "").strip()
+	if not name:
+		raise ApiError("VALIDATION_ERROR", "Template name is required.", http_status=400)
+	kind = payload.get("letter_kind")
+	if kind and kind not in _LETTER_KINDS:
+		raise ApiError("VALIDATION_ERROR", "Invalid letter kind.", http_status=400)
+	fmt_id = int(payload["format_id"]) if payload.get("format_id") else None
+	if fmt_id:
+		fmt = db.query(OaLetterFormat).filter(OaLetterFormat.id == fmt_id, OaLetterFormat.business_id == business_id).first()
+		if not fmt:
+			raise ApiError("OA_FORMAT_NOT_FOUND", "Letter format was not found.", http_status=404)
+	row = OaLetterTemplate(
+		business_id=business_id,
+		name=name[:120],
+		letter_kind=kind or None,
+		subject=(str(payload.get("subject") or "").strip()[:500] or None),
+		body=payload.get("body"),
+		body_format=payload.get("body_format") if payload.get("body_format") in _BODY_FORMATS else "markdown",
+		format_id=fmt_id,
+		is_default=bool(payload.get("is_default")),
+		is_active=bool(payload.get("is_active", True)),
+		sort_order=int(payload.get("sort_order") or 0),
+		created_at=_now(),
+		updated_at=_now(),
+	)
+	if row.is_default:
+		_clear_default_templates(db, business_id)
+	db.add(row)
+	db.flush()
+	_audit(db, business_id=business_id, user_id=user_id, action="template.create", payload={"id": row.id})
+	db.commit()
+	db.refresh(row)
+	return _template_dict(row)
+
+
+def update_letter_template(db: Session, business_id: int, template_id: int, payload: dict, user_id: int) -> dict:
+	_ensure_plugin(db, business_id)
+	row = db.query(OaLetterTemplate).filter(OaLetterTemplate.id == template_id, OaLetterTemplate.business_id == business_id).first()
+	if not row:
+		raise ApiError("OA_TEMPLATE_NOT_FOUND", "Letter template was not found.", http_status=404)
+	if payload.get("name"):
+		row.name = str(payload["name"]).strip()[:120]
+	if "letter_kind" in payload:
+		kind = payload.get("letter_kind")
+		if kind and kind not in _LETTER_KINDS:
+			raise ApiError("VALIDATION_ERROR", "Invalid letter kind.", http_status=400)
+		row.letter_kind = kind or None
+	if "subject" in payload:
+		row.subject = (str(payload.get("subject") or "").strip()[:500] or None)
+	if "body" in payload:
+		row.body = payload.get("body")
+	if payload.get("body_format") in _BODY_FORMATS:
+		row.body_format = payload["body_format"]
+	if "format_id" in payload:
+		fmt_id = int(payload["format_id"]) if payload.get("format_id") else None
+		if fmt_id:
+			fmt = db.query(OaLetterFormat).filter(OaLetterFormat.id == fmt_id, OaLetterFormat.business_id == business_id).first()
+			if not fmt:
+				raise ApiError("OA_FORMAT_NOT_FOUND", "Letter format was not found.", http_status=404)
+		row.format_id = fmt_id
+	if "is_active" in payload:
+		row.is_active = bool(payload["is_active"])
+	if "sort_order" in payload:
+		row.sort_order = int(payload.get("sort_order") or 0)
+	if "is_default" in payload:
+		row.is_default = bool(payload["is_default"])
+		if row.is_default:
+			_clear_default_templates(db, business_id, except_id=row.id)
+	row.updated_at = _now()
+	_audit(db, business_id=business_id, user_id=user_id, action="template.update", payload={"id": row.id})
+	db.commit()
+	db.refresh(row)
+	return _template_dict(row)
+
+
+def delete_letter_template(db: Session, business_id: int, template_id: int, user_id: int) -> dict:
+	_ensure_plugin(db, business_id)
+	row = db.query(OaLetterTemplate).filter(OaLetterTemplate.id == template_id, OaLetterTemplate.business_id == business_id).first()
+	if not row:
+		raise ApiError("OA_TEMPLATE_NOT_FOUND", "Letter template was not found.", http_status=404)
+	db.query(OaLetter).filter(OaLetter.template_id == row.id).update({"template_id": None})
+	db.delete(row)
+	_audit(db, business_id=business_id, user_id=user_id, action="template.delete", payload={"id": template_id})
+	db.commit()
+	return {"id": template_id, "deleted": True}
+
+
+def search_letters(
+	db: Session,
+	business_id: int,
+	user_id: int,
+	*,
+	q: Optional[str] = None,
+	limit: int = 20,
+	lang: str = "fa",
+	is_admin: bool = False,
+) -> List[dict]:
+	_ensure_plugin(db, business_id)
+	query = db.query(OaLetter).filter(OaLetter.business_id == business_id, OaLetter.status != "draft")
+	needle = (q or "").strip()
+	if needle:
+		like = f"%{needle}%"
+		if needle.isdigit():
+			query = query.filter(
+				or_(
+					OaLetter.id == int(needle),
+					OaLetter.subject.ilike(like),
+					OaLetter.secretariat_number.ilike(like),
+				)
+			)
+		else:
+			query = query.filter(or_(OaLetter.subject.ilike(like), OaLetter.secretariat_number.ilike(like)))
+	rows = query.order_by(OaLetter.id.desc()).limit(max(1, min(int(limit or 20), 50))).all()
+	items = []
+	for row in rows:
+		if not _can_view_letter(db, row, user_id, is_admin):
+			continue
+		items.append(
+			{
+				"id": row.id,
+				"subject": row.subject,
+				"secretariat_number": row.secretariat_number,
+				"status": row.status,
+				"letter_kind": row.letter_kind,
+				"letter_date": row.letter_date,
+			}
+		)
+	return items
+
+
+def _resolve_print_format(db: Session, business_id: int, letter: OaLetter) -> dict:
+	settings = get_or_create_settings(db, business_id)
+	fmt = None
+	if letter.format_id:
+		fmt = db.query(OaLetterFormat).filter(
+			OaLetterFormat.id == letter.format_id, OaLetterFormat.business_id == business_id
+		).first()
+	if fmt is None and settings.default_format_id:
+		fmt = db.query(OaLetterFormat).filter(
+			OaLetterFormat.id == settings.default_format_id, OaLetterFormat.business_id == business_id
+		).first()
+	if fmt is None:
+		fmt = (
+			db.query(OaLetterFormat)
+			.filter(OaLetterFormat.business_id == business_id, OaLetterFormat.is_default == True)  # noqa: E712
+			.first()
+		)
+	if fmt is not None:
+		data = _format_dict(fmt)
+	else:
+		data = {
+			"id": None,
+			"name": "",
+			"paper_size": settings.paper_size or "a4",
+			"paper_orientation": settings.paper_orientation or "portrait",
+			"margin_top": settings.margin_top if settings.margin_top is not None else 20,
+			"margin_right": settings.margin_right if settings.margin_right is not None else 20,
+			"margin_bottom": settings.margin_bottom if settings.margin_bottom is not None else 20,
+			"margin_left": settings.margin_left if settings.margin_left is not None else 20,
+			"letterhead_file_id": settings.letterhead_file_id,
+			"background_file_id": settings.background_file_id,
+			"footer_text": settings.footer_text,
+			"header_html": None,
+		}
+	if not data.get("letterhead_file_id"):
+		data["letterhead_file_id"] = settings.letterhead_file_id
+	if not data.get("background_file_id"):
+		data["background_file_id"] = settings.background_file_id
+	if not data.get("footer_text"):
+		data["footer_text"] = settings.footer_text
+	return data
 
 
 def _get_position(db: Session, business_id: int, position_id: int) -> OaPosition:
@@ -788,6 +1244,7 @@ def _letter_dict(
 		"status": row.status,
 		"subject": row.subject,
 		"body": row.body,
+		"body_format": row.body_format or "markdown",
 		"locale": row.locale,
 		"letter_date": row.letter_date,
 		"urgency": row.urgency,
@@ -796,6 +1253,10 @@ def _letter_dict(
 		"sender_org": row.sender_org,
 		"receiver_name": row.receiver_name,
 		"receiver_org": row.receiver_org,
+		"sender_position_id": row.sender_position_id,
+		"receiver_position_id": row.receiver_position_id,
+		"format_id": row.format_id,
+		"template_id": row.template_id,
 		"origin_position_id": row.origin_position_id,
 		"created_by_user_id": row.created_by_user_id,
 		"registered_at": row.registered_at,
@@ -912,6 +1373,8 @@ def _apply_letter_payload(row: OaLetter, payload: dict, calendar_type: CalendarT
 		row.subject = str(payload["subject"]).strip()[:500]
 	if "body" in payload:
 		row.body = payload.get("body")
+	if payload.get("body_format") in _BODY_FORMATS:
+		row.body_format = payload["body_format"]
 	if payload.get("locale") in {"fa", "en"}:
 		row.locale = payload["locale"]
 	if payload.get("letter_kind") in _LETTER_KINDS:
@@ -930,6 +1393,14 @@ def _apply_letter_payload(row: OaLetter, payload: dict, calendar_type: CalendarT
 		row.receiver_org = payload.get("receiver_org")
 	if "person_id" in payload:
 		row.person_id = int(payload["person_id"]) if payload.get("person_id") else None
+	if "sender_position_id" in payload:
+		row.sender_position_id = int(payload["sender_position_id"]) if payload.get("sender_position_id") else None
+	if "receiver_position_id" in payload:
+		row.receiver_position_id = int(payload["receiver_position_id"]) if payload.get("receiver_position_id") else None
+	if "format_id" in payload:
+		row.format_id = int(payload["format_id"]) if payload.get("format_id") else None
+	if "template_id" in payload:
+		row.template_id = int(payload["template_id"]) if payload.get("template_id") else None
 	if "letter_date" in payload and payload.get("letter_date"):
 		row.letter_date = _parse_date(payload["letter_date"], calendar_type) or row.letter_date
 	if "follow_up_at" in payload:
@@ -959,6 +1430,7 @@ def create_letter_draft(
 		status="draft",
 		subject=subject[:500],
 		body=payload.get("body"),
+		body_format=payload.get("body_format") if payload.get("body_format") in _BODY_FORMATS else "markdown",
 		locale=payload.get("locale") if payload.get("locale") in {"fa", "en"} else "fa",
 		letter_date=letter_date,
 		urgency=payload.get("urgency") if payload.get("urgency") in _URGENCY else "normal",
@@ -967,6 +1439,10 @@ def create_letter_draft(
 		sender_org=payload.get("sender_org"),
 		receiver_name=payload.get("receiver_name"),
 		receiver_org=payload.get("receiver_org"),
+		sender_position_id=int(payload["sender_position_id"]) if payload.get("sender_position_id") else None,
+		receiver_position_id=int(payload["receiver_position_id"]) if payload.get("receiver_position_id") else None,
+		format_id=int(payload["format_id"]) if payload.get("format_id") else None,
+		template_id=int(payload["template_id"]) if payload.get("template_id") else None,
 		origin_position_id=position.id,
 		created_by_user_id=user_id,
 		person_id=int(payload["person_id"]) if payload.get("person_id") else None,
@@ -974,6 +1450,7 @@ def create_letter_draft(
 		created_at=_now(),
 		updated_at=_now(),
 	)
+	_validate_letter_refs(db, business_id, row)
 	db.add(row)
 	db.flush()
 	_audit(db, business_id=business_id, user_id=user_id, action="letter.draft", letter_id=row.id, position_id=position.id)
@@ -999,6 +1476,7 @@ def update_letter_draft(
 	if row.origin_position_id != position.id:
 		raise ApiError("OA_LETTER_FORBIDDEN", "This draft does not belong to the active position.", http_status=403)
 	_apply_letter_payload(row, payload, calendar_type)
+	_validate_letter_refs(db, business_id, row)
 	row.updated_at = _now()
 	_audit(db, business_id=business_id, user_id=user_id, action="letter.update_draft", letter_id=row.id, position_id=position.id)
 	db.commit()
@@ -1550,6 +2028,23 @@ def get_letter(
 		.all()
 	)
 	data = _letter_dict(row, lang, origin=origin)
+	party_ids = {pid for pid in (row.sender_position_id, row.receiver_position_id) if pid}
+	if party_ids:
+		party_rows = (
+			db.query(OaPosition, OaOrgUnit)
+			.join(OaOrgUnit, OaOrgUnit.id == OaPosition.org_unit_id)
+			.filter(OaPosition.id.in_(party_ids))
+			.all()
+		)
+		by_id = {p.id: (p, u) for p, u in party_rows}
+		if row.sender_position_id in by_id:
+			pos, unit = by_id[row.sender_position_id]
+			data["sender_position_title"] = resolve_i18n(pos.name_i18n, lang)
+			data["sender_unit_title"] = resolve_i18n(unit.name_i18n, lang)
+		if row.receiver_position_id in by_id:
+			pos, unit = by_id[row.receiver_position_id]
+			data["receiver_position_title"] = resolve_i18n(pos.name_i18n, lang)
+			data["receiver_unit_title"] = resolve_i18n(unit.name_i18n, lang)
 	data["paraphs"] = [
 		{
 			"id": p.id,
@@ -1620,12 +2115,25 @@ def get_letter_print(
 ) -> dict:
 	data = get_letter(db, business_id, letter_id, user_id, position_id, lang=lang, is_admin=is_admin)
 	settings = get_settings(db, business_id)
+	letter = _get_letter(db, business_id, letter_id)
+	fmt = _resolve_print_format(db, business_id, letter)
+	data["format"] = fmt
 	data["print"] = {
-		"letterhead_file_id": settings.get("letterhead_file_id"),
+		"letterhead_file_id": fmt.get("letterhead_file_id") or settings.get("letterhead_file_id"),
+		"background_file_id": fmt.get("background_file_id") or settings.get("background_file_id"),
+		"footer_text": fmt.get("footer_text") or settings.get("footer_text"),
+		"header_html": fmt.get("header_html"),
+		"paper_size": fmt.get("paper_size") or "a4",
+		"paper_orientation": fmt.get("paper_orientation") or "portrait",
+		"margin_top": fmt.get("margin_top", 20),
+		"margin_right": fmt.get("margin_right", 20),
+		"margin_bottom": fmt.get("margin_bottom", 20),
+		"margin_left": fmt.get("margin_left", 20),
 		"numbering_calendar": settings.get("numbering_calendar"),
 		"incoming_prefix": settings.get("incoming_prefix"),
 		"outgoing_prefix": settings.get("outgoing_prefix"),
 		"internal_prefix": settings.get("internal_prefix"),
+		"body_format": data.get("body_format") or "markdown",
 	}
 	return data
 

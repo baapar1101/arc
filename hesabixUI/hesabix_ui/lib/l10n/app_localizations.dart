@@ -24375,8 +24375,452 @@ abstract class AppLocalizations {
   /// No description provided for @oaLetterhead.
   ///
   /// In en, this message translates to:
-  /// **'Letterhead file ID'**
+  /// **'Letterhead'**
   String get oaLetterhead;
+
+  /// No description provided for @oaSearchPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'Search and select a position'**
+  String get oaSearchPosition;
+
+  /// No description provided for @oaSearchPositionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Type a position, unit, or occupant name'**
+  String get oaSearchPositionHint;
+
+  /// No description provided for @oaNoSearchResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No results found.'**
+  String get oaNoSearchResults;
+
+  /// No description provided for @oaInCirculation.
+  ///
+  /// In en, this message translates to:
+  /// **'In circulation'**
+  String get oaInCirculation;
+
+  /// No description provided for @oaClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Closed'**
+  String get oaClosed;
+
+  /// No description provided for @oaMarkdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Markdown'**
+  String get oaMarkdown;
+
+  /// No description provided for @oaHtml.
+  ///
+  /// In en, this message translates to:
+  /// **'HTML'**
+  String get oaHtml;
+
+  /// No description provided for @oaEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get oaEdit;
+
+  /// No description provided for @oaPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get oaPreview;
+
+  /// No description provided for @oaBold.
+  ///
+  /// In en, this message translates to:
+  /// **'Bold'**
+  String get oaBold;
+
+  /// No description provided for @oaItalic.
+  ///
+  /// In en, this message translates to:
+  /// **'Italic'**
+  String get oaItalic;
+
+  /// No description provided for @oaUnderline.
+  ///
+  /// In en, this message translates to:
+  /// **'Underline'**
+  String get oaUnderline;
+
+  /// No description provided for @oaHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Heading'**
+  String get oaHeading;
+
+  /// No description provided for @oaBullet.
+  ///
+  /// In en, this message translates to:
+  /// **'List'**
+  String get oaBullet;
+
+  /// No description provided for @oaQuote.
+  ///
+  /// In en, this message translates to:
+  /// **'Quote'**
+  String get oaQuote;
+
+  /// No description provided for @oaInsertLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Insert link'**
+  String get oaInsertLink;
+
+  /// No description provided for @oaLinkLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Label'**
+  String get oaLinkLabel;
+
+  /// No description provided for @oaLinkUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'URL'**
+  String get oaLinkUrl;
+
+  /// No description provided for @oaInsert.
+  ///
+  /// In en, this message translates to:
+  /// **'Insert'**
+  String get oaInsert;
+
+  /// No description provided for @oaBodyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Write the letter with formatting…'**
+  String get oaBodyHint;
+
+  /// No description provided for @oaUploadImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload image'**
+  String get oaUploadImage;
+
+  /// No description provided for @oaSearchLetter.
+  ///
+  /// In en, this message translates to:
+  /// **'Search related letter'**
+  String get oaSearchLetter;
+
+  /// No description provided for @oaLetterFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Letter format'**
+  String get oaLetterFormat;
+
+  /// No description provided for @oaLetterTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Letter template'**
+  String get oaLetterTemplate;
+
+  /// No description provided for @oaStationery.
+  ///
+  /// In en, this message translates to:
+  /// **'Letterhead & paper'**
+  String get oaStationery;
+
+  /// No description provided for @oaBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Letter background'**
+  String get oaBackground;
+
+  /// No description provided for @oaFooter.
+  ///
+  /// In en, this message translates to:
+  /// **'Footer'**
+  String get oaFooter;
+
+  /// No description provided for @oaPaperSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Paper size'**
+  String get oaPaperSize;
+
+  /// No description provided for @oaPaperOrientation.
+  ///
+  /// In en, this message translates to:
+  /// **'Orientation'**
+  String get oaPaperOrientation;
+
+  /// No description provided for @oaPortrait.
+  ///
+  /// In en, this message translates to:
+  /// **'Portrait'**
+  String get oaPortrait;
+
+  /// No description provided for @oaLandscape.
+  ///
+  /// In en, this message translates to:
+  /// **'Landscape'**
+  String get oaLandscape;
+
+  /// No description provided for @oaMargins.
+  ///
+  /// In en, this message translates to:
+  /// **'Margins (mm)'**
+  String get oaMargins;
+
+  /// No description provided for @oaMarginTop.
+  ///
+  /// In en, this message translates to:
+  /// **'Top'**
+  String get oaMarginTop;
+
+  /// No description provided for @oaMarginRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Right'**
+  String get oaMarginRight;
+
+  /// No description provided for @oaMarginBottom.
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom'**
+  String get oaMarginBottom;
+
+  /// No description provided for @oaMarginLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Left'**
+  String get oaMarginLeft;
+
+  /// No description provided for @oaDefaultFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Default format'**
+  String get oaDefaultFormat;
+
+  /// No description provided for @oaApplyTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply template'**
+  String get oaApplyTemplate;
+
+  /// No description provided for @oaSaveAsTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Save as template'**
+  String get oaSaveAsTemplate;
+
+  /// No description provided for @oaNewFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'New format'**
+  String get oaNewFormat;
+
+  /// No description provided for @oaNewTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'New template'**
+  String get oaNewTemplate;
+
+  /// No description provided for @oaFormatName.
+  ///
+  /// In en, this message translates to:
+  /// **'Format name'**
+  String get oaFormatName;
+
+  /// No description provided for @oaTemplateName.
+  ///
+  /// In en, this message translates to:
+  /// **'Template name'**
+  String get oaTemplateName;
+
+  /// No description provided for @oaAllKinds.
+  ///
+  /// In en, this message translates to:
+  /// **'All types'**
+  String get oaAllKinds;
+
+  /// No description provided for @oaCartable.
+  ///
+  /// In en, this message translates to:
+  /// **'Inbox'**
+  String get oaCartable;
+
+  /// No description provided for @oaActingAs.
+  ///
+  /// In en, this message translates to:
+  /// **'Acting as'**
+  String get oaActingAs;
+
+  /// No description provided for @oaDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Letter document'**
+  String get oaDocument;
+
+  /// No description provided for @oaTimeline.
+  ///
+  /// In en, this message translates to:
+  /// **'Timeline'**
+  String get oaTimeline;
+
+  /// No description provided for @oaCirculation.
+  ///
+  /// In en, this message translates to:
+  /// **'Circulation'**
+  String get oaCirculation;
+
+  /// No description provided for @oaMetadata.
+  ///
+  /// In en, this message translates to:
+  /// **'Letter details'**
+  String get oaMetadata;
+
+  /// No description provided for @oaCustomParty.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter manually'**
+  String get oaCustomParty;
+
+  /// No description provided for @oaPartyFromPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick from organization positions'**
+  String get oaPartyFromPosition;
+
+  /// No description provided for @oaLetterPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Letter preview'**
+  String get oaLetterPreview;
+
+  /// No description provided for @oaPaperA4.
+  ///
+  /// In en, this message translates to:
+  /// **'A4'**
+  String get oaPaperA4;
+
+  /// No description provided for @oaPaperA5.
+  ///
+  /// In en, this message translates to:
+  /// **'A5'**
+  String get oaPaperA5;
+
+  /// No description provided for @oaPaperLetter.
+  ///
+  /// In en, this message translates to:
+  /// **'Letter'**
+  String get oaPaperLetter;
+
+  /// No description provided for @oaDefaultBodyFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Default body format'**
+  String get oaDefaultBodyFormat;
+
+  /// No description provided for @oaMakeDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get oaMakeDefault;
+
+  /// No description provided for @oaEmptyTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'No templates yet.'**
+  String get oaEmptyTemplates;
+
+  /// No description provided for @oaEmptyFormats.
+  ///
+  /// In en, this message translates to:
+  /// **'No paper formats yet.'**
+  String get oaEmptyFormats;
+
+  /// No description provided for @oaAddRecipient.
+  ///
+  /// In en, this message translates to:
+  /// **'Add recipient'**
+  String get oaAddRecipient;
+
+  /// No description provided for @oaCompose.
+  ///
+  /// In en, this message translates to:
+  /// **'Compose'**
+  String get oaCompose;
+
+  /// No description provided for @oaViewLetter.
+  ///
+  /// In en, this message translates to:
+  /// **'View letter'**
+  String get oaViewLetter;
+
+  /// No description provided for @oaMoreActions.
+  ///
+  /// In en, this message translates to:
+  /// **'More actions'**
+  String get oaMoreActions;
+
+  /// No description provided for @oaNumbering.
+  ///
+  /// In en, this message translates to:
+  /// **'Numbering'**
+  String get oaNumbering;
+
+  /// No description provided for @oaTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Templates'**
+  String get oaTemplates;
+
+  /// No description provided for @oaFormats.
+  ///
+  /// In en, this message translates to:
+  /// **'Formats'**
+  String get oaFormats;
+
+  /// No description provided for @oaSelectTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a ready template'**
+  String get oaSelectTemplate;
+
+  /// No description provided for @oaSelectFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose paper format and letterhead'**
+  String get oaSelectFormat;
+
+  /// No description provided for @oaHeaderHtml.
+  ///
+  /// In en, this message translates to:
+  /// **'Header text'**
+  String get oaHeaderHtml;
+
+  /// No description provided for @oaDefaultBodyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Markdown or HTML'**
+  String get oaDefaultBodyHint;
+
+  /// No description provided for @oaInboxHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Letters referred to the active position'**
+  String get oaInboxHint;
+
+  /// No description provided for @oaNewLetterHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Compose with templates, letterhead, and searchable positions'**
+  String get oaNewLetterHint;
+
+  /// No description provided for @oaPositionWithHolder.
+  ///
+  /// In en, this message translates to:
+  /// **'{title} · {holder}'**
+  String oaPositionWithHolder(String title, String holder);
 
   /// No description provided for @businessSettingsOfficeAutomation.
   ///
@@ -24387,7 +24831,7 @@ abstract class AppLocalizations {
   /// No description provided for @businessSettingsOfficeAutomationDescription.
   ///
   /// In en, this message translates to:
-  /// **'Letter numbering, letterhead, and secretariat prefixes'**
+  /// **'Numbering, letterhead, templates, and letter formats'**
   String get businessSettingsOfficeAutomationDescription;
 
   /// No description provided for @fixedAssetsTitle.

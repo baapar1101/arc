@@ -5,6 +5,8 @@ import '../../../core/auth_store.dart';
 import '../../../services/office_automation_service.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
+import '../../../widgets/office_automation/oa_searchable_field.dart';
+import '../../../widgets/office_automation/oa_ui.dart';
 
 final _oaCodeRe = RegExp(r'^[a-zA-Z][a-zA-Z0-9_]{0,63}$');
 
@@ -282,15 +284,35 @@ class _OaOrgPageState extends State<OaOrgPage> with SingleTickerProviderStateMix
       extra: (draft, setLocal) {
         final loc = AppLocalizations.of(context);
         return [
-          DropdownButtonFormField<int?>(
-            initialValue: oaId(draft['parent_id']),
-            decoration: InputDecoration(labelText: loc.oaParentUnit),
-            items: [
-              DropdownMenuItem<int?>(value: null, child: Text(loc.oaNoParent)),
-              for (final u in _units.where((u) => oaId(u['id']) != oaId(existing?['id'])))
-                DropdownMenuItem<int?>(value: oaId(u['id']), child: Text('${u['title'] ?? u['code']}')),
-            ],
-            onChanged: (v) => setLocal(() => draft['parent_id'] = v),
+          OaSearchableField(
+            label: loc.oaParentUnit,
+            hint: loc.oaNoParent,
+            emptyText: loc.oaNoSearchResults,
+            prefixIcon: Icons.account_tree_outlined,
+            allowClear: true,
+            value: () {
+              final id = oaId(draft['parent_id']);
+              if (id == null) return null;
+              for (final u in _units) {
+                if (oaId(u['id']) == id) {
+                  return OaSearchItem(id: '$id', title: '${u['title'] ?? u['code']}', payload: u);
+                }
+              }
+              return OaSearchItem(id: '$id', title: '$id');
+            }(),
+            onChanged: (item) => setLocal(() => draft['parent_id'] = item == null ? null : int.tryParse(item.id)),
+            onSearch: (q) async {
+              final needle = q.trim().toLowerCase();
+              final rows = _units.where((u) => oaId(u['id']) != oaId(existing?['id']));
+              final filtered = needle.isEmpty
+                  ? rows
+                  : rows.where((u) => '${u['title'] ?? ''} ${u['code'] ?? ''}'.toLowerCase().contains(needle));
+              return [
+                for (final u in filtered)
+                  if (oaId(u['id']) != null)
+                    OaSearchItem(id: '${oaId(u['id'])}', title: '${u['title'] ?? u['code']}', subtitle: '${u['code'] ?? ''}'),
+              ];
+            },
           ),
         ];
       },
@@ -316,16 +338,33 @@ class _OaOrgPageState extends State<OaOrgPage> with SingleTickerProviderStateMix
       extra: (draft, setLocal) {
         final loc = AppLocalizations.of(context);
         return [
-          DropdownButtonFormField<int>(
-            initialValue: oaId(draft['org_unit_id']),
-            decoration: InputDecoration(labelText: loc.oaUnits),
-            items: [
-              for (final u in _units)
-                if (oaId(u['id']) != null)
-                  DropdownMenuItem(value: oaId(u['id']), child: Text('${u['title'] ?? u['code']}')),
-            ],
-            onChanged: (v) => setLocal(() => draft['org_unit_id'] = v),
-            validator: (v) => v == null ? loc.oaSelectUnit : null,
+          OaSearchableField(
+            label: loc.oaUnits,
+            hint: loc.oaSelectUnit,
+            emptyText: loc.oaNoSearchResults,
+            prefixIcon: Icons.apartment_outlined,
+            value: () {
+              final id = oaId(draft['org_unit_id']);
+              if (id == null) return null;
+              for (final u in _units) {
+                if (oaId(u['id']) == id) {
+                  return OaSearchItem(id: '$id', title: '${u['title'] ?? u['code']}', subtitle: '${u['code'] ?? ''}');
+                }
+              }
+              return OaSearchItem(id: '$id', title: '$id');
+            }(),
+            onChanged: (item) => setLocal(() => draft['org_unit_id'] = item == null ? null : int.tryParse(item.id)),
+            onSearch: (q) async {
+              final needle = q.trim().toLowerCase();
+              final filtered = needle.isEmpty
+                  ? _units
+                  : _units.where((u) => '${u['title'] ?? ''} ${u['code'] ?? ''}'.toLowerCase().contains(needle)).toList();
+              return [
+                for (final u in filtered)
+                  if (oaId(u['id']) != null)
+                    OaSearchItem(id: '${oaId(u['id'])}', title: '${u['title'] ?? u['code']}', subtitle: '${u['code'] ?? ''}'),
+              ];
+            },
           ),
           SwitchListTile(
             title: Text(loc.oaRegistry),
@@ -375,24 +414,23 @@ class _OaOrgPageState extends State<OaOrgPage> with SingleTickerProviderStateMix
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                DropdownButtonFormField<int>(
-                  decoration: InputDecoration(labelText: t.oaPositions),
-                  items: [
-                    for (final p in _positions)
-                      if (oaId(p['id']) != null)
-                        DropdownMenuItem(value: oaId(p['id']), child: Text('${p['title'] ?? p['code']}')),
-                  ],
+                OaPositionPicker(
+                  businessId: widget.businessId,
+                  label: t.oaPositions,
+                  includeInactive: true,
                   onChanged: (v) => setLocal(() {
-                    positionId = v;
+                    positionId = oaId(v?['id']);
                     errorText = null;
                   }),
                 ),
-                DropdownButtonFormField<int>(
-                  decoration: InputDecoration(labelText: t.users),
-                  items: [
-                    for (final u in _users)
-                      DropdownMenuItem(value: _userIdOf(u), child: Text(_userLabel(u))),
-                  ],
+                OaUserSearchableField(
+                  label: t.users,
+                  users: _users,
+                  valueId: userId,
+                  idOf: _userIdOf,
+                  labelOf: _userLabel,
+                  emptyText: t.oaNoSearchResults,
+                  hint: t.oaSelectUser,
                   onChanged: (v) => setLocal(() {
                     userId = v;
                     errorText = null;
@@ -465,24 +503,23 @@ class _OaOrgPageState extends State<OaOrgPage> with SingleTickerProviderStateMix
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                DropdownButtonFormField<int>(
-                  decoration: InputDecoration(labelText: t.oaPositions),
-                  items: [
-                    for (final p in _positions)
-                      if (oaId(p['id']) != null)
-                        DropdownMenuItem(value: oaId(p['id']), child: Text('${p['title'] ?? p['code']}')),
-                  ],
+                OaPositionPicker(
+                  businessId: widget.businessId,
+                  label: t.oaPositions,
+                  includeInactive: true,
                   onChanged: (v) => setLocal(() {
-                    positionId = v;
+                    positionId = oaId(v?['id']);
                     errorText = null;
                   }),
                 ),
-                DropdownButtonFormField<int>(
-                  decoration: InputDecoration(labelText: t.users),
-                  items: [
-                    for (final u in _users)
-                      DropdownMenuItem(value: _userIdOf(u), child: Text(_userLabel(u))),
-                  ],
+                OaUserSearchableField(
+                  label: t.users,
+                  users: _users,
+                  valueId: userId,
+                  idOf: _userIdOf,
+                  labelOf: _userLabel,
+                  emptyText: t.oaNoSearchResults,
+                  hint: t.oaSelectUser,
                   onChanged: (v) => setLocal(() {
                     userId = v;
                     errorText = null;

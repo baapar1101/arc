@@ -36,6 +36,16 @@ class OaSettings(Base):
 	outgoing_prefix: Mapped[str] = mapped_column(String(16), nullable=False, default="OUT")
 	internal_prefix: Mapped[str] = mapped_column(String(16), nullable=False, default="INT")
 	letterhead_file_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+	background_file_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+	footer_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+	paper_size: Mapped[str] = mapped_column(String(16), nullable=False, default="a4")
+	paper_orientation: Mapped[str] = mapped_column(String(16), nullable=False, default="portrait")
+	margin_top: Mapped[int] = mapped_column(Integer, nullable=False, default=20)
+	margin_right: Mapped[int] = mapped_column(Integer, nullable=False, default=20)
+	margin_bottom: Mapped[int] = mapped_column(Integer, nullable=False, default=20)
+	margin_left: Mapped[int] = mapped_column(Integer, nullable=False, default=20)
+	default_body_format: Mapped[str] = mapped_column(String(16), nullable=False, default="markdown")
+	default_format_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 	extra_settings: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(
@@ -152,6 +162,59 @@ class OaDelegation(Base):
 	)
 
 
+class OaLetterFormat(Base):
+	__tablename__ = "oa_letter_formats"
+	__table_args__ = (Index("ix_oa_letter_formats_business_id", "business_id"),)
+
+	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+	business_id: Mapped[int] = mapped_column(
+		Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False
+	)
+	name: Mapped[str] = mapped_column(String(120), nullable=False)
+	paper_size: Mapped[str] = mapped_column(String(16), nullable=False, default="a4")
+	paper_orientation: Mapped[str] = mapped_column(String(16), nullable=False, default="portrait")
+	margin_top: Mapped[int] = mapped_column(Integer, nullable=False, default=20)
+	margin_right: Mapped[int] = mapped_column(Integer, nullable=False, default=20)
+	margin_bottom: Mapped[int] = mapped_column(Integer, nullable=False, default=20)
+	margin_left: Mapped[int] = mapped_column(Integer, nullable=False, default=20)
+	letterhead_file_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+	background_file_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+	footer_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+	header_html: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+	is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+	is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+	sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+	updated_at: Mapped[datetime] = mapped_column(
+		DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+	)
+
+
+class OaLetterTemplate(Base):
+	__tablename__ = "oa_letter_templates"
+	__table_args__ = (Index("ix_oa_letter_templates_business_id", "business_id"),)
+
+	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+	business_id: Mapped[int] = mapped_column(
+		Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False
+	)
+	name: Mapped[str] = mapped_column(String(120), nullable=False)
+	letter_kind: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+	subject: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+	body: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+	body_format: Mapped[str] = mapped_column(String(16), nullable=False, default="markdown")
+	format_id: Mapped[Optional[int]] = mapped_column(
+		Integer, ForeignKey("oa_letter_formats.id", ondelete="SET NULL"), nullable=True
+	)
+	is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+	is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+	sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+	updated_at: Mapped[datetime] = mapped_column(
+		DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+	)
+
+
 class OaLetter(Base):
 	__tablename__ = "oa_letters"
 	__table_args__ = (
@@ -179,6 +242,7 @@ class OaLetter(Base):
 	status: Mapped[str] = mapped_column(String(24), nullable=False, default="draft")
 	subject: Mapped[str] = mapped_column(String(500), nullable=False)
 	body: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+	body_format: Mapped[str] = mapped_column(String(16), nullable=False, default="markdown")
 	locale: Mapped[str] = mapped_column(String(8), nullable=False, default="fa")
 	letter_date: Mapped[date] = mapped_column(Date, nullable=False)
 	urgency: Mapped[str] = mapped_column(String(16), nullable=False, default="normal")
@@ -187,6 +251,18 @@ class OaLetter(Base):
 	sender_org: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 	receiver_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 	receiver_org: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+	sender_position_id: Mapped[Optional[int]] = mapped_column(
+		Integer, ForeignKey("oa_positions.id", ondelete="SET NULL"), nullable=True
+	)
+	receiver_position_id: Mapped[Optional[int]] = mapped_column(
+		Integer, ForeignKey("oa_positions.id", ondelete="SET NULL"), nullable=True
+	)
+	format_id: Mapped[Optional[int]] = mapped_column(
+		Integer, ForeignKey("oa_letter_formats.id", ondelete="SET NULL"), nullable=True
+	)
+	template_id: Mapped[Optional[int]] = mapped_column(
+		Integer, ForeignKey("oa_letter_templates.id", ondelete="SET NULL"), nullable=True
+	)
 	origin_position_id: Mapped[int] = mapped_column(
 		Integer, ForeignKey("oa_positions.id", ondelete="RESTRICT"), nullable=False
 	)
