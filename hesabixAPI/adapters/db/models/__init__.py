@@ -70,6 +70,11 @@ from .product_variant_allocation import (  # noqa: F401
 	WarehouseLineVariantAllocation,
 )
 from .inventory_variant_balance import InventoryVariantBalance  # noqa: F401
+from .inventory_lot import (  # noqa: F401
+	InventoryLot,
+	InvoiceItemLineLotAllocation,
+	WarehouseLineLotAllocation,
+)
 from .product_bundle import ProductBundle, ProductBundleItem  # noqa: F401
 from .product_supplier import ProductSupplier, ProductSupplierSocialContact  # noqa: F401
 from .public_catalog_contact_message import PublicCatalogContactMessage  # noqa: F401

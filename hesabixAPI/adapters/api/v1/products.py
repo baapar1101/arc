@@ -854,6 +854,14 @@ def get_products_metadata_endpoint(
         Product.track_inventory,
         Product.inventory_mode,
         Product.variant_mode,
+        Product.track_expiry,
+        Product.lot_policy,
+        Product.expired_sale_policy,
+        Product.shelf_life_days,
+        Product.best_before_offset_days,
+        Product.removal_offset_days,
+        Product.alert_offset_days,
+        Product.min_remaining_shelf_life_days,
         Product.general_barcodes,
     ).filter(
         Product.business_id == business_id,
@@ -889,6 +897,16 @@ def get_products_metadata_endpoint(
             "track_inventory": product.track_inventory,
             "inventory_mode": product.inventory_mode or "bulk",
             "variant_mode": getattr(product, "variant_mode", None) or "none",
+            "track_expiry": bool(getattr(product, "track_expiry", False)),
+            "lot_policy": getattr(product, "lot_policy", None) or "optional",
+            "expired_sale_policy": getattr(product, "expired_sale_policy", None) or "block",
+            "shelf_life_days": getattr(product, "shelf_life_days", None),
+            "best_before_offset_days": getattr(product, "best_before_offset_days", None),
+            "removal_offset_days": getattr(product, "removal_offset_days", None),
+            "alert_offset_days": getattr(product, "alert_offset_days", None),
+            "min_remaining_shelf_life_days": int(
+                getattr(product, "min_remaining_shelf_life_days", 0) or 0
+            ),
             "general_barcodes": product.general_barcodes,
             "attribute_ids": attribute_ids_by_product.get(int(product.id), []),
         }
@@ -2708,6 +2726,9 @@ def import_products_excel(
                                 "warehouse_id": int(ob.warehouse_id or result["data"].get("default_warehouse_id")),
                                 "quantity": float(ob.quantity),
                                 "cost_price": float(ob.cost_price or 0),
+                                "lot_code": getattr(ob, "lot_code", None),
+                                "manufacturing_date": getattr(ob, "manufacturing_date", None),
+                                "expiry_date": getattr(ob, "expiry_date", None),
                             })
                         inserted += 1
                     elif conflict_policy == "insert":
@@ -2742,6 +2763,9 @@ def import_products_excel(
                                 "previous_warehouse_id": previous_warehouse_id,
                                 "quantity": float(ob.quantity),
                                 "cost_price": float(ob.cost_price or 0),
+                                "lot_code": getattr(ob, "lot_code", None),
+                                "manufacturing_date": getattr(ob, "manufacturing_date", None),
+                                "expiry_date": getattr(ob, "expiry_date", None),
                             })
                         updated += 1
 

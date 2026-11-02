@@ -3495,6 +3495,10 @@ class AppLocalizationsFa extends AppLocalizations {
       'تغییر دستی فی در فاکتور و فروش سریع';
 
   @override
+  String get permissionInvoiceConfirmExpiredSale =>
+      'تأیید فروش کالای تاریخ‌گذشته در فاکتور';
+
+  @override
   String get permissionSectionCrmWebChat => 'چت وب (ویجت CRM)';
 
   @override
@@ -6415,6 +6419,238 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get reportsCriticalStockSubtitle =>
       'کالاهایی که موجودی آن‌ها کمتر از حد تعیین‌شده است';
+
+  @override
+  String get reportsExpiryStockTitle => 'گزارش تاریخ تولید و انقضا';
+
+  @override
+  String get reportsExpiryStockSubtitle =>
+      'لات‌های قابل فروش، نزدیک به انقضا، مسدود و منقضی';
+
+  @override
+  String get expiryStatusSellable => 'قابل فروش';
+
+  @override
+  String get expiryStatusNearExpiry => 'نزدیک انقضا';
+
+  @override
+  String get expiryStatusBlocked => 'مسدود (خروج از قفسه)';
+
+  @override
+  String get expiryStatusExpired => 'منقضی';
+
+  @override
+  String get expiryStatusUndated => 'بدون تاریخ (موجودی قبلی)';
+
+  @override
+  String get expiryReportAsOf => 'تاریخ گزارش';
+
+  @override
+  String get expiryReportAllStatuses => 'همه';
+
+  @override
+  String get expiryColLotSerial => 'لات / سریال';
+
+  @override
+  String get expiryColManufacturing => 'تاریخ تولید';
+
+  @override
+  String get expiryColExpiry => 'تاریخ انقضا';
+
+  @override
+  String get expiryColRemainingDays => 'روز مانده';
+
+  @override
+  String get quickSalesExpiredInstanceBlocked =>
+      'این واحد منقضی است و فروش آن مجاز نیست';
+
+  @override
+  String get lotPickerTitlePrefix => 'لات و تاریخ —';
+
+  @override
+  String get lotPickerInboundHelp =>
+      'تاریخ روی لات است؛ اگر ۱ کارتن ۱۰ عددی وارد شود هر عدد همان تاریخ تولید و انقضا را دارد.';
+
+  @override
+  String get lotPickerOutboundHelp =>
+      'خروج به‌صورت پیش‌فرض از نزدیک‌ترین انقضا (FEFO) است. می‌توانید لات را عوض کنید.';
+
+  @override
+  String get lotPickerCode => 'کد لات';
+
+  @override
+  String get lotPickerAddAnother => 'لات دیگر';
+
+  @override
+  String get lotPickerDatesRequired => 'تاریخ تولید یا تاریخ انقضا الزامی است';
+
+  @override
+  String get lotPickerMinOne => 'حداقل یک لات با مقدار وارد کنید';
+
+  @override
+  String get lotPickerQtyMismatch =>
+      'جمع مقدار لات‌ها باید با مقدار ردیف برابر باشد';
+
+  @override
+  String get lotPickerBestBeforePrefix => 'بهترین مصرف تا';
+
+  @override
+  String get instanceDatesRequired =>
+      'برای کالای تاریخ‌دار تاریخ تولید یا انقضا الزامی است';
+
+  @override
+  String get productionLotsTitle => 'لات مواد و خروجی‌ها';
+
+  @override
+  String get productionLotsFefoHelp =>
+      'مواد مصرفی از نزدیک‌ترین انقضا (FEFO) انتخاب می‌شوند.';
+
+  @override
+  String get productionPickFefo => 'انتخاب از موجودی FEFO';
+
+  @override
+  String get productionEditLots => 'ویرایش لات‌ها';
+
+  @override
+  String get quickSalesFefoSummary => 'خروج FEFO از نزدیک‌ترین انقضا';
+
+  @override
+  String get lotAndDates => 'لات و تاریخ';
+
+  @override
+  String get lotPickerInboundPrompt => 'لات و تاریخ تولید/انقضا را ثبت کنید';
+
+  @override
+  String get openingBalanceLotCode => 'شماره لات / بچ موجودی اولیه';
+
+  @override
+  String get openingBalanceManufacturing => 'تاریخ تولید موجودی اولیه';
+
+  @override
+  String get openingBalanceExpiry => 'تاریخ انقضای موجودی اولیه';
+
+  @override
+  String get uniqueInstanceSelectTitle => 'انتخاب کالاهای یونیک';
+
+  @override
+  String get uniqueInstanceReturnTitle => 'برگشت واحدهای فروخته‌شده';
+
+  @override
+  String uniqueInstanceNeedCount(int count) {
+    return 'نیاز: $count کالا';
+  }
+
+  @override
+  String get uniqueInstanceSearchHint => 'جستجو (سریال/بارکد/ویژگی‌ها)';
+
+  @override
+  String get uniqueWarehouseSearchHint => 'جستجو (سریال/بارکد)';
+
+  @override
+  String get uniqueInstanceNotFound => 'کالای یونیکی یافت نشد';
+
+  @override
+  String uniqueInstanceSelectExact(int required, int selected) {
+    return 'لطفاً دقیقاً $required کالا انتخاب کنید ($selected انتخاب شده)';
+  }
+
+  @override
+  String uniqueInstanceSelectedOf(int selected, int required) {
+    return '$selected از $required کالا انتخاب شده';
+  }
+
+  @override
+  String uniqueInstanceNeedMore(int count) {
+    return 'لطفاً $count کالای دیگر انتخاب کنید';
+  }
+
+  @override
+  String uniqueInstanceMaxCount(int count) {
+    return 'شما فقط می‌توانید $count کالا انتخاب کنید';
+  }
+
+  @override
+  String get uniqueInstanceMinOne => 'لطفاً حداقل یک کالا انتخاب کنید';
+
+  @override
+  String uniqueUnitsSelected(int count) {
+    return '$count کالا انتخاب شده';
+  }
+
+  @override
+  String uniqueSerialPrefix(String serial) {
+    return 'سریال: $serial';
+  }
+
+  @override
+  String uniqueBarcodePrefix(String barcode) {
+    return 'بارکد: $barcode';
+  }
+
+  @override
+  String uniqueWarehousePrefix(String name) {
+    return 'انبار: $name';
+  }
+
+  @override
+  String uniqueAttributesPrefix(String value) {
+    return 'ویژگی‌ها: $value';
+  }
+
+  @override
+  String get productionOutputsTitle => 'خروجی‌ها';
+
+  @override
+  String get productionPickUniqueUnits => 'انتخاب واحدهای یونیک';
+
+  @override
+  String get productionLotsSaved => 'کدهای لات ذخیره شدند';
+
+  @override
+  String get productTrackExpiry => 'ردیابی تاریخ تولید و انقضا';
+
+  @override
+  String get productTrackExpiryHelp =>
+      'برای کالاهای فاسدشدنی. کالاهای بدون این گزینه تغییری نمی‌کنند. تاریخ روی لات است و از کارتن به عدد می‌رسد.';
+
+  @override
+  String get productLotPolicy => 'سیاست لات';
+
+  @override
+  String get productLotPolicyOptional => 'لات اختیاری (سبزی و کالای بدون کد)';
+
+  @override
+  String get productLotPolicyRequired => 'لات اجباری (دارو و بسته‌بندی)';
+
+  @override
+  String get productShelfLifeDays => 'عمر مفید از تاریخ تولید (روز)';
+
+  @override
+  String get productShelfLifeDaysHelp =>
+      'اگر فقط تاریخ تولید وارد شود، انقضا از روی این عدد پیشنهاد می‌شود';
+
+  @override
+  String get productAlertOffsetDays => 'هشدار چند روز مانده به انقضا';
+
+  @override
+  String get productRemovalOffsetDays => 'خروج از قفسه چند روز مانده به انقضا';
+
+  @override
+  String get productBestBeforeOffsetDays =>
+      'بهترین مصرف چند روز مانده به انقضا';
+
+  @override
+  String get productExpiredSalePolicy => 'فروش کالای منقضی';
+
+  @override
+  String get productExpiredSalePolicyBlock => 'ممنوع';
+
+  @override
+  String get productExpiredSalePolicyConfirm => 'با تأیید مدیر';
+
+  @override
+  String get productMinRemainingShelfLifeDays =>
+      'حداقل روز مانده هنگام فروش';
 
   @override
   String get reportsInterWarehouseTransfersTitle =>
@@ -11363,6 +11599,12 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get aiToolGetWarehouseStockSummary => 'خلاصه موجودی انبار';
+
+  @override
+  String get aiToolListInventoryLots => 'موجودی لات‌های تاریخ‌دار';
+
+  @override
+  String get aiToolGetExpiryStockReport => 'گزارش موجودی نزدیک به انقضا';
 
   @override
   String get aiToolSearchChecks => 'جستجوی چک';

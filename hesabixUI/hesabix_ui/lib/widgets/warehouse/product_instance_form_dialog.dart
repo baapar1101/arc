@@ -4,6 +4,7 @@ import '../../utils/number_normalizer.dart' show parseFormattedNumber;
 import '../../widgets/date_input_field.dart';
 import '../../core/calendar_controller.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../l10n/app_localizations.dart';
 
 
 class ProductInstanceFormDialog extends StatefulWidget {
@@ -12,6 +13,7 @@ class ProductInstanceFormDialog extends StatefulWidget {
   final String productName;
   final bool trackSerial;
   final bool trackBarcode;
+  final bool trackExpiry;
   final List<Map<String, dynamic>> productAttributes;
   final Map<String, dynamic>? initialData;
   final VoidCallback? onSuccess;
@@ -24,6 +26,7 @@ class ProductInstanceFormDialog extends StatefulWidget {
     required this.productName,
     required this.trackSerial,
     required this.trackBarcode,
+    this.trackExpiry = false,
     required this.productAttributes,
     this.initialData,
     this.onSuccess,
@@ -41,6 +44,8 @@ class _ProductInstanceFormDialogState extends State<ProductInstanceFormDialog> {
   final Map<String, dynamic> _attributeValues = {};
   bool _saving = false;
   CalendarController? _calendarController;
+  DateTime? _manufacturingDate;
+  DateTime? _expiryDate;
 
   @override
   void initState() {
@@ -49,6 +54,8 @@ class _ProductInstanceFormDialogState extends State<ProductInstanceFormDialog> {
     if (widget.initialData != null) {
       _serialController.text = widget.initialData!['serial_number']?.toString() ?? '';
       _barcodeController.text = widget.initialData!['barcode']?.toString() ?? '';
+      _manufacturingDate = DateTime.tryParse(widget.initialData!['manufacturing_date']?.toString() ?? '');
+      _expiryDate = DateTime.tryParse(widget.initialData!['expiry_date']?.toString() ?? '');
       final attrs = widget.initialData!['custom_attributes'] as Map<String, dynamic>? ?? {};
       _attributeValues.addAll(attrs);
     }
@@ -78,12 +85,20 @@ class _ProductInstanceFormDialogState extends State<ProductInstanceFormDialog> {
       SnackBarHelper.show(context, message: 'لطفاً شماره سریال را وارد کنید');
       return;
     }
+    if (widget.trackExpiry && _manufacturingDate == null && _expiryDate == null) {
+      final t = AppLocalizations.of(context);
+      SnackBarHelper.show(context, message: t.instanceDatesRequired);
+      return;
+    }
 
-    final result = {
+    final result = <String, dynamic>{
+      if (widget.initialData?['id'] != null) 'id': widget.initialData!['id'],
       'serial_number': widget.trackSerial ? _serialController.text.trim() : null,
       'barcode': widget.trackBarcode && _barcodeController.text.trim().isNotEmpty
           ? _barcodeController.text.trim()
           : null,
+      'manufacturing_date': _manufacturingDate?.toIso8601String().split('T').first,
+      'expiry_date': _expiryDate?.toIso8601String().split('T').first,
       'custom_attributes': _attributeValues.isNotEmpty ? _attributeValues : null,
     };
 
@@ -229,6 +244,7 @@ class _ProductInstanceFormDialogState extends State<ProductInstanceFormDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return Dialog(
       child: Container(
         constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
@@ -317,6 +333,22 @@ class _ProductInstanceFormDialogState extends State<ProductInstanceFormDialog> {
                             ),
                           ),
                         if (widget.trackBarcode) const SizedBox(height: 16),
+                        if (widget.trackExpiry && _calendarController != null) ...[
+                          DateInputField(
+                            value: _manufacturingDate,
+                            onChanged: (date) => setState(() => _manufacturingDate = date),
+                            calendarController: _calendarController!,
+                            labelText: t.expiryColManufacturing,
+                          ),
+                          const SizedBox(height: 16),
+                          DateInputField(
+                            value: _expiryDate,
+                            onChanged: (date) => setState(() => _expiryDate = date),
+                            calendarController: _calendarController!,
+                            labelText: t.expiryDate,
+                          ),
+                          const SizedBox(height: 16),
+                        ],
                         // ویژگی‌های کالا
                         if (widget.productAttributes.isNotEmpty) ...[
                           Text(

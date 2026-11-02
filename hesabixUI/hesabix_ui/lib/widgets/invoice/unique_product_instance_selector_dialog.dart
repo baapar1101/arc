@@ -6,6 +6,7 @@ import '../../core/calendar_controller.dart';
 import '../../utils/attribute_formatter.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 
@@ -18,6 +19,9 @@ class UniqueProductInstanceSelectorDialog extends StatefulWidget {
   final List<int>? selectedInstanceIds;
   final int requiredQuantity;
   final CalendarController calendarController;
+  final bool forReturn;
+  final bool allowExpiredConfirm;
+  final bool includeUnsellable;
 
   const UniqueProductInstanceSelectorDialog({
     super.key,
@@ -28,6 +32,9 @@ class UniqueProductInstanceSelectorDialog extends StatefulWidget {
     this.selectedInstanceIds,
     required this.requiredQuantity,
     required this.calendarController,
+    this.forReturn = false,
+    this.allowExpiredConfirm = false,
+    this.includeUnsellable = false,
   });
 
   @override
@@ -105,12 +112,23 @@ class _UniqueProductInstanceSelectorDialogState
         }
       }
 
-      // Load instances
-      final result = await _svc.getAvailableInstances(
-        businessId: widget.businessId,
-        productId: widget.productId,
-        warehouseId: widget.warehouseId,
-      );
+      final Map<String, dynamic> result;
+      if (widget.forReturn) {
+        result = await _svc.searchProductInstances(
+          businessId: widget.businessId,
+          productId: widget.productId,
+          status: 'sold',
+        );
+      } else {
+        result = await _svc.getAvailableInstances(
+          businessId: widget.businessId,
+          productId: widget.productId,
+          warehouseId: widget.warehouseId,
+          includeExpired: widget.includeUnsellable ||
+              (widget.allowExpiredConfirm &&
+                  product['expired_sale_policy']?.toString() == 'manager_confirm'),
+        );
+      }
 
       final items = (result['items'] as List<dynamic>?) ?? [];
       if (mounted) {
@@ -151,7 +169,35 @@ class _UniqueProductInstanceSelectorDialogState
     }).toList();
   }
 
+  bool _canSelectExpired() =>
+      widget.includeUnsellable ||
+      (widget.allowExpiredConfirm &&
+          _product?['expired_sale_policy']?.toString() == 'manager_confirm');
+
+  bool _isExpired(Map<String, dynamic> inst) => inst['is_expired'] == true;
+
+  Map<String, dynamic>? _instanceById(int instanceId) {
+    for (final row in _instances) {
+      final raw = row['id'];
+      final id = raw is int ? raw : int.tryParse(raw?.toString() ?? '');
+      if (id == instanceId) return row;
+    }
+    return null;
+  }
+
   void _toggleSelection(int instanceId) {
+    final inst = _instanceById(instanceId);
+    if (inst != null &&
+        !widget.forReturn &&
+        _isExpired(inst) &&
+        !_canSelectExpired() &&
+        !_selectedIds.contains(instanceId)) {
+      SnackBarHelper.show(
+        context,
+        message: AppLocalizations.of(context).quickSalesExpiredInstanceBlocked,
+      );
+      return;
+    }
     setState(() {
       if (_selectedIds.contains(instanceId)) {
         _selectedIds.remove(instanceId);
@@ -160,7 +206,10 @@ class _UniqueProductInstanceSelectorDialogState
         if (_selectedIds.length < widget.requiredQuantity) {
           _selectedIds.add(instanceId);
         } else {
-          SnackBarHelper.show(context, message: 'شما فقط می‌توانید ${widget.requiredQuantity} کالا انتخاب کنید',);
+          SnackBarHelper.show(
+            context,
+            message: AppLocalizations.of(context).uniqueInstanceMaxCount(widget.requiredQuantity),
+          );
         }
       }
     });
@@ -168,16 +217,29 @@ class _UniqueProductInstanceSelectorDialogState
 
   void _confirmSelection() {
     if (_selectedIds.isEmpty) {
-      SnackBarHelper.show(context, message: 'لطفاً حداقل یک کالا انتخاب کنید');
+      SnackBarHelper.show(context, message: AppLocalizations.of(context).uniqueInstanceMinOne);
       return;
     }
 
     if (_selectedIds.length != widget.requiredQuantity) {
-      SnackBarHelper.show(context, message: 'لطفاً دقیقاً ${widget.requiredQuantity} کالا انتخاب کنید (${_selectedIds.length} انتخاب شده)');
+      SnackBarHelper.show(
+        context,
+        message: AppLocalizations.of(context).uniqueInstanceSelectExact(
+          widget.requiredQuantity,
+          _selectedIds.length,
+        ),
+      );
       return;
     }
 
-    Navigator.of(context).pop(_selectedIds.toList());
+    final allowExpired = _selectedIds.any((id) {
+      final inst = _instanceById(id);
+      return inst != null && _isExpired(inst);
+    });
+    Navigator.of(context).pop({
+      'ids': _selectedIds.toList(),
+      'allow_expired_lot_sale': allowExpired && _canSelectExpired(),
+    });
   }
 
   @override
@@ -212,7 +274,9 @@ class _UniqueProductInstanceSelectorDialogState
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'انتخاب کالاهای یونیک',
+                          widget.forReturn
+                              ? AppLocalizations.of(context).uniqueInstanceReturnTitle
+                              : AppLocalizations.of(context).uniqueInstanceSelectTitle,
                           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),
@@ -222,7 +286,7 @@ class _UniqueProductInstanceSelectorDialogState
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                         Text(
-                          'نیاز: ${widget.requiredQuantity} کالا',
+                          AppLocalizations.of(context).uniqueInstanceNeedCount(widget.requiredQuantity),
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: Colors.grey[600],
                               ),
@@ -233,7 +297,7 @@ class _UniqueProductInstanceSelectorDialogState
                   IconButton(
                     icon: const Icon(Icons.close),
                     onPressed: () => Navigator.of(context).pop(),
-                    tooltip: 'بستن',
+                    tooltip: AppLocalizations.of(context).close,
                   ),
                 ],
               ),
@@ -247,10 +311,10 @@ class _UniqueProductInstanceSelectorDialogState
                   Expanded(
                     child: TextField(
                       controller: _searchController,
-                      decoration: const InputDecoration(
-                        labelText: 'جستجو (سریال/بارکد/ویژگی‌ها)',
-                        prefixIcon: Icon(Icons.search),
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: AppLocalizations.of(context).uniqueInstanceSearchHint,
+                        prefixIcon: const Icon(Icons.search),
+                        border: const OutlineInputBorder(),
                       ),
                     ),
                   ),
@@ -284,17 +348,17 @@ class _UniqueProductInstanceSelectorDialogState
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Text('خطا: $_error'),
+                                  Text('${AppLocalizations.of(context).error}: $_error'),
                                   const SizedBox(height: 16),
                                   ElevatedButton(
                                     onPressed: _loadData,
-                                    child: const Text('تلاش مجدد'),
+                                    child: Text(AppLocalizations.of(context).retry),
                                   ),
                                 ],
                               ),
                             )
                           : _filteredInstances.isEmpty
-                              ? const Center(child: Text('کالای یونیکی یافت نشد'))
+                              ? Center(child: Text(AppLocalizations.of(context).uniqueInstanceNotFound))
                               : ListView.builder(
                               itemCount: _filteredInstances.length,
                               itemBuilder: (context, index) {
@@ -329,7 +393,7 @@ class _UniqueProductInstanceSelectorDialogState
                                         ? (value) => _toggleSelection(instId)
                                         : null,
                                     title: Text(
-                                      'سریال: $serial',
+                                      AppLocalizations.of(context).uniqueSerialPrefix(serial),
                                       style: TextStyle(
                                         fontWeight: isSelected
                                             ? FontWeight.bold
@@ -342,12 +406,29 @@ class _UniqueProductInstanceSelectorDialogState
                                         if (barcode != null && barcode.isNotEmpty)
                                           Padding(
                                             padding: const EdgeInsets.only(top: 4),
-                                            child: Text('بارکد: $barcode'),
+                                            child: Text(AppLocalizations.of(context).uniqueBarcodePrefix(barcode)),
+                                          ),
+                                        if (inst['manufacturing_date'] != null)
+                                          Padding(
+                                            padding: const EdgeInsets.only(top: 4),
+                                            child: Text('${AppLocalizations.of(context).expiryColManufacturing}: ${inst['manufacturing_date']}'),
+                                          ),
+                                        if (inst['expiry_date'] != null)
+                                          Padding(
+                                            padding: const EdgeInsets.only(top: 4),
+                                            child: Text(
+                                              inst['is_expired'] == true
+                                                  ? '${AppLocalizations.of(context).expiryColExpiry}: ${inst['expiry_date']} (${AppLocalizations.of(context).expiryStatusExpired})'
+                                                  : '${AppLocalizations.of(context).expiryColExpiry}: ${inst['expiry_date']}',
+                                              style: inst['is_expired'] == true
+                                                  ? TextStyle(color: Theme.of(context).colorScheme.error)
+                                                  : null,
+                                            ),
                                           ),
                                         if (warehouseName != null)
                                           Padding(
                                             padding: const EdgeInsets.only(top: 4),
-                                            child: Text('انبار: $warehouseName'),
+                                            child: Text(AppLocalizations.of(context).uniqueWarehousePrefix(warehouseName)),
                                           ),
                                         if (formattedAttrs != null &&
                                             formattedAttrs.isNotEmpty)
@@ -397,14 +478,19 @@ class _UniqueProductInstanceSelectorDialogState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${_selectedIds.length} از ${widget.requiredQuantity} کالا انتخاب شده',
+                        AppLocalizations.of(context).uniqueInstanceSelectedOf(
+                          _selectedIds.length,
+                          widget.requiredQuantity,
+                        ),
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
                       ),
                       if (_selectedIds.length != widget.requiredQuantity)
                         Text(
-                          'لطفاً ${widget.requiredQuantity - _selectedIds.length} کالای دیگر انتخاب کنید',
+                          AppLocalizations.of(context).uniqueInstanceNeedMore(
+                            widget.requiredQuantity - _selectedIds.length,
+                          ),
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: SemanticColorResolver.warning(context),
                               ),
@@ -415,12 +501,12 @@ class _UniqueProductInstanceSelectorDialogState
                     children: [
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('انصراف'),
+                        child: Text(AppLocalizations.of(context).cancel),
                       ),
                       const SizedBox(width: 8),
                       FilledButton(
                         onPressed: _confirmSelection,
-                        child: const Text('تأیید'),
+                        child: Text(AppLocalizations.of(context).confirm),
                       ),
                     ],
                   ),

@@ -1280,6 +1280,16 @@ TOOL_MANIFEST: Dict[str, Dict[str, Any]] = {
     'get_inventory_valuation_report': {'domains': ('warehouse', 'reports')},
     'get_pending_warehouse_documents': {'domains': ('warehouse', 'reports')},
     'get_inventory_turnover_report': {'domains': ('warehouse', 'reports')},
+    'get_expiry_stock_report': {
+        'domains': ('warehouse', 'reports'),
+        'companion_tools': ('list_inventory_lots', 'search_products', 'list_warehouses'),
+        'aliases': ('گزارش انقضا', 'لات منقضی'),
+    },
+    'list_inventory_lots': {
+        'domains': ('warehouse', 'inventory'),
+        'companion_tools': ('search_products', 'list_warehouses', 'get_expiry_stock_report'),
+        'aliases': ('موجودی لات', 'لات انبار', 'تاریخ انقضا کالا'),
+    },
     'get_repair_shop_settings': {'domains': ('repair',)},
     'update_repair_shop_settings': {'domains': ('repair',), 'intent_write': True, 'always_confirm': True},
     'list_repair_technicians': {'domains': ('repair',)},

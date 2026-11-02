@@ -95,7 +95,7 @@ def register_mcp_production_functions(registry) -> None:
         return result
     _register(registry, "refresh_production_order_costing", "بازمحاسبه بهای واقعی سفارش تولید از اسناد؛ نیازمند تأیید.", _schema(order_id, ["order_id"]), refresh_cost, "inventory.write", write=True)
 
-    lot_line = _schema({"id": {"type": "integer", "minimum": 1}, "lot_code": {"type": ["string", "null"], "maxLength": 64}, "scrap_quantity": {"type": ["number", "null"], "minimum": 0}}, ["id"])
+    lot_line = _schema({"id": {"type": "integer", "minimum": 1}, "lot_code": {"type": ["string", "null"], "maxLength": 64}, "manufacturing_date": {"type": ["string", "null"]}, "expiry_date": {"type": ["string", "null"]}, "scrap_quantity": {"type": ["number", "null"], "minimum": 0}, "selected_instance_ids": {"type": ["array", "null"], "items": {"type": "integer"}}}, ["id"])
     def update_lots(a,c):
         payload = _model("adapters.api.v1.schema_models.production_order", "ProductionOrderLotsUpdateRequest", {k:v for k,v in a.items() if k != "order_id"})
         result = production.update_production_order_lots(c["db"], int(c["business_id"]), int(a["order_id"]), expected_version=payload.version,

@@ -7,7 +7,7 @@ from .financial_triggers import (
     ReceiptPaymentUpdatedTrigger,
     CheckDueDateTrigger,
 )
-from .inventory_triggers import InventoryLowTrigger
+from .inventory_triggers import InventoryLowTrigger, InventoryExpiresSoonTrigger
 from .person_triggers import PersonCreatedTrigger, PersonUpdatedTrigger
 from .scheduled_triggers import ScheduledTrigger
 from .webhook_triggers import WebhookTrigger

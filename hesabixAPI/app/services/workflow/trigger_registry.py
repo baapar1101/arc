@@ -71,6 +71,7 @@ class TriggerRegistry:
             ReceiptPaymentUpdatedTrigger,
             CheckDueDateTrigger,
             InventoryLowTrigger,
+            InventoryExpiresSoonTrigger,
             PersonCreatedTrigger,
             ScheduledTrigger,
             WebhookTrigger,
@@ -109,6 +110,7 @@ class TriggerRegistry:
         
         # Inventory triggers
         self.register("inventory.low", InventoryLowTrigger())
+        self.register("inventory.expires_soon", InventoryExpiresSoonTrigger())
         
         # Person triggers
         self.register("person.created", PersonCreatedTrigger())

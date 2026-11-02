@@ -3116,8 +3116,9 @@ async def convert_deal_to_invoice(
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("crm", "write")),
 ) -> Dict[str, Any]:
-    from datetime import date, datetime
+    from datetime import datetime
     from decimal import Decimal
+    from app.core.business_calendar import business_today
 
     deal = (
         db.query(Deal)
@@ -3175,7 +3176,7 @@ async def convert_deal_to_invoice(
     invoice_data: Dict[str, Any] = {
         "invoice_type": "invoice_sales",
         "currency_id": int(currency_id),
-        "document_date": date.today().isoformat(),
+        "document_date": business_today(business_id).isoformat(),
         "is_proforma": bool(body.is_proforma),
         "lines": invoice_lines,
         "extra_info": {"person_id": int(deal.person_id)},

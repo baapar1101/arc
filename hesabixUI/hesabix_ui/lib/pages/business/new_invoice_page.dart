@@ -3429,6 +3429,12 @@ class _NewInvoicePageState extends State<NewInvoicePage>
     };
     extraInfo['post_inventory'] = _invoiceWarehouseReleaseMode != 'none';
     extraInfo['auto_post_warehouse'] = _invoiceWarehouseReleaseMode == 'posted';
+    if (widget.copyFromInvoiceId != null) {
+      extraInfo['copy_from_invoice_id'] = widget.copyFromInvoiceId;
+      if (_selectedInvoiceType == InvoiceType.salesReturn) {
+        extraInfo['returned_from_invoice_id'] = widget.copyFromInvoiceId;
+      }
+    }
     // انبار کلی در سطح سند (برای استفاده در حواله‌های انبار)
     if (_documentWarehouseId != null) {
       extraInfo['warehouse_id'] = _documentWarehouseId;
@@ -3673,14 +3679,21 @@ class _NewInvoicePageState extends State<NewInvoicePage>
     // اضافه کردن selected_instance_ids به extra_info برای کالاهای یونیک
     if (e.selectedInstanceIds != null && e.selectedInstanceIds!.isNotEmpty) {
       extraInfo['selected_instance_ids'] = e.selectedInstanceIds;
+    } else if (_selectedInvoiceType == InvoiceType.salesReturn) {
+      final returned = extraInfo['returned_from_instance_ids'];
+      if (returned is List && returned.isNotEmpty) {
+        extraInfo['selected_instance_ids'] = returned;
+      }
     }
 
     final allocations = extraInfo['allocations'];
+    final lotAllocations = extraInfo['lot_allocations'];
     return <String, dynamic>{
       'product_id': e.productId,
       'quantity': e.quantity,
       if ((e.description ?? '').isNotEmpty) 'description': e.description,
       if (allocations is List && allocations.isNotEmpty) 'allocations': allocations,
+      if (lotAllocations is List && lotAllocations.isNotEmpty) 'lot_allocations': lotAllocations,
       'extra_info': extraInfo,
     };
   }
@@ -3694,6 +3707,20 @@ class _NewInvoicePageState extends State<NewInvoicePage>
       sanitized[key] = value;
     });
     return sanitized;
+  }
+
+  InvoiceLineItem _hydrateSalesReturnSourceLots(InvoiceLineItem item) {
+    if (item.selectedInstanceIds != null && item.selectedInstanceIds!.isNotEmpty) {
+      return item;
+    }
+    final returned = item.extraInfo?['returned_from_instance_ids'];
+    if (returned is! List || returned.isEmpty) return item;
+    final ids = returned
+        .map((e) => e is int ? e : int.tryParse(e.toString()))
+        .whereType<int>()
+        .toList();
+    if (ids.isEmpty) return item;
+    return item.copyWith(selectedInstanceIds: ids);
   }
 
   void _showError(String message) {
@@ -3720,6 +3747,11 @@ class _NewInvoicePageState extends State<NewInvoicePage>
 
     setState(() {
       _selectedInvoiceType = newType;
+      if (newType == InvoiceType.salesReturn && oldType == InvoiceType.sales) {
+        _lineItems = [
+          for (final item in _lineItems) _hydrateSalesReturnSourceLots(item),
+        ];
+      }
       _hasUserCustomizedSettings = false;
       if (!invoiceTypeSupportsGlobalDiscount(newType.value)) {
         _globalDiscountValueController.clear();

@@ -3514,6 +3514,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Change invoice unit price manually (invoice & quick sales)';
 
   @override
+  String get permissionInvoiceConfirmExpiredSale =>
+      'Confirm sale of expired lots on invoices';
+
+  @override
   String get permissionSectionCrmWebChat => 'Web chat widget (CRM)';
 
   @override
@@ -6453,6 +6457,242 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get reportsCriticalStockSubtitle =>
       'Items with stock below the defined threshold';
+
+  @override
+  String get reportsExpiryStockTitle => 'Manufacturing and expiry stock';
+
+  @override
+  String get reportsExpiryStockSubtitle =>
+      'Sellable, near-expiry, blocked, and expired lots';
+
+  @override
+  String get expiryStatusSellable => 'Sellable';
+
+  @override
+  String get expiryStatusNearExpiry => 'Near expiry';
+
+  @override
+  String get expiryStatusBlocked => 'Blocked (off shelf)';
+
+  @override
+  String get expiryStatusExpired => 'Expired';
+
+  @override
+  String get expiryStatusUndated => 'Undated (existing stock)';
+
+  @override
+  String get expiryReportAsOf => 'As of';
+
+  @override
+  String get expiryReportAllStatuses => 'All';
+
+  @override
+  String get expiryColLotSerial => 'Lot / serial';
+
+  @override
+  String get expiryColManufacturing => 'Manufacturing date';
+
+  @override
+  String get expiryColExpiry => 'Expiry date';
+
+  @override
+  String get expiryColRemainingDays => 'Days remaining';
+
+  @override
+  String get quickSalesExpiredInstanceBlocked =>
+      'This unit is expired and cannot be sold';
+
+  @override
+  String get lotPickerTitlePrefix => 'Lot and dates —';
+
+  @override
+  String get lotPickerInboundHelp =>
+      'Dates live on the lot; a carton of 10 pieces shares the same manufacturing and expiry dates.';
+
+  @override
+  String get lotPickerOutboundHelp =>
+      'Outbound picking uses nearest expiry (FEFO) by default. You can change the lot.';
+
+  @override
+  String get lotPickerCode => 'Lot code';
+
+  @override
+  String get lotPickerAddAnother => 'Another lot';
+
+  @override
+  String get lotPickerDatesRequired =>
+      'Manufacturing or expiry date is required';
+
+  @override
+  String get lotPickerMinOne => 'Enter at least one lot with a quantity';
+
+  @override
+  String get lotPickerQtyMismatch =>
+      'Lot quantities must add up to the line quantity';
+
+  @override
+  String get lotPickerBestBeforePrefix => 'Best before';
+
+  @override
+  String get instanceDatesRequired =>
+      'Perishable units need a manufacturing or expiry date';
+
+  @override
+  String get productionLotsTitle => 'Material and output lots';
+
+  @override
+  String get productionLotsFefoHelp =>
+      'Materials are picked from the nearest expiry (FEFO).';
+
+  @override
+  String get productionPickFefo => 'Pick from FEFO stock';
+
+  @override
+  String get productionEditLots => 'Edit lots';
+
+  @override
+  String get quickSalesFefoSummary => 'FEFO issue from nearest expiry';
+
+  @override
+  String get lotAndDates => 'Lot and dates';
+
+  @override
+  String get lotPickerInboundPrompt =>
+      'Record lot manufacturing and expiry dates';
+
+  @override
+  String get openingBalanceLotCode => 'Opening-balance lot / batch code';
+
+  @override
+  String get openingBalanceManufacturing =>
+      'Opening-balance manufacturing date';
+
+  @override
+  String get openingBalanceExpiry => 'Opening-balance expiry date';
+
+  @override
+  String get uniqueInstanceSelectTitle => 'Select unique units';
+
+  @override
+  String get uniqueInstanceReturnTitle => 'Return sold units';
+
+  @override
+  String uniqueInstanceNeedCount(int count) {
+    return 'Need: $count units';
+  }
+
+  @override
+  String get uniqueInstanceSearchHint => 'Search serial, barcode, or attributes';
+
+  @override
+  String get uniqueWarehouseSearchHint => 'Search serial or barcode';
+
+  @override
+  String get uniqueInstanceNotFound => 'No unique units found';
+
+  @override
+  String uniqueInstanceSelectExact(int required, int selected) {
+    return 'Select exactly $required units ($selected selected)';
+  }
+
+  @override
+  String uniqueInstanceSelectedOf(int selected, int required) {
+    return '$selected of $required units selected';
+  }
+
+  @override
+  String uniqueInstanceNeedMore(int count) {
+    return 'Select $count more units';
+  }
+
+  @override
+  String uniqueInstanceMaxCount(int count) {
+    return 'You can select only $count units';
+  }
+
+  @override
+  String get uniqueInstanceMinOne => 'Select at least one unit';
+
+  @override
+  String uniqueUnitsSelected(int count) {
+    return '$count units selected';
+  }
+
+  @override
+  String uniqueSerialPrefix(String serial) {
+    return 'Serial: $serial';
+  }
+
+  @override
+  String uniqueBarcodePrefix(String barcode) {
+    return 'Barcode: $barcode';
+  }
+
+  @override
+  String uniqueWarehousePrefix(String name) {
+    return 'Warehouse: $name';
+  }
+
+  @override
+  String uniqueAttributesPrefix(String value) {
+    return 'Attributes: $value';
+  }
+
+  @override
+  String get productionOutputsTitle => 'Outputs';
+
+  @override
+  String get productionPickUniqueUnits => 'Pick unique units';
+
+  @override
+  String get productionLotsSaved => 'Lots saved';
+
+  @override
+  String get productTrackExpiry => 'Track manufacturing and expiry dates';
+
+  @override
+  String get productTrackExpiryHelp =>
+      'For perishables only. Other products stay unchanged. Dates live on the lot and apply from carton to piece.';
+
+  @override
+  String get productLotPolicy => 'Lot policy';
+
+  @override
+  String get productLotPolicyOptional =>
+      'Optional lot (produce without lot codes)';
+
+  @override
+  String get productLotPolicyRequired =>
+      'Required lot (pharma and packaged goods)';
+
+  @override
+  String get productShelfLifeDays => 'Shelf life from manufacturing (days)';
+
+  @override
+  String get productShelfLifeDaysHelp =>
+      'If only manufacturing date is entered, expiry is suggested from this number';
+
+  @override
+  String get productAlertOffsetDays => 'Alert days before expiry';
+
+  @override
+  String get productRemovalOffsetDays => 'Remove from shelf days before expiry';
+
+  @override
+  String get productBestBeforeOffsetDays => 'Best-before days before expiry';
+
+  @override
+  String get productExpiredSalePolicy => 'Sale of expired goods';
+
+  @override
+  String get productExpiredSalePolicyBlock => 'Blocked';
+
+  @override
+  String get productExpiredSalePolicyConfirm => 'Manager confirmation';
+
+  @override
+  String get productMinRemainingShelfLifeDays =>
+      'Minimum remaining days at sale';
 
   @override
   String get reportsInterWarehouseTransfersTitle => 'Inter-warehouse transfers';
@@ -11426,6 +11666,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiToolGetWarehouseStockSummary => 'Warehouse stock summary';
+
+  @override
+  String get aiToolListInventoryLots => 'Dated lot balances';
+
+  @override
+  String get aiToolGetExpiryStockReport => 'Expiry stock report';
 
   @override
   String get aiToolSearchChecks => 'Search checks';

@@ -336,6 +336,28 @@ def test_create_transfer_and_warehouse_and_workflow_payloads():
     assert wh["doc_type"] == "receipt"
     assert wh["warehouse_id_to"] == 9
     assert wh["lines"][0]["product_id"] == 1
+    assert "document_date" not in wh
+
+    dated = build_create_warehouse_document_payload(
+        {
+            "doc_type": "receipt",
+            "warehouse_id": 9,
+            "document_date": "2026-11-02",
+            "lines": [
+                {
+                    "product_id": 4,
+                    "quantity": 3,
+                    "lot_code": "L-1",
+                    "manufacturing_date": "2026-10-01",
+                    "expiry_date": "2026-12-01",
+                }
+            ],
+        }
+    )
+    assert dated["document_date"] == "2026-11-02"
+    assert dated["lines"][0]["lot_code"] == "L-1"
+    assert dated["lines"][0]["expiry_date"] == "2026-12-01"
+    assert dated["lines"][0]["extra_info"]["lot_code"] == "L-1"
 
     wf = build_create_workflow_payload(
         {
@@ -684,3 +706,32 @@ def test_extract_product_price_list_items_requires_list_identity():
         extract_product_price_list_items(
             {"price_list_items": [{"price": 10}]}
         )
+
+
+def test_normalize_line_copies_lot_allocations_to_extra():
+    line = normalize_ai_invoice_line(
+        {
+            "product_id": 4,
+            "quantity": 2,
+            "lot_allocations": [{"lot_code": "A", "quantity": 2}],
+            "allow_expired_lot_sale": True,
+        }
+    )
+    assert line["extra_info"]["lot_allocations"][0]["lot_code"] == "A"
+    assert line["extra_info"]["allow_expired_lot_sale"] is True
+
+
+def test_build_create_invoice_payload_uses_business_today(monkeypatch):
+    monkeypatch.setattr(
+        "app.core.business_calendar.business_today",
+        lambda bid=None: date(2026, 3, 21),
+    )
+    payload = build_create_invoice_payload(
+        {
+            "invoice_type": "فروش",
+            "customer_id": 9,
+            "lines": [{"product_id": 1, "quantity": 1, "unit_price": 10}],
+        },
+        business_id=7,
+    )
+    assert payload["document_date"] == "2026-03-21"

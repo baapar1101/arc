@@ -93,7 +93,71 @@ def enable_inventory_variants(
     product.variant_mode = VARIANT_MODE_INVENTORY
     db.flush()
 
-    document_date = payload.get("document_date") or date.today().isoformat()
+    from app.core.business_calendar import business_today
+    from app.services.inventory_lot_service import is_expiry_tracked_product, suggest_fefo
+    from app.services.inventory_lot_allocation_service import slice_lots_across_quantities
+
+    today = business_today(business_id)
+    document_date = payload.get("document_date") or today.isoformat()
+    out_line: Dict[str, Any] = {
+        "product_id": int(product_id),
+        "warehouse_id": warehouse_id,
+        "quantity": str(physical),
+        "movement": "out",
+    }
+    in_lines: List[Dict[str, Any]] = [
+        {
+            "product_id": int(product_id),
+            "warehouse_id": warehouse_id,
+            "quantity": str(physical),
+            "movement": "in",
+            "allocations": [
+                {"variant_id": int(x["variant_id"]), "quantity": str(x["quantity"])}
+                for x in items
+            ],
+        }
+    ]
+    if is_expiry_tracked_product(product):
+        as_of = date.fromisoformat(str(document_date)[:10]) if document_date else today
+        picked = suggest_fefo(
+            db,
+            business_id,
+            product,
+            warehouse_id,
+            physical,
+            as_of,
+            allow_unsellable=True,
+        )
+        out_allocs = [{"lot_id": int(lot.id), "quantity": str(qty)} for lot, qty in picked]
+        out_line["lot_allocations"] = out_allocs
+        out_line["extra_info"] = {
+            "lot_allocations": out_allocs,
+            "allow_expired_lot_sale": True,
+        }
+        sliced = slice_lots_across_quantities(
+            picked,
+            [(int(x["variant_id"]), Decimal(str(x["quantity"]))) for x in items],
+        )
+        in_lines = []
+        for vid, allocs in sliced:
+            qty = sum((Decimal(str(a.get("quantity") or 0)) for a in allocs), Decimal("0"))
+            in_lines.append(
+                {
+                    "product_id": int(product_id),
+                    "warehouse_id": warehouse_id,
+                    "quantity": str(qty),
+                    "movement": "in",
+                    "variant_id": vid,
+                    "allocations": [{"variant_id": vid, "quantity": str(qty)}],
+                    "lot_allocations": allocs,
+                    "extra_info": {
+                        "lot_allocations": allocs,
+                        "variant_id": vid,
+                        "allow_undated": True,
+                        "allocations": [{"variant_id": vid, "quantity": str(qty)}],
+                    },
+                }
+            )
     doc_payload = {
         "doc_type": "adjustment",
         "document_date": document_date,
@@ -103,24 +167,7 @@ def enable_inventory_variants(
             "system_origin": "variant_allocation",
             "product_id": int(product_id),
         },
-        "lines": [
-            {
-                "product_id": int(product_id),
-                "warehouse_id": warehouse_id,
-                "quantity": str(physical),
-                "movement": "out",
-            },
-            {
-                "product_id": int(product_id),
-                "warehouse_id": warehouse_id,
-                "quantity": str(physical),
-                "movement": "in",
-                "allocations": [
-                    {"variant_id": int(x["variant_id"]), "quantity": str(x["quantity"])}
-                    for x in items
-                ],
-            },
-        ],
+        "lines": [out_line, *in_lines],
     }
     wh = create_manual_warehouse_document(db, business_id, user_id, doc_payload)
     post_warehouse_document(db, int(wh.id))

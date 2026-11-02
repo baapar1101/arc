@@ -800,7 +800,9 @@ class Hesabix_V2_Stock_Pull_Service
 					if ($pid < 1) {
 						continue;
 					}
-					$q = isset($it['quantity']) ? (float) $it['quantity'] : 0.0;
+					$q = isset($it['sellable_quantity'])
+						? (float) $it['sellable_quantity']
+						: (isset($it['quantity']) ? (float) $it['quantity'] : 0.0);
 					if (!isset($totals[ $pid ])) {
 						$totals[ $pid ] = 0.0;
 					}
@@ -872,7 +874,9 @@ class Hesabix_V2_Stock_Pull_Service
 					continue;
 				}
 				$vid = (int) $row['variant_id'];
-				$q = isset($row['quantity']) ? (float) $row['quantity'] : 0.0;
+				$q = isset($row['sellable_quantity'])
+					? (float) $row['sellable_quantity']
+					: (isset($row['quantity']) ? (float) $row['quantity'] : 0.0);
 				if (!isset($totals[ $vid ])) {
 					$totals[ $vid ] = 0.0;
 				}

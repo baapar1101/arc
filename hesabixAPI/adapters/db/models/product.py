@@ -120,6 +120,22 @@ class Product(Base):
     )
     track_serial: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, comment="ردیابی سریال نامبر برای کالاهای یونیک")
     track_barcode: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, comment="ردیابی بارکد برای کالاهای یونیک")
+    track_expiry: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, server_default="0", comment="ردیابی لات و تاریخ تولید/انقضا"
+    )
+    lot_policy: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="optional", server_default="optional", comment="optional یا required"
+    )
+    shelf_life_days: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="عمر مفید از تاریخ تولید (روز)")
+    best_before_offset_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    removal_offset_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    alert_offset_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    expired_sale_policy: Mapped[str] = mapped_column(
+        String(24), nullable=False, default="block", server_default="block", comment="block یا manager_confirm"
+    )
+    min_remaining_shelf_life_days: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
 
     # مالیات
     is_sales_taxable: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

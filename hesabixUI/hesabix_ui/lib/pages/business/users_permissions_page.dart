@@ -1209,6 +1209,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'draft': '${t.draft} ${t.invoices}',
         'export': '${t.export} ${t.invoices}',
         'change_unit_price': t.permissionInvoiceChangeUnitPrice,
+        'confirm_expired_sale': t.permissionInvoiceConfirmExpiredSale,
       },
       'quick_sales': {
         'create_customer': 'ثبت سریع مشتری در فروش سریع',
@@ -2282,6 +2283,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.export;
       case 'change_unit_price':
         return t.permissionInvoiceChangeUnitPrice;
+      case 'confirm_expired_sale':
+        return t.permissionInvoiceConfirmExpiredSale;
       case 'manage':
         if (sectionKey == 'payroll') {
           return t.payrollPermissionManage;

@@ -49,7 +49,10 @@ class ProductionOrderActionRequest(BaseModel):
 class ProductionOrderLotLine(BaseModel):
 	id: int = Field(gt=0)
 	lot_code: Optional[str] = Field(default=None, max_length=64)
+	manufacturing_date: Optional[date] = None
+	expiry_date: Optional[date] = None
 	scrap_quantity: Optional[Decimal] = Field(default=None, ge=0, max_digits=18, decimal_places=6)
+	selected_instance_ids: Optional[list[int]] = None
 
 
 class ProductionOrderLotsUpdateRequest(BaseModel):

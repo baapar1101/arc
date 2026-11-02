@@ -204,6 +204,7 @@ def add_parts_to_repair_order(
     """افزودن قطعات به سفارش تعمیر"""
     _check_plugin_active(db, business_id)
     from app.services.repair_shop_service import get_repair_order
+    from app.services.inventory_lot_service import business_as_of, is_expiry_tracked_product, sellable_quantity
     from app.services.warehouse_service import get_physical_stock
 
     repo = RepairOrderRepository(db)
@@ -250,7 +251,16 @@ def add_parts_to_repair_order(
                 raise ApiError("WAREHOUSE_REQUIRED", "WAREHOUSE_REQUIRED",
                     http_status=400,
                 )
-            current_stock = get_physical_stock(db, business_id, product_id, warehouse_id)
+            if is_expiry_tracked_product(product):
+                current_stock = sellable_quantity(
+                    db,
+                    business_id,
+                    product,
+                    warehouse_id,
+                    business_as_of(business_id),
+                )
+            else:
+                current_stock = get_physical_stock(db, business_id, product_id, warehouse_id)
 
             if current_stock < Decimal(str(quantity)):
                 raise ApiError(
@@ -287,12 +297,21 @@ def add_parts_to_repair_order(
         parts_repo.create(part_data)
 
         if product.track_inventory and warehouse_id:
+            line_extra: Dict[str, Any] = {}
+            ids = part.get("selected_instance_ids") or part.get("instance_ids")
+            if ids:
+                line_extra["selected_instance_ids"] = ids
+                line_extra["instance_ids"] = ids
+            if part.get("lot_allocations"):
+                line_extra["lot_allocations"] = part.get("lot_allocations")
             warehouse_lines.append({
                 "product_id": product_id,
                 "quantity": float(quantity_dec),
                 "warehouse_id": warehouse_id,
                 "movement": "out",
-                "description": f"قطعات تعمیر - {order.code}"
+                "description": f"قطعات تعمیر - {order.code}",
+                "extra_info": line_extra or None,
+                "instance_ids": ids if ids else None,
             })
 
     _recalculate_parts_cost(db, order)
@@ -306,7 +325,7 @@ def add_parts_to_repair_order(
         try:
             warehouse_doc_data = {
                 "doc_type": "issue",
-                "document_date": datetime.utcnow().date(),
+                "document_date": business_as_of(business_id),
                 "status": "draft",
                 "warehouse_id_from": warehouse_lines[0]["warehouse_id"],
                 "extra_info": {

@@ -207,6 +207,14 @@ USER_TEMPLATE_COLUMNS: List[ImportColumn] = [
         group="inventory",
     ),
     ImportColumn(
+        "track_expiry",
+        {"fa": "ردیابی تاریخ انقضا", "en": "Track Expiry"},
+        "بله / خیر. برای کالای فاسدشدنی با کنترل موجودی.",
+        "Yes / No. Perishable products with inventory tracking.",
+        aliases=("track expiry", "expiry tracking", "انقضا"),
+        group="inventory",
+    ),
+    ImportColumn(
         "warehouse_code",
         {"fa": "کد انبار", "en": "Warehouse Code"},
         "کد انبار پیش‌فرض. از شیت انبارها کپی کنید.",
@@ -240,6 +248,30 @@ USER_TEMPLATE_COLUMNS: List[ImportColumn] = [
             "بهای تمام شده (هر واحد)",
             "قیمت تمام شده",
         ),
+        group="inventory",
+    ),
+    ImportColumn(
+        "opening_balance_lot_code",
+        {"fa": "شماره لات موجودی اولیه", "en": "Opening Lot Code"},
+        "شماره لات/بچ موجودی اولیه برای کالای تاریخ‌دار.",
+        "Lot/batch code of opening stock for perishable products.",
+        aliases=("opening lot code", "lot code", "شماره لات"),
+        group="inventory",
+    ),
+    ImportColumn(
+        "opening_balance_manufacturing_date",
+        {"fa": "تاریخ تولید موجودی اولیه", "en": "Opening Manufacturing Date"},
+        "تاریخ تولید موجودی اولیه (YYYY-MM-DD).",
+        "Manufacturing date of opening stock (YYYY-MM-DD).",
+        aliases=("opening manufacturing date", "manufacturing date", "تاریخ تولید"),
+        group="inventory",
+    ),
+    ImportColumn(
+        "opening_balance_expiry_date",
+        {"fa": "تاریخ انقضای موجودی اولیه", "en": "Opening Expiry Date"},
+        "تاریخ انقضای موجودی اولیه (YYYY-MM-DD).",
+        "Expiry date of opening stock (YYYY-MM-DD).",
+        aliases=("opening expiry date", "expiry date", "تاریخ انقضا"),
         group="inventory",
     ),
     ImportColumn(
@@ -470,6 +502,9 @@ EXCEL_ONLY_RESOLVE_KEYS = frozenset({
     "warehouse_name",
     "opening_balance_quantity",
     "opening_balance_cost_price",
+    "opening_balance_lot_code",
+    "opening_balance_manufacturing_date",
+    "opening_balance_expiry_date",
     "price_fx_currency_code",
 })
 
@@ -483,6 +518,7 @@ HELPER_KEYS = frozenset({
 
 BOOLEAN_KEYS = frozenset({
     "track_inventory",
+    "track_expiry",
     "is_sales_taxable",
     "is_purchase_taxable",
     "is_active",
@@ -536,6 +572,7 @@ CREATE_UPDATE_SCHEMA_KEYS = frozenset({
     "price_fx_currency_id",
     "auto_update_base_from_fx",
     "track_inventory",
+    "track_expiry",
     "inventory_mode",
     "track_serial",
     "track_barcode",

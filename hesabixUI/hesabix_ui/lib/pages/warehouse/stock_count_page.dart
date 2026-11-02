@@ -19,7 +19,17 @@ import '../../widgets/jalali_date_picker.dart';
 import '../../utils/responsive_helper.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
-String _rowKey(int? productId, int? warehouseId) => '${productId ?? 0}:${warehouseId ?? 0}';
+String _rowKey(int? productId, int? warehouseId, [int? lotId, int? instanceId]) =>
+    '${productId ?? 0}:${warehouseId ?? 0}:${lotId ?? 0}:${instanceId ?? 0}';
+
+int? _mapId(Map<String, dynamic> m, String key) => (m[key] as num?)?.toInt();
+
+String _keyOf(Map<String, dynamic> m) => _rowKey(
+      _mapId(m, 'product_id'),
+      _mapId(m, 'warehouse_id'),
+      _mapId(m, 'lot_id'),
+      _mapId(m, 'instance_id'),
+    );
 
 /// برچسب موجودی سیستم در انبارگردانی (فقط حواله‌های posted)
 const String _kStockCountSystemQtyLabel = 'موجودی سیستم (انبار posted)';
@@ -45,7 +55,9 @@ class _StockCountRowVm {
 
   int? get productId => (raw['product_id'] as num?)?.toInt();
   int? get warehouseId => (raw['warehouse_id'] as num?)?.toInt();
-  String get key => _rowKey(productId, warehouseId);
+  int? get lotId => (raw['lot_id'] as num?)?.toInt();
+  int? get instanceId => (raw['instance_id'] as num?)?.toInt();
+  String get key => _rowKey(productId, warehouseId, lotId, instanceId);
 }
 
 class StockCountPage extends StatefulWidget {
@@ -92,7 +104,7 @@ class _StockCountPageState extends State<StockCountPage> {
   @override
   void initState() {
     super.initState();
-    _asOfDate = DateTime.now();
+    _asOfDate = null;
     _generateStockCountCode();
     _startDraftAutoSave();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -346,9 +358,7 @@ class _StockCountPageState extends State<StockCountPage> {
 
       final newRows = <_StockCountRowVm>[];
       for (final it in items) {
-        final pid = (it['product_id'] as num?)?.toInt();
-        final wid = (it['warehouse_id'] as num?)?.toInt();
-        final rowKey = _rowKey(pid, wid);
+        final rowKey = _keyOf(it);
         final physicalQty = (it['physical_quantity'] as num?)?.toDouble();
         final preserved = previousPhysicalByKey[rowKey];
         final initialPhysical = preserved ??
@@ -405,6 +415,12 @@ class _StockCountPageState extends State<StockCountPage> {
         return {
           'product_id': item['product_id'],
           'warehouse_id': item['warehouse_id'],
+          if (item['lot_id'] != null) 'lot_id': item['lot_id'],
+          if (item['instance_id'] != null) 'instance_id': item['instance_id'],
+          if (item['lot_code'] != null) 'lot_code': item['lot_code'],
+          if (item['variant_id'] != null) 'variant_id': item['variant_id'],
+          if (item['manufacturing_date'] != null) 'manufacturing_date': item['manufacturing_date'],
+          if (item['expiry_date'] != null) 'expiry_date': item['expiry_date'],
           'physical_quantity': physical,
         };
       }).toList();
@@ -418,9 +434,7 @@ class _StockCountPageState extends State<StockCountPage> {
       final calculatedItems = List<Map<String, dynamic>>.from(res['items'] ?? const []);
       final map = <String, Map<String, dynamic>>{};
       for (final it in calculatedItems) {
-        final pid = (it['product_id'] as num?)?.toInt();
-        final wid = (it['warehouse_id'] as num?)?.toInt();
-        final key = _rowKey(pid, wid);
+        final key = _keyOf(it);
         map[key] = it;
         final vm = _rowVmByKey[key];
         if (vm != null && it['system_quantity'] != null) {
@@ -679,7 +693,14 @@ class _StockCountPageState extends State<StockCountPage> {
           width: ColumnWidth.large,
           sortable: false,
           searchable: false,
-          formatter: (row) => (row as Map<String, dynamic>)['product_name']?.toString() ?? '-',
+          formatter: (row) {
+            final m = row as Map<String, dynamic>;
+            final name = m['product_name']?.toString() ?? '-';
+            final lot = m['lot_code']?.toString();
+            final exp = m['expiry_date']?.toString();
+            if (lot == null || lot.isEmpty) return name;
+            return exp == null || exp.isEmpty ? '$name · لات $lot' : '$name · لات $lot / $exp';
+          },
         ),
         TextColumn(
           'warehouse_name',
@@ -709,9 +730,7 @@ class _StockCountPageState extends State<StockCountPage> {
           searchable: false,
           builder: (row, index) {
             final m = row as Map<String, dynamic>;
-            final pid = (m['product_id'] as num?)?.toInt();
-            final wid = (m['warehouse_id'] as num?)?.toInt();
-            final key = _rowKey(pid, wid);
+            final key = _keyOf(m);
             final vm = _rowVmByKey[key];
             final cs = Theme.of(context).colorScheme;
 
@@ -768,9 +787,7 @@ class _StockCountPageState extends State<StockCountPage> {
           searchable: false,
           builder: (row, index) {
             final m = row as Map<String, dynamic>;
-            final pid = (m['product_id'] as num?)?.toInt();
-            final wid = (m['warehouse_id'] as num?)?.toInt();
-            final key = _rowKey(pid, wid);
+            final key = _keyOf(m);
             final diff = (_calculatedByKey[key]?['difference'] as num?)?.toDouble();
             Color? c;
             if (diff != null) {
@@ -795,9 +812,7 @@ class _StockCountPageState extends State<StockCountPage> {
       ],
       rowColorBuilder: (row, index) {
         final m = row as Map<String, dynamic>;
-        final pid = (m['product_id'] as num?)?.toInt();
-        final wid = (m['warehouse_id'] as num?)?.toInt();
-        final key = _rowKey(pid, wid);
+        final key = _keyOf(m);
         final diff = (_calculatedByKey[key]?['difference'] as num?)?.toDouble() ?? 0.0;
         if (diff == 0) return null;
         return diff > 0 ? SemanticColorResolver.positive(context).withValues(alpha: 0.05) : SemanticColorResolver.negative(context).withValues(alpha: 0.05);
@@ -1282,7 +1297,12 @@ class _StockCountRowCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final code = row.raw['product_code']?.toString() ?? '-';
-    final name = row.raw['product_name']?.toString() ?? '-';
+    final lot = row.raw['lot_code']?.toString();
+    final exp = row.raw['expiry_date']?.toString();
+    final nameBase = row.raw['product_name']?.toString() ?? '-';
+    final name = (lot == null || lot.isEmpty)
+        ? nameBase
+        : (exp == null || exp.isEmpty ? '$nameBase · لات $lot' : '$nameBase · لات $lot / $exp');
     final wh = row.raw['warehouse_name']?.toString() ?? '-';
     final unit = row.raw['unit']?.toString() ?? '-';
     final systemQty = (row.raw['system_quantity'] as num?)?.toDouble() ?? 0.0;

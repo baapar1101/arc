@@ -19,6 +19,7 @@ from adapters.db.models.document import Document
 from adapters.db.repositories.repair_shop_repository import RepairInvoiceRepository, RepairShopSettingsRepository
 from app.core.responses import ApiError
 from app.core.repair_shop_plugin_dependency import check_repair_shop_plugin_active
+from app.core.business_calendar import business_today
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +165,7 @@ def create_repair_invoice_accounting(
     invoice_payload: Dict[str, Any] = {
         "invoice_type": "invoice_sales",
         "document_date": (
-            repair_order.completed_at.date() if repair_order.completed_at else date.today()
+            repair_order.completed_at.date() if repair_order.completed_at else business_today(business_id)
         ).isoformat(),
         "currency_id": repair_order.currency_id,
         "fiscal_year_id": fiscal_year.id,

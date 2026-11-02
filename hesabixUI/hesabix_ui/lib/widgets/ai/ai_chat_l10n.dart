@@ -79,6 +79,10 @@ String aiToolLabel(AppLocalizations l10n, String toolName, {String? toolKey}) {
       return l10n.aiToolListWarehouses;
     case 'aiToolGetWarehouseStockSummary':
       return l10n.aiToolGetWarehouseStockSummary;
+    case 'aiToolListInventoryLots':
+      return l10n.aiToolListInventoryLots;
+    case 'aiToolGetExpiryStockReport':
+      return l10n.aiToolGetExpiryStockReport;
     case 'aiToolSearchChecks':
       return l10n.aiToolSearchChecks;
     case 'aiToolGetCheckDetails':
@@ -215,6 +219,8 @@ String _toolNameToKey(String name) {
     'get_warehouse_document_details': 'aiToolGetWarehouseDocumentDetails',
     'list_warehouses': 'aiToolListWarehouses',
     'get_warehouse_stock_summary': 'aiToolGetWarehouseStockSummary',
+    'list_inventory_lots': 'aiToolListInventoryLots',
+    'get_expiry_stock_report': 'aiToolGetExpiryStockReport',
     'search_checks': 'aiToolSearchChecks',
     'get_check_details': 'aiToolGetCheckDetails',
     'search_transfers': 'aiToolSearchTransfers',

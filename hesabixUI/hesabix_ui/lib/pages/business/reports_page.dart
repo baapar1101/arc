@@ -1207,6 +1207,15 @@ class _ReportsPageState extends State<ReportsPage> {
             permissionSection: 'products',
           ),
           _ReportLink(
+            key: 'expiry_stock',
+            title: t.reportsExpiryStockTitle,
+            subtitle: t.reportsExpiryStockSubtitle,
+            icon: Icons.event_busy,
+            route: '/business/$b/reports/expiry-stock',
+            keywords: const ['انقضا', 'لات', 'تاریخ تولید', 'فاسدشدنی', 'expiry', 'lot'],
+            permissionSection: 'products',
+          ),
+          _ReportLink(
             key: 'inter_warehouse_transfers',
             title: t.reportsInterWarehouseTransfersTitle,
             subtitle: t.reportsInterWarehouseTransfersSubtitle,

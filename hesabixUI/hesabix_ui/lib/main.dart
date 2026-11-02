@@ -108,6 +108,7 @@ import 'pages/business/stock_count_report_page.dart';
 import 'pages/business/warehouse_documents_summary_report_page.dart';
 import 'pages/business/slow_moving_items_report_page.dart';
 import 'pages/business/critical_stock_report_page.dart';
+import 'pages/business/expiry_stock_report_page.dart';
 import 'pages/business/inter_warehouse_transfers_report_page.dart';
 import 'pages/business/adjustment_documents_report_page.dart';
 import 'pages/business/warehouse_performance_report_page.dart';
@@ -4084,6 +4085,21 @@ class _MyAppState extends State<MyApp> {
                               return hesabixNoTransitionPage(
                                 state,
                                 CriticalStockReportPage(
+                                  businessId: businessId,
+                                  calendarController: _calendarController!,
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'reports/expiry-stock',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                ExpiryStockReportPage(
                                   businessId: businessId,
                                   calendarController: _calendarController!,
                                 ),

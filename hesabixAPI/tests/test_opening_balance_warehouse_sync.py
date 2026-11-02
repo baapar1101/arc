@@ -57,3 +57,28 @@ def test_lines_are_grouped_by_warehouse_not_by_product() -> None:
     assert len(receipts) == 2
     assert len(receipts[5]) == 2
     assert len(receipts[6]) == 1
+
+
+def test_receipt_delta_stamps_lot_quantity_as_delta() -> None:
+    deltas = {(10, 1): Decimal("5")}
+    lots = {
+        (10, 1): {
+            "lot_code": "OB-1",
+            "manufacturing_date": "2026-01-01",
+            "expiry_date": "2026-12-01",
+            "lot_allocations": [
+                {
+                    "lot_code": "OB-1",
+                    "manufacturing_date": "2026-01-01",
+                    "expiry_date": "2026-12-01",
+                    "quantity": 15,
+                }
+            ],
+        }
+    }
+    receipts, issues = _group_delta_lines(deltas, {}, lots)
+    assert issues == {}
+    extra = receipts[1][0]["extra_info"]
+    assert extra["lot_code"] == "OB-1"
+    assert extra["lot_allocations"][0]["quantity"] == 5.0
+    assert receipts[1][0]["lot_allocations"][0]["quantity"] == 5.0

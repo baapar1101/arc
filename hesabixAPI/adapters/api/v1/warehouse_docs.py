@@ -1062,14 +1062,16 @@ def create_stock_count_adjustment_endpoint(
 	if not stock_count_code:
 		stock_count_code = f"INV-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
 	
+	from app.core.business_calendar import business_today
+
 	stock_count_date_str = payload.get("stock_count_date")
 	if not stock_count_date_str:
-		stock_count_date = datetime.now().date()
+		stock_count_date = business_today(business_id)
 	else:
 		try:
 			stock_count_date = _parse_date(stock_count_date_str)
 		except Exception:
-			stock_count_date = datetime.now().date()
+			stock_count_date = business_today(business_id)
 	
 	items = payload.get("items", [])
 	if not isinstance(items, list):

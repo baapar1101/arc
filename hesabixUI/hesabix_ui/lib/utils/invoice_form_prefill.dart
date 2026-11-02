@@ -22,7 +22,10 @@ List<InvoiceLineItem> invoiceLineItemsFromProductLinesForCopy(
   for (final raw in linesRaw) {
     final r = Map<String, dynamic>.from(raw as Map);
     final Map<String, dynamic> info = Map<String, dynamic>.from(r['extra_info'] ?? const {});
-    info.remove('selected_instance_ids');
+    final sourceInstances = info.remove('selected_instance_ids');
+    if (sourceInstances is List && sourceInstances.isNotEmpty) {
+      info['returned_from_instance_ids'] = sourceInstances;
+    }
 
     final num qty = toNum(r['quantity']);
     final num unitPrice = toNum(info['unit_price']);

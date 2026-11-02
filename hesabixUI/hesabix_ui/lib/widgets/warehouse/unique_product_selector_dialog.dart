@@ -6,6 +6,7 @@ import '../../core/calendar_controller.dart';
 import '../../utils/attribute_formatter.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../l10n/app_localizations.dart';
 
 
 class UniqueProductSelectorDialog extends StatefulWidget {
@@ -16,6 +17,7 @@ class UniqueProductSelectorDialog extends StatefulWidget {
   final List<int>? selectedInstanceIds;
   final int? requiredQuantity;
   final CalendarController? calendarController;
+  final bool forReturn;
 
   const UniqueProductSelectorDialog({
     super.key,
@@ -26,6 +28,7 @@ class UniqueProductSelectorDialog extends StatefulWidget {
     this.selectedInstanceIds,
     this.requiredQuantity,
     this.calendarController,
+    this.forReturn = false,
   });
 
   @override
@@ -107,12 +110,21 @@ class _UniqueProductSelectorDialogState extends State<UniqueProductSelectorDialo
         }
       }
 
-      // Load instances
-      final result = await _svc.getAvailableInstances(
-        businessId: widget.businessId,
-        productId: widget.productId,
-        warehouseId: widget.warehouseId,
-      );
+      final Map<String, dynamic> result;
+      if (widget.forReturn) {
+        result = await _svc.searchProductInstances(
+          businessId: widget.businessId,
+          productId: widget.productId,
+          status: 'sold',
+        );
+      } else {
+        result = await _svc.getAvailableInstances(
+          businessId: widget.businessId,
+          productId: widget.productId,
+          warehouseId: widget.warehouseId,
+          includeExpired: true,
+        );
+      }
       
       final items = (result['items'] as List<dynamic>?) ?? [];
       if (mounted) {
@@ -209,7 +221,9 @@ class _UniqueProductSelectorDialogState extends State<UniqueProductSelectorDialo
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'انتخاب کالاهای یونیک',
+                          widget.forReturn
+                              ? AppLocalizations.of(context).uniqueInstanceReturnTitle
+                              : AppLocalizations.of(context).uniqueInstanceSelectTitle,
                           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),
@@ -224,7 +238,7 @@ class _UniqueProductSelectorDialogState extends State<UniqueProductSelectorDialo
                   IconButton(
                     icon: const Icon(Icons.close),
                     onPressed: () => Navigator.of(context).pop(),
-                    tooltip: 'بستن',
+                    tooltip: AppLocalizations.of(context).close,
                   ),
                 ],
               ),
@@ -238,10 +252,10 @@ class _UniqueProductSelectorDialogState extends State<UniqueProductSelectorDialo
                   Expanded(
                     child: TextField(
                       controller: _searchController,
-                      decoration: const InputDecoration(
-                        labelText: 'جستجو (سریال/بارکد)',
-                        prefixIcon: Icon(Icons.search),
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: AppLocalizations.of(context).uniqueWarehouseSearchHint,
+                        prefixIcon: const Icon(Icons.search),
+                        border: const OutlineInputBorder(),
                       ),
                     ),
                   ),
@@ -275,17 +289,17 @@ class _UniqueProductSelectorDialogState extends State<UniqueProductSelectorDialo
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Text('خطا: $_error'),
+                                  Text('${AppLocalizations.of(context).error}: $_error'),
                                   const SizedBox(height: 16),
                                   ElevatedButton(
                                     onPressed: _loadData,
-                                    child: const Text('تلاش مجدد'),
+                                    child: Text(AppLocalizations.of(context).retry),
                                   ),
                                 ],
                               ),
                             )
                           : _filteredInstances.isEmpty
-                              ? const Center(child: Text('کالای یونیکی یافت نشد'))
+                              ? Center(child: Text(AppLocalizations.of(context).uniqueInstanceNotFound))
                               : ListView.builder(
                               itemCount: _filteredInstances.length,
                               itemBuilder: (context, index) {
@@ -311,15 +325,26 @@ class _UniqueProductSelectorDialogState extends State<UniqueProductSelectorDialo
                                   onChanged: instId != null
                                       ? (value) => _toggleSelection(instId)
                                       : null,
-                                  title: Text('سریال: $serial'),
+                                  title: Text(AppLocalizations.of(context).uniqueSerialPrefix(serial)),
                                   subtitle: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      if (barcode != '-') Text('بارکد: $barcode'),
-                                      if (warehouseName != null) Text('انبار: $warehouseName'),
+                                      if (barcode != '-') Text(AppLocalizations.of(context).uniqueBarcodePrefix(barcode)),
+                                      if (warehouseName != null) Text(AppLocalizations.of(context).uniqueWarehousePrefix(warehouseName)),
+                                      if (inst['manufacturing_date'] != null)
+                                        Text('${AppLocalizations.of(context).expiryColManufacturing}: ${inst['manufacturing_date']}'),
+                                      if (inst['expiry_date'] != null)
+                                        Text(
+                                          inst['is_expired'] == true
+                                              ? '${AppLocalizations.of(context).expiryColExpiry}: ${inst['expiry_date']} (${AppLocalizations.of(context).expiryStatusExpired})'
+                                              : '${AppLocalizations.of(context).expiryColExpiry}: ${inst['expiry_date']}',
+                                          style: inst['is_expired'] == true
+                                              ? TextStyle(color: Theme.of(context).colorScheme.error)
+                                              : null,
+                                        ),
                                       if (formattedAttrs.isNotEmpty)
                                         Text(
-                                          'ویژگی‌ها: $formattedAttrs',
+                                          AppLocalizations.of(context).uniqueAttributesPrefix(formattedAttrs),
                                           style: Theme.of(context).textTheme.bodySmall,
                                         ),
                                     ],
@@ -348,7 +373,7 @@ class _UniqueProductSelectorDialogState extends State<UniqueProductSelectorDialo
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    '${_selectedIds.length} کالا انتخاب شده',
+                    AppLocalizations.of(context).uniqueUnitsSelected(_selectedIds.length),
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -357,12 +382,12 @@ class _UniqueProductSelectorDialogState extends State<UniqueProductSelectorDialo
                     children: [
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('انصراف'),
+                        child: Text(AppLocalizations.of(context).cancel),
                       ),
                       const SizedBox(width: 8),
                       FilledButton(
                         onPressed: _confirmSelection,
-                        child: const Text('تأیید'),
+                        child: Text(AppLocalizations.of(context).confirm),
                       ),
                     ],
                   ),

@@ -15,7 +15,10 @@ import '../../widgets/invoice/account_combobox_widget.dart';
 import '../../widgets/invoice/person_combobox_widget.dart';
 import '../../widgets/invoice/product_combobox_widget.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
+import '../../widgets/invoice/invoice_line_lot_picker_dialog.dart';
+import '../../widgets/invoice/unique_product_instance_selector_dialog.dart';
 import 'goods_expense_income_list_page.dart' show docKindLabel, geiStatusLabel;
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 const String _kSection = 'goods_expense_income';
@@ -23,6 +26,10 @@ const String _kSection = 'goods_expense_income';
 class _LineVm {
   Map<String, dynamic>? product;
   int? warehouseId;
+  List<Map<String, dynamic>> lotAllocations;
+  List<int> selectedInstanceIds;
+  DateTime? manufacturingDate;
+  DateTime? expiryDate;
   final TextEditingController qtyCtrl;
   final TextEditingController unitCostCtrl;
   final TextEditingController descCtrl;
@@ -30,10 +37,16 @@ class _LineVm {
   _LineVm({
     this.product,
     this.warehouseId,
+    List<Map<String, dynamic>>? lotAllocations,
+    List<int>? selectedInstanceIds,
+    this.manufacturingDate,
+    this.expiryDate,
     String qty = '1',
     String unitCost = '0',
     String desc = '',
-  })  : qtyCtrl = TextEditingController(text: qty),
+  })  : lotAllocations = lotAllocations ?? <Map<String, dynamic>>[],
+        selectedInstanceIds = selectedInstanceIds ?? <int>[],
+        qtyCtrl = TextEditingController(text: qty),
         unitCostCtrl = TextEditingController(text: unitCost),
         descCtrl = TextEditingController(text: desc);
 
@@ -231,11 +244,32 @@ class _GoodsExpenseIncomeFormDialogState extends State<GoodsExpenseIncomeFormDia
           'code': m['product_code'],
           'base_purchase_price': m['unit_cost'],
           'track_inventory': true,
+          'track_expiry': m['track_expiry'] == true,
+          'inventory_mode': m['inventory_mode'] ?? 'bulk',
         };
+        final extra = m['extra_info'] is Map ? Map<String, dynamic>.from(m['extra_info'] as Map) : <String, dynamic>{};
+        final lots = extra['lot_allocations'] is List
+            ? (extra['lot_allocations'] as List)
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList()
+            : <Map<String, dynamic>>[];
+        final rawIds = extra['selected_instance_ids'] ?? extra['instance_ids'];
+        final instanceIds = rawIds is List
+            ? rawIds.map((e) => (e as num?)?.toInt()).whereType<int>().toList()
+            : <int>[];
         _lines.add(
           _LineVm(
             product: product,
             warehouseId: (m['warehouse_id'] as num?)?.toInt(),
+            lotAllocations: lots,
+            selectedInstanceIds: instanceIds,
+            manufacturingDate: DateTime.tryParse(
+              extra['manufacturing_date']?.toString() ?? '',
+            ),
+            expiryDate: DateTime.tryParse(
+              extra['expiry_date']?.toString() ?? '',
+            ),
             qty: formatWithThousands(m['quantity'] ?? 0, decimalPlaces: 3),
             unitCost: formatWithThousands(m['unit_cost'] ?? 0, decimalPlaces: 2),
             desc: m['description']?.toString() ?? '',
@@ -258,6 +292,26 @@ class _GoodsExpenseIncomeFormDialogState extends State<GoodsExpenseIncomeFormDia
       };
       if (_unitCostEditable) {
         row['unit_cost'] = ln.unitCost;
+      }
+      final extra = <String, dynamic>{};
+      if (ln.lotAllocations.isNotEmpty) {
+        extra['lot_allocations'] = ln.lotAllocations;
+        row['lot_allocations'] = ln.lotAllocations;
+      }
+      if (ln.selectedInstanceIds.isNotEmpty) {
+        extra['selected_instance_ids'] = ln.selectedInstanceIds;
+        extra['instance_ids'] = ln.selectedInstanceIds;
+        row['selected_instance_ids'] = ln.selectedInstanceIds;
+      }
+      if (ln.manufacturingDate != null) {
+        extra['manufacturing_date'] =
+            ln.manufacturingDate!.toIso8601String().split('T').first;
+      }
+      if (ln.expiryDate != null) {
+        extra['expiry_date'] = ln.expiryDate!.toIso8601String().split('T').first;
+      }
+      if (extra.isNotEmpty) {
+        row['extra_info'] = extra;
       }
       lines.add(row);
     }
@@ -715,6 +769,122 @@ class _GoodsExpenseIncomeFormDialogState extends State<GoodsExpenseIncomeFormDia
                 border: OutlineInputBorder(),
               ),
             ),
+            if (line.product?['track_expiry'] == true &&
+                (line.product?['inventory_mode']?.toString() ?? 'bulk') != 'unique') ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton.icon(
+                  onPressed: !_opsEditable
+                      ? null
+                      : () async {
+                          final pid = (line.product?['id'] as num?)?.toInt();
+                          if (pid == null) return;
+                          final variantId = line.lotAllocations.isNotEmpty
+                              ? (line.lotAllocations.first['variant_id'] as num?)?.toInt()
+                              : (line.product?['variant_id'] as num?)?.toInt();
+                          final result = await showDialog<List<Map<String, dynamic>>>(
+                            context: context,
+                            builder: (context) => InvoiceLineLotPickerDialog(
+                              businessId: widget.businessId,
+                              productId: pid,
+                              productName: line.product?['name']?.toString() ?? '',
+                              lineQuantity: line.quantity,
+                              warehouseId: line.warehouseId,
+                              variantId: variantId,
+                              initialAllocations: line.lotAllocations,
+                              inbound: _docKind == 'goods_income',
+                              includeUnsellable: _docKind == 'goods_expense',
+                              calendarController: _calendar,
+                            ),
+                          );
+                          if (result != null && mounted) {
+                            setState(() => line.lotAllocations = result);
+                          }
+                        },
+                  icon: const Icon(Icons.event),
+                  label: Text(
+                    line.lotAllocations.isEmpty
+                        ? AppLocalizations.of(context).lotAndDates
+                        : '${line.lotAllocations.length} ${AppLocalizations.of(context).lotAndDates}',
+                  ),
+                ),
+              ),
+            ],
+            if ((line.product?['inventory_mode']?.toString() ?? 'bulk') == 'unique' &&
+                _docKind == 'goods_income' &&
+                line.product?['track_expiry'] == true) ...[
+              const SizedBox(height: 8),
+              DateInputField(
+                calendarController: _calendar,
+                value: line.manufacturingDate,
+                labelText: AppLocalizations.of(context).expiryColManufacturing,
+                enabled: _opsEditable,
+                onChanged: (v) => setState(() => line.manufacturingDate = v),
+              ),
+              DateInputField(
+                calendarController: _calendar,
+                value: line.expiryDate,
+                labelText: AppLocalizations.of(context).expiryDate,
+                enabled: _opsEditable,
+                onChanged: (v) => setState(() => line.expiryDate = v),
+              ),
+            ],
+            if ((line.product?['inventory_mode']?.toString() ?? 'bulk') == 'unique' &&
+                _docKind == 'goods_expense') ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton.icon(
+                  onPressed: !_opsEditable
+                      ? null
+                      : () async {
+                          final pid = (line.product?['id'] as num?)?.toInt();
+                          if (pid == null) return;
+                          final qty = line.quantity.round();
+                          if (qty <= 0) {
+                            SnackBarHelper.show(
+                              context,
+                              message: AppLocalizations.of(context).lotPickerMinOne,
+                            );
+                            return;
+                          }
+                          final result = await showDialog<Map<String, dynamic>>(
+                            context: context,
+                            builder: (context) => UniqueProductInstanceSelectorDialog(
+                              businessId: widget.businessId,
+                              productId: pid,
+                              productName: line.product?['name']?.toString() ?? '',
+                              warehouseId: line.warehouseId,
+                              selectedInstanceIds: line.selectedInstanceIds,
+                              requiredQuantity: qty,
+                              calendarController: _calendar,
+                              includeUnsellable: true,
+                            ),
+                          );
+                          if (result != null && mounted) {
+                            final selectedIds = ((result['ids'] as List?) ?? const [])
+                                .map((e) => int.tryParse(e.toString()))
+                                .whereType<int>()
+                                .toList();
+                            setState(() {
+                              line.selectedInstanceIds = selectedIds;
+                              line.qtyCtrl.text = formatWithThousands(
+                                selectedIds.length,
+                                decimalPlaces: 0,
+                              );
+                            });
+                          }
+                        },
+                  icon: const Icon(Icons.qr_code_2),
+                  label: Text(
+                    line.selectedInstanceIds.isEmpty
+                        ? AppLocalizations.of(context).selectUnitTitle
+                        : '${line.selectedInstanceIds.length} ${AppLocalizations.of(context).selectUnitTitle}',
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),

@@ -8,6 +8,7 @@ from datetime import date
 
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
+from app.core.business_calendar import business_today
 from app.core.permissions import require_business_access
 from app.core.responses import success_response, ApiError
 from adapters.db.models.product_instance import ProductInstance
@@ -18,6 +19,62 @@ from app.services.product_attribute_service import validate_custom_attributes
 
 
 router = APIRouter(prefix="/product-instances", tags=["product_instances"])
+
+
+def _instance_dates(inst: ProductInstance) -> Dict[str, Any]:
+    return {
+        "manufacturing_date": inst.manufacturing_date.isoformat() if getattr(inst, "manufacturing_date", None) else None,
+        "expiry_date": inst.expiry_date.isoformat() if getattr(inst, "expiry_date", None) else None,
+    }
+
+
+def _parse_instance_date(value: Any) -> Optional[date]:
+    if not value:
+        return None
+    return date.fromisoformat(str(value)[:10])
+
+
+def _require_instance_dates(product: Product, manufacturing_date: Optional[date], expiry_date: Optional[date]) -> None:
+    from app.services.inventory_lot_service import is_expiry_tracked_product
+
+    if not is_expiry_tracked_product(product):
+        return
+    if manufacturing_date is None and expiry_date is None:
+        raise ApiError(
+            "INSTANCE_DATES_REQUIRED",
+            "برای کالای تاریخ‌دار باید تاریخ تولید یا انقضا روی هر واحد ثبت شود",
+            http_status=422,
+        )
+
+
+def _instance_is_expired(instance: ProductInstance, product: Product, as_of: Optional[date] = None) -> bool:
+    from app.services.inventory_lot_service import STATUS_BLOCKED, STATUS_EXPIRED, instance_expiry_view
+
+    as_of = as_of or business_today(getattr(product, "business_id", None))
+    status = str(instance_expiry_view(instance, product, as_of).get("status") or "")
+    return status in {STATUS_EXPIRED, STATUS_BLOCKED}
+
+
+def _instance_search_payload(inst: ProductInstance) -> Dict[str, Any]:
+    warehouse_name = None
+    if inst.warehouse_id and getattr(inst, "warehouse", None) is not None:
+        warehouse_name = inst.warehouse.name
+    product = getattr(inst, "product", None)
+    product_name = product.name if product is not None else None
+    return {
+        "id": inst.id,
+        "product_id": inst.product_id,
+        "product_name": product_name,
+        "serial_number": inst.serial_number,
+        "barcode": inst.barcode,
+        "warehouse_id": inst.warehouse_id,
+        "warehouse_name": warehouse_name,
+        "status": inst.status,
+        "custom_attributes": inst.custom_attributes or {},
+        "entry_date": inst.entry_date.isoformat() if inst.entry_date else None,
+        **_instance_dates(inst),
+        "is_expired": _instance_is_expired(inst, product) if product is not None else False,
+    }
 
 
 @router.post("/business/{business_id}/search")
@@ -75,6 +132,11 @@ def search_product_instances(
         )
     
     instances = query.order_by(ProductInstance.created_at.desc()).all()
+    product = None
+    if product_id:
+        product = db.query(Product).filter(
+            and_(Product.id == int(product_id), Product.business_id == business_id)
+        ).first()
     
     items = []
     for inst in instances:
@@ -89,6 +151,8 @@ def search_product_instances(
             "entry_date": inst.entry_date.isoformat() if inst.entry_date else None,
             "last_movement_date": inst.last_movement_date.isoformat() if inst.last_movement_date else None,
             "current_invoice_id": inst.current_invoice_id,
+            **_instance_dates(inst),
+            "is_expired": _instance_is_expired(inst, product) if product else False,
         })
     
     return success_response(data={"items": items, "total": len(items)}, request=request)
@@ -101,6 +165,7 @@ def get_available_instances(
     business_id: int,
     product_id: int,
     warehouse_id: Optional[int] = Query(None),
+    include_expired: bool = Query(False),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -127,6 +192,10 @@ def get_available_instances(
         query = query.filter(ProductInstance.warehouse_id == warehouse_id)
     
     instances = query.order_by(ProductInstance.entry_date.desc()).all()
+    from app.services.inventory_lot_service import is_expiry_tracked_product
+    expiry_tracked = is_expiry_tracked_product(product)
+    if expiry_tracked and not include_expired:
+        instances = [inst for inst in instances if not _instance_is_expired(inst, product)]
     
     items = []
     for inst in instances:
@@ -142,6 +211,9 @@ def get_available_instances(
             "warehouse_name": warehouse_name,
             "custom_attributes": inst.custom_attributes or {},
             "entry_date": inst.entry_date.isoformat() if inst.entry_date else None,
+            "manufacturing_date": inst.manufacturing_date.isoformat() if getattr(inst, "manufacturing_date", None) else None,
+            "expiry_date": inst.expiry_date.isoformat() if getattr(inst, "expiry_date", None) else None,
+            "is_expired": _instance_is_expired(inst, product) if expiry_tracked else False,
         })
     
     return success_response(data={"items": items, "total": len(items)}, request=request)
@@ -220,6 +292,10 @@ def create_product_instance(
         if not is_valid:
             raise ApiError("INVALID_CUSTOM_ATTRIBUTES", error_message or "مقادیر ویژگی‌های کالا معتبر نیست", http_status=400)
     
+    manufacturing_date = _parse_instance_date(payload.get("manufacturing_date"))
+    expiry_date = _parse_instance_date(payload.get("expiry_date"))
+    _require_instance_dates(product, manufacturing_date, expiry_date)
+
     # ایجاد کالای یونیک
     instance = ProductInstance(
         business_id=business_id,
@@ -229,7 +305,9 @@ def create_product_instance(
         warehouse_id=warehouse_id,
         status="available",
         custom_attributes=custom_attributes if custom_attributes else None,
-        entry_date=date.fromisoformat(entry_date) if entry_date else date.today(),
+        entry_date=date.fromisoformat(entry_date) if entry_date else business_today(business_id),
+        manufacturing_date=manufacturing_date,
+        expiry_date=expiry_date,
     )
     
     db.add(instance)
@@ -243,6 +321,7 @@ def create_product_instance(
             "warehouse_id": instance.warehouse_id,
             "status": instance.status,
             "custom_attributes": instance.custom_attributes or {},
+            **_instance_dates(instance),
         },
         request=request,
     )
@@ -279,6 +358,19 @@ def create_bulk_product_instances(
             
             if not product_id or not serial_number:
                 errors.append({"index": idx, "error": "Product ID and serial number are required"})
+                continue
+            product = db.query(Product).filter(
+                and_(Product.id == product_id, Product.business_id == business_id)
+            ).first()
+            if not product:
+                errors.append({"index": idx, "error": "Product not found"})
+                continue
+            manufacturing_date = _parse_instance_date(inst_data.get("manufacturing_date"))
+            expiry_date = _parse_instance_date(inst_data.get("expiry_date"))
+            try:
+                _require_instance_dates(product, manufacturing_date, expiry_date)
+            except ApiError as exc:
+                errors.append({"index": idx, "error": exc.message})
                 continue
             
             # بررسی یکتایی
@@ -323,7 +415,9 @@ def create_bulk_product_instances(
                 warehouse_id=warehouse_id,
                 status="available",
                 custom_attributes=custom_attributes if custom_attributes else None,
-                entry_date=date.fromisoformat(entry_date) if entry_date else date.today(),
+                entry_date=date.fromisoformat(entry_date) if entry_date else business_today(business_id),
+                manufacturing_date=manufacturing_date,
+                expiry_date=expiry_date,
             )
             
             db.add(instance)
@@ -381,27 +475,8 @@ def search_instance_by_code(
 	
 	# اگر تطابق دقیق پیدا شد، همان را برگردان
 	if exact_instance:
-		warehouse_name = None
-		if exact_instance.warehouse_id and exact_instance.warehouse:
-			warehouse_name = exact_instance.warehouse.name
-		
-		product_name = None
-		if exact_instance.product:
-			product_name = exact_instance.product.name
-		
 		return success_response(
-			data={
-				"id": exact_instance.id,
-				"product_id": exact_instance.product_id,
-				"product_name": product_name,
-				"serial_number": exact_instance.serial_number,
-				"barcode": exact_instance.barcode,
-				"warehouse_id": exact_instance.warehouse_id,
-				"warehouse_name": warehouse_name,
-				"status": exact_instance.status,
-				"custom_attributes": exact_instance.custom_attributes or {},
-				"entry_date": exact_instance.entry_date.isoformat() if exact_instance.entry_date else None,
-			},
+			data=_instance_search_payload(exact_instance),
 			request=request,
 		)
 	
@@ -521,54 +596,13 @@ def search_instance_by_code(
 	
 	# اگر فقط یک نتیجه پیدا شد، همان را برگردان (برای سازگاری با API قبلی)
 	if len(instances) == 1:
-		instance = instances[0]
-		warehouse_name = None
-		if instance.warehouse_id and instance.warehouse:
-			warehouse_name = instance.warehouse.name
-		
-		product_name = None
-		if instance.product:
-			product_name = instance.product.name
-		
 		return success_response(
-			data={
-				"id": instance.id,
-				"product_id": instance.product_id,
-				"product_name": product_name,
-				"serial_number": instance.serial_number,
-				"barcode": instance.barcode,
-				"warehouse_id": instance.warehouse_id,
-				"warehouse_name": warehouse_name,
-				"status": instance.status,
-				"custom_attributes": instance.custom_attributes or {},
-				"entry_date": instance.entry_date.isoformat() if instance.entry_date else None,
-			},
+			data=_instance_search_payload(instances[0]),
 			request=request,
 		)
 	
 	# اگر چند نتیجه پیدا شد، لیست را برگردان
-	items = []
-	for instance in instances:
-		warehouse_name = None
-		if instance.warehouse_id and instance.warehouse:
-			warehouse_name = instance.warehouse.name
-		
-		product_name = None
-		if instance.product:
-			product_name = instance.product.name
-		
-		items.append({
-			"id": instance.id,
-			"product_id": instance.product_id,
-			"product_name": product_name,
-			"serial_number": instance.serial_number,
-			"barcode": instance.barcode,
-			"warehouse_id": instance.warehouse_id,
-			"warehouse_name": warehouse_name,
-			"status": instance.status,
-			"custom_attributes": instance.custom_attributes or {},
-			"entry_date": instance.entry_date.isoformat() if instance.entry_date else None,
-		})
+	items = [_instance_search_payload(instance) for instance in instances]
 	
 	return success_response(
 		data={
@@ -625,6 +659,7 @@ def get_product_instance(
             "entry_date": instance.entry_date.isoformat() if instance.entry_date else None,
             "last_movement_date": instance.last_movement_date.isoformat() if instance.last_movement_date else None,
             "current_invoice_id": instance.current_invoice_id,
+            **_instance_dates(instance),
         },
         request=request,
     )
@@ -700,6 +735,15 @@ def update_product_instance(
         movement_date = payload.get("last_movement_date")
         if movement_date:
             instance.last_movement_date = date.fromisoformat(movement_date) if isinstance(movement_date, str) else movement_date
+    if "manufacturing_date" in payload:
+        instance.manufacturing_date = _parse_instance_date(payload.get("manufacturing_date"))
+    if "expiry_date" in payload:
+        instance.expiry_date = _parse_instance_date(payload.get("expiry_date"))
+    product = db.query(Product).filter(
+        and_(Product.id == instance.product_id, Product.business_id == business_id)
+    ).first()
+    if product is not None:
+        _require_instance_dates(product, instance.manufacturing_date, instance.expiry_date)
     
     db.flush()
     
@@ -711,6 +755,7 @@ def update_product_instance(
             "warehouse_id": instance.warehouse_id,
             "status": instance.status,
             "custom_attributes": instance.custom_attributes or {},
+            **_instance_dates(instance),
         },
         request=request,
     )
@@ -796,18 +841,33 @@ def convert_product_to_unique(
 	create_for_existing_stock = payload.get("create_for_existing_stock", True)
 	
 	from app.services.warehouse_service import get_warehouse_stock_report
-	from datetime import date as date_type
-	
-	# محاسبه موجودی فعلی به تفکیک انبار
+	from app.services.inventory_lot_service import (
+		is_expiry_tracked_product,
+		list_lot_balances,
+		unit_dates_from_lot_balances,
+	)
+
+	today = business_today(business_id)
 	stock_report = get_warehouse_stock_report(
 		db=db,
 		business_id=business_id,
 		query={
 			"product_ids": [str(product_id)],
-			"as_of_date": date_type.today().isoformat(),
+			"as_of_date": today.isoformat(),
 			"include_zero": False,
 		},
 	)
+	lot_queues: Dict[int, list] = {}
+	if is_expiry_tracked_product(product):
+		for item in stock_report.get("items", []):
+			wh_id = item.get("warehouse_id")
+			qty = int(item.get("quantity", 0) or 0)
+			if not wh_id or qty <= 0:
+				continue
+			balances = list_lot_balances(
+				db, business_id, product_id, int(wh_id), today, sellable_only=False
+			)
+			lot_queues[int(wh_id)] = unit_dates_from_lot_balances(balances, qty)
 	
 	created_instances = []
 	errors = []
@@ -856,15 +916,25 @@ def convert_product_to_unique(
 							).first()
 							counter += 1
 					
+					mfg = exp = None
+					queue = lot_queues.get(int(warehouse_id)) if warehouse_id is not None else None
+					if queue:
+						mfg_raw, exp_raw = queue.pop(0)
+						if mfg_raw:
+							mfg = date.fromisoformat(str(mfg_raw)[:10])
+						if exp_raw:
+							exp = date.fromisoformat(str(exp_raw)[:10])
 					instance = ProductInstance(
 						business_id=business_id,
 						product_id=product_id,
 						serial_number=serial_number,
-						barcode=None,  # می‌تواند بعداً اضافه شود
+						barcode=None,
 						warehouse_id=warehouse_id,
 						status="available",
 						custom_attributes=None,
-						entry_date=date_type.today(),
+						entry_date=today,
+						manufacturing_date=mfg,
+						expiry_date=exp,
 					)
 					
 					db.add(instance)
@@ -874,6 +944,8 @@ def convert_product_to_unique(
 						"id": instance.id,
 						"serial_number": instance.serial_number,
 						"warehouse_id": instance.warehouse_id,
+						"manufacturing_date": mfg.isoformat() if mfg else None,
+						"expiry_date": exp.isoformat() if exp else None,
 					})
 				except Exception as e:
 					errors.append({

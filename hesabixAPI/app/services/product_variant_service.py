@@ -654,7 +654,7 @@ def list_variant_balances(
 ) -> List[Dict[str, Any]]:
     from adapters.db.models.inventory_variant_balance import InventoryVariantBalance
 
-    _load_product(db, business_id, product_id)
+    product = _load_product(db, business_id, product_id)
     q = db.query(InventoryVariantBalance).filter(
         InventoryVariantBalance.business_id == int(business_id),
         InventoryVariantBalance.product_id == int(product_id),
@@ -662,12 +662,31 @@ def list_variant_balances(
     if warehouse_id is not None:
         q = q.filter(InventoryVariantBalance.warehouse_id == int(warehouse_id))
     rows = q.all()
-    return [
-        {
+    from app.core.business_calendar import business_today
+    from app.services.inventory_lot_service import is_expiry_tracked_product, sellable_quantity
+    expiry_tracked = is_expiry_tracked_product(product)
+    as_of = business_today(business_id)
+    out: List[Dict[str, Any]] = []
+    for row in rows:
+        physical = row.quantity or 0
+        item = {
             "warehouse_id": int(row.warehouse_id),
             "product_id": int(row.product_id),
             "variant_id": int(row.variant_id),
-            "quantity": str(row.quantity or 0),
+            "quantity": str(physical),
         }
-        for row in rows
-    ]
+        if expiry_tracked:
+            item["sellable_quantity"] = str(
+                sellable_quantity(
+                    db,
+                    business_id,
+                    product,
+                    int(row.warehouse_id),
+                    as_of,
+                    variant_id=int(row.variant_id),
+                )
+            )
+        else:
+            item["sellable_quantity"] = str(physical)
+        out.append(item)
+    return out

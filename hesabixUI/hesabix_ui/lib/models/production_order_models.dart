@@ -12,6 +12,11 @@ class ProductionOrderMaterial {
   final double standardUnitCost;
   final double standardTotalCost;
   final String? lotCode;
+  final String? manufacturingDate;
+  final String? expiryDate;
+  final List<int> selectedInstanceIds;
+  final String inventoryMode;
+  final bool trackExpiry;
   final String? bomPath;
   final bool isOptional;
   final int? sourceBomId;
@@ -30,6 +35,11 @@ class ProductionOrderMaterial {
     this.standardUnitCost = 0,
     this.standardTotalCost = 0,
     this.lotCode,
+    this.manufacturingDate,
+    this.expiryDate,
+    this.selectedInstanceIds = const [],
+    this.inventoryMode = 'bulk',
+    this.trackExpiry = false,
     this.bomPath,
     this.isOptional = false,
     this.sourceBomId,
@@ -55,6 +65,14 @@ class ProductionOrderMaterial {
       standardTotalCost:
           double.tryParse(json['standard_total_cost']?.toString() ?? '0') ?? 0,
       lotCode: json['lot_code']?.toString(),
+      manufacturingDate: json['manufacturing_date']?.toString(),
+      expiryDate: json['expiry_date']?.toString(),
+      selectedInstanceIds: ((json['selected_instance_ids'] as List?) ?? const [])
+          .map((e) => (e as num?)?.toInt())
+          .whereType<int>()
+          .toList(),
+      inventoryMode: json['inventory_mode']?.toString() ?? 'bulk',
+      trackExpiry: json['track_expiry'] == true,
       bomPath: json['bom_path']?.toString(),
       isOptional: json['is_optional'] == true,
       sourceBomId: (json['source_bom_id'] as num?)?.toInt(),
@@ -76,6 +94,10 @@ class ProductionOrderOutput {
   final double actualTotalCost;
   final double scrapQuantity;
   final String? lotCode;
+  final String? manufacturingDate;
+  final String? expiryDate;
+  final String inventoryMode;
+  final bool trackExpiry;
 
   const ProductionOrderOutput({
     this.id,
@@ -91,6 +113,10 @@ class ProductionOrderOutput {
     this.actualTotalCost = 0,
     this.scrapQuantity = 0,
     this.lotCode,
+    this.manufacturingDate,
+    this.expiryDate,
+    this.inventoryMode = 'bulk',
+    this.trackExpiry = false,
   });
 
   factory ProductionOrderOutput.fromJson(Map<String, dynamic> json) {
@@ -114,6 +140,10 @@ class ProductionOrderOutput {
       scrapQuantity:
           double.tryParse(json['scrap_quantity']?.toString() ?? '0') ?? 0,
       lotCode: json['lot_code']?.toString(),
+      manufacturingDate: json['manufacturing_date']?.toString(),
+      expiryDate: json['expiry_date']?.toString(),
+      inventoryMode: json['inventory_mode']?.toString() ?? 'bulk',
+      trackExpiry: json['track_expiry'] == true,
     );
   }
 }

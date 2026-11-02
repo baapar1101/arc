@@ -138,6 +138,10 @@ def _product_dict(product: Product) -> dict[str, Any]:
         "sales_tax_rate": product.sales_tax_rate,
         "track_inventory": bool(product.track_inventory),
         "inventory_mode": product.inventory_mode,
+        "track_expiry": bool(getattr(product, "track_expiry", False)),
+        "lot_policy": getattr(product, "lot_policy", None) or "optional",
+        "expired_sale_policy": getattr(product, "expired_sale_policy", None) or "block",
+        "shelf_life_days": getattr(product, "shelf_life_days", None),
         "default_warehouse_id": product.default_warehouse_id,
         "min_order_qty": product.min_order_qty,
     }

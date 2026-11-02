@@ -85,6 +85,8 @@ class ProductionOrderMaterial(Base):
 	actual_total_cost: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False, default=Decimal("0"))
 	uom: Mapped[str | None] = mapped_column(String(32), nullable=True)
 	lot_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+	manufacturing_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+	expiry_date: Mapped[date | None] = mapped_column(Date, nullable=True)
 	bom_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
 	is_optional: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 	source_bom_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("product_boms.id", ondelete="SET NULL"), nullable=True)
@@ -113,6 +115,8 @@ class ProductionOrderOutput(Base):
 	actual_total_cost: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False, default=Decimal("0"))
 	uom: Mapped[str | None] = mapped_column(String(32), nullable=True)
 	lot_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+	manufacturing_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+	expiry_date: Mapped[date | None] = mapped_column(Date, nullable=True)
 
 	order = relationship("ProductionOrder", back_populates="outputs")
 

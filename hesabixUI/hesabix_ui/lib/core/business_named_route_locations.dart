@@ -85,6 +85,7 @@ abstract final class BusinessNamedRoutes {
         'reports/warehouse-documents-summary',
     'business_reports_slow_moving_items': 'reports/slow-moving-items',
     'business_reports_critical_stock': 'reports/critical-stock',
+    'business_reports_expiry_stock': 'reports/expiry-stock',
     'business_reports_inter_warehouse_transfers':
         'reports/inter-warehouse-transfers',
     'business_reports_adjustment_documents': 'reports/adjustment-documents',

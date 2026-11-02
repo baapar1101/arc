@@ -31,6 +31,7 @@ from adapters.db.models.product import Product
 from adapters.db.models.marketplace import BusinessPlugin, MarketplacePlugin
 from fastapi import HTTPException
 from app.core.basalam_plugin_dependency import check_basalam_plugin_active
+from app.core.business_calendar import business_today
 from app.core.cache import get_cache
 from app.core.responses import ApiError
 from app.services import crm_chat_service
@@ -755,7 +756,7 @@ def _sync_order_to_invoice(
         "invoice_type": invoice_type,
         "person_id": int(person_id),
         "currency_id": int(currency_id),
-        "document_date": (date.today()).isoformat(),
+        "document_date": business_today(business_id).isoformat(),
         "lines": lines,
         "description": f"Basalam order {order_id}",
         "extra_info": {
@@ -2087,10 +2088,33 @@ def _get_local_product(
     return None
 
 
+def _basalam_local_stock(db: Session, business_id: int, local_product: Product, item: Dict[str, Any], settings: Dict[str, Any]) -> int:
+    stock = item.get("stock")
+    if stock is None:
+        from app.services.inventory_lot_service import business_as_of, is_expiry_tracked_product, sellable_quantity
+
+        if is_expiry_tracked_product(local_product):
+            stock = sellable_quantity(
+                db,
+                int(business_id),
+                local_product,
+                None,
+                business_as_of(int(business_id)),
+            )
+        else:
+            stock = settings.get("default_basalam_stock", 1)
+    try:
+        return max(0, int(stock))
+    except Exception:
+        return 1
+
+
 def _build_basalam_product_request_from_local(
     local_product: Product,
     item: Dict[str, Any],
     settings: Dict[str, Any],
+    db: Optional[Session] = None,
+    business_id: Optional[int] = None,
 ) -> Any:
     try:
         from basalam_sdk.core.models import ProductRequestSchema
@@ -2101,13 +2125,17 @@ def _build_basalam_product_request_from_local(
             http_status=500,
             details={"reason": str(exc)},
         )
-    stock = item.get("stock")
-    if stock is None:
-        stock = settings.get("default_basalam_stock", 1)
-    try:
-        stock_int = max(0, int(stock))
-    except Exception:
-        stock_int = 1
+    bid = int(business_id or getattr(local_product, "business_id", 0) or 0)
+    if db is not None:
+        stock_int = _basalam_local_stock(db, bid, local_product, item, settings)
+    else:
+        stock = item.get("stock")
+        if stock is None:
+            stock = settings.get("default_basalam_stock", 1)
+        try:
+            stock_int = max(0, int(stock))
+        except Exception:
+            stock_int = 1
     price_src = item.get("primary_price")
     if price_src is None:
         price_src = local_product.base_sales_price
@@ -2226,7 +2254,7 @@ def publish_products_to_basalam(
             )
             results.append({"status": "manual_review_required", "local_product_id": int(local_product.id), "reason": "variant_conflict"})
             continue
-        req = _build_basalam_product_request_from_local(local_product, item, settings)
+        req = _build_basalam_product_request_from_local(local_product, item, settings, db=db, business_id=int(business_id))
         remote_id = str(item.get("basalam_product_id") or local_to_remote.get(str(local_product.id)) or "").strip()
         try:
             req_payload = req.model_dump(exclude_none=True)
@@ -2527,7 +2555,7 @@ def push_products_incremental(
                 "description": p.description,
                 "sku": p.code,
                 "primary_price": int(_parse_decimal(p.base_sales_price, 0)),
-                "stock": int(payload.get("stock") or settings.get("default_basalam_stock", 1)),
+                "stock": _basalam_local_stock(db, int(business_id), p, payload, settings),
             }
         )
     out = publish_products_to_basalam(

@@ -219,6 +219,8 @@ _EXACT: Dict[str, str] = {
     "list_warehouse_locations": "inventory.warehouse",
     "list_warehouse_placements": "inventory.warehouse",
     "list_warehouses": "inventory.warehouse",
+    "list_inventory_lots": "inventory.stock",
+    "get_expiry_stock_report": "inventory.stock",
     "list_woocommerce_orders": "integration.woocommerce",
     "list_woocommerce_products": "integration.woocommerce",
     "list_workflow_action_catalog": "automation.workflow",

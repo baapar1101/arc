@@ -189,6 +189,125 @@
   "reportsSlowMovingItemsSubtitle": "کالاهایی که در بازه زمانی مشخص‌شده هیچ حرکتی نداشته‌اند",
   "reportsCriticalStockTitle": "گزارش کالاهای با موجودی بحرانی",
   "reportsCriticalStockSubtitle": "کالاهایی که موجودی آن‌ها کمتر از حد تعیین‌شده است",
+  "reportsExpiryStockTitle": "گزارش تاریخ تولید و انقضا",
+  "reportsExpiryStockSubtitle": "لات‌های قابل فروش، نزدیک به انقضا، مسدود و منقضی",
+  "expiryStatusSellable": "قابل فروش",
+  "expiryStatusNearExpiry": "نزدیک انقضا",
+  "expiryStatusBlocked": "مسدود (خروج از قفسه)",
+  "expiryStatusExpired": "منقضی",
+  "expiryStatusUndated": "بدون تاریخ (موجودی قبلی)",
+  "expiryReportAsOf": "تاریخ گزارش",
+  "expiryReportAllStatuses": "همه",
+  "expiryColLotSerial": "لات / سریال",
+  "expiryColManufacturing": "تاریخ تولید",
+  "expiryColExpiry": "تاریخ انقضا",
+  "expiryColRemainingDays": "روز مانده",
+  "quickSalesExpiredInstanceBlocked": "این واحد منقضی است و فروش آن مجاز نیست",
+  "lotPickerTitlePrefix": "لات و تاریخ —",
+  "lotPickerInboundHelp": "تاریخ روی لات است؛ اگر ۱ کارتن ۱۰ عددی وارد شود هر عدد همان تاریخ تولید و انقضا را دارد.",
+  "lotPickerOutboundHelp": "خروج به‌صورت پیش‌فرض از نزدیک‌ترین انقضا (FEFO) است. می‌توانید لات را عوض کنید.",
+  "lotPickerCode": "کد لات",
+  "lotPickerAddAnother": "لات دیگر",
+  "lotPickerDatesRequired": "تاریخ تولید یا تاریخ انقضا الزامی است",
+  "lotPickerMinOne": "حداقل یک لات با مقدار وارد کنید",
+  "lotPickerQtyMismatch": "جمع مقدار لات‌ها باید با مقدار ردیف برابر باشد",
+  "lotPickerBestBeforePrefix": "بهترین مصرف تا",
+  "instanceDatesRequired": "برای کالای تاریخ‌دار تاریخ تولید یا انقضا الزامی است",
+  "productionLotsTitle": "لات مواد و خروجی‌ها",
+  "productionLotsFefoHelp": "مواد مصرفی از نزدیک‌ترین انقضا (FEFO) انتخاب می‌شوند.",
+  "productionPickFefo": "انتخاب از موجودی FEFO",
+  "productionEditLots": "ویرایش لات‌ها",
+  "quickSalesFefoSummary": "خروج FEFO از نزدیک‌ترین انقضا",
+  "lotAndDates": "لات و تاریخ",
+  "lotPickerInboundPrompt": "لات و تاریخ تولید/انقضا را ثبت کنید",
+  "openingBalanceLotCode": "شماره لات / بچ موجودی اولیه",
+  "openingBalanceManufacturing": "تاریخ تولید موجودی اولیه",
+  "openingBalanceExpiry": "تاریخ انقضای موجودی اولیه",
+  "uniqueInstanceSelectTitle": "انتخاب کالاهای یونیک",
+  "uniqueInstanceReturnTitle": "برگشت واحدهای فروخته‌شده",
+  "uniqueInstanceNeedCount": "نیاز: {count} کالا",
+  "@uniqueInstanceNeedCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "uniqueInstanceSearchHint": "جستجو (سریال/بارکد/ویژگی‌ها)",
+  "uniqueWarehouseSearchHint": "جستجو (سریال/بارکد)",
+  "uniqueInstanceNotFound": "کالای یونیکی یافت نشد",
+  "uniqueInstanceSelectExact": "لطفاً دقیقاً {required} کالا انتخاب کنید ({selected} انتخاب شده)",
+  "@uniqueInstanceSelectExact": {
+    "placeholders": {
+      "required": {"type": "int"},
+      "selected": {"type": "int"}
+    }
+  },
+  "uniqueInstanceSelectedOf": "{selected} از {required} کالا انتخاب شده",
+  "@uniqueInstanceSelectedOf": {
+    "placeholders": {
+      "selected": {"type": "int"},
+      "required": {"type": "int"}
+    }
+  },
+  "uniqueInstanceNeedMore": "لطفاً {count} کالای دیگر انتخاب کنید",
+  "@uniqueInstanceNeedMore": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "uniqueInstanceMaxCount": "شما فقط می‌توانید {count} کالا انتخاب کنید",
+  "@uniqueInstanceMaxCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "uniqueInstanceMinOne": "لطفاً حداقل یک کالا انتخاب کنید",
+  "uniqueUnitsSelected": "{count} کالا انتخاب شده",
+  "@uniqueUnitsSelected": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "uniqueSerialPrefix": "سریال: {serial}",
+  "@uniqueSerialPrefix": {
+    "placeholders": {
+      "serial": {"type": "String"}
+    }
+  },
+  "uniqueBarcodePrefix": "بارکد: {barcode}",
+  "@uniqueBarcodePrefix": {
+    "placeholders": {
+      "barcode": {"type": "String"}
+    }
+  },
+  "uniqueWarehousePrefix": "انبار: {name}",
+  "@uniqueWarehousePrefix": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "uniqueAttributesPrefix": "ویژگی‌ها: {value}",
+  "@uniqueAttributesPrefix": {
+    "placeholders": {
+      "value": {"type": "String"}
+    }
+  },
+  "productionOutputsTitle": "خروجی‌ها",
+  "productionPickUniqueUnits": "انتخاب واحدهای یونیک",
+  "productionLotsSaved": "کدهای لات ذخیره شدند",
+  "productTrackExpiry": "ردیابی تاریخ تولید و انقضا",
+  "productTrackExpiryHelp": "برای کالاهای فاسدشدنی. کالاهای بدون این گزینه تغییری نمی‌کنند. تاریخ روی لات است و از کارتن به عدد می‌رسد.",
+  "productLotPolicy": "سیاست لات",
+  "productLotPolicyOptional": "لات اختیاری (سبزی و کالای بدون کد)",
+  "productLotPolicyRequired": "لات اجباری (دارو و بسته‌بندی)",
+  "productShelfLifeDays": "عمر مفید از تاریخ تولید (روز)",
+  "productShelfLifeDaysHelp": "اگر فقط تاریخ تولید وارد شود، انقضا از روی این عدد پیشنهاد می‌شود",
+  "productAlertOffsetDays": "هشدار چند روز مانده به انقضا",
+  "productRemovalOffsetDays": "خروج از قفسه چند روز مانده به انقضا",
+  "productBestBeforeOffsetDays": "بهترین مصرف چند روز مانده به انقضا",
+  "productExpiredSalePolicy": "فروش کالای منقضی",
+  "productExpiredSalePolicyBlock": "ممنوع",
+  "productExpiredSalePolicyConfirm": "با تأیید مدیر",
+  "productMinRemainingShelfLifeDays": "حداقل روز مانده هنگام فروش",
   "reportsInterWarehouseTransfersTitle": "گزارش انتقالات بین انبارها",
   "reportsInterWarehouseTransfersSubtitle": "جزئیات انتقالات بین انبارها",
   "reportsAdjustmentDocumentsTitle": "گزارش حواله‌های تعدیل",
@@ -1492,6 +1611,7 @@
   "permissionSectionInvoiceTypes": "نوع‌های مجاز فاکتور",
   "permissionSectionPricing": "نمایش قیمت فروش و خرید",
   "permissionInvoiceChangeUnitPrice": "تغییر دستی فی در فاکتور و فروش سریع",
+  "permissionInvoiceConfirmExpiredSale": "تأیید فروش کالای تاریخ‌گذشته در فاکتور",
   "permissionSectionCrmWebChat": "چت وب (ویجت CRM)",
   "permissionCrmEditAndAdd": "ایجاد و ویرایش رکوردهای CRM",
   "permissionCrmViewReports": "مشاهده گزارش‌های CRM",
@@ -4573,6 +4693,8 @@
   "aiToolGetWarehouseDocumentDetails": "جزئیات حواله انبار",
   "aiToolListWarehouses": "لیست انبارها",
   "aiToolGetWarehouseStockSummary": "خلاصه موجودی انبار",
+  "aiToolListInventoryLots": "موجودی لات‌های تاریخ‌دار",
+  "aiToolGetExpiryStockReport": "گزارش موجودی نزدیک به انقضا",
   "aiToolSearchChecks": "جستجوی چک",
   "aiToolGetCheckDetails": "جزئیات چک",
   "aiToolSearchTransfers": "جستجوی انتقال",

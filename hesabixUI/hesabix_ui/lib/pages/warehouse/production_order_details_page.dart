@@ -13,6 +13,10 @@ import '../../services/production_order_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/number_formatters.dart' show formatWithThousands;
 import '../../utils/snackbar_helper.dart';
+import '../../widgets/date_input_field.dart';
+import '../../widgets/invoice/invoice_line_lot_picker_dialog.dart';
+import '../../widgets/invoice/unique_product_instance_selector_dialog.dart';
+import '../../l10n/app_localizations.dart';
 import 'production_order_form_dialog.dart';
 
 class ProductionOrderDetailsPage extends StatefulWidget {
@@ -106,76 +110,226 @@ class _ProductionOrderDetailsPageState
   }
 
   Future<void> _editLots(ProductionOrder order) async {
+    final calendar = _calendar ?? await CalendarController.load();
+    if (!mounted) return;
+
+    String? iso(DateTime? value) =>
+        value?.toIso8601String().split('T').first;
+
     final materialControllers = <int, TextEditingController>{
       for (final row in order.materials.where((row) => row.id != null))
         row.id!: TextEditingController(text: row.lotCode ?? ''),
+    };
+    final materialMfg = <int, DateTime?>{
+      for (final row in order.materials.where((row) => row.id != null))
+        row.id!: HesabixDateUtils.parseApiDate(row.manufacturingDate),
+    };
+    final materialExp = <int, DateTime?>{
+      for (final row in order.materials.where((row) => row.id != null))
+        row.id!: HesabixDateUtils.parseApiDate(row.expiryDate),
     };
     final outputControllers = <int, TextEditingController>{
       for (final row in order.outputs.where((row) => row.id != null))
         row.id!: TextEditingController(text: row.lotCode ?? ''),
     };
+    final outputMfg = <int, DateTime?>{
+      for (final row in order.outputs.where((row) => row.id != null))
+        row.id!: HesabixDateUtils.parseApiDate(row.manufacturingDate),
+    };
+    final outputExp = <int, DateTime?>{
+      for (final row in order.outputs.where((row) => row.id != null))
+        row.id!: HesabixDateUtils.parseApiDate(row.expiryDate),
+    };
+    final materialInstanceIds = <int, List<int>>{
+      for (final row in order.materials.where((row) => row.id != null))
+        row.id!: List<int>.from(row.selectedInstanceIds),
+    };
     final result = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('کد لات مواد و خروجی‌ها'),
-        content: SizedBox(
-          width: 640,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'مواد مصرفی',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          Future<void> pickMaterialLot(ProductionOrderMaterial row) async {
+            final remaining = row.plannedQuantity - row.issuedQuantity;
+            final qty = remaining > 0 ? remaining : row.plannedQuantity;
+            if (row.inventoryMode == 'unique') {
+              final picked = await showDialog<Map<String, dynamic>>(
+                context: ctx,
+                builder: (lotCtx) => UniqueProductInstanceSelectorDialog(
+                  businessId: widget.businessId,
+                  productId: row.productId,
+                  productName: row.productName ?? '${row.productId}',
+                  warehouseId: row.warehouseId == 0 ? null : row.warehouseId,
+                  selectedInstanceIds: materialInstanceIds[row.id],
+                  requiredQuantity: qty <= 0 ? 1 : qty.round(),
+                  calendarController: calendar,
                 ),
-                for (final row in order.materials.where(
-                  (row) => row.id != null,
-                ))
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 5),
-                    child: TextField(
-                      controller: materialControllers[row.id],
-                      maxLength: 64,
-                      decoration: InputDecoration(
-                        labelText:
-                            '${row.productName ?? row.productId} · ردیف ${row.lineNo}',
-                        counterText: '',
-                      ),
+              );
+              if (picked == null) return;
+              final ids = ((picked['ids'] as List?) ?? const [])
+                  .map((e) => int.tryParse(e.toString()))
+                  .whereType<int>()
+                  .toList();
+              setLocal(() => materialInstanceIds[row.id!] = ids);
+              return;
+            }
+            final picked = await showDialog<List<Map<String, dynamic>>>(
+              context: ctx,
+              builder: (lotCtx) => InvoiceLineLotPickerDialog(
+                businessId: widget.businessId,
+                productId: row.productId,
+                productName: row.productName ?? '${row.productId}',
+                lineQuantity: qty <= 0 ? 1 : qty,
+                warehouseId: row.warehouseId == 0 ? null : row.warehouseId,
+                inbound: false,
+                includeUnsellable: false,
+                calendarController: calendar,
+                initialAllocations: [
+                  if ((materialControllers[row.id]?.text.trim().isNotEmpty ??
+                          false) ||
+                      materialMfg[row.id] != null)
+                    {
+                      'lot_code': materialControllers[row.id]?.text,
+                      'manufacturing_date': iso(materialMfg[row.id]),
+                      'expiry_date': iso(materialExp[row.id]),
+                      'quantity': qty <= 0 ? 1 : qty,
+                    },
+                ],
+              ),
+            );
+            if (picked == null || picked.isEmpty) return;
+            final first = picked.first;
+            setLocal(() {
+              materialControllers[row.id!]?.text =
+                  first['lot_code']?.toString() ?? '';
+              materialMfg[row.id!] = HesabixDateUtils.parseApiDate(
+                first['manufacturing_date']?.toString(),
+              );
+              materialExp[row.id!] = HesabixDateUtils.parseApiDate(
+                first['expiry_date']?.toString(),
+              );
+            });
+          }
+
+          final t = AppLocalizations.of(ctx);
+          return AlertDialog(
+            title: Text(t.productionLotsTitle),
+            content: SizedBox(
+              width: 640,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      t.productionLotsFefoHelp,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                  ),
-                const SizedBox(height: 12),
-                const Text(
-                  'خروجی‌ها',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                    for (final row in order.materials.where(
+                      (row) => row.id != null,
+                    ))
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 5),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (row.inventoryMode != 'unique') ...[
+                              TextField(
+                                controller: materialControllers[row.id],
+                                maxLength: 64,
+                                decoration: InputDecoration(
+                                  labelText:
+                                      '${row.productName ?? row.productId} · ${t.lotPickerCode}',
+                                  counterText: '',
+                                ),
+                              ),
+                              DateInputField(
+                                calendarController: calendar,
+                                value: materialMfg[row.id],
+                                labelText: t.expiryColManufacturing,
+                                onChanged: (v) =>
+                                    setLocal(() => materialMfg[row.id!] = v),
+                              ),
+                              DateInputField(
+                                calendarController: calendar,
+                                value: materialExp[row.id],
+                                labelText: t.expiryDate,
+                                onChanged: (v) =>
+                                    setLocal(() => materialExp[row.id!] = v),
+                              ),
+                            ] else
+                              Text(
+                                '${row.productName ?? row.productId} · ${t.uniqueUnitsSelected((materialInstanceIds[row.id] ?? const []).length)}',
+                              ),
+                            TextButton.icon(
+                              onPressed: () => pickMaterialLot(row),
+                              icon: Icon(
+                                row.inventoryMode == 'unique'
+                                    ? Icons.qr_code_2
+                                    : Icons.inventory_2_outlined,
+                              ),
+                              label: Text(
+                                row.inventoryMode == 'unique'
+                                    ? t.productionPickUniqueUnits
+                                    : t.productionPickFefo,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 12),
+                    Text(
+                      t.productionOutputsTitle,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    for (final row in order.outputs.where(
+                      (row) => row.id != null,
+                    ))
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 5),
+                        child: Column(
+                          children: [
+                            TextField(
+                              controller: outputControllers[row.id],
+                              maxLength: 64,
+                              decoration: InputDecoration(
+                                labelText:
+                                    '${row.productName ?? row.productId} · ${t.lotPickerCode}',
+                                counterText: '',
+                              ),
+                            ),
+                            DateInputField(
+                              calendarController: calendar,
+                              value: outputMfg[row.id],
+                              labelText: t.expiryColManufacturing,
+                              onChanged: (v) =>
+                                  setLocal(() => outputMfg[row.id!] = v),
+                            ),
+                            DateInputField(
+                              calendarController: calendar,
+                              value: outputExp[row.id],
+                              labelText: t.expiryDate,
+                              onChanged: (v) =>
+                                  setLocal(() => outputExp[row.id!] = v),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
                 ),
-                for (final row in order.outputs.where((row) => row.id != null))
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 5),
-                    child: TextField(
-                      controller: outputControllers[row.id],
-                      maxLength: 64,
-                      decoration: InputDecoration(
-                        labelText:
-                            '${row.productName ?? row.productId} · ردیف ${row.lineNo}',
-                        counterText: '',
-                      ),
-                    ),
-                  ),
-              ],
+              ),
             ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('انصراف'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('ذخیره'),
-          ),
-        ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(t.cancel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(t.save),
+              ),
+            ],
+          );
+        },
       ),
     );
     if (result == true && mounted) {
@@ -190,6 +344,10 @@ class _ProductionOrderDetailsPageState
                 (entry) => <String, dynamic>{
                   'id': entry.key,
                   'lot_code': entry.value.text.trim(),
+                  'manufacturing_date': iso(materialMfg[entry.key]),
+                  'expiry_date': iso(materialExp[entry.key]),
+                  if (materialInstanceIds[entry.key] != null)
+                    'selected_instance_ids': materialInstanceIds[entry.key],
                 },
               )
               .toList(),
@@ -198,13 +356,18 @@ class _ProductionOrderDetailsPageState
                 (entry) => <String, dynamic>{
                   'id': entry.key,
                   'lot_code': entry.value.text.trim(),
+                  'manufacturing_date': iso(outputMfg[entry.key]),
+                  'expiry_date': iso(outputExp[entry.key]),
                 },
               )
               .toList(),
         );
         if (mounted) {
           setState(() => _order = updated);
-          SnackBarHelper.showSuccess(context, message: 'کدهای لات ذخیره شدند');
+          SnackBarHelper.showSuccess(
+            context,
+            message: AppLocalizations.of(context).productionLotsSaved,
+          );
         }
       } catch (e) {
         if (mounted) {
@@ -674,7 +837,7 @@ class _ProductionOrderDetailsPageState
                       TextButton.icon(
                         onPressed: _acting ? null : () => _editLots(order),
                         icon: const Icon(Icons.qr_code_2),
-                        label: const Text('ویرایش لات‌ها'),
+                        label: Text(AppLocalizations.of(context).productionEditLots),
                       ),
                   ],
                 ),
@@ -683,16 +846,16 @@ class _ProductionOrderDetailsPageState
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: DataTable(
-                      columns: const [
-                        DataColumn(label: Text('#')),
-                        DataColumn(label: Text('کالا')),
-                        DataColumn(label: Text('برنامه')),
-                        DataColumn(label: Text('رزرو')),
-                        DataColumn(label: Text('صادر شده')),
-                        DataColumn(label: Text('بهای استاندارد')),
-                        DataColumn(label: Text('لات')),
-                        DataColumn(label: Text('انبار')),
-                        DataColumn(label: Text('مسیر BOM')),
+                      columns: [
+                        const DataColumn(label: Text('#')),
+                        const DataColumn(label: Text('کالا')),
+                        const DataColumn(label: Text('برنامه')),
+                        const DataColumn(label: Text('رزرو')),
+                        const DataColumn(label: Text('صادر شده')),
+                        const DataColumn(label: Text('بهای استاندارد')),
+                        DataColumn(label: Text(AppLocalizations.of(context).lotPickerCode)),
+                        const DataColumn(label: Text('انبار')),
+                        const DataColumn(label: Text('مسیر BOM')),
                       ],
                       rows: order.materials
                           .map(
@@ -726,7 +889,7 @@ class _ProductionOrderDetailsPageState
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'خروجی‌ها',
+                  AppLocalizations.of(context).productionOutputsTitle,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
@@ -734,15 +897,15 @@ class _ProductionOrderDetailsPageState
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: DataTable(
-                      columns: const [
-                        DataColumn(label: Text('#')),
-                        DataColumn(label: Text('کالا')),
-                        DataColumn(label: Text('برنامه')),
-                        DataColumn(label: Text('تولیدشده')),
-                        DataColumn(label: Text('ضایعات')),
-                        DataColumn(label: Text('بهای استاندارد')),
-                        DataColumn(label: Text('بهای واقعی')),
-                        DataColumn(label: Text('لات')),
+                      columns: [
+                        const DataColumn(label: Text('#')),
+                        const DataColumn(label: Text('کالا')),
+                        const DataColumn(label: Text('برنامه')),
+                        const DataColumn(label: Text('تولیدشده')),
+                        const DataColumn(label: Text('ضایعات')),
+                        const DataColumn(label: Text('بهای استاندارد')),
+                        const DataColumn(label: Text('بهای واقعی')),
+                        DataColumn(label: Text(AppLocalizations.of(context).lotPickerCode)),
                       ],
                       rows: order.outputs
                           .map(

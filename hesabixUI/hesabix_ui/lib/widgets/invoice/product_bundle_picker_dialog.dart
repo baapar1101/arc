@@ -6,6 +6,7 @@ import '../../services/product_bundle_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/number_normalizer.dart';
 import '../../utils/snackbar_helper.dart';
+import 'invoice_line_lot_picker_dialog.dart';
 
 Future<List<InvoiceLineItem>?> showProductBundlePickerDialog({
   required BuildContext context,
@@ -128,6 +129,33 @@ class _ProductBundlePickerDialogState
         quantity: multiplier,
       );
       final lines = items.map(_toInvoiceLine).toList();
+      for (var i = 0; i < lines.length; i++) {
+        final product = items[i].product;
+        if (product['track_expiry'] != true) continue;
+        if ((product['inventory_mode']?.toString() ?? 'bulk') == 'unique') {
+          continue;
+        }
+        if (product['lot_policy']?.toString() != 'required') continue;
+        if (!mounted) break;
+        final line = lines[i];
+        if (line.productId == null) continue;
+        final picked = await showDialog<List<Map<String, dynamic>>>(
+          context: context,
+          builder: (ctx) => InvoiceLineLotPickerDialog(
+            businessId: widget.businessId,
+            productId: line.productId!,
+            productName: line.productName ?? '',
+            lineQuantity: line.quantity,
+            warehouseId: line.warehouseId,
+            inbound: false,
+          ),
+        );
+        if (picked != null) {
+          final extra = Map<String, dynamic>.from(line.extraInfo ?? {});
+          extra['lot_allocations'] = picked;
+          lines[i] = line.copyWith(extraInfo: extra);
+        }
+      }
       if (mounted) Navigator.of(context).pop(lines);
     } catch (error) {
       if (mounted) {
@@ -169,7 +197,15 @@ class _ProductBundlePickerDialogState
       description: salesNote.isNotEmpty
           ? salesNote
           : (description.isNotEmpty ? description : null),
-      extraInfo: const {'_local_resolve_unit_price': true},
+      extraInfo: {
+        '_local_resolve_unit_price': true,
+        if (product['track_expiry'] == true &&
+            (product['inventory_mode']?.toString() ?? 'bulk') != 'unique') ...{
+          'track_expiry': true,
+          'lot_policy': product['lot_policy'],
+          'expired_sale_policy': product['expired_sale_policy'],
+        },
+      },
     );
   }
 

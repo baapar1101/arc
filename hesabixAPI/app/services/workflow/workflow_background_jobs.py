@@ -18,6 +18,7 @@ from adapters.db.models.workflow import Workflow, WorkflowStatus
 from app.services.workflow.schedule_cron_resolution import resolve_schedule_config_to_cron
 from app.services.workflow.workflow_trigger_service import (
     fire_check_due_workflow_triggers,
+    fire_inventory_expiry_scan,
     run_scheduled_workflow_fire,
 )
 
@@ -25,14 +26,17 @@ logger = logging.getLogger(__name__)
 
 _scheduled_fired: Set[Tuple[int, str]] = set()
 _check_due_fired: Set[Tuple[int, str]] = set()
+_expiry_scan_fired: Set[Tuple[int, str]] = set()
 
 
 def _prune_fired_sets() -> None:
-    global _scheduled_fired, _check_due_fired
+    global _scheduled_fired, _check_due_fired, _expiry_scan_fired
     if len(_scheduled_fired) > 5000:
         _scheduled_fired = set(list(_scheduled_fired)[-2000:])
     if len(_check_due_fired) > 5000:
         _check_due_fired = set(list(_check_due_fired)[-2000:])
+    if len(_expiry_scan_fired) > 5000:
+        _expiry_scan_fired = set(list(_expiry_scan_fired)[-2000:])
 
 
 def _cron_should_fire_now(schedule: str, timezone_name: str, now_utc: datetime) -> Tuple[bool, str]:
@@ -136,12 +140,37 @@ def _tick_check_due(db: Session, today: Optional[date] = None) -> int:
     return fired
 
 
+def _tick_inventory_expiry(db: Session, today: Optional[date] = None) -> int:
+    from adapters.db.models.product import Product
+    from app.core.business_calendar import business_today
+
+    business_ids = [
+        int(row[0])
+        for row in db.query(Product.business_id)
+        .filter(Product.track_inventory == True, Product.track_expiry == True)  # noqa: E712
+        .distinct()
+        .all()
+    ]
+    fired = 0
+    for bid in business_ids:
+        as_of = today or business_today(bid)
+        dk = (int(bid), as_of.isoformat())
+        if dk in _expiry_scan_fired:
+            continue
+        _expiry_scan_fired.add(dk)
+        try:
+            fired += fire_inventory_expiry_scan(db, int(bid))
+        except Exception as e:
+            logger.error("inventory expiry scan failed business_id=%s: %s", bid, e, exc_info=True)
+    return fired
+
+
 def workflow_automation_tick_once() -> Dict[str, int]:
     """یک بار اسکن زمان‌بندی و چک‌ها (برای job یا تست)."""
     from adapters.db.session import get_db_session
 
     _prune_fired_sets()
-    out = {"scheduled_fires": 0, "check_due_triggers": 0}
+    out = {"scheduled_fires": 0, "check_due_triggers": 0, "expiry_scan_triggers": 0}
     with get_db_session() as db:
         try:
             out["scheduled_fires"] = _tick_scheduled_workflows(db)
@@ -151,6 +180,10 @@ def workflow_automation_tick_once() -> Dict[str, int]:
             out["check_due_triggers"] = _tick_check_due(db)
         except Exception as e:
             logger.error("check due tick failed: %s", e, exc_info=True)
+        try:
+            out["expiry_scan_triggers"] = _tick_inventory_expiry(db)
+        except Exception as e:
+            logger.error("inventory expiry tick failed: %s", e, exc_info=True)
         try:
             db.commit()
         except Exception:

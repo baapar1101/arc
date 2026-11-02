@@ -34,6 +34,23 @@ from app.services.warehouse_service import create_manual_warehouse_document, get
 _MAP_TILE_SOURCES = frozenset({"osm", "memaps"})
 
 
+def _van_available_qty(
+	db: Session,
+	business_id: int,
+	product_id: int,
+	warehouse_id: int,
+	as_of: date,
+	*,
+	sellable: bool,
+) -> float:
+	from app.services.inventory_lot_service import is_expiry_tracked_product, sellable_quantity
+
+	product = db.get(Product, int(product_id))
+	if sellable and product is not None and is_expiry_tracked_product(product):
+		return float(sellable_quantity(db, business_id, product, warehouse_id, as_of) or 0)
+	return float(get_physical_stock(db, business_id, product_id, warehouse_id, as_of) or 0)
+
+
 def normalize_map_tile_source(value: Any) -> str:
 	source = str(value or "osm").strip().lower()
 	return source if source in _MAP_TILE_SOURCES else "osm"
@@ -271,7 +288,8 @@ def get_van_stock(db: Session, business_id: int, van_id: int, ctx: Optional[Auth
 	products = db.query(Product).filter(Product.business_id == business_id, Product.track_inventory == True).all()  # noqa: E712
 	items = []
 	for p in products:
-		qty = get_physical_stock(db, business_id, p.id, van.warehouse_id, business_today(business_id))
+		as_of = business_today(business_id)
+		qty = get_physical_stock(db, business_id, p.id, van.warehouse_id, as_of)
 		if qty and float(qty) > 0:
 			unit_price = _resolve_unit_price(db, business_id, p, None)
 			tax_rate = float(p.sales_tax_rate or 0) if bool(getattr(p, "is_sales_taxable", False)) else 0.0
@@ -280,6 +298,9 @@ def get_van_stock(db: Session, business_id: int, van_id: int, ctx: Optional[Auth
 					"product_id": p.id,
 					"product_name": p.name,
 					"quantity": float(qty),
+					"sellable_quantity": _van_available_qty(
+						db, business_id, int(p.id), int(van.warehouse_id), as_of, sellable=True
+					),
 					"unit_price": unit_price,
 					"tax_rate": tax_rate,
 					"is_sales_taxable": bool(getattr(p, "is_sales_taxable", False)),
@@ -338,7 +359,13 @@ def load_van(
 		raise ApiError("VALIDATION_ERROR", "source_warehouse_id required", http_status=400)
 	if not lines:
 		raise ApiError("VALIDATION_ERROR", "lines required", http_status=400)
+	from adapters.db.models.product import Product
+	from app.services.inventory_lot_service import is_expiry_tracked_product, suggest_fefo
+	from decimal import Decimal as _Dec
+
+	today = business_today(business_id)
 	wh_lines = []
+	van_lot_lines = []
 	for i, ln in enumerate(lines):
 		if not isinstance(ln, dict):
 			raise ApiError("VALIDATION_ERROR", f"lines[{i}] invalid", http_status=400)
@@ -346,11 +373,56 @@ def load_van(
 		qty = float(ln.get("quantity") or 0)
 		if pid <= 0 or qty <= 0:
 			raise ApiError("VALIDATION_ERROR", f"lines[{i}] product_id and quantity required", http_status=400)
-		wh_lines.append({"product_id": pid, "quantity": qty})
-	today = business_today(business_id)
-	# پیش‌بررسی موجودی مبدأ
-	for ln in wh_lines:
-		avail = float(get_physical_stock(db, business_id, int(ln["product_id"]), int(src), today) or 0)
+		product = db.query(Product).filter(Product.id == pid, Product.business_id == business_id).first()
+		payload_line = {"product_id": pid, "quantity": qty, "extra_info": dict(ln.get("extra_info") or {})}
+		if product is not None and is_expiry_tracked_product(product) and str(product.inventory_mode or "bulk") != "unique":
+			if ln.get("lot_code") or ln.get("expiry_date") or ln.get("lot_allocations"):
+				payload_line["lot_code"] = ln.get("lot_code")
+				payload_line["expiry_date"] = ln.get("expiry_date")
+				payload_line["manufacturing_date"] = ln.get("manufacturing_date")
+				payload_line["lot_allocations"] = ln.get("lot_allocations")
+			else:
+				extra = dict(ln.get("extra_info") or {})
+				variant_id = extra.get("variant_id")
+				if variant_id is None:
+					allocs = extra.get("allocations")
+					if isinstance(allocs, list) and allocs and isinstance(allocs[0], dict):
+						variant_id = allocs[0].get("variant_id")
+				picked = suggest_fefo(
+					db,
+					business_id,
+					product,
+					int(src),
+					_Dec(str(qty)),
+					today,
+					variant_id=int(variant_id) if variant_id else None,
+				)
+				payload_line["lot_allocations"] = [
+					{
+						"lot_id": int(lot.id),
+						"lot_code": lot.lot_code,
+						"manufacturing_date": lot.manufacturing_date.isoformat() if lot.manufacturing_date else None,
+						"expiry_date": lot.expiry_date.isoformat() if lot.expiry_date else None,
+						"quantity": float(take),
+					}
+					for lot, take in picked
+				]
+		wh_lines.append(payload_line)
+		van_lot_lines.append(payload_line)
+	# پیش‌بررسی موجودی مبدأ — کالای تاریخ‌دار با FEFO خودکار فقط موجودی قابل‌فروش
+	for orig, ln in zip(lines, wh_lines):
+		explicit_lots = bool(
+			isinstance(orig, dict)
+			and (orig.get("lot_allocations") or orig.get("lot_code") or orig.get("expiry_date"))
+		)
+		avail = _van_available_qty(
+			db,
+			business_id,
+			int(ln["product_id"]),
+			int(src),
+			today,
+			sellable=not explicit_lots,
+		)
 		if avail + 1e-9 < float(ln["quantity"]):
 			raise ApiError(
 				"INSUFFICIENT_STOCK",
@@ -376,8 +448,38 @@ def load_van(
 
 	from app.services.distribution_field_ops_service import add_van_lot, assert_van_capacity
 
-	for ln in lines:
-		if not isinstance(ln, dict):
+	for ln in van_lot_lines:
+		allocs = ln.get("lot_allocations") if isinstance(ln.get("lot_allocations"), list) else None
+		if allocs:
+			for alloc in allocs:
+				if not isinstance(alloc, dict):
+					continue
+				exp = None
+				raw_exp = alloc.get("expiry_date")
+				if raw_exp:
+					try:
+						exp = _date.fromisoformat(str(raw_exp)[:10])
+					except ValueError:
+						exp = None
+				mfg = None
+				raw_mfg = alloc.get("manufacturing_date")
+				if raw_mfg:
+					try:
+						mfg = _date.fromisoformat(str(raw_mfg)[:10])
+					except ValueError:
+						mfg = None
+				add_van_lot(
+					db,
+					business_id,
+					int(van.id),
+					int(ln.get("product_id") or 0),
+					float(alloc.get("quantity") or 0),
+					lot_code=alloc.get("lot_code"),
+					expiry_date=exp,
+					manufacturing_date=mfg,
+					unit_weight_kg=float(ln["unit_weight_kg"]) if ln.get("unit_weight_kg") else None,
+					unit_volume_m3=float(ln["unit_volume_m3"]) if ln.get("unit_volume_m3") else None,
+				)
 			continue
 		exp = None
 		raw_exp = ln.get("expiry_date")
@@ -437,6 +539,9 @@ def unload_van(
 		raise ApiError("VALIDATION_ERROR", "destination must differ from van warehouse", http_status=400)
 	if not lines:
 		raise ApiError("VALIDATION_ERROR", "lines required", http_status=400)
+	from adapters.db.models.distribution import DistributionVanLot
+	from app.services.distribution_field_ops_service import NO_EXPIRY
+
 	wh_lines = []
 	for i, ln in enumerate(lines):
 		if not isinstance(ln, dict):
@@ -448,7 +553,38 @@ def unload_van(
 		avail = get_physical_stock(db, business_id, pid, van.warehouse_id, business_today(business_id))
 		if float(avail or 0) < qty:
 			raise ApiError("INSUFFICIENT_VAN_STOCK", f"Insufficient stock for product {pid}", http_status=400)
-		wh_lines.append({"product_id": pid, "quantity": qty})
+		payload: Dict[str, Any] = {"product_id": pid, "quantity": qty}
+		van_lots = (
+			db.query(DistributionVanLot)
+			.filter(
+				DistributionVanLot.van_id == int(van.id),
+				DistributionVanLot.product_id == pid,
+				DistributionVanLot.quantity > 0,
+			)
+			.order_by(DistributionVanLot.expiry_date.asc().nullslast(), DistributionVanLot.id.asc())
+			.all()
+		)
+		if van_lots:
+			allocs = []
+			need = float(qty)
+			for row in van_lots:
+				if need <= 1e-9:
+					break
+				take = min(float(row.quantity or 0), need)
+				if take <= 0:
+					continue
+				exp = row.expiry_date
+				allocs.append({
+					"lot_code": row.lot_code,
+					"expiry_date": None if exp == NO_EXPIRY else (exp.isoformat() if exp else None),
+					"manufacturing_date": row.manufacturing_date.isoformat() if getattr(row, "manufacturing_date", None) else None,
+					"quantity": take,
+				})
+				need -= take
+			if allocs:
+				payload["lot_allocations"] = allocs
+				payload["extra_info"] = {"lot_allocations": allocs}
+		wh_lines.append(payload)
 	wh_doc = create_manual_warehouse_document(
 		db,
 		business_id,
@@ -466,7 +602,15 @@ def unload_van(
 	from app.services.distribution_field_ops_service import consume_van_lots_fefo
 
 	for ln in wh_lines:
-		consume_van_lots_fefo(db, int(van.id), int(ln["product_id"]), float(ln["quantity"]))
+		allocs = ln.get("lot_allocations") or (ln.get("extra_info") or {}).get("lot_allocations")
+		consume_van_lots_fefo(
+			db,
+			int(van.id),
+			int(ln["product_id"]),
+			float(ln["quantity"]),
+			skip_expired=False,
+			allocations=allocs if isinstance(allocs, list) else None,
+		)
 	db.commit()
 	return {"van_id": van_id, "warehouse_document_id": wh_doc.id, "status": "posted"}
 
@@ -534,7 +678,14 @@ def record_van_sale_issue(
 		qty = float(ln.get("quantity") or 0)
 		if pid <= 0 or qty <= 0:
 			continue
-		avail = get_physical_stock(db, business_id, pid, van.warehouse_id, business_today(business_id))
+		avail = _van_available_qty(
+			db,
+			business_id,
+			pid,
+			int(van.warehouse_id),
+			business_today(business_id),
+			sellable=True,
+		)
 		if float(avail or 0) < qty:
 			raise ApiError("INSUFFICIENT_VAN_STOCK", f"Insufficient stock for product {pid}", http_status=400)
 		wh_lines.append({"product_id": pid, "quantity": qty})

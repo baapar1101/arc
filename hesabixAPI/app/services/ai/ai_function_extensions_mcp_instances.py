@@ -23,6 +23,7 @@ GET_AVAILABLE_PRODUCT_INSTANCES_SCHEMA = mcp_schema(
     {
         "product_id": {"type": "integer", "minimum": 1},
         "warehouse_id": {"type": "integer", "minimum": 1},
+        "include_expired": {"type": "boolean", "description": "اگر false باشد واحدهای منقضی/مسدود برنمی‌گردند"},
     },
     ["product_id"],
 )
@@ -33,6 +34,8 @@ CREATE_PRODUCT_INSTANCE_SCHEMA = mcp_schema(
         "barcode": {"type": ["string", "null"], "maxLength": 255},
         "warehouse_id": {"type": ["integer", "null"], "minimum": 1},
         "entry_date": {"type": "string", "description": "ISO date YYYY-MM-DD"},
+        "manufacturing_date": {"type": ["string", "null"], "description": "ISO date YYYY-MM-DD"},
+        "expiry_date": {"type": ["string", "null"], "description": "ISO date YYYY-MM-DD"},
         "custom_attributes": {"type": "object"},
     },
     ["product_id", "serial_number"],
@@ -45,12 +48,14 @@ UPDATE_PRODUCT_INSTANCE_SCHEMA = mcp_schema(
         "status": {"type": "string", "enum": _STATUSES},
         "custom_attributes": {"type": "object"},
         "last_movement_date": {"type": ["string", "null"]},
+        "manufacturing_date": {"type": ["string", "null"]},
+        "expiry_date": {"type": ["string", "null"]},
     },
     ["instance_id"],
 )
 
 
-def _instance_public(inst, warehouse_name=None) -> Dict[str, Any]:
+def _instance_public(inst, warehouse_name=None, *, is_expired=None) -> Dict[str, Any]:
     return {
         "id": inst.id,
         "product_id": inst.product_id,
@@ -63,6 +68,9 @@ def _instance_public(inst, warehouse_name=None) -> Dict[str, Any]:
         "entry_date": inst.entry_date.isoformat() if inst.entry_date else None,
         "last_movement_date": inst.last_movement_date.isoformat() if inst.last_movement_date else None,
         "current_invoice_id": getattr(inst, "current_invoice_id", None),
+        "manufacturing_date": inst.manufacturing_date.isoformat() if getattr(inst, "manufacturing_date", None) else None,
+        "expiry_date": inst.expiry_date.isoformat() if getattr(inst, "expiry_date", None) else None,
+        "is_expired": bool(is_expired) if is_expired is not None else False,
     }
 
 
@@ -86,6 +94,8 @@ def get_available_product_instances_handler(args, context):
 
     from adapters.db.models.product import Product
     from adapters.db.models.product_instance import ProductInstance
+    from app.core.business_calendar import business_today
+    from app.services.inventory_lot_service import is_expiry_tracked_product, is_instance_sellable
 
     db = mcp_db(context)
     bid = mcp_bid(context)
@@ -102,10 +112,16 @@ def get_available_product_instances_handler(args, context):
     )
     if args.get("warehouse_id"):
         q = q.filter(ProductInstance.warehouse_id == int(args["warehouse_id"]))
+    include_expired = bool(args.get("include_expired"))
+    expiry_tracked = is_expiry_tracked_product(product)
+    as_of = business_today(bid)
     items = []
     for inst in q.order_by(ProductInstance.entry_date.desc()).all():
+        expired = expiry_tracked and not is_instance_sellable(inst, product, as_of)
+        if expired and not include_expired:
+            continue
         wh_name = inst.warehouse.name if inst.warehouse_id and inst.warehouse else None
-        items.append(_instance_public(inst, wh_name))
+        items.append(_instance_public(inst, wh_name, is_expired=expired))
     return {"items": items, "total": len(items)}
 
 
@@ -140,6 +156,8 @@ def create_product_instance_handler(args, context):
         ok, err = validate_custom_attributes(db=db, business_id=bid, product_id=product_id, custom_attributes=custom_attributes)
         if not ok:
             raise ValueError(err or "مقادیر ویژگی‌های کالا معتبر نیست")
+    from app.core.business_calendar import business_today
+
     entry_raw = args.get("entry_date")
     instance = ProductInstance(
         business_id=bid,
@@ -149,8 +167,17 @@ def create_product_instance_handler(args, context):
         warehouse_id=int(warehouse_id) if warehouse_id else None,
         status="available",
         custom_attributes=custom_attributes or None,
-        entry_date=date.fromisoformat(str(entry_raw)[:10]) if entry_raw else date.today(),
+        entry_date=date.fromisoformat(str(entry_raw)[:10]) if entry_raw else business_today(bid),
+        manufacturing_date=date.fromisoformat(str(args["manufacturing_date"])[:10]) if args.get("manufacturing_date") else None,
+        expiry_date=date.fromisoformat(str(args["expiry_date"])[:10]) if args.get("expiry_date") else None,
     )
+    from adapters.api.v1.product_instances import _require_instance_dates
+    from app.core.responses import ApiError
+
+    try:
+        _require_instance_dates(product, instance.manufacturing_date, instance.expiry_date)
+    except ApiError as exc:
+        raise ValueError(exc.message) from exc
     db.add(instance)
     db.flush()
     return _instance_public(instance)
@@ -203,6 +230,21 @@ def update_product_instance_handler(args, context):
         inst.custom_attributes = custom_attributes
     if args.get("last_movement_date"):
         inst.last_movement_date = date.fromisoformat(str(args["last_movement_date"])[:10])
+    if "manufacturing_date" in args:
+        inst.manufacturing_date = date.fromisoformat(str(args["manufacturing_date"])[:10]) if args.get("manufacturing_date") else None
+    if "expiry_date" in args:
+        inst.expiry_date = date.fromisoformat(str(args["expiry_date"])[:10]) if args.get("expiry_date") else None
+    if "manufacturing_date" in args or "expiry_date" in args:
+        from adapters.db.models.product import Product
+        from adapters.api.v1.product_instances import _require_instance_dates
+        from app.core.responses import ApiError
+
+        product = db.get(Product, inst.product_id)
+        if product is not None:
+            try:
+                _require_instance_dates(product, inst.manufacturing_date, inst.expiry_date)
+            except ApiError as exc:
+                raise ValueError(exc.message) from exc
     db.flush()
     return _instance_public(inst)
 

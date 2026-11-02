@@ -24,10 +24,15 @@ def register_mcp_stock_count_functions(registry) -> None:
         _schema({"warehouse_id": {"type": "integer", "minimum": 1}, "product_ids": {"type": "array", "minItems": 1, "maxItems": 500, "uniqueItems": True, "items": {"type": "integer", "minimum": 1}},
             "as_of_date": {"type": "string", "format": "date"}, "only_with_warehouse_history": {"type": "boolean"}}, ["warehouse_id", "product_ids"]), _start)
     item_schema = {"type": "object", "properties": {"product_id": {"type": "integer", "minimum": 1}, "warehouse_id": {"type": ["integer", "null"], "minimum": 1},
+        "lot_id": {"type": ["integer", "null"], "minimum": 1}, "lot_code": {"type": ["string", "null"], "maxLength": 64},
+        "manufacturing_date": {"type": ["string", "null"], "format": "date"}, "expiry_date": {"type": ["string", "null"], "format": "date"},
         "physical_quantity": {"type": "number", "minimum": 0}}, "required": ["product_id", "physical_quantity"], "additionalProperties": False}
     _register(registry, "calculate_stock_count_differences", "محاسبه تفاوت موجودی فیزیکی با موجودی سیستمی؛ شناسه محصول و مقدار واقعی برای حداکثر ۵۰۰ ردیف لازم است.",
         _schema({"items": {"type": "array", "minItems": 1, "maxItems": 500, "items": item_schema}, "as_of_date": {"type": "string", "format": "date"}}, ["items"]), _calculate)
     adjustment_item = {"type": "object", "properties": {"product_id": {"type": "integer", "minimum": 1}, "warehouse_id": {"type": ["integer", "null"], "minimum": 1},
+        "lot_id": {"type": ["integer", "null"], "minimum": 1}, "lot_code": {"type": ["string", "null"], "maxLength": 64},
+        "manufacturing_date": {"type": ["string", "null"], "format": "date"}, "expiry_date": {"type": ["string", "null"], "format": "date"},
+        "lot_allocations": {"type": "array", "items": {"type": "object"}},
         "difference": {"type": "number"}, "movement": {"type": ["string", "null"], "enum": ["in", "out", None]}, "quantity": {"type": "number", "minimum": 0}},
         "required": ["product_id", "difference", "quantity"], "additionalProperties": False}
     _register(registry, "create_stock_count_adjustment", "ایجاد نتیجه انبارگردانی طبق تنظیم فعلی کسب‌وکار؛ ممکن است حواله تعدیل یا اسناد کالای هزینه/درآمد ایجاد کند. نیازمند تأیید است.",
@@ -80,7 +85,9 @@ def _create_adjustment(args: Dict[str, Any], context: Dict[str, Any]):
         return {"needs_choice": True, "options": [STOCK_COUNT_GOODS_DOCS, STOCK_COUNT_PHYSICAL], "settings": settings}
     if mode not in (STOCK_COUNT_GOODS_DOCS, STOCK_COUNT_PHYSICAL):
         raise ValueError("result_mode نامعتبر است")
-    count_date = date.fromisoformat(args["stock_count_date"]) if args.get("stock_count_date") else datetime.now().date()
+    from app.core.business_calendar import business_today
+
+    count_date = date.fromisoformat(args["stock_count_date"]) if args.get("stock_count_date") else business_today(bid)
     count_code = (args.get("stock_count_code") or "").strip() or f"INV-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
     if mode == STOCK_COUNT_GOODS_DOCS:
         if not has_business_permission_for_business(ctx, db, bid, "goods_expense_income", "add"):

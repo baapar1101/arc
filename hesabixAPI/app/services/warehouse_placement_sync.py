@@ -178,10 +178,12 @@ def placement_reconciliation_for_warehouse(
 	from datetime import date as date_type
 	from app.services.invoice_service import _compute_available_stock
 
+	from app.services.inventory_lot_service import business_as_of
+
 	if as_of_date is None:
-		as_of_date = datetime.utcnow().date()
+		as_of_date = business_as_of(business_id)
 	elif isinstance(as_of_date, str):
-		as_of_date = date_type.fromisoformat(as_of_date)
+		as_of_date = business_as_of(business_id, date_type.fromisoformat(as_of_date))
 
 	products_with_placement = (
 		db.query(WarehouseProductPlacement.product_id)

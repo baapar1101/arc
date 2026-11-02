@@ -49,6 +49,7 @@ OFFICE_AUTOMATION_EVENT_CODES: frozenset[str] = frozenset(
 		"office_automation.letter_signed",
 	}
 )
+INVENTORY_EXPIRY_EVENT_CODES: frozenset[str] = frozenset({"inventory.expires_soon"})
 
 PAY_LINK_RECEIVED_TEMPLATE_VARIABLES: list[dict[str, str]] = [
     {"key": "payer_name", "type": "string", "description": "نام واریزکننده"},
@@ -310,6 +311,38 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
 
 {{ business_name }} — {{ business_phone }}""",
         "default_email_subject": "کمبود موجودی — {{ business_name }}",
+        "is_active": True,
+        "requires_approval": True,
+    },
+    {
+        "code": "inventory.expires_soon",
+        "name": "هشدار نزدیک به انقضا",
+        "description": "وقتی لات کالا به تاریخ هشدار یا انقضا برسد — «inventory.expires_soon».",
+        "category": "warehouse",
+        "available_variables": [
+            {"key": "product_id", "type": "number", "description": "شناسه کالا"},
+            {"key": "product_name", "type": "string", "description": "نام کالا"},
+            {"key": "lot_code", "type": "string", "description": "کد لات"},
+            {"key": "manufacturing_date", "type": "date", "description": "تاریخ تولید"},
+            {"key": "expiry_date", "type": "date", "description": "تاریخ انقضا"},
+            {"key": "remaining_days", "type": "number", "description": "روز مانده تا انقضا"},
+            {"key": "quantity_main", "type": "number", "description": "مقدار در واحد اصلی"},
+            {"key": "status", "type": "string", "description": "وضعیت لات"},
+            {"key": "warehouse_id", "type": "number", "description": "شناسه انبار"},
+            {"key": "business_name", "type": "string", "description": "نام کسب‌وکار"},
+        ],
+        "default_sms_template": "هشدار انقضا: {{ product_name }} لات {{ lot_code }} تا {{ remaining_days | format_number }} روز دیگر منقضی می‌شود. {{ business_name }}",
+        "default_email_template": """هشدار نزدیک به انقضا
+
+کالا: {{ product_name }}
+لات: {{ lot_code }}
+تاریخ تولید: {{ manufacturing_date | format_date }}
+تاریخ انقضا: {{ expiry_date | format_date }}
+مانده: {{ remaining_days | format_number }} روز
+مقدار: {{ quantity_main | format_number }}
+
+{{ business_name }}""",
+        "default_email_subject": "نزدیک به انقضا — {{ product_name }}",
         "is_active": True,
         "requires_approval": True,
     },

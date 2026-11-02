@@ -1386,6 +1386,7 @@
   "permissionSectionInvoiceTypes": "Allowed invoice types",
   "permissionSectionPricing": "Sales / purchase price visibility",
   "permissionInvoiceChangeUnitPrice": "Change invoice unit price manually (invoice & quick sales)",
+  "permissionInvoiceConfirmExpiredSale": "Confirm sale of expired lots on invoices",
   "permissionSectionCrmWebChat": "Web chat widget (CRM)",
   "permissionCrmEditAndAdd": "Create and edit CRM records",
   "permissionCrmViewReports": "View CRM reports",
@@ -2440,6 +2441,127 @@
   "reportsSlowMovingItemsSubtitle": "Items with no movement during the selected time range",
   "reportsCriticalStockTitle": "Critical stock items",
   "reportsCriticalStockSubtitle": "Items with stock below the defined threshold",
+  "reportsExpiryStockTitle": "Manufacturing and expiry stock",
+  "reportsExpiryStockSubtitle": "Sellable, near-expiry, blocked, and expired lots",
+  "expiryStatusSellable": "Sellable",
+  "expiryStatusNearExpiry": "Near expiry",
+  "expiryStatusBlocked": "Blocked (off shelf)",
+  "expiryStatusExpired": "Expired",
+  "expiryStatusUndated": "Undated (existing stock)",
+  "expiryReportAsOf": "As of",
+  "expiryReportAllStatuses": "All",
+  "expiryColLotSerial": "Lot / serial",
+  "expiryColManufacturing": "Manufacturing date",
+  "expiryColExpiry": "Expiry date",
+  "expiryColRemainingDays": "Days remaining",
+  "quickSalesExpiredInstanceBlocked": "This unit is expired and cannot be sold",
+  "lotPickerTitlePrefix": "Lot and dates —",
+  "lotPickerInboundHelp": "Dates live on the lot; a carton of 10 pieces shares the same manufacturing and expiry dates.",
+  "lotPickerOutboundHelp": "Outbound picking uses nearest expiry (FEFO) by default. You can change the lot.",
+  "lotPickerCode": "Lot code",
+  "lotPickerAddAnother": "Another lot",
+  "lotPickerDatesRequired": "Manufacturing or expiry date is required",
+  "lotPickerMinOne": "Enter at least one lot with a quantity",
+  "lotPickerQtyMismatch": "Lot quantities must add up to the line quantity",
+  "lotPickerBestBeforePrefix": "Best before",
+  "instanceDatesRequired": "Perishable units need a manufacturing or expiry date",
+  "productionLotsTitle": "Material and output lots",
+  "productionLotsFefoHelp": "Materials are picked from the nearest expiry (FEFO).",
+  "productionPickFefo": "Pick from FEFO stock",
+  "productionEditLots": "Edit lots",
+  "quickSalesFefoSummary": "FEFO issue from nearest expiry",
+  "lotAndDates": "Lot and dates",
+  "lotPickerInboundPrompt": "Record lot manufacturing and expiry dates",
+  "openingBalanceLotCode": "Opening-balance lot / batch code",
+  "openingBalanceManufacturing": "Opening-balance manufacturing date",
+  "openingBalanceExpiry": "Opening-balance expiry date",
+  "uniqueInstanceSelectTitle": "Select unique units",
+  "uniqueInstanceReturnTitle": "Return sold units",
+  "uniqueInstanceNeedCount": "Need: {count} units",
+  "@uniqueInstanceNeedCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "uniqueInstanceSearchHint": "Search serial, barcode, or attributes",
+  "uniqueWarehouseSearchHint": "Search serial or barcode",
+  "uniqueInstanceNotFound": "No unique units found",
+  "uniqueInstanceSelectExact": "Select exactly {required} units ({selected} selected)",
+  "@uniqueInstanceSelectExact": {
+    "placeholders": {
+      "required": {"type": "int"},
+      "selected": {"type": "int"}
+    }
+  },
+  "uniqueInstanceSelectedOf": "{selected} of {required} units selected",
+  "@uniqueInstanceSelectedOf": {
+    "placeholders": {
+      "selected": {"type": "int"},
+      "required": {"type": "int"}
+    }
+  },
+  "uniqueInstanceNeedMore": "Select {count} more units",
+  "@uniqueInstanceNeedMore": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "uniqueInstanceMaxCount": "You can select only {count} units",
+  "@uniqueInstanceMaxCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "uniqueInstanceMinOne": "Select at least one unit",
+  "uniqueUnitsSelected": "{count} units selected",
+  "@uniqueUnitsSelected": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "uniqueSerialPrefix": "Serial: {serial}",
+  "@uniqueSerialPrefix": {
+    "placeholders": {
+      "serial": {"type": "String"}
+    }
+  },
+  "uniqueBarcodePrefix": "Barcode: {barcode}",
+  "@uniqueBarcodePrefix": {
+    "placeholders": {
+      "barcode": {"type": "String"}
+    }
+  },
+  "uniqueWarehousePrefix": "Warehouse: {name}",
+  "@uniqueWarehousePrefix": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "uniqueAttributesPrefix": "Attributes: {value}",
+  "@uniqueAttributesPrefix": {
+    "placeholders": {
+      "value": {"type": "String"}
+    }
+  },
+  "productionOutputsTitle": "Outputs",
+  "productionPickUniqueUnits": "Pick unique units",
+  "productionLotsSaved": "Lots saved",
+  "aiToolListInventoryLots": "Dated lot balances",
+  "aiToolGetExpiryStockReport": "Expiry stock report",
+  "productTrackExpiry": "Track manufacturing and expiry dates",
+  "productTrackExpiryHelp": "For perishables only. Other products stay unchanged. Dates live on the lot and apply from carton to piece.",
+  "productLotPolicy": "Lot policy",
+  "productLotPolicyOptional": "Optional lot (produce without lot codes)",
+  "productLotPolicyRequired": "Required lot (pharma and packaged goods)",
+  "productShelfLifeDays": "Shelf life from manufacturing (days)",
+  "productShelfLifeDaysHelp": "If only manufacturing date is entered, expiry is suggested from this number",
+  "productAlertOffsetDays": "Alert days before expiry",
+  "productRemovalOffsetDays": "Remove from shelf days before expiry",
+  "productBestBeforeOffsetDays": "Best-before days before expiry",
+  "productExpiredSalePolicy": "Sale of expired goods",
+  "productExpiredSalePolicyBlock": "Blocked",
+  "productExpiredSalePolicyConfirm": "Manager confirmation",
+  "productMinRemainingShelfLifeDays": "Minimum remaining days at sale",
   "reportsInterWarehouseTransfersTitle": "Inter-warehouse transfers",
   "reportsInterWarehouseTransfersSubtitle": "Details of transfers between warehouses",
   "reportsAdjustmentDocumentsTitle": "Adjustment documents",

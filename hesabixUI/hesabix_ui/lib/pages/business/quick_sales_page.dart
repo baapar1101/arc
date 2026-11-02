@@ -36,6 +36,7 @@ import '../../models/invoice_transaction.dart';
 import '../../models/quick_sales_parked_sale.dart';
 import '../../models/quick_sales_change_resolution.dart';
 import '../../widgets/invoice/customer_combobox_widget.dart';
+import '../../widgets/invoice/invoice_line_lot_picker_dialog.dart';
 import '../../widgets/quick_sales/quick_sales_parked_sales_bar.dart';
 import '../../widgets/quick_sales/quick_sales_payment_dock.dart';
 import '../../widgets/quick_sales/quick_sales_stock_shortage_dialog.dart';
@@ -1966,6 +1967,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
                 instanceId: instanceId,
                 instanceWarehouseId: instanceWarehouseId,
                 skipHydrate: true,
+                instanceExpired: selected['is_expired'] == true,
               );
               await _saveRecentProduct(product);
               _barcodeController.clear();
@@ -2009,6 +2011,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             instanceId: instanceId,
             instanceWarehouseId: instanceWarehouseId,
             skipHydrate: true,
+            instanceExpired: instanceData['is_expired'] == true,
           );
           await _saveRecentProduct(product);
           _barcodeController.clear();
@@ -2381,12 +2384,26 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     int? instanceId,
     int? instanceWarehouseId,
     bool skipHydrate = false,
+    bool instanceExpired = false,
   }) async {
     if (!skipHydrate) {
       await _hydrateProductCodeIfNeeded(product);
     }
     final productId = _productIntId(product);
     if (productId == null) return;
+    if (instanceId != null &&
+        instanceExpired &&
+        !_canSellExpiredUnique(product)) {
+      if (mounted) {
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.show(
+          context,
+          message: t?.quickSalesExpiredInstanceBlocked ??
+              'این واحد منقضی است و فروش آن مجاز نیست',
+        );
+      }
+      return;
+    }
 
     setState(() => _addingProductId = productId);
     try {
@@ -2404,8 +2421,8 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           // افزایش تعداد محصول موجود
           setState(() {
             final existingItem = _cartItems[existingIndex];
-            _cartItems[existingIndex] = existingItem.copyWith(
-              quantity: existingItem.quantity + 1,
+            _cartItems[existingIndex] = _clearLotAllocations(
+              existingItem.copyWith(quantity: existingItem.quantity + 1),
             );
           });
           // بارگذاری موجودی اگر لازم باشد و نمایش موجودی فعال باشد
@@ -2453,18 +2470,21 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         basePurchasePriceMainUnit: product['base_purchase_price'] != null
             ? _toNum(product['base_purchase_price'])
             : null,
-        extraInfo: instanceId != null
-            ? {
-                'instance_id': instanceId,
-                if (instanceWarehouseId != null)
-                  'instance_warehouse_id': instanceWarehouseId,
-              }
-            : null,
+        extraInfo: _cartExtraFromProduct(
+          product,
+          instanceId: instanceId,
+          instanceWarehouseId: instanceWarehouseId,
+          allowExpiredLotSale:
+              instanceExpired && _canSellExpiredUnique(product),
+        ),
       );
 
       setState(() {
         _cartItems.add(lineItem);
       });
+      if (_shouldRequireLotPick(product) && instanceId == null) {
+        await _pickCartLots(_cartItems.length - 1);
+      }
 
       // بارگذاری موجودی اگر لازم باشد و نمایش موجودی فعال باشد
       if (trackInventory && instanceId == null && _showInventory) {
@@ -2513,7 +2533,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         query: {
           'product_ids': productIds,
           'warehouse_ids': [_defaultWarehouseId],
-          'as_of_date': DateTime.now().toIso8601String().split('T')[0],
           'include_zero': true,
         },
       );
@@ -2522,7 +2541,9 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       for (final item in items) {
         final pid = (item['product_id'] as num?)?.toInt();
         if (pid != null) {
-          stocksMap[pid] = (item['quantity'] as num?) ?? 0;
+          stocksMap[pid] = (item['sellable_quantity'] as num?) ??
+              (item['quantity'] as num?) ??
+              0;
         }
       }
       if (!mounted) return;
@@ -2574,7 +2595,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         query: {
           'product_ids': trackInventoryProductIds,
           'warehouse_ids': [_defaultWarehouseId],
-          'as_of_date': DateTime.now().toIso8601String().split('T')[0],
           'include_zero': true,
         },
       );
@@ -2585,7 +2605,9 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       for (final item in items) {
         final pid = (item['product_id'] as num?)?.toInt();
         if (pid != null) {
-          stocksMap[pid] = (item['quantity'] as num?) ?? 0;
+          stocksMap[pid] = (item['sellable_quantity'] as num?) ??
+              (item['quantity'] as num?) ??
+              0;
         }
       }
 
@@ -3096,6 +3118,10 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           'discount_value': item.discountValue,
           if (item.description != null) 'description': item.description,
           'extra_info': extraInfoMap,
+          if (extraInfoMap['lot_allocations'] != null)
+            'lot_allocations': extraInfoMap['lot_allocations'],
+          if (extraInfoMap['allow_expired_lot_sale'] == true)
+            'allow_expired_lot_sale': true,
         };
         return lineData;
       }).toList();
@@ -3668,8 +3694,143 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     );
 
     if (result != null) {
-      _updateCartItem(index, result);
+      final qtyChanged = result.quantity != item.quantity;
+      _updateCartItem(
+        index,
+        qtyChanged ? _clearLotAllocations(result) : result,
+      );
     }
+  }
+
+  bool _cartItemTracksExpiry(InvoiceLineItem item) {
+    if (item.extraInfo?['instance_id'] != null) return false;
+    return item.extraInfo?['track_expiry'] == true;
+  }
+
+  bool _shouldRequireLotPick(Map<String, dynamic> product) {
+    if (product['track_expiry'] != true) return false;
+    if ((product['inventory_mode']?.toString() ?? 'bulk') == 'unique') {
+      return false;
+    }
+    return product['lot_policy']?.toString() == 'required';
+  }
+
+  bool _canSellExpiredUnique(Map<String, dynamic> product) {
+    return widget.authStore.canConfirmExpiredSale() &&
+        product['expired_sale_policy']?.toString() == 'manager_confirm';
+  }
+
+  Map<String, dynamic>? _cartExtraFromProduct(
+    Map<String, dynamic> product, {
+    int? instanceId,
+    int? instanceWarehouseId,
+    bool allowExpiredLotSale = false,
+  }) {
+    final extra = <String, dynamic>{};
+    if (instanceId != null) {
+      extra['instance_id'] = instanceId;
+      extra['selected_instance_ids'] = [instanceId];
+      extra['instance_ids'] = [instanceId];
+      if (instanceWarehouseId != null) {
+        extra['instance_warehouse_id'] = instanceWarehouseId;
+      }
+      extra['track_expiry'] = product['track_expiry'] == true;
+      extra['expired_sale_policy'] = product['expired_sale_policy'];
+      if (allowExpiredLotSale) {
+        extra['allow_expired_lot_sale'] = true;
+      }
+    } else if (product['track_expiry'] == true &&
+        (product['inventory_mode']?.toString() ?? 'bulk') != 'unique') {
+      extra['track_expiry'] = true;
+      extra['lot_policy'] = product['lot_policy'];
+      extra['expired_sale_policy'] = product['expired_sale_policy'];
+    }
+    return extra.isEmpty ? null : extra;
+  }
+
+  InvoiceLineItem _clearLotAllocations(InvoiceLineItem item) {
+    if (!_cartItemTracksExpiry(item)) return item;
+    final extra = Map<String, dynamic>.from(item.extraInfo ?? {});
+    extra.remove('lot_allocations');
+    extra.remove('allow_expired_lot_sale');
+    return item.copyWith(extraInfo: extra);
+  }
+
+  Future<void> _pickCartLots(int index) async {
+    if (index < 0 || index >= _cartItems.length) return;
+    final item = _cartItems[index];
+    if (item.productId == null || !_cartItemTracksExpiry(item)) return;
+    final includeUnsellable = widget.authStore.canConfirmExpiredSale() &&
+        item.extraInfo?['expired_sale_policy']?.toString() == 'manager_confirm';
+    final result = await showDialog<List<Map<String, dynamic>>>(
+      context: context,
+      builder: (context) => InvoiceLineLotPickerDialog(
+        businessId: widget.businessId,
+        productId: item.productId!,
+        productName: item.productName ?? '',
+        lineQuantity: item.quantity,
+        warehouseId: item.warehouseId ?? _defaultWarehouseId,
+        initialAllocations: lotAllocationsFromExtra(item.extraInfo),
+        inbound: false,
+        includeUnsellable: includeUnsellable,
+        calendarController: ApiClient.getCalendarController(),
+      ),
+    );
+    if (result == null || !mounted) return;
+    final ei = Map<String, dynamic>.from(item.extraInfo ?? {});
+    ei['lot_allocations'] = result;
+    final today = DateTime.now();
+    final pickedExpired = result.any((row) {
+      final raw = row['expiry_date']?.toString();
+      if (raw == null || raw.isEmpty) {
+        return row['status'] == 'expired' || row['status'] == 'blocked';
+      }
+      final exp = DateTime.tryParse(raw);
+      return exp != null &&
+          !exp.isAfter(DateTime(today.year, today.month, today.day));
+    });
+    if (pickedExpired && includeUnsellable) {
+      ei['allow_expired_lot_sale'] = true;
+    } else {
+      ei.remove('allow_expired_lot_sale');
+    }
+    setState(() {
+      _cartItems[index] = item.copyWith(extraInfo: ei);
+    });
+  }
+
+  Widget _cartLotRow(int index, InvoiceLineItem item) {
+    if (!_cartItemTracksExpiry(item)) return const SizedBox.shrink();
+    final allocs = lotAllocationsFromExtra(item.extraInfo);
+    final t = AppLocalizations.of(context);
+    final summary = allocs.isEmpty
+        ? t.quickSalesFefoSummary
+        : allocs.map((e) {
+            final code = e['lot_code']?.toString() ?? '-';
+            final exp = e['expiry_date']?.toString() ?? '';
+            return exp.isEmpty
+                ? '$code: ${e['quantity']}'
+                : '$code / $exp: ${e['quantity']}';
+          }).join('، ');
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: InkWell(
+        onTap: () => _pickCartLots(index),
+        child: Row(
+          children: [
+            Icon(Icons.event, size: 14, color: cs.primary),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text(
+                summary,
+                style: TextStyle(fontSize: 11, color: cs.primary),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _increaseQuantity(int index) {
@@ -3693,7 +3854,9 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         }
       }
 
-      _cartItems[index] = item.copyWith(quantity: item.quantity + 1);
+      _cartItems[index] = _clearLotAllocations(
+        item.copyWith(quantity: item.quantity + 1),
+      );
     });
   }
 
@@ -3701,7 +3864,9 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     setState(() {
       final item = _cartItems[index];
       if (item.quantity > 1) {
-        _cartItems[index] = item.copyWith(quantity: item.quantity - 1);
+        _cartItems[index] = _clearLotAllocations(
+          item.copyWith(quantity: item.quantity - 1),
+        );
       }
     });
   }
@@ -5090,6 +5255,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
                                                       ),
                                                     ),
                                                   ),
+                                                _cartLotRow(index, item),
                                                 // نمایش موجودی (فقط اگر تنظیمات نمایش موجودی فعال باشد)
                                                 if (_showInventory &&
                                                     item.trackInventory &&
@@ -5580,6 +5746,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
                                                 ),
                                               ),
                                             ),
+                                          _cartLotRow(index, item),
                                           if (_showInventory &&
                                               item.trackInventory &&
                                               item.productId != null &&

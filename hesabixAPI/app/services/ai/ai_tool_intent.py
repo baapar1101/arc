@@ -25,7 +25,7 @@ MEMORY_TOOL_NAMES = _CATEGORY_TOOLS.get("memory", frozenset())
 # کلیدواژهٔ فارسی/انگلیسی → دسته
 _KEYWORD_CATEGORIES: List[tuple[str, str]] = [
     (r"فاکتور|invoice|فروش|خرید|دریافت|پرداخت|چک|انتقال|سند|حساب|بانک|صندوق|سال\s*مال|تراز|افتتاح|اقساط|اعتبار|credit|receipt|payment|بدهکار|بستانکار|debtor|creditor", "financial"),
-    (r"انبار|موجودی|حواله|warehouse|stock|کاردکس", "warehouse"),
+    (r"انبار|موجودی|حواله|warehouse|stock|کاردکس|انقضا|لات|expiry|fefo|تاریخ\s*مصرف", "warehouse"),
     (r"bom|صورت\s*مواد|تولید|production|سفارش\s*تولید|بهای\s*تمام.?شده", "production"),
     (r"سرنخ|lead|معامله|deal|crm|قیف|pipeline|فعالیت\s*crm", "crm"),
     (r"باشگاه|امتیاز|rfm|مشتری\s*وفادار|customer\s*club", "customer_club"),

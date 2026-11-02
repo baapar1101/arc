@@ -478,7 +478,9 @@ class Hesabix_V2_Stock_Push_Service
 			if (!is_array($row) || (int) ($row['variant_id'] ?? 0) !== (int) $variant_id) {
 				continue;
 			}
-			$total += isset($row['quantity']) ? (float) $row['quantity'] : 0.0;
+			$total += isset($row['sellable_quantity'])
+				? (float) $row['sellable_quantity']
+				: (isset($row['quantity']) ? (float) $row['quantity'] : 0.0);
 		}
 		return $total;
 	}
@@ -520,7 +522,9 @@ class Hesabix_V2_Stock_Push_Service
 				continue;
 			}
 			$found = true;
-			$total += isset($it['quantity']) ? (float) $it['quantity'] : 0.0;
+			$total += isset($it['sellable_quantity'])
+				? (float) $it['sellable_quantity']
+				: (isset($it['quantity']) ? (float) $it['quantity'] : 0.0);
 		}
 
 		return $found ? $total : 0.0;

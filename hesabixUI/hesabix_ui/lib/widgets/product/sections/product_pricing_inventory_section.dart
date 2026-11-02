@@ -4,7 +4,9 @@ import 'package:flutter/services.dart';
 
 import '../../../controllers/product_form_controller.dart';
 import '../../../core/auth_store.dart';
+import '../../../core/calendar_controller.dart';
 import '../../../models/product_form_data.dart';
+import '../../../widgets/date_input_field.dart';
 import '../../../services/product_service.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/number_normalizer.dart';
@@ -60,6 +62,8 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
   late TextEditingController _purchaseNoteController;
   late TextEditingController _openingQuantityController;
   late TextEditingController _openingCostPriceController;
+  late TextEditingController _openingLotCodeController;
+  CalendarController? _calendar;
   ProductFormController? _boundController;
   bool _syncingFxBase = false;
   bool _syncPriceListWithFx = true;
@@ -77,6 +81,10 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
     _purchaseNoteController = TextEditingController(text: widget.formData.basePurchaseNote ?? '');
     _openingQuantityController = TextEditingController();
     _openingCostPriceController = TextEditingController();
+    _openingLotCodeController = TextEditingController();
+    CalendarController.load().then((c) {
+      if (mounted) setState(() => _calendar = c);
+    });
     _bindController(widget.controller);
   }
 
@@ -99,6 +107,9 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
     }
     if (_openingCostPriceController.text != cost) {
       _openingCostPriceController.text = cost;
+    }
+    if (_openingLotCodeController.text != controller.openingBalanceLotCode) {
+      _openingLotCodeController.text = controller.openingBalanceLotCode;
     }
     if (mounted) setState(() {});
   }
@@ -146,6 +157,7 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
     _purchaseNoteController.dispose();
     _openingQuantityController.dispose();
     _openingCostPriceController.dispose();
+    _openingLotCodeController.dispose();
     super.dispose();
   }
 
@@ -289,6 +301,112 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
           ),
         ),
         if (widget.formData.trackInventory) ...[
+          const SizedBox(height: 8),
+          SwitchListTile(
+            value: widget.formData.trackExpiry,
+            onChanged: (value) => _updateFormData(widget.formData.copyWith(trackExpiry: value)),
+            title: Text(t.productTrackExpiry),
+            subtitle: Text(t.productTrackExpiryHelp),
+          ),
+          if (widget.formData.trackExpiry) ...[
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: widget.formData.lotPolicy,
+              decoration: InputDecoration(labelText: t.productLotPolicy),
+              items: [
+                DropdownMenuItem(value: 'optional', child: Text(t.productLotPolicyOptional)),
+                DropdownMenuItem(value: 'required', child: Text(t.productLotPolicyRequired)),
+              ],
+              onChanged: (v) {
+                if (v != null) _updateFormData(widget.formData.copyWith(lotPolicy: v));
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              key: ValueKey('shelfLife_${widget.formData.shelfLifeDays}'),
+              initialValue: widget.formData.shelfLifeDays?.toString() ?? '',
+              decoration: InputDecoration(
+                labelText: t.productShelfLifeDays,
+                helperText: t.productShelfLifeDaysHelp,
+              ),
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                const EnglishDigitsFormatter(),
+                FilteringTextInputFormatter.digitsOnly,
+              ],
+              onChanged: (value) => _updateFormData(
+                widget.formData.copyWith(shelfLifeDays: int.tryParse(value)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              key: ValueKey('alertOff_${widget.formData.alertOffsetDays}'),
+              initialValue: widget.formData.alertOffsetDays?.toString() ?? '',
+              decoration: InputDecoration(labelText: t.productAlertOffsetDays),
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                const EnglishDigitsFormatter(),
+                FilteringTextInputFormatter.digitsOnly,
+              ],
+              onChanged: (value) => _updateFormData(
+                widget.formData.copyWith(alertOffsetDays: int.tryParse(value)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              key: ValueKey('removalOff_${widget.formData.removalOffsetDays}'),
+              initialValue: widget.formData.removalOffsetDays?.toString() ?? '',
+              decoration: InputDecoration(labelText: t.productRemovalOffsetDays),
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                const EnglishDigitsFormatter(),
+                FilteringTextInputFormatter.digitsOnly,
+              ],
+              onChanged: (value) => _updateFormData(
+                widget.formData.copyWith(removalOffsetDays: int.tryParse(value)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              key: ValueKey('bestBeforeOff_${widget.formData.bestBeforeOffsetDays}'),
+              initialValue: widget.formData.bestBeforeOffsetDays?.toString() ?? '',
+              decoration: InputDecoration(labelText: t.productBestBeforeOffsetDays),
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                const EnglishDigitsFormatter(),
+                FilteringTextInputFormatter.digitsOnly,
+              ],
+              onChanged: (value) => _updateFormData(
+                widget.formData.copyWith(bestBeforeOffsetDays: int.tryParse(value)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: widget.formData.expiredSalePolicy,
+              decoration: InputDecoration(labelText: t.productExpiredSalePolicy),
+              items: [
+                DropdownMenuItem(value: 'block', child: Text(t.productExpiredSalePolicyBlock)),
+                DropdownMenuItem(value: 'manager_confirm', child: Text(t.productExpiredSalePolicyConfirm)),
+              ],
+              onChanged: (v) {
+                if (v != null) _updateFormData(widget.formData.copyWith(expiredSalePolicy: v));
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              key: ValueKey('minRsl_${widget.formData.minRemainingShelfLifeDays}'),
+              initialValue: widget.formData.minRemainingShelfLifeDays.toString(),
+              decoration: InputDecoration(labelText: t.productMinRemainingShelfLifeDays),
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                const EnglishDigitsFormatter(),
+                FilteringTextInputFormatter.digitsOnly,
+              ],
+              onChanged: (value) => _updateFormData(
+                widget.formData.copyWith(minRemainingShelfLifeDays: int.tryParse(value) ?? 0),
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           WarehouseComboboxWidget(
             businessId: widget.businessId,
@@ -561,6 +679,41 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
                   ),
                 ],
               ),
+            if (widget.formData.trackExpiry) ...[
+              SizedBox(height: spacing),
+              TextFormField(
+                controller: _openingLotCodeController,
+                readOnly: readonly || loading,
+                decoration: InputDecoration(
+                  labelText: AppLocalizations.of(context).openingBalanceLotCode,
+                ),
+                onChanged: (readonly || loading)
+                    ? null
+                    : controller.setOpeningBalanceLotCode,
+              ),
+              if (_calendar != null) ...[
+                SizedBox(height: spacing),
+                DateInputField(
+                  value: controller.openingBalanceManufacturingDate,
+                  onChanged: (readonly || loading)
+                      ? null
+                      : controller.setOpeningBalanceManufacturingDate,
+                  labelText: AppLocalizations.of(context).openingBalanceManufacturing,
+                  enabled: !(readonly || loading),
+                  calendarController: _calendar!,
+                ),
+                SizedBox(height: spacing),
+                DateInputField(
+                  value: controller.openingBalanceExpiryDate,
+                  onChanged: (readonly || loading)
+                      ? null
+                      : controller.setOpeningBalanceExpiryDate,
+                  labelText: AppLocalizations.of(context).openingBalanceExpiry,
+                  enabled: !(readonly || loading),
+                  calendarController: _calendar!,
+                ),
+              ],
+            ],
           ],
         ),
       ),

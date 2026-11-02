@@ -202,10 +202,14 @@ class WarehouseService {
     required int businessId,
     required int productId,
     int? warehouseId,
+    bool includeExpired = false,
   }) async {
     final queryParams = <String, dynamic>{};
     if (warehouseId != null) {
       queryParams['warehouse_id'] = warehouseId;
+    }
+    if (includeExpired) {
+      queryParams['include_expired'] = true;
     }
     
     final res = await _api.get<Map<String, dynamic>>(

@@ -239,5 +239,31 @@ void main() {
       expect(formData.suppliers.first.isPreferred, true);
       expect(formData.suppliers.first.socialContacts.first.value, '@shop');
     });
+
+    test('expiry tracking is off by default and round-trips when enabled', () {
+      final defaults = ProductFormData();
+      expect(defaults.trackExpiry, isFalse);
+      expect(defaults.toPayload()['track_expiry'], isFalse);
+
+      final enabled = ProductFormData.fromProduct({
+        'name': 'شیر',
+        'track_inventory': true,
+        'track_expiry': true,
+        'lot_policy': 'required',
+        'shelf_life_days': 30,
+        'best_before_offset_days': 5,
+        'removal_offset_days': 3,
+        'alert_offset_days': 7,
+        'expired_sale_policy': 'manager_confirm',
+        'min_remaining_shelf_life_days': 2,
+      });
+      expect(enabled.trackExpiry, isTrue);
+      final payload = enabled.toPayload();
+      expect(payload['track_expiry'], isTrue);
+      expect(payload['lot_policy'], 'required');
+      expect(payload['shelf_life_days'], 30);
+      expect(payload['expired_sale_policy'], 'manager_confirm');
+      expect(payload['min_remaining_shelf_life_days'], 2);
+    });
   });
 }

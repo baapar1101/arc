@@ -698,6 +698,12 @@ class AuthStore with ChangeNotifier {
     return inv['change_unit_price'] == true;
   }
 
+  /// تأیید فروش لات/سریال منقضی وقتی سیاست کالا manager_confirm است.
+  bool canConfirmExpiredSale() {
+    if (_currentBusiness?.isOwner == true) return true;
+    return hasBusinessPermission('invoices', 'confirm_expired_sale');
+  }
+
   /// ثبت یا ویرایش سند حسابداری (شامل اسناد خودکار از چک، دریافت‌وپرداخت و …).
   /// هم‌ارز بررسیٔ `accounting.write` در سرور.
   bool canCreateOrEditAccountingDocuments() {

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from decimal import Decimal
-from typing import Any, Dict, Iterable, List, Mapping, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
 from uuid import uuid4
 
 from sqlalchemy import func
@@ -44,9 +44,10 @@ def _desired_opening_inventory(
     db: Session,
     document_id: int,
     product_ids: List[int],
-) -> tuple[Dict[InventoryKey, Decimal], Dict[InventoryKey, Decimal]]:
+) -> tuple[Dict[InventoryKey, Decimal], Dict[InventoryKey, Decimal], Dict[InventoryKey, Dict[str, Any]]]:
     desired: Dict[InventoryKey, Decimal] = defaultdict(Decimal)
     costs: Dict[InventoryKey, Decimal] = {}
+    lots: Dict[InventoryKey, Dict[str, Any]] = {}
     rows = db.query(DocumentLine).filter(
         DocumentLine.document_id == int(document_id),
         DocumentLine.product_id.in_(product_ids),
@@ -73,7 +74,26 @@ def _desired_opening_inventory(
         key = (int(row.product_id), int(warehouse_id))
         desired[key] += quantity
         costs[key] = _decimal(info.get("cost_price"))
-    return dict(desired), costs
+        lot_payload: Dict[str, Any] = {}
+        if info.get("lot_allocations"):
+            lot_payload["lot_allocations"] = info.get("lot_allocations")
+        elif info.get("lot_code") or info.get("manufacturing_date") or info.get("expiry_date"):
+            lot_payload = {
+                "lot_code": info.get("lot_code"),
+                "manufacturing_date": info.get("manufacturing_date"),
+                "expiry_date": info.get("expiry_date"),
+                "lot_allocations": [
+                    {
+                        "lot_code": info.get("lot_code"),
+                        "manufacturing_date": info.get("manufacturing_date"),
+                        "expiry_date": info.get("expiry_date"),
+                        "quantity": float(quantity),
+                    }
+                ],
+            }
+        if lot_payload:
+            lots[key] = lot_payload
+    return dict(desired), costs, lots
 
 
 def _linked_opening_inventory(
@@ -200,19 +220,35 @@ def _assert_no_unrelated_posted_history(
 def _group_delta_lines(
     deltas: Mapping[InventoryKey, Decimal],
     costs: Mapping[InventoryKey, Decimal],
+    lots: Optional[Mapping[InventoryKey, Dict[str, Any]]] = None,
 ) -> tuple[Dict[int, List[Dict[str, Any]]], Dict[int, List[Dict[str, Any]]]]:
     receipts: Dict[int, List[Dict[str, Any]]] = defaultdict(list)
     issues: Dict[int, List[Dict[str, Any]]] = defaultdict(list)
+    lot_map = lots or {}
     for (product_id, warehouse_id), delta in sorted(deltas.items()):
         if not delta:
             continue
+        extra: Dict[str, Any] = {
+            "opening_balance_sync": True,
+            "cost_price": float(costs.get((product_id, warehouse_id), Decimal(0))),
+        }
+        if delta > 0:
+            lot_extra = dict(lot_map.get((product_id, warehouse_id)) or {})
+            allocs = [
+                dict(item)
+                for item in (lot_extra.get("lot_allocations") or [])
+                if isinstance(item, dict)
+            ]
+            if allocs:
+                first = allocs[0]
+                first["quantity"] = float(delta)
+                lot_extra["lot_allocations"] = [first]
+            extra.update(lot_extra)
         line = {
             "product_id": int(product_id),
             "quantity": abs(delta),
-            "extra_info": {
-                "opening_balance_sync": True,
-                "cost_price": float(costs.get((product_id, warehouse_id), Decimal(0))),
-            },
+            "extra_info": extra,
+            "lot_allocations": extra.get("lot_allocations"),
         }
         (receipts if delta > 0 else issues)[int(warehouse_id)].append(line)
     return dict(receipts), dict(issues)
@@ -249,10 +285,10 @@ def sync_opening_balance_warehouse_documents(
     _assert_products_can_sync(db, business_id, product_ids)
     _assert_no_unrelated_posted_history(db, business_id, product_ids)
 
-    desired, costs = _desired_opening_inventory(db, int(opening_document.id), product_ids)
+    desired, costs, lots = _desired_opening_inventory(db, int(opening_document.id), product_ids)
     linked = _linked_opening_inventory(db, business_id, int(opening_document.id), product_ids)
     deltas = build_opening_balance_warehouse_deltas(desired, linked)
-    receipts, issues = _group_delta_lines(deltas, costs)
+    receipts, issues = _group_delta_lines(deltas, costs, lots)
 
     unchanged = sum(1 for key in set(desired) | set(linked) if key not in deltas)
     summary = {**empty_summary, "unchanged_lines": unchanged}

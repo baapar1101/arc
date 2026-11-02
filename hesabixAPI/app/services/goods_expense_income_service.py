@@ -81,17 +81,19 @@ def _qty(value: Decimal | float | int | str | None) -> Decimal:
 	return Decimal(str(value or 0)).quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
 
 
-def _parse_iso_date(dt: str | datetime | date | None) -> date:
+def _parse_iso_date(dt: str | datetime | date | None, business_id: int | None = None) -> date:
 	if isinstance(dt, date) and not isinstance(dt, datetime):
 		return dt
 	if isinstance(dt, datetime):
 		return dt.date()
+	from app.core.business_calendar import business_today
+
 	if not dt:
-		return datetime.utcnow().date()
+		return business_today(business_id)
 	try:
 		return datetime.fromisoformat(str(dt)).date()
 	except Exception:
-		return datetime.utcnow().date()
+		return business_today(business_id)
 
 
 def _get_business(db: Session, business_id: int) -> Business:
@@ -261,11 +263,15 @@ def _document_to_dict(doc: GoodsExpenseIncomeDocument, db: Optional[Session] = N
 		product_name = None
 		product_code = None
 		warehouse_name = None
+		inventory_mode = "bulk"
+		track_expiry = False
 		if db is not None:
 			p = db.query(Product).filter(Product.id == ln.product_id).first()
 			if p:
 				product_name = p.name
 				product_code = getattr(p, "code", None)
+				inventory_mode = str(getattr(p, "inventory_mode", None) or "bulk")
+				track_expiry = bool(getattr(p, "track_expiry", False))
 			w = db.query(Warehouse).filter(Warehouse.id == ln.warehouse_id).first()
 			if w:
 				warehouse_name = w.name
@@ -276,6 +282,8 @@ def _document_to_dict(doc: GoodsExpenseIncomeDocument, db: Optional[Session] = N
 				"product_id": ln.product_id,
 				"product_name": product_name,
 				"product_code": product_code,
+				"inventory_mode": inventory_mode,
+				"track_expiry": track_expiry,
 				"warehouse_id": ln.warehouse_id,
 				"warehouse_name": warehouse_name,
 				"quantity": float(ln.quantity or 0),
@@ -410,6 +418,21 @@ def _validate_and_build_lines(
 				http_status=400,
 			)
 
+		extra = dict(raw.get("extra_info")) if isinstance(raw.get("extra_info"), dict) else {}
+		if raw.get("lot_allocations"):
+			extra["lot_allocations"] = raw.get("lot_allocations")
+		for key in ("manufacturing_date", "expiry_date", "lot_code"):
+			if raw.get(key) not in (None, ""):
+				extra[key] = raw.get(key)
+		ids = (
+			raw.get("selected_instance_ids")
+			or raw.get("instance_ids")
+			or extra.get("selected_instance_ids")
+			or extra.get("instance_ids")
+		)
+		if ids:
+			extra["selected_instance_ids"] = ids
+			extra["instance_ids"] = ids
 		built.append(
 			{
 				"line_no": i,
@@ -419,7 +442,7 @@ def _validate_and_build_lines(
 				"unit_cost": unit_cost,
 				"amount": amount,
 				"description": (str(raw.get("description")).strip() if raw.get("description") else None),
-				"extra_info": raw.get("extra_info") if isinstance(raw.get("extra_info"), dict) else None,
+				"extra_info": extra or None,
 			}
 		)
 		total += amount
@@ -438,7 +461,7 @@ def _apply_header_fields(
 ) -> None:
 	settings = get_workflow_settings(biz)
 	if "document_date" in data and data.get("document_date") is not None:
-		doc.document_date = _parse_iso_date(data.get("document_date"))
+		doc.document_date = _parse_iso_date(data.get("document_date"), business_id)
 		fy = _get_business_fiscal_year(db, business_id)
 		if doc.document_date < fy.start_date or (fy.end_date and doc.document_date > fy.end_date):
 			raise ApiError(
@@ -506,7 +529,7 @@ def create_document(
 			http_status=400,
 		)
 
-	document_date = _parse_iso_date(data.get("document_date"))
+	document_date = _parse_iso_date(data.get("document_date"), business_id)
 	fy = _get_business_fiscal_year(db, business_id)
 	if document_date < fy.start_date or (fy.end_date and document_date > fy.end_date):
 		raise ApiError("DATE_OUT_OF_RANGE", "تاریخ خارج از سال مالی است", http_status=400)
@@ -865,26 +888,126 @@ def _create_warehouse_and_post(
 
 	for ln in doc.lines:
 		product = db.query(Product).filter(Product.id == int(ln.product_id)).first()
+		line_extra = dict(ln.extra_info or {}) if isinstance(ln.extra_info, dict) else {}
 		qty, extra = warehouse_payload_quantity_to_main(
 			product,
 			ln.quantity,
 			{
+				**line_extra,
 				"unit_cost": float(ln.unit_cost or 0),
 				"amount": float(ln.amount or 0),
 				"goods_expense_income_line_id": ln.id,
 				"description": ln.description,
 			},
 		)
-		db.add(
-			WarehouseDocumentLine(
-				warehouse_document_id=wh.id,
-				product_id=ln.product_id,
-				warehouse_id=ln.warehouse_id,
-				movement=movement,
-				quantity=qty,
-				extra_info=extra,
-			)
+		wline = WarehouseDocumentLine(
+			warehouse_document_id=wh.id,
+			product_id=ln.product_id,
+			warehouse_id=ln.warehouse_id,
+			movement=movement,
+			quantity=qty,
+			extra_info=extra,
 		)
+		db.add(wline)
+		db.flush()
+		if product is not None and str(getattr(product, "inventory_mode", None) or "bulk") == "unique":
+			if is_expense:
+				from adapters.db.models.product_instance import ProductInstance
+				from sqlalchemy.orm.attributes import flag_modified
+
+				raw_ids = extra.get("selected_instance_ids") or extra.get("instance_ids") or []
+				if not isinstance(raw_ids, list) or not raw_ids:
+					raise ApiError(
+						"INSTANCE_REQUIRED",
+						"برای خروج کالای یونیک باید واحدها انتخاب شوند",
+						http_status=422,
+					)
+				consumed: List[int] = []
+				for inst_id in raw_ids:
+					instance = db.query(ProductInstance).filter(
+						and_(
+							ProductInstance.id == int(inst_id),
+							ProductInstance.business_id == int(business_id),
+							ProductInstance.product_id == int(ln.product_id),
+							ProductInstance.status == "available",
+						)
+					).first()
+					if instance is None:
+						raise ApiError(
+							"INSTANCE_NOT_FOUND",
+							f"واحد یونیک {inst_id} در دسترس نیست",
+							http_status=404,
+						)
+					instance.status = "sold"
+					instance.warehouse_id = None
+					instance.last_movement_date = doc.document_date
+					consumed.append(int(instance.id))
+				if Decimal(len(consumed)) != _qty(qty):
+					raise ApiError(
+						"INSTANCE_QTY_MISMATCH",
+						"تعداد واحدهای یونیک با مقدار سطر برابر نیست",
+						http_status=422,
+					)
+				extra["instance_ids"] = consumed
+				extra["selected_instance_ids"] = consumed
+				wline.extra_info = extra
+				flag_modified(wline, "extra_info")
+			else:
+				from adapters.db.models.product_instance import ProductInstance
+				from sqlalchemy.orm.attributes import flag_modified
+				from app.services.warehouse_service import _unique_instance_dates_from_payload
+
+				qty_n = int(_qty(qty))
+				if qty_n <= 0:
+					raise ApiError("INVALID_QUANTITY", "مقدار کالای یونیک باید عدد صحیح مثبت باشد", http_status=422)
+				mfg, exp = _unique_instance_dates_from_payload(product, extra)
+				created: List[int] = []
+				prefix = str(getattr(product, "code", None) or f"PRD{ln.product_id}")
+				for idx in range(qty_n):
+					serial = extra.get("lot_code") if qty_n == 1 and extra.get("lot_code") else f"{prefix}-GEI{wh.id}-{ln.id}-{idx + 1:04d}"
+					instance = ProductInstance(
+						business_id=business_id,
+						product_id=int(ln.product_id),
+						serial_number=serial,
+						barcode=None,
+						warehouse_id=int(ln.warehouse_id) if ln.warehouse_id else None,
+						status="available",
+						custom_attributes=None,
+						entry_date=doc.document_date,
+						manufacturing_date=mfg,
+						expiry_date=exp,
+					)
+					db.add(instance)
+					db.flush()
+					created.append(int(instance.id))
+				extra["instance_ids"] = created
+				extra["selected_instance_ids"] = created
+				if mfg is not None:
+					extra["manufacturing_date"] = mfg.isoformat()
+				if exp is not None:
+					extra["expiry_date"] = exp.isoformat()
+				wline.extra_info = extra
+				flag_modified(wline, "extra_info")
+		elif product is not None:
+			from app.services.inventory_lot_allocation_service import attach_warehouse_line_lots_from_payload
+
+			if is_expense:
+				extra["allow_expired_lot_sale"] = True
+			payload = {
+				"quantity": ln.quantity,
+				"extra_info": extra,
+				"lot_allocations": line_extra.get("lot_allocations") or extra.get("lot_allocations"),
+			}
+			attach_warehouse_line_lots_from_payload(
+				db,
+				business_id,
+				wline,
+				product,
+				payload,
+				document=wh,
+				source_line_unit=line_extra.get("unit"),
+				allow_expired_confirm=is_expense,
+			)
 	db.flush()
 	post_warehouse_document(db, wh.id)
 	return wh
@@ -1307,9 +1430,9 @@ def list_documents(
 	date_from = query.get("date_from") or query.get("from_date")
 	date_to = query.get("date_to") or query.get("to_date")
 	if date_from:
-		q = q.filter(GoodsExpenseIncomeDocument.document_date >= _parse_iso_date(date_from))
+		q = q.filter(GoodsExpenseIncomeDocument.document_date >= _parse_iso_date(date_from, business_id))
 	if date_to:
-		q = q.filter(GoodsExpenseIncomeDocument.document_date <= _parse_iso_date(date_to))
+		q = q.filter(GoodsExpenseIncomeDocument.document_date <= _parse_iso_date(date_to, business_id))
 
 	total = q.with_entities(func.count(GoodsExpenseIncomeDocument.id)).scalar() or 0
 	page = max(int(query.get("page") or 1), 1)
@@ -1366,18 +1489,46 @@ def create_from_stock_count(
 		diff = Decimal(str(item.get("difference") or 0))
 		if diff == 0:
 			continue
+		line_extra: Dict[str, Any] = {
+			"system_quantity": item.get("system_quantity"),
+			"physical_quantity": item.get("physical_quantity"),
+			"difference": float(diff),
+			"stock_count_code": stock_count_code,
+		}
+		if item.get("variant_id") is not None:
+			line_extra["variant_id"] = item.get("variant_id")
+		if item.get("lot_allocations"):
+			line_extra["lot_allocations"] = item.get("lot_allocations")
+		elif item.get("lot_id") or item.get("lot_code"):
+			line_extra["lot_allocations"] = [
+				{
+					"lot_id": item.get("lot_id"),
+					"lot_code": item.get("lot_code"),
+					"variant_id": item.get("variant_id"),
+					"manufacturing_date": item.get("manufacturing_date"),
+					"expiry_date": item.get("expiry_date"),
+					"quantity": abs(diff),
+				}
+			]
+		if item.get("instance_id"):
+			try:
+				ids = [int(item.get("instance_id"))]
+			except (TypeError, ValueError):
+				ids = []
+			if ids:
+				line_extra["selected_instance_ids"] = ids
+				line_extra["instance_ids"] = ids
 		base = {
 			"product_id": item.get("product_id"),
 			"warehouse_id": item.get("warehouse_id"),
 			"quantity": abs(diff),
 			"description": item.get("description"),
-			"extra_info": {
-				"system_quantity": item.get("system_quantity"),
-				"physical_quantity": item.get("physical_quantity"),
-				"difference": float(diff),
-				"stock_count_code": stock_count_code,
-			},
+			"extra_info": line_extra,
 		}
+		if line_extra.get("lot_allocations"):
+			base["lot_allocations"] = line_extra["lot_allocations"]
+		if line_extra.get("selected_instance_ids"):
+			base["selected_instance_ids"] = line_extra["selected_instance_ids"]
 		if diff < 0:
 			shortage_lines.append(base)
 		else:

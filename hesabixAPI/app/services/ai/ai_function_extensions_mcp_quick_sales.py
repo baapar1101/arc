@@ -27,6 +27,25 @@ _LINE = {
         "unit_price": {"type": "number", "minimum": 0},
         "warehouse_id": {"type": "integer", "minimum": 1},
         "description": {"type": ["string", "null"], "maxLength": 500},
+        "variant_id": {"type": ["integer", "null"], "minimum": 1},
+        "lot_code": {"type": ["string", "null"], "maxLength": 64},
+        "manufacturing_date": {"type": ["string", "null"], "format": "date"},
+        "expiry_date": {"type": ["string", "null"], "format": "date"},
+        "allow_expired_lot_sale": {"type": "boolean"},
+        "lot_allocations": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": True,
+                "properties": {
+                    "lot_id": {"type": ["integer", "null"]},
+                    "lot_code": {"type": ["string", "null"]},
+                    "manufacturing_date": {"type": ["string", "null"]},
+                    "expiry_date": {"type": ["string", "null"]},
+                    "quantity": {"type": "number"},
+                },
+            },
+        },
     },
 }
 _PAY = {
@@ -168,13 +187,32 @@ def enqueue_quick_sale_handler(args, context):
     if not re.fullmatch(r"[A-Za-z0-9._:-]{16,160}", request_id):
         raise ValueError("شناسه یکتای درخواست فروش سریع نامعتبر است")
     extra: Dict[str, Any] = {"quick_sale": True, "quick_sale_request_id": request_id}
+    lines: list = []
+    for raw_line in args.get("lines") or []:
+        if not isinstance(raw_line, dict):
+            continue
+        line = dict(raw_line)
+        line_extra = dict(line.get("extra_info") or {})
+        for key in (
+            "lot_allocations",
+            "allow_expired_lot_sale",
+            "lot_code",
+            "manufacturing_date",
+            "expiry_date",
+            "variant_id",
+        ):
+            if line.get(key) is not None and line_extra.get(key) is None:
+                line_extra[key] = line.get(key)
+        if line_extra:
+            line["extra_info"] = line_extra
+        lines.append(line)
     payload: Dict[str, Any] = {
         "invoice_type": "invoice_sales",
         "person_id": args.get("person_id"),
         "warehouse_id": args.get("warehouse_id"),
         "document_date": args.get("document_date"),
         "description": args.get("description"),
-        "lines": args.get("lines") or [],
+        "lines": lines,
         "payments": args.get("payments") or [],
         "extra_info": extra,
     }
@@ -307,8 +345,9 @@ def list_quick_sales_stock_discrepancies_handler(args, context):
 
 
 def create_quick_sales_stock_correction_handler(args, context):
-    from datetime import date, datetime
+    from datetime import date
 
+    from app.core.business_calendar import business_today
     from app.services.inventory_discrepancy_service import create_goods_income_correction
 
     if args.get("confirm_unexplained_physical_surplus") is not True:
@@ -317,7 +356,7 @@ def create_quick_sales_stock_correction_handler(args, context):
     if raw:
         document_date = date.fromisoformat(str(raw)[:10])
     else:
-        document_date = datetime.utcnow().date()
+        document_date = business_today(mcp_bid(context))
     result = mcp_run(
         create_goods_income_correction,
         mcp_db(context),

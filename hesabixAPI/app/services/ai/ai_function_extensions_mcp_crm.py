@@ -598,12 +598,12 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
     ))
 
     def convert_deal_to_invoice(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
-        from datetime import date
         from decimal import Decimal
         from sqlalchemy.orm import selectinload
         from adapters.db.models.crm import CrmProcessStage, Deal
         from adapters.db.models.business import Business
         from adapters.api.v1.schema_models.crm import CrmDealConvertToInvoiceRequest
+        from app.core.business_calendar import business_today
         from app.services.invoice_service import create_invoice
 
         db = context["db"]
@@ -646,7 +646,7 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
 
         invoice_data = {
             "invoice_type": "invoice_sales", "currency_id": int(currency_id),
-            "document_date": date.today().isoformat(), "is_proforma": bool(body.is_proforma),
+            "document_date": business_today(business_id).isoformat(), "is_proforma": bool(body.is_proforma),
             "lines": lines, "extra_info": {"person_id": int(deal.person_id)},
             "description": f"صادر شده از فرصت فروش {deal.code or deal.id}",
         }

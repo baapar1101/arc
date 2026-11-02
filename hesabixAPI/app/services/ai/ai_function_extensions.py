@@ -177,6 +177,10 @@ def register_extended_business_functions(registry: "AIFunctionRegistry") -> None
         business_id = int(args.get("business_id") or context.get("business_id"))
         user_id = context["user_context"].get_user_id()
         data = build_create_warehouse_document_payload(args)
+        if not data.get("document_date"):
+            from app.core.business_calendar import business_today
+
+            data["document_date"] = business_today(business_id).isoformat()
         wh = create_manual_warehouse_document(db, business_id, user_id, data)
         return warehouse_document_to_dict(db, wh)
 

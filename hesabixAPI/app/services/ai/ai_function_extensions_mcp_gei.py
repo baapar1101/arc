@@ -18,6 +18,28 @@ _LINE = {
         "quantity": {"type": "number", "exclusiveMinimum": 0},
         "unit_cost": {"type": ["number", "null"], "minimum": 0},
         "description": {"type": ["string", "null"], "maxLength": 2000},
+        "lot_allocations": {
+            "type": ["array", "null"],
+            "items": {
+                "type": "object",
+                "properties": {
+                    "lot_id": {"type": "integer"},
+                    "lot_code": {"type": "string"},
+                    "manufacturing_date": {"type": "string"},
+                    "expiry_date": {"type": "string"},
+                    "quantity": {"type": "number"},
+                },
+            },
+        },
+        "selected_instance_ids": {
+            "type": ["array", "null"],
+            "items": {"type": "integer", "minimum": 1},
+            "description": "واحدهای یونیک برای خروج کالای هزینه‌شده",
+        },
+        "instance_ids": {
+            "type": ["array", "null"],
+            "items": {"type": "integer", "minimum": 1},
+        },
     },
 }
 _HEADER = {

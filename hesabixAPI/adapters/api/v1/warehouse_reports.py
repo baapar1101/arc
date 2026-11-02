@@ -11,7 +11,7 @@ import re
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_access, require_business_permission_dep
-from app.core.responses import success_response, format_datetime_fields
+from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.core.response_cache import cache_response
 from app.core.i18n import negotiate_locale
 from app.services.warehouse_reports_service import (
@@ -25,6 +25,7 @@ from app.services.warehouse_reports_service import (
     get_inventory_valuation_report,
     get_pending_documents_report,
     get_inventory_turnover_report,
+    get_expiry_stock_report,
 )
 
 router = APIRouter(prefix="/warehouse-reports", tags=["warehouse_reports"])
@@ -925,4 +926,69 @@ async def export_inventory_turnover_excel(
     ]
     
     return _create_excel_export(items, headers, "inventory_turnover", request, db, business_id)
+
+
+@router.post("/businesses/{business_id}/expiry-stock",
+    summary="گزارش لات‌های نزدیک به انقضا و منقضی",
+)
+@require_business_access("business_id")
+async def expiry_stock_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "view")),
+) -> Dict[str, Any]:
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+    result = get_expiry_stock_report(
+        db=db,
+        business_id=business_id,
+        warehouse_ids=body.get("warehouse_ids"),
+        statuses=body.get("statuses"),
+        as_of_date=body.get("as_of_date"),
+        skip=int(body.get("skip", 0)),
+        take=int(body.get("take", 50)),
+    )
+    return success_response(data=result, request=request)
+
+
+@router.post("/businesses/{business_id}/expiry-stock/export/excel",
+    summary="خروجی Excel گزارش انقضا",
+)
+@require_business_access("business_id")
+async def export_expiry_stock_excel(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "export")),
+) -> Response:
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    is_fa = (locale == "fa")
+    result = get_expiry_stock_report(
+        db=db,
+        business_id=business_id,
+        warehouse_ids=body.get("warehouse_ids"),
+        statuses=body.get("statuses"),
+        as_of_date=body.get("as_of_date"),
+        skip=0,
+        take=10000,
+    )
+    items = result.get("items", [])
+    headers = [
+        ("product_code", "کد کالا" if is_fa else "Product Code"),
+        ("product_name", "نام کالا" if is_fa else "Product Name"),
+        ("lot_code", "لات" if is_fa else "Lot"),
+        ("manufacturing_date", "تاریخ تولید" if is_fa else "Manufacturing Date"),
+        ("expiry_date", "تاریخ انقضا" if is_fa else "Expiry Date"),
+        ("status", "وضعیت" if is_fa else "Status"),
+        ("quantity_main", "مقدار اصلی" if is_fa else "Qty Main"),
+        ("quantity_secondary", "مقدار فرعی" if is_fa else "Qty Secondary"),
+        ("remaining_days", "روز مانده" if is_fa else "Remaining Days"),
+        ("warehouse_name", "انبار" if is_fa else "Warehouse"),
+    ]
+    return _create_excel_export(items, headers, "expiry_stock", request, db, business_id)
 

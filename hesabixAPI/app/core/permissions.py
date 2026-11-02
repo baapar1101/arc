@@ -440,6 +440,25 @@ def user_can_change_invoice_unit_price(auth_context: AuthContext, db: Session, b
     return user_can_change_invoice_unit_price_from_permissions(perms)
 
 
+def user_can_confirm_expired_sale_from_permissions(permissions: Optional[dict]) -> bool:
+    """فروش لات/سریال منقضی فقط با کلید صریح invoices.confirm_expired_sale."""
+    if not permissions or not isinstance(permissions, dict):
+        return False
+    inv = permissions.get("invoices")
+    if not isinstance(inv, dict):
+        return False
+    return bool(inv.get("confirm_expired_sale"))
+
+
+def user_can_confirm_expired_sale(auth_context: AuthContext, db: Session, business_id: int) -> bool:
+    if auth_context.is_superadmin():
+        return True
+    if auth_context.is_business_owner(business_id):
+        return True
+    perms = get_business_permissions_for_user(auth_context, db, business_id)
+    return user_can_confirm_expired_sale_from_permissions(perms)
+
+
 def has_business_permission_for_business(
     auth_context: AuthContext,
     db: Session,

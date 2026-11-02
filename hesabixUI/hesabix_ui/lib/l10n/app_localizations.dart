@@ -6618,6 +6618,12 @@ abstract class AppLocalizations {
   /// **'Change invoice unit price manually (invoice & quick sales)'**
   String get permissionInvoiceChangeUnitPrice;
 
+  /// No description provided for @permissionInvoiceConfirmExpiredSale.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm sale of expired lots on invoices'**
+  String get permissionInvoiceConfirmExpiredSale;
+
   /// No description provided for @permissionSectionCrmWebChat.
   ///
   /// In en, this message translates to:
@@ -12107,6 +12113,154 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Items with stock below the defined threshold'**
   String get reportsCriticalStockSubtitle;
+
+  /// No description provided for @reportsExpiryStockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manufacturing and expiry stock'**
+  String get reportsExpiryStockTitle;
+
+  /// No description provided for @reportsExpiryStockSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sellable, near-expiry, blocked, and expired lots'**
+  String get reportsExpiryStockSubtitle;
+
+  String get expiryStatusSellable;
+  String get expiryStatusNearExpiry;
+  String get expiryStatusBlocked;
+  String get expiryStatusExpired;
+  String get expiryStatusUndated;
+  String get expiryReportAsOf;
+  String get expiryReportAllStatuses;
+  String get expiryColLotSerial;
+  String get expiryColManufacturing;
+  String get expiryColExpiry;
+  String get expiryColRemainingDays;
+  String get quickSalesExpiredInstanceBlocked;
+  String get lotPickerTitlePrefix;
+  String get lotPickerInboundHelp;
+  String get lotPickerOutboundHelp;
+  String get lotPickerCode;
+  String get lotPickerAddAnother;
+  String get lotPickerDatesRequired;
+  String get lotPickerMinOne;
+  String get lotPickerQtyMismatch;
+  String get lotPickerBestBeforePrefix;
+  String get instanceDatesRequired;
+  String get productionLotsTitle;
+  String get productionLotsFefoHelp;
+  String get productionPickFefo;
+  String get productionEditLots;
+  String get quickSalesFefoSummary;
+  String get lotAndDates;
+  String get lotPickerInboundPrompt;
+  String get openingBalanceLotCode;
+  String get openingBalanceManufacturing;
+  String get openingBalanceExpiry;
+  String get uniqueInstanceSelectTitle;
+  String get uniqueInstanceReturnTitle;
+  String uniqueInstanceNeedCount(int count);
+  String get uniqueInstanceSearchHint;
+  String get uniqueWarehouseSearchHint;
+  String get uniqueInstanceNotFound;
+  String uniqueInstanceSelectExact(int required, int selected);
+  String uniqueInstanceSelectedOf(int selected, int required);
+  String uniqueInstanceNeedMore(int count);
+  String uniqueInstanceMaxCount(int count);
+  String get uniqueInstanceMinOne;
+  String uniqueUnitsSelected(int count);
+  String uniqueSerialPrefix(String serial);
+  String uniqueBarcodePrefix(String barcode);
+  String uniqueWarehousePrefix(String name);
+  String uniqueAttributesPrefix(String value);
+  String get productionOutputsTitle;
+  String get productionPickUniqueUnits;
+  String get productionLotsSaved;
+
+  /// No description provided for @productTrackExpiry.
+  ///
+  /// In en, this message translates to:
+  /// **'Track manufacturing and expiry dates'**
+  String get productTrackExpiry;
+
+  /// No description provided for @productTrackExpiryHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'For perishables only. Other products stay unchanged. Dates live on the lot and apply from carton to piece.'**
+  String get productTrackExpiryHelp;
+
+  /// No description provided for @productLotPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'Lot policy'**
+  String get productLotPolicy;
+
+  /// No description provided for @productLotPolicyOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional lot (produce without lot codes)'**
+  String get productLotPolicyOptional;
+
+  /// No description provided for @productLotPolicyRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Required lot (pharma and packaged goods)'**
+  String get productLotPolicyRequired;
+
+  /// No description provided for @productShelfLifeDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Shelf life from manufacturing (days)'**
+  String get productShelfLifeDays;
+
+  /// No description provided for @productShelfLifeDaysHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'If only manufacturing date is entered, expiry is suggested from this number'**
+  String get productShelfLifeDaysHelp;
+
+  /// No description provided for @productAlertOffsetDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Alert days before expiry'**
+  String get productAlertOffsetDays;
+
+  /// No description provided for @productRemovalOffsetDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from shelf days before expiry'**
+  String get productRemovalOffsetDays;
+
+  /// No description provided for @productBestBeforeOffsetDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Best-before days before expiry'**
+  String get productBestBeforeOffsetDays;
+
+  /// No description provided for @productExpiredSalePolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'Sale of expired goods'**
+  String get productExpiredSalePolicy;
+
+  /// No description provided for @productExpiredSalePolicyBlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked'**
+  String get productExpiredSalePolicyBlock;
+
+  /// No description provided for @productExpiredSalePolicyConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Manager confirmation'**
+  String get productExpiredSalePolicyConfirm;
+
+  /// No description provided for @productMinRemainingShelfLifeDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum remaining days at sale'**
+  String get productMinRemainingShelfLifeDays;
 
   /// No description provided for @reportsInterWarehouseTransfersTitle.
   ///
@@ -21149,6 +21303,8 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Warehouse stock summary'**
   String get aiToolGetWarehouseStockSummary;
+  String get aiToolListInventoryLots;
+  String get aiToolGetExpiryStockReport;
 
   /// No description provided for @aiToolSearchChecks.
   ///

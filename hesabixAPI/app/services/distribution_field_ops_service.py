@@ -729,6 +729,7 @@ def add_van_lot(
 	*,
 	lot_code: Optional[str] = None,
 	expiry_date: Optional[date] = None,
+	manufacturing_date: Optional[date] = None,
 	unit_weight_kg: Optional[float] = None,
 	unit_volume_m3: Optional[float] = None,
 ) -> DistributionVanLot:
@@ -757,6 +758,7 @@ def add_van_lot(
 		van_id=van_id,
 		product_id=product_id,
 		lot_code=code,
+		manufacturing_date=manufacturing_date,
 		expiry_date=exp,
 		quantity=float(qty),
 		unit_weight_kg=unit_weight_kg,
@@ -766,13 +768,24 @@ def add_van_lot(
 	return row
 
 
-def consume_van_lots_fefo(
-	db: Session, van_id: int, product_id: int, qty: float,
-) -> List[Dict[str, Any]]:
-	need = float(qty)
-	if need <= 0:
-		return []
-	rows = (
+def _van_lot_is_expired(exp: Optional[date], as_of: date) -> bool:
+	if exp is None or exp == NO_EXPIRY:
+		return False
+	return exp < as_of
+
+
+def _van_lot_payload(row: DistributionVanLot, take: float) -> Dict[str, Any]:
+	exp = row.expiry_date
+	return {
+		"lot_code": row.lot_code,
+		"manufacturing_date": row.manufacturing_date.isoformat() if getattr(row, "manufacturing_date", None) else None,
+		"expiry_date": None if exp == NO_EXPIRY else (exp.isoformat() if exp else None),
+		"quantity": take,
+	}
+
+
+def _van_lots_query(db: Session, van_id: int, product_id: int):
+	return (
 		db.query(DistributionVanLot)
 		.filter(
 			DistributionVanLot.van_id == van_id,
@@ -780,25 +793,133 @@ def consume_van_lots_fefo(
 			DistributionVanLot.quantity > 0,
 		)
 		.order_by(DistributionVanLot.expiry_date.asc().nullslast(), DistributionVanLot.id.asc())
-		.all()
 	)
+
+
+def plan_van_lots_fefo(
+	db: Session,
+	van_id: int,
+	product_id: int,
+	qty: float,
+	*,
+	skip_expired: bool = True,
+	as_of: Optional[date] = None,
+) -> List[Dict[str, Any]]:
+	need = float(qty)
+	if need <= 0:
+		return []
+	today = as_of or business_today()
+	planned: List[Dict[str, Any]] = []
+	for row in _van_lots_query(db, van_id, product_id).all():
+		if need <= 1e-9:
+			break
+		if skip_expired and _van_lot_is_expired(row.expiry_date, today):
+			continue
+		avail = float(row.quantity or 0)
+		take = min(avail, need)
+		if take <= 0:
+			continue
+		planned.append(_van_lot_payload(row, take))
+		need -= take
+	if need > 1e-6:
+		raise ApiError(
+			"INSUFFICIENT_VAN_LOT",
+			f"لات کافی برای کالای {product_id} نیست (کمبود {round(need, 3)})",
+			http_status=400,
+		)
+	return planned
+
+
+def consume_van_lots_fefo(
+	db: Session,
+	van_id: int,
+	product_id: int,
+	qty: float,
+	*,
+	skip_expired: bool = True,
+	as_of: Optional[date] = None,
+	allocations: Optional[List[Dict[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
+	need = float(qty)
+	if need <= 0:
+		return []
+	today = as_of or business_today()
+	rows = _van_lots_query(db, van_id, product_id).all()
 	if not rows:
+		if allocations:
+			raise ApiError(
+				"INSUFFICIENT_VAN_LOT",
+				f"لات کافی برای کالای {product_id} نیست",
+				http_status=400,
+			)
 		return []
 	consumed: List[Dict[str, Any]] = []
+
+	def _take_from_row(row: DistributionVanLot, take_need: float) -> float:
+		avail = float(row.quantity or 0)
+		take = min(avail, take_need)
+		if take <= 0:
+			return 0.0
+		row.quantity = round(avail - take, 3)
+		row.updated_at = datetime.utcnow()
+		consumed.append(_van_lot_payload(row, take))
+		return take
+
+	if allocations:
+		for alloc in allocations:
+			if not isinstance(alloc, dict):
+				continue
+			take_need = float(alloc.get("quantity") or 0)
+			if take_need <= 0:
+				continue
+			code = (str(alloc.get("lot_code") or "-").strip() or "-")
+			exp_raw = alloc.get("expiry_date")
+			exp_key = None
+			if exp_raw:
+				try:
+					exp_key = date.fromisoformat(str(exp_raw)[:10])
+				except ValueError:
+					exp_key = None
+			matched = False
+			for row in rows:
+				row_exp = None if row.expiry_date == NO_EXPIRY else row.expiry_date
+				row_code = (str(row.lot_code or "-").strip() or "-")
+				if row_code != code:
+					continue
+				if exp_key is not None and row_exp != exp_key:
+					continue
+				if exp_key is None and row_exp not in (None,):
+					if alloc.get("expiry_date") not in (None, ""):
+						continue
+				taken = _take_from_row(row, take_need)
+				if taken <= 0:
+					continue
+				take_need = round(take_need - taken, 6)
+				need = round(need - taken, 6)
+				matched = True
+				if take_need <= 1e-9:
+					break
+			if take_need > 1e-6:
+				raise ApiError(
+					"INSUFFICIENT_VAN_LOT",
+					f"لات کافی برای کالای {product_id} نیست (کمبود {round(take_need, 3)})",
+					http_status=400,
+				)
+			if not matched and float(alloc.get("quantity") or 0) > 0:
+				raise ApiError(
+					"INSUFFICIENT_VAN_LOT",
+					f"لات کافی برای کالای {product_id} نیست",
+					http_status=400,
+				)
+		return consumed
+
 	for row in rows:
 		if need <= 1e-9:
 			break
-		avail = float(row.quantity or 0)
-		take = min(avail, need)
-		row.quantity = round(avail - take, 3)
-		row.updated_at = datetime.utcnow()
-		need -= take
-		exp = row.expiry_date
-		consumed.append({
-			"lot_code": row.lot_code,
-			"expiry_date": None if exp == NO_EXPIRY else (exp.isoformat() if exp else None),
-			"quantity": take,
-		})
+		if skip_expired and _van_lot_is_expired(row.expiry_date, today):
+			continue
+		taken = _take_from_row(row, need)
+		need = round(need - taken, 6)
 	if need > 1e-6:
 		raise ApiError(
 			"INSUFFICIENT_VAN_LOT",

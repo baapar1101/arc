@@ -9,6 +9,33 @@ import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
+Map<String, dynamic> _lotFieldsFromOrderLine({
+  String? lotCode,
+  String? manufacturingDate,
+  String? expiryDate,
+  num quantity = 0,
+}) {
+  final code = (lotCode ?? '').trim();
+  final mfg = (manufacturingDate ?? '').trim();
+  final exp = (expiryDate ?? '').trim();
+  if (code.isEmpty && mfg.isEmpty && exp.isEmpty) {
+    return const {};
+  }
+  return {
+    if (code.isNotEmpty) 'lot_code': code,
+    if (mfg.isNotEmpty) 'manufacturing_date': mfg,
+    if (exp.isNotEmpty) 'expiry_date': exp,
+    'lot_allocations': [
+      {
+        if (code.isNotEmpty) 'lot_code': code,
+        if (mfg.isNotEmpty) 'manufacturing_date': mfg,
+        if (exp.isNotEmpty) 'expiry_date': exp,
+        'quantity': quantity,
+      },
+    ],
+  };
+}
+
 /// ویجت انفجار فرمول تولید برای استفاده در فاکتور تولید
 /// این ویجت فقط در فاکتور تولید نمایش داده می‌شود
 class BomExplosionWidget extends StatefulWidget {
@@ -542,6 +569,12 @@ class _BomExplosionWidgetState extends State<BomExplosionWidget> {
             if (linkedMaterial?.warehouseId == null &&
                 item.suggestedWarehouseId != null)
               'warehouse_id': item.suggestedWarehouseId,
+            ..._lotFieldsFromOrderLine(
+              lotCode: linkedMaterial?.lotCode,
+              manufacturingDate: linkedMaterial?.manufacturingDate,
+              expiryDate: linkedMaterial?.expiryDate,
+              quantity: item.requiredQtyMainUnit ?? item.requiredQty,
+            ),
           },
         ),
       );
@@ -595,6 +628,12 @@ class _BomExplosionWidgetState extends State<BomExplosionWidget> {
               'warehouse_id': widget.productionOrder!.outputWarehouseId,
             if (linkedOutput?.id != null)
               'production_order_output_id': linkedOutput!.id,
+            ..._lotFieldsFromOrderLine(
+              lotCode: linkedOutput?.lotCode,
+              manufacturingDate: linkedOutput?.manufacturingDate,
+              expiryDate: linkedOutput?.expiryDate,
+              quantity: output.ratioMainUnit ?? output.ratio,
+            ),
           },
         ),
       );

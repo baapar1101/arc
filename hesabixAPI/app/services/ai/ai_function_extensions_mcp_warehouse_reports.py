@@ -61,3 +61,53 @@ def register_mcp_warehouse_report_functions(registry) -> None:
     _tool(registry, "get_inventory_turnover_report", "نرخ گردش کالا در بازه، دسته و انبار؛ حداکثر ۲۰۰ ردیف.",
         {**common_dates, "warehouse_ids": _IDS, "category_ids": _IDS, **_PAGE},
         _report("get_inventory_turnover_report", ("date_from", "date_to", "warehouse_ids", "category_ids", "skip", "take")))
+    _tool(registry, "get_expiry_stock_report", "گزارش موجودی لات‌های تاریخ‌دار به‌تفکیک وضعیت انقضا؛ حداکثر ۲۰۰ ردیف.",
+        {"warehouse_ids": _IDS, "statuses": {"type": "array", "maxItems": 10, "items": {"type": "string", "enum": ["sellable", "near_expiry", "blocked", "expired", "undated"]}},
+         "as_of_date": _DATE, **_PAGE},
+        _report("get_expiry_stock_report", ("warehouse_ids", "statuses", "as_of_date", "skip", "take")))
+
+    def list_inventory_lots_handler(args: Dict[str, Any], context: Dict[str, Any]):
+        from datetime import date as _date
+
+        from app.services.inventory_lot_service import business_as_of, list_lot_balances
+
+        db, bid = context["db"], int(context["business_id"])
+        explicit = None
+        raw = args.get("as_of_date")
+        if raw:
+            explicit = _date.fromisoformat(str(raw)[:10])
+        as_of = business_as_of(bid, explicit)
+        warehouse_id = int(args["warehouse_id"]) if args.get("warehouse_id") is not None else None
+        variant_id = int(args["variant_id"]) if args.get("variant_id") is not None else None
+        items = list_lot_balances(
+            db,
+            bid,
+            int(args["product_id"]),
+            warehouse_id,
+            as_of,
+            sellable_only=bool(args.get("sellable_only")),
+            variant_id=variant_id,
+        )
+        return {"items": items, "as_of_date": as_of.isoformat()}
+
+    registry.register(AIFunction(
+        name="list_inventory_lots",
+        description="موجودی لات‌های تاریخ‌دار یک کالا در انبار؛ product_id را از search_products بگیر.",
+        parameters_schema={
+            "type": "object",
+            "properties": {
+                "product_id": {"type": "integer", "minimum": 1},
+                "warehouse_id": {"type": "integer", "minimum": 1},
+                "variant_id": {"type": "integer", "minimum": 1},
+                "sellable_only": {"type": "boolean"},
+                "as_of_date": _DATE,
+            },
+            "required": ["product_id"],
+            "additionalProperties": False,
+        },
+        handler=list_inventory_lots_handler,
+        allowed_roles=_ROLES,
+        required_permissions=["inventory.read"],
+        category="warehouse",
+        is_readonly=True,
+    ))

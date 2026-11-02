@@ -19,6 +19,9 @@ if TYPE_CHECKING:
 
 OPENING_BALANCE_QUANTITY_KEY = "opening_balance_quantity"
 OPENING_BALANCE_COST_KEY = "opening_balance_cost_price"
+OPENING_BALANCE_LOT_CODE_KEY = "opening_balance_lot_code"
+OPENING_BALANCE_MFG_KEY = "opening_balance_manufacturing_date"
+OPENING_BALANCE_EXPIRY_KEY = "opening_balance_expiry_date"
 WAREHOUSE_CODE_KEY = "warehouse_code"
 WAREHOUSE_NAME_KEY = "warehouse_name"
 
@@ -36,6 +39,9 @@ WAREHOUSE_RESOLVE_EXCEL_KEYS = frozenset({
 EXCEL_ONLY_POP_KEYS = frozenset({
     OPENING_BALANCE_QUANTITY_KEY,
     OPENING_BALANCE_COST_KEY,
+    OPENING_BALANCE_LOT_CODE_KEY,
+    OPENING_BALANCE_MFG_KEY,
+    OPENING_BALANCE_EXPIRY_KEY,
     WAREHOUSE_CODE_KEY,
     WAREHOUSE_NAME_KEY,
 })
@@ -302,12 +308,24 @@ def prepare_opening_balance_for_import_row(
             "بهای تمام‌شده خالی است؛ مانند فرم کالا از قیمت خرید (یا صفر) استفاده می‌شود"
         )
 
+    lot_code = item.get(OPENING_BALANCE_LOT_CODE_KEY)
+    mfg = item.get(OPENING_BALANCE_MFG_KEY)
+    exp = item.get(OPENING_BALANCE_EXPIRY_KEY)
+    preview.update({
+        "lot_code": None if _blank(lot_code) else str(lot_code).strip(),
+        "manufacturing_date": None if _blank(mfg) else str(getattr(mfg, "isoformat", lambda: mfg)())[:10],
+        "expiry_date": None if _blank(exp) else str(getattr(exp, "isoformat", lambda: exp)())[:10],
+    })
+
     return (
         ProductOpeningBalanceInput(
             quantity=float(qty_dec),
             cost_price=float(cost_dec),
             warehouse_id=int(warehouse_id),
             fiscal_year_id=int(fiscal_year_id) if fiscal_year_id is not None else None,
+            lot_code=None if _blank(lot_code) else str(lot_code).strip(),
+            manufacturing_date=None if _blank(mfg) else mfg,
+            expiry_date=None if _blank(exp) else exp,
         ),
         errors,
         warnings,

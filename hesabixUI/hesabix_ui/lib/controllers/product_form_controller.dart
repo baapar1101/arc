@@ -66,9 +66,15 @@ class ProductFormController extends ChangeNotifier {
   bool _obEligibilityLoading = false;
   String _openingBalanceQuantity = '';
   String _openingBalanceCostPrice = '';
+  String _openingBalanceLotCode = '';
+  DateTime? _openingBalanceManufacturingDate;
+  DateTime? _openingBalanceExpiryDate;
   double? _obInitialQuantity;
   double? _obInitialCostPrice;
   int? _obInitialWarehouseId;
+  String? _obInitialLotCode;
+  DateTime? _obInitialManufacturingDate;
+  DateTime? _obInitialExpiryDate;
   bool _obInitialHadLine = false;
 
   ProductFormController({
@@ -110,6 +116,9 @@ class ProductFormController extends ChangeNotifier {
   bool get obEligibilityLoading => _obEligibilityLoading;
   String get openingBalanceQuantity => _openingBalanceQuantity;
   String get openingBalanceCostPrice => _openingBalanceCostPrice;
+  String get openingBalanceLotCode => _openingBalanceLotCode;
+  DateTime? get openingBalanceManufacturingDate => _openingBalanceManufacturingDate;
+  DateTime? get openingBalanceExpiryDate => _openingBalanceExpiryDate;
   bool get obEditable => _obEligibility?['editable'] == true;
   /// نمایش بخش تعداد اولیه — حتی بدون دسترسی ویرایش (فقط‌خواندنی با هشدار).
   bool get showOpeningBalanceSection {
@@ -124,6 +133,21 @@ class ProductFormController extends ChangeNotifier {
 
   void setOpeningBalanceCostPrice(String value) {
     _openingBalanceCostPrice = value;
+    notifyListeners();
+  }
+
+  void setOpeningBalanceLotCode(String value) {
+    _openingBalanceLotCode = value;
+    notifyListeners();
+  }
+
+  void setOpeningBalanceManufacturingDate(DateTime? value) {
+    _openingBalanceManufacturingDate = value;
+    notifyListeners();
+  }
+
+  void setOpeningBalanceExpiryDate(DateTime? value) {
+    _openingBalanceExpiryDate = value;
     notifyListeners();
   }
 
@@ -152,6 +176,9 @@ class ProductFormController extends ChangeNotifier {
     _obInitialQuantity = null;
     _obInitialCostPrice = null;
     _obInitialWarehouseId = null;
+    _obInitialLotCode = null;
+    _obInitialManufacturingDate = null;
+    _obInitialExpiryDate = null;
     if (pob is Map) {
       final qty = (pob['quantity'] as num?)?.toDouble();
       final cost = (pob['cost_price'] as num?)?.toDouble();
@@ -170,14 +197,36 @@ class ProductFormController extends ChangeNotifier {
         _openingBalanceCostPrice = formatNumberForInput(cost);
         _obInitialCostPrice = cost;
       }
+      final lotCode = pob['lot_code']?.toString() ?? '';
+      _openingBalanceLotCode = lotCode;
+      _obInitialLotCode = lotCode.isEmpty ? null : lotCode;
+      _openingBalanceManufacturingDate = _parseObDate(pob['manufacturing_date']);
+      _obInitialManufacturingDate = _openingBalanceManufacturingDate;
+      _openingBalanceExpiryDate = _parseObDate(pob['expiry_date']);
+      _obInitialExpiryDate = _openingBalanceExpiryDate;
     } else if (_obInitialHadLine) {
       _obInitialHadLine = false;
     }
     if (!_obInitialHadLine) {
       _openingBalanceQuantity = '';
       _openingBalanceCostPrice = '';
+      _openingBalanceLotCode = '';
+      _openingBalanceManufacturingDate = null;
+      _openingBalanceExpiryDate = null;
       _obInitialWarehouseId = null;
     }
+  }
+
+  DateTime? _parseObDate(dynamic raw) {
+    if (raw == null) return null;
+    final s = raw.toString().trim();
+    if (s.isEmpty) return null;
+    return DateTime.tryParse(s.split('T').first);
+  }
+
+  DateTime? _dateOnly(DateTime? value) {
+    if (value == null) return null;
+    return DateTime(value.year, value.month, value.day);
   }
 
   bool _openingBalanceChanged() {
@@ -198,7 +247,19 @@ class ProductFormController extends ChangeNotifier {
             double.tryParse(rawCost.replaceAll(',', '')) ??
             0.0);
     final initialCost = _obInitialCostPrice ?? 0.0;
-    return qty != _obInitialQuantity || cost != initialCost;
+    if (qty != _obInitialQuantity || cost != initialCost) return true;
+    if (_formData.trackExpiry) {
+      if (_openingBalanceLotCode.trim() != (_obInitialLotCode ?? '')) return true;
+      if (_dateOnly(_openingBalanceManufacturingDate) !=
+          _dateOnly(_obInitialManufacturingDate)) {
+        return true;
+      }
+      if (_dateOnly(_openingBalanceExpiryDate) !=
+          _dateOnly(_obInitialExpiryDate)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   int? _resolveOpeningBalanceWarehouseId() {
@@ -248,6 +309,9 @@ class ProductFormController extends ChangeNotifier {
         costPrice: cost,
         warehouseId: warehouseId,
         fiscalYearId: fiscalYearId,
+        lotCode: _obLotCodeOrNull(),
+        manufacturingDate: _obManufacturingDateOrNull(),
+        expiryDate: _obExpiryDateOrNull(),
       );
     }
 
@@ -276,7 +340,24 @@ class ProductFormController extends ChangeNotifier {
       costPrice: cost,
       warehouseId: warehouseId,
       fiscalYearId: fiscalYearId,
+      lotCode: _obLotCodeOrNull(),
+      manufacturingDate: _obManufacturingDateOrNull(),
+      expiryDate: _obExpiryDateOrNull(),
     );
+  }
+
+  String? _obLotCodeOrNull() {
+    if (!_formData.trackExpiry) return null;
+    final code = _openingBalanceLotCode.trim();
+    return code.isEmpty ? null : code;
+  }
+
+  DateTime? _obManufacturingDateOrNull() {
+    return _formData.trackExpiry ? _openingBalanceManufacturingDate : null;
+  }
+
+  DateTime? _obExpiryDateOrNull() {
+    return _formData.trackExpiry ? _openingBalanceExpiryDate : null;
   }
 
   void addOrUpdateDraftPriceItem(Map<String, dynamic> item) {

@@ -65,6 +65,11 @@ def _attach_variant_allocations_for_warehouse_line(
 			copy_invoice_allocations_to_warehouse_line(
 				db, int(business_id), wline, product, invoice_line
 			)
+			from app.services.inventory_lot_allocation_service import copy_invoice_lot_allocations_to_warehouse_line
+
+			copy_invoice_lot_allocations_to_warehouse_line(
+				db, int(business_id), wline, product, invoice_line
+			)
 			return
 	source_unit = payload_line_unit(payload, extra_info_dict(payload.get("extra_info")))
 	attach_warehouse_line_from_payload(
@@ -76,6 +81,90 @@ def _attach_variant_allocations_for_warehouse_line(
 		document=document,
 		source_line_unit=source_unit,
 	)
+	from app.services.inventory_lot_allocation_service import attach_warehouse_line_lots_from_payload
+
+	extra_payload = extra_info_dict(payload.get("extra_info"))
+	allow_expired = bool(extra_payload.get("allow_expired_lot_sale"))
+	if document is not None and str(getattr(document, "doc_type", "") or "") == "adjustment":
+		allow_expired = True
+	attach_warehouse_line_lots_from_payload(
+		db,
+		int(business_id),
+		wline,
+		product,
+		payload,
+		document=document,
+		source_line_unit=source_unit,
+		allow_expired_confirm=allow_expired,
+	)
+
+
+def _restore_sold_unique_instances(
+	db: Session,
+	business_id: int,
+	product_id: int,
+	instance_ids: List[Any],
+	warehouse_id: Optional[int],
+	document_date: date,
+	line_label: str,
+) -> List[int]:
+	from adapters.db.models.product_instance import ProductInstance
+
+	restored: List[int] = []
+	for inst_id in instance_ids:
+		try:
+			inst_id_int = int(inst_id)
+		except (TypeError, ValueError) as exc:
+			raise ApiError(
+				"INVALID_INSTANCE_ID",
+				f"{line_label}: شناسه کالای یونیک معتبر نیست",
+				http_status=400,
+			) from exc
+		instance = db.query(ProductInstance).filter(
+			and_(
+				ProductInstance.id == inst_id_int,
+				ProductInstance.business_id == int(business_id),
+				ProductInstance.product_id == int(product_id),
+			)
+		).first()
+		if instance is None:
+			raise ApiError(
+				"INSTANCE_NOT_FOUND",
+				f"{line_label}: کالای یونیک با ID {inst_id_int} یافت نشد",
+				http_status=404,
+			)
+		if instance.status not in ("sold", "available"):
+			raise ApiError(
+				"INSTANCE_NOT_RESTORABLE",
+				f"{line_label}: کالای یونیک با ID {inst_id_int} قابل برگشت به انبار نیست",
+				http_status=409,
+			)
+		instance.status = "available"
+		if warehouse_id is not None:
+			instance.warehouse_id = int(warehouse_id)
+		move_date = document_date.date() if hasattr(document_date, "date") and not isinstance(document_date, date) else document_date
+		instance.last_movement_date = move_date
+		instance.current_invoice_id = None
+		restored.append(instance.id)
+	return restored
+
+
+def _unique_instance_dates_from_payload(
+	product: Product,
+	inst_data: Any,
+	existing: Any = None,
+) -> tuple:
+	from adapters.api.v1.product_instances import _parse_instance_date, _require_instance_dates
+
+	payload = inst_data if isinstance(inst_data, dict) else {}
+	mfg = _parse_instance_date(payload.get("manufacturing_date"))
+	exp = _parse_instance_date(payload.get("expiry_date"))
+	if mfg is None and existing is not None:
+		mfg = getattr(existing, "manufacturing_date", None)
+	if exp is None and existing is not None:
+		exp = getattr(existing, "expiry_date", None)
+	_require_instance_dates(product, mfg, exp)
+	return mfg, exp
 
 
 _INVOICE_TYPE_LABELS_FA = {
@@ -1246,6 +1335,20 @@ def invoice_lines_have_trackable_inventory_products(
 	return False
 
 
+def _unique_instance_ids_from_line(ln: Dict[str, Any], extra: Dict[str, Any]) -> List[Any]:
+	raw = ln.get("instance_ids")
+	if isinstance(raw, list) and len(raw) > 0:
+		return list(raw)
+	for key in ("selected_instance_ids", "instance_ids"):
+		val = extra.get(key)
+		if isinstance(val, list) and len(val) > 0:
+			return list(val)
+	one = extra.get("instance_id")
+	if one is not None:
+		return [one]
+	return []
+
+
 def create_from_invoice(
 	db: Session,
 	business_id: int,
@@ -1291,8 +1394,9 @@ def create_from_invoice(
 		except Exception:
 			raise ApiError("INVALID_DATE", "فرمت تاریخ حواله معتبر نیست", http_status=400)
 	else:
-		# تاریخ صدور حواله؛ در صورت عدم ارسال، روز جاری (زمان عملیات صدور)
-		document_date = date.today()
+		from app.core.business_calendar import business_today
+
+		document_date = getattr(invoice, "document_date", None) or business_today(business_id)
 
 	delivery_fields = {
 		"description": extra_data.get("description"),
@@ -1389,6 +1493,20 @@ def create_from_invoice(
 		# بررسی و ایجاد instance های کالای یونیک (فقط برای حواله ورود)
 		instance_data = ln.get("instance_data")
 		instance_ids = []
+		if (
+			not instance_data
+			and str(getattr(product, "inventory_mode", None) or "bulk") == "unique"
+			and wh_doc_type in ("receipt", "production_in")
+			and int(qty or 0) > 0
+		):
+			instance_data = [
+				{
+					"serial_number": extra.get("lot_code") if int(qty) == 1 else None,
+					"manufacturing_date": extra.get("manufacturing_date"),
+					"expiry_date": extra.get("expiry_date"),
+				}
+				for _ in range(int(qty))
+			]
 		
 		if instance_data and isinstance(instance_data, list) and len(instance_data) > 0:
 			# بررسی اینکه کالا یونیک است
@@ -1447,6 +1565,7 @@ def create_from_invoice(
 					instance_warehouse_id = warehouse_id if wh_doc_type in ("receipt", "production_in") else None
 					
 					# ایجاد instance
+					mfg, exp = _unique_instance_dates_from_payload(product, inst_data)
 					instance = ProductInstance(
 						business_id=business_id,
 						product_id=int(pid),
@@ -1456,6 +1575,8 @@ def create_from_invoice(
 						status="available",
 						custom_attributes=custom_attributes if custom_attributes else None,
 						entry_date=document_date,
+						manufacturing_date=mfg,
+						expiry_date=exp,
 					)
 					db.add(instance)
 					db.flush()  # برای دریافت ID
@@ -1463,12 +1584,7 @@ def create_from_invoice(
 		
 		# برای حواله خروج، instance_ids را پردازش می‌کنیم
 		# اول بررسی می‌کنیم که آیا selected_instance_ids از فاکتور آمده است
-		instance_ids_from_line = ln.get("instance_ids")
-		selected_instance_ids_from_invoice = extra.get("selected_instance_ids")
-		
-		# اگر selected_instance_ids از فاکتور آمده و instance_ids مستقیم در خط نباشد، از selected_instance_ids استفاده می‌کنیم
-		if not instance_ids_from_line and selected_instance_ids_from_invoice and isinstance(selected_instance_ids_from_invoice, list) and len(selected_instance_ids_from_invoice) > 0:
-			instance_ids_from_line = selected_instance_ids_from_invoice
+		instance_ids_from_line = _unique_instance_ids_from_line(ln, extra)
 		
 		if instance_ids_from_line and isinstance(instance_ids_from_line, list) and len(instance_ids_from_line) > 0:
 			from adapters.db.models.product_instance import ProductInstance
@@ -1497,6 +1613,18 @@ def create_from_invoice(
 					instance.status = "sold"  # یا می‌توانیم status دیگری استفاده کنیم
 					instance.last_movement_date = document_date
 					instance_ids.append(instance.id)  # برای ذخیره در خط
+			elif wh_doc_type in ("receipt", "production_in") and not instance_ids:
+				instance_ids.extend(
+					_restore_sold_unique_instances(
+						db,
+						business_id,
+						int(pid),
+						instance_ids_from_line,
+						warehouse_id,
+						document_date,
+						f"خط با product_id {pid}",
+					)
+				)
 
 		# پیوند به ردیف فاکتور برای شناسایی بهای تمام‌شده قطعی و گزارش‌ها
 		if ln.get("invoice_item_line_id") is not None:
@@ -1888,6 +2016,42 @@ def create_manual_warehouse_document(
 		# بررسی و ایجاد instance های کالای یونیک (فقط برای حواله ورود)
 		instance_data = ln.get("instance_data")
 		instance_ids = []
+		line_extra_for_unique = extra_info_dict(ln.get("extra_info"))
+		if (
+			not instance_data
+			and str(getattr(product, "inventory_mode", None) or "bulk") == "unique"
+			and doc_type in ("receipt", "production_in")
+			and int(qty or 0) > 0
+		):
+			instance_data = [
+				{
+					"serial_number": line_extra_for_unique.get("lot_code") if int(qty) == 1 else None,
+					"manufacturing_date": line_extra_for_unique.get("manufacturing_date"),
+					"expiry_date": line_extra_for_unique.get("expiry_date"),
+				}
+				for _ in range(int(qty))
+			]
+		if (
+			str(getattr(product, "inventory_mode", None) or "bulk") == "unique"
+			and doc_type in ("issue", "production_out")
+			and not _unique_instance_ids_from_line(ln, line_extra_for_unique)
+		):
+			from app.services.inventory_lot_service import pick_unique_instances_fefo
+			from app.core.business_calendar import business_today
+
+			picked = pick_unique_instances_fefo(
+				db,
+				business_id,
+				product,
+				int(line_wh) if line_wh is not None else None,
+				qty,
+				document_date if isinstance(document_date, date) else business_today(business_id),
+			)
+			ln = dict(ln)
+			ln["instance_ids"] = picked
+			line_extra_for_unique["instance_ids"] = picked
+			line_extra_for_unique["selected_instance_ids"] = picked
+			ln["extra_info"] = line_extra_for_unique
 		
 		if instance_data and isinstance(instance_data, list) and len(instance_data) > 0:
 			# بررسی اینکه کالا یونیک است
@@ -1947,6 +2111,7 @@ def create_manual_warehouse_document(
 					instance_warehouse_id = line_wh if doc_type in ("receipt", "production_in") else None
 					
 					# ایجاد instance
+					mfg, exp = _unique_instance_dates_from_payload(product, inst_data)
 					instance = ProductInstance(
 						business_id=business_id,
 						product_id=int(pid),
@@ -1956,6 +2121,8 @@ def create_manual_warehouse_document(
 						status="available",
 						custom_attributes=custom_attributes if custom_attributes else None,
 						entry_date=document_date,
+						manufacturing_date=mfg,
+						expiry_date=exp,
 					)
 					db.add(instance)
 					db.flush()  # برای دریافت ID
@@ -1991,6 +2158,19 @@ def create_manual_warehouse_document(
 					instance.last_movement_date = document_date
 					instance_ids.append(instance.id)  # برای ذخیره در خط
 			
+			elif doc_type in ("receipt", "production_in") and not instance_ids:
+				instance_ids.extend(
+					_restore_sold_unique_instances(
+						db,
+						business_id,
+						int(pid),
+						instance_ids_from_line,
+						line_wh,
+						document_date,
+						f"خط {i}",
+					)
+				)
+
 			# برای حواله انتقال، instance_ids را برای استفاده بعدی ذخیره می‌کنیم
 			# (به‌روزرسانی انبار در زمان پست انجام می‌شود)
 			elif doc_type == "transfer":
@@ -2145,6 +2325,10 @@ def create_manual_warehouse_document(
 	db.flush()
 	if wh.doc_type == "transfer":
 		from app.services.variant_allocation_service import assert_transfer_allocations_match
+		from app.services.inventory_lot_allocation_service import (
+			assert_transfer_lot_allocations_match,
+			copy_warehouse_lot_allocations_to_reverse_line,
+		)
 
 		posted_lines = (
 			db.query(WarehouseDocumentLine)
@@ -2157,6 +2341,16 @@ def create_manual_warehouse_document(
 			in_line = next((x for x in ins if int(x.product_id) == int(out_line.product_id)), None)
 			if in_line is not None:
 				assert_transfer_allocations_match(db, out_line, in_line)
+				from adapters.db.models.inventory_lot import WarehouseLineLotAllocation
+
+				in_has_lots = (
+					db.query(WarehouseLineLotAllocation.id)
+					.filter(WarehouseLineLotAllocation.warehouse_document_line_id == int(in_line.id))
+					.first()
+				)
+				if in_has_lots is None:
+					copy_warehouse_lot_allocations_to_reverse_line(db, business_id, out_line, in_line)
+				assert_transfer_lot_allocations_match(db, out_line, in_line)
 	
 	# Invalidate cache بعد از ایجاد موفق سند انبار
 	invalidate_warehouse_docs_cache(
@@ -2283,8 +2477,9 @@ def create_linked_warehouse_document_bulk(
 		raise ApiError("WAREHOUSE_CODE_CONFLICT", "Failed to generate unique warehouse document code", http_status=500)
 
 	movement = "in" if doc_type == "receipt" else "out"
-	db.add_all([
-		WarehouseDocumentLine(
+	created_lines: List[WarehouseDocumentLine] = []
+	for pid, quantity, line_extra in normalized_lines:
+		wline = WarehouseDocumentLine(
 			warehouse_document_id=int(wh.id),
 			product_id=pid,
 			warehouse_id=int(warehouse_id),
@@ -2292,9 +2487,21 @@ def create_linked_warehouse_document_bulk(
 			quantity=quantity,
 			extra_info=line_extra or None,
 		)
-		for pid, quantity, line_extra in normalized_lines
-	])
+		db.add(wline)
+		created_lines.append(wline)
 	db.flush()
+	for wline in created_lines:
+		product = products_by_id.get(int(wline.product_id))
+		if product is None:
+			continue
+		_attach_variant_allocations_for_warehouse_line(
+			db,
+			int(business_id),
+			wh,
+			wline,
+			product,
+			{"quantity": wline.quantity, "extra_info": wline.extra_info},
+		)
 
 	invalidate_warehouse_docs_cache(
 		business_id=int(business_id),
@@ -2544,6 +2751,9 @@ def update_warehouse_document(
 									instance_warehouse_id = line_wh if wh.doc_type in ("receipt", "production_in") else instance.warehouse_id
 									if instance_warehouse_id:
 										instance.warehouse_id = int(instance_warehouse_id)
+									mfg, exp = _unique_instance_dates_from_payload(product, inst_data, existing=instance)
+									instance.manufacturing_date = mfg
+									instance.expiry_date = exp
 									
 									instance_ids.append(instance.id)
 								else:
@@ -2585,6 +2795,7 @@ def update_warehouse_document(
 									instance_warehouse_id = line_wh if wh.doc_type in ("receipt", "production_in") else None
 									
 									# ایجاد instance جدید
+									mfg, exp = _unique_instance_dates_from_payload(product, inst_data)
 									instance = ProductInstance(
 										business_id=business_id,
 										product_id=int(pid),
@@ -2594,6 +2805,8 @@ def update_warehouse_document(
 										status="available",
 										custom_attributes=custom_attributes if custom_attributes else None,
 										entry_date=document_date,
+										manufacturing_date=mfg,
+										expiry_date=exp,
 									)
 									db.add(instance)
 									db.flush()
@@ -2658,6 +2871,19 @@ def update_warehouse_document(
 									raise ApiError("INSTANCE_WRONG_WAREHOUSE", f"خط {i}: کالای یونیک با ID {inst_id} در انبار مبدا نیست", http_status=400)
 								
 								instance_ids.append(instance.id)
+
+						elif wh.doc_type in ("receipt", "production_in") and not instance_ids:
+							instance_ids.extend(
+								_restore_sold_unique_instances(
+									db,
+									business_id,
+									int(pid),
+									instance_ids_from_line,
+									line_wh,
+									wh.document_date,
+									f"خط {i}",
+								)
+							)
 					
 					# اضافه کردن instance_ids به extra_info
 					extra_info = existing_line.extra_info or {}
@@ -2866,6 +3092,9 @@ def update_warehouse_document(
 									instance_warehouse_id = line_wh if wh.doc_type in ("receipt", "production_in") else instance.warehouse_id
 									if instance_warehouse_id:
 										instance.warehouse_id = int(instance_warehouse_id)
+									mfg, exp = _unique_instance_dates_from_payload(product, inst_data, existing=instance)
+									instance.manufacturing_date = mfg
+									instance.expiry_date = exp
 									
 									instance_ids.append(instance.id)
 								else:
@@ -2907,6 +3136,7 @@ def update_warehouse_document(
 									instance_warehouse_id = line_wh if wh.doc_type in ("receipt", "production_in") else None
 									
 									# ایجاد instance جدید
+									mfg, exp = _unique_instance_dates_from_payload(product, inst_data)
 									instance = ProductInstance(
 										business_id=business_id,
 										product_id=int(pid),
@@ -2916,6 +3146,8 @@ def update_warehouse_document(
 										status="available",
 										custom_attributes=custom_attributes if custom_attributes else None,
 										entry_date=document_date,
+										manufacturing_date=mfg,
+										expiry_date=exp,
 									)
 									db.add(instance)
 									db.flush()  # برای دریافت ID
@@ -2987,6 +3219,19 @@ def update_warehouse_document(
 									raise ApiError("INSTANCE_WRONG_WAREHOUSE", f"خط {i}: کالای یونیک با ID {inst_id} در انبار مبدا نیست", http_status=400)
 								
 								instance_ids.append(instance.id)
+
+						elif wh.doc_type in ("receipt", "production_in") and not instance_ids:
+							instance_ids.extend(
+								_restore_sold_unique_instances(
+									db,
+									business_id,
+									int(pid),
+									instance_ids_from_line,
+									line_wh,
+									wh.document_date,
+									f"خط {i}",
+								)
+							)
 					
 					# اضافه کردن instance_ids به extra_info
 					extra_info = ln.get("extra_info") or {}
@@ -3266,12 +3511,15 @@ def post_warehouse_document(
 					"product_id": ln.product_id,
 					"quantity": float(ln.quantity),
 					"allocations": allocations_as_payload(list_warehouse_line_allocations(db, int(ln.id))),
+					"lot_allocations": line_extra.get("lot_allocations"),
 					"extra_info": {
 						"warehouse_id": ln.warehouse_id,
 						"movement": "out",
 						"inventory_tracked": True,
 						"unit": line_extra.get("unit"),
 						"inventory_quantity_unit": line_extra.get("inventory_quantity_unit"),
+						"lot_allocations": line_extra.get("lot_allocations"),
+						"allow_expired_lot_sale": line_extra.get("allow_expired_lot_sale"),
 						**({"production_order_id": exclude_production_order_id} if exclude_production_order_id is not None else {}),
 					},
 				})
@@ -3600,6 +3848,15 @@ def post_warehouse_document(
 					wid,
 					user_id=getattr(wh, "created_by_user_id", None),
 				)
+				from app.services.workflow.workflow_trigger_service import maybe_fire_inventory_expiry_triggers
+
+				maybe_fire_inventory_expiry_triggers(
+					db,
+					int(business_id),
+					int(ln.product_id),
+					wid,
+					user_id=getattr(wh, "created_by_user_id", None),
+				)
 		except Exception as inv_wf_err:
 			logger.warning(
 				"warehouse_workflow_inventory_low_failed wh_id=%s err=%s",
@@ -3698,6 +3955,12 @@ def _get_line_dict_with_instances(db: Session, ln: WarehouseDocumentLine, busine
 						"serial_number": instance.serial_number,
 						"barcode": instance.barcode,
 						"custom_attributes": instance.custom_attributes or {},
+						"manufacturing_date": instance.manufacturing_date.isoformat()
+						if getattr(instance, "manufacturing_date", None)
+						else None,
+						"expiry_date": instance.expiry_date.isoformat()
+						if getattr(instance, "expiry_date", None)
+						else None,
 					})
 			except Exception:
 				# در صورت خطا، از instance_id استفاده کن
@@ -3705,6 +3968,36 @@ def _get_line_dict_with_instances(db: Session, ln: WarehouseDocumentLine, busine
 		
 		if instance_data:
 			line_dict["instance_data"] = instance_data
+
+	from adapters.db.models.inventory_lot import InventoryLot, WarehouseLineLotAllocation
+
+	lot_rows = (
+		db.query(WarehouseLineLotAllocation)
+		.filter(WarehouseLineLotAllocation.warehouse_document_line_id == int(ln.id))
+		.all()
+	)
+	if lot_rows:
+		lot_ids = [int(r.lot_id) for r in lot_rows]
+		lots = {
+			int(l.id): l
+			for l in db.query(InventoryLot).filter(InventoryLot.id.in_(lot_ids)).all()
+		}
+		line_dict["lot_allocations"] = [
+			{
+				"lot_id": int(r.lot_id),
+				"lot_code": lots[int(r.lot_id)].lot_code if int(r.lot_id) in lots else None,
+				"manufacturing_date": lots[int(r.lot_id)].manufacturing_date.isoformat()
+				if int(r.lot_id) in lots and lots[int(r.lot_id)].manufacturing_date
+				else None,
+				"expiry_date": lots[int(r.lot_id)].expiry_date.isoformat()
+				if int(r.lot_id) in lots and lots[int(r.lot_id)].expiry_date
+				else None,
+				"quantity": float(r.quantity),
+			}
+			for r in lot_rows
+		]
+		extra["lot_allocations"] = line_dict["lot_allocations"]
+		line_dict["extra_info"] = extra
 	
 	return line_dict
 
@@ -4338,6 +4631,9 @@ def cancel_warehouse_document(
 		from app.services.variant_allocation_service import copy_warehouse_allocations_to_reverse_line
 
 		copy_warehouse_allocations_to_reverse_line(db, business_id, ln, cancel_line)
+		from app.services.inventory_lot_allocation_service import copy_warehouse_lot_allocations_to_reverse_line
+
+		copy_warehouse_lot_allocations_to_reverse_line(db, business_id, ln, cancel_line)
 	
 	try:
 		from app.services.purchase_accounting_service import reverse_purchase_grni_clearance_for_warehouse
@@ -4439,6 +4735,14 @@ def cancel_warehouse_document(
 	return cancel_wh
 
 
+def _report_sellable_qty(db: Session, business_id: int, product: Product, warehouse_id: Optional[int], as_of, physical):
+	from app.services.inventory_lot_service import is_expiry_tracked_product, sellable_quantity
+
+	if not is_expiry_tracked_product(product):
+		return physical
+	return sellable_quantity(db, business_id, product, warehouse_id, as_of)
+
+
 def get_warehouse_stock_report(
 	db: Session,
 	business_id: int,
@@ -4453,13 +4757,15 @@ def get_warehouse_stock_report(
 	as_of_date_str = query.get("as_of_date")
 	include_zero = bool(query.get("include_zero", False))
 	
-	# تبدیل تاریخ
-	as_of_date = datetime.now().date()
+	from app.services.inventory_lot_service import business_as_of
+
+	explicit = None
 	if as_of_date_str:
 		try:
-			as_of_date = date_type.fromisoformat(as_of_date_str) if isinstance(as_of_date_str, str) else as_of_date_str
+			explicit = date_type.fromisoformat(as_of_date_str) if isinstance(as_of_date_str, str) else as_of_date_str
 		except Exception:
-			pass
+			explicit = None
+	as_of_date = business_as_of(business_id, explicit)
 	
 	# دریافت لیست محصولات
 	if product_ids:
@@ -4523,6 +4829,7 @@ def get_warehouse_stock_report(
 					"warehouse_code": None,
 					"warehouse_name": "بدون انبار / کل",
 					"quantity": float(stock),
+					"sellable_quantity": float(_report_sellable_qty(db, business_id, product, None, as_of_date, stock)),
 					"unit": product.main_unit or "",
 				})
 		else:
@@ -4542,6 +4849,7 @@ def get_warehouse_stock_report(
 						"warehouse_code": warehouse.code,
 						"warehouse_name": warehouse.name,
 						"quantity": float(stock),
+						"sellable_quantity": float(_report_sellable_qty(db, business_id, product, warehouse.id, as_of_date, stock)),
 						"unit": product.main_unit or "",
 					})
 	
@@ -4550,6 +4858,80 @@ def get_warehouse_stock_report(
 		"as_of_date": as_of_date.isoformat(),
 		"total_items": len(items),
 	}
+
+
+def _stock_count_lot_rows(
+	db: Session,
+	business_id: int,
+	product: Product,
+	warehouse_id: Optional[int],
+	warehouse: Optional[Warehouse],
+	as_of_date: date,
+	physical_stock: Decimal,
+) -> List[Dict[str, Any]]:
+	from app.services.inventory_lot_service import is_expiry_tracked_product, list_lot_balances
+
+	base = {
+		"product_id": product.id,
+		"product_code": product.code or "",
+		"product_name": product.name,
+		"warehouse_id": warehouse_id,
+		"warehouse_code": warehouse.code if warehouse is not None else None,
+		"warehouse_name": warehouse.name if warehouse is not None else None,
+		"unit": product.main_unit or "",
+	}
+	if not is_expiry_tracked_product(product):
+		return [{**base, "system_quantity": float(physical_stock)}]
+	if str(product.inventory_mode or "bulk") == "unique":
+		from adapters.db.models.product_instance import ProductInstance
+		from app.services.inventory_lot_service import instance_expiry_view
+
+		q = db.query(ProductInstance).filter(
+			ProductInstance.business_id == int(business_id),
+			ProductInstance.product_id == int(product.id),
+			ProductInstance.status == "available",
+		)
+		if warehouse_id is not None:
+			q = q.filter(ProductInstance.warehouse_id == int(warehouse_id))
+		out_unique: List[Dict[str, Any]] = []
+		for inst in q.all():
+			view = instance_expiry_view(inst, product, as_of_date)
+			mfg = view.get("manufacturing_date")
+			exp = view.get("expiry_date")
+			out_unique.append(
+				{
+					**base,
+					"instance_id": int(inst.id),
+					"lot_code": inst.serial_number,
+					"serial_number": inst.serial_number,
+					"manufacturing_date": mfg.isoformat() if mfg else None,
+					"expiry_date": exp.isoformat() if exp else None,
+					"system_quantity": 1.0,
+				}
+			)
+		if not out_unique:
+			return [{**base, "system_quantity": float(physical_stock)}]
+		return out_unique
+	rows = list_lot_balances(db, business_id, int(product.id), warehouse_id, as_of_date, sellable_only=False)
+	out = []
+	for row in rows:
+		qty = float(row.get("quantity_main") or 0)
+		if qty == 0:
+			continue
+		out.append(
+			{
+				**base,
+				"lot_id": row.get("id"),
+				"lot_code": row.get("lot_code"),
+				"variant_id": row.get("variant_id"),
+				"manufacturing_date": row.get("manufacturing_date"),
+				"expiry_date": row.get("expiry_date"),
+				"system_quantity": qty,
+			}
+		)
+	if not out:
+		return [{**base, "system_quantity": float(physical_stock)}]
+	return out
 
 
 def start_stock_count(
@@ -4562,7 +4944,9 @@ def start_stock_count(
 ) -> Dict[str, Any]:
 	"""شروع انبار گردانی: دریافت لیست محصولات با موجودی سیستم (فقط حواله‌های posted)."""
 	if as_of_date is None:
-		as_of_date = datetime.now().date()
+		from app.core.business_calendar import business_today
+
+		as_of_date = business_today(business_id)
 
 	products_query = db.query(Product).filter(
 		and_(
@@ -4605,32 +4989,34 @@ def start_stock_count(
 			if only_with_warehouse_history and (product.id, int(warehouse_id)) not in wh_history_pairs:
 				continue
 			stock = get_physical_stock(db, business_id, product.id, warehouse_id, as_of_date)
-			items.append({
-				"product_id": product.id,
-				"product_code": product.code or "",
-				"product_name": product.name,
-				"warehouse_id": warehouse_id,
-				"warehouse_code": selected_wh.code if selected_wh else None,
-				"warehouse_name": selected_wh.name if selected_wh else None,
-				"system_quantity": float(stock),
-				"unit": product.main_unit or "",
-			})
+			items.extend(
+				_stock_count_lot_rows(
+					db,
+					business_id,
+					product,
+					warehouse_id,
+					selected_wh,
+					as_of_date,
+					stock,
+				)
+			)
 		else:
 			if warehouses:
 				for warehouse in warehouses:
 					if only_with_warehouse_history and (product.id, warehouse.id) not in wh_history_pairs:
 						continue
 					stock = get_physical_stock(db, business_id, product.id, warehouse.id, as_of_date)
-					items.append({
-						"product_id": product.id,
-						"product_code": product.code or "",
-						"product_name": product.name,
-						"warehouse_id": warehouse.id,
-						"warehouse_code": warehouse.code,
-						"warehouse_name": warehouse.name,
-						"system_quantity": float(stock),
-						"unit": product.main_unit or "",
-					})
+					items.extend(
+						_stock_count_lot_rows(
+							db,
+							business_id,
+							product,
+							warehouse.id,
+							warehouse,
+							as_of_date,
+							stock,
+						)
+					)
 			else:
 				if only_with_warehouse_history and product.id not in products_with_wh_history:
 					continue
@@ -4662,7 +5048,9 @@ def calculate_stock_count_differences(
 ) -> Dict[str, Any]:
 	"""محاسبه تفاوت‌های انبار گردانی؛ موجودی سیستم از سرور (posted) خوانده می‌شود."""
 	if as_of_date is None:
-		as_of_date = datetime.now().date()
+		from app.core.business_calendar import business_today
+
+		as_of_date = business_today(business_id)
 
 	result_items = []
 
@@ -4678,6 +5066,8 @@ def calculate_stock_count_differences(
 		except (TypeError, ValueError):
 			wh_id = None
 
+		lot_id = item.get("lot_id")
+		instance_id = item.get("instance_id")
 		system_quantity = get_physical_stock(
 			db,
 			business_id,
@@ -4685,6 +5075,40 @@ def calculate_stock_count_differences(
 			wh_id,
 			as_of_date,
 		)
+		if instance_id is not None:
+			from adapters.db.models.product_instance import ProductInstance
+
+			try:
+				inst = (
+					db.query(ProductInstance)
+					.filter(
+						and_(
+							ProductInstance.id == int(instance_id),
+							ProductInstance.business_id == int(business_id),
+							ProductInstance.product_id == int(product_id),
+						)
+					)
+					.first()
+				)
+			except (TypeError, ValueError):
+				inst = None
+			if (
+				inst is not None
+				and inst.status == "available"
+				and (wh_id is None or inst.warehouse_id == wh_id)
+			):
+				system_quantity = Decimal("1")
+			else:
+				system_quantity = Decimal("0")
+		elif lot_id is not None:
+			from app.services.inventory_lot_service import compute_available_lot_stock
+
+			try:
+				system_quantity = compute_available_lot_stock(
+					db, business_id, int(product_id), wh_id, int(lot_id), as_of_date
+				)
+			except (TypeError, ValueError):
+				pass
 		try:
 			physical_quantity = Decimal(str(item.get("physical_quantity", 0)))
 		except Exception:
@@ -4702,6 +5126,12 @@ def calculate_stock_count_differences(
 		result_items.append({
 			"product_id": int(product_id),
 			"warehouse_id": int(warehouse_id) if warehouse_id else None,
+			"lot_id": int(lot_id) if lot_id is not None else None,
+			"instance_id": int(instance_id) if instance_id is not None else None,
+			"lot_code": item.get("lot_code"),
+			"variant_id": item.get("variant_id"),
+			"manufacturing_date": item.get("manufacturing_date"),
+			"expiry_date": item.get("expiry_date"),
 			"system_quantity": float(system_quantity),
 			"physical_quantity": float(physical_quantity),
 			"difference": float(difference),
@@ -4806,6 +5236,56 @@ def create_stock_count_adjustment(
 				"difference": item.get("difference"),
 			},
 		)
+		if item.get("instance_id"):
+			stamped_extra = dict(stamped_extra or {})
+			try:
+				iid = int(item.get("instance_id"))
+			except (TypeError, ValueError):
+				iid = None
+			if iid is not None:
+				stamped_extra["instance_ids"] = [iid]
+				stamped_extra["selected_instance_ids"] = [iid]
+				if movement == "out":
+					from adapters.db.models.product_instance import ProductInstance
+
+					instance = (
+						db.query(ProductInstance)
+						.filter(
+							and_(
+								ProductInstance.id == iid,
+								ProductInstance.business_id == int(business_id),
+								ProductInstance.product_id == int(product_id),
+								ProductInstance.status == "available",
+							)
+						)
+						.first()
+					)
+					if instance is None:
+						raise ApiError(
+							"INSTANCE_NOT_FOUND",
+							f"واحد یونیک {iid} در دسترس نیست",
+							http_status=404,
+						)
+					instance.status = "sold"
+					instance.warehouse_id = None
+					instance.last_movement_date = stock_count_date
+		if item.get("lot_id") or item.get("lot_allocations") or item.get("lot_code"):
+			stamped_extra = dict(stamped_extra or {})
+			if item.get("variant_id") is not None:
+				stamped_extra["variant_id"] = item.get("variant_id")
+			if item.get("lot_allocations"):
+				stamped_extra["lot_allocations"] = item.get("lot_allocations")
+			elif item.get("lot_id") or item.get("lot_code"):
+				stamped_extra["lot_allocations"] = [
+					{
+						"lot_id": item.get("lot_id"),
+						"lot_code": item.get("lot_code"),
+						"variant_id": item.get("variant_id"),
+						"manufacturing_date": item.get("manufacturing_date"),
+						"expiry_date": item.get("expiry_date"),
+						"quantity": quantity,
+					}
+				]
 		line = WarehouseDocumentLine(
 			warehouse_document_id=wh.id,
 			product_id=int(product_id),
@@ -4815,6 +5295,19 @@ def create_stock_count_adjustment(
 			extra_info=stamped_extra,
 		)
 		db.add(line)
+		db.flush()
+		_attach_variant_allocations_for_warehouse_line(
+			db,
+			business_id,
+			wh,
+			line,
+			product,
+			{
+				"quantity": quantity,
+				"extra_info": stamped_extra,
+				"lot_allocations": (stamped_extra or {}).get("lot_allocations"),
+			},
+		)
 	
 	db.flush()
 	return wh
@@ -4854,7 +5347,9 @@ def get_physical_stock_bulk(
 		return {}
 
 	if as_of_date is None:
-		as_of_date = datetime.now().date()
+		from app.core.business_calendar import business_today
+
+		as_of_date = business_today(business_id)
 
 	lines_query = (
 		db.query(WarehouseDocumentLine, WarehouseDocument)

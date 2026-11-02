@@ -659,6 +659,7 @@ class DistributionVanLot(Base):
 	van_id: Mapped[int] = mapped_column(Integer, ForeignKey("distribution_vans.id", ondelete="CASCADE"), index=True)
 	product_id: Mapped[int] = mapped_column(Integer, ForeignKey("products.id", ondelete="CASCADE"), index=True)
 	lot_code: Mapped[str] = mapped_column(String(64), nullable=False, default="-")
+	manufacturing_date: Mapped[date | None] = mapped_column(Date, nullable=True)
 	expiry_date: Mapped[date | None] = mapped_column(Date, nullable=True)
 	quantity: Mapped[float] = mapped_column(Numeric(18, 3), nullable=False, default=0)
 	unit_weight_kg: Mapped[float | None] = mapped_column(Numeric(12, 3), nullable=True)

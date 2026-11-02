@@ -18,6 +18,7 @@ from adapters.db.models.production_order import (
 	ProductionOrderOutput,
 )
 from adapters.db.models.warehouse import Warehouse
+from app.core.business_calendar import business_today
 from app.core.responses import ApiError
 
 
@@ -29,6 +30,34 @@ UNIT_COST_QUANT = Decimal("0.000001")
 
 def _as_decimal(value: Any) -> Decimal:
 	return Decimal(str(value or 0))
+
+
+def _parse_optional_date(value: Any) -> Optional[date]:
+	if value in (None, ""):
+		return None
+	if isinstance(value, datetime):
+		return value.date()
+	if isinstance(value, date):
+		return value
+	try:
+		return date.fromisoformat(str(value)[:10])
+	except ValueError as exc:
+		raise ApiError("INVALID_LOT_DATE", "تاریخ لات نامعتبر است", http_status=422) from exc
+
+
+def _issuable_stock(
+	db: Session,
+	business_id: int,
+	product: Product,
+	warehouse_id: Optional[int],
+	as_of: date,
+) -> Decimal:
+	from app.services.invoice_service import _compute_available_stock
+	from app.services.inventory_lot_service import is_expiry_tracked_product, sellable_quantity
+
+	if is_expiry_tracked_product(product):
+		return _as_decimal(sellable_quantity(db, business_id, product, warehouse_id, as_of))
+	return _as_decimal(_compute_available_stock(db, business_id, int(product.id), warehouse_id, as_of))
 
 
 def _money(value: Decimal) -> Decimal:
@@ -373,6 +402,8 @@ def get_production_order_costing(db: Session, business_id: int, order_id: int) -
 			"actual_total_cost": m.actual_total_cost,
 			"cost_variance": _as_decimal(m.actual_total_cost) - _as_decimal(m.standard_total_cost),
 			"lot_code": m.lot_code,
+			"manufacturing_date": m.manufacturing_date.isoformat() if getattr(m, "manufacturing_date", None) else None,
+			"expiry_date": m.expiry_date.isoformat() if getattr(m, "expiry_date", None) else None,
 		}
 		for m in materials
 	]
@@ -423,6 +454,8 @@ def get_production_order_costing(db: Session, business_id: int, order_id: int) -
 				"actual_total_cost": o.actual_total_cost,
 				"cost_variance": _as_decimal(o.actual_total_cost) - _as_decimal(o.standard_total_cost),
 				"lot_code": o.lot_code,
+				"manufacturing_date": o.manufacturing_date.isoformat() if getattr(o, "manufacturing_date", None) else None,
+				"expiry_date": o.expiry_date.isoformat() if getattr(o, "expiry_date", None) else None,
 			}
 			for o in outputs
 		],
@@ -456,6 +489,20 @@ def update_production_order_lots(
 			if _as_decimal(material.issued_quantity) > 0 and new_code != material.lot_code:
 				raise ApiError("PRODUCTION_MATERIAL_LOT_LOCKED", "پس از صدور ماده از انبار، کد لات آن قابل تغییر نیست", http_status=409)
 			material.lot_code = new_code
+			if "manufacturing_date" in row:
+				material.manufacturing_date = _parse_optional_date(row.get("manufacturing_date"))
+			if "expiry_date" in row:
+				material.expiry_date = _parse_optional_date(row.get("expiry_date"))
+			if "selected_instance_ids" in row:
+				from sqlalchemy.orm.attributes import flag_modified
+
+				extra = dict(order.extra_info or {})
+				ids_map = dict(extra.get("material_instance_ids") or {})
+				raw_ids = row.get("selected_instance_ids") or []
+				ids_map[str(material.id)] = [int(x) for x in raw_ids] if isinstance(raw_ids, list) else []
+				extra["material_instance_ids"] = ids_map
+				order.extra_info = extra
+				flag_modified(order, "extra_info")
 	if output_lots:
 		by_id = {int(o.id): o for o in order.outputs}
 		for row in output_lots:
@@ -468,6 +515,10 @@ def update_production_order_lots(
 			if _as_decimal(output.produced_quantity) > 0 and new_code != output.lot_code:
 				raise ApiError("PRODUCTION_OUTPUT_LOT_LOCKED", "پس از ثبت ورود محصول، کد لات آن قابل تغییر نیست", http_status=409)
 			output.lot_code = new_code
+			if "manufacturing_date" in row:
+				output.manufacturing_date = _parse_optional_date(row.get("manufacturing_date"))
+			if "expiry_date" in row:
+				output.expiry_date = _parse_optional_date(row.get("expiry_date"))
 			if row.get("scrap_quantity") is not None:
 				scrap = _as_decimal(row.get("scrap_quantity"))
 				if scrap < 0:
@@ -554,7 +605,13 @@ def _order_dict(db: Session, order: ProductionOrder) -> Dict[str, Any]:
 	products = {}
 	if material_product_ids | output_product_ids:
 		products = {
-			int(p.id): {"name": p.name, "code": p.code, "main_unit": p.main_unit}
+			int(p.id): {
+				"name": p.name,
+				"code": p.code,
+				"main_unit": p.main_unit,
+				"inventory_mode": getattr(p, "inventory_mode", None) or "bulk",
+				"track_expiry": bool(getattr(p, "track_expiry", False)),
+			}
 			for p in db.query(Product).filter(Product.id.in_(material_product_ids | output_product_ids)).all()
 		}
 	std_total = _as_decimal(order.standard_materials_cost) + _as_decimal(order.standard_operations_cost)
@@ -610,6 +667,13 @@ def _order_dict(db: Session, order: ProductionOrder) -> Dict[str, Any]:
 				"standard_total_cost": m.standard_total_cost,
 				"actual_total_cost": m.actual_total_cost,
 				"lot_code": m.lot_code,
+				"manufacturing_date": m.manufacturing_date.isoformat() if getattr(m, "manufacturing_date", None) else None,
+				"expiry_date": m.expiry_date.isoformat() if getattr(m, "expiry_date", None) else None,
+				"selected_instance_ids": list(
+					((order.extra_info or {}).get("material_instance_ids") or {}).get(str(m.id)) or []
+				),
+				"inventory_mode": products.get(m.product_id, {}).get("inventory_mode") or "bulk",
+				"track_expiry": bool(products.get(m.product_id, {}).get("track_expiry")),
 				"bom_path": m.bom_path,
 				"is_optional": m.is_optional,
 				"source_bom_id": m.source_bom_id,
@@ -631,6 +695,10 @@ def _order_dict(db: Session, order: ProductionOrder) -> Dict[str, Any]:
 				"standard_total_cost": o.standard_total_cost,
 				"actual_total_cost": o.actual_total_cost,
 				"lot_code": o.lot_code,
+				"manufacturing_date": o.manufacturing_date.isoformat() if getattr(o, "manufacturing_date", None) else None,
+				"expiry_date": o.expiry_date.isoformat() if getattr(o, "expiry_date", None) else None,
+				"inventory_mode": products.get(o.product_id, {}).get("inventory_mode") or "bulk",
+				"track_expiry": bool(products.get(o.product_id, {}).get("track_expiry")),
 			}
 			for o in outputs
 		],
@@ -672,7 +740,7 @@ def create_production_order(
 		raise ApiError("BOM_NOT_FOUND", "فرمول تولید برای این محصول یافت نشد", http_status=404)
 	if (bom.status or "").strip().lower() != "approved":
 		raise ApiError("BOM_NOT_APPROVED", "برای ایجاد سفارش تولید، نسخهٔ تأییدشدهٔ BOM لازم است", http_status=409)
-	as_of = payload.planned_start_date or date.today()
+	as_of = payload.planned_start_date or business_today(business_id)
 	if bom.effective_from and as_of < bom.effective_from:
 		raise ApiError("BOM_NOT_EFFECTIVE", "تاریخ شروع سفارش پیش از تاریخ اثر فرمول است", http_status=409)
 	if bom.effective_to and as_of > bom.effective_to:
@@ -800,9 +868,8 @@ def get_production_material_plan(
 		):
 			row["earliest_due_date"] = order.due_date
 
-	from app.services.invoice_service import _compute_available_stock
-
 	items = []
+	as_of = business_today(business_id)
 	for (product_id, warehouse_id), row in groups.items():
 		product = db.query(Product).filter(
 			Product.id == product_id,
@@ -814,15 +881,13 @@ def get_production_material_plan(
 		).first()
 		if not product or not warehouse:
 			continue
-		physical = _as_decimal(_compute_available_stock(
-			db, int(business_id), product_id, warehouse_id, date.today()
-		))
+		physical = _issuable_stock(db, int(business_id), product, warehouse_id, as_of)
 		required = row["required_quantity"]
 		active_reserved = _active_reserved_quantity(db, business_id, product_id, warehouse_id)
 		free = max(physical - active_reserved, Decimal("0"))
 		unreserved_demand = max(required - row["reserved_quantity"], Decimal("0"))
 		shortage = max(unreserved_demand - free, Decimal("0"))
-		planning_date = row["earliest_due_date"] or date.today()
+		planning_date = row["earliest_due_date"] or as_of
 		make_bom = db.query(ProductBOM.id).filter(
 			ProductBOM.business_id == int(business_id),
 			ProductBOM.product_id == product_id,
@@ -855,7 +920,7 @@ def get_production_material_plan(
 	))
 	return {
 		"business_id": int(business_id),
-		"as_of_date": date.today().isoformat(),
+		"as_of_date": as_of.isoformat(),
 		"due_from": due_from.isoformat() if due_from else None,
 		"due_to": due_to.isoformat() if due_to else None,
 		"items": items,
@@ -886,7 +951,7 @@ def update_production_order(db: Session, business_id: int, order_id: int, payloa
 		).first()
 		if not bom or (bom.status or "").strip().lower() != "approved":
 			raise ApiError("BOM_NOT_APPROVED", "نسخهٔ تأییدشدهٔ فرمول سفارش دیگر در دسترس نیست", http_status=409)
-		as_of = new_start or date.today()
+		as_of = new_start or business_today(business_id)
 		if bom.effective_from and as_of < bom.effective_from:
 			raise ApiError("BOM_NOT_EFFECTIVE", "تاریخ شروع سفارش پیش از تاریخ اثر فرمول است", http_status=409)
 		if bom.effective_to and as_of > bom.effective_to:
@@ -904,7 +969,7 @@ def update_production_order(db: Session, business_id: int, order_id: int, payloa
 			order.planned_quantity = values["quantity"]
 		from adapters.api.v1.schema_models.product_bom import BOMExplosionRequest
 		from app.services.bom_service import explode_bom
-		as_of = new_start or date.today()
+		as_of = new_start or business_today(business_id)
 		explosion = explode_bom(
 			db,
 			business_id,
@@ -937,7 +1002,6 @@ def release_production_order(db: Session, business_id: int, order_id: int, expec
 	if not order.materials or not order.outputs:
 		raise ApiError("PRODUCTION_ORDER_INCOMPLETE", "سفارش باید مواد و خروجی‌های معتبر داشته باشد", http_status=409)
 	from app.core.transaction_lock import acquire_transaction_lock
-	from app.services.invoice_service import _compute_available_stock
 
 	keys = sorted({(m.product_id, m.warehouse_id) for m in order.materials if not m.is_optional})
 	for product_id, warehouse_id in keys:
@@ -958,7 +1022,9 @@ def release_production_order(db: Session, business_id: int, order_id: int, expec
 		requirement = tracked_requirements.setdefault(key, {"quantity": Decimal("0"), "product": product})
 		requirement["quantity"] += _as_decimal(material.planned_quantity)
 	for (product_id, warehouse_id), requirement in tracked_requirements.items():
-		physical = _compute_available_stock(db, business_id, product_id, warehouse_id, date.today())
+		physical = _issuable_stock(
+			db, business_id, requirement["product"], warehouse_id, business_today(business_id)
+		)
 		reserved = _active_reserved_quantity(db, business_id, product_id, warehouse_id, exclude_order_id=order.id)
 		available = physical - reserved
 		if available < requirement["quantity"]:

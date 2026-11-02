@@ -20,6 +20,14 @@ void main() {
           'unit': 'عدد',
           'warehouse_id': 3,
           'selected_instance_ids': [9],
+          'lot_allocations': [
+            {
+              'lot_id': 4,
+              'lot_code': 'L-1',
+              'expiry_date': '2026-12-01',
+              'quantity': 2,
+            }
+          ],
         },
       },
     ]);
@@ -36,5 +44,7 @@ void main() {
     expect(item.warehouseId, 3);
     expect(item.selectedInstanceIds, isNull);
     expect(item.extraInfo?['selected_instance_ids'], isNull);
+    expect(item.extraInfo?['returned_from_instance_ids'], [9]);
+    expect(item.extraInfo?['lot_allocations'], isNotEmpty);
   });
 }

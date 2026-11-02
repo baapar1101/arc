@@ -70,6 +70,8 @@ abstract class ListFilterPageIds {
       'slow_moving_items_report_table';
   static const String criticalStockReportTable =
       'critical_stock_report_table';
+  static const String expiryStockReportTable =
+      'expiry_stock_report_table';
   static const String salesByProductReportTable =
       'sales_by_product_report_table';
   static const String materialsConsumptionReportTable =

@@ -16,6 +16,7 @@ import '../../utils/number_normalizer.dart' show EnglishDigitsFormatter, formatN
 import '../../core/calendar_controller.dart';
 import './unique_product_instance_selector_dialog.dart';
 import './invoice_line_variant_picker_dialog.dart';
+import './invoice_line_lot_picker_dialog.dart';
 import './invoice_line_attributes_dialog.dart';
 import '../../services/product_service.dart';
 import '../../services/warehouse_service.dart';
@@ -537,6 +538,88 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     return (product['variant_mode']?.toString() ?? 'none') == 'inventory';
   }
 
+  bool _shouldShowLotPicker(InvoiceLineItem item) {
+    if (item.productId == null) return false;
+    final product = _productCache[item.productId];
+    if (product == null) return false;
+    if (product['track_expiry'] != true) return false;
+    if ((product['inventory_mode']?.toString() ?? 'bulk') == 'unique') return false;
+    return true;
+  }
+
+  bool get _lotPickerInbound {
+    final t = widget.invoiceType;
+    return t == 'purchase' || t == 'sales_return';
+  }
+
+  bool get _canConfirmExpired =>
+      widget.authStore?.canConfirmExpiredSale() ?? false;
+
+  bool _productAllowsExpiredConfirm(Map<String, dynamic> product) {
+    if (widget.invoiceType == 'waste') return true;
+    return _canConfirmExpired &&
+        product['expired_sale_policy']?.toString() == 'manager_confirm';
+  }
+
+  String _lotAllocationsSummary(InvoiceLineItem item) {
+    final t = AppLocalizations.of(context);
+    final allocs = lotAllocationsFromExtra(item.extraInfo);
+    if (allocs.isEmpty) {
+      return _lotPickerInbound ? t.lotPickerInboundPrompt : t.quickSalesFefoSummary;
+    }
+    return allocs.map((e) {
+      final code = e['lot_code']?.toString() ?? '-';
+      final exp = e['expiry_date']?.toString() ?? '';
+      return exp.isEmpty ? '$code: ${e['quantity']}' : '$code / $exp: ${e['quantity']}';
+    }).join('، ');
+  }
+
+  Future<void> _selectLotAllocations(int index, InvoiceLineItem item) async {
+    if (item.productId == null) return;
+    await _loadProductInfo(item.productId!);
+    if (!mounted) return;
+    if (!_shouldShowLotPicker(item)) return;
+    final product = _productCache[item.productId!]!;
+    final variantAllocs = allocationsFromExtra(item.extraInfo);
+    int? variantId;
+    if (variantAllocs.length == 1) {
+      variantId = (variantAllocs.first['variant_id'] as num?)?.toInt();
+    } else {
+      variantId = (item.extraInfo?['variant_id'] as num?)?.toInt();
+    }
+    final result = await showDialog<List<Map<String, dynamic>>>(
+      context: context,
+      builder: (context) => InvoiceLineLotPickerDialog(
+        businessId: widget.businessId,
+        productId: item.productId!,
+        productName: item.productName ?? product['name']?.toString() ?? '',
+        lineQuantity: item.quantity,
+        warehouseId: item.warehouseId,
+        variantId: variantId,
+        initialAllocations: lotAllocationsFromExtra(item.extraInfo),
+        inbound: _lotPickerInbound,
+        includeUnsellable: _productAllowsExpiredConfirm(product),
+        calendarController: widget.calendarController,
+      ),
+    );
+    if (result == null || !mounted) return;
+    final ei = Map<String, dynamic>.from(item.extraInfo ?? {});
+    ei['lot_allocations'] = result;
+    final today = DateTime.now();
+    final pickedExpired = result.any((row) {
+      final raw = row['expiry_date']?.toString();
+      if (raw == null || raw.isEmpty) return row['status'] == 'expired' || row['status'] == 'blocked';
+      final exp = DateTime.tryParse(raw);
+      return exp != null && !exp.isAfter(DateTime(today.year, today.month, today.day));
+    });
+    if (pickedExpired && _productAllowsExpiredConfirm(product)) {
+      ei['allow_expired_lot_sale'] = true;
+    } else {
+      ei.remove('allow_expired_lot_sale');
+    }
+    _updateRow(index, item.copyWith(extraInfo: ei));
+  }
+
   String _variantAllocationsSummary(InvoiceLineItem item) {
     final t = AppLocalizations.of(context);
     final allocs = allocationsFromExtra(item.extraInfo);
@@ -616,7 +699,6 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
       return;
     }
     
-    final product = _productCache[item.productId!]!;
     final quantity = item.quantity.toInt();
     
     if (quantity <= 0) {
@@ -624,7 +706,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
       return;
     }
     
-    final selectedIds = await showDialog<List<int>>(
+    final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => UniqueProductInstanceSelectorDialog(
         businessId: widget.businessId,
@@ -634,12 +716,25 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
         selectedInstanceIds: item.selectedInstanceIds,
         requiredQuantity: quantity,
         calendarController: widget.calendarController!,
+        forReturn: widget.invoiceType == 'sales_return',
+        allowExpiredConfirm: _canConfirmExpired,
+        includeUnsellable: widget.invoiceType == 'waste',
       ),
     );
     
-    if (selectedIds != null && mounted) {
+    if (result != null && mounted) {
+      final selectedIds = ((result['ids'] as List?) ?? const [])
+          .map((e) => int.tryParse(e.toString()))
+          .whereType<int>()
+          .toList();
+      final ei = Map<String, dynamic>.from(item.extraInfo ?? {});
+      if (result['allow_expired_lot_sale'] == true) {
+        ei['allow_expired_lot_sale'] = true;
+      } else {
+        ei.remove('allow_expired_lot_sale');
+      }
       setState(() {
-        _rows[index] = item.copyWith(selectedInstanceIds: selectedIds);
+        _rows[index] = item.copyWith(selectedInstanceIds: selectedIds, extraInfo: ei);
       });
       _notify();
     }
@@ -1958,6 +2053,29 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 ),
               ),
             ],
+            if (_shouldShowLotPicker(item)) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.teal.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.teal.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.event, size: 20, color: Colors.teal),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(_lotAllocationsSummary(item))),
+                    TextButton.icon(
+                      onPressed: () => _selectLotAllocations(index, item),
+                      icon: const Icon(Icons.arrow_forward, size: 18),
+                      label: Text(AppLocalizations.of(context).lotAndDates),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             if (_shouldShowInstanceSelector(item)) ...[
               SizedBox(height: 12),
               Container(
@@ -2302,6 +2420,37 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                           onPressed: () => _selectVariantAllocations(index, item),
                           icon: const Icon(Icons.arrow_forward, size: 18),
                           label: Text(AppLocalizations.of(context).productVariantSelectCombination),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (_shouldShowLotPicker(item)) ...[
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(width: 48),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.teal.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.event, size: 18, color: Colors.teal),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(_lotAllocationsSummary(item))),
+                        TextButton.icon(
+                          onPressed: () => _selectLotAllocations(index, item),
+                          icon: const Icon(Icons.arrow_forward, size: 18),
+                          label: Text(AppLocalizations.of(context).lotAndDates),
                         ),
                       ],
                     ),

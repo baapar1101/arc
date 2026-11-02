@@ -7,7 +7,7 @@ import contextvars
 import logging
 import secrets
 from datetime import date, datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_
 
@@ -692,7 +692,9 @@ def maybe_fire_inventory_low_triggers(
             return
         if min_f < 0:
             return
-        as_of = datetime.utcnow().date()
+        from app.core.business_calendar import business_today
+
+        as_of = business_today(business_id)
         current = float(
             _compute_available_stock(db, business_id, int(product_id), warehouse_id, as_of)
         )
@@ -708,6 +710,93 @@ def maybe_fire_inventory_low_triggers(
         trigger_workflows(db, business_id, "inventory.low", trigger_data, user_id)
     except Exception as e:
         logger.warning("maybe_fire_inventory_low_triggers failed: %s", e, exc_info=True)
+
+
+def fire_inventory_expiry_scan(db: Session, business_id: int, user_id: Optional[int] = None) -> int:
+    """اسکن روزانهٔ لات‌های نزدیک/منقضی برای تریگر و اعلان."""
+    from adapters.db.models.product import Product
+
+    products = (
+        db.query(Product.id)
+        .filter(
+            Product.business_id == int(business_id),
+            Product.track_inventory == True,  # noqa: E712
+            Product.track_expiry == True,  # noqa: E712
+        )
+        .all()
+    )
+    fired = 0
+    for row in products:
+        before = fired
+        maybe_fire_inventory_expiry_triggers(db, int(business_id), int(row.id), None, user_id)
+        fired = before + 1
+    return fired
+
+
+def maybe_fire_inventory_expiry_triggers(
+    db: Session,
+    business_id: int,
+    product_id: int,
+    warehouse_id: Optional[int],
+    user_id: Optional[int] = None,
+) -> None:
+    try:
+        from adapters.db.models.product import Product
+        from adapters.db.models.product_instance import ProductInstance
+        from app.services.inventory_lot_service import (
+            instance_expiry_view,
+            is_expiry_tracked_product,
+            list_lot_balances,
+        )
+
+        product = db.query(Product).filter(Product.id == int(product_id)).first()
+        if product is None or not is_expiry_tracked_product(product):
+            return
+        from app.core.business_calendar import business_today
+
+        as_of = business_today(business_id)
+        rows: List[Dict[str, Any]] = []
+        if str(getattr(product, "inventory_mode", None) or "bulk") == "unique":
+            q = db.query(ProductInstance).filter(
+                ProductInstance.business_id == int(business_id),
+                ProductInstance.product_id == int(product_id),
+                ProductInstance.status == "available",
+            )
+            if warehouse_id is not None:
+                q = q.filter(ProductInstance.warehouse_id == int(warehouse_id))
+            for inst in q.all():
+                view = instance_expiry_view(inst, product, as_of)
+                rows.append({
+                    "lot_code": inst.serial_number,
+                    "manufacturing_date": view.get("manufacturing_date").isoformat() if view.get("manufacturing_date") else None,
+                    "expiry_date": view.get("expiry_date").isoformat() if view.get("expiry_date") else None,
+                    "remaining_days": view.get("remaining_days"),
+                    "quantity_main": 1,
+                    "status": view.get("status"),
+                    "warehouse_id": int(inst.warehouse_id) if inst.warehouse_id else None,
+                })
+        else:
+            rows = list_lot_balances(db, business_id, int(product_id), warehouse_id, as_of, sellable_only=False)
+        for row in rows:
+            status = str(row.get("status") or "")
+            if status not in {"near_expiry", "blocked", "expired"}:
+                continue
+            trigger_data: Dict[str, Any] = {
+                "product_id": int(product_id),
+                "product_name": getattr(product, "name", None),
+                "lot_code": row.get("lot_code"),
+                "manufacturing_date": row.get("manufacturing_date"),
+                "expiry_date": row.get("expiry_date"),
+                "remaining_days": row.get("remaining_days"),
+                "quantity_main": row.get("quantity_main"),
+                "status": status,
+            }
+            wh = warehouse_id if warehouse_id is not None else row.get("warehouse_id")
+            if wh is not None:
+                trigger_data["warehouse_id"] = int(wh)
+            trigger_workflows(db, business_id, "inventory.expires_soon", trigger_data, user_id)
+    except Exception as e:
+        logger.warning("maybe_fire_inventory_expiry_triggers failed: %s", e, exc_info=True)
 
 
 def _check_type_trigger_value(check_type: Any) -> str:

@@ -31,6 +31,7 @@ from adapters.db.models.tax_unit import TaxUnit
 from adapters.db.models.product_bom import ProductBOM, ProductBOMOutput
 from adapters.db.models.business import Business
 from app.core.calendar import CalendarConverter, CalendarType
+from app.core.business_calendar import business_today
 from app.core.responses import ApiError, success_response
 from app.core.transaction_lock import acquire_transaction_lock
 from app.services.document_monetization_service import ensure_document_policy_allows_creation
@@ -1560,7 +1561,7 @@ def get_financial_stock_bulk(
         return {}
     
     if as_of_date is None:
-        as_of_date = datetime.now().date()
+        as_of_date = business_today(business_id)
     
     # دریافت حرکات از اسناد مالی
     movements = _iter_product_movements(
@@ -1612,6 +1613,7 @@ def collect_stock_shortages(
     exclude_warehouse_document_ids: Optional[List[int]] = None,
     exclude_production_order_id: Optional[int] = None,
     include_production_reservations: bool = False,
+    enforce_sellable: bool = False,
 ) -> List[Dict[str, Any]]:
     # تجمیع نیاز خروجی به تفکیک کالا/انبار
     pending_required: List[Tuple[int, Optional[int], Decimal, Dict[str, Any]]] = []
@@ -1639,6 +1641,9 @@ def collect_stock_shortages(
                 Product.unit_conversion_factor,
                 Product.inventory_mode,
                 Product.variant_mode,
+                Product.track_inventory,
+                Product.track_expiry,
+                Product.min_remaining_shelf_life_days,
             )
             .filter(Product.business_id == business_id, Product.id.in_(pids))
             .all()
@@ -1718,6 +1723,34 @@ def collect_stock_shortages(
             if exclude_production_order_id is not None:
                 reserved_query = reserved_query.filter(ProductionOrder.id != int(exclude_production_order_id))
             avail -= Decimal(str(reserved_query.scalar() or 0))
+        product_row = product_units.get(pid)
+        from app.services.inventory_lot_service import is_expiry_tracked_product, sellable_quantity
+
+        allow_expired_line = any(
+            extra_info_dict(ln.get("extra_info")).get("allow_expired_lot_sale")
+            or extra_info_dict(ln.get("extra_info")).get("manager_confirm_expired")
+            for ln in outgoing_lines
+            if int(ln.get("product_id") or 0) == int(pid)
+        )
+        if (
+            enforce_sellable
+            and not allow_expired_line
+            and product_row is not None
+            and is_expiry_tracked_product(product_row)
+        ):
+            sellable = sellable_quantity(
+                db,
+                business_id,
+                product_row,
+                wh_id,
+                document_date,
+                exclude_document_id=exclude_document_id,
+                variant_id=int(variant_id) if variant_id is not None else None,
+                exclude_invoice_source_document_id=exclude_invoice_source_document_id,
+                exclude_warehouse_document_ids=exclude_warehouse_document_ids,
+            )
+            if sellable < req:
+                avail = sellable
         if avail < req:
             pname, pcode = product_labels.get(pid, ("", ""))
             shortages.append(
@@ -1759,6 +1792,121 @@ def _persist_invoice_variant_allocations(
         if not product:
             continue
         persist_invoice_allocations(db, int(business_id), item, product, payload)
+    _persist_invoice_lot_allocations(db, business_id, created_lines, products)
+
+
+def _apply_expired_sale_confirm_permission(
+    invoice_type: str,
+    lines_input: List[Dict[str, Any]],
+    *,
+    user_can_confirm_expired_sale: bool,
+) -> None:
+    """پرچم فروش منقضی را فقط برای پسماند یا کاربر مجاز نگه می‌دارد."""
+    if invoice_type == INVOICE_WASTE or user_can_confirm_expired_sale:
+        return
+    for ln in lines_input:
+        extra = ln.get("extra_info")
+        if not isinstance(extra, dict):
+            continue
+        extra.pop("allow_expired_lot_sale", None)
+        extra.pop("manager_confirm_expired", None)
+
+
+def _invoice_line_movement(document: Document, extra: Dict[str, Any]) -> str:
+    explicit = extra.get("movement")
+    if explicit in ("in", "out"):
+        return str(explicit)
+    doc_type = str(document.document_type or "")
+    if doc_type in (INVOICE_SALES, INVOICE_PURCHASE_RETURN, INVOICE_WASTE, INVOICE_DIRECT_CONSUMPTION):
+        return "out"
+    if doc_type in (INVOICE_PURCHASE, INVOICE_SALES_RETURN, "opening_balance"):
+        return "in"
+    return str(explicit or "out")
+
+
+def _persist_invoice_lot_allocations(
+    db: Session,
+    business_id: int,
+    created_lines: List[tuple[InvoiceItemLine, Dict[str, Any]]],
+    products: Dict[int, Product],
+) -> None:
+    if not created_lines:
+        return
+    from app.services.inventory_lot_allocation_service import persist_invoice_lot_allocations
+
+    doc_ids = {int(item.document_id) for item, _ in created_lines}
+    docs = {
+        int(d.id): d
+        for d in db.query(Document).filter(Document.id.in_(list(doc_ids))).all()
+    } if doc_ids else {}
+    for item, payload in created_lines:
+        product = products.get(int(item.product_id))
+        if not product:
+            continue
+        document = docs.get(int(item.document_id))
+        if document is None:
+            continue
+        extra = extra_info_dict(item.extra_info)
+        payload_extra = extra_info_dict(payload.get("extra_info") if isinstance(payload, dict) else None)
+        extra = {**payload_extra, **extra}
+        movement = _invoice_line_movement(document, extra)
+        wh_raw = extra.get("warehouse_id")
+        try:
+            warehouse_id = int(wh_raw) if wh_raw is not None else None
+        except (TypeError, ValueError):
+            warehouse_id = None
+        if warehouse_id is None:
+            header = extra_info_dict(document.extra_info)
+            try:
+                warehouse_id = int(header.get("warehouse_id")) if header.get("warehouse_id") is not None else None
+            except (TypeError, ValueError):
+                warehouse_id = None
+        allow_confirm = bool(extra.get("allow_expired_lot_sale") or extra.get("manager_confirm_expired"))
+        allow_unsellable = None
+        restore_from_sales = False
+        source_invoice_id = None
+        doc_type = str(document.document_type or "")
+        if doc_type == INVOICE_WASTE:
+            allow_confirm = True
+            allow_unsellable = True
+        if doc_type == INVOICE_SALES_RETURN:
+            restore_from_sales = True
+            header = extra_info_dict(document.extra_info)
+            source_raw = (
+                extra.get("returned_from_invoice_id")
+                or extra.get("source_invoice_id")
+                or extra.get("copy_from_invoice_id")
+                or header.get("returned_from_invoice_id")
+                or header.get("source_invoice_id")
+                or header.get("copy_from_invoice_id")
+            )
+            try:
+                source_invoice_id = int(source_raw) if source_raw is not None else None
+            except (TypeError, ValueError):
+                source_invoice_id = None
+        if doc_type == "opening_balance":
+            extra["allow_undated_opening"] = True
+            payload_extra["allow_undated_opening"] = True
+            if isinstance(payload, dict):
+                merged = dict(payload)
+                extra_payload = extra_info_dict(merged.get("extra_info"))
+                extra_payload["allow_undated_opening"] = True
+                merged["extra_info"] = extra_payload
+                payload = merged
+        persist_invoice_lot_allocations(
+            db,
+            int(business_id),
+            item,
+            product,
+            payload if isinstance(payload, dict) else {},
+            movement=movement,
+            warehouse_id=warehouse_id,
+            document_date=document.document_date or business_today(business_id),
+            allow_expired_confirm=allow_confirm,
+            allow_unsellable=allow_unsellable,
+            restore_from_sales=restore_from_sales,
+            source_invoice_id=source_invoice_id,
+        )
 
 
 def _acquire_inventory_stock_locks(
@@ -1916,18 +2064,22 @@ def _validate_outgoing_stock_before_invoice_commit(
         except (TypeError, ValueError):
             raise ApiError("WAREHOUSE_REQUIRED", "شناسه انبار نامعتبر است", http_status=400)
         from app.services.variant_allocation_service import parse_payload_allocations
+        from app.services.inventory_lot_allocation_service import parse_payload_lot_allocations
 
         outgoing_lines.append(
             {
                 "product_id": int(pid),
                 "quantity": float(qty),
                 "allocations": parse_payload_allocations(ln),
+                "lot_allocations": parse_payload_lot_allocations(ln),
                 "extra_info": {
                     "warehouse_id": wh_id,
                     "movement": "out",
                     "inventory_tracked": True,
                     "unit": extra.get("unit"),
                     "inventory_quantity_unit": extra.get("inventory_quantity_unit"),
+                    "allow_expired_lot_sale": extra.get("allow_expired_lot_sale"),
+                    "lot_allocations": extra.get("lot_allocations"),
                 },
             }
         )
@@ -1965,6 +2117,10 @@ def _validate_outgoing_stock_before_invoice_commit(
         include_production_reservations=(
             getattr(document, "document_type", None) == INVOICE_PRODUCTION
             and (document.extra_info or {}).get("production_order_id") is not None
+        ),
+        enforce_sellable=str(getattr(document, "document_type", None) or "") in (
+            INVOICE_SALES,
+            INVOICE_PURCHASE_RETURN,
         ),
     )
     if not shortages:
@@ -3174,15 +3330,24 @@ def _attach_production_order_lots_to_invoice_lines(
 		return
 	material_rows = db.query(ProductionOrderMaterial).filter(ProductionOrderMaterial.production_order_id == order.id).all()
 	output_rows = db.query(ProductionOrderOutput).filter(ProductionOrderOutput.production_order_id == order.id).all()
+	from adapters.db.models.product import Product as ProductModel
+	from app.services.inventory_lot_service import pick_unique_instances_fefo
+
 	for line in lines_input:
 		extra = dict(line.get("extra_info") or {})
-		if extra.get("lot_code"):
-			continue
 		movement = extra.get("movement")
 		pid = line.get("product_id")
 		if not pid:
 			continue
 		pid = int(pid)
+		product = (
+			db.query(ProductModel)
+			.filter(ProductModel.id == pid, ProductModel.business_id == int(business_id))
+			.first()
+		)
+		is_unique = product is not None and str(getattr(product, "inventory_mode", None) or "bulk") == "unique"
+		if extra.get("lot_code") and not is_unique:
+			continue
 		if movement == "out":
 			rows = [row for row in material_rows if int(row.product_id) == pid]
 			row_id = extra.get("production_order_material_id")
@@ -3209,8 +3374,51 @@ def _attach_production_order_lots_to_invoice_lines(
 		# duplicate lines, assigning a lot or standard cost to an arbitrary row
 		# would corrupt traceability and valuation.
 		row = rows[0] if len(rows) == 1 else None
-		if row and row.lot_code:
-			extra["lot_code"] = row.lot_code
+		if is_unique:
+			if movement == "out" and not (extra.get("selected_instance_ids") or extra.get("instance_ids")):
+				stored = None
+				if row is not None:
+					stored = ((order.extra_info or {}).get("material_instance_ids") or {}).get(str(row.id))
+				if stored:
+					ids = [int(x) for x in stored]
+				else:
+					wh_id = extra.get("warehouse_id")
+					if wh_id is None and row is not None:
+						wh_id = getattr(row, "warehouse_id", None)
+					ids = pick_unique_instances_fefo(
+						db,
+						int(business_id),
+						product,
+						int(wh_id) if wh_id is not None else None,
+						line.get("quantity"),
+						business_today(business_id),
+					)
+				extra["selected_instance_ids"] = ids
+				extra["instance_ids"] = ids
+			elif movement == "in" and row is not None:
+				if row.lot_code and not extra.get("lot_code"):
+					extra["lot_code"] = row.lot_code
+				if getattr(row, "manufacturing_date", None) and not extra.get("manufacturing_date"):
+					extra["manufacturing_date"] = row.manufacturing_date.isoformat()
+				if getattr(row, "expiry_date", None) and not extra.get("expiry_date"):
+					extra["expiry_date"] = row.expiry_date.isoformat()
+			line["extra_info"] = extra
+			continue
+		if row and (row.lot_code or getattr(row, "manufacturing_date", None) or getattr(row, "expiry_date", None)):
+			if row.lot_code:
+				extra["lot_code"] = row.lot_code
+			if getattr(row, "manufacturing_date", None):
+				extra["manufacturing_date"] = row.manufacturing_date.isoformat()
+			if getattr(row, "expiry_date", None):
+				extra["expiry_date"] = row.expiry_date.isoformat()
+			alloc = {
+				"lot_code": extra.get("lot_code"),
+				"manufacturing_date": extra.get("manufacturing_date"),
+				"expiry_date": extra.get("expiry_date"),
+				"quantity": line.get("quantity"),
+			}
+			extra["lot_allocations"] = [alloc]
+			line["lot_allocations"] = [alloc]
 			line["extra_info"] = extra
 		if movement == "in" and extra.get("cost_price") is None and row is not None:
 			std = Decimal(str(row.standard_unit_cost or 0))
@@ -4513,6 +4721,34 @@ def _build_invoice_code(db: Session, business_id: int, invoice_type: str) -> str
     return f"{prefix}-{next_num:04d}"
 
 
+def _normalize_unique_instance_ids(extra_info: Dict[str, Any]) -> Dict[str, Any]:
+    """یکسان‌سازی instance_id تکی فروش سریع با selected_instance_ids فاکتور."""
+    ids: List[int] = []
+    seen: Set[int] = set()
+    candidates: List[Any] = []
+    for key in ("selected_instance_ids", "instance_ids"):
+        raw = extra_info.get(key)
+        if isinstance(raw, list):
+            candidates.extend(raw)
+    one = extra_info.get("instance_id")
+    if one is not None:
+        candidates.append(one)
+    for raw in candidates:
+        try:
+            iid = int(raw)
+        except (TypeError, ValueError):
+            continue
+        if iid in seen:
+            continue
+        seen.add(iid)
+        ids.append(iid)
+    if ids:
+        extra_info["selected_instance_ids"] = ids
+        extra_info["instance_ids"] = ids
+        extra_info["instance_id"] = ids[0]
+    return extra_info
+
+
 def _validate_selected_instances(
     db: Session,
     business_id: int,
@@ -4520,6 +4756,8 @@ def _validate_selected_instances(
     selected_instance_ids: List[Any],
     quantity: int,
     invoice_type: str,
+    allow_expired_confirm: bool = False,
+    document_date: Optional[date] = None,
 ) -> None:
     """
     اعتبارسنجی selected_instance_ids برای کالاهای یونیک در فاکتور.
@@ -4595,6 +4833,114 @@ def _validate_selected_instances(
                 f"کالای یونیک با ID {inst_id_int} یافت نشد یا در دسترس نیست (status != available)",
                 http_status=404
             )
+        from app.core.business_calendar import business_today
+        from app.services.inventory_lot_service import (
+            EXPIRED_SALE_CONFIRM,
+            is_expiry_tracked_product,
+            is_instance_sellable,
+        )
+
+        if is_expiry_tracked_product(product):
+            as_of = document_date or business_today(business_id)
+            if not is_instance_sellable(instance, product, as_of):
+                policy = str(getattr(product, "expired_sale_policy", None) or "block")
+                if policy != EXPIRED_SALE_CONFIRM or not allow_expired_confirm:
+                    raise ApiError(
+                        "EXPIRED_INSTANCE_BLOCKED",
+                        "فروش واحد یونیک منقضی برای این کالا مجاز نیست",
+                        http_status=409,
+                        details={"instance_id": inst_id_int},
+                    )
+
+
+def _ensure_unique_sales_return_instances(
+    db: Session,
+    business_id: int,
+    product_id: int,
+    extra_info: Dict[str, Any],
+    quantity: int,
+    invoice_type: str,
+    *,
+    source_invoice_id: Optional[int] = None,
+    document_date: Optional[date] = None,
+) -> Dict[str, Any]:
+    """برگشت کالای یونیک را روی همان واحدهای فروخته‌شده ثبت می‌کند."""
+    if invoice_type != INVOICE_SALES_RETURN:
+        return extra_info
+    product = db.query(Product).filter(
+        and_(Product.id == int(product_id), Product.business_id == int(business_id))
+    ).first()
+    if product is None or str(product.inventory_mode or "bulk") != "unique":
+        return extra_info
+
+    from adapters.db.models.product_instance import ProductInstance
+
+    raw_ids = extra_info.get("selected_instance_ids") or extra_info.get("returned_from_instance_ids")
+    ids: List[int] = []
+    if isinstance(raw_ids, list):
+        for raw in raw_ids:
+            try:
+                parsed = int(raw)
+            except (TypeError, ValueError) as exc:
+                raise ApiError("INVALID_INSTANCE_ID", f"شناسه instance معتبر نیست: {raw}", http_status=400) from exc
+            if parsed in ids:
+                raise ApiError("DUPLICATE_INSTANCE", f"instance با ID {parsed} به صورت تکراری انتخاب شده است", http_status=400)
+            ids.append(parsed)
+
+    qty = int(quantity)
+    if qty <= 0:
+        return extra_info
+
+    if not ids:
+        src = source_invoice_id or extra_info.get("returned_from_invoice_id") or extra_info.get("source_invoice_id") or extra_info.get("copy_from_invoice_id")
+        try:
+            src = int(src) if src is not None else None
+        except (TypeError, ValueError):
+            src = None
+        sold_q = db.query(ProductInstance).filter(
+            ProductInstance.business_id == int(business_id),
+            ProductInstance.product_id == int(product_id),
+            ProductInstance.status == "sold",
+        )
+        if src is not None:
+            sourced = sold_q.filter(ProductInstance.current_invoice_id == int(src)).order_by(ProductInstance.id.asc()).all()
+            if len(sourced) >= qty:
+                ids = [int(row.id) for row in sourced[:qty]]
+        if not ids:
+            fallback = sold_q.order_by(
+                ProductInstance.last_movement_date.desc().nullslast(),
+                ProductInstance.id.desc(),
+            ).limit(qty).all()
+            ids = [int(row.id) for row in fallback]
+
+    if len(ids) != qty:
+        raise ApiError(
+            "UNIQUE_RETURN_INSTANCES_REQUIRED",
+            f"برای برگشت کالای یونیک باید دقیقاً {qty} واحد فروخته‌شده انتخاب شود",
+            http_status=422,
+            details={"product_id": int(product_id), "required": qty, "selected": len(ids)},
+        )
+
+    warehouse_id = extra_info.get("warehouse_id")
+    try:
+        warehouse_id = int(warehouse_id) if warehouse_id is not None else None
+    except (TypeError, ValueError):
+        warehouse_id = None
+    from app.services.warehouse_service import _restore_sold_unique_instances
+
+    _restore_sold_unique_instances(
+        db,
+        int(business_id),
+        int(product_id),
+        ids,
+        warehouse_id,
+        document_date or business_today(business_id),
+        f"کالای {product.name}",
+    )
+    extra_info["selected_instance_ids"] = ids
+    extra_info["returned_from_instance_ids"] = ids
+    extra_info["instance_ids"] = ids
+    return extra_info
 
 
 # ==================== توابع محاسبه سود فاکتور ====================
@@ -6402,6 +6748,7 @@ def create_invoice(
     data: Dict[str, Any],
     user_can_select_fx_rate: bool = False,
     user_can_change_invoice_unit_price: bool = True,
+    user_can_confirm_expired_sale: bool = False,
     *,
     commit: bool = True,
     skip_post_commit_hooks: bool = False,
@@ -6427,6 +6774,11 @@ def create_invoice(
     lines_input: List[Dict[str, Any]] = list(data.get("lines") or [])
     if not isinstance(lines_input, list) or len(lines_input) == 0:
         raise ApiError("LINES_REQUIRED", "At least one line is required", http_status=400)
+    _apply_expired_sale_confirm_permission(
+        invoice_type,
+        lines_input,
+        user_can_confirm_expired_sale=user_can_confirm_expired_sale,
+    )
 
     # اعتبارسنجی ویژه برای فاکتور تولید
     if invoice_type == INVOICE_PRODUCTION:
@@ -6839,12 +7191,35 @@ def create_invoice(
 
         if not is_capital_invoice_line(extra_info):
             extra_info.pop("inventory_posted", None)
-        
+
+        extra_info = _ensure_unique_sales_return_instances(
+            db,
+            business_id,
+            int(product_id),
+            extra_info,
+            int(qty),
+            invoice_type,
+            source_invoice_id=(extra_info_dict(document.extra_info).get("returned_from_invoice_id")
+                               or extra_info_dict(document.extra_info).get("copy_from_invoice_id")),
+            document_date=document.document_date,
+        )
+        extra_info = _normalize_unique_instance_ids(extra_info)
+        line["extra_info"] = extra_info
+
         # اعتبارسنجی selected_instance_ids برای کالاهای یونیک
         selected_instance_ids = extra_info.get("selected_instance_ids")
         if selected_instance_ids:
             _validate_selected_instances(
-                db, business_id, int(product_id), selected_instance_ids, int(qty), invoice_type
+                db,
+                business_id,
+                int(product_id),
+                selected_instance_ids,
+                int(qty),
+                invoice_type,
+                allow_expired_confirm=bool(
+                    extra_info.get("allow_expired_lot_sale") or extra_info.get("manager_confirm_expired")
+                ),
+                document_date=document.document_date,
             )
 
         _validate_invoice_line_custom_attributes(db, business_id, line)
@@ -7606,6 +7981,7 @@ def update_invoice(
     data: Dict[str, Any],
     user_can_select_fx_rate: bool = False,
     user_can_change_invoice_unit_price: bool = True,
+    user_can_confirm_expired_sale: bool = False,
 ) -> Dict[str, Any]:
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document or document.document_type not in SUPPORTED_INVOICE_TYPES:
@@ -7790,6 +8166,22 @@ def update_invoice(
                         },
                         synchronize_session=False
                     )
+        if _old_document_type == INVOICE_SALES_RETURN:
+            for old_line in old_invoice_lines:
+                extra_old = extra_info_dict(old_line.extra_info)
+                returned_ids = extra_old.get("selected_instance_ids") or extra_old.get("returned_from_instance_ids")
+                if returned_ids and isinstance(returned_ids, list):
+                    db.query(ProductInstance).filter(
+                        and_(
+                            ProductInstance.id.in_([int(x) for x in returned_ids]),
+                            ProductInstance.business_id == document.business_id,
+                            ProductInstance.product_id == old_line.product_id,
+                            ProductInstance.status == "available",
+                        )
+                    ).update(
+                        {"status": "sold", "warehouse_id": None},
+                        synchronize_session=False,
+                    )
         db.flush()
     except Exception as e:
         # اگر خطایی رخ داد، فقط log می‌کنیم و ادامه می‌دهیم
@@ -7815,6 +8207,11 @@ def update_invoice(
     lines_input: List[Dict[str, Any]] = list(data.get("lines") or [])
     if not lines_input:
         raise ApiError("LINES_REQUIRED", "At least one line is required", http_status=400)
+    _apply_expired_sale_confirm_permission(
+        inv_type,
+        lines_input,
+        user_can_confirm_expired_sale=user_can_confirm_expired_sale,
+    )
 
     if inv_type == INVOICE_PRODUCTION:
         prod_extra = dict(data.get("extra_info") or document.extra_info or {})
@@ -7989,12 +8386,34 @@ def update_invoice(
         if not product_id or qty <= 0:
             raise ApiError("INVALID_LINE", "line.product_id and positive quantity are required", http_status=400)
         extra_info = dict(line.get("extra_info") or {})
-        
+        extra_info = _ensure_unique_sales_return_instances(
+            db,
+            int(document.business_id),
+            int(product_id),
+            extra_info,
+            int(qty),
+            inv_type,
+            source_invoice_id=(extra_info_dict(document.extra_info).get("returned_from_invoice_id")
+                               or extra_info_dict(document.extra_info).get("copy_from_invoice_id")),
+            document_date=document.document_date,
+        )
+        extra_info = _normalize_unique_instance_ids(extra_info)
+        line["extra_info"] = extra_info
+
         # اعتبارسنجی selected_instance_ids برای کالاهای یونیک
         selected_instance_ids = extra_info.get("selected_instance_ids")
         if selected_instance_ids:
             _validate_selected_instances(
-                db, document.business_id, int(product_id), selected_instance_ids, int(qty), inv_type
+                db,
+                document.business_id,
+                int(product_id),
+                selected_instance_ids,
+                int(qty),
+                inv_type,
+                allow_expired_confirm=bool(
+                    extra_info.get("allow_expired_lot_sale") or extra_info.get("manager_confirm_expired")
+                ),
+                document_date=document.document_date,
             )
 
         _validate_invoice_line_custom_attributes(db, document.business_id, line)
@@ -9419,7 +9838,17 @@ def invoice_document_to_dict(
     )
     product_lines: List[Dict[str, Any]] = []
     for it, product in item_rows:
-        line_extra = it.extra_info or {}
+        line_extra = dict(it.extra_info or {})
+        from app.services.inventory_lot_allocation_service import invoice_lot_allocations_payload
+        from adapters.db.models.inventory_lot import InvoiceItemLineLotAllocation
+
+        lot_rows = (
+            db.query(InvoiceItemLineLotAllocation)
+            .filter(InvoiceItemLineLotAllocation.invoice_item_line_id == int(it.id))
+            .all()
+        )
+        if lot_rows:
+            line_extra["lot_allocations"] = invoice_lot_allocations_payload(lot_rows, db)
         row_dict: Dict[str, Any] = {
             "id": it.id,
             "product_id": it.product_id,
@@ -9431,7 +9860,7 @@ def invoice_document_to_dict(
             "product_tax_unit_id": getattr(product, "tax_unit_id", None) if product else None,
             "quantity": float(it.quantity) if it.quantity else None,
             "description": it.description,
-            "extra_info": it.extra_info,
+            "extra_info": line_extra,
         }
         for _key in ("unit_price", "line_total", "line_discount", "tax_amount"):
             if line_extra.get(_key) is not None:

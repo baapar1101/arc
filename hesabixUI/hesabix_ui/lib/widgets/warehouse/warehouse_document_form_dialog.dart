@@ -16,6 +16,7 @@ import '../../utils/attribute_formatter.dart';
 import 'product_instance_form_dialog.dart';
 import 'unique_product_selector_dialog.dart';
 import '../invoice/invoice_line_variant_picker_dialog.dart';
+import '../invoice/invoice_line_lot_picker_dialog.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/error_extractor.dart';
 import '../../constants/frequent_description_scope.dart';
@@ -1616,6 +1617,8 @@ class _WarehouseDocumentFormDialogState
         _selectUniqueProductInstances(index);
       } else if (value == 'variant_alloc') {
         _selectVariantAllocations(index);
+      } else if (value == 'lot_alloc') {
+        _selectLotAllocations(index);
       } else if (value == 'auto_line') {
         _autoCompleteLine(index);
       } else if (value == 'delete') {
@@ -1626,13 +1629,20 @@ class _WarehouseDocumentFormDialogState
     final iconRow = <Widget>[
       if ((_docType == 'receipt' || _docType == 'production_in') &&
           line['product_id'] != null &&
-          _isProductUnique(line['product_id'] as int))
+          _isProductUnique(line['product_id'] as int)) ...[
         IconButton(
           icon: Icon(Icons.qr_code_scanner, size: 20),
           onPressed: () => _registerUniqueProductInstances(index),
           tooltip: 'ثبت اطلاعات کالاهای یونیک',
           color: Theme.of(context).colorScheme.primary,
         ),
+        IconButton(
+          icon: const Icon(Icons.undo, size: 20),
+          onPressed: () => _selectUniqueProductInstances(index),
+          tooltip: 'برگشت واحدهای فروخته‌شده',
+          color: Theme.of(context).colorScheme.primary,
+        ),
+      ],
       if ((_docType == 'issue' ||
               _docType == 'production_out' ||
               _docType == 'transfer') &&
@@ -1651,6 +1661,13 @@ class _WarehouseDocumentFormDialogState
           icon: const Icon(Icons.tune, size: 20),
           onPressed: () => _selectVariantAllocations(index),
           tooltip: AppLocalizations.of(context).productVariantSelectCombination,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+      if (line['product_id'] != null && _isProductExpiryTracked(line['product_id'] as int))
+        IconButton(
+          icon: const Icon(Icons.event, size: 20),
+          onPressed: () => _selectLotAllocations(index),
+          tooltip: AppLocalizations.of(context).lotAndDates,
           color: Theme.of(context).colorScheme.primary,
         ),
       if (_isFromInvoice && line['product_id'] != null)
@@ -1720,6 +1737,18 @@ class _WarehouseDocumentFormDialogState
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.tune),
             title: Text(AppLocalizations.of(context).productVariantSelectCombination),
+          ),
+        ),
+      );
+    }
+    if (line['product_id'] != null && _isProductExpiryTracked(line['product_id'] as int)) {
+      entries.add(
+        PopupMenuItem(
+          value: 'lot_alloc',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.event),
+            title: Text(AppLocalizations.of(context).lotAndDates),
           ),
         ),
       );
@@ -1871,6 +1900,58 @@ class _WarehouseDocumentFormDialogState
     return (product['variant_mode']?.toString() ?? 'none') == 'inventory';
   }
 
+  bool _isProductExpiryTracked(int productId) {
+    final product = _productCache[productId];
+    if (product == null) return false;
+    if (product['track_expiry'] != true) return false;
+    if ((product['inventory_mode']?.toString() ?? 'bulk') == 'unique') return false;
+    return true;
+  }
+
+  bool get _lotPickerInbound =>
+      _docType == 'receipt' || _docType == 'production_in';
+
+  Future<void> _selectLotAllocations(int lineIndex) async {
+    final line = _lines[lineIndex];
+    final productId = line['product_id'] as int?;
+    if (productId == null) return;
+    await _loadProductInfo(productId);
+    if (!mounted) return;
+    if (!_isProductExpiryTracked(productId)) return;
+    final product = _productCache[productId]!;
+    final extra = Map<String, dynamic>.from(line['extra_info'] ?? const {});
+    final warehouseId = _docType == 'transfer'
+        ? (line['warehouse_id_from'] as int? ?? _warehouseIdFrom)
+        : (_warehouseIdFrom ?? line['warehouse_id'] as int?);
+    final variantAllocs = allocationsFromExtra(extra);
+    int? variantId;
+    if (variantAllocs.length == 1) {
+      variantId = (variantAllocs.first['variant_id'] as num?)?.toInt();
+    } else {
+      variantId = (extra['variant_id'] as num?)?.toInt();
+    }
+    final result = await showDialog<List<Map<String, dynamic>>>(
+      context: context,
+      builder: (context) => InvoiceLineLotPickerDialog(
+        businessId: widget.businessId,
+        productId: productId,
+        productName: product['name']?.toString() ?? '',
+        lineQuantity: (line['quantity'] as num?) ?? 0,
+        warehouseId: warehouseId,
+        variantId: variantId,
+        initialAllocations: lotAllocationsFromExtra(extra),
+        inbound: _lotPickerInbound || (_docType == 'adjustment' && line['movement'] == 'in'),
+        includeUnsellable: _docType == 'issue' ||
+            _docType == 'production_out' ||
+            (_docType == 'adjustment' && line['movement'] == 'out'),
+        calendarController: widget.calendarController,
+      ),
+    );
+    if (result == null || !mounted) return;
+    extra['lot_allocations'] = result;
+    _updateLine(lineIndex, {'extra_info': extra, 'lot_allocations': result});
+  }
+
   Future<void> _selectVariantAllocations(int lineIndex) async {
     final line = _lines[lineIndex];
     final productId = line['product_id'] as int?;
@@ -1936,6 +2017,7 @@ class _WarehouseDocumentFormDialogState
         productName: productName,
         trackSerial: trackSerial,
         trackBarcode: trackBarcode,
+        trackExpiry: product['track_expiry'] == true,
         productAttributes: attributes,
         existingInstances: existingInstances,
         requiredQuantity: quantity,
@@ -1982,9 +2064,12 @@ class _WarehouseDocumentFormDialogState
     final quantity = (line['quantity'] as num?)?.toInt();
     // برای transfer، از انبار مبدا استفاده می‌کنیم (از خط یا سطح سند)
     // برای issue/production_out، از انبار خروج استفاده می‌کنیم
-    final warehouseId = _docType == 'transfer'
-        ? (line['warehouse_id_from'] as int? ?? _warehouseIdFrom)
-        : (_warehouseIdFrom ?? line['warehouse_id'] as int?);
+    final forReturn = _docType == 'receipt' || _docType == 'production_in';
+    final warehouseId = forReturn
+        ? null
+        : (_docType == 'transfer'
+            ? (line['warehouse_id_from'] as int? ?? _warehouseIdFrom)
+            : (_warehouseIdFrom ?? line['warehouse_id'] as int?));
 
     // نمایش دیالوگ انتخاب
     final selectedIds = await showDialog<List<int>>(
@@ -1997,6 +2082,7 @@ class _WarehouseDocumentFormDialogState
         selectedInstanceIds: line['instance_ids'] as List<int>?,
         requiredQuantity: quantity,
         calendarController: _calendarController,
+        forReturn: forReturn,
       ),
     );
 
@@ -3411,6 +3497,7 @@ class _ProductInstancesManagerDialog extends StatefulWidget {
   final String productName;
   final bool trackSerial;
   final bool trackBarcode;
+  final bool trackExpiry;
   final List<Map<String, dynamic>> productAttributes;
   final List<Map<String, dynamic>> existingInstances;
   final int requiredQuantity;
@@ -3422,6 +3509,7 @@ class _ProductInstancesManagerDialog extends StatefulWidget {
     required this.productName,
     required this.trackSerial,
     required this.trackBarcode,
+    this.trackExpiry = false,
     required this.productAttributes,
     required this.existingInstances,
     required this.requiredQuantity,
@@ -3452,6 +3540,7 @@ class _ProductInstancesManagerDialogState
         productName: widget.productName,
         trackSerial: widget.trackSerial,
         trackBarcode: widget.trackBarcode,
+        trackExpiry: widget.trackExpiry,
         productAttributes: widget.productAttributes,
         calendarController: widget.calendarController,
       ),
@@ -3474,6 +3563,7 @@ class _ProductInstancesManagerDialogState
         productName: widget.productName,
         trackSerial: widget.trackSerial,
         trackBarcode: widget.trackBarcode,
+        trackExpiry: widget.trackExpiry,
         productAttributes: widget.productAttributes,
         initialData: existing,
         calendarController: widget.calendarController,
@@ -3504,6 +3594,14 @@ class _ProductInstancesManagerDialogState
     }
     if (barcode != null && barcode.isNotEmpty) {
       parts.add('بارکد: $barcode');
+    }
+    final mfg = instance['manufacturing_date']?.toString();
+    final exp = instance['expiry_date']?.toString();
+    if (mfg != null && mfg.isNotEmpty) {
+      parts.add('${AppLocalizations.of(context).expiryColManufacturing}: $mfg');
+    }
+    if (exp != null && exp.isNotEmpty) {
+      parts.add('${AppLocalizations.of(context).expiryColExpiry}: $exp');
     }
     if (attrs != null && attrs.isNotEmpty) {
       // ساخت attributesMap از productAttributes

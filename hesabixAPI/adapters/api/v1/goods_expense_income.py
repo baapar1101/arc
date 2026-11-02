@@ -300,8 +300,11 @@ async def from_stock_count_endpoint(
 	items = body.get("items") or []
 	if not items:
 		raise ApiError("ITEMS_REQUIRED", "لیست اقلام الزامی است", http_status=400)
+	from app.core.business_calendar import business_today
+
 	stock_count_code = str(body.get("stock_count_code") or "").strip() or "SC"
-	stock_count_date = _parse_date(body.get("stock_count_date") or date.today().isoformat())
+	raw_count_date = body.get("stock_count_date")
+	stock_count_date = _parse_date(raw_count_date) if raw_count_date else business_today(business_id)
 	result = create_from_stock_count(
 		db,
 		business_id,

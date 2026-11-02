@@ -27,7 +27,15 @@ _PRODUCT_PAYLOAD = _schema({
     "base_sales_price": {"type": ["number", "null"], "minimum": 0}, "base_purchase_price": {"type": ["number", "null"], "minimum": 0},
     "sales_price_fx": {"type": ["number", "null"], "minimum": 0}, "purchase_price_fx": {"type": ["number", "null"], "minimum": 0},
     "price_fx_currency_id": {"type": ["integer", "null"], "minimum": 1}, "auto_update_base_from_fx": {"type": "boolean"},
-    "track_inventory": {"type": "boolean"}, "default_warehouse_id": {"type": ["integer", "null"], "minimum": 1},
+    "track_inventory": {"type": "boolean"}, "track_expiry": {"type": "boolean"},
+    "lot_policy": {"type": ["string", "null"], "enum": ["optional", "required", None]},
+    "shelf_life_days": {"type": ["integer", "null"], "minimum": 0},
+    "alert_offset_days": {"type": ["integer", "null"], "minimum": 0},
+    "removal_offset_days": {"type": ["integer", "null"], "minimum": 0},
+    "best_before_offset_days": {"type": ["integer", "null"], "minimum": 0},
+    "expired_sale_policy": {"type": ["string", "null"], "enum": ["block", "manager_confirm", None]},
+    "min_remaining_shelf_life_days": {"type": ["integer", "null"], "minimum": 0},
+    "default_warehouse_id": {"type": ["integer", "null"], "minimum": 1},
     "reorder_point": {"type": ["integer", "null"], "minimum": 0}, "min_order_qty": {"type": ["integer", "null"], "minimum": 0},
     "lead_time_days": {"type": ["integer", "null"], "minimum": 0}, "inventory_mode": {"type": ["string", "null"], "enum": ["bulk", "unique", None]},
     "track_serial": {"type": "boolean"}, "track_barcode": {"type": "boolean"}, "is_sales_taxable": {"type": "boolean"},
@@ -48,7 +56,11 @@ _PRODUCT_PAYLOAD = _schema({
     "opening_balance": {"type": ["object", "null"], "properties": {
         "quantity": {"type": "number", "minimum": 0}, "cost_price": {"type": "number", "minimum": 0},
         "warehouse_id": {"type": ["integer", "null"], "minimum": 1}, "fiscal_year_id": {"type": ["integer", "null"], "minimum": 1},
-        "clear": {"type": "boolean"}}, "additionalProperties": False},
+        "clear": {"type": "boolean"},
+        "lot_code": {"type": ["string", "null"], "maxLength": 64},
+        "manufacturing_date": {"type": ["string", "null"], "format": "date"},
+        "expiry_date": {"type": ["string", "null"], "format": "date"},
+    }, "additionalProperties": False},
 })
 
 _PRICE_PROPERTIES = {

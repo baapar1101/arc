@@ -73,7 +73,10 @@ class _ProductSearchSuggestionTile extends StatelessWidget {
     if (!trackInventory) {
       metricsLine = '${purchaseSeg}فروش $salesStr · بدون موجودی انباردیاری';
     } else {
-      final wh = item['inventory_stock_warehouse'];
+      final sellable = item['inventory_stock_sellable'];
+      final wh = item['track_expiry'] == true && sellable != null
+          ? sellable
+          : item['inventory_stock_warehouse'];
       final acc = item['inventory_stock_accounting'];
       final hasLoaded = wh != null || acc != null;
       final stockPart = !hasLoaded

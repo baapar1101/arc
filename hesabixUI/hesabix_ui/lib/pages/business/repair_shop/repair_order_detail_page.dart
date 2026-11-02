@@ -13,6 +13,8 @@ import '../../../utils/error_extractor.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
 import '../../../widgets/invoice/product_combobox_widget.dart';
 import '../../../widgets/invoice/warehouse_combobox_widget.dart';
+import '../../../widgets/invoice/unique_product_instance_selector_dialog.dart';
+import '../../../widgets/invoice/invoice_line_lot_picker_dialog.dart';
 import 'repair_shop_calendar_utils.dart';
 import 'repair_shop_status.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -395,7 +397,10 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
   Future<void> _openAddPartDialog() async {
     final payload = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) => _AddPartDialog(businessId: widget.businessId),
+      builder: (context) => _AddPartDialog(
+        businessId: widget.businessId,
+        calendarController: widget.calendarController,
+      ),
     );
     if (payload == null) return;
 
@@ -1398,7 +1403,11 @@ class _LaborCostDialogState extends State<_LaborCostDialog> {
 
 class _AddPartDialog extends StatefulWidget {
   final int businessId;
-  const _AddPartDialog({required this.businessId});
+  final CalendarController calendarController;
+  const _AddPartDialog({
+    required this.businessId,
+    required this.calendarController,
+  });
 
   @override
   State<_AddPartDialog> createState() => _AddPartDialogState();
@@ -1407,8 +1416,14 @@ class _AddPartDialog extends StatefulWidget {
 class _AddPartDialogState extends State<_AddPartDialog> {
   Map<String, dynamic>? _product;
   int? _warehouseId;
+  List<int> _selectedInstanceIds = <int>[];
+  List<Map<String, dynamic>> _lotAllocations = <Map<String, dynamic>>[];
   final _qtyController = TextEditingController(text: '1');
   final _priceController = TextEditingController();
+
+  bool get _isUnique =>
+      (_product?['inventory_mode']?.toString() ?? 'bulk') == 'unique';
+  bool get _trackExpiry => _product?['track_expiry'] == true;
 
   @override
   void dispose() {
@@ -1436,6 +1451,8 @@ class _AddPartDialogState extends State<_AddPartDialog> {
                 onChanged: (product) {
                   setState(() {
                     _product = product;
+                    _selectedInstanceIds = <int>[];
+                    _lotAllocations = <Map<String, dynamic>>[];
                     final price = product?['base_sales_price'];
                     if (price != null) {
                       _priceController.text = price.toString();
@@ -1469,6 +1486,95 @@ class _AddPartDialogState extends State<_AddPartDialog> {
                   border: const OutlineInputBorder(),
                 ),
               ),
+              if (_isUnique) ...[
+                const SizedBox(height: 8),
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TextButton.icon(
+                    onPressed: () async {
+                      final pid = (_product?['id'] as num?)?.toInt();
+                      if (pid == null) return;
+                      final qty = int.tryParse(_qtyController.text.trim()) ?? 0;
+                      if (qty <= 0) {
+                        SnackBarHelper.show(
+                          context,
+                          message: AppLocalizations.of(context).repairShopEnterValidQty,
+                        );
+                        return;
+                      }
+                      final result = await showDialog<Map<String, dynamic>>(
+                        context: context,
+                        builder: (context) => UniqueProductInstanceSelectorDialog(
+                          businessId: widget.businessId,
+                          productId: pid,
+                          productName: _product?['name']?.toString() ?? '',
+                          warehouseId: _warehouseId,
+                          selectedInstanceIds: _selectedInstanceIds,
+                          requiredQuantity: qty,
+                          calendarController: widget.calendarController,
+                        ),
+                      );
+                      if (result != null && mounted) {
+                        final ids = ((result['ids'] as List?) ?? const [])
+                            .map((e) => int.tryParse(e.toString()))
+                            .whereType<int>()
+                            .toList();
+                        setState(() {
+                          _selectedInstanceIds = ids;
+                          _qtyController.text = ids.length.toString();
+                        });
+                      }
+                    },
+                    icon: const Icon(Icons.qr_code_2),
+                    label: Text(
+                      _selectedInstanceIds.isEmpty
+                          ? AppLocalizations.of(context).selectUnitTitle
+                          : AppLocalizations.of(context).uniqueUnitsSelected(_selectedInstanceIds.length),
+                    ),
+                  ),
+                ),
+              ] else if (_trackExpiry) ...[
+                const SizedBox(height: 8),
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TextButton.icon(
+                    onPressed: () async {
+                      final pid = (_product?['id'] as num?)?.toInt();
+                      if (pid == null) return;
+                      final qty = double.tryParse(_qtyController.text.trim()) ?? 0;
+                      if (qty <= 0) {
+                        SnackBarHelper.show(
+                          context,
+                          message: AppLocalizations.of(context).repairShopEnterValidQty,
+                        );
+                        return;
+                      }
+                      final result = await showDialog<List<Map<String, dynamic>>>(
+                        context: context,
+                        builder: (context) => InvoiceLineLotPickerDialog(
+                          businessId: widget.businessId,
+                          productId: pid,
+                          productName: _product?['name']?.toString() ?? '',
+                          lineQuantity: qty,
+                          warehouseId: _warehouseId,
+                          inbound: false,
+                          calendarController: widget.calendarController,
+                          initialAllocations: _lotAllocations,
+                        ),
+                      );
+                      if (result != null && mounted) {
+                        setState(() => _lotAllocations = result);
+                      }
+                    },
+                    icon: const Icon(Icons.event),
+                    label: Text(
+                      _lotAllocations.isEmpty
+                          ? AppLocalizations.of(context).lotAndDates
+                          : '${_lotAllocations.length} ${AppLocalizations.of(context).lotAndDates}',
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -1498,6 +1604,9 @@ class _AddPartDialogState extends State<_AddPartDialog> {
               'quantity': qty,
               'unit_price': ?price,
               'warehouse_id': ?_warehouseId,
+              if (_selectedInstanceIds.isNotEmpty)
+                'selected_instance_ids': _selectedInstanceIds,
+              if (_lotAllocations.isNotEmpty) 'lot_allocations': _lotAllocations,
             });
           },
           child: Text(AppLocalizations.of(context).add),

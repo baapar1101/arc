@@ -1997,7 +1997,12 @@ def complete_visit(
 			from app.services.distribution_documents import create_distribution_invoice
 			from app.services.invoice_service import INVOICE_SALES
 			from app.services.distribution_commercial_service import apply_promotions_to_lines
-			from app.services.distribution_field_ops_service import apply_auto_promotions_if_needed, consume_van_lots_fefo
+			from app.services.distribution_field_ops_service import (
+				apply_auto_promotions_if_needed,
+				consume_van_lots_fefo,
+				plan_van_lots_fefo,
+			)
+			from app.services.inventory_lot_service import is_expiry_tracked_product
 
 			promo_ids = None
 			ex = payload.get("extra_info") if isinstance(payload.get("extra_info"), dict) else {}
@@ -2017,6 +2022,25 @@ def complete_visit(
 				raise ApiError("VALIDATION_ERROR", "No van assigned for van sale", http_status=400)
 			if not v.document_id:
 				# Fail-closed: بدون فاکتور موفق، ویزیت کامل نمی‌شود (بدون حوالهٔ خام انبار)
+				today = business_today(business_id)
+				for ln in van_lines:
+					if not isinstance(ln, dict) or ln.get("is_foc"):
+						continue
+					pid = int(ln.get("product_id") or 0)
+					product = db.query(Product).filter(Product.id == pid, Product.business_id == business_id).first()
+					if product is None or not is_expiry_tracked_product(product):
+						continue
+					if str(product.inventory_mode or "bulk") == "unique":
+						continue
+					extra = dict(ln.get("extra_info") or {})
+					if extra.get("lot_allocations") or ln.get("lot_allocations"):
+						continue
+					planned = plan_van_lots_fefo(
+						db, int(van.id), pid, float(ln.get("quantity") or 0), skip_expired=True, as_of=today
+					)
+					extra["lot_allocations"] = planned
+					ln["extra_info"] = extra
+					ln["lot_allocations"] = planned
 				inv = create_distribution_invoice(
 					db,
 					business_id,
@@ -2036,8 +2060,18 @@ def complete_visit(
 				for ln in van_lines:
 					if ln.get("is_foc"):
 						continue
+					extra = ln.get("extra_info") if isinstance(ln.get("extra_info"), dict) else {}
+					allocs = ln.get("lot_allocations") or extra.get("lot_allocations")
 					lots_used.extend(
-						consume_van_lots_fefo(db, int(van.id), int(ln["product_id"]), float(ln["quantity"]))
+						consume_van_lots_fefo(
+							db,
+							int(van.id),
+							int(ln["product_id"]),
+							float(ln["quantity"]),
+							skip_expired=True,
+							as_of=today,
+							allocations=allocs if isinstance(allocs, list) else None,
+						)
 					)
 				if lots_used:
 					_base["van_lots_consumed"] = lots_used

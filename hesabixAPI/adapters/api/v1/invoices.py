@@ -25,6 +25,7 @@ from app.core.permissions import (
     has_invoice_type_permission_for_business,
     allowed_invoice_types_for_business,
     user_can_change_invoice_unit_price,
+    user_can_confirm_expired_sale,
     has_business_permission_for_business,
 )
 from app.core.responses import success_response, format_datetime_fields
@@ -324,6 +325,7 @@ def create_invoice_endpoint(
     payload["extra_info"] = extra
     can_pick = _user_can_select_fx_rate_for_business(db, ctx, business_id)
     can_change_unit = user_can_change_invoice_unit_price(ctx, db, business_id)
+    can_confirm_expired = user_can_confirm_expired_sale(ctx, db, business_id)
     result = create_invoice(
         db=db,
         business_id=business_id,
@@ -331,6 +333,7 @@ def create_invoice_endpoint(
         data=payload,
         user_can_select_fx_rate=can_pick,
         user_can_change_invoice_unit_price=can_change_unit,
+        user_can_confirm_expired_sale=can_confirm_expired,
         lightweight_response=extra.get("quick_sale") is True,
     )
     return success_response(data=result, request=request, message="INVOICE_CREATED")
@@ -769,6 +772,7 @@ def update_invoice_endpoint(
     try:
         can_pick = _user_can_select_fx_rate_for_business(db, ctx, business_id)
         can_change_unit = user_can_change_invoice_unit_price(ctx, db, business_id)
+        can_confirm_expired = user_can_confirm_expired_sale(ctx, db, business_id)
         result = update_invoice(
             db=db,
             document_id=invoice_id,
@@ -776,6 +780,7 @@ def update_invoice_endpoint(
             data=payload,
             user_can_select_fx_rate=can_pick,
             user_can_change_invoice_unit_price=can_change_unit,
+            user_can_confirm_expired_sale=can_confirm_expired,
         )
     except IntegrityError as e:
         db.rollback()
@@ -5710,6 +5715,7 @@ async def import_invoices_excel(
         if not is_dry_run and valid_invoices:
             user_id = ctx.get_user_id()
             can_change_unit = user_can_change_invoice_unit_price(ctx, db, business_id)
+            can_confirm_expired = user_can_confirm_expired_sale(ctx, db, business_id)
             for inv_info in valid_invoices:
                 try:
                     create_invoice(
@@ -5718,6 +5724,7 @@ async def import_invoices_excel(
                         user_id=user_id,
                         data=inv_info["payload"],
                         user_can_change_invoice_unit_price=can_change_unit,
+                        user_can_confirm_expired_sale=can_confirm_expired,
                     )
                     created_count += 1
                 except Exception as e:
