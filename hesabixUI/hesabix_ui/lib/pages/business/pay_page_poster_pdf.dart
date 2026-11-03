@@ -7,18 +7,15 @@ import 'package:pdf/widgets.dart' as pw;
 
 import 'package:hesabix_ui/widgets/product/product_label_pdf_text.dart';
 
-/// متن خوانا روی پوستر: بدون https و بدون مسیر /u/ تا از فاصله دیده شود.
+/// متن خوانا روی پوستر: بدون http/https تا از فاصله راحت‌تر خوانده شود.
+/// مسیر `/u/` می‌ماند چون همان نشانی واقعی برای تایپ است.
 String payPagePosterDisplayUrl(String url) {
   var value = url.trim();
   value = value.replaceFirst(RegExp(r'^https?://', caseSensitive: false), '');
-  final slash = value.indexOf('/');
-  if (slash <= 0) return value;
-  final host = value.substring(0, slash);
-  var path = value.substring(slash);
-  if (path.startsWith('/u/')) {
-    path = path.substring(2);
+  while (value.endsWith('/')) {
+    value = value.substring(0, value.length - 1);
   }
-  return '$host$path';
+  return value;
 }
 
 Future<Uint8List> buildPayPagePosterPdf({
@@ -123,20 +120,28 @@ Future<Uint8List> buildPayPagePosterPdf({
                   width: 220,
                   height: 220,
                 ),
-                pw.SizedBox(height: 22),
+                pw.SizedBox(height: 24),
                 pw.Text(
                   t(urlLabel),
                   textAlign: pw.TextAlign.center,
                   textDirection: pw.TextDirection.ltr,
                   style: style(14, bold: true),
                 ),
-                pw.SizedBox(height: 10),
+                pw.SizedBox(height: 12),
                 pw.Directionality(
                   textDirection: pw.TextDirection.ltr,
-                  child: pw.Text(
-                    payPagePosterDisplayUrl(url),
-                    textAlign: pw.TextAlign.center,
-                    style: style(28, bold: true),
+                  child: pw.SizedBox(
+                    width: double.infinity,
+                    child: pw.FittedBox(
+                      fit: pw.BoxFit.scaleDown,
+                      alignment: pw.Alignment.center,
+                      child: pw.Text(
+                        payPagePosterDisplayUrl(url),
+                        textAlign: pw.TextAlign.center,
+                        maxLines: 1,
+                        style: style(42, bold: true),
+                      ),
+                    ),
                   ),
                 ),
                 if (intro.isNotEmpty) ...[
