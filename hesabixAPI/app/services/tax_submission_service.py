@@ -278,7 +278,6 @@ def send_document_to_tax_system(
             details=rate_info,
         )
 
-    extra = dict(document.extra_info or {})
     if provider_code not in {"moadian_direct", "fanava", MOTAMED_ASA_PROVIDER}:
         raise ApiError("TAX_PROVIDER_UNSUPPORTED", "روش ارسال مالیاتی این کسب‌وکار پشتیبانی نمی‌شود.", http_status=400)
     if provider_code == "fanava" and bool(getattr(tax_setting, "sandbox_mode", False)):
@@ -287,12 +286,12 @@ def send_document_to_tax_system(
             "فن‌آوا محیط آزمایشی ندارد؛ حالت آزمایشی را خاموش کنید یا روش ارسال مستقیم را انتخاب کنید.",
             http_status=400,
         )
-    if provider_code == MOTAMED_ASA_PROVIDER and bool(getattr(tax_setting, "sandbox_mode", False)):
-        raise ApiError(
-            "MOTAMED_ASA_SANDBOX_UNAVAILABLE",
-            "ارسال از طریق معتمد آسا فقط در محیط اصلی سامانهٔ مؤدیان انجام می‌شود؛ حالت آزمایشی را خاموش کنید.",
-            http_status=400,
-        )
+    if provider_code == MOTAMED_ASA_PROVIDER:
+        # Before the document is marked as being sent: an invoice registered in one environment
+        # (production or sandbox) is not changed from the other one.
+        from app.services.motamed_asa_tax_submission_service import prepare_motamed_asa_environment
+        prepare_motamed_asa_environment(db, document, tax_setting, submission_mode=mode)
+    extra = dict(document.extra_info or {})
     extra["tax_submission_provider"] = provider_code
     document.extra_info = extra
     db.add(document)

@@ -40553,11 +40553,11 @@ abstract class AppLocalizations {
   /// **'The Motamed ASA connection has not been set up by the system administrator yet.'**
   String get motamedAsaUnavailable;
 
-  /// No description provided for @motamedAsaSandboxUnavailable.
+  /// No description provided for @motamedAsaSandboxNote.
   ///
   /// In en, this message translates to:
-  /// **'Motamed ASA sends to the production tax system only. Turn off sandbox mode to select it.'**
-  String get motamedAsaSandboxUnavailable;
+  /// **'Sandbox mode is on: invoices go through Motamed ASA to the sandbox of the tax system and are not registered in the live tax system. The Sandbox fiscal memory ID of this business, issued in that sandbox, must be registered with Motamed ASA. Invoices registered in the live tax system are only inquired in this mode; correct, cancel or add payments to them after turning sandbox mode off.'**
+  String get motamedAsaSandboxNote;
 
   /// No description provided for @motamedAsaEconomicCodeRequired.
   ///

@@ -15,6 +15,14 @@ Operations (API v2 docs, sections 05, 07, 08D):
   return document's own lines (the goods taken back) and ASA matches them to
   the registered reference rows and builds the rows left after the return
   (RC_IITP.IS_V7.9 table 1, pp. 14-18) with every tax field of the reference.
+
+Sandbox (API v2 docs, section 05F): with the business's sandbox mode on, each
+/send member carries sandBox: true; ASA then accepts it only with a Sandbox
+fiscal memory of the business and sends it to the tax organisation's sandbox.
+editInvoice, cancelInvoice and registerPayment take no sandBox: an invoice stays
+in the environment it was registered in. Each document records that environment
+(asa_sandbox), and a later change of the setting never moves an invoice ASA
+holds (prepare_motamed_asa_environment).
 """
 from __future__ import annotations
 
@@ -74,14 +82,66 @@ _BUYER_FIELDS = ("tob", "bid", "tinb", "sbc", "bpc", "bbc", "bpn")
 # --- Identifiers ----------------------------------------------------------------------------
 
 
-def motamed_asa_internal_id(document: Document) -> str:
+def _new_internal_id(document: Document, *, sandbox: bool) -> str:
+    # ASA keeps an internalId unique per business across both environments, so a sandbox
+    # chain has its own id and can never answer for a production invoice of the same document.
+    return f"hesabix-sandbox-{int(document.id)}" if sandbox else f"hesabix-{int(document.id)}"
+
+
+def motamed_asa_internal_id(document: Document, *, sandbox: bool = False) -> str:
     """The ASA internalId of the document's invoice chain; stable across retries."""
     stored = str((document.extra_info or {}).get("asa_internal_id") or "").strip()
-    return stored or f"hesabix-{int(document.id)}"
+    return stored or _new_internal_id(document, sandbox=sandbox)
 
 
 def _cancel_internal_id(internal_id: str) -> str:
     return f"{internal_id}-cancel"
+
+
+# --- Environment (production or the tax organisation's sandbox) -----------------------------
+
+
+def motamed_asa_document_sandbox(document: Document) -> bool | None:
+    """
+    The environment the document's ASA chain was sent to: True for the sandbox,
+    False for production, None before its first send. Chains sent before sandbox
+    support carry no flag and are production.
+    """
+    extra = document.extra_info or {}
+    if isinstance(extra.get("asa_sandbox"), bool):
+        return extra["asa_sandbox"]
+    return False if extra.get("asa_internal_id") else None
+
+
+def _business_sandbox(db: Session, business_id: int) -> bool:
+    setting = db.query(TaxSetting).filter(TaxSetting.business_id == int(business_id)).first()
+    return bool(getattr(setting, "sandbox_mode", False))
+
+
+def _environment_mismatch(invoice_sandbox: bool) -> ApiError:
+    if invoice_sandbox:
+        message = (
+            "این صورتحساب در محیط آزمایشی (Sandbox) به معتمد آسا ارسال شده است و ارسال، اصلاح، ابطال "
+            "و ثبت پرداخت آن فقط در همان محیط انجام می‌شود؛ برای ادامه، حالت سندباکس را روشن کنید."
+        )
+    else:
+        message = (
+            "این صورتحساب در محیط اصلی سامانهٔ مؤدیان ثبت شده است و ارسال، اصلاح، ابطال و ثبت پرداخت آن "
+            "در حالت سندباکس انجام نمی‌شود؛ برای ادامه، حالت سندباکس را خاموش کنید."
+        )
+    return ApiError(
+        "MOTAMED_ASA_ENVIRONMENT_MISMATCH",
+        message,
+        http_status=409,
+        details={"provider": MOTAMED_ASA_PROVIDER, "invoice_sandbox": invoice_sandbox},
+    )
+
+
+def _require_environment(document: Document, sandbox: bool) -> None:
+    """A registered chain is changed only in its own environment; reading it is always allowed."""
+    invoice_sandbox = motamed_asa_document_sandbox(document)
+    if invoice_sandbox is not None and invoice_sandbox != sandbox:
+        raise _environment_mismatch(invoice_sandbox)
 
 
 # --- Payload ----------------------------------------------------------------------------------
@@ -349,6 +409,7 @@ def _send_or_update(
     mode: str,
     fiscal_id: str | None,
     item_fields: dict[str, Any] | None = None,
+    sandbox: bool = False,
 ) -> dict[str, Any]:
     current = _inquire_one(client, token, internal_id)
     if current is not None:
@@ -390,6 +451,8 @@ def _send_or_update(
     item_request: dict[str, Any] = {
         "internalId": internal_id,
         "send": True,
+        # Explicit for both environments; ASA treats a missing value as production.
+        "sandBox": bool(sandbox),
         "description": _description(document),
         **(item_fields or {}),
         "data": data,
@@ -508,10 +571,11 @@ def _cancel(
     raise _rejected(response, item)
 
 
-def motamed_asa_return_reference_tax_id(db: Session, document: Document) -> str:
+def motamed_asa_return_reference_tax_id(db: Session, document: Document, *, sandbox: bool = False) -> str:
     """
     The tax id of the sale a return refers to. Any registered invoice of the reference's
-    chain will do: ASA finds the chain's latest itself (returnRows "returned").
+    chain will do: ASA finds the chain's latest itself (returnRows "returned"). The sale
+    must be in the environment the return is sent to.
     """
     reference = resolve_reference_document(db, int(document.business_id), document)
     if reference is None:
@@ -527,6 +591,18 @@ def motamed_asa_return_reference_tax_id(db: Session, document: Document) -> str:
             "فاکتور مرجع از طریق معتمد آسا ارسال نشده است؛ برگشت آن را از همان روشی بفرستید که فاکتور مرجع با آن ارسال شده است.",
             http_status=409,
         )
+    reference_sandbox = bool(motamed_asa_document_sandbox(reference))
+    if reference_sandbox != sandbox:
+        raise ApiError(
+            "MOTAMED_ASA_REFERENCE_OTHER_ENVIRONMENT",
+            (
+                "فاکتور مرجع در محیط آزمایشی (Sandbox) ثبت شده است؛ برگشت از فروش آن فقط با حالت سندباکس روشن فرستاده می‌شود."
+                if reference_sandbox
+                else "فاکتور مرجع در محیط اصلی سامانهٔ مؤدیان ثبت شده است؛ برگشت از فروش آن در حالت سندباکس فرستاده نمی‌شود."
+            ),
+            http_status=409,
+            details={"provider": MOTAMED_ASA_PROVIDER, "reference_sandbox": reference_sandbox},
+        )
     tax_id = str(reference_extra.get("tax_moadian_taxid") or "").strip()
     if len(tax_id) != 22:
         raise ApiError(
@@ -535,6 +611,54 @@ def motamed_asa_return_reference_tax_id(db: Session, document: Document) -> str:
             http_status=409,
         )
     return tax_id
+
+
+def prepare_motamed_asa_environment(
+    db: Session,
+    document: Document,
+    tax_setting: TaxSetting,
+    *,
+    submission_mode: str,
+) -> None:
+    """
+    Runs before the document is marked as being sent. A document stays in the
+    environment its chain was sent to, whatever the setting says now: a correction
+    or cancellation in the other environment is refused. An original or a return
+    whose chain there is unknown to ASA or was refused starts again in the current
+    environment under its own internalId; one registered or in flight is refused.
+    """
+    sandbox = bool(getattr(tax_setting, "sandbox_mode", False))
+    invoice_sandbox = motamed_asa_document_sandbox(document)
+    if invoice_sandbox is None or invoice_sandbox == sandbox:
+        return
+    if submission_mode not in ("normal", "return"):
+        raise _environment_mismatch(invoice_sandbox)
+    previous_internal_id = motamed_asa_internal_id(document)
+    try:
+        held = motamed_asa_business_call(
+            db,
+            int(document.business_id),
+            lambda client, token, _account: _inquire_one(client, token, previous_internal_id),
+        )
+    except MotamedAsaApiError as exc:
+        # Nothing has been sent yet, so this is not an unknown result.
+        raise ApiError(
+            "MOTAMED_ASA_STATUS_INQUIRY_FAILED", str(exc), http_status=502 if exc.is_transient else 400
+        ) from exc
+    if held is not None and _hesabix_status(held)[0] != "failed":
+        raise _environment_mismatch(invoice_sandbox)
+    extra = dict(document.extra_info or {})
+    # Nothing of the chain in the other environment belongs to the new one.
+    for key in (
+        "asa_invoice_ids_by_mode", "asa_tax_ids_by_mode", "asa_latest_invoice_id", "asa_fiscal_id",
+        "tax_moadian_taxid", "tax_tracking_code",
+    ):
+        extra.pop(key, None)
+    extra["asa_internal_id"] = _new_internal_id(document, sandbox=sandbox)
+    extra["asa_sandbox"] = sandbox
+    document.extra_info = extra
+    db.add(document)
+    db.flush()
 
 
 def send_document_via_motamed_asa(
@@ -546,14 +670,21 @@ def send_document_via_motamed_asa(
     submission_mode: str,
 ) -> dict[str, Any]:
     business_id = int(document.business_id)
-    internal_id = motamed_asa_internal_id(document)
+    sandbox = bool(getattr(tax_setting, "sandbox_mode", False))
+    # prepare_motamed_asa_environment has already refused, or restarted, a chain of the other environment.
+    _require_environment(document, sandbox)
+    internal_id = motamed_asa_internal_id(document, sandbox=sandbox)
     extra = dict(document.extra_info or {})
     extra["tax_submission_provider"] = MOTAMED_ASA_PROVIDER
     extra["asa_internal_id"] = internal_id
+    extra["asa_sandbox"] = sandbox
     extra["tax_provider_operation"] = submission_mode
     document.extra_info = extra
     db.add(document)
     db.flush()
+    reference_tax_id = (
+        motamed_asa_return_reference_tax_id(db, document, sandbox=sandbox) if submission_mode == "return" else None
+    )
 
     def operation(client: MotamedAsaClient, token: str, account: Any) -> dict[str, Any]:
         if submission_mode == "cancel":
@@ -561,17 +692,21 @@ def send_document_via_motamed_asa(
         if submission_mode == "corrective":
             data = build_motamed_asa_invoice(invoice_dto, document_id=int(document.id), subject=_ISSUE_CORRECTION)
             return _correct(db, client, token, document, internal_id, data)
-        fiscal_id = str(account.memory_number or "").strip() or None
+        # The business's memory id from onboarding is a production one. In the sandbox ASA picks
+        # the business's Sandbox memory itself (its default, or the only active one; section 05F).
+        fiscal_id = None if sandbox else (str(account.memory_number or "").strip() or None)
         if submission_mode == "return":
             # The return document's own lines; ASA matches them to the reference rows (API v2 05, «ارسال اقلام برگشتی»).
             data = build_motamed_asa_invoice(invoice_dto, document_id=int(document.id), subject=_ISSUE_RETURN)
-            data["Header"]["irtaxid"] = motamed_asa_return_reference_tax_id(db, document)
+            data["Header"]["irtaxid"] = reference_tax_id
             return _send_or_update(
                 db, client, token, document, internal_id, data,
-                mode=submission_mode, fiscal_id=fiscal_id, item_fields={"returnRows": "returned"},
+                mode=submission_mode, fiscal_id=fiscal_id, item_fields={"returnRows": "returned"}, sandbox=sandbox,
             )
         data = build_motamed_asa_invoice(invoice_dto, document_id=int(document.id), subject=_ISSUE_ORIGINAL)
-        return _send_or_update(db, client, token, document, internal_id, data, mode=submission_mode, fiscal_id=fiscal_id)
+        return _send_or_update(
+            db, client, token, document, internal_id, data, mode=submission_mode, fiscal_id=fiscal_id, sandbox=sandbox,
+        )
 
     try:
         return motamed_asa_business_call(db, business_id, operation)
@@ -793,6 +928,8 @@ def register_motamed_asa_payments(
     a lost answer is never re-sent blindly: the rows are read back instead.
     """
     internal_id = _payments_internal_id(document)
+    # registerPayment takes no sandBox: the rows go to the invoice's own environment.
+    _require_environment(document, _business_sandbox(db, business_id))
     rows = build_motamed_asa_payment_rows(payments)
     request = {"uuid": str(uuid.uuid4()), "internalId": internal_id, "payments": rows}
 

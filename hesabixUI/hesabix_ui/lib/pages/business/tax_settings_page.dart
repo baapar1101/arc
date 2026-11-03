@@ -1442,19 +1442,18 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
               (_saving ||
                   _providerSaving ||
                   _motamedAsaBusy ||
-                  _sandboxMode ||
                   _settings?.motamedAsaAvailable != true)
               ? null
               : (_) => _selectMotamedAsa(),
           title: Text(t.taxSubmissionMotamedAsa),
           subtitle: Text(
-            _sandboxMode
-                ? t.motamedAsaSandboxUnavailable
-                : _settings?.motamedAsaAvailable == true
+            _settings?.motamedAsaAvailable == true
                 ? t.taxSubmissionMotamedAsaDescription
                 : t.motamedAsaUnavailable,
           ),
         ),
+        if (provider == 'motamed_asa' && _sandboxMode)
+          _buildMotamedAsaSandboxNote(t),
         _buildMotamedAsaStatus(t),
         if (_providerSaving)
           const LinearProgressIndicator(minHeight: 2)
@@ -1527,6 +1526,28 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
             ),
           ),
       ],
+    );
+  }
+
+  /// Where Motamed ASA sends while sandbox mode is on, and what the business needs for it.
+  Widget _buildMotamedAsaSandboxNote(AppLocalizations t) {
+    final tone = SemanticColorResolver.warning(context);
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: tone.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.science_outlined, color: tone),
+          const SizedBox(width: 8),
+          Expanded(child: Text(t.motamedAsaSandboxNote)),
+        ],
+      ),
     );
   }
 
