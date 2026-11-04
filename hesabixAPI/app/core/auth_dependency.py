@@ -691,13 +691,13 @@ def _detect_business_id(request: Request) -> Optional[int]:
 	if business_id_str:
 		try:
 			business_id = int(business_id_str)
-			logger.info(f"Detected business ID: {business_id}")
+			logger.debug("Detected business ID: %s", business_id)
 			return business_id
 		except ValueError:
-			logger.warning(f"Invalid business ID format: {business_id_str}")
+			logger.warning("Invalid business ID format: %s", business_id_str)
 			pass
-	
-	logger.info("No business ID detected from headers")
+
+	logger.debug("No business ID detected from headers")
 	return None
 
 

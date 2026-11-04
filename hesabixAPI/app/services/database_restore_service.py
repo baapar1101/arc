@@ -14,7 +14,11 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
-from app.core.postgres_tools import PostgreSQLToolNotFoundError, resolve_postgres_tool
+from app.core.postgres_tools import (
+    PostgreSQLToolNotFoundError,
+    missing_client_message_fa,
+    resolve_postgres_tool,
+)
 from app.core.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -85,10 +89,7 @@ class DatabaseRestoreService:
         try:
             psql = resolve_postgres_tool("psql", environment=env)
         except PostgreSQLToolNotFoundError as e:
-            raise DatabaseRestoreError(
-                "ابزار psql یافت نشد. PostgreSQL client tools را نصب کنید یا "
-                "HESABIX_POSTGRES_BIN_DIR را تنظیم کنید."
-            ) from e
+            raise DatabaseRestoreError(missing_client_message_fa("psql")) from e
 
         try:
             restore_file_path, temporary_sql_path = self._prepare_sql_file(file_path, is_gz)

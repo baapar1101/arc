@@ -3,6 +3,7 @@
 # pip / Flutter mirrors: scripts/mirror_config.sh (saved in ${APP_ROOT}/.deploy_env from deploy).
 # Run via: hesabix -update [-source URL] [-branch NAME]
 # PostgreSQL pgvector: scripts/ensure_pgvector.sh (idempotent, non-fatal) before Alembic migrations.
+# PostgreSQL client (pg_dump): scripts/ensure_postgresql_client.sh so existing installs get backup tools.
 # AI voice (local STT/TTS): scripts/ensure_voice_chat.sh — prompts if deps missing (INSTALL_VOICE in .deploy_env).
 # Requires: API_DOMAIN, UI_DOMAIN, BRANCH, REPO_URL in env or in ${APP_ROOT}/.deploy_env
 # Web build API URL: https if /etc/letsencrypt/live/<API_DOMAIN> exists; else http unless API_PUBLIC_SCHEME is set in env (custom TLS).
@@ -298,6 +299,16 @@ if [[ -f "${ensure_pgvector}" ]]; then
     log_ok "pgvector package check completed."
   else
     log_info "pgvector package not installed (non-fatal)."
+  fi
+fi
+ensure_pg_client="${APP_ROOT}/app/scripts/ensure_postgresql_client.sh"
+if [[ -f "${ensure_pg_client}" ]]; then
+  chmod +x "${ensure_pg_client}" 2>/dev/null || true
+  log_info "Ensuring PostgreSQL client tools (pg_dump/psql) for database backup..."
+  if bash "${ensure_pg_client}"; then
+    log_ok "PostgreSQL client tools are installed."
+  else
+    log_info "postgresql-client install failed (non-fatal). Database backup needs postgresql-client-<version>."
   fi
 fi
 fixup_db="${APP_ROOT}/app/scripts/hesabix_fixup_db_privileges.sh"

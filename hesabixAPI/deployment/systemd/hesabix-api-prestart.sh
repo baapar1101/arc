@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # اجرا با دسترسی root (ExecStartPre=! در hesabix-api.service)
-# ۱) systemctl daemon-reload — بعد از تغییر یونیت‌ها یا اسکریپت‌هایی مثل build_web
-# ۲) در صورت نبودن/خرابی وابستگی‌های Python، نصب از آینه‌ها مطابق deploy.sh
+# ۱) نصب postgresql-client نسخه‌دار اگر pg_dump فقط wrapper باشد (نصب‌های قبلی)
+# ۲) systemctl daemon-reload — بعد از تغییر یونیت‌ها یا اسکریپت‌هایی مثل build_web
+# ۳) در صورت نبودن/خرابی وابستگی‌های Python، نصب از آینه‌ها مطابق deploy.sh
 
 set -euo pipefail
 # systemd ممکن است PATH کوتاه بدهد؛ runuser در /usr/sbin است
@@ -22,6 +23,23 @@ if [[ -f "${ENSURE_SECRETS}" ]]; then
     log "ensure_api_production_secrets failed"
     exit 1
   fi
+fi
+
+# نصب postgresql-client نسخه‌دار روی نصب‌های قبلی (قبل از daemon-reload تا drop-in اعمال شود).
+# شکست apt API را پایین نمی‌آورد — بکاپ تا نصب موفق بسته کار نمی‌کند.
+ENSURE_PG_CLIENT=""
+for _pg_client_script in \
+  "${API_DIR}/../scripts/ensure_postgresql_client.sh" \
+  "${APP_ROOT}/app/scripts/ensure_postgresql_client.sh"; do
+  if [[ -f "${_pg_client_script}" ]]; then
+    ENSURE_PG_CLIENT="${_pg_client_script}"
+    break
+  fi
+done
+if [[ -n "${ENSURE_PG_CLIENT}" ]]; then
+  chmod +x "${ENSURE_PG_CLIENT}" 2>/dev/null || true
+  log "ensuring postgresql-client tools for pg_dump"
+  bash "${ENSURE_PG_CLIENT}" --nonfatal || log "ensure_postgresql_client skipped (non-fatal)"
 fi
 
 if ! command -v systemctl >/dev/null 2>&1; then

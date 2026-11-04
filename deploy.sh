@@ -1704,6 +1704,17 @@ install_prereqs() {
       log_warning "pgvector package install skipped or failed (non-fatal)."
     fi
   fi
+
+  local pg_client_script=""
+  if pg_client_script="$(hesabix_find_repo_script ensure_postgresql_client.sh)"; then
+    chmod +x "${pg_client_script}" 2>/dev/null || true
+    log_info "Ensuring PostgreSQL client tools (pg_dump/psql) for database backup..."
+    if bash "${pg_client_script}"; then
+      log_success "PostgreSQL client tools are installed."
+    else
+      log_warning "postgresql-client install skipped or failed. Database backup needs postgresql-client-<version>."
+    fi
+  fi
   
   log_success "Prerequisites installed (or already present)."
 }
@@ -2444,6 +2455,12 @@ print('Connection successful')
     log_info "Ensuring PostgreSQL pgvector package before migrations..."
     bash "${pgvector_script}" || log_warning "pgvector install skipped (non-fatal)."
   fi
+  local pg_client_script=""
+  if pg_client_script="$(hesabix_find_repo_script ensure_postgresql_client.sh)"; then
+    chmod +x "${pg_client_script}" 2>/dev/null || true
+    log_info "Ensuring PostgreSQL client tools before API start..."
+    bash "${pg_client_script}" || log_warning "postgresql-client install skipped (non-fatal)."
+  fi
 
   # Always run migrations (after optional seed import, or when DB was already initialized)
   if ! hesabix_db_is_fully_initialized && [[ "${table_count}" -gt 0 ]]; then
@@ -2489,7 +2506,7 @@ WorkingDirectory=${api_dir}
 Environment=PATH=/usr/bin:/usr/local/bin:${api_dir}/.venv/bin
 Environment=PYTHONUNBUFFERED=1
 Environment=TZ=UTC
-# ! = run as root: daemon-reload + pip from deploy mirrors if needed (before alembic)
+# ! = run as root: postgresql-client + daemon-reload + pip from deploy mirrors if needed
 ExecStartPre=!${api_dir}/deployment/systemd/hesabix-api-prestart.sh
 # Before start/restart: run migrations; service does not start if migrations fail
 ExecStartPre=${api_dir}/.venv/bin/python -m alembic -c ${api_dir}/alembic.ini upgrade head

@@ -5,7 +5,9 @@ import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
-from app.services.database_backup_service import DatabaseBackupService
+import pytest
+
+from app.services.database_backup_service import DatabaseBackupError, DatabaseBackupService
 from app.services.database_restore_service import DatabaseRestoreService
 
 
@@ -43,6 +45,30 @@ def test_backup_uses_resolved_pg_dump_without_rewriting_path(monkeypatch) -> Non
     assert observed["command"][0] == "C:\\PostgreSQL\\16\\bin\\pg_dump.exe"
     assert observed["resolver_path"] == "original-test-path"
     assert observed["run_path"] == "original-test-path"
+
+
+def test_backup_translates_debian_missing_client_stderr(monkeypatch) -> None:
+    service = DatabaseBackupService.__new__(DatabaseBackupService)
+    service.db = None
+    service.settings = _settings()
+
+    monkeypatch.setattr(
+        "app.services.database_backup_service.resolve_postgres_tool",
+        lambda tool, *, environment: Path("/usr/bin/pg_dump"),
+    )
+
+    def fake_run(command, **kwargs):
+        raise subprocess.CalledProcessError(
+            1,
+            command,
+            output=b"",
+            stderr=b"Error: You must install at least one postgresql-client-<version> package\n",
+        )
+
+    monkeypatch.setattr("app.services.database_backup_service.subprocess.run", fake_run)
+
+    with pytest.raises(DatabaseBackupError, match="postgresql-client"):
+        service.create_backup(compress=False)
 
 
 def test_gzip_restore_is_expanded_before_psql_and_temp_file_is_removed(

@@ -24,7 +24,7 @@ Environment="PYTHONHASHSEED=0"  # استفاده از hash randomization برا�
 # اجرای API با uvicorn
 # تعداد workers: 2x تعداد CPU cores برای استفاده حداکثری از منابع
 # با 12 هسته CPU: 24 worker برای بهینه‌سازی عملکرد و کاهش تاخیر
-# ! = اجرا با root: daemon-reload + در صورت نبود وابستگی، نصب از آینه (مثل deploy.sh)
+# ! = اجرا با root: postgresql-client + daemon-reload + در صورت نبود وابستگی، نصب از آینه
 TimeoutStartSec=300
 ExecStartPre=!/var/www/arc/hesabixAPI/deployment/systemd/hesabix-api-prestart.sh
 ExecStartPre=/var/www/arc/hesabixAPI/.venv/bin/python -m alembic -c /var/www/arc/hesabixAPI/alembic.ini upgrade head

@@ -16,7 +16,12 @@ from typing import Literal
 from sqlalchemy.orm import Session
 
 from adapters.db.models.file_storage import StorageConfig
-from app.core.postgres_tools import PostgreSQLToolNotFoundError, resolve_postgres_tool
+from app.core.postgres_tools import (
+    PostgreSQLToolNotFoundError,
+    is_missing_debian_client_error,
+    missing_client_message_fa,
+    resolve_postgres_tool,
+)
 from app.core.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -49,10 +54,7 @@ class DatabaseBackupService:
             pg_dump = resolve_postgres_tool("pg_dump", environment=env)
         except PostgreSQLToolNotFoundError as e:
             logger.error("database_backup_pg_dump_not_found: %s", e)
-            raise DatabaseBackupError(
-                "ابزار pg_dump یافت نشد. PostgreSQL client tools را نصب کنید یا "
-                "HESABIX_POSTGRES_BIN_DIR را تنظیم کنید."
-            ) from e
+            raise DatabaseBackupError(missing_client_message_fa("pg_dump")) from e
 
         cmd = [
             str(pg_dump),
@@ -94,13 +96,12 @@ class DatabaseBackupService:
                 e.returncode,
                 stderr[:500],
             )
+            if is_missing_debian_client_error(stderr):
+                raise DatabaseBackupError(missing_client_message_fa("pg_dump")) from e
             raise DatabaseBackupError(f"خطا در pg_dump: {stderr[:200]}") from e
         except FileNotFoundError as e:
             logger.error("database_backup_pg_dump_not_found: %s", e)
-            raise DatabaseBackupError(
-                "ابزار pg_dump اجرا نشد. PostgreSQL client tools و مقدار "
-                "HESABIX_POSTGRES_BIN_DIR را بررسی کنید."
-            ) from e
+            raise DatabaseBackupError(missing_client_message_fa("pg_dump")) from e
         except Exception as e:
             logger.exception("database_backup_unexpected_error error=%s", str(e))
             raise DatabaseBackupError(str(e)) from e
