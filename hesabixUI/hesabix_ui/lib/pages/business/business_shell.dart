@@ -2625,6 +2625,7 @@ class _BusinessShellState extends State<BusinessShell> {
         );
 
     final appBar = AppBar(
+      primary: false,
       toolbarHeight: _kBizAppBarToolbarHeight,
       elevation: 0,
       scrolledUnderElevation: 0,
@@ -2858,36 +2859,48 @@ class _BusinessShellState extends State<BusinessShell> {
     final bool showBizTabs =
         useRail && uiStore.shouldShowTabStrip(widget.businessId, isDesktop: true);
     final Widget shellMainChild = widget.child;
+    final double topInset = MediaQuery.paddingOf(context).top;
     final double topStripHeight = isMobile ? 0 : _kUnifiedBizTabBarHeight;
 
     final PreferredSizeWidget preferredAppBar = PreferredSize(
-      preferredSize: Size.fromHeight(topStripHeight + _kBizAppBarToolbarHeight),
+      preferredSize: Size.fromHeight(topInset + _kBizAppBarToolbarHeight + topStripHeight),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: MainAxisSize.max,
         children: [
-          appBar,
-          if (showBizTabs)
-            _buildUnifiedDesktopTabStrip(
-              context: context,
-              menuRoot: allMenuItems,
-              barBg: secondaryStripBg,
-              stripBottomBorder: stripBottomBorder,
-              businessName: businessName,
-              dateTimeStr: dateTimeStr,
-              isMobile: isMobile,
-            )
-          else if (!isMobile)
-            businessTopBar,
+          if (topInset > 0) SizedBox(height: topInset),
+          SizedBox(
+            height: _kBizAppBarToolbarHeight,
+            child: appBar,
+          ),
+          if (!isMobile)
+            SizedBox(
+              height: _kUnifiedBizTabBarHeight,
+              child: showBizTabs
+                  ? _buildUnifiedDesktopTabStrip(
+                      context: context,
+                      menuRoot: allMenuItems,
+                      barBg: secondaryStripBg,
+                      stripBottomBorder: stripBottomBorder,
+                      businessName: businessName,
+                      dateTimeStr: dateTimeStr,
+                      isMobile: isMobile,
+                    )
+                  : businessTopBar,
+            ),
         ],
       ),
     );
 
-    final content = Container(
+    // Overlayهای تلفن وقتی غیرفعال‌اند SizedBox.shrink برمی‌گردانند (غیر Positioned).
+    // Stack با fit پیش‌فرض در قید شل، خودش را به همان صفر جمع می‌کند و ناوبری دیده نمی‌شود.
+    final content = ColoredBox(
       color: scheme.surface,
       child: SafeArea(
+        top: false,
         child: Stack(
+          fit: StackFit.expand,
           children: [
-            Positioned.fill(child: shellMainChild),
+            SizedBox.expand(child: shellMainChild),
             TelephonyScreenPopLayer(
               businessId: widget.businessId,
               authStore: widget.authStore,
