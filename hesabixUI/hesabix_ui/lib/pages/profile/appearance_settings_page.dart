@@ -72,7 +72,6 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
     'basalam',
     'woocommerce',
     'digipay',
-    'plugin-marketplace',
     'group:warehouses',
     'storage-files',
     'tax-workspace',
@@ -86,9 +85,16 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
     'zohal/inquiries',
   ];
 
-  static const List<String> _defaultOrderOther = [
+  /// آخر منو: بازار افزونه‌ها، سپس تنظیمات.
+  static const List<String> _footerRootKeys = [
+    'plugin-marketplace',
     'settings',
+  ];
+
+  static const List<String> _defaultOrderOther = [
     'report-templates',
+    'plugin-marketplace',
+    'settings',
   ];
 
   static const Map<String, List<String>> _defaultChildrenOrder = {
@@ -273,6 +279,15 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
     }
     for (final k in defaults) {
       if (seen.add(k)) out.add(k);
+    }
+    return _pinFooterMenuKeys(out);
+  }
+
+  static List<String> _pinFooterMenuKeys(List<String> keys) {
+    final rest = keys.where((k) => !_footerRootKeys.contains(k)).toList();
+    final out = [...rest];
+    for (final k in _footerRootKeys) {
+      if (keys.contains(k)) out.add(k);
     }
     return out;
   }
@@ -594,7 +609,7 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
                           setOrder: (v) => setState(() => _orderPrograms = v), onResetSection: () => _resetSectionToDefault('programs')),
                       const Divider(height: 24),
                       _menuSection(theme, title: 'سایر', order: _orderOther,
-                          setOrder: (v) => setState(() => _orderOther = v), onResetSection: () => _resetSectionToDefault('other')),
+                          setOrder: (v) => setState(() => _orderOther = _pinFooterMenuKeys(v)), onResetSection: () => _resetSectionToDefault('other')),
                     ],
                     const SizedBox(height: 8),
                     Text(

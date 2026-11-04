@@ -1836,15 +1836,6 @@ class _BusinessShellState extends State<BusinessShell> {
         hasAddButton: false,
       ),
       _MenuItem(
-        key: 'plugin-marketplace',
-        label: t.pluginMarketplace,
-        icon: Icons.store,
-        selectedIcon: Icons.store,
-        path: _bu('plugin-marketplace'),
-        type: _MenuItemType.simple,
-        hasAddButton: false,
-      ),
-      _MenuItem(
         key: 'hscript',
         label: 'گزارش‌ساز اسکریپتی',
         icon: Icons.code_outlined,
@@ -2253,19 +2244,28 @@ class _BusinessShellState extends State<BusinessShell> {
         type: _MenuItemType.separator,
       ),
       _MenuItem(
-        key: 'settings',
-        label: t.settings,
-        icon: Icons.settings,
-        selectedIcon: Icons.settings,
-        path: _bu('settings'),
-        type: _MenuItemType.simple,
-      ),
-      _MenuItem(
         key: 'report-templates',
         label: t.templates,
         icon: Icons.picture_as_pdf,
         selectedIcon: Icons.picture_as_pdf,
         path: _bu('report-templates'),
+        type: _MenuItemType.simple,
+      ),
+      _MenuItem(
+        key: 'plugin-marketplace',
+        label: t.pluginMarketplace,
+        icon: Icons.store,
+        selectedIcon: Icons.store,
+        path: _bu('plugin-marketplace'),
+        type: _MenuItemType.simple,
+        hasAddButton: false,
+      ),
+      _MenuItem(
+        key: 'settings',
+        label: t.settings,
+        icon: Icons.settings,
+        selectedIcon: Icons.settings,
+        path: _bu('settings'),
         type: _MenuItemType.simple,
       ),
     ];
@@ -3170,6 +3170,13 @@ class _BusinessShellState extends State<BusinessShell> {
                       );
                     } else {
                       // آیتم ساده یا آیتم بازشونده
+                      final chrome = _sidebarItemChrome(
+                        item,
+                        selected: isSelected,
+                        hovered: isHovered,
+                        fallbackFg: active ? activeFg : sideFg,
+                        fallbackBg: bgColor,
+                      );
                       Widget menuItemWidget = MouseRegion(
                         onEnter: (_) => setState(() => _hoverIndex = index),
                         onExit: (_) => setState(() => _hoverIndex = -1),
@@ -3195,7 +3202,7 @@ class _BusinessShellState extends State<BusinessShell> {
                             margin: EdgeInsets.zero,
                             padding: nav.parentPaddingFor(extended: railExtended),
                             decoration: BoxDecoration(
-                              color: bgColor,
+                              color: chrome.bg,
                               borderRadius: br,
                             ),
                             child: Row(
@@ -3206,7 +3213,7 @@ class _BusinessShellState extends State<BusinessShell> {
                                   children: [
                                     _buildSidebarMenuIcon(
                                       item,
-                                      color: active ? activeFg : sideFg,
+                                      color: chrome.fg,
                                       size: nav.iconSizeFor(extended: railExtended, child: false),
                                       active: active,
                                     ),
@@ -3249,8 +3256,9 @@ class _BusinessShellState extends State<BusinessShell> {
                                       overflow: TextOverflow.ellipsis,
                                       style: nav.parentLabelStyle(
                                         textTheme,
-                                        color: active ? activeFg : sideFg,
-                                        active: active,
+                                        color: chrome.fg,
+                                        active: active ||
+                                            context.shellColors.sidebarFooterForeground(item.key) != null,
                                       ),
                                     ),
                                   ),
@@ -3393,10 +3401,17 @@ class _BusinessShellState extends State<BusinessShell> {
                   } else if (item.type == _MenuItemType.simple) {
                     final section = _sectionForLabel(item.label, t);
                     final canAdd = section != null && (widget.authStore.hasBusinessPermission(section, 'add'));
+                    final chrome = _sidebarItemChrome(
+                      item,
+                      selected: active,
+                      hovered: false,
+                      fallbackFg: active ? activeFg : sideFg,
+                      fallbackBg: active ? activeBg : Colors.transparent,
+                    );
                     return ListTile(
                       leading: _buildSidebarMenuIcon(
                         item,
-                        color: active ? activeFg : sideFg,
+                        color: chrome.fg,
                         size: nav.iconSizeFor(extended: true, child: false),
                         active: active,
                       ),
@@ -3406,12 +3421,14 @@ class _BusinessShellState extends State<BusinessShell> {
                         overflow: TextOverflow.ellipsis,
                         style: nav.parentLabelStyle(
                           textTheme,
-                          color: active ? activeFg : sideFg,
-                          active: active,
+                          color: chrome.fg,
+                          active: active ||
+                              context.shellColors.sidebarFooterForeground(item.key) != null,
                         ),
                       ),
                       selected: active,
-                      selectedTileColor: activeBg,
+                      tileColor: chrome.bg,
+                      selectedTileColor: chrome.bg,
                       trailing: (item.hasAddButton && canAdd)
                           ? _sidebarAddAffordance(
                               nav: nav,
@@ -3764,7 +3781,7 @@ class _BusinessShellState extends State<BusinessShell> {
         .toList();
 
     final order = _menuPreferences.rootOrder;
-    if (order.isEmpty) return visibleRoot;
+    if (order.isEmpty) return _pinSidebarFooterItems(visibleRoot);
     final byKey = <String, _MenuItem>{for (final it in visibleRoot) _menuKey(it): it};
     final nonSepKeys =
         byKey.entries.where((e) => e.value.type != _MenuItemType.separator).map((e) => e.key).toSet();
@@ -3773,7 +3790,7 @@ class _BusinessShellState extends State<BusinessShell> {
         order.where(nonSepKeys.contains).length;
     final knownCount = knownNonSep;
     if (knownCount < 3 || knownCount * 3 < byKey.length) {
-      return visibleRoot;
+      return _pinSidebarFooterItems(visibleRoot);
     }
     final out = <_MenuItem>[];
     for (final key in order) {
@@ -3781,7 +3798,51 @@ class _BusinessShellState extends State<BusinessShell> {
       if (found != null) out.add(found);
     }
     out.addAll(byKey.values);
-    return out;
+    return _pinSidebarFooterItems(out);
+  }
+
+  /// بازار افزونه‌ها و تنظیمات همیشه انتهای منوی کناری می‌مانند.
+  List<_MenuItem> _pinSidebarFooterItems(List<_MenuItem> items) {
+    const footerKeys = ['plugin-marketplace', 'settings'];
+    final footer = <String, _MenuItem>{};
+    final rest = <_MenuItem>[];
+    for (final it in items) {
+      final key = it.key;
+      if (key != null && footerKeys.contains(key)) {
+        footer[key] = it;
+      } else {
+        rest.add(it);
+      }
+    }
+    for (final key in footerKeys) {
+      final found = footer[key];
+      if (found != null) rest.add(found);
+    }
+    return rest;
+  }
+
+  ({Color fg, Color bg}) _sidebarItemChrome(
+    _MenuItem item, {
+    required bool selected,
+    required bool hovered,
+    required Color fallbackFg,
+    required Color fallbackBg,
+  }) {
+    final shell = context.shellColors;
+    final fg = shell.sidebarFooterForeground(item.key);
+    final fill = shell.sidebarFooterFill(item.key);
+    if (fg == null || fill == null) {
+      return (fg: fallbackFg, bg: fallbackBg);
+    }
+    final Color bg;
+    if (selected) {
+      bg = Color.alphaBlend(fg.withValues(alpha: 0.22), fill);
+    } else if (hovered) {
+      bg = Color.alphaBlend(fg.withValues(alpha: 0.10), fill);
+    } else {
+      bg = fill;
+    }
+    return (fg: fg, bg: bg);
   }
 
   // فیلتر کردن منو بر اساس دسترسی‌ها
