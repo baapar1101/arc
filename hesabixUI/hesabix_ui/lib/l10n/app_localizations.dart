@@ -11976,6 +11976,114 @@ abstract class AppLocalizations {
   /// **'Trial balance, balance sheet and P&L in one view'**
   String get reportsFinancialPackageSubtitle;
 
+  /// No description provided for @reportsHscriptTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Script report builder'**
+  String get reportsHscriptTitle;
+
+  /// No description provided for @reportsHscriptSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Build custom reports with HScript'**
+  String get reportsHscriptSubtitle;
+
+  /// No description provided for @reportsHscriptKeywords.
+  ///
+  /// In en, this message translates to:
+  /// **'hscript|script|custom report|dashboard|chart'**
+  String get reportsHscriptKeywords;
+
+  /// No description provided for @reportsArAgingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer receivables aging'**
+  String get reportsArAgingTitle;
+
+  /// No description provided for @reportsArAgingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Analyze overdue customer receivables'**
+  String get reportsArAgingSubtitle;
+
+  /// No description provided for @reportsArAgingKeywords.
+  ///
+  /// In en, this message translates to:
+  /// **'aging|ar|receivables|due date'**
+  String get reportsArAgingKeywords;
+
+  /// No description provided for @reportsApAgingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier payables aging'**
+  String get reportsApAgingTitle;
+
+  /// No description provided for @reportsApAgingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Analyze overdue supplier payables'**
+  String get reportsApAgingSubtitle;
+
+  /// No description provided for @reportsApAgingKeywords.
+  ///
+  /// In en, this message translates to:
+  /// **'aging|ap|payables|supplier|due date'**
+  String get reportsApAgingKeywords;
+
+  /// No description provided for @reportsPersonBalancesByCurrencyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Person balances by currency'**
+  String get reportsPersonBalancesByCurrencyTitle;
+
+  /// No description provided for @reportsPersonBalancesByCurrencySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Native balance per currency and base-currency equivalent'**
+  String get reportsPersonBalancesByCurrencySubtitle;
+
+  /// No description provided for @reportsPersonBalancesByCurrencyKeywords.
+  ///
+  /// In en, this message translates to:
+  /// **'person balance|currency|base equivalent'**
+  String get reportsPersonBalancesByCurrencyKeywords;
+
+  /// No description provided for @reportsCashFlowTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash flow statement'**
+  String get reportsCashFlowTitle;
+
+  /// No description provided for @reportsCashFlowSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Analyze cash inflows and outflows'**
+  String get reportsCashFlowSubtitle;
+
+  /// No description provided for @reportsCashFlowKeywords.
+  ///
+  /// In en, this message translates to:
+  /// **'cash flow|cash|liquidity'**
+  String get reportsCashFlowKeywords;
+
+  /// No description provided for @reportsFxRevaluationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency revaluation report'**
+  String get reportsFxRevaluationTitle;
+
+  /// No description provided for @reportsFxRevaluationSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Gains and losses from currency revaluation'**
+  String get reportsFxRevaluationSubtitle;
+
+  /// No description provided for @reportsFxRevaluationKeywords.
+  ///
+  /// In en, this message translates to:
+  /// **'fx|revaluation|currency|exchange'**
+  String get reportsFxRevaluationKeywords;
+
   /// No description provided for @exportFinancialPackagePdf.
   ///
   /// In en, this message translates to:
@@ -46144,7 +46252,7 @@ abstract class AppLocalizations {
   /// No description provided for @advancedProductionLedgerNext.
   ///
   /// In en, this message translates to:
-  /// **'With these accounts, the next production invoice changes the general ledger.'**
+  /// **'With these accounts, the next production invoice changes the general ledger. Standard or weighted-average costing also needs the variance account.'**
   String get advancedProductionLedgerNext;
 
   /// No description provided for @advancedProductionLedgerUnchanged.

@@ -6378,6 +6378,65 @@ class AppLocalizationsEn extends AppLocalizations {
       'Trial balance, balance sheet and P&L in one view';
 
   @override
+  String get reportsHscriptTitle => 'Script report builder';
+
+  @override
+  String get reportsHscriptSubtitle => 'Build custom reports with HScript';
+
+  @override
+  String get reportsHscriptKeywords =>
+      'hscript|script|custom report|dashboard|chart';
+
+  @override
+  String get reportsArAgingTitle => 'Customer receivables aging';
+
+  @override
+  String get reportsArAgingSubtitle => 'Analyze overdue customer receivables';
+
+  @override
+  String get reportsArAgingKeywords => 'aging|ar|receivables|due date';
+
+  @override
+  String get reportsApAgingTitle => 'Supplier payables aging';
+
+  @override
+  String get reportsApAgingSubtitle => 'Analyze overdue supplier payables';
+
+  @override
+  String get reportsApAgingKeywords => 'aging|ap|payables|supplier|due date';
+
+  @override
+  String get reportsPersonBalancesByCurrencyTitle =>
+      'Person balances by currency';
+
+  @override
+  String get reportsPersonBalancesByCurrencySubtitle =>
+      'Native balance per currency and base-currency equivalent';
+
+  @override
+  String get reportsPersonBalancesByCurrencyKeywords =>
+      'person balance|currency|base equivalent';
+
+  @override
+  String get reportsCashFlowTitle => 'Cash flow statement';
+
+  @override
+  String get reportsCashFlowSubtitle => 'Analyze cash inflows and outflows';
+
+  @override
+  String get reportsCashFlowKeywords => 'cash flow|cash|liquidity';
+
+  @override
+  String get reportsFxRevaluationTitle => 'Currency revaluation report';
+
+  @override
+  String get reportsFxRevaluationSubtitle =>
+      'Gains and losses from currency revaluation';
+
+  @override
+  String get reportsFxRevaluationKeywords => 'fx|revaluation|currency|exchange';
+
+  @override
   String get exportFinancialPackagePdf => 'Combined PDF (financial package)';
 
   @override
@@ -25157,7 +25216,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get advancedProductionLedgerNext =>
-      'With these accounts, the next production invoice changes the general ledger.';
+      'With these accounts, the next production invoice changes the general ledger. Standard or weighted-average costing also needs the variance account.';
 
   @override
   String get advancedProductionLedgerUnchanged =>

@@ -6341,6 +6341,64 @@ class AppLocalizationsFa extends AppLocalizations {
       'تراز آزمایشی، ترازنامه و سود و زیان در یک نما';
 
   @override
+  String get reportsHscriptTitle => 'گزارش‌ساز اسکریپتی';
+
+  @override
+  String get reportsHscriptSubtitle => 'ساخت گزارش سفارشی با HScript';
+
+  @override
+  String get reportsHscriptKeywords =>
+      'hscript|اسکریپت|گزارش سفارشی|داشبورد|نمودار|custom report';
+
+  @override
+  String get reportsArAgingTitle => 'سن بدهی مشتریان';
+
+  @override
+  String get reportsArAgingSubtitle => 'تحلیل سررسید مطالبات';
+
+  @override
+  String get reportsArAgingKeywords => 'سن بدهی|مطالبات|سررسید|aging|ar';
+
+  @override
+  String get reportsApAgingTitle => 'سن بستانکاری تامین‌کنندگان';
+
+  @override
+  String get reportsApAgingSubtitle => 'تحلیل سررسید بدهی‌ها';
+
+  @override
+  String get reportsApAgingKeywords =>
+      'سن بستانکاری|بدهی|تامین کننده|سررسید|aging|ap';
+
+  @override
+  String get reportsPersonBalancesByCurrencyTitle => 'مانده اشخاص به تفکیک ارز';
+
+  @override
+  String get reportsPersonBalancesByCurrencySubtitle =>
+      'مانده بومی هر ارز و معادل ارز پایه';
+
+  @override
+  String get reportsPersonBalancesByCurrencyKeywords =>
+      'مانده اشخاص|ارز|معادل پایه|currency';
+
+  @override
+  String get reportsCashFlowTitle => 'صورت جریان وجوه نقد';
+
+  @override
+  String get reportsCashFlowSubtitle => 'تحلیل ورود و خروج وجه نقد';
+
+  @override
+  String get reportsCashFlowKeywords => 'جریان نقد|وجوه نقد|cash flow';
+
+  @override
+  String get reportsFxRevaluationTitle => 'گزارش تسعیر ارز';
+
+  @override
+  String get reportsFxRevaluationSubtitle => 'سود و زیان ناشی از تسعیر ارز';
+
+  @override
+  String get reportsFxRevaluationKeywords => 'تسعیر|ارز|fx|revaluation';
+
+  @override
   String get exportFinancialPackagePdf => 'خروجی PDF یکجا (بسته مالی)';
 
   @override

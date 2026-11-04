@@ -20,6 +20,7 @@ class AppTheme {
     const spacing = AppSpacing();
     const radii = AppRadii();
     const shellNav = AppShellNavMetrics();
+    const reportsCatalog = AppReportsCatalogMetrics();
     final shellColors = AppShellColors.fromScheme(scheme, isDark: isDark);
     final semantics = AppSemanticColors.fromDefinition(
       themeDef,
@@ -56,6 +57,7 @@ class AppTheme {
         spacing,
         radii,
         shellNav,
+        reportsCatalog,
         shellColors,
         semantics,
       ],
