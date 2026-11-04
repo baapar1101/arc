@@ -1513,3 +1513,537 @@ msgstr "افزونه «سرور MCP هوش مصنوعی» برای این کسب
 
 msgid "AI_MCP_PLUGIN_EXPIRED"
 msgstr "اشتراک افزونه «سرور MCP هوش مصنوعی» تمام شده است."
+
+msgid "ADVANCED_PRODUCTION_PLUGIN_NOT_ACTIVE"
+msgstr "افزونه تولید پیشرفته برای این کسب‌وکار فعال نیست."
+
+msgid "AP_ACCOUNT_NOT_IN_BUSINESS"
+msgstr "حساب انتخاب‌شده متعلق به این کسب‌وکار نیست."
+
+msgid "AP_INVALID_COSTING_METHOD"
+msgstr "روش بهای گزارش معتبر نیست."
+
+msgid "AP_OVERHEAD_MODE_UNSUPPORTED"
+msgstr "این حالت سربار هنوز در دفتر کل پشتیبانی نمی‌شود."
+
+msgid "AP_REPORT_UNKNOWN"
+msgstr "گزارش تولید پیشرفته شناخته نشد."
+
+msgid "INVALID_DATE_RANGE"
+msgstr "بازه تاریخ معتبر نیست."
+
+msgid "INVALID_PRODUCTION_ORDER_STATUS"
+msgstr "وضعیت سفارش تولید معتبر نیست."
+
+msgid "AP_REPORT_ORDERS"
+msgstr "سفارش‌های تولید"
+
+msgid "AP_REPORT_PROGRESS"
+msgstr "پیشرفت تولید"
+
+msgid "AP_REPORT_OVERDUE"
+msgstr "تولید عقب‌افتاده"
+
+msgid "AP_REPORT_SCHEDULE"
+msgstr "برنامه تولید"
+
+msgid "AP_REPORT_PLAN_ACHIEVEMENT"
+msgstr "تحقق برنامه تولید"
+
+msgid "AP_REPORT_OPEN_ORDERS"
+msgstr "سفارش‌های باز"
+
+msgid "AP_REPORT_CYCLE_TIME"
+msgstr "زمان چرخه تولید"
+
+msgid "AP_REPORT_ORDER_COSTING"
+msgstr "بهای سفارش تولید"
+
+msgid "AP_REPORT_MATERIAL_REQUIREMENTS"
+msgstr "مواد موردنیاز تولید"
+
+msgid "AP_REPORT_MATERIAL_SHORTAGE"
+msgstr "کسری مواد اولیه"
+
+msgid "AP_REPORT_MATERIAL_VARIANCE"
+msgstr "انحراف مصرف مواد"
+
+msgid "AP_COL_CODE"
+msgstr "کد سفارش"
+
+msgid "AP_COL_PRODUCT_CODE"
+msgstr "کد کالا"
+
+msgid "AP_COL_PRODUCT_NAME"
+msgstr "نام کالا"
+
+msgid "AP_COL_STATUS"
+msgstr "وضعیت"
+
+msgid "AP_COL_PLANNED_QUANTITY"
+msgstr "مقدار برنامه"
+
+msgid "AP_COL_PRODUCED_QUANTITY"
+msgstr "مقدار تولید"
+
+msgid "AP_COL_REMAINING_QUANTITY"
+msgstr "مانده"
+
+msgid "AP_COL_DUE_DATE"
+msgstr "سررسید"
+
+msgid "AP_COL_PROGRESS_PERCENT"
+msgstr "درصد پیشرفت"
+
+msgid "AP_COL_PLANNED_START_DATE"
+msgstr "شروع برنامه"
+
+msgid "AP_COL_QUANTITY_VARIANCE"
+msgstr "انحراف مقدار"
+
+msgid "AP_COL_STARTED_AT"
+msgstr "شروع واقعی"
+
+msgid "AP_COL_COMPLETED_AT"
+msgstr "تکمیل"
+
+msgid "AP_COL_CYCLE_HOURS"
+msgstr "ساعت چرخه"
+
+msgid "AP_COL_COSTING_METHOD"
+msgstr "روش بها"
+
+msgid "AP_COL_STANDARD_TOTAL"
+msgstr "بهای استاندارد"
+
+msgid "AP_COL_ACTUAL_TOTAL"
+msgstr "بهای واقعی"
+
+msgid "AP_COL_VALUED_TOTAL"
+msgstr "بهای گزارش"
+
+msgid "AP_COL_COST_VARIANCE"
+msgstr "انحراف هزینه"
+
+msgid "AP_COL_WAREHOUSE_NAME"
+msgstr "انبار"
+
+msgid "AP_COL_REQUIRED_QUANTITY"
+msgstr "مقدار موردنیاز"
+
+msgid "AP_COL_RESERVED_QUANTITY"
+msgstr "رزرو"
+
+msgid "AP_COL_FREE_QUANTITY"
+msgstr "آزاد"
+
+msgid "AP_COL_SHORTAGE_QUANTITY"
+msgstr "کسری"
+
+msgid "AP_COL_ORDER_CODE"
+msgstr "کد سفارش"
+
+msgid "AP_COL_ISSUED_QUANTITY"
+msgstr "مقدار صادرشده"
+
+msgid "AP_COL_DOCUMENT_DATE"
+msgstr "تاریخ سند"
+
+msgid "AP_COL_DOCUMENT_CODE"
+msgstr "کد سند"
+
+msgid "AP_COL_QUANTITY"
+msgstr "مقدار"
+
+msgid "AP_COL_AMOUNT"
+msgstr "مبلغ"
+
+msgid "AP_COL_PRODUCED_QUANTITY"
+msgstr "مقدار تولید"
+
+msgid "AP_COL_SCRAP_PERCENT"
+msgstr "درصد ضایعات"
+
+msgid "AP_REPORT_SCRAP"
+msgstr "ضایعات تولید"
+
+msgid "AP_REPORT_SCRAP_BY_PRODUCT"
+msgstr "ضایعات به تفکیک محصول"
+
+msgid "AP_REPORT_SCRAP_RATE"
+msgstr "درصد ضایعات"
+
+msgid "AP_REPORT_FINISHED_GOODS"
+msgstr "تولید نهایی"
+
+msgid "AP_REPORT_FINISHED_BY_PRODUCT"
+msgstr "تولید به تفکیک محصول"
+
+msgid "AP_REPORT_UNPLANNED_PRODUCTION"
+msgstr "تولید بدون سفارش"
+
+msgid "AP_WORK_CENTER_NOT_FOUND"
+msgstr "مرکز تولید در این کسب‌وکار یافت نشد."
+
+msgid "AP_NOMINAL_RATE_INVALID"
+msgstr "ظرفیت اسمی نمی‌تواند منفی باشد."
+
+msgid "AP_ASSET_NOT_FOUND"
+msgstr "دارایی ثابت در این کسب‌وکار یافت نشد."
+
+msgid "AP_SHIFT_NOT_FOUND"
+msgstr "شیفت در این کسب‌وکار یافت نشد."
+
+msgid "AP_FISCAL_YEAR_NOT_FOUND"
+msgstr "سال مالی در این کسب‌وکار یافت نشد."
+
+msgid "AP_WAREHOUSE_NOT_FOUND"
+msgstr "انبار در این کسب‌وکار یافت نشد."
+
+msgid "AP_CURRENCY_NOT_FOUND"
+msgstr "ارز معتبر نیست."
+
+msgid "AP_VARIANCE_ACCOUNT_REQUIRED"
+msgstr "برای روش استاندارد یا میانگین موزون، حساب انحراف بها لازم است تا بهای واقعی به‌جای روش انتخابی سند نشود."
+
+msgid "AP_STATUS_DRAFT"
+msgstr "پیش‌نویس"
+
+msgid "AP_STATUS_RELEASED"
+msgstr "آزادشده"
+
+msgid "AP_STATUS_IN_PROGRESS"
+msgstr "در حال تولید"
+
+msgid "AP_STATUS_COMPLETED"
+msgstr "تکمیل‌شده"
+
+msgid "AP_STATUS_CANCELLED"
+msgstr "لغوشده"
+
+msgid "AP_STAGE_INCOMING"
+msgstr "ورود مواد"
+
+msgid "AP_STAGE_IN_PROCESS"
+msgstr "حین تولید"
+
+msgid "AP_STAGE_FINAL"
+msgstr "محصول نهایی"
+
+msgid "AP_RESULT_PASS"
+msgstr "قبول"
+
+msgid "AP_RESULT_FAIL"
+msgstr "مردود"
+
+msgid "AP_MAINTENANCE_BREAKDOWN"
+msgstr "خرابی"
+
+msgid "AP_MAINTENANCE_PREVENTIVE"
+msgstr "پیشگیرانه"
+
+msgid "AP_BASIS_ACTUAL"
+msgstr "واقعی"
+
+msgid "AP_BASIS_STANDARD"
+msgstr "استاندارد"
+
+msgid "AP_BASIS_WEIGHTED_AVERAGE"
+msgstr "میانگین موزون"
+
+msgid "AP_ROLE_MATERIAL"
+msgstr "ماده"
+
+msgid "AP_ROLE_OUTPUT"
+msgstr "خروجی"
+
+msgid "AP_RECYCLABLE_YES"
+msgstr "بله"
+
+msgid "AP_RECYCLABLE_NO"
+msgstr "خیر"
+
+msgid "AP_LINE_NOT_FOUND"
+msgstr "خط تولید در این کسب‌وکار یافت نشد."
+
+msgid "AP_PRODUCT_NOT_FOUND"
+msgstr "کالا در این کسب‌وکار یافت نشد."
+
+msgid "AP_MASTER_UNKNOWN"
+msgstr "نوع داده تولید پیشرفته شناخته نشد."
+
+msgid "AP_MINUTES_REQUIRED"
+msgstr "مدت به دقیقه باید بزرگ‌تر از صفر باشد."
+
+msgid "AP_OUTPUT_QUANTITY_REQUIRED"
+msgstr "مقدار سالم یا ضایعات باید بزرگ‌تر از صفر باشد."
+
+msgid "AP_QC_VALUE_INVALID"
+msgstr "مرحله یا نتیجه کنترل کیفیت معتبر نیست."
+
+msgid "AP_QC_QUANTITY_INVALID"
+msgstr "مقدار کنترل‌شده و مردود معتبر نیست."
+
+msgid "AP_CODE_REQUIRED"
+msgstr "کد الزامی است."
+
+msgid "AP_NAME_REQUIRED"
+msgstr "نام الزامی است."
+
+msgid "AP_TIME_INVALID"
+msgstr "ساعت باید به شکل HH:MM باشد."
+
+msgid "AP_MACHINE_NOT_FOUND"
+msgstr "دستگاه در این کسب‌وکار یافت نشد."
+
+msgid "AP_MAINTENANCE_KIND_INVALID"
+msgstr "نوع تعمیر باید خرابی یا پیشگیرانه باشد."
+
+msgid "AP_OPERATOR_NOT_FOUND"
+msgstr "اپراتور در این کسب‌وکار یافت نشد."
+
+msgid "AP_MACHINE_LINE_MISMATCH"
+msgstr "دستگاه به این خط تولید وصل نیست."
+
+msgid "AP_COST_INVALID"
+msgstr "مبلغ هزینه نمی‌تواند منفی باشد."
+
+msgid "AP_HOLD_NOT_FOUND"
+msgstr "توقف سفارش در این کسب‌وکار یافت نشد."
+
+msgid "AP_ORDER_NOT_FOUND"
+msgstr "سفارش تولید در این کسب‌وکار یافت نشد."
+
+msgid "AP_HOLD_REASON_REQUIRED"
+msgstr "علت توقف سفارش لازم است."
+
+msgid "AP_REPORT_MACHINE_OUTPUT"
+msgstr "بهره‌وری ماشین"
+
+msgid "AP_REPORT_DOWNTIME_COST"
+msgstr "هزینه توقف"
+
+msgid "AP_REPORT_HELD_ORDERS"
+msgstr "سفارش‌های متوقف"
+
+msgid "AP_COUNT_INVALID"
+msgstr "مقدار شمارش نمی‌تواند منفی باشد."
+
+msgid "AP_REPORT_MATERIAL_CONSUMPTION"
+msgstr "مصرف مواد تولید"
+
+msgid "AP_REPORT_CAPACITY_REQUIRED"
+msgstr "ظرفیت موردنیاز"
+
+msgid "AP_REPORT_WIP_COUNT"
+msgstr "مغایرت شمارش جریان ساخت"
+
+msgid "AP_REPORT_REWORK"
+msgstr "دوباره‌کاری"
+
+msgid "AP_REPORT_LINE_RETURNS"
+msgstr "برگشت به خط"
+
+msgid "AP_TRANSFER_LINES_SAME"
+msgstr "خط مبدأ و مقصد انتقال نمی‌تواند یکی باشد."
+
+msgid "AP_IDLE_DAYS_INVALID"
+msgstr "تعداد روز بدون حرکت باید بزرگ‌تر از صفر باشد."
+
+msgid "AP_REPORT_WIP_BY_CENTER"
+msgstr "جریان ساخت به تفکیک مرکز"
+
+msgid "AP_REPORT_MATERIAL_SCRAP"
+msgstr "ضایعات مواد تولید"
+
+msgid "AP_REPORT_IDLE_MATERIALS"
+msgstr "مواد راکد تولید"
+
+msgid "AP_REPORT_STAGE_TRANSFERS"
+msgstr "انتقال بین خطوط"
+
+msgid "AP_LABOR_HOURS_REQUIRED"
+msgstr "ساعت واقعی دستمزد باید بزرگ‌تر از صفر باشد."
+
+msgid "AP_LABOR_RATE_INVALID"
+msgstr "نرخ ساعتی دستمزد نمی‌تواند منفی باشد."
+
+msgid "AP_REPORT_WAGE_VARIANCE"
+msgstr "انحراف دستمزد"
+
+msgid "AP_SCRAP_RECYCLABLE_REQUIRED"
+msgstr "باید مشخص شود ضایعات قابل بازیافت است یا نه."
+
+msgid "AP_SCRAP_REASON_NOT_FOUND"
+msgstr "علت ضایعات در این کسب‌وکار یافت نشد."
+
+msgid "AP_SCRAP_QUANTITY_REQUIRED"
+msgstr "مقدار ضایعات باید بزرگ‌تر از صفر باشد."
+
+msgid "AP_REPORT_SCRAP_BY_REASON"
+msgstr "علل ضایعات"
+
+msgid "AP_REPORT_RECYCLABLE_SCRAP"
+msgstr "ضایعات قابل بازیافت"
+
+msgid "AP_REPORT_NONRECYCLABLE_SCRAP"
+msgstr "ضایعات غیرقابل بازیافت"
+
+msgid "AP_REPORT_QC_CAUSES"
+msgstr "علل عدم انطباق"
+
+msgid "AP_LOT_CODE_REQUIRED"
+msgstr "کد بچ برای ردیابی لازم است."
+
+msgid "AP_BREAK_EVEN_INPUTS_REQUIRED"
+msgstr "برای نقطه سربه‌سر، کالا و هزینه ثابت همان کالا لازم است."
+
+msgid "AP_REPORT_YIELD_RATE"
+msgstr "بازده تولید"
+
+msgid "AP_REPORT_UNUSED_CAPACITY"
+msgstr "ظرفیت بلااستفاده"
+
+msgid "AP_REPORT_BREAK_EVEN"
+msgstr "نقطه سربه‌سر"
+
+msgid "AP_REPORT_MONTHLY_COMPARISON"
+msgstr "مقایسه ماهانه تولید"
+
+msgid "AP_REPORT_MATERIAL_FLOW"
+msgstr "گردش مواد تولید"
+
+msgid "AP_REPORT_PRODUCTION_BY_LOT"
+msgstr "تولید به تفکیک بچ"
+
+msgid "AP_REPORT_CONVERSION_EFFICIENCY"
+msgstr "راندمان تبدیل مواد"
+
+msgid "AP_REPORT_LOW_YIELD"
+msgstr "محصولات کم‌بازده"
+
+msgid "AP_REPORT_LINE_MAINTENANCE_COST"
+msgstr "هزینه نگهداری هر خط"
+
+msgid "AP_REPORT_MATERIAL_PRICE_VARIANCE"
+msgstr "انحراف نرخ مواد"
+
+msgid "AP_REPORT_PRODUCT_COST"
+msgstr "بهای تمام‌شده محصول"
+
+msgid "AP_REPORT_WIP_BALANCE"
+msgstr "مانده کالای در جریان ساخت"
+
+msgid "AP_REPORT_OPERATION_VARIANCE"
+msgstr "انحراف عملیات تولید"
+
+msgid "AP_COL_USAGE_VARIANCE"
+msgstr "انحراف مصرف"
+
+msgid "AP_COL_PRICE_VARIANCE"
+msgstr "انحراف نرخ"
+
+msgid "AP_COL_STANDARD_UNIT_COST"
+msgstr "نرخ استاندارد"
+
+msgid "AP_COL_TRANSFERRED_AMOUNT"
+msgstr "انتقال به محصول نهایی"
+
+msgid "AP_COL_REMAINING_WIP"
+msgstr "مانده در جریان ساخت"
+
+msgid "AP_COL_STANDARD_OPERATIONS"
+msgstr "عملیات استاندارد"
+
+msgid "AP_COL_STANDARD_MATERIALS"
+msgstr "مواد استاندارد"
+
+msgid "AP_COL_ACTUAL_MATERIALS"
+msgstr "مواد واقعی"
+
+msgid "AP_COL_ACTUAL_OPERATIONS"
+msgstr "عملیات واقعی"
+
+msgid "AP_COL_OPERATION_VARIANCE"
+msgstr "انحراف عملیات"
+
+msgid "AP_COL_PERIOD"
+msgstr "دوره"
+
+msgid "AP_COL_PURCHASED_QUANTITY"
+msgstr "خرید"
+
+msgid "AP_COL_RETURNED_QUANTITY"
+msgstr "برگشت خرید"
+
+msgid "AP_COL_CONSUMED_QUANTITY"
+msgstr "مصرف تولید"
+
+msgid "AP_COL_SCRAPPED_QUANTITY"
+msgstr "ضایعات"
+
+msgid "AP_COL_PERIOD_NET_QUANTITY"
+msgstr "خالص دوره"
+
+msgid "AP_COL_MATERIAL_NAME"
+msgstr "ماده"
+
+msgid "AP_COL_MATERIAL_COUNT"
+msgstr "تعداد مواد"
+
+msgid "AP_COL_CONVERSION_PERCENT"
+msgstr "درصد تبدیل"
+
+msgid "AP_COL_MANUFACTURING_DATE"
+msgstr "تاریخ ساخت"
+
+msgid "AP_COL_RECORD_COUNT"
+msgstr "تعداد رکورد"
+
+msgid "AP_COL_REPAIR_MINUTES"
+msgstr "دقیقه تعمیر"
+
+msgid "AP_COL_COST_AMOUNT"
+msgstr "مبلغ هزینه"
+
+msgid "AP_COL_LINE_CODE"
+msgstr "کد خط"
+
+msgid "AP_COL_LINE_NAME"
+msgstr "خط"
+
+msgid "AP_COL_QUANTITY_GOOD"
+msgstr "مقدار سالم"
+
+msgid "AP_COL_QUANTITY_SCRAP"
+msgstr "مقدار ضایعات"
+
+msgid "AP_COL_YIELD_PERCENT"
+msgstr "درصد بازده"
+
+msgid "AP_COL_IDEAL_QUANTITY"
+msgstr "ظرفیت اسمی"
+
+msgid "AP_COL_UNUSED_QUANTITY"
+msgstr "ظرفیت بلااستفاده"
+
+msgid "AP_COL_UTILIZATION_PERCENT"
+msgstr "درصد استفاده"
+
+msgid "AP_COL_PRODUCT_CODE"
+msgstr "کد کالا"
+
+msgid "AP_COL_PRODUCT_NAME"
+msgstr "کالا"
+
+msgid "AP_COL_FIXED_COST"
+msgstr "هزینه ثابت"
+
+msgid "AP_COL_UNIT_COST"
+msgstr "بهای واحد"
+
+msgid "AP_COL_SALES_AMOUNT"
+msgstr "مبلغ فروش"
+
+msgid "AP_COL_BREAK_EVEN_QUANTITY"
+msgstr "مقدار سربه‌سر"

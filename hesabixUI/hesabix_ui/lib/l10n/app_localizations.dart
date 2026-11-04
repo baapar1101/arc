@@ -45468,6 +45468,1194 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Allocated quantities must equal the line quantity'**
   String get productVariantAllocationMismatch;
+
+  /// No description provided for @advancedProductionMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced production'**
+  String get advancedProductionMenu;
+
+  /// No description provided for @advancedProductionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced production add-on'**
+  String get advancedProductionTitle;
+
+  /// No description provided for @advancedProductionDashboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Dashboard'**
+  String get advancedProductionDashboard;
+
+  /// No description provided for @advancedProductionReports.
+  ///
+  /// In en, this message translates to:
+  /// **'Reports'**
+  String get advancedProductionReports;
+
+  /// No description provided for @advancedProductionSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get advancedProductionSettings;
+
+  /// No description provided for @advancedProductionValuationNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Without a variance account, the costing method is for reports only. When a finished-goods, WIP, or variance account is set, the next production invoice posts to those accounts and stays balanced. A positive variance is above standard.'**
+  String get advancedProductionValuationNote;
+
+  /// No description provided for @advancedProductionReportScrap.
+  ///
+  /// In en, this message translates to:
+  /// **'Scrap'**
+  String get advancedProductionReportScrap;
+
+  /// No description provided for @advancedProductionReportScrapProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Scrap by product'**
+  String get advancedProductionReportScrapProduct;
+
+  /// No description provided for @advancedProductionReportScrapRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Scrap rate'**
+  String get advancedProductionReportScrapRate;
+
+  /// No description provided for @advancedProductionReportFinished.
+  ///
+  /// In en, this message translates to:
+  /// **'Finished output'**
+  String get advancedProductionReportFinished;
+
+  /// No description provided for @advancedProductionReportFinishedProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Output by product'**
+  String get advancedProductionReportFinishedProduct;
+
+  /// No description provided for @advancedProductionReportUnplanned.
+  ///
+  /// In en, this message translates to:
+  /// **'Production without an order'**
+  String get advancedProductionReportUnplanned;
+
+  /// No description provided for @advancedProductionReportOee.
+  ///
+  /// In en, this message translates to:
+  /// **'Equipment effectiveness'**
+  String get advancedProductionReportOee;
+
+  /// No description provided for @advancedProductionReportDowntime.
+  ///
+  /// In en, this message translates to:
+  /// **'Line downtime'**
+  String get advancedProductionReportDowntime;
+
+  /// No description provided for @advancedProductionReportQc.
+  ///
+  /// In en, this message translates to:
+  /// **'Quality inspections'**
+  String get advancedProductionReportQc;
+
+  /// No description provided for @advancedProductionRecords.
+  ///
+  /// In en, this message translates to:
+  /// **'Records'**
+  String get advancedProductionRecords;
+
+  /// No description provided for @advancedProductionRecordsHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Record work centers, lines, downtime, line output, quality checks, and maintenance here. Repair cost does not create an accounting document.'**
+  String get advancedProductionRecordsHelp;
+
+  /// No description provided for @advancedProductionRecordKind.
+  ///
+  /// In en, this message translates to:
+  /// **'Record type'**
+  String get advancedProductionRecordKind;
+
+  /// No description provided for @advancedProductionWorkCenter.
+  ///
+  /// In en, this message translates to:
+  /// **'Work center'**
+  String get advancedProductionWorkCenter;
+
+  /// No description provided for @advancedProductionLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Production line'**
+  String get advancedProductionLine;
+
+  /// No description provided for @advancedProductionMachine.
+  ///
+  /// In en, this message translates to:
+  /// **'Machine'**
+  String get advancedProductionMachine;
+
+  /// No description provided for @advancedProductionShift.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift'**
+  String get advancedProductionShift;
+
+  /// No description provided for @advancedProductionNominalRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Nominal units per hour'**
+  String get advancedProductionNominalRate;
+
+  /// No description provided for @advancedProductionStartTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Start time'**
+  String get advancedProductionStartTime;
+
+  /// No description provided for @advancedProductionEndTime.
+  ///
+  /// In en, this message translates to:
+  /// **'End time'**
+  String get advancedProductionEndTime;
+
+  /// No description provided for @advancedProductionOutput.
+  ///
+  /// In en, this message translates to:
+  /// **'Line output'**
+  String get advancedProductionOutput;
+
+  /// No description provided for @advancedProductionMaintenance.
+  ///
+  /// In en, this message translates to:
+  /// **'Maintenance'**
+  String get advancedProductionMaintenance;
+
+  /// No description provided for @advancedProductionCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get advancedProductionCode;
+
+  /// No description provided for @advancedProductionName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get advancedProductionName;
+
+  /// No description provided for @advancedProductionMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'Minutes'**
+  String get advancedProductionMinutes;
+
+  /// No description provided for @advancedProductionGoodQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Good quantity'**
+  String get advancedProductionGoodQuantity;
+
+  /// No description provided for @advancedProductionScrapQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Scrap quantity'**
+  String get advancedProductionScrapQuantity;
+
+  /// No description provided for @advancedProductionCheckedQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity checked'**
+  String get advancedProductionCheckedQuantity;
+
+  /// No description provided for @advancedProductionRejectedQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity rejected'**
+  String get advancedProductionRejectedQuantity;
+
+  /// No description provided for @advancedProductionCostAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Repair cost'**
+  String get advancedProductionCostAmount;
+
+  /// No description provided for @advancedProductionReportMaintenance.
+  ///
+  /// In en, this message translates to:
+  /// **'Maintenance history'**
+  String get advancedProductionReportMaintenance;
+
+  /// No description provided for @advancedProductionReportReliability.
+  ///
+  /// In en, this message translates to:
+  /// **'Time between failures'**
+  String get advancedProductionReportReliability;
+
+  /// No description provided for @advancedProductionReportProfit.
+  ///
+  /// In en, this message translates to:
+  /// **'Product profitability'**
+  String get advancedProductionReportProfit;
+
+  /// No description provided for @advancedProductionReportCostShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Cost composition'**
+  String get advancedProductionReportCostShare;
+
+  /// No description provided for @advancedProductionReportPassRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Quality acceptance rate'**
+  String get advancedProductionReportPassRate;
+
+  /// No description provided for @advancedProductionReportDaily.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily output'**
+  String get advancedProductionReportDaily;
+
+  /// No description provided for @advancedProductionReportLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Line output'**
+  String get advancedProductionReportLine;
+
+  /// No description provided for @advancedProductionReportShift.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift output'**
+  String get advancedProductionReportShift;
+
+  /// No description provided for @advancedProductionReportWipAge.
+  ///
+  /// In en, this message translates to:
+  /// **'Open order age'**
+  String get advancedProductionReportWipAge;
+
+  /// No description provided for @advancedProductionReportCenter.
+  ///
+  /// In en, this message translates to:
+  /// **'Work center output'**
+  String get advancedProductionReportCenter;
+
+  /// No description provided for @advancedProductionReportCapacity.
+  ///
+  /// In en, this message translates to:
+  /// **'Nominal and actual capacity'**
+  String get advancedProductionReportCapacity;
+
+  /// No description provided for @advancedProductionReportRejects.
+  ///
+  /// In en, this message translates to:
+  /// **'Quality rejects'**
+  String get advancedProductionReportRejects;
+
+  /// No description provided for @advancedProductionReportPeriodCost.
+  ///
+  /// In en, this message translates to:
+  /// **'Period production cost'**
+  String get advancedProductionReportPeriodCost;
+
+  /// No description provided for @advancedProductionReportOperator.
+  ///
+  /// In en, this message translates to:
+  /// **'Operator output'**
+  String get advancedProductionReportOperator;
+
+  /// No description provided for @advancedProductionReportSetup.
+  ///
+  /// In en, this message translates to:
+  /// **'Setup time'**
+  String get advancedProductionReportSetup;
+
+  /// No description provided for @advancedProductionReportLot.
+  ///
+  /// In en, this message translates to:
+  /// **'Lot trace'**
+  String get advancedProductionReportLot;
+
+  /// No description provided for @advancedProductionReportYield.
+  ///
+  /// In en, this message translates to:
+  /// **'Production yield'**
+  String get advancedProductionReportYield;
+
+  /// No description provided for @advancedProductionReportUnused.
+  ///
+  /// In en, this message translates to:
+  /// **'Unused capacity'**
+  String get advancedProductionReportUnused;
+
+  /// No description provided for @advancedProductionReportBreakEven.
+  ///
+  /// In en, this message translates to:
+  /// **'Break-even'**
+  String get advancedProductionReportBreakEven;
+
+  /// No description provided for @advancedProductionLotCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Lot code'**
+  String get advancedProductionLotCode;
+
+  /// No description provided for @advancedProductionFixedCost.
+  ///
+  /// In en, this message translates to:
+  /// **'Product fixed cost'**
+  String get advancedProductionFixedCost;
+
+  /// No description provided for @advancedProductionReportMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly comparison'**
+  String get advancedProductionReportMonthly;
+
+  /// No description provided for @advancedProductionReportFlow.
+  ///
+  /// In en, this message translates to:
+  /// **'Material flow'**
+  String get advancedProductionReportFlow;
+
+  /// No description provided for @advancedProductionPurchased.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchased'**
+  String get advancedProductionPurchased;
+
+  /// No description provided for @advancedProductionReturned.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase return'**
+  String get advancedProductionReturned;
+
+  /// No description provided for @advancedProductionConsumed.
+  ///
+  /// In en, this message translates to:
+  /// **'Production consumption'**
+  String get advancedProductionConsumed;
+
+  /// No description provided for @advancedProductionPeriodNet.
+  ///
+  /// In en, this message translates to:
+  /// **'Period net'**
+  String get advancedProductionPeriodNet;
+
+  /// No description provided for @advancedProductionReportByLot.
+  ///
+  /// In en, this message translates to:
+  /// **'Production by lot'**
+  String get advancedProductionReportByLot;
+
+  /// No description provided for @advancedProductionReportConversion.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversion efficiency'**
+  String get advancedProductionReportConversion;
+
+  /// No description provided for @advancedProductionReportLowYield.
+  ///
+  /// In en, this message translates to:
+  /// **'Low-yield products'**
+  String get advancedProductionReportLowYield;
+
+  /// No description provided for @advancedProductionReportLineCost.
+  ///
+  /// In en, this message translates to:
+  /// **'Line maintenance cost'**
+  String get advancedProductionReportLineCost;
+
+  /// No description provided for @advancedProductionReportPriceVariance.
+  ///
+  /// In en, this message translates to:
+  /// **'Material price variance'**
+  String get advancedProductionReportPriceVariance;
+
+  /// No description provided for @advancedProductionReportProductCost.
+  ///
+  /// In en, this message translates to:
+  /// **'Product cost'**
+  String get advancedProductionReportProductCost;
+
+  /// No description provided for @advancedProductionReportWip.
+  ///
+  /// In en, this message translates to:
+  /// **'WIP balance'**
+  String get advancedProductionReportWip;
+
+  /// No description provided for @advancedProductionReportOperationVariance.
+  ///
+  /// In en, this message translates to:
+  /// **'Operation variance'**
+  String get advancedProductionReportOperationVariance;
+
+  /// No description provided for @advancedProductionUsageVariance.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage variance'**
+  String get advancedProductionUsageVariance;
+
+  /// No description provided for @advancedProductionPriceVariance.
+  ///
+  /// In en, this message translates to:
+  /// **'Price variance'**
+  String get advancedProductionPriceVariance;
+
+  /// No description provided for @advancedProductionTransferred.
+  ///
+  /// In en, this message translates to:
+  /// **'Transferred to finished goods'**
+  String get advancedProductionTransferred;
+
+  /// No description provided for @advancedProductionRemainingWip.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining WIP'**
+  String get advancedProductionRemainingWip;
+
+  /// No description provided for @advancedProductionUnitCost.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit cost'**
+  String get advancedProductionUnitCost;
+
+  /// No description provided for @advancedProductionScrapReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Scrap reason'**
+  String get advancedProductionScrapReason;
+
+  /// No description provided for @advancedProductionScrapEvent.
+  ///
+  /// In en, this message translates to:
+  /// **'Scrap event'**
+  String get advancedProductionScrapEvent;
+
+  /// No description provided for @advancedProductionRecyclable.
+  ///
+  /// In en, this message translates to:
+  /// **'Recyclable'**
+  String get advancedProductionRecyclable;
+
+  /// No description provided for @advancedProductionRecyclableYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes'**
+  String get advancedProductionRecyclableYes;
+
+  /// No description provided for @advancedProductionRecyclableNo.
+  ///
+  /// In en, this message translates to:
+  /// **'No'**
+  String get advancedProductionRecyclableNo;
+
+  /// No description provided for @advancedProductionReportScrapReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Scrap reasons'**
+  String get advancedProductionReportScrapReason;
+
+  /// No description provided for @advancedProductionReportRecyclable.
+  ///
+  /// In en, this message translates to:
+  /// **'Recyclable scrap'**
+  String get advancedProductionReportRecyclable;
+
+  /// No description provided for @advancedProductionReportNonrecyclable.
+  ///
+  /// In en, this message translates to:
+  /// **'Non-recyclable scrap'**
+  String get advancedProductionReportNonrecyclable;
+
+  /// No description provided for @advancedProductionReportQcCause.
+  ///
+  /// In en, this message translates to:
+  /// **'Nonconformance causes'**
+  String get advancedProductionReportQcCause;
+
+  /// No description provided for @advancedProductionReportMachine.
+  ///
+  /// In en, this message translates to:
+  /// **'Machine productivity'**
+  String get advancedProductionReportMachine;
+
+  /// No description provided for @advancedProductionReportDowntimeCost.
+  ///
+  /// In en, this message translates to:
+  /// **'Downtime cost'**
+  String get advancedProductionReportDowntimeCost;
+
+  /// No description provided for @advancedProductionReportHeld.
+  ///
+  /// In en, this message translates to:
+  /// **'Held orders'**
+  String get advancedProductionReportHeld;
+
+  /// No description provided for @advancedProductionOrderId.
+  ///
+  /// In en, this message translates to:
+  /// **'Order id'**
+  String get advancedProductionOrderId;
+
+  /// No description provided for @advancedProductionHoldReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold reason'**
+  String get advancedProductionHoldReason;
+
+  /// No description provided for @advancedProductionHoldId.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold id to release'**
+  String get advancedProductionHoldId;
+
+  /// No description provided for @advancedProductionReportConsumption.
+  ///
+  /// In en, this message translates to:
+  /// **'Material consumption'**
+  String get advancedProductionReportConsumption;
+
+  /// No description provided for @advancedProductionReportCapacityNeed.
+  ///
+  /// In en, this message translates to:
+  /// **'Required capacity'**
+  String get advancedProductionReportCapacityNeed;
+
+  /// No description provided for @advancedProductionReportWipCount.
+  ///
+  /// In en, this message translates to:
+  /// **'WIP count variance'**
+  String get advancedProductionReportWipCount;
+
+  /// No description provided for @advancedProductionReportRework.
+  ///
+  /// In en, this message translates to:
+  /// **'Rework'**
+  String get advancedProductionReportRework;
+
+  /// No description provided for @advancedProductionReportLineReturn.
+  ///
+  /// In en, this message translates to:
+  /// **'Return to line'**
+  String get advancedProductionReportLineReturn;
+
+  /// No description provided for @advancedProductionRequiredHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Required hours'**
+  String get advancedProductionRequiredHours;
+
+  /// No description provided for @advancedProductionCountedQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Counted quantity'**
+  String get advancedProductionCountedQuantity;
+
+  /// No description provided for @advancedProductionReportWipCenter.
+  ///
+  /// In en, this message translates to:
+  /// **'WIP by center'**
+  String get advancedProductionReportWipCenter;
+
+  /// No description provided for @advancedProductionReportMaterialScrap.
+  ///
+  /// In en, this message translates to:
+  /// **'Material scrap'**
+  String get advancedProductionReportMaterialScrap;
+
+  /// No description provided for @advancedProductionReportIdle.
+  ///
+  /// In en, this message translates to:
+  /// **'Idle materials'**
+  String get advancedProductionReportIdle;
+
+  /// No description provided for @advancedProductionReportTransfer.
+  ///
+  /// In en, this message translates to:
+  /// **'Line transfer'**
+  String get advancedProductionReportTransfer;
+
+  /// No description provided for @advancedProductionIdleDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Days without movement'**
+  String get advancedProductionIdleDays;
+
+  /// No description provided for @advancedProductionCurrentStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Current stock'**
+  String get advancedProductionCurrentStock;
+
+  /// No description provided for @advancedProductionReportWage.
+  ///
+  /// In en, this message translates to:
+  /// **'Wage variance'**
+  String get advancedProductionReportWage;
+
+  /// No description provided for @advancedProductionActualHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Actual hours'**
+  String get advancedProductionActualHours;
+
+  /// No description provided for @advancedProductionStandardHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard hours'**
+  String get advancedProductionStandardHours;
+
+  /// No description provided for @advancedProductionStandardRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard hourly rate'**
+  String get advancedProductionStandardRate;
+
+  /// No description provided for @advancedProductionActualRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Actual hourly rate'**
+  String get advancedProductionActualRate;
+
+  /// No description provided for @advancedProductionWipAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Work-in-process account'**
+  String get advancedProductionWipAccount;
+
+  /// No description provided for @advancedProductionFinishedAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Finished goods account'**
+  String get advancedProductionFinishedAccount;
+
+  /// No description provided for @advancedProductionScrapAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Scrap expense account'**
+  String get advancedProductionScrapAccount;
+
+  /// No description provided for @advancedProductionVarianceAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Cost variance account'**
+  String get advancedProductionVarianceAccount;
+
+  /// No description provided for @advancedProductionLedgerNext.
+  ///
+  /// In en, this message translates to:
+  /// **'With these accounts, the next production invoice changes the general ledger.'**
+  String get advancedProductionLedgerNext;
+
+  /// No description provided for @advancedProductionLedgerUnchanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Until a WIP, finished-goods, or variance account is chosen, production invoices keep the current ledger posting.'**
+  String get advancedProductionLedgerUnchanged;
+
+  /// No description provided for @advancedProductionScrapLedger.
+  ///
+  /// In en, this message translates to:
+  /// **'The scrap account changes only the expense line of the next waste invoice. Inventory stays the credit.'**
+  String get advancedProductionScrapLedger;
+
+  /// No description provided for @advancedProductionWeekOutput.
+  ///
+  /// In en, this message translates to:
+  /// **'Output of the last seven days'**
+  String get advancedProductionWeekOutput;
+
+  /// No description provided for @advancedProductionPlanAchievement.
+  ///
+  /// In en, this message translates to:
+  /// **'Plan achievement'**
+  String get advancedProductionPlanAchievement;
+
+  /// No description provided for @advancedProductionScrapPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Scrap percent'**
+  String get advancedProductionScrapPercent;
+
+  /// No description provided for @advancedProductionWeekCost.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed cost, last seven days'**
+  String get advancedProductionWeekCost;
+
+  /// No description provided for @advancedProductionNoFigure.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get advancedProductionNoFigure;
+
+  /// No description provided for @advancedProductionStandardMaterials.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard materials'**
+  String get advancedProductionStandardMaterials;
+
+  /// No description provided for @advancedProductionActualMaterials.
+  ///
+  /// In en, this message translates to:
+  /// **'Actual materials'**
+  String get advancedProductionActualMaterials;
+
+  /// No description provided for @advancedProductionStandardOperations.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard operations'**
+  String get advancedProductionStandardOperations;
+
+  /// No description provided for @advancedProductionActualOperations.
+  ///
+  /// In en, this message translates to:
+  /// **'Actual operations'**
+  String get advancedProductionActualOperations;
+
+  /// No description provided for @advancedProductionFromLine.
+  ///
+  /// In en, this message translates to:
+  /// **'From line'**
+  String get advancedProductionFromLine;
+
+  /// No description provided for @advancedProductionToLine.
+  ///
+  /// In en, this message translates to:
+  /// **'To line'**
+  String get advancedProductionToLine;
+
+  /// No description provided for @advancedProductionPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'Period'**
+  String get advancedProductionPeriod;
+
+  /// No description provided for @advancedProductionStage.
+  ///
+  /// In en, this message translates to:
+  /// **'Stage'**
+  String get advancedProductionStage;
+
+  /// No description provided for @advancedProductionStageIncoming.
+  ///
+  /// In en, this message translates to:
+  /// **'Incoming material'**
+  String get advancedProductionStageIncoming;
+
+  /// No description provided for @advancedProductionStageInProcess.
+  ///
+  /// In en, this message translates to:
+  /// **'In process'**
+  String get advancedProductionStageInProcess;
+
+  /// No description provided for @advancedProductionStageFinal.
+  ///
+  /// In en, this message translates to:
+  /// **'Finished goods'**
+  String get advancedProductionStageFinal;
+
+  /// No description provided for @advancedProductionResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Result'**
+  String get advancedProductionResult;
+
+  /// No description provided for @advancedProductionResultPass.
+  ///
+  /// In en, this message translates to:
+  /// **'Pass'**
+  String get advancedProductionResultPass;
+
+  /// No description provided for @advancedProductionRoleMaterial.
+  ///
+  /// In en, this message translates to:
+  /// **'Material'**
+  String get advancedProductionRoleMaterial;
+
+  /// No description provided for @advancedProductionRoleOutput.
+  ///
+  /// In en, this message translates to:
+  /// **'Output'**
+  String get advancedProductionRoleOutput;
+
+  /// No description provided for @advancedProductionResultFail.
+  ///
+  /// In en, this message translates to:
+  /// **'Fail'**
+  String get advancedProductionResultFail;
+
+  /// No description provided for @advancedProductionMaintenanceBreakdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Breakdown'**
+  String get advancedProductionMaintenanceBreakdown;
+
+  /// No description provided for @advancedProductionMaintenancePreventive.
+  ///
+  /// In en, this message translates to:
+  /// **'Preventive'**
+  String get advancedProductionMaintenancePreventive;
+
+  /// No description provided for @advancedProductionAgeDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Age in days'**
+  String get advancedProductionAgeDays;
+
+  /// No description provided for @advancedProductionOperator.
+  ///
+  /// In en, this message translates to:
+  /// **'Operator id'**
+  String get advancedProductionOperator;
+
+  /// No description provided for @advancedProductionReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Downtime reason'**
+  String get advancedProductionReason;
+
+  /// No description provided for @advancedProductionCostingMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Report costing method'**
+  String get advancedProductionCostingMethod;
+
+  /// No description provided for @advancedProductionCostingActual.
+  ///
+  /// In en, this message translates to:
+  /// **'Actual'**
+  String get advancedProductionCostingActual;
+
+  /// No description provided for @advancedProductionCostingStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard'**
+  String get advancedProductionCostingStandard;
+
+  /// No description provided for @advancedProductionCostingAverage.
+  ///
+  /// In en, this message translates to:
+  /// **'Weighted average'**
+  String get advancedProductionCostingAverage;
+
+  /// No description provided for @advancedProductionOpenOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'Open orders'**
+  String get advancedProductionOpenOrders;
+
+  /// No description provided for @advancedProductionOverdue.
+  ///
+  /// In en, this message translates to:
+  /// **'Overdue'**
+  String get advancedProductionOverdue;
+
+  /// No description provided for @advancedProductionInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get advancedProductionInProgress;
+
+  /// No description provided for @advancedProductionCompletedToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed today'**
+  String get advancedProductionCompletedToday;
+
+  /// No description provided for @advancedProductionOutputToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Output today'**
+  String get advancedProductionOutputToday;
+
+  /// No description provided for @advancedProductionShortageLines.
+  ///
+  /// In en, this message translates to:
+  /// **'Material shortage lines'**
+  String get advancedProductionShortageLines;
+
+  /// No description provided for @advancedProductionSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save settings'**
+  String get advancedProductionSave;
+
+  /// No description provided for @advancedProductionSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings saved'**
+  String get advancedProductionSaved;
+
+  /// No description provided for @advancedProductionPluginRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced production is not active'**
+  String get advancedProductionPluginRequired;
+
+  /// No description provided for @advancedProductionPluginRequiredBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Activate the add-on from the marketplace to open the industrial dashboard and reports.'**
+  String get advancedProductionPluginRequiredBody;
+
+  /// No description provided for @advancedProductionOpenMarketplace.
+  ///
+  /// In en, this message translates to:
+  /// **'Plugin marketplace'**
+  String get advancedProductionOpenMarketplace;
+
+  /// No description provided for @advancedProductionPermissionManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage advanced production settings'**
+  String get advancedProductionPermissionManage;
+
+  /// No description provided for @advancedProductionPermissionOperate.
+  ///
+  /// In en, this message translates to:
+  /// **'Operate advanced production'**
+  String get advancedProductionPermissionOperate;
+
+  /// No description provided for @advancedProductionPermissionCost.
+  ///
+  /// In en, this message translates to:
+  /// **'Run advanced production costing'**
+  String get advancedProductionPermissionCost;
+
+  /// No description provided for @advancedProductionPermissionPost.
+  ///
+  /// In en, this message translates to:
+  /// **'Post advanced production documents'**
+  String get advancedProductionPermissionPost;
+
+  /// No description provided for @advancedProductionStatusDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft'**
+  String get advancedProductionStatusDraft;
+
+  /// No description provided for @advancedProductionStatusReleased.
+  ///
+  /// In en, this message translates to:
+  /// **'Released'**
+  String get advancedProductionStatusReleased;
+
+  /// No description provided for @advancedProductionStatusInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get advancedProductionStatusInProgress;
+
+  /// No description provided for @advancedProductionStatusCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get advancedProductionStatusCompleted;
+
+  /// No description provided for @advancedProductionStatusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get advancedProductionStatusCancelled;
+
+  /// No description provided for @advancedProductionReportOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'Production orders'**
+  String get advancedProductionReportOrders;
+
+  /// No description provided for @advancedProductionReportProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Production progress'**
+  String get advancedProductionReportProgress;
+
+  /// No description provided for @advancedProductionReportOverdue.
+  ///
+  /// In en, this message translates to:
+  /// **'Overdue production'**
+  String get advancedProductionReportOverdue;
+
+  /// No description provided for @advancedProductionReportSchedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Production schedule'**
+  String get advancedProductionReportSchedule;
+
+  /// No description provided for @advancedProductionReportPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Plan achievement'**
+  String get advancedProductionReportPlan;
+
+  /// No description provided for @advancedProductionReportOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open orders'**
+  String get advancedProductionReportOpen;
+
+  /// No description provided for @advancedProductionReportCycle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cycle time'**
+  String get advancedProductionReportCycle;
+
+  /// No description provided for @advancedProductionReportCost.
+  ///
+  /// In en, this message translates to:
+  /// **'Order cost'**
+  String get advancedProductionReportCost;
+
+  /// No description provided for @advancedProductionReportMaterials.
+  ///
+  /// In en, this message translates to:
+  /// **'Material requirements'**
+  String get advancedProductionReportMaterials;
+
+  /// No description provided for @advancedProductionReportShortage.
+  ///
+  /// In en, this message translates to:
+  /// **'Material shortage'**
+  String get advancedProductionReportShortage;
+
+  /// No description provided for @advancedProductionReportVariance.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage variance'**
+  String get advancedProductionReportVariance;
+
+  /// No description provided for @advancedProductionColOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Order code'**
+  String get advancedProductionColOrder;
+
+  /// No description provided for @advancedProductionColProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Product'**
+  String get advancedProductionColProduct;
+
+  /// No description provided for @advancedProductionColStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get advancedProductionColStatus;
+
+  /// No description provided for @advancedProductionColPlanned.
+  ///
+  /// In en, this message translates to:
+  /// **'Planned'**
+  String get advancedProductionColPlanned;
+
+  /// No description provided for @advancedProductionColProduced.
+  ///
+  /// In en, this message translates to:
+  /// **'Produced'**
+  String get advancedProductionColProduced;
+
+  /// No description provided for @advancedProductionColRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining'**
+  String get advancedProductionColRemaining;
+
+  /// No description provided for @advancedProductionColDue.
+  ///
+  /// In en, this message translates to:
+  /// **'Due date'**
+  String get advancedProductionColDue;
+
+  /// No description provided for @advancedProductionColProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress %'**
+  String get advancedProductionColProgress;
+
+  /// No description provided for @advancedProductionColStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Planned start'**
+  String get advancedProductionColStart;
+
+  /// No description provided for @advancedProductionColVarianceQty.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity variance'**
+  String get advancedProductionColVarianceQty;
+
+  /// No description provided for @advancedProductionColCycle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cycle hours'**
+  String get advancedProductionColCycle;
+
+  /// No description provided for @advancedProductionColStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard cost'**
+  String get advancedProductionColStandard;
+
+  /// No description provided for @advancedProductionColActual.
+  ///
+  /// In en, this message translates to:
+  /// **'Actual cost'**
+  String get advancedProductionColActual;
+
+  /// No description provided for @advancedProductionColValued.
+  ///
+  /// In en, this message translates to:
+  /// **'Report value'**
+  String get advancedProductionColValued;
+
+  /// No description provided for @advancedProductionColVarianceCost.
+  ///
+  /// In en, this message translates to:
+  /// **'Cost variance'**
+  String get advancedProductionColVarianceCost;
+
+  /// No description provided for @advancedProductionColWarehouse.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse'**
+  String get advancedProductionColWarehouse;
+
+  /// No description provided for @advancedProductionColRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Required'**
+  String get advancedProductionColRequired;
+
+  /// No description provided for @advancedProductionColFree.
+  ///
+  /// In en, this message translates to:
+  /// **'Free'**
+  String get advancedProductionColFree;
+
+  /// No description provided for @advancedProductionColShortage.
+  ///
+  /// In en, this message translates to:
+  /// **'Shortage'**
+  String get advancedProductionColShortage;
+
+  /// No description provided for @advancedProductionColIssued.
+  ///
+  /// In en, this message translates to:
+  /// **'Issued'**
+  String get advancedProductionColIssued;
+
+  /// No description provided for @advancedProductionFromDate.
+  ///
+  /// In en, this message translates to:
+  /// **'From date'**
+  String get advancedProductionFromDate;
+
+  /// No description provided for @advancedProductionToDate.
+  ///
+  /// In en, this message translates to:
+  /// **'To date'**
+  String get advancedProductionToDate;
 }
 
 class _AppLocalizationsDelegate

@@ -99,6 +99,7 @@ from adapters.api.v1.customer_club import router as customer_club_router
 from adapters.api.v1.payroll import router as payroll_router
 from adapters.api.v1.office_automation import router as office_automation_router
 from adapters.api.v1.fixed_assets import router as fixed_assets_router
+from adapters.api.v1.advanced_production import router as advanced_production_router
 from adapters.api.v1.barcode_labels import router as barcode_labels_router
 from adapters.api.v1.repair_shop import router as repair_shop_router
 from adapters.api.v1.business_notifications import router as business_notifications_router
@@ -1103,6 +1104,7 @@ def create_app() -> FastAPI:
     application.include_router(payroll_router, prefix=settings.api_v1_prefix)
     application.include_router(office_automation_router, prefix=settings.api_v1_prefix)
     application.include_router(fixed_assets_router, prefix=settings.api_v1_prefix)
+    application.include_router(advanced_production_router, prefix=settings.api_v1_prefix)
     application.include_router(barcode_labels_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.distribution import router as distribution_router
     application.include_router(distribution_router, prefix=settings.api_v1_prefix)

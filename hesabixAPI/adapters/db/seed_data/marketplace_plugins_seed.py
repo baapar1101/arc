@@ -276,6 +276,20 @@ _DEFAULT_PLUGINS: Tuple[_PluginSeed, ...] = (
 		plans=(("monthly", 250_000), ("yearly", 2_500_000), ("lifetime", 9_000_000)),
 	),
 	_PluginSeed(
+		code="advanced_production",
+		name="افزونه تولید پیشرفته",
+		description=(
+			"گزارش‌های صنعتی تولید روی سفارش، فرمول ساخت و فاکتور تولید موجود: "
+			"پیشرفت، عقب‌افتادگی، بهای گزارشی استاندارد/واقعی/میانگین، کسری مواد و انحراف مصرف. "
+			"ثبت دفتر کل فاکتور تولید هسته بدون این افزونه تغییر نمی‌کند."
+		),
+		category="operations",
+		icon_url=None,
+		trial_days=14,
+		trial_allowed=True,
+		plans=(("monthly", 220_000), ("yearly", 2_200_000)),
+	),
+	_PluginSeed(
 		code=AI_MCP_SERVER_PLUGIN_CODE,
 		name="سرور MCP هوش مصنوعی",
 		description=_AI_MCP_SERVER_DESCRIPTION,

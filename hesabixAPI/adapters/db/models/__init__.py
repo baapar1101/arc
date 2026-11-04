@@ -126,6 +126,26 @@ from .production_order import (  # noqa: F401
 	ProductionOrderOperation,
 	ProductionOrderOutput,
 )
+from .advanced_production import (  # noqa: F401
+	AdvancedProductionDowntime,
+	AdvancedProductionInspection,
+	AdvancedProductionLabor,
+	AdvancedProductionLine,
+	AdvancedProductionMaintenance,
+	AdvancedProductionMachine,
+	AdvancedProductionLineReturn,
+	AdvancedProductionOrderHold,
+	AdvancedProductionOrderLine,
+	AdvancedProductionRework,
+	AdvancedProductionWipCount,
+	AdvancedProductionOutputLog,
+	AdvancedProductionScrapEvent,
+	AdvancedProductionScrapReason,
+	AdvancedProductionSettings,
+	AdvancedProductionStageTransfer,
+	AdvancedProductionShift,
+	AdvancedProductionWorkCenter,
+)
 from .ping_pong_score import PingPongScore  # noqa: F401
 from .storage_plan import StoragePlan, BusinessStorageSubscription, StorageInvoice, StorageUsageTransaction  # noqa: F401
 from .document_monetization import (  # noqa: F401

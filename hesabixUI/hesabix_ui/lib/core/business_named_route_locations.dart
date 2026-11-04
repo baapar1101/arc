@@ -182,6 +182,7 @@ abstract final class BusinessNamedRoutes {
     'business_stock_count': 'stock-count',
     'business_goods_expense_income': 'goods-expense-income',
     'business_production_orders': 'production-orders',
+    'business_advanced_production': 'advanced-production',
     'business_production_order_details': 'production-orders/:order_id',
     'business_documents': 'documents',
     'business_storage_files': 'storage-files',

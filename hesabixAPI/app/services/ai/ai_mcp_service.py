@@ -48,6 +48,7 @@ _PROMPT_CATALOG = {
     "repair_review": ("مرور تعمیرگاه", "repair", "سفارش‌های تعمیر و وضعیت، تعمیرکار، قطعات و هزینه را از ابزارهای مجاز کسب‌وکار بررسی کن. پیش از تغییر وضعیت، اعلان به مشتری، مصرف قطعه، اتمام/تحویل یا صدور فاکتور، اثر عملیات و سفارش دقیق را بیان کن و تأیید صریح بگیر."),
     "warranty_review": ("مرور گارانتی", "warranty", "کدها و وضعیت گارانتی را فقط از ابزارهای مجاز همین کسب‌وکار بررسی کن. اطلاعات تماس مشتری و کد لینک رهگیری را در پاسخ عادی نمایش نده. پیش از تولید کد، تغییر تنظیمات یا حذف، دامنه اثر را شرح بده و تأیید صریح بگیر؛ فعال‌سازی عمومی گارانتی را از طرف مشتری انجام نده."),
     "production_review": ("مرور تولید", "production", "وضعیت سفارش‌های تولید، مواد موردنیاز، lot و بهای تمام‌شده را از ابزارهای مجاز بررسی کن. BOM را فقط با محصولات همان کسب‌وکار به کار ببر. آزادسازی، شروع، تکمیل یا لغو سفارش می‌تواند روی موجودی اثر بگذارد؛ پیش از هر اقدام اثر، شناسه سفارش و نسخه را روشن کن و تأیید صریح بگیر."),
+    "advanced_production_review": ("مرور تولید پیشرفته", "advanced_production", "گزارش‌های افزونه تولید پیشرفته را فقط اگر ابزارهای advanced_production در این اتصال هستند بخوان. روش بها فقط گزارش است و دفتر کل را عوض نمی‌کند. اگر ابزار در دسترس نیست بگو افزونه فعال نیست."),
     "distribution_review": ("مرور توزیع", "distribution", "برنامه ویزیت، مسیرها، سفارش‌ها، مرجوعی، موجودی خودرو، تسویه و تحویل را فقط با ابزارهای مجاز همین کسب‌وکار بررسی کن. عملیات توزیع می‌تواند فاکتور، سند انبار، پرداخت، اطلاعات مکانی یا ارتباط با مشتری ایجاد کند؛ اثر و رکورد هدف را پیش از نوشتن مشخص کن و تأیید صریح بگیر. داده مکانی و اطلاعات مشتری را فقط در پاسخ لازم به درخواست کاربر نمایش بده."),
     "invoice_draft": ("آماده‌سازی فاکتور", "invoices", "اطلاعات لازم برای ثبت فاکتور را جمع‌آوری و پیش‌نویس ورودی ابزار را آماده کن."),
     "tax_review": ("بررسی وضعیت مالیاتی فاکتورها", "tax", "وضعیت کارپوشه، خطاهای ارسال و اعتبار اطلاعات مالیاتی فاکتورهای انتخابی را بررسی کن. پیش از هر ارسال، ابطال یا استعلام بیرونی، اثر عملیات و شناسهٔ فاکتور را روشن کن و تأیید صریح بگیر."),
@@ -64,7 +65,7 @@ def _prompt_category_available(category: str, visible: set[str]) -> bool:
 
 def _prompt_content(name: str, title: str, goal: str, user_request: str, catalog: list[dict[str, Any]]) -> str:
     categories = sorted({item["category"] for item in catalog})
-    tools = [item for item in catalog if item["category"] in {"general", "query", "business", "reports", "financial", "payroll", "office_automation", "repair", "production", "warranty", "distribution", "invoices", "warehouse", "crm", "products", "persons"}]
+    tools = [item for item in catalog if item["category"] in {"general", "query", "business", "reports", "financial", "payroll", "office_automation", "repair", "production", "advanced_production", "warranty", "distribution", "invoices", "warehouse", "crm", "products", "persons"}]
     tool_names = ", ".join(item["name"] for item in tools[:100]) or "هیچ ابزار دامنه‌ای در این اتصال مجاز نیست"
     text = (
         f"{title}. {goal}\n"

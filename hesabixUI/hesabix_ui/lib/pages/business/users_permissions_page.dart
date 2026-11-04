@@ -1054,6 +1054,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
     'customer_club': 'customer_club',
     'distribution': 'distribution',
     'payroll': 'payroll',
+    'advanced_production': 'advanced_production',
     'office_automation': 'office_automation',
     'fixed_assets': 'fixed_assets',
     'telephony': 'asterisk_issabel_connector',
@@ -1372,6 +1373,13 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'operate': t.payrollPermissionOperate,
         'post': t.payrollPermissionPost,
         'approve': t.payrollPermissionApprove,
+      },
+      'advanced_production': {
+        'view': '${t.view} ${t.advancedProductionMenu}',
+        'manage': t.advancedProductionPermissionManage,
+        'operate': t.advancedProductionPermissionOperate,
+        'cost': t.advancedProductionPermissionCost,
+        'post': t.advancedProductionPermissionPost,
       },
       'office_automation': {
         'view': '${t.view} ${t.oaMenu}',
@@ -1996,6 +2004,11 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'sections': ['payroll'],
       },
       {
+        'title': t.advancedProductionMenu,
+        'icon': Icons.precision_manufacturing_outlined,
+        'sections': ['advanced_production'],
+      },
+      {
         'title': t.oaMenu,
         'icon': Icons.mark_email_unread_outlined,
         'sections': ['office_automation'],
@@ -2178,6 +2191,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.distributionMenu;
       case 'payroll':
         return t.payrollMenu;
+      case 'advanced_production':
+        return t.advancedProductionMenu;
       case 'office_automation':
         return t.oaMenu;
       case 'fixed_assets':
@@ -2236,6 +2251,15 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       case 'allocate':
         return 'تخصیص حساب';
       case 'post':
+        if (sectionKey == 'advanced_production') {
+          return t.advancedProductionPermissionPost;
+        }
+        if (sectionKey == 'fixed_assets') {
+          return t.fixedAssetsPermissionPost;
+        }
+        if (sectionKey == 'payroll') {
+          return t.payrollPermissionPost;
+        }
         return 'قطعی‌سازی';
       case 'cancel':
         return 'ابطال';
@@ -2287,6 +2311,9 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       case 'confirm_expired_sale':
         return t.permissionInvoiceConfirmExpiredSale;
       case 'manage':
+        if (sectionKey == 'advanced_production') {
+          return t.advancedProductionPermissionManage;
+        }
         if (sectionKey == 'payroll') {
           return t.payrollPermissionManage;
         }
@@ -2321,6 +2348,9 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       case 'delete_messages':
         return t.permissionCrmWebChatDeleteMessages;
       case 'operate':
+        if (sectionKey == 'advanced_production') {
+          return t.advancedProductionPermissionOperate;
+        }
         if (sectionKey == 'payroll') {
           return t.payrollPermissionOperate;
         }
@@ -2328,11 +2358,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
           return t.fixedAssetsPermissionOperate;
         }
         return t.distributionPermissionOperate;
-      case 'post':
-        if (sectionKey == 'fixed_assets') {
-          return t.fixedAssetsPermissionPost;
-        }
-        return t.payrollPermissionPost;
+      case 'cost':
+        return t.advancedProductionPermissionCost;
       case 'approve':
         return t.payrollPermissionApprove;
       case 'sync':

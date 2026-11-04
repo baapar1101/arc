@@ -15,6 +15,7 @@ const Map<String, String> pluginSetupRouteByCode = {
   'digipay_credit': 'business_digipay',
   'customer_club': 'business_customer_club',
   'payroll': 'business_payroll',
+  'advanced_production': 'business_advanced_production',
   'fixed_assets': 'business_fixed_assets',
   'hscript_custom_reports': 'business_hscript_reports',
   'advanced_accounting': 'business_reports',

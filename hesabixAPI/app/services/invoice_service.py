@@ -2591,6 +2591,95 @@ def _sync_payload_cost_price_to_item_lines(
         flag_modified(item_line, "extra_info")
 
 
+_PRODUCTION_POSTING_DESCRIPTIONS = {
+    "production_wip_materials": "انتقال مواد اولیه به WIP",
+    "production_raw_issue": "خروج مواد اولیه از موجودی",
+    "production_wip_overhead": "هزینه عملیات تولید (انتقال به WIP)",
+    "production_overhead": "هزینه عملیات/سربار تولید",
+    "production_finished_in": "ورود محصول نهایی به موجودی",
+    "production_wip_relief": "انتقال محصول نهایی از WIP",
+    "production_variance_unfavorable": "انحراف نامساعد بهای تولید",
+    "production_variance_favorable": "انحراف مساعد بهای تولید",
+    "production_wip_variance": "انتقال انحراف بها از WIP",
+}
+
+
+def _try_plugin_production_posting(
+    db: Session,
+    document: Document,
+    business_id: int,
+    accounts: Dict[str, Account],
+    header_extra: Optional[Dict[str, Any]],
+    out_lines: List[Dict[str, Any]],
+    in_lines: List[Dict[str, Any]],
+    created_invoice_lines: List[tuple],
+) -> bool:
+    """اگر افزونه تولید پیشرفته برنامهٔ ثبت بدهد، همان را سند می‌زند و True برمی‌گرداند."""
+    from app.services.advanced_production_posting import plan_production_posting
+
+    output_qty = Decimal(0)
+    product_id = None
+    for line in in_lines:
+        qty = Decimal(str(line.get("quantity", 0) or 0))
+        if qty <= 0:
+            continue
+        output_qty += qty
+        if product_id is None and line.get("product_id"):
+            product_id = int(line["product_id"])
+    materials = _extract_cogs_total_for_invoice(out_lines)
+    try:
+        operations = Decimal(str((header_extra or {}).get("production_operations_total", 0) or 0))
+    except Exception:
+        operations = Decimal(0)
+    plan = plan_production_posting(
+        db,
+        int(business_id),
+        header_extra,
+        materials,
+        operations,
+        output_qty,
+        product_id=product_id,
+    )
+    if plan is None:
+        return False
+    role_accounts = {
+        "wip": plan["wip_account_id"] or accounts["wip"].id,
+        "raw_inventory": accounts["inventory"].id,
+        "overhead": accounts["production_overhead"].id,
+        "finished": plan["finished_goods_account_id"] or accounts["inventory"].id,
+        "variance": plan["variance_account_id"] or accounts["production_overhead"].id,
+    }
+    for spec in plan["journal"]:
+        db.add(DocumentLine(
+            document_id=document.id,
+            account_id=role_accounts[spec["role"]],
+            debit=spec["debit"],
+            credit=spec["credit"],
+            description=_PRODUCTION_POSTING_DESCRIPTIONS.get(spec["description_key"], spec["description_key"]),
+            extra_info={"source": spec["description_key"], "advanced_production": True},
+        ))
+    if plan.get("unit_cost") is not None:
+        for line in in_lines:
+            qty = Decimal(str(line.get("quantity", 0) or 0))
+            if qty <= 0:
+                continue
+            extra = dict(line.get("extra_info") or {})
+            extra["cost_price"] = float(plan["unit_cost"])
+            extra["advanced_production_costing_method"] = plan["costing_method"]
+            line["extra_info"] = extra
+        _sync_payload_cost_price_to_item_lines(created_invoice_lines)
+    return True
+
+
+def _waste_expense_account_id(db: Session, business_id: int, accounts: Dict[str, Account]) -> int:
+    from app.services.advanced_production_posting import choose_waste_expense_account, mapped_scrap_expense_account_id
+
+    return choose_waste_expense_account(
+        accounts["waste_expense"].id,
+        mapped_scrap_expense_account_id(db, int(business_id)),
+    )
+
+
 def _extract_cogs_total_for_invoice(lines: List[Dict[str, Any]]) -> Decimal:
     """
     محاسبه COGS برای فاکتورها (بدون بررسی inventory_posted).
@@ -7461,7 +7550,7 @@ def create_invoice(
                     # بدهکار: هزینه ضایعات
                     db.add(DocumentLine(
                         document_id=document.id,
-                        account_id=accounts["waste_expense"].id,
+                        account_id=_waste_expense_account_id(db, int(business_id), accounts),
                         debit=total_cogs,
                         credit=Decimal(0),
                         description="هزینه کسری و ضایعات کالا",
@@ -7480,13 +7569,20 @@ def create_invoice(
                 # جداسازی خطوط ورودی و خروجی
                 out_lines = [ln for ln in lines_input if (ln.get("extra_info") or {}).get("movement") == "out"]
                 in_lines = [ln for ln in lines_input if (ln.get("extra_info") or {}).get("movement") == "in"]
+                posting_header = header_extra
+                if _try_plugin_production_posting(
+                    db, document, int(business_id), accounts, header_extra, out_lines, in_lines, created_invoice_lines
+                ):
+                    out_lines = []
+                    in_lines = []
+                    posting_header = {}
                 
                 # محاسبه COGS برای مواد اولیه (خروج)
                 total_materials_cost = _extract_cogs_total_for_invoice(out_lines)
 
                 # هزینه عملیات/سربار تولید (در صورت ارسال از UI)
                 try:
-                    operations_total = Decimal(str((header_extra or {}).get("production_operations_total", 0) or 0))
+                    operations_total = Decimal(str((posting_header or {}).get("production_operations_total", 0) or 0))
                 except Exception:
                     operations_total = Decimal(0)
                 
@@ -9154,7 +9250,7 @@ def update_invoice(
                 # بدهکار: هزینه ضایعات
                 db.add(DocumentLine(
                     document_id=document.id,
-                    account_id=accounts["waste_expense"].id,
+                    account_id=_waste_expense_account_id(db, int(document.business_id), accounts),
                     debit=total_cogs,
                     credit=Decimal(0),
                     description="هزینه کسری و ضایعات کالا",
@@ -9172,12 +9268,19 @@ def update_invoice(
             # جداسازی خطوط ورودی و خروجی
             out_lines = [ln for ln in lines_input if (ln.get("extra_info") or {}).get("movement") == "out"]
             in_lines = [ln for ln in lines_input if (ln.get("extra_info") or {}).get("movement") == "in"]
+            posting_header = header_extra
+            if _try_plugin_production_posting(
+                db, document, int(document.business_id), accounts, header_extra, out_lines, in_lines, created_invoice_lines
+            ):
+                out_lines = []
+                in_lines = []
+                posting_header = {}
             
             # محاسبه COGS برای مواد اولیه (خروج)
             total_materials_cost = _extract_cogs_total_for_invoice(out_lines)
 
             # هزینه عملیات/سربار تولید (در صورت ارسال از UI)
-            operations_total_raw = (header_extra or {}).get("production_operations_total", 0)
+            operations_total_raw = (posting_header or {}).get("production_operations_total", 0)
             try:
                 operations_total = Decimal(str(operations_total_raw or 0))
             except Exception:

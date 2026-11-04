@@ -220,6 +220,8 @@ class _BusinessShellState extends State<BusinessShell> {
         return t.businessPanelTabRouteRepairShopSettings;
       case 'payroll':
         return t.payrollMenu;
+      case 'advanced-production':
+        return t.advancedProductionMenu;
       case 'office-automation':
         return t.oaCartable;
       case 'office-automation/org':
@@ -264,6 +266,9 @@ class _BusinessShellState extends State<BusinessShell> {
     }
     if (pathTailBase.startsWith('payroll/')) {
       return t.payrollMenu;
+    }
+    if (pathTailBase.startsWith('advanced-production')) {
+      return t.advancedProductionMenu;
     }
     if (pathTailBase.startsWith('office-automation')) {
       return t.oaMenu;
@@ -1348,6 +1353,9 @@ class _BusinessShellState extends State<BusinessShell> {
 
   bool _isPayrollPluginActive() => _isPluginCodeLicensed('payroll');
 
+  bool _isAdvancedProductionPluginActive() =>
+      _isPluginCodeLicensed('advanced_production');
+
   bool _isOfficeAutomationPluginActive() => _isPluginCodeLicensed('office_automation');
 
   bool _isFixedAssetsPluginActive() => _isPluginCodeLicensed('fixed_assets');
@@ -2139,6 +2147,15 @@ class _BusinessShellState extends State<BusinessShell> {
         path: _bu('payroll'),
         type: _MenuItemType.simple,
         hasAddButton: true,
+      ),
+      _MenuItem(
+        key: 'advanced-production',
+        label: t.advancedProductionMenu,
+        icon: Icons.precision_manufacturing_outlined,
+        selectedIcon: Icons.precision_manufacturing,
+        path: _bu('advanced-production'),
+        type: _MenuItemType.simple,
+        hasAddButton: false,
       ),
       _MenuItem(
         key: 'group:office-automation',
@@ -3862,6 +3879,12 @@ class _BusinessShellState extends State<BusinessShell> {
       }
     }
 
+    if (section == 'advanced_production') {
+      if (!_showPluginGatedMenu(_isAdvancedProductionPluginActive())) {
+        return false;
+      }
+    }
+
     if (section == 'office_automation') {
       if (!_showPluginGatedMenu(_isOfficeAutomationPluginActive())) {
         return false;
@@ -3976,6 +3999,8 @@ class _BusinessShellState extends State<BusinessShell> {
         return 'reports';
       case 'payroll':
         return 'payroll';
+      case 'advanced-production':
+        return 'advanced_production';
       case 'office-automation':
       case 'group:office-automation':
         return 'office_automation';
@@ -4005,6 +4030,7 @@ class _BusinessShellState extends State<BusinessShell> {
       if (path.contains('/report-templates')) return 'report_templates';
       if (path.contains('/hscript')) return 'reports';
       if (path.contains('/payroll')) return 'payroll';
+      if (path.contains('/advanced-production')) return 'advanced_production';
       if (path.contains('/office-automation')) return 'office_automation';
       if (path.contains('/fixed-assets')) return 'fixed_assets';
       if (path.contains('/barcode-labels')) return 'barcode_labels';
@@ -4082,6 +4108,9 @@ class _BusinessShellState extends State<BusinessShell> {
         label == 'Payroll' ||
         label == 'حقوق و دستمزد') {
       return 'payroll';
+    }
+    if (label == t.advancedProductionMenu || label == t.advancedProductionTitle) {
+      return 'advanced_production';
     }
     if (label == t.oaMenu ||
         label == t.oaOrg ||

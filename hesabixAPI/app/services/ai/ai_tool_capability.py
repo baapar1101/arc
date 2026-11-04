@@ -453,6 +453,12 @@ _EXACT: Dict[str, str] = {
     "post_goods_expense_income": "inventory.warehouse",
     "cancel_goods_expense_income": "inventory.warehouse",
     "delete_goods_expense_income": "inventory.warehouse",
+    "get_advanced_production_settings": "inventory.production",
+    "update_advanced_production_settings": "inventory.production",
+    "get_advanced_production_dashboard": "reports.overview",
+    "get_advanced_production_report": "reports.overview",
+    "list_advanced_production_master": "inventory.production",
+    "create_advanced_production_master": "inventory.production",
 }
 
 

@@ -155,6 +155,7 @@ import 'pages/business/repair_shop/repair_settings_page.dart';
 import 'pages/business/customer_club/customer_club_main_page.dart';
 import 'pages/business/customer_club/customer_club_settings_page.dart';
 import 'pages/business/payroll/payroll_main_page.dart';
+import 'pages/business/advanced_production/advanced_production_page.dart';
 import 'pages/business/office_automation/oa_archive_page.dart';
 import 'pages/business/office_automation/oa_cartable_page.dart';
 import 'pages/business/office_automation/oa_external_orgs_page.dart';
@@ -176,6 +177,7 @@ import 'pages/business/telephony/telephony_softphone_page.dart';
 import 'pages/business/distribution/distribution_main_page.dart';
 import 'widgets/marketplace/distribution_plugin_gate.dart';
 import 'widgets/marketplace/payroll_plugin_gate.dart';
+import 'widgets/marketplace/advanced_production_plugin_gate.dart';
 import 'widgets/marketplace/office_automation_plugin_gate.dart';
 import 'widgets/marketplace/fixed_assets_plugin_gate.dart';
 import 'widgets/marketplace/telephony_plugin_gate.dart';
@@ -2900,6 +2902,26 @@ class _MyAppState extends State<MyApp> {
                                   businessId: businessId,
                                   authStore: _authStore!,
                                   calendarController: _calendarController!,
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'advanced-production',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                AdvancedProductionPluginGate(
+                                  businessId: businessId,
+                                  child: AdvancedProductionPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    calendarController: _calendarController!,
+                                    initialReport: state.uri.queryParameters['report'],
+                                  ),
                                 ),
                               );
                             },

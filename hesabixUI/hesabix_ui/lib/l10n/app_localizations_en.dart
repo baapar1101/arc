@@ -24816,4 +24816,609 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get productVariantAllocationMismatch =>
       'Allocated quantities must equal the line quantity';
+
+  @override
+  String get advancedProductionMenu => 'Advanced production';
+
+  @override
+  String get advancedProductionTitle => 'Advanced production add-on';
+
+  @override
+  String get advancedProductionDashboard => 'Dashboard';
+
+  @override
+  String get advancedProductionReports => 'Reports';
+
+  @override
+  String get advancedProductionSettings => 'Settings';
+
+  @override
+  String get advancedProductionValuationNote =>
+      'Without a variance account, the costing method is for reports only. When a finished-goods, WIP, or variance account is set, the next production invoice posts to those accounts and stays balanced. A positive variance is above standard.';
+
+  @override
+  String get advancedProductionReportScrap => 'Scrap';
+
+  @override
+  String get advancedProductionReportScrapProduct => 'Scrap by product';
+
+  @override
+  String get advancedProductionReportScrapRate => 'Scrap rate';
+
+  @override
+  String get advancedProductionReportFinished => 'Finished output';
+
+  @override
+  String get advancedProductionReportFinishedProduct => 'Output by product';
+
+  @override
+  String get advancedProductionReportUnplanned => 'Production without an order';
+
+  @override
+  String get advancedProductionReportOee => 'Equipment effectiveness';
+
+  @override
+  String get advancedProductionReportDowntime => 'Line downtime';
+
+  @override
+  String get advancedProductionReportQc => 'Quality inspections';
+
+  @override
+  String get advancedProductionRecords => 'Records';
+
+  @override
+  String get advancedProductionRecordsHelp =>
+      'Record work centers, lines, downtime, line output, quality checks, and maintenance here. Repair cost does not create an accounting document.';
+
+  @override
+  String get advancedProductionRecordKind => 'Record type';
+
+  @override
+  String get advancedProductionWorkCenter => 'Work center';
+
+  @override
+  String get advancedProductionLine => 'Production line';
+
+  @override
+  String get advancedProductionMachine => 'Machine';
+
+  @override
+  String get advancedProductionShift => 'Shift';
+
+  @override
+  String get advancedProductionNominalRate => 'Nominal units per hour';
+
+  @override
+  String get advancedProductionStartTime => 'Start time';
+
+  @override
+  String get advancedProductionEndTime => 'End time';
+
+  @override
+  String get advancedProductionOutput => 'Line output';
+
+  @override
+  String get advancedProductionMaintenance => 'Maintenance';
+
+  @override
+  String get advancedProductionCode => 'Code';
+
+  @override
+  String get advancedProductionName => 'Name';
+
+  @override
+  String get advancedProductionMinutes => 'Minutes';
+
+  @override
+  String get advancedProductionGoodQuantity => 'Good quantity';
+
+  @override
+  String get advancedProductionScrapQuantity => 'Scrap quantity';
+
+  @override
+  String get advancedProductionCheckedQuantity => 'Quantity checked';
+
+  @override
+  String get advancedProductionRejectedQuantity => 'Quantity rejected';
+
+  @override
+  String get advancedProductionCostAmount => 'Repair cost';
+
+  @override
+  String get advancedProductionReportMaintenance => 'Maintenance history';
+
+  @override
+  String get advancedProductionReportReliability => 'Time between failures';
+
+  @override
+  String get advancedProductionReportProfit => 'Product profitability';
+
+  @override
+  String get advancedProductionReportCostShare => 'Cost composition';
+
+  @override
+  String get advancedProductionReportPassRate => 'Quality acceptance rate';
+
+  @override
+  String get advancedProductionReportDaily => 'Daily output';
+
+  @override
+  String get advancedProductionReportLine => 'Line output';
+
+  @override
+  String get advancedProductionReportShift => 'Shift output';
+
+  @override
+  String get advancedProductionReportWipAge => 'Open order age';
+
+  @override
+  String get advancedProductionReportCenter => 'Work center output';
+
+  @override
+  String get advancedProductionReportCapacity => 'Nominal and actual capacity';
+
+  @override
+  String get advancedProductionReportRejects => 'Quality rejects';
+
+  @override
+  String get advancedProductionReportPeriodCost => 'Period production cost';
+
+  @override
+  String get advancedProductionReportOperator => 'Operator output';
+
+  @override
+  String get advancedProductionReportSetup => 'Setup time';
+
+  @override
+  String get advancedProductionReportLot => 'Lot trace';
+
+  @override
+  String get advancedProductionReportYield => 'Production yield';
+
+  @override
+  String get advancedProductionReportUnused => 'Unused capacity';
+
+  @override
+  String get advancedProductionReportBreakEven => 'Break-even';
+
+  @override
+  String get advancedProductionLotCode => 'Lot code';
+
+  @override
+  String get advancedProductionFixedCost => 'Product fixed cost';
+
+  @override
+  String get advancedProductionReportMonthly => 'Monthly comparison';
+
+  @override
+  String get advancedProductionReportFlow => 'Material flow';
+
+  @override
+  String get advancedProductionPurchased => 'Purchased';
+
+  @override
+  String get advancedProductionReturned => 'Purchase return';
+
+  @override
+  String get advancedProductionConsumed => 'Production consumption';
+
+  @override
+  String get advancedProductionPeriodNet => 'Period net';
+
+  @override
+  String get advancedProductionReportByLot => 'Production by lot';
+
+  @override
+  String get advancedProductionReportConversion => 'Conversion efficiency';
+
+  @override
+  String get advancedProductionReportLowYield => 'Low-yield products';
+
+  @override
+  String get advancedProductionReportLineCost => 'Line maintenance cost';
+
+  @override
+  String get advancedProductionReportPriceVariance => 'Material price variance';
+
+  @override
+  String get advancedProductionReportProductCost => 'Product cost';
+
+  @override
+  String get advancedProductionReportWip => 'WIP balance';
+
+  @override
+  String get advancedProductionReportOperationVariance => 'Operation variance';
+
+  @override
+  String get advancedProductionUsageVariance => 'Usage variance';
+
+  @override
+  String get advancedProductionPriceVariance => 'Price variance';
+
+  @override
+  String get advancedProductionTransferred => 'Transferred to finished goods';
+
+  @override
+  String get advancedProductionRemainingWip => 'Remaining WIP';
+
+  @override
+  String get advancedProductionUnitCost => 'Unit cost';
+
+  @override
+  String get advancedProductionScrapReason => 'Scrap reason';
+
+  @override
+  String get advancedProductionScrapEvent => 'Scrap event';
+
+  @override
+  String get advancedProductionRecyclable => 'Recyclable';
+
+  @override
+  String get advancedProductionRecyclableYes => 'Yes';
+
+  @override
+  String get advancedProductionRecyclableNo => 'No';
+
+  @override
+  String get advancedProductionReportScrapReason => 'Scrap reasons';
+
+  @override
+  String get advancedProductionReportRecyclable => 'Recyclable scrap';
+
+  @override
+  String get advancedProductionReportNonrecyclable => 'Non-recyclable scrap';
+
+  @override
+  String get advancedProductionReportQcCause => 'Nonconformance causes';
+
+  @override
+  String get advancedProductionReportMachine => 'Machine productivity';
+
+  @override
+  String get advancedProductionReportDowntimeCost => 'Downtime cost';
+
+  @override
+  String get advancedProductionReportHeld => 'Held orders';
+
+  @override
+  String get advancedProductionOrderId => 'Order id';
+
+  @override
+  String get advancedProductionHoldReason => 'Hold reason';
+
+  @override
+  String get advancedProductionHoldId => 'Hold id to release';
+
+  @override
+  String get advancedProductionReportConsumption => 'Material consumption';
+
+  @override
+  String get advancedProductionReportCapacityNeed => 'Required capacity';
+
+  @override
+  String get advancedProductionReportWipCount => 'WIP count variance';
+
+  @override
+  String get advancedProductionReportRework => 'Rework';
+
+  @override
+  String get advancedProductionReportLineReturn => 'Return to line';
+
+  @override
+  String get advancedProductionRequiredHours => 'Required hours';
+
+  @override
+  String get advancedProductionCountedQuantity => 'Counted quantity';
+
+  @override
+  String get advancedProductionReportWipCenter => 'WIP by center';
+
+  @override
+  String get advancedProductionReportMaterialScrap => 'Material scrap';
+
+  @override
+  String get advancedProductionReportIdle => 'Idle materials';
+
+  @override
+  String get advancedProductionReportTransfer => 'Line transfer';
+
+  @override
+  String get advancedProductionIdleDays => 'Days without movement';
+
+  @override
+  String get advancedProductionCurrentStock => 'Current stock';
+
+  @override
+  String get advancedProductionReportWage => 'Wage variance';
+
+  @override
+  String get advancedProductionActualHours => 'Actual hours';
+
+  @override
+  String get advancedProductionStandardHours => 'Standard hours';
+
+  @override
+  String get advancedProductionStandardRate => 'Standard hourly rate';
+
+  @override
+  String get advancedProductionActualRate => 'Actual hourly rate';
+
+  @override
+  String get advancedProductionWipAccount => 'Work-in-process account';
+
+  @override
+  String get advancedProductionFinishedAccount => 'Finished goods account';
+
+  @override
+  String get advancedProductionScrapAccount => 'Scrap expense account';
+
+  @override
+  String get advancedProductionVarianceAccount => 'Cost variance account';
+
+  @override
+  String get advancedProductionLedgerNext =>
+      'With these accounts, the next production invoice changes the general ledger.';
+
+  @override
+  String get advancedProductionLedgerUnchanged =>
+      'Until a WIP, finished-goods, or variance account is chosen, production invoices keep the current ledger posting.';
+
+  @override
+  String get advancedProductionScrapLedger =>
+      'The scrap account changes only the expense line of the next waste invoice. Inventory stays the credit.';
+
+  @override
+  String get advancedProductionWeekOutput => 'Output of the last seven days';
+
+  @override
+  String get advancedProductionPlanAchievement => 'Plan achievement';
+
+  @override
+  String get advancedProductionScrapPercent => 'Scrap percent';
+
+  @override
+  String get advancedProductionWeekCost => 'Completed cost, last seven days';
+
+  @override
+  String get advancedProductionNoFigure => 'None';
+
+  @override
+  String get advancedProductionStandardMaterials => 'Standard materials';
+
+  @override
+  String get advancedProductionActualMaterials => 'Actual materials';
+
+  @override
+  String get advancedProductionStandardOperations => 'Standard operations';
+
+  @override
+  String get advancedProductionActualOperations => 'Actual operations';
+
+  @override
+  String get advancedProductionFromLine => 'From line';
+
+  @override
+  String get advancedProductionToLine => 'To line';
+
+  @override
+  String get advancedProductionPeriod => 'Period';
+
+  @override
+  String get advancedProductionStage => 'Stage';
+
+  @override
+  String get advancedProductionStageIncoming => 'Incoming material';
+
+  @override
+  String get advancedProductionStageInProcess => 'In process';
+
+  @override
+  String get advancedProductionStageFinal => 'Finished goods';
+
+  @override
+  String get advancedProductionResult => 'Result';
+
+  @override
+  String get advancedProductionResultPass => 'Pass';
+
+  @override
+  String get advancedProductionRoleMaterial => 'Material';
+
+  @override
+  String get advancedProductionRoleOutput => 'Output';
+
+  @override
+  String get advancedProductionResultFail => 'Fail';
+
+  @override
+  String get advancedProductionMaintenanceBreakdown => 'Breakdown';
+
+  @override
+  String get advancedProductionMaintenancePreventive => 'Preventive';
+
+  @override
+  String get advancedProductionAgeDays => 'Age in days';
+
+  @override
+  String get advancedProductionOperator => 'Operator id';
+
+  @override
+  String get advancedProductionReason => 'Downtime reason';
+
+  @override
+  String get advancedProductionCostingMethod => 'Report costing method';
+
+  @override
+  String get advancedProductionCostingActual => 'Actual';
+
+  @override
+  String get advancedProductionCostingStandard => 'Standard';
+
+  @override
+  String get advancedProductionCostingAverage => 'Weighted average';
+
+  @override
+  String get advancedProductionOpenOrders => 'Open orders';
+
+  @override
+  String get advancedProductionOverdue => 'Overdue';
+
+  @override
+  String get advancedProductionInProgress => 'In progress';
+
+  @override
+  String get advancedProductionCompletedToday => 'Completed today';
+
+  @override
+  String get advancedProductionOutputToday => 'Output today';
+
+  @override
+  String get advancedProductionShortageLines => 'Material shortage lines';
+
+  @override
+  String get advancedProductionSave => 'Save settings';
+
+  @override
+  String get advancedProductionSaved => 'Settings saved';
+
+  @override
+  String get advancedProductionPluginRequired =>
+      'Advanced production is not active';
+
+  @override
+  String get advancedProductionPluginRequiredBody =>
+      'Activate the add-on from the marketplace to open the industrial dashboard and reports.';
+
+  @override
+  String get advancedProductionOpenMarketplace => 'Plugin marketplace';
+
+  @override
+  String get advancedProductionPermissionManage =>
+      'Manage advanced production settings';
+
+  @override
+  String get advancedProductionPermissionOperate =>
+      'Operate advanced production';
+
+  @override
+  String get advancedProductionPermissionCost =>
+      'Run advanced production costing';
+
+  @override
+  String get advancedProductionPermissionPost =>
+      'Post advanced production documents';
+
+  @override
+  String get advancedProductionStatusDraft => 'Draft';
+
+  @override
+  String get advancedProductionStatusReleased => 'Released';
+
+  @override
+  String get advancedProductionStatusInProgress => 'In progress';
+
+  @override
+  String get advancedProductionStatusCompleted => 'Completed';
+
+  @override
+  String get advancedProductionStatusCancelled => 'Cancelled';
+
+  @override
+  String get advancedProductionReportOrders => 'Production orders';
+
+  @override
+  String get advancedProductionReportProgress => 'Production progress';
+
+  @override
+  String get advancedProductionReportOverdue => 'Overdue production';
+
+  @override
+  String get advancedProductionReportSchedule => 'Production schedule';
+
+  @override
+  String get advancedProductionReportPlan => 'Plan achievement';
+
+  @override
+  String get advancedProductionReportOpen => 'Open orders';
+
+  @override
+  String get advancedProductionReportCycle => 'Cycle time';
+
+  @override
+  String get advancedProductionReportCost => 'Order cost';
+
+  @override
+  String get advancedProductionReportMaterials => 'Material requirements';
+
+  @override
+  String get advancedProductionReportShortage => 'Material shortage';
+
+  @override
+  String get advancedProductionReportVariance => 'Usage variance';
+
+  @override
+  String get advancedProductionColOrder => 'Order code';
+
+  @override
+  String get advancedProductionColProduct => 'Product';
+
+  @override
+  String get advancedProductionColStatus => 'Status';
+
+  @override
+  String get advancedProductionColPlanned => 'Planned';
+
+  @override
+  String get advancedProductionColProduced => 'Produced';
+
+  @override
+  String get advancedProductionColRemaining => 'Remaining';
+
+  @override
+  String get advancedProductionColDue => 'Due date';
+
+  @override
+  String get advancedProductionColProgress => 'Progress %';
+
+  @override
+  String get advancedProductionColStart => 'Planned start';
+
+  @override
+  String get advancedProductionColVarianceQty => 'Quantity variance';
+
+  @override
+  String get advancedProductionColCycle => 'Cycle hours';
+
+  @override
+  String get advancedProductionColStandard => 'Standard cost';
+
+  @override
+  String get advancedProductionColActual => 'Actual cost';
+
+  @override
+  String get advancedProductionColValued => 'Report value';
+
+  @override
+  String get advancedProductionColVarianceCost => 'Cost variance';
+
+  @override
+  String get advancedProductionColWarehouse => 'Warehouse';
+
+  @override
+  String get advancedProductionColRequired => 'Required';
+
+  @override
+  String get advancedProductionColFree => 'Free';
+
+  @override
+  String get advancedProductionColShortage => 'Shortage';
+
+  @override
+  String get advancedProductionColIssued => 'Issued';
+
+  @override
+  String get advancedProductionFromDate => 'From date';
+
+  @override
+  String get advancedProductionToDate => 'To date';
 }

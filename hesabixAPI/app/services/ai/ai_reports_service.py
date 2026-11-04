@@ -22,6 +22,7 @@ _PLUGIN_CHECKERS = {
     "distribution": "app.core.distribution_plugin_dependency.check_distribution_plugin_active",
     "basalam_connector": "app.core.basalam_plugin_dependency.check_basalam_plugin_active",
     "woocommerce_hesabix": "app.core.woocommerce_plugin_dependency.check_woocommerce_plugin_active",
+    "advanced_production": "app.core.advanced_production_plugin_dependency.check_advanced_production_plugin_active",
 }
 
 
@@ -289,6 +290,32 @@ def execute_ai_report(
         from app.services.invoice_service import get_production_report
 
         return get_production_report(db, business_id, **kw)
+
+    if rt.startswith("advprod_"):
+        from app.services.advanced_production_service import run_named_report
+
+        return run_named_report(
+            db,
+            business_id,
+            rt,
+            {
+                "date_from": args.get("date_from") or args.get("from_date"),
+                "date_to": args.get("date_to") or args.get("to_date"),
+                "product_id": args.get("product_id"),
+                "status": args.get("status"),
+                "search": args.get("search"),
+                "lot_code": args.get("lot_code"),
+                "fixed_cost": args.get("fixed_cost"),
+                "calendar_type": args.get("calendar_type"),
+                "days_without_movement": args.get("days_without_movement"),
+                "production_order_id": args.get("production_order_id"),
+                "fiscal_year_id": args.get("fiscal_year_id"),
+                "warehouse_id": args.get("warehouse_id"),
+                "currency_id": args.get("currency_id"),
+                "skip": args.get("skip") or 0,
+                "take": args.get("take") or args.get("limit") or 50,
+            },
+        )
 
     if rt == "people_transactions":
         from app.services.person_service import get_people_transactions_report

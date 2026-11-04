@@ -1490,3 +1490,537 @@ msgstr "The AI MCP server add-on is not active for this business."
 
 msgid "AI_MCP_PLUGIN_EXPIRED"
 msgstr "The AI MCP server add-on subscription has expired."
+
+msgid "ADVANCED_PRODUCTION_PLUGIN_NOT_ACTIVE"
+msgstr "The advanced production add-on is not active for this business."
+
+msgid "AP_ACCOUNT_NOT_IN_BUSINESS"
+msgstr "The selected account does not belong to this business."
+
+msgid "AP_INVALID_COSTING_METHOD"
+msgstr "The report costing method is not valid."
+
+msgid "AP_OVERHEAD_MODE_UNSUPPORTED"
+msgstr "This overhead mode is not posted to the general ledger yet."
+
+msgid "AP_REPORT_UNKNOWN"
+msgstr "Unknown advanced production report."
+
+msgid "INVALID_DATE_RANGE"
+msgstr "The date range is not valid."
+
+msgid "INVALID_PRODUCTION_ORDER_STATUS"
+msgstr "The production order status is not valid."
+
+msgid "AP_REPORT_ORDERS"
+msgstr "Production orders"
+
+msgid "AP_REPORT_PROGRESS"
+msgstr "Production progress"
+
+msgid "AP_REPORT_OVERDUE"
+msgstr "Overdue production"
+
+msgid "AP_REPORT_SCHEDULE"
+msgstr "Production schedule"
+
+msgid "AP_REPORT_PLAN_ACHIEVEMENT"
+msgstr "Plan achievement"
+
+msgid "AP_REPORT_OPEN_ORDERS"
+msgstr "Open production orders"
+
+msgid "AP_REPORT_CYCLE_TIME"
+msgstr "Production cycle time"
+
+msgid "AP_REPORT_ORDER_COSTING"
+msgstr "Production order cost"
+
+msgid "AP_REPORT_MATERIAL_REQUIREMENTS"
+msgstr "Material requirements"
+
+msgid "AP_REPORT_MATERIAL_SHORTAGE"
+msgstr "Material shortage"
+
+msgid "AP_REPORT_MATERIAL_VARIANCE"
+msgstr "Material usage variance"
+
+msgid "AP_COL_CODE"
+msgstr "Order code"
+
+msgid "AP_COL_PRODUCT_CODE"
+msgstr "Product code"
+
+msgid "AP_COL_PRODUCT_NAME"
+msgstr "Product"
+
+msgid "AP_COL_STATUS"
+msgstr "Status"
+
+msgid "AP_COL_PLANNED_QUANTITY"
+msgstr "Planned quantity"
+
+msgid "AP_COL_PRODUCED_QUANTITY"
+msgstr "Produced quantity"
+
+msgid "AP_COL_REMAINING_QUANTITY"
+msgstr "Remaining"
+
+msgid "AP_COL_DUE_DATE"
+msgstr "Due date"
+
+msgid "AP_COL_PROGRESS_PERCENT"
+msgstr "Progress percent"
+
+msgid "AP_COL_PLANNED_START_DATE"
+msgstr "Planned start"
+
+msgid "AP_COL_QUANTITY_VARIANCE"
+msgstr "Quantity variance"
+
+msgid "AP_COL_STARTED_AT"
+msgstr "Started"
+
+msgid "AP_COL_COMPLETED_AT"
+msgstr "Completed"
+
+msgid "AP_COL_CYCLE_HOURS"
+msgstr "Cycle hours"
+
+msgid "AP_COL_COSTING_METHOD"
+msgstr "Costing method"
+
+msgid "AP_COL_STANDARD_TOTAL"
+msgstr "Standard cost"
+
+msgid "AP_COL_ACTUAL_TOTAL"
+msgstr "Actual cost"
+
+msgid "AP_COL_VALUED_TOTAL"
+msgstr "Report value"
+
+msgid "AP_COL_COST_VARIANCE"
+msgstr "Cost variance"
+
+msgid "AP_COL_WAREHOUSE_NAME"
+msgstr "Warehouse"
+
+msgid "AP_COL_REQUIRED_QUANTITY"
+msgstr "Required quantity"
+
+msgid "AP_COL_RESERVED_QUANTITY"
+msgstr "Reserved"
+
+msgid "AP_COL_FREE_QUANTITY"
+msgstr "Free quantity"
+
+msgid "AP_COL_SHORTAGE_QUANTITY"
+msgstr "Shortage"
+
+msgid "AP_COL_ORDER_CODE"
+msgstr "Order code"
+
+msgid "AP_COL_ISSUED_QUANTITY"
+msgstr "Issued quantity"
+
+msgid "AP_COL_DOCUMENT_DATE"
+msgstr "Document date"
+
+msgid "AP_COL_DOCUMENT_CODE"
+msgstr "Document code"
+
+msgid "AP_COL_QUANTITY"
+msgstr "Quantity"
+
+msgid "AP_COL_AMOUNT"
+msgstr "Amount"
+
+msgid "AP_COL_PRODUCED_QUANTITY"
+msgstr "Produced quantity"
+
+msgid "AP_COL_SCRAP_PERCENT"
+msgstr "Scrap percent"
+
+msgid "AP_REPORT_SCRAP"
+msgstr "Production scrap"
+
+msgid "AP_REPORT_SCRAP_BY_PRODUCT"
+msgstr "Scrap by product"
+
+msgid "AP_REPORT_SCRAP_RATE"
+msgstr "Scrap rate"
+
+msgid "AP_REPORT_FINISHED_GOODS"
+msgstr "Finished output"
+
+msgid "AP_REPORT_FINISHED_BY_PRODUCT"
+msgstr "Output by product"
+
+msgid "AP_REPORT_UNPLANNED_PRODUCTION"
+msgstr "Production without an order"
+
+msgid "AP_WORK_CENTER_NOT_FOUND"
+msgstr "The work center was not found in this business."
+
+msgid "AP_NOMINAL_RATE_INVALID"
+msgstr "The nominal rate cannot be negative."
+
+msgid "AP_ASSET_NOT_FOUND"
+msgstr "The fixed asset was not found in this business."
+
+msgid "AP_SHIFT_NOT_FOUND"
+msgstr "The shift was not found in this business."
+
+msgid "AP_FISCAL_YEAR_NOT_FOUND"
+msgstr "The fiscal year was not found in this business."
+
+msgid "AP_WAREHOUSE_NOT_FOUND"
+msgstr "The warehouse was not found in this business."
+
+msgid "AP_CURRENCY_NOT_FOUND"
+msgstr "The currency is not valid."
+
+msgid "AP_VARIANCE_ACCOUNT_REQUIRED"
+msgstr "Standard or weighted-average costing needs a variance account so the ledger is not posted at actual cost instead."
+
+msgid "AP_STATUS_DRAFT"
+msgstr "Draft"
+
+msgid "AP_STATUS_RELEASED"
+msgstr "Released"
+
+msgid "AP_STATUS_IN_PROGRESS"
+msgstr "In progress"
+
+msgid "AP_STATUS_COMPLETED"
+msgstr "Completed"
+
+msgid "AP_STATUS_CANCELLED"
+msgstr "Cancelled"
+
+msgid "AP_STAGE_INCOMING"
+msgstr "Incoming material"
+
+msgid "AP_STAGE_IN_PROCESS"
+msgstr "In process"
+
+msgid "AP_STAGE_FINAL"
+msgstr "Finished goods"
+
+msgid "AP_RESULT_PASS"
+msgstr "Pass"
+
+msgid "AP_RESULT_FAIL"
+msgstr "Fail"
+
+msgid "AP_MAINTENANCE_BREAKDOWN"
+msgstr "Breakdown"
+
+msgid "AP_MAINTENANCE_PREVENTIVE"
+msgstr "Preventive"
+
+msgid "AP_BASIS_ACTUAL"
+msgstr "Actual"
+
+msgid "AP_BASIS_STANDARD"
+msgstr "Standard"
+
+msgid "AP_BASIS_WEIGHTED_AVERAGE"
+msgstr "Weighted average"
+
+msgid "AP_ROLE_MATERIAL"
+msgstr "Material"
+
+msgid "AP_ROLE_OUTPUT"
+msgstr "Output"
+
+msgid "AP_RECYCLABLE_YES"
+msgstr "Yes"
+
+msgid "AP_RECYCLABLE_NO"
+msgstr "No"
+
+msgid "AP_LINE_NOT_FOUND"
+msgstr "The production line was not found in this business."
+
+msgid "AP_PRODUCT_NOT_FOUND"
+msgstr "The product was not found in this business."
+
+msgid "AP_MASTER_UNKNOWN"
+msgstr "Unknown advanced production master type."
+
+msgid "AP_MINUTES_REQUIRED"
+msgstr "Duration in minutes must be greater than zero."
+
+msgid "AP_OUTPUT_QUANTITY_REQUIRED"
+msgstr "Good or scrap quantity must be greater than zero."
+
+msgid "AP_QC_VALUE_INVALID"
+msgstr "The quality stage or result is not valid."
+
+msgid "AP_QC_QUANTITY_INVALID"
+msgstr "Checked and rejected quantities are not valid."
+
+msgid "AP_CODE_REQUIRED"
+msgstr "Code is required."
+
+msgid "AP_NAME_REQUIRED"
+msgstr "Name is required."
+
+msgid "AP_TIME_INVALID"
+msgstr "Time must use HH:MM."
+
+msgid "AP_MACHINE_NOT_FOUND"
+msgstr "The machine was not found in this business."
+
+msgid "AP_MAINTENANCE_KIND_INVALID"
+msgstr "Maintenance type must be breakdown or preventive."
+
+msgid "AP_OPERATOR_NOT_FOUND"
+msgstr "The operator was not found in this business."
+
+msgid "AP_MACHINE_LINE_MISMATCH"
+msgstr "The machine is not assigned to this line."
+
+msgid "AP_COST_INVALID"
+msgstr "Cost cannot be negative."
+
+msgid "AP_HOLD_NOT_FOUND"
+msgstr "The order hold was not found in this business."
+
+msgid "AP_ORDER_NOT_FOUND"
+msgstr "The production order was not found in this business."
+
+msgid "AP_HOLD_REASON_REQUIRED"
+msgstr "A reason is required to hold the order."
+
+msgid "AP_REPORT_MACHINE_OUTPUT"
+msgstr "Machine productivity"
+
+msgid "AP_REPORT_DOWNTIME_COST"
+msgstr "Downtime cost"
+
+msgid "AP_REPORT_HELD_ORDERS"
+msgstr "Held production orders"
+
+msgid "AP_COUNT_INVALID"
+msgstr "Counted quantity cannot be negative."
+
+msgid "AP_REPORT_MATERIAL_CONSUMPTION"
+msgstr "Production material consumption"
+
+msgid "AP_REPORT_CAPACITY_REQUIRED"
+msgstr "Required capacity"
+
+msgid "AP_REPORT_WIP_COUNT"
+msgstr "WIP count variance"
+
+msgid "AP_REPORT_REWORK"
+msgstr "Rework"
+
+msgid "AP_REPORT_LINE_RETURNS"
+msgstr "Return to line"
+
+msgid "AP_TRANSFER_LINES_SAME"
+msgstr "The source and destination lines must be different."
+
+msgid "AP_IDLE_DAYS_INVALID"
+msgstr "Days without movement must be greater than zero."
+
+msgid "AP_REPORT_WIP_BY_CENTER"
+msgstr "WIP by work center"
+
+msgid "AP_REPORT_MATERIAL_SCRAP"
+msgstr "Production material scrap"
+
+msgid "AP_REPORT_IDLE_MATERIALS"
+msgstr "Idle production materials"
+
+msgid "AP_REPORT_STAGE_TRANSFERS"
+msgstr "Transfers between lines"
+
+msgid "AP_LABOR_HOURS_REQUIRED"
+msgstr "Actual labor hours must be greater than zero."
+
+msgid "AP_LABOR_RATE_INVALID"
+msgstr "The hourly labor rate cannot be negative."
+
+msgid "AP_REPORT_WAGE_VARIANCE"
+msgstr "Wage variance"
+
+msgid "AP_SCRAP_RECYCLABLE_REQUIRED"
+msgstr "Say whether the scrap is recyclable."
+
+msgid "AP_SCRAP_REASON_NOT_FOUND"
+msgstr "The scrap reason was not found in this business."
+
+msgid "AP_SCRAP_QUANTITY_REQUIRED"
+msgstr "Scrap quantity must be greater than zero."
+
+msgid "AP_REPORT_SCRAP_BY_REASON"
+msgstr "Scrap by reason"
+
+msgid "AP_REPORT_RECYCLABLE_SCRAP"
+msgstr "Recyclable scrap"
+
+msgid "AP_REPORT_NONRECYCLABLE_SCRAP"
+msgstr "Non-recyclable scrap"
+
+msgid "AP_REPORT_QC_CAUSES"
+msgstr "Nonconformance causes"
+
+msgid "AP_LOT_CODE_REQUIRED"
+msgstr "A lot code is required for trace."
+
+msgid "AP_BREAK_EVEN_INPUTS_REQUIRED"
+msgstr "Break-even needs a product and that product's fixed cost."
+
+msgid "AP_REPORT_YIELD_RATE"
+msgstr "Production yield"
+
+msgid "AP_REPORT_UNUSED_CAPACITY"
+msgstr "Unused capacity"
+
+msgid "AP_REPORT_BREAK_EVEN"
+msgstr "Break-even"
+
+msgid "AP_REPORT_MONTHLY_COMPARISON"
+msgstr "Monthly production comparison"
+
+msgid "AP_REPORT_MATERIAL_FLOW"
+msgstr "Production material flow"
+
+msgid "AP_REPORT_PRODUCTION_BY_LOT"
+msgstr "Production by lot"
+
+msgid "AP_REPORT_CONVERSION_EFFICIENCY"
+msgstr "Material conversion efficiency"
+
+msgid "AP_REPORT_LOW_YIELD"
+msgstr "Low-yield products"
+
+msgid "AP_REPORT_LINE_MAINTENANCE_COST"
+msgstr "Maintenance cost by line"
+
+msgid "AP_REPORT_MATERIAL_PRICE_VARIANCE"
+msgstr "Material price variance"
+
+msgid "AP_REPORT_PRODUCT_COST"
+msgstr "Product cost"
+
+msgid "AP_REPORT_WIP_BALANCE"
+msgstr "Work-in-process balance"
+
+msgid "AP_REPORT_OPERATION_VARIANCE"
+msgstr "Operation variance"
+
+msgid "AP_COL_USAGE_VARIANCE"
+msgstr "Usage variance"
+
+msgid "AP_COL_PRICE_VARIANCE"
+msgstr "Price variance"
+
+msgid "AP_COL_STANDARD_UNIT_COST"
+msgstr "Standard rate"
+
+msgid "AP_COL_TRANSFERRED_AMOUNT"
+msgstr "Transferred to finished goods"
+
+msgid "AP_COL_REMAINING_WIP"
+msgstr "Remaining WIP"
+
+msgid "AP_COL_STANDARD_OPERATIONS"
+msgstr "Standard operations"
+
+msgid "AP_COL_STANDARD_MATERIALS"
+msgstr "Standard materials"
+
+msgid "AP_COL_ACTUAL_MATERIALS"
+msgstr "Actual materials"
+
+msgid "AP_COL_ACTUAL_OPERATIONS"
+msgstr "Actual operations"
+
+msgid "AP_COL_OPERATION_VARIANCE"
+msgstr "Operation variance"
+
+msgid "AP_COL_PERIOD"
+msgstr "Period"
+
+msgid "AP_COL_PURCHASED_QUANTITY"
+msgstr "Purchased"
+
+msgid "AP_COL_RETURNED_QUANTITY"
+msgstr "Purchase return"
+
+msgid "AP_COL_CONSUMED_QUANTITY"
+msgstr "Production consumption"
+
+msgid "AP_COL_SCRAPPED_QUANTITY"
+msgstr "Scrap"
+
+msgid "AP_COL_PERIOD_NET_QUANTITY"
+msgstr "Period net"
+
+msgid "AP_COL_MATERIAL_NAME"
+msgstr "Material"
+
+msgid "AP_COL_MATERIAL_COUNT"
+msgstr "Material count"
+
+msgid "AP_COL_CONVERSION_PERCENT"
+msgstr "Conversion percent"
+
+msgid "AP_COL_MANUFACTURING_DATE"
+msgstr "Manufacturing date"
+
+msgid "AP_COL_RECORD_COUNT"
+msgstr "Record count"
+
+msgid "AP_COL_REPAIR_MINUTES"
+msgstr "Repair minutes"
+
+msgid "AP_COL_COST_AMOUNT"
+msgstr "Cost amount"
+
+msgid "AP_COL_LINE_CODE"
+msgstr "Line code"
+
+msgid "AP_COL_LINE_NAME"
+msgstr "Line"
+
+msgid "AP_COL_QUANTITY_GOOD"
+msgstr "Good quantity"
+
+msgid "AP_COL_QUANTITY_SCRAP"
+msgstr "Scrap quantity"
+
+msgid "AP_COL_YIELD_PERCENT"
+msgstr "Yield percent"
+
+msgid "AP_COL_IDEAL_QUANTITY"
+msgstr "Nominal capacity"
+
+msgid "AP_COL_UNUSED_QUANTITY"
+msgstr "Unused capacity"
+
+msgid "AP_COL_UTILIZATION_PERCENT"
+msgstr "Utilization percent"
+
+msgid "AP_COL_PRODUCT_CODE"
+msgstr "Product code"
+
+msgid "AP_COL_PRODUCT_NAME"
+msgstr "Product"
+
+msgid "AP_COL_FIXED_COST"
+msgstr "Fixed cost"
+
+msgid "AP_COL_UNIT_COST"
+msgstr "Unit cost"
+
+msgid "AP_COL_SALES_AMOUNT"
+msgstr "Sales amount"
+
+msgid "AP_COL_BREAK_EVEN_QUANTITY"
+msgstr "Break-even quantity"

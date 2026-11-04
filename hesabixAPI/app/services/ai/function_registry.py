@@ -200,6 +200,11 @@ class AIFunctionRegistry:
         from app.services.ai.ai_function_extensions_mcp_production import register_mcp_production_functions
 
         register_mcp_production_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_advanced_production import (
+            register_mcp_advanced_production_functions,
+        )
+
+        register_mcp_advanced_production_functions(self)
         from app.services.ai.ai_function_extensions_mcp_distribution import register_mcp_distribution_functions
 
         register_mcp_distribution_functions(self)

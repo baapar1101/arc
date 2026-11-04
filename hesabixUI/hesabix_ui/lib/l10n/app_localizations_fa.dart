@@ -24670,4 +24670,606 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get productVariantAllocationMismatch =>
       'جمع تخصیص‌ها باید با تعداد ردیف برابر باشد';
+
+  @override
+  String get advancedProductionMenu => 'تولید پیشرفته';
+
+  @override
+  String get advancedProductionTitle => 'افزونه تولید پیشرفته';
+
+  @override
+  String get advancedProductionDashboard => 'داشبورد';
+
+  @override
+  String get advancedProductionReports => 'گزارش‌ها';
+
+  @override
+  String get advancedProductionSettings => 'تنظیمات';
+
+  @override
+  String get advancedProductionValuationNote =>
+      'بدون حساب انحراف، روش بها فقط گزارش است. اگر حساب کالای ساخته‌شده، WIP یا انحراف بها تعیین شود، فاکتور تولید بعدی با همان حساب‌ها سند می‌خورد و جمع بدهکار و بستانکار برابر می‌ماند. انحراف مثبت یعنی بیشتر از استاندارد.';
+
+  @override
+  String get advancedProductionReportScrap => 'ضایعات';
+
+  @override
+  String get advancedProductionReportScrapProduct => 'ضایعات به تفکیک محصول';
+
+  @override
+  String get advancedProductionReportScrapRate => 'درصد ضایعات';
+
+  @override
+  String get advancedProductionReportFinished => 'تولید نهایی';
+
+  @override
+  String get advancedProductionReportFinishedProduct => 'تولید به تفکیک محصول';
+
+  @override
+  String get advancedProductionReportUnplanned => 'تولید بدون سفارش';
+
+  @override
+  String get advancedProductionReportOee => 'راندمان تجهیزات';
+
+  @override
+  String get advancedProductionReportDowntime => 'توقف خط';
+
+  @override
+  String get advancedProductionReportQc => 'کنترل کیفیت';
+
+  @override
+  String get advancedProductionRecords => 'ثبت';
+
+  @override
+  String get advancedProductionRecordsHelp =>
+      'مرکز، خط، توقف، خروجی خط، کنترل کیفیت و تعمیرات از اینجا ثبت می‌شود. هزینه تعمیر سند حسابداری نمی‌سازد.';
+
+  @override
+  String get advancedProductionRecordKind => 'نوع ثبت';
+
+  @override
+  String get advancedProductionWorkCenter => 'مرکز تولید';
+
+  @override
+  String get advancedProductionLine => 'خط تولید';
+
+  @override
+  String get advancedProductionMachine => 'دستگاه';
+
+  @override
+  String get advancedProductionShift => 'شیفت';
+
+  @override
+  String get advancedProductionNominalRate => 'ظرفیت اسمی در ساعت';
+
+  @override
+  String get advancedProductionStartTime => 'ساعت شروع';
+
+  @override
+  String get advancedProductionEndTime => 'ساعت پایان';
+
+  @override
+  String get advancedProductionOutput => 'خروجی خط';
+
+  @override
+  String get advancedProductionMaintenance => 'نگهداری و تعمیر';
+
+  @override
+  String get advancedProductionCode => 'کد';
+
+  @override
+  String get advancedProductionName => 'نام';
+
+  @override
+  String get advancedProductionMinutes => 'دقیقه';
+
+  @override
+  String get advancedProductionGoodQuantity => 'مقدار سالم';
+
+  @override
+  String get advancedProductionScrapQuantity => 'مقدار ضایعات';
+
+  @override
+  String get advancedProductionCheckedQuantity => 'مقدار کنترل‌شده';
+
+  @override
+  String get advancedProductionRejectedQuantity => 'مقدار مردود';
+
+  @override
+  String get advancedProductionCostAmount => 'هزینه تعمیر';
+
+  @override
+  String get advancedProductionReportMaintenance => 'سوابق تعمیر';
+
+  @override
+  String get advancedProductionReportReliability => 'فاصله و زمان تعمیر';
+
+  @override
+  String get advancedProductionReportProfit => 'سودآوری محصول';
+
+  @override
+  String get advancedProductionReportCostShare => 'سهم اجزای بها';
+
+  @override
+  String get advancedProductionReportPassRate => 'نرخ قبولی کیفیت';
+
+  @override
+  String get advancedProductionReportDaily => 'تولید روزانه';
+
+  @override
+  String get advancedProductionReportLine => 'خروجی خط';
+
+  @override
+  String get advancedProductionReportShift => 'خروجی شیفت';
+
+  @override
+  String get advancedProductionReportWipAge => 'سن سفارش باز';
+
+  @override
+  String get advancedProductionReportCenter => 'خروجی مرکز تولید';
+
+  @override
+  String get advancedProductionReportCapacity => 'ظرفیت اسمی و واقعی';
+
+  @override
+  String get advancedProductionReportRejects => 'مردودی کیفیت';
+
+  @override
+  String get advancedProductionReportPeriodCost => 'بهای دوره';
+
+  @override
+  String get advancedProductionReportOperator => 'تولید اپراتور';
+
+  @override
+  String get advancedProductionReportSetup => 'زمان آماده‌سازی';
+
+  @override
+  String get advancedProductionReportLot => 'ردیابی بچ';
+
+  @override
+  String get advancedProductionReportYield => 'بازده تولید';
+
+  @override
+  String get advancedProductionReportUnused => 'ظرفیت بلااستفاده';
+
+  @override
+  String get advancedProductionReportBreakEven => 'نقطه سربه‌سر';
+
+  @override
+  String get advancedProductionLotCode => 'کد بچ';
+
+  @override
+  String get advancedProductionFixedCost => 'هزینه ثابت کالا';
+
+  @override
+  String get advancedProductionReportMonthly => 'مقایسه ماهانه';
+
+  @override
+  String get advancedProductionReportFlow => 'گردش مواد';
+
+  @override
+  String get advancedProductionPurchased => 'خرید';
+
+  @override
+  String get advancedProductionReturned => 'برگشت خرید';
+
+  @override
+  String get advancedProductionConsumed => 'مصرف تولید';
+
+  @override
+  String get advancedProductionPeriodNet => 'خالص دوره';
+
+  @override
+  String get advancedProductionReportByLot => 'تولید به تفکیک بچ';
+
+  @override
+  String get advancedProductionReportConversion => 'راندمان تبدیل';
+
+  @override
+  String get advancedProductionReportLowYield => 'محصولات کم‌بازده';
+
+  @override
+  String get advancedProductionReportLineCost => 'هزینه نگهداری خط';
+
+  @override
+  String get advancedProductionReportPriceVariance => 'انحراف نرخ مواد';
+
+  @override
+  String get advancedProductionReportProductCost => 'بهای محصول';
+
+  @override
+  String get advancedProductionReportWip => 'مانده در جریان ساخت';
+
+  @override
+  String get advancedProductionReportOperationVariance => 'انحراف عملیات';
+
+  @override
+  String get advancedProductionUsageVariance => 'انحراف مصرف';
+
+  @override
+  String get advancedProductionPriceVariance => 'انحراف نرخ';
+
+  @override
+  String get advancedProductionTransferred => 'انتقال به محصول';
+
+  @override
+  String get advancedProductionRemainingWip => 'مانده در جریان';
+
+  @override
+  String get advancedProductionUnitCost => 'بهای واحد';
+
+  @override
+  String get advancedProductionScrapReason => 'علت ضایعات';
+
+  @override
+  String get advancedProductionScrapEvent => 'رویداد ضایعات';
+
+  @override
+  String get advancedProductionRecyclable => 'قابل بازیافت';
+
+  @override
+  String get advancedProductionRecyclableYes => 'بله';
+
+  @override
+  String get advancedProductionRecyclableNo => 'خیر';
+
+  @override
+  String get advancedProductionReportScrapReason => 'علل ضایعات';
+
+  @override
+  String get advancedProductionReportRecyclable => 'ضایعات قابل بازیافت';
+
+  @override
+  String get advancedProductionReportNonrecyclable => 'ضایعات غیرقابل بازیافت';
+
+  @override
+  String get advancedProductionReportQcCause => 'علل عدم انطباق';
+
+  @override
+  String get advancedProductionReportMachine => 'بهره‌وری ماشین';
+
+  @override
+  String get advancedProductionReportDowntimeCost => 'هزینه توقف';
+
+  @override
+  String get advancedProductionReportHeld => 'سفارش متوقف';
+
+  @override
+  String get advancedProductionOrderId => 'شناسه سفارش';
+
+  @override
+  String get advancedProductionHoldReason => 'علت توقف سفارش';
+
+  @override
+  String get advancedProductionHoldId => 'شناسه توقف برای آزادسازی';
+
+  @override
+  String get advancedProductionReportConsumption => 'مصرف مواد';
+
+  @override
+  String get advancedProductionReportCapacityNeed => 'ظرفیت موردنیاز';
+
+  @override
+  String get advancedProductionReportWipCount => 'مغایرت شمارش';
+
+  @override
+  String get advancedProductionReportRework => 'دوباره‌کاری';
+
+  @override
+  String get advancedProductionReportLineReturn => 'برگشت به خط';
+
+  @override
+  String get advancedProductionRequiredHours => 'ساعت موردنیاز';
+
+  @override
+  String get advancedProductionCountedQuantity => 'مقدار شمارش‌شده';
+
+  @override
+  String get advancedProductionReportWipCenter => 'جریان ساخت مرکز';
+
+  @override
+  String get advancedProductionReportMaterialScrap => 'ضایعات مواد';
+
+  @override
+  String get advancedProductionReportIdle => 'مواد راکد';
+
+  @override
+  String get advancedProductionReportTransfer => 'انتقال بین خطوط';
+
+  @override
+  String get advancedProductionIdleDays => 'روز بدون حرکت';
+
+  @override
+  String get advancedProductionCurrentStock => 'موجودی فعلی';
+
+  @override
+  String get advancedProductionReportWage => 'انحراف دستمزد';
+
+  @override
+  String get advancedProductionActualHours => 'ساعت واقعی';
+
+  @override
+  String get advancedProductionStandardHours => 'ساعت استاندارد';
+
+  @override
+  String get advancedProductionStandardRate => 'نرخ استاندارد ساعت';
+
+  @override
+  String get advancedProductionActualRate => 'نرخ واقعی ساعت';
+
+  @override
+  String get advancedProductionWipAccount => 'حساب کالای در جریان ساخت';
+
+  @override
+  String get advancedProductionFinishedAccount => 'حساب محصول نهایی';
+
+  @override
+  String get advancedProductionScrapAccount => 'حساب هزینه ضایعات';
+
+  @override
+  String get advancedProductionVarianceAccount => 'حساب انحراف بها';
+
+  @override
+  String get advancedProductionLedgerNext =>
+      'با این حساب‌ها، فاکتور تولید بعدی در دفتر کل تغییر می‌کند. برای روش استاندارد یا میانگین موزون، حساب انحراف هم لازم است.';
+
+  @override
+  String get advancedProductionLedgerUnchanged =>
+      'تا وقتی حساب جریان ساخت، محصول نهایی یا انحراف انتخاب نشود، دفتر کل فاکتور تولید مثل قبل می‌ماند.';
+
+  @override
+  String get advancedProductionScrapLedger =>
+      'حساب ضایعات فقط هزینه فاکتور ضایعات بعدی را عوض می‌کند. موجودی همچنان بستانکار می‌شود.';
+
+  @override
+  String get advancedProductionWeekOutput => 'تولید هفت روز اخیر';
+
+  @override
+  String get advancedProductionPlanAchievement => 'تحقق برنامه';
+
+  @override
+  String get advancedProductionScrapPercent => 'درصد ضایعات';
+
+  @override
+  String get advancedProductionWeekCost => 'بهای تکمیل‌شده هفت روز';
+
+  @override
+  String get advancedProductionNoFigure => 'ندارد';
+
+  @override
+  String get advancedProductionStandardMaterials => 'مواد استاندارد';
+
+  @override
+  String get advancedProductionActualMaterials => 'مواد واقعی';
+
+  @override
+  String get advancedProductionStandardOperations => 'عملیات استاندارد';
+
+  @override
+  String get advancedProductionActualOperations => 'عملیات واقعی';
+
+  @override
+  String get advancedProductionFromLine => 'از خط';
+
+  @override
+  String get advancedProductionToLine => 'به خط';
+
+  @override
+  String get advancedProductionPeriod => 'دوره';
+
+  @override
+  String get advancedProductionStage => 'مرحله';
+
+  @override
+  String get advancedProductionStageIncoming => 'ورود مواد';
+
+  @override
+  String get advancedProductionStageInProcess => 'حین تولید';
+
+  @override
+  String get advancedProductionStageFinal => 'محصول نهایی';
+
+  @override
+  String get advancedProductionResult => 'نتیجه';
+
+  @override
+  String get advancedProductionResultPass => 'قبول';
+
+  @override
+  String get advancedProductionRoleMaterial => 'ماده';
+
+  @override
+  String get advancedProductionRoleOutput => 'خروجی';
+
+  @override
+  String get advancedProductionResultFail => 'مردود';
+
+  @override
+  String get advancedProductionMaintenanceBreakdown => 'خرابی';
+
+  @override
+  String get advancedProductionMaintenancePreventive => 'پیشگیرانه';
+
+  @override
+  String get advancedProductionAgeDays => 'عمر به روز';
+
+  @override
+  String get advancedProductionOperator => 'شناسه اپراتور';
+
+  @override
+  String get advancedProductionReason => 'علت توقف';
+
+  @override
+  String get advancedProductionCostingMethod => 'روش بهای گزارش';
+
+  @override
+  String get advancedProductionCostingActual => 'واقعی';
+
+  @override
+  String get advancedProductionCostingStandard => 'استاندارد';
+
+  @override
+  String get advancedProductionCostingAverage => 'میانگین موزون';
+
+  @override
+  String get advancedProductionOpenOrders => 'سفارش‌های باز';
+
+  @override
+  String get advancedProductionOverdue => 'عقب‌افتاده';
+
+  @override
+  String get advancedProductionInProgress => 'در حال تولید';
+
+  @override
+  String get advancedProductionCompletedToday => 'تکمیل‌شده امروز';
+
+  @override
+  String get advancedProductionOutputToday => 'تولید امروز';
+
+  @override
+  String get advancedProductionShortageLines => 'ردیف کسری مواد';
+
+  @override
+  String get advancedProductionSave => 'ذخیره تنظیمات';
+
+  @override
+  String get advancedProductionSaved => 'تنظیمات ذخیره شد';
+
+  @override
+  String get advancedProductionPluginRequired =>
+      'افزونه تولید پیشرفته فعال نیست';
+
+  @override
+  String get advancedProductionPluginRequiredBody =>
+      'برای دیدن داشبورد و گزارش‌های صنعتی، افزونه را از بازار فعال کنید.';
+
+  @override
+  String get advancedProductionOpenMarketplace => 'بازار افزونه‌ها';
+
+  @override
+  String get advancedProductionPermissionManage =>
+      'مدیریت تنظیمات تولید پیشرفته';
+
+  @override
+  String get advancedProductionPermissionOperate => 'ثبت عملیات تولید پیشرفته';
+
+  @override
+  String get advancedProductionPermissionCost => 'محاسبه بهای تولید پیشرفته';
+
+  @override
+  String get advancedProductionPermissionPost => 'صدور سند تولید پیشرفته';
+
+  @override
+  String get advancedProductionStatusDraft => 'پیش‌نویس';
+
+  @override
+  String get advancedProductionStatusReleased => 'آزادشده';
+
+  @override
+  String get advancedProductionStatusInProgress => 'در حال تولید';
+
+  @override
+  String get advancedProductionStatusCompleted => 'تکمیل‌شده';
+
+  @override
+  String get advancedProductionStatusCancelled => 'لغوشده';
+
+  @override
+  String get advancedProductionReportOrders => 'سفارش‌های تولید';
+
+  @override
+  String get advancedProductionReportProgress => 'پیشرفت تولید';
+
+  @override
+  String get advancedProductionReportOverdue => 'تولید عقب‌افتاده';
+
+  @override
+  String get advancedProductionReportSchedule => 'برنامه تولید';
+
+  @override
+  String get advancedProductionReportPlan => 'تحقق برنامه';
+
+  @override
+  String get advancedProductionReportOpen => 'سفارش‌های باز';
+
+  @override
+  String get advancedProductionReportCycle => 'زمان چرخه';
+
+  @override
+  String get advancedProductionReportCost => 'بهای سفارش';
+
+  @override
+  String get advancedProductionReportMaterials => 'مواد موردنیاز';
+
+  @override
+  String get advancedProductionReportShortage => 'کسری مواد';
+
+  @override
+  String get advancedProductionReportVariance => 'انحراف مصرف';
+
+  @override
+  String get advancedProductionColOrder => 'کد سفارش';
+
+  @override
+  String get advancedProductionColProduct => 'کالا';
+
+  @override
+  String get advancedProductionColStatus => 'وضعیت';
+
+  @override
+  String get advancedProductionColPlanned => 'برنامه';
+
+  @override
+  String get advancedProductionColProduced => 'تولیدشده';
+
+  @override
+  String get advancedProductionColRemaining => 'مانده';
+
+  @override
+  String get advancedProductionColDue => 'سررسید';
+
+  @override
+  String get advancedProductionColProgress => 'درصد پیشرفت';
+
+  @override
+  String get advancedProductionColStart => 'شروع برنامه';
+
+  @override
+  String get advancedProductionColVarianceQty => 'انحراف مقدار';
+
+  @override
+  String get advancedProductionColCycle => 'ساعت چرخه';
+
+  @override
+  String get advancedProductionColStandard => 'بهای استاندارد';
+
+  @override
+  String get advancedProductionColActual => 'بهای واقعی';
+
+  @override
+  String get advancedProductionColValued => 'بهای گزارش';
+
+  @override
+  String get advancedProductionColVarianceCost => 'انحراف هزینه';
+
+  @override
+  String get advancedProductionColWarehouse => 'انبار';
+
+  @override
+  String get advancedProductionColRequired => 'موردنیاز';
+
+  @override
+  String get advancedProductionColFree => 'آزاد';
+
+  @override
+  String get advancedProductionColShortage => 'کسری';
+
+  @override
+  String get advancedProductionColIssued => 'صادرشده';
+
+  @override
+  String get advancedProductionFromDate => 'از تاریخ';
+
+  @override
+  String get advancedProductionToDate => 'تا تاریخ';
 }
