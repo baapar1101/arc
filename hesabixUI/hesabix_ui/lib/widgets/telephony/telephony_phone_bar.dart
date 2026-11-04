@@ -3,31 +3,100 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/auth_store.dart';
 import '../../core/business_nav.dart';
+import '../../l10n/app_localizations.dart';
 import '../../services/telephony/softphone_engine.dart';
 import '../../services/telephony/telephony_session_controller.dart';
 import 'telephony_dialer_sheet.dart';
 import 'telephony_post_call_sheet.dart';
 import 'telephony_screen_pop.dart';
-import '../../l10n/app_localizations.dart';
 
-/// نوار تلفن داخل BusinessShell (بدون Screen Pop — Pop جداگانه Overlay می‌شود).
+Color _telephonyStatusColor({
+  required ColorScheme scheme,
+  required TelephonySessionController session,
+  SoftphoneEngine? softphone,
+}) {
+  final sf = softphone?.state;
+  if (sf == SoftphoneConnectionState.ringing) return const Color(0xFFD97706);
+  if (sf == SoftphoneConnectionState.inCall) return scheme.primary;
+  if (sf == SoftphoneConnectionState.registered) return const Color(0xFF059669);
+  if (sf == SoftphoneConnectionState.error ||
+      sf == SoftphoneConnectionState.reconnecting) {
+    return scheme.error;
+  }
+  switch (session.presenceLabel) {
+    case 'ringing':
+      return const Color(0xFFD97706);
+    case 'in_call':
+      return scheme.primary;
+    case 'offline':
+      return scheme.outline;
+    case 'no_extension':
+      return scheme.error.withValues(alpha: 0.75);
+    default:
+      return const Color(0xFF159947);
+  }
+}
+
+String _telephonyStatusText({
+  required AppLocalizations t,
+  required TelephonySessionController session,
+  SoftphoneEngine? softphone,
+}) {
+  final sf = softphone?.state;
+  if (sf == SoftphoneConnectionState.connecting) return t.telephonyBarConnecting;
+  if (sf == SoftphoneConnectionState.registered) return t.telephonyBarReady;
+  if (sf == SoftphoneConnectionState.ringing) {
+    final from = softphone?.incomingCallerDisplay;
+    return from == null || from.isEmpty ? t.telephonyBarRinging : t.telephonyRingFrom(from);
+  }
+  if (sf == SoftphoneConnectionState.inCall) return t.telephonyBarInCall;
+  if (sf == SoftphoneConnectionState.reconnecting) return t.telephonyBarReconnecting;
+  if (sf == SoftphoneConnectionState.error) return t.telephonyBarError;
+  switch (session.presenceLabel) {
+    case 'ringing':
+      return t.telephonyPresenceRinging;
+    case 'in_call':
+      return t.telephonyPresenceTalking;
+    case 'offline':
+      return t.telephonyPresenceOffline;
+    case 'no_extension':
+      return t.telephonyPresenceNoExt;
+    default:
+      return t.telephonyPresenceIdle;
+  }
+}
+
+bool _telephonyIsRinging(TelephonySessionController session, SoftphoneEngine? softphone) {
+  return session.presenceLabel == 'ringing' ||
+      softphone?.state == SoftphoneConnectionState.ringing;
+}
+
+bool _telephonyIsInCall(TelephonySessionController session, SoftphoneEngine? softphone) {
+  return session.presenceLabel == 'in_call' ||
+      softphone?.state == SoftphoneConnectionState.inCall;
+}
+
+/// آیکن فشردهٔ مرکز تماس در نوار بالای BusinessShell.
 class TelephonyPhoneBarHost extends StatefulWidget {
   final int businessId;
   final AuthStore authStore;
   final bool pluginActive;
+  final Color? iconColor;
 
   const TelephonyPhoneBarHost({
     super.key,
     required this.businessId,
     required this.authStore,
     required this.pluginActive,
+    this.iconColor,
   });
 
   @override
   State<TelephonyPhoneBarHost> createState() => _TelephonyPhoneBarHostState();
 }
 
-class _TelephonyPhoneBarHostState extends State<TelephonyPhoneBarHost> with SingleTickerProviderStateMixin {
+class _TelephonyPhoneBarHostState extends State<TelephonyPhoneBarHost>
+    with SingleTickerProviderStateMixin {
   late final TelephonySessionController _session;
   SoftphoneEngine? _softphone;
   late final AnimationController _pulse;
@@ -50,7 +119,8 @@ class _TelephonyPhoneBarHostState extends State<TelephonyPhoneBarHost> with Sing
   @override
   void didUpdateWidget(covariant TelephonyPhoneBarHost oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.businessId != widget.businessId || oldWidget.pluginActive != widget.pluginActive) {
+    if (oldWidget.businessId != widget.businessId ||
+        oldWidget.pluginActive != widget.pluginActive) {
       _session.bindBusiness(widget.businessId, pluginActive: widget.pluginActive);
       _softphone?.removeListener(_onSoftphone);
       _softphone = SoftphoneEngineStore.instance.obtain(
@@ -77,8 +147,7 @@ class _TelephonyPhoneBarHostState extends State<TelephonyPhoneBarHost> with Sing
 
   void _onSession() {
     if (!mounted) return;
-    final ringing = _session.presenceLabel == 'ringing' ||
-        _softphone?.state == SoftphoneConnectionState.ringing;
+    final ringing = _telephonyIsRinging(_session, _softphone);
     if (ringing && !_pulse.isAnimating) {
       _pulse.repeat(reverse: true);
     } else if (!ringing && _pulse.isAnimating) {
@@ -102,224 +171,403 @@ class _TelephonyPhoneBarHostState extends State<TelephonyPhoneBarHost> with Sing
     super.dispose();
   }
 
-  Color _statusColor(ColorScheme scheme) {
-    final sf = _softphone?.state;
-    if (sf == SoftphoneConnectionState.ringing) return const Color(0xFFD97706);
-    if (sf == SoftphoneConnectionState.inCall) return scheme.primary;
-    if (sf == SoftphoneConnectionState.registered) return const Color(0xFF059669);
-    if (sf == SoftphoneConnectionState.error || sf == SoftphoneConnectionState.reconnecting) {
-      return scheme.error;
-    }
-    switch (_session.presenceLabel) {
-      case 'ringing':
-        return const Color(0xFFD97706);
-      case 'in_call':
-        return scheme.primary;
-      case 'offline':
-        return scheme.outline;
-      case 'no_extension':
-        return scheme.error.withValues(alpha: 0.75);
-      default:
-        return const Color(0xFF159947);
-    }
-  }
-
-  String _statusText() {
-    final sf = _softphone?.state;
-    final t = AppLocalizations.of(context);
-    if (sf == SoftphoneConnectionState.connecting) return t.telephonyBarConnecting;
-    if (sf == SoftphoneConnectionState.registered) return t.telephonyBarReady;
-    if (sf == SoftphoneConnectionState.ringing) {
-      final from = _softphone?.incomingCallerDisplay;
-      return from == null || from.isEmpty ? t.telephonyBarRinging : t.telephonyRingFrom(from);
-    }
-    if (sf == SoftphoneConnectionState.inCall) return t.telephonyBarInCall;
-    if (sf == SoftphoneConnectionState.reconnecting) return t.telephonyBarReconnecting;
-    if (sf == SoftphoneConnectionState.error) return t.telephonyBarError;
-    switch (_session.presenceLabel) {
-      case 'ringing':
-        return t.telephonyPresenceRinging;
-      case 'in_call':
-        return t.telephonyPresenceTalking;
-      case 'offline':
-        return t.telephonyPresenceOffline;
-      case 'no_extension':
-        return t.telephonyPresenceNoExt;
-      default:
-        return t.telephonyPresenceIdle;
-    }
+  Future<void> _openMenu() async {
+    final hostContext = context;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withValues(alpha: 0.18),
+      builder: (dialogContext) {
+        return _TelephonyToolbarMenu(
+          businessId: widget.businessId,
+          authStore: widget.authStore,
+          onClose: () => Navigator.of(dialogContext).pop(),
+          onNavigate: (path) {
+            Navigator.of(dialogContext).pop();
+            hostContext.go(hostContext.businessPanelUrl(widget.businessId, path));
+          },
+          onDialer: () {
+            Navigator.of(dialogContext).pop();
+            showTelephonyDialerSheet(
+              hostContext,
+              businessId: widget.businessId,
+              session: _session,
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context);
     if (!widget.pluginActive) return const SizedBox.shrink();
 
+    final t = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
-    final width = MediaQuery.sizeOf(context).width;
-    final compact = width < 720;
-    final statusColor = _statusColor(scheme);
-    final ringing = _session.presenceLabel == 'ringing' ||
-        _softphone?.state == SoftphoneConnectionState.ringing;
-    final inCall = _session.presenceLabel == 'in_call' ||
-        _softphone?.state == SoftphoneConnectionState.inCall;
-    final softReady = _softphone?.isReady == true;
+    final fg = widget.iconColor ?? scheme.onSurface;
+    final statusColor = _telephonyStatusColor(
+      scheme: scheme,
+      session: _session,
+      softphone: _softphone,
+    );
+    final ringing = _telephonyIsRinging(_session, _softphone);
+    final inCall = _telephonyIsInCall(_session, _softphone);
+    final missed = _session.missedToday;
+    final status = _telephonyStatusText(
+      t: t,
+      session: _session,
+      softphone: _softphone,
+    );
+    final tooltip = [
+      t.telephonyMenu,
+      if ((_session.primaryExtension ?? '').isNotEmpty)
+        t.telephonyExtensionValue(_session.primaryExtension!),
+      status,
+    ].join(' · ');
 
-    return Material(
-      color: Colors.transparent,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 280),
-        curve: Curves.easeOutCubic,
-        margin: EdgeInsets.fromLTRB(compact ? 8 : 12, 8, compact ? 8 : 12, 4),
-        padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 14, vertical: compact ? 8 : 10),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(
-            begin: Alignment.centerRight,
-            end: Alignment.centerLeft,
-            colors: [
-              (ringing || inCall)
-                  ? statusColor.withValues(alpha: 0.12)
-                  : scheme.surfaceContainerHighest.withValues(alpha: 0.95),
-              scheme.surfaceContainerLow.withValues(alpha: 0.98),
-            ],
-          ),
-          border: Border.all(color: statusColor.withValues(alpha: 0.35)),
-          boxShadow: [
-            BoxShadow(
-              color: statusColor.withValues(alpha: ringing ? 0.2 : 0.06),
-              blurRadius: ringing ? 18 : 10,
-              offset: const Offset(0, 4),
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(end: 2),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          IconButton(
+            tooltip: tooltip,
+            visualDensity: VisualDensity.compact,
+            style: IconButton.styleFrom(
+              minimumSize: const Size(38, 38),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-          ],
-        ),
-        child: Row(
-          children: [
-            AnimatedBuilder(
+            onPressed: _openMenu,
+            icon: AnimatedBuilder(
               animation: _pulse,
-              builder: (context, _) {
-                final scale = ringing ? 0.85 + (_pulse.value * 0.3) : 1.0;
-                return Transform.scale(
-                  scale: scale,
-                  child: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: statusColor,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(color: statusColor.withValues(alpha: 0.45), blurRadius: 8),
-                      ],
-                    ),
-                  ),
-                );
+              builder: (context, child) {
+                final scale = ringing ? 0.88 + (_pulse.value * 0.22) : 1.0;
+                return Transform.scale(scale: scale, child: child);
               },
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: InkWell(
-                borderRadius: BorderRadius.circular(10),
-                onTap: () {
-                  if (_session.presenceLabel == 'no_extension') {
-                    context.go(context.businessPanelUrl(widget.businessId, 'telephony'));
-                    return;
-                  }
-                  context.go(context.businessPanelUrl(widget.businessId, 'telephony/softphone'));
-                },
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              child: SizedBox(
+                width: 22,
+                height: 22,
+                child: Stack(
+                  clipBehavior: Clip.none,
                   children: [
-                    Text(
-                      t.telephonyMenu,
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+                    Icon(
+                      inCall || ringing
+                          ? Icons.headset_mic_rounded
+                          : Icons.headset_mic_outlined,
+                      size: 21,
+                      color: fg,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      [
-                        if ((_session.primaryExtension ?? '').isNotEmpty) t.telephonyExtensionValue(_session.primaryExtension!),
-                        _statusText(),
-                        if (_session.presenceLabel == 'no_extension') t.telephonyConfigureExtension,
-                      ].where((e) => e.isNotEmpty).join(' · '),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: _session.presenceLabel == 'no_extension' ? scheme.error : scheme.onSurfaceVariant,
+                    PositionedDirectional(
+                      top: -1,
+                      end: -1,
+                      child: Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          color: statusColor,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: statusColor.withValues(alpha: ringing ? 0.55 : 0.35),
+                              blurRadius: ringing ? 6 : 3,
+                            ),
+                          ],
+                          border: Border.all(
+                            color: fg.withValues(alpha: 0.35),
+                            width: 0.8,
                           ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
-            if (inCall || ringing) ...[
-              if (ringing && _softphone?.activeCallId != null)
-                IconButton(
-                  tooltip: t.telephonyAnswerSoftphone,
-                  onPressed: () async {
-                    final id = _softphone!.activeCallId!;
-                    await _softphone!.answer(id);
-                  },
-                  icon: Icon(Icons.call_rounded, color: scheme.primary),
-                ),
-              if (ringing)
-                IconButton(
-                  tooltip: t.telephonyDeclineCall,
-                  onPressed: () => _softphone?.rejectIncoming(),
-                  icon: Icon(Icons.call_end_rounded, color: scheme.error),
-                ),
-              if (!ringing)
-                IconButton(
-                  tooltip: _softphone?.muted == true ? t.telephonyUnmute : t.telephonyMute,
-                  onPressed: softReady ? () => _softphone!.setMuted(!(_softphone!.muted)) : null,
-                  icon: Icon(
-                    _softphone?.muted == true ? Icons.mic_off_rounded : Icons.mic_rounded,
-                    color: scheme.onSurfaceVariant,
+          ),
+          if (missed > 0)
+            Positioned(
+              right: 4,
+              top: 6,
+              child: IgnorePointer(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent,
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                ),
-              if (!ringing)
-                IconButton(
-                  tooltip: t.telephonyHangup,
-                  onPressed: softReady ? () => _softphone!.hangup() : () => _session.hangupActiveCall(),
-                  icon: Icon(Icons.call_end_rounded, color: scheme.error),
-                ),
-            ] else ...[
-              IconButton(
-                tooltip: softReady ? t.telephonySoftphoneOnline : t.telephonySoftphoneTitle,
-                onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony/softphone')),
-                icon: Icon(
-                  Icons.headset_mic_rounded,
-                  color: softReady ? const Color(0xFF059669) : scheme.primary,
-                ),
-              ),
-              if (_session.missedToday > 0)
-                Padding(
-                  padding: const EdgeInsetsDirectional.only(end: 6),
-                  child: InkWell(
-                    onTap: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony/calls')),
-                    child: Badge(
-                      label: Text('${_session.missedToday}'),
-                      child: Icon(Icons.call_missed_outgoing_rounded, color: scheme.error, size: 22),
+                  constraints: const BoxConstraints(minWidth: 18),
+                  child: Text(
+                    missed > 99 ? '99+' : '$missed',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
                     ),
+                    textAlign: TextAlign.center,
                   ),
                 ),
-              IconButton(
-                tooltip: t.telephonyDialer,
-                onPressed: () => showTelephonyDialerSheet(
-                  context,
-                  businessId: widget.businessId,
-                  session: _session,
-                ),
-                icon: Icon(Icons.dialpad_rounded, color: scheme.primary),
               ),
-              if (!compact)
-                IconButton(
-                  tooltip: t.history,
-                  onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony/calls')),
-                  icon: Icon(Icons.history_rounded, color: scheme.onSurfaceVariant),
-                ),
-            ],
-          ],
-        ),
+            ),
+        ],
       ),
+    );
+  }
+}
+
+class _TelephonyToolbarMenu extends StatefulWidget {
+  final int businessId;
+  final AuthStore authStore;
+  final VoidCallback onClose;
+  final ValueChanged<String> onNavigate;
+  final VoidCallback onDialer;
+
+  const _TelephonyToolbarMenu({
+    required this.businessId,
+    required this.authStore,
+    required this.onClose,
+    required this.onNavigate,
+    required this.onDialer,
+  });
+
+  @override
+  State<_TelephonyToolbarMenu> createState() => _TelephonyToolbarMenuState();
+}
+
+class _TelephonyToolbarMenuState extends State<_TelephonyToolbarMenu> {
+  late final TelephonySessionController _session;
+  SoftphoneEngine? _softphone;
+
+  @override
+  void initState() {
+    super.initState();
+    _session = TelephonySessionStore.instance.controller;
+    _session.addListener(_onChanged);
+    _softphone = SoftphoneEngineStore.instance.obtain(
+      businessId: widget.businessId,
+      authStore: widget.authStore,
+    );
+    _softphone?.addListener(_onChanged);
+  }
+
+  void _onChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _session.removeListener(_onChanged);
+    _softphone?.removeListener(_onChanged);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final statusColor = _telephonyStatusColor(
+      scheme: scheme,
+      session: _session,
+      softphone: _softphone,
+    );
+    final ringing = _telephonyIsRinging(_session, _softphone);
+    final inCall = _telephonyIsInCall(_session, _softphone);
+    final softReady = _softphone?.isReady == true;
+    final status = _telephonyStatusText(
+      t: t,
+      session: _session,
+      softphone: _softphone,
+    );
+    final extension = _session.primaryExtension ?? '';
+    final subtitle = [
+      if (extension.isNotEmpty) t.telephonyExtensionValue(extension),
+      status,
+      if (_session.presenceLabel == 'no_extension') t.telephonyConfigureExtension,
+    ].where((e) => e.isNotEmpty).join(' · ');
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      alignment: AlignmentDirectional.topEnd,
+      insetPadding: const EdgeInsets.fromLTRB(12, 52, 12, 12),
+      child: Material(
+        color: scheme.surface,
+        elevation: 8,
+        shadowColor: Colors.black.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 340),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: statusColor,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: statusColor.withValues(alpha: 0.4),
+                              blurRadius: 8,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () {
+                            if (_session.presenceLabel == 'no_extension') {
+                              widget.onNavigate('telephony');
+                              return;
+                            }
+                            widget.onNavigate('telephony/softphone');
+                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                t.telephonyMenu,
+                                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                subtitle,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: _session.presenceLabel == 'no_extension'
+                                          ? scheme.error
+                                          : scheme.onSurfaceVariant,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: t.close,
+                        visualDensity: VisualDensity.compact,
+                        onPressed: widget.onClose,
+                        icon: const Icon(Icons.close, size: 20),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  if (inCall || ringing)
+                    Padding(
+                      padding: const EdgeInsetsDirectional.only(end: 6, bottom: 6),
+                      child: Row(
+                        children: [
+                          if (ringing && _softphone?.activeCallId != null)
+                            Expanded(
+                              child: FilledButton.icon(
+                                onPressed: () async {
+                                  final id = _softphone!.activeCallId!;
+                                  await _softphone!.answer(id);
+                                },
+                                icon: const Icon(Icons.call_rounded, size: 18),
+                                label: Text(t.telephonyAnswerSoftphone),
+                              ),
+                            ),
+                          if (ringing) ...[
+                            if (_softphone?.activeCallId != null) const SizedBox(width: 8),
+                            Expanded(
+                              child: FilledButton.tonalIcon(
+                                style: FilledButton.styleFrom(
+                                  foregroundColor: scheme.error,
+                                ),
+                                onPressed: () => _softphone?.rejectIncoming(),
+                                icon: const Icon(Icons.call_end_rounded, size: 18),
+                                label: Text(t.telephonyDeclineCall),
+                              ),
+                            ),
+                          ],
+                          if (!ringing) ...[
+                            IconButton(
+                              tooltip: _softphone?.muted == true
+                                  ? t.telephonyUnmute
+                                  : t.telephonyMute,
+                              onPressed: softReady
+                                  ? () => _softphone!.setMuted(!(_softphone!.muted))
+                                  : null,
+                              icon: Icon(
+                                _softphone?.muted == true
+                                    ? Icons.mic_off_rounded
+                                    : Icons.mic_rounded,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: FilledButton.tonalIcon(
+                                style: FilledButton.styleFrom(
+                                  foregroundColor: scheme.error,
+                                ),
+                                onPressed: softReady
+                                    ? () => _softphone!.hangup()
+                                    : () => _session.hangupActiveCall(),
+                                icon: const Icon(Icons.call_end_rounded, size: 18),
+                                label: Text(t.telephonyHangup),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsetsDirectional.only(end: 6),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          ActionChip(
+                            avatar: Icon(
+                              Icons.headset_mic_rounded,
+                              size: 18,
+                              color: softReady ? const Color(0xFF059669) : scheme.primary,
+                            ),
+                            label: Text(t.telephonySoftphoneTitle),
+                            onPressed: () => widget.onNavigate('telephony/softphone'),
+                          ),
+                          ActionChip(
+                            avatar: Icon(Icons.dialpad_rounded, size: 18, color: scheme.primary),
+                            label: Text(t.telephonyDialer),
+                            onPressed: widget.onDialer,
+                          ),
+                          ActionChip(
+                            avatar: Badge(
+                              isLabelVisible: _session.missedToday > 0,
+                              label: Text('${_session.missedToday}'),
+                              child: Icon(
+                                Icons.history_rounded,
+                                size: 18,
+                                color: _session.missedToday > 0
+                                    ? scheme.error
+                                    : scheme.onSurfaceVariant,
+                              ),
+                            ),
+                            label: Text(t.history),
+                            onPressed: () => widget.onNavigate('telephony/calls'),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
     );
   }
 }

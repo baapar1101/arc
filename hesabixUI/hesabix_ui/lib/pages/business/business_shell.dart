@@ -2668,6 +2668,12 @@ class _BusinessShellState extends State<BusinessShell> {
           iconColor: appBarFg,
           denseToolbar: true,
         ),
+        TelephonyPhoneBarHost(
+          businessId: widget.businessId,
+          authStore: widget.authStore,
+          pluginActive: _isTelephonyPluginActive(),
+          iconColor: appBarFg,
+        ),
         if (!isMobile) ...[
           _bizToolbarIconButton(
             tooltip: t.businessShellAiChatTooltip,
@@ -2891,16 +2897,7 @@ class _BusinessShellState extends State<BusinessShell> {
       child: SafeArea(
         child: Stack(
           children: [
-            Column(
-              children: [
-                TelephonyPhoneBarHost(
-                  businessId: widget.businessId,
-                  authStore: widget.authStore,
-                  pluginActive: _isTelephonyPluginActive(),
-                ),
-                Expanded(child: shellMainChild),
-              ],
-            ),
+            Positioned.fill(child: shellMainChild),
             TelephonyScreenPopLayer(
               businessId: widget.businessId,
               authStore: widget.authStore,
