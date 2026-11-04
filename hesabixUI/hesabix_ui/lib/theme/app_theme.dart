@@ -19,6 +19,7 @@ class AppTheme {
     final fontFallback = isFa ? AppFonts.faFallback : AppFonts.enFallback;
     const spacing = AppSpacing();
     const radii = AppRadii();
+    const shellNav = AppShellNavMetrics();
     final shellColors = AppShellColors.fromScheme(scheme, isDark: isDark);
     final semantics = AppSemanticColors.fromDefinition(
       themeDef,
@@ -43,7 +44,7 @@ class AppTheme {
       appBarTheme: appAppBarTheme(scheme, textTheme),
       cardTheme: appCardTheme(scheme, radii),
       listTileTheme: appListTileTheme(scheme, textTheme),
-      navigationRailTheme: appNavigationRailTheme(scheme, textTheme),
+      navigationRailTheme: appNavigationRailTheme(scheme, textTheme, shellNav),
       dividerTheme: appDividerTheme(scheme),
       iconButtonTheme: appIconButtonTheme(scheme),
       dialogTheme: appDialogTheme(scheme, radii, textTheme),
@@ -54,6 +55,7 @@ class AppTheme {
       extensions: <ThemeExtension<dynamic>>[
         spacing,
         radii,
+        shellNav,
         shellColors,
         semantics,
       ],

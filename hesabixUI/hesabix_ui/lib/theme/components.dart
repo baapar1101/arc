@@ -133,18 +133,27 @@ ListTileThemeData appListTileTheme(ColorScheme scheme, TextTheme textTheme) => L
       subtitleTextStyle: textTheme.bodySmall,
     );
 
-NavigationRailThemeData appNavigationRailTheme(ColorScheme scheme, TextTheme textTheme) =>
+NavigationRailThemeData appNavigationRailTheme(
+  ColorScheme scheme,
+  TextTheme textTheme,
+  AppShellNavMetrics nav,
+) =>
     NavigationRailThemeData(
       backgroundColor: scheme.surface,
       indicatorColor: scheme.primaryContainer,
-      selectedIconTheme: IconThemeData(color: scheme.primary, size: 20),
-      unselectedIconTheme: IconThemeData(color: scheme.onSurfaceVariant, size: 20),
-      selectedLabelTextStyle: textTheme.labelMedium?.copyWith(
+      minWidth: nav.collapsedWidth,
+      minExtendedWidth: nav.extendedWidth,
+      selectedIconTheme: IconThemeData(color: scheme.primary, size: nav.parentIconExtended),
+      unselectedIconTheme: IconThemeData(color: scheme.onSurfaceVariant, size: nav.parentIconExtended),
+      selectedLabelTextStyle: nav.parentLabelStyle(
+        textTheme,
         color: scheme.primary,
-        fontWeight: FontWeight.w600,
+        active: true,
       ),
-      unselectedLabelTextStyle: textTheme.labelMedium?.copyWith(
+      unselectedLabelTextStyle: nav.parentLabelStyle(
+        textTheme,
         color: scheme.onSurfaceVariant,
+        active: false,
       ),
     );
 

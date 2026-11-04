@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import 'semantic_colors.dart';
+import 'shell_nav.dart';
 import 'theme_catalog.dart';
 
 export 'semantic_colors.dart';
+export 'shell_nav.dart';
 export 'theme_catalog.dart';
 
 @immutable
@@ -132,6 +134,8 @@ class AppShellColors extends ThemeExtension<AppShellColors> {
 extension AppThemeExtensions on BuildContext {
   AppSpacing get appSpacing => Theme.of(this).extension<AppSpacing>() ?? const AppSpacing();
   AppRadii get appRadii => Theme.of(this).extension<AppRadii>() ?? const AppRadii();
+  AppShellNavMetrics get shellNav =>
+      Theme.of(this).extension<AppShellNavMetrics>() ?? const AppShellNavMetrics();
   AppShellColors get shellColors =>
       Theme.of(this).extension<AppShellColors>() ??
       AppShellColors.fromScheme(Theme.of(this).colorScheme, isDark: Theme.of(this).brightness == Brightness.dark);

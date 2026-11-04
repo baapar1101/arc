@@ -90,14 +90,16 @@ class BusinessShell extends StatefulWidget {
 class _BusinessShellState extends State<BusinessShell> {
   /// ارتفاع نوار ابزار آبی (لوگو، اکشن‌ها) — فشرده‌تر از [kToolbarHeight] پیش‌فرض.
   static const double _kBizAppBarToolbarHeight = 44;
-  /// نوار دوم: تب‌ها / نام کسب‌وکار و زمان — کمی فشرده‌تر از قبل.
-  static const double _kUnifiedBizTabBarHeight = 44;
-  static const double _kBizTabStripVerticalPadding = 6;
+  /// نوار دوم: تب‌ها / نام کسب‌وکار و زمان — نزدیک به نصف ارتفاع قبلی (۴۴).
+  static const double _kUnifiedBizTabBarHeight = 24;
+  static const double _kBizTabStripVerticalPadding = 2;
   /// ارتفاع ثابت بدنهٔ هر تب داخل نوار (نوار − پدینگ عمودی).
   static const double _kBizTabChipInnerHeight =
       _kUnifiedBizTabBarHeight - (_kBizTabStripVerticalPadding * 2);
-  static const double _kBizTabMinWidth = 100;
-  static const double _kBizTabMaxWidth = 188;
+  static const double _kBizTabMinWidth = 80;
+  static const double _kBizTabMaxWidth = 156;
+  static const double _kBizTabMetaGlyphSize = 12;
+  static const double _kBizTabOverflowSize = 20;
 
   int _hoverIndex = -1;
   final Map<String, bool> _expandedMenuByKey = {};
@@ -529,7 +531,7 @@ class _BusinessShellState extends State<BusinessShell> {
         ? cs.primary.withValues(alpha: active ? 0.95 : 0.82)
         : cs.outline.withValues(alpha: 0.55);
 
-    final BorderRadius chipRadius = BorderRadius.circular(11);
+    final BorderRadius chipRadius = BorderRadius.circular(6);
 
     final Color chipBg = active
         ? Color.alphaBlend(
@@ -545,16 +547,16 @@ class _BusinessShellState extends State<BusinessShell> {
             : cs.outline.withValues(alpha: isDarkStrip ? 0.38 : 0.22);
 
     return Padding(
-      padding: const EdgeInsetsDirectional.only(end: 8),
+      padding: const EdgeInsetsDirectional.only(end: 4),
       child: ConstrainedBox(
         constraints: const BoxConstraints(minWidth: _kBizTabMinWidth, maxWidth: _kBizTabMaxWidth),
         child: Material(
-          elevation: active ? (isDarkStrip ? 5 : 4) : (pinned ? 1 : 0),
-          shadowColor: cs.shadow.withValues(alpha: active ? (isDarkStrip ? 0.45 : 0.28) : 0.12),
+          elevation: active ? (isDarkStrip ? 2 : 1) : 0,
+          shadowColor: cs.shadow.withValues(alpha: active ? 0.18 : 0.08),
           color: chipBg,
           shape: RoundedRectangleBorder(
             borderRadius: chipRadius,
-            side: BorderSide(color: chipBorder, width: active ? 1.5 : 1),
+            side: BorderSide(color: chipBorder),
           ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
@@ -566,22 +568,22 @@ class _BusinessShellState extends State<BusinessShell> {
             child: SizedBox(
               height: _kBizTabChipInnerHeight,
               child: Padding(
-                padding: const EdgeInsetsDirectional.only(start: 12, end: 4),
+                padding: const EdgeInsetsDirectional.only(start: 7, end: 1),
                 child: Row(
                   children: [
                     if (pinned)
                       Padding(
-                        padding: const EdgeInsetsDirectional.only(end: 8),
+                        padding: const EdgeInsetsDirectional.only(end: 5),
                         child: Transform.rotate(
                           angle: -0.6,
-                          child: Icon(Icons.push_pin_rounded, size: 13, color: chipPin),
+                          child: Icon(Icons.push_pin_rounded, size: 10, color: chipPin),
                         ),
                       )
                     else
                       Container(
-                        width: 5,
-                        height: 5,
-                        margin: const EdgeInsetsDirectional.only(end: 10),
+                        width: 4,
+                        height: 4,
+                        margin: const EdgeInsetsDirectional.only(end: 6),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: active ? cs.primary : cs.outline.withValues(alpha: 0.55),
@@ -593,29 +595,30 @@ class _BusinessShellState extends State<BusinessShell> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                              fontSize: 12.5,
-                              height: 1.15,
-                              letterSpacing: active ? 0.15 : 0.02,
+                              fontSize: 11,
+                              height: 1.0,
+                              letterSpacing: active ? 0.12 : 0.01,
                               fontWeight: active ? FontWeight.w700 : FontWeight.w500,
                               color: active ? chipFgStrong : chipFg,
                             ),
                       ),
                     ),
-                    SizedBox(
-                      width: 28,
-                      height: 28,
-                      child: IconButton(
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        tooltip: pinned
-                            ? t.businessPanelTabClosePinnedTooltip
-                            : MaterialLocalizations.of(context).closeButtonTooltip,
-                        icon: Icon(
-                          Icons.close_rounded,
-                          size: 16.5,
-                          color: pinned ? cs.primary.withValues(alpha: 0.75) : chipClose,
+                    Tooltip(
+                      message: pinned
+                          ? t.businessPanelTabClosePinnedTooltip
+                          : MaterialLocalizations.of(context).closeButtonTooltip,
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () => _requestCloseTab(context, path, goLoc),
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: Icon(
+                            Icons.close_rounded,
+                            size: 12,
+                            color: pinned ? cs.primary.withValues(alpha: 0.75) : chipClose,
+                          ),
                         ),
-                        onPressed: () => _requestCloseTab(context, path, goLoc),
                       ),
                     ),
                   ],
@@ -628,7 +631,111 @@ class _BusinessShellState extends State<BusinessShell> {
     );
   }
 
-  /// یک خط: نام کسب‌وکار + آیکون • تب‌ها (کنار نام، با اسکرول) • زمان • منوی تب‌ها
+  Widget _denseStripMetaCapsule({
+    required ColorScheme cs,
+    required bool isDark,
+    required Widget child,
+    double maxW = 220,
+  }) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: maxW,
+        maxHeight: _kBizTabChipInnerHeight,
+      ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(6),
+          color: cs.surface.withValues(alpha: isDark ? 0.52 : 0.94),
+          border: Border.all(color: cs.outline.withValues(alpha: isDark ? 0.38 : 0.22)),
+        ),
+        child: SizedBox(
+          height: _kBizTabChipInnerHeight,
+          child: Padding(
+            padding: const EdgeInsetsDirectional.symmetric(horizontal: 7),
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: child,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _denseBusinessIdentityRow({
+    required ThemeData theme,
+    required ColorScheme cs,
+    required bool isDark,
+    required String businessName,
+    required Color titleColor,
+    required bool expanded,
+    TextAlign textAlign = TextAlign.start,
+  }) {
+    return Row(
+      mainAxisSize: expanded ? MainAxisSize.max : MainAxisSize.min,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: cs.primary.withValues(alpha: isDark ? 0.35 : 0.18),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(2),
+            child: BusinessShellStorefrontGlyph(
+              size: _kBizTabMetaGlyphSize,
+              color: cs.primary,
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            businessName,
+            style: theme.textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+              fontSize: 11.5,
+              height: 1.0,
+              letterSpacing: 0.08,
+              color: titleColor,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: textAlign,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _denseDateTimeRow({
+    required ThemeData theme,
+    required Color muted,
+    required String dateTimeStr,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.schedule_rounded, size: 12, color: muted.withValues(alpha: 0.95)),
+        const SizedBox(width: 5),
+        Flexible(
+          child: Text(
+            dateTimeStr,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: muted,
+              fontWeight: FontWeight.w600,
+              fontSize: 10.5,
+              height: 1.0,
+              letterSpacing: 0.01,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// یک خط فشرده: نام کسب‌وکار + آیکون • تب‌ها (کنار نام، با اسکرول) • زمان • منوی تب‌ها
   ///
   /// [menuRoot] باید **منوی کامل** ([allMenuItems]) باشد نه [menuItems] فیلترشده،
   /// تا عنوان تب‌ها از همان برچسب‌های محلی منو به‌دست آید (و به `products` خام نیفتد).
@@ -655,89 +762,30 @@ class _BusinessShellState extends State<BusinessShell> {
     final Color stripFgTitle = cs.onSurface;
     final isRtl = Directionality.of(context) == TextDirection.rtl;
 
-    final BorderRadius pillRadius = BorderRadius.circular(12);
-
-    Widget metaCapsule({
-      required Widget child,
-      double maxW = 260,
-      EdgeInsetsGeometry padding = const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-    }) {
-      return ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxW),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: pillRadius,
-            color: cs.surface.withValues(alpha: isDark ? 0.52 : 0.94),
-            border: Border.all(color: cs.outline.withValues(alpha: isDark ? 0.42 : 0.26)),
-            boxShadow: [
-              BoxShadow(
-                color: cs.shadow.withValues(alpha: isDark ? 0.35 : 0.07),
-                blurRadius: isDark ? 14 : 10,
-                spreadRadius: -2,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Padding(padding: padding, child: child),
-        ),
-      );
-    }
-
-    final Widget businessTitle = metaCapsule(
-      maxW: 248,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: cs.primary.withValues(alpha: isDark ? 0.35 : 0.18),
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(7),
-              child: BusinessShellStorefrontGlyph(size: 18, color: cs.primary),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Flexible(
-            child: Text(
-              businessName,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.12,
-                color: stripFgTitle,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: isRtl ? TextAlign.right : TextAlign.left,
-            ),
-          ),
-        ],
+    final Widget businessTitle = _denseStripMetaCapsule(
+      cs: cs,
+      isDark: isDark,
+      maxW: 200,
+      child: _denseBusinessIdentityRow(
+        theme: theme,
+        cs: cs,
+        isDark: isDark,
+        businessName: businessName,
+        titleColor: stripFgTitle,
+        expanded: false,
+        textAlign: isRtl ? TextAlign.right : TextAlign.left,
       ),
     );
 
     final Widget dateWidget = !isMobile
-        ? metaCapsule(
-            maxW: 268,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.schedule_rounded, size: 17, color: stripFg.withValues(alpha: 0.95)),
-                const SizedBox(width: 9),
-                Flexible(
-                  child: Text(
-                    dateTimeStr,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: stripFg,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                      letterSpacing: 0.02,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
+        ? _denseStripMetaCapsule(
+            cs: cs,
+            isDark: isDark,
+            maxW: 220,
+            child: _denseDateTimeRow(
+              theme: theme,
+              muted: stripFg,
+              dateTimeStr: dateTimeStr,
             ),
           )
         : const SizedBox.shrink();
@@ -748,15 +796,18 @@ class _BusinessShellState extends State<BusinessShell> {
       child: Material(
         color: cs.surfaceContainerHighest.withValues(alpha: isDark ? 0.55 : 0.82),
         shape: const CircleBorder(),
-        elevation: isDark ? 2 : 1,
-        shadowColor: cs.shadow.withValues(alpha: 0.18),
+        elevation: 0,
         child: InkWell(
           customBorder: const CircleBorder(),
           onTap: () => _showAllTabsManagementDialog(context, menuRoot),
           child: SizedBox(
-            width: 34,
-            height: 34,
-            child: Icon(Icons.more_horiz_rounded, color: stripFgTitle.withValues(alpha: 0.85), size: 22),
+            width: _kBizTabOverflowSize,
+            height: _kBizTabOverflowSize,
+            child: Icon(
+              Icons.more_horiz_rounded,
+              color: stripFgTitle.withValues(alpha: 0.85),
+              size: 14,
+            ),
           ),
         ),
       ),
@@ -770,7 +821,7 @@ class _BusinessShellState extends State<BusinessShell> {
             scrollDirection: Axis.horizontal,
             reverse: isRtl,
             physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsetsDirectional.only(start: 10, end: 12),
+            padding: const EdgeInsetsDirectional.only(start: 6, end: 8),
             child: Row(
               textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
               mainAxisSize: MainAxisSize.min,
@@ -787,21 +838,14 @@ class _BusinessShellState extends State<BusinessShell> {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: barBg,
-        border: Border(bottom: BorderSide(color: stripBottomBorder, width: 1)),
-        boxShadow: [
-          BoxShadow(
-            color: cs.shadow.withValues(alpha: isDark ? 0.25 : 0.06),
-            blurRadius: isDark ? 8 : 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border(bottom: BorderSide(color: stripBottomBorder)),
       ),
       child: SizedBox(
         height: _kUnifiedBizTabBarHeight,
         child: Padding(
           padding: const EdgeInsetsDirectional.only(
-            start: 14,
-            end: 14,
+            start: 10,
+            end: 8,
             top: _kBizTabStripVerticalPadding,
             bottom: _kBizTabStripVerticalPadding,
           ),
@@ -809,13 +853,13 @@ class _BusinessShellState extends State<BusinessShell> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               businessTitle,
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               tabRegion,
               if (!isMobile) ...[
-                const SizedBox(width: 10),
+                const SizedBox(width: 6),
                 dateWidget,
               ],
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               overflowBtn,
             ],
           ),
@@ -2769,21 +2813,14 @@ class _BusinessShellState extends State<BusinessShell> {
     final Widget businessTopBar = DecoratedBox(
       decoration: BoxDecoration(
         color: secondaryStripBg,
-        border: Border(bottom: BorderSide(color: stripBottomBorder, width: 1)),
-        boxShadow: [
-          BoxShadow(
-            color: scheme.shadow.withValues(alpha: isDark ? 0.25 : 0.06),
-            blurRadius: isDark ? 8 : 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border(bottom: BorderSide(color: stripBottomBorder)),
       ),
       child: SizedBox(
         height: _kUnifiedBizTabBarHeight,
         child: Padding(
           padding: const EdgeInsetsDirectional.only(
-            start: 14,
-            end: 14,
+            start: 10,
+            end: 8,
             top: _kBizTabStripVerticalPadding,
             bottom: _kBizTabStripVerticalPadding,
           ),
@@ -2791,71 +2828,24 @@ class _BusinessShellState extends State<BusinessShell> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                child: Row(
-                  children: [
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: scheme.primary.withValues(alpha: isDark ? 0.35 : 0.18),
-                        borderRadius: BorderRadius.circular(9),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(7),
-                        child: BusinessShellStorefrontGlyph(size: 18, color: scheme.primary),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        businessName,
-                        style: shellStripTheme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.12,
-                          color: stripTitle,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.start,
-                      ),
-                    ),
-                  ],
+                child: _denseBusinessIdentityRow(
+                  theme: shellStripTheme,
+                  cs: scheme,
+                  isDark: isDark,
+                  businessName: businessName,
+                  titleColor: stripTitle,
+                  expanded: true,
                 ),
               ),
               if (!isMobile)
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    color: scheme.surface.withValues(alpha: isDark ? 0.52 : 0.94),
-                    border: Border.all(color: scheme.outline.withValues(alpha: isDark ? 0.42 : 0.26)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: scheme.shadow.withValues(alpha: isDark ? 0.35 : 0.07),
-                        blurRadius: isDark ? 14 : 10,
-                        spreadRadius: -2,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.schedule_rounded, size: 17, color: stripMuted.withValues(alpha: 0.95)),
-                        const SizedBox(width: 9),
-                        Flexible(
-                          child: Text(
-                            dateTimeStr,
-                            style: shellStripTheme.textTheme.bodySmall?.copyWith(
-                              color: stripMuted,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
+                _denseStripMetaCapsule(
+                  cs: scheme,
+                  isDark: isDark,
+                  maxW: 220,
+                  child: _denseDateTimeRow(
+                    theme: shellStripTheme,
+                    muted: stripMuted,
+                    dateTimeStr: dateTimeStr,
                   ),
                 ),
             ],
@@ -2914,6 +2904,8 @@ class _BusinessShellState extends State<BusinessShell> {
     );
 
     // Side colors and styles
+    final nav = context.shellNav;
+    final textTheme = Theme.of(context).textTheme;
     final Color sideBg = Theme.of(context).brightness == Brightness.dark
         ? scheme.surfaceContainerHighest
         : scheme.surfaceContainerLow;
@@ -2932,11 +2924,11 @@ class _BusinessShellState extends State<BusinessShell> {
           children: [
             if (_desktopRailVisible) ...[
             Container(
-              width: railExtended ? 240 : 72,
+              width: nav.widthFor(extended: railExtended),
               height: double.infinity,
               color: sideBg,
               child: ListView.builder(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: nav.listPadding,
                 itemCount: getTotalMenuItemsCount(),
                 itemBuilder: (ctx, index) {
                   // محاسبه ایندکس منو و تشخیص نوع آیتم
@@ -2971,9 +2963,9 @@ class _BusinessShellState extends State<BusinessShell> {
                   final bool isHovered = index == _hoverIndex;
                   final bool isSelected = menuIndex == selectedIndex;
                   final bool active = isSelected || isHovered;
-                  final BorderRadius br = (isSelected && useRail)
-                      ? BorderRadius.zero
-                      : (isHovered ? BorderRadius.zero : BorderRadius.circular(8));
+                  final BorderRadius br = nav.itemBorderRadius(
+                    flush: isSelected || isHovered,
+                  );
                   final Color bgColor = active
                       ? (isHovered && !isSelected ? activeBg.withValues(alpha: 0.85) : activeBg)
                       : Colors.transparent;
@@ -2985,9 +2977,9 @@ class _BusinessShellState extends State<BusinessShell> {
                         _businessMenuPathMatchesLocation(location, child.path!, widget.businessId);
                     final bool isChildHovered = index == _hoverIndex;
                     final bool isChildActive = isChildSelected || isChildHovered;
-                    final BorderRadius childBr = isChildSelected
-                        ? BorderRadius.zero
-                        : (isChildHovered ? BorderRadius.zero : BorderRadius.circular(8));
+                    final BorderRadius childBr = nav.itemBorderRadius(
+                      flush: isChildSelected || isChildHovered,
+                    );
                     final Color childBgColor = isChildActive
                         ? (isChildHovered && !isChildSelected 
                             ? (isDark ? activeBg.withValues(alpha: 0.5) : activeBg.withValues(alpha: 0.7))
@@ -3012,10 +3004,7 @@ class _BusinessShellState extends State<BusinessShell> {
                               : null,
                           child: Container(
                             margin: EdgeInsets.zero,
-                            padding: EdgeInsets.symmetric(
-                              horizontal: railExtended ? 32 : 20,
-                              vertical: 10,
-                            ),
+                            padding: nav.childPaddingFor(extended: railExtended),
                             decoration: BoxDecoration(
                               color: childBgColor,
                               borderRadius: childBr,
@@ -3029,23 +3018,30 @@ class _BusinessShellState extends State<BusinessShell> {
                                   _buildSidebarMenuIcon(
                                     child,
                                     color: isChildActive ? activeFg : sideFg,
-                                    size: railExtended ? 20 : 22,
+                                    size: nav.iconSizeFor(extended: railExtended, child: true),
                                     active: isChildActive,
                                   ),
                                   if (railExtended) ...[
-                                    const SizedBox(width: 12),
+                                    SizedBox(width: nav.iconLabelGap),
                                     Expanded(
                                       child: Text(
                                         child.label,
-                                        style: TextStyle(
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: nav.childLabelStyle(
+                                          textTheme,
                                           color: isChildActive ? activeFg : sideFg,
-                                          fontWeight: isChildActive ? FontWeight.w600 : FontWeight.w400,
-                                          fontSize: 13,
+                                          active: isChildActive,
                                         ),
                                       ),
                                     ),
                                     if (child.hasAddButton && _canAddForSection(_sectionForLabel(child.label, t)))
-                                      GestureDetector(
+                                      _sidebarAddAffordance(
+                                        nav: nav,
+                                        foreground: isChildActive ? activeFg : sideFg,
+                                        background: isChildActive
+                                            ? activeFg.withValues(alpha: 0.15)
+                                            : sideFg.withValues(alpha: 0.1),
                                         onTap: () {
                                           // Navigate to add new item
                                           if (child.label == t.personsList) {
@@ -3092,21 +3088,6 @@ class _BusinessShellState extends State<BusinessShell> {
                                             showLoanFacilityCreateDialog();
                                           }
                                         },
-                                        child: Container(
-                                          width: 22,
-                                          height: 22,
-                                          decoration: BoxDecoration(
-                                            color: isChildActive 
-                                                ? activeFg.withValues(alpha: 0.15)
-                                                : sideFg.withValues(alpha: 0.1),
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Icon(
-                                            Icons.add,
-                                            size: 14,
-                                            color: isChildActive ? activeFg : sideFg,
-                                          ),
-                                        ),
                                       ),
                                   ],
                                 ],
@@ -3121,10 +3102,7 @@ class _BusinessShellState extends State<BusinessShell> {
                     if (item.type == _MenuItemType.separator) {
                       // آیتم جداکننده
                       return Container(
-                        margin: EdgeInsets.symmetric(
-                          horizontal: railExtended ? 16 : 8,
-                          vertical: 12,
-                        ),
+                        margin: nav.separatorPaddingFor(extended: railExtended),
                         child: Row(
                           children: [
                             if (railExtended) ...[
@@ -3134,17 +3112,15 @@ class _BusinessShellState extends State<BusinessShell> {
                                   thickness: 1,
                                 ),
                               ),
-                              const SizedBox(width: 12),
+                              SizedBox(width: nav.iconLabelGap),
                               Text(
                                 item.label,
-                                style: TextStyle(
+                                style: nav.separatorLabelStyle(
+                                  textTheme,
                                   color: sideFg.withValues(alpha: 0.7),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.5,
                                 ),
                               ),
-                              const SizedBox(width: 12),
+                              SizedBox(width: nav.iconLabelGap),
                               Expanded(
                                 child: Divider(
                                   color: sideFg.withValues(alpha: 0.3),
@@ -3187,10 +3163,7 @@ class _BusinessShellState extends State<BusinessShell> {
                               : () => onSelect(menuIndex, longPress: true),
                           child: Container(
                             margin: EdgeInsets.zero,
-                            padding: EdgeInsets.symmetric(
-                              horizontal: railExtended ? 16 : 0,
-                              vertical: 12,
-                            ),
+                            padding: nav.parentPaddingFor(extended: railExtended),
                             decoration: BoxDecoration(
                               color: bgColor,
                               borderRadius: br,
@@ -3204,17 +3177,17 @@ class _BusinessShellState extends State<BusinessShell> {
                                     _buildSidebarMenuIcon(
                                       item,
                                       color: active ? activeFg : sideFg,
-                                      size: railExtended ? 24 : 28,
+                                      size: nav.iconSizeFor(extended: railExtended, child: false),
                                       active: active,
                                     ),
                                     // آیکون expand/collapse کوچک در گوشه برای حالت Rail
                                     if (!railExtended && item.type == _MenuItemType.expandable)
                                       Positioned(
-                                        right: -4,
-                                        bottom: -4,
+                                        right: -3,
+                                        bottom: -3,
                                         child: Container(
-                                          width: 14,
-                                          height: 14,
+                                          width: nav.expandBadgeSize,
+                                          height: nav.expandBadgeSize,
                                           decoration: BoxDecoration(
                                             color: sideBg,
                                             shape: BoxShape.circle,
@@ -3230,7 +3203,7 @@ class _BusinessShellState extends State<BusinessShell> {
                                             child: Icon(
                                               Icons.expand_more,
                                               color: sideFg,
-                                              size: 10,
+                                              size: nav.expandBadgeSize - 2,
                                             ),
                                           ),
                                         ),
@@ -3238,14 +3211,16 @@ class _BusinessShellState extends State<BusinessShell> {
                                   ],
                                 ),
                                 if (railExtended) ...[
-                                  const SizedBox(width: 12),
+                                  SizedBox(width: nav.iconLabelGap),
                                   Expanded(
                                     child: Text(
                                       item.label,
-                                      style: TextStyle(
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: nav.parentLabelStyle(
+                                        textTheme,
                                         color: active ? activeFg : sideFg,
-                                        fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-                                        fontSize: 14,
+                                        active: active,
                                       ),
                                     ),
                                   ),
@@ -3257,7 +3232,7 @@ class _BusinessShellState extends State<BusinessShell> {
                                       child: Icon(
                                         Icons.expand_more,
                                         color: sideFg,
-                                        size: 20,
+                                        size: nav.expandIconSize,
                                       ),
                                     )
                                   else if (item.hasAddButton)
@@ -3265,7 +3240,10 @@ class _BusinessShellState extends State<BusinessShell> {
                                       final section = _sectionForLabel(item.label, t);
                                       final canAdd = section != null && (widget.authStore.hasBusinessPermission(section, 'add'));
                                       if (!canAdd) return const SizedBox.shrink();
-                                      return GestureDetector(
+                                      return _sidebarAddAffordance(
+                                        nav: nav,
+                                        foreground: sideFg,
+                                        background: sideFg.withValues(alpha: 0.1),
                                         onTap: () {
                                           if (item.label == t.people) {
                                             showAddPersonDialog();
@@ -3287,19 +3265,6 @@ class _BusinessShellState extends State<BusinessShell> {
                                             showAddDocumentDialog();
                                           }
                                         },
-                                        child: Container(
-                                          width: 24,
-                                          height: 24,
-                                          decoration: BoxDecoration(
-                                            color: sideFg.withValues(alpha: 0.1),
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Icon(
-                                            Icons.add,
-                                            size: 16,
-                                            color: sideFg,
-                                          ),
-                                        ),
                                       );
                                     }),
                                 ],
@@ -3343,14 +3308,14 @@ class _BusinessShellState extends State<BusinessShell> {
         backgroundColor: sideBg,
         child: SafeArea(
           child: ListView(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: nav.listPadding,
             children: [
               if (launcherHomePath != null) ...[
                 ListTile(
-                  leading: Icon(Icons.apps_rounded, color: sideFg),
+                  leading: Icon(Icons.apps_rounded, color: sideFg, size: nav.parentIconExtended),
                   title: Text(
                     t.businessShellBackToLauncher,
-                    style: TextStyle(color: sideFg, fontWeight: FontWeight.w600),
+                    style: nav.parentLabelStyle(textTheme, color: sideFg, active: true),
                   ),
                   onTap: () {
                     context.pop();
@@ -3368,7 +3333,7 @@ class _BusinessShellState extends State<BusinessShell> {
                   if (item.type == _MenuItemType.separator) {
                     // آیتم جداکننده در منوی موبایل
                     return Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      margin: nav.separatorPaddingExtended,
                       child: Row(
                         children: [
                           Expanded(
@@ -3377,16 +3342,15 @@ class _BusinessShellState extends State<BusinessShell> {
                               thickness: 1,
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          SizedBox(width: nav.iconLabelGap),
                           Text(
                             item.label,
-                            style: TextStyle(
+                            style: nav.separatorLabelStyle(
+                              textTheme,
                               color: sideFg.withValues(alpha: 0.7),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          SizedBox(width: nav.iconLabelGap),
                           Expanded(
                             child: Divider(
                               color: sideFg.withValues(alpha: 0.3),
@@ -3403,14 +3367,26 @@ class _BusinessShellState extends State<BusinessShell> {
                       leading: _buildSidebarMenuIcon(
                         item,
                         color: active ? activeFg : sideFg,
-                        size: 24,
+                        size: nav.iconSizeFor(extended: true, child: false),
                         active: active,
                       ),
-                      title: Text(item.label, style: TextStyle(color: active ? activeFg : sideFg, fontWeight: active ? FontWeight.w600 : FontWeight.w400)),
+                      title: Text(
+                        item.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: nav.parentLabelStyle(
+                          textTheme,
+                          color: active ? activeFg : sideFg,
+                          active: active,
+                        ),
+                      ),
                       selected: active,
                       selectedTileColor: activeBg,
                       trailing: (item.hasAddButton && canAdd)
-                          ? GestureDetector(
+                          ? _sidebarAddAffordance(
+                              nav: nav,
+                              foreground: sideFg,
+                              background: sideFg.withValues(alpha: 0.1),
                               onTap: () {
                                 context.pop();
                                 // در حال حاضر فقط اشخاص پشتیبانی می‌شود
@@ -3433,15 +3409,6 @@ class _BusinessShellState extends State<BusinessShell> {
                                   showAddDocumentDialog();
                                 }
                               },
-                              child: Container(
-                                width: 24,
-                                height: 24,
-                                decoration: BoxDecoration(
-                                  color: sideFg.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Icon(Icons.add, size: 16, color: sideFg),
-                              ),
                             )
                           : null,
                       onTap: () {
@@ -3453,13 +3420,22 @@ class _BusinessShellState extends State<BusinessShell> {
                     // فیلتر کردن زیرآیتم‌ها بر اساس دسترسی
                     final visibleChildren = (item.children ?? []).where((child) => _hasAccessToMenuItem(child)).toList();
                     return ExpansionTile(
+                      dense: true,
+                      visualDensity: VisualDensity.compact,
+                      tilePadding: nav.parentPaddingExtended,
+                      childrenPadding: EdgeInsetsDirectional.only(start: nav.iconLabelGap),
                       leading: _buildSidebarMenuIcon(
                         item,
                         color: sideFg,
-                        size: 24,
+                        size: nav.iconSizeFor(extended: true, child: false),
                         active: false,
                       ),
-                      title: Text(item.label, style: TextStyle(color: sideFg)),
+                      title: Text(
+                        item.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: nav.parentLabelStyle(textTheme, color: sideFg, active: false),
+                      ),
                       initiallyExpanded: isExpanded(item),
                       onExpansionChanged: (expanded) {
                         setState(() => _setExpandableMenuOpen(item, expanded));
@@ -3468,9 +3444,17 @@ class _BusinessShellState extends State<BusinessShell> {
                         final childSection = _sectionForLabel(child.label, t);
                         final childCanAdd = child.hasAddButton && _canAddForSection(childSection);
                         return ListTile(
-                        leading: const SizedBox(width: 24),
-                        title: Text(child.label),
-                        trailing: childCanAdd ? GestureDetector(
+                        leading: SizedBox(width: nav.childIconExtended),
+                        title: Text(
+                          child.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: nav.childLabelStyle(textTheme, color: sideFg, active: false),
+                        ),
+                        trailing: childCanAdd ? _sidebarAddAffordance(
+                          nav: nav,
+                          foreground: sideFg,
+                          background: sideFg.withValues(alpha: 0.1),
                           onTap: () {
                             context.pop();
                             // Navigate to add new item
@@ -3524,19 +3508,6 @@ class _BusinessShellState extends State<BusinessShell> {
                               showLoanFacilityCreateDialog();
                             }
                           },
-                          child: Container(
-                            width: 24,
-                            height: 24,
-                            decoration: BoxDecoration(
-                              color: sideFg.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Icon(
-                              Icons.add,
-                              size: 16,
-                              color: sideFg,
-                            ),
-                          ),
                         ) : null,
                         onTap: () {
                           context.pop();
@@ -3664,6 +3635,28 @@ class _BusinessShellState extends State<BusinessShell> {
   void _toggleExpandableMenu(_MenuItem item) {
     final key = _expandableMenuKey(item);
     _expandedMenuByKey[key] = !(_expandedMenuByKey[key] ?? false);
+  }
+
+  Widget _sidebarAddAffordance({
+    required AppShellNavMetrics nav,
+    required Color foreground,
+    required Color background,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(nav.addButtonRadius),
+        ),
+        child: SizedBox(
+          width: nav.addButtonSize,
+          height: nav.addButtonSize,
+          child: Icon(Icons.add, size: nav.addIconSize, color: foreground),
+        ),
+      ),
+    );
   }
 
   Widget _buildSidebarMenuIcon(
