@@ -762,7 +762,7 @@
           {% if invoice_footer_note %}
             <div class="footer-info-section">
               <div class="footer-info-title meta">
-                {{ 'توضیحات / متن انتهای فاکتور' if is_fa else 'Footer notes' }}
+                {{ 'توضیحات:' if is_fa else 'Description:' }}
               </div>
               <div class="meta">{{ invoice_footer_note }}</div>
             </div>
