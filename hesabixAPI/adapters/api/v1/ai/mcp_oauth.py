@@ -556,7 +556,7 @@ async function request(path,options={{}}){{
   let payload;try{{payload=await response.json()}}catch{{if(response.status===404)throw Error(`مسیر API «${{path}}» در سرور پیدا نشد (HTTP 404). سرور یا تنظیم Nginx نیاز به به‌روزرسانی دارد.`);throw Error(`پاسخ سرور معتبر نیست (HTTP ${{response.status}}). اگر خطا ادامه دارد، صفحه را دوباره باز کنید.`)}}
   const error=payload?.error&&typeof payload.error==='object'?payload.error:payload;
   if(!response.ok||payload?.success===false){{
-    const friendlyErrors={{INVALID_CAPTCHA:'کد امنیتی درست نیست. تصویر تازه بگیرید و دوباره وارد کنید.',INVALID_CREDENTIALS:'ایمیل یا شماره موبایل و رمز عبور را بررسی کنید.',INVALID_IDENTIFIER:'ایمیل یا شماره موبایل معتبر وارد کنید.',INVALID_OTP_FORMAT:'کد تایید باید ۶ رقم باشد.',OTP_NOT_FOUND:'کد تایید منقضی شده است. دوباره کد بگیرید.',SESSION_NOT_FOUND:'نشست ورود منقضی شده است. دوباره کد بگیرید.',INVALID_OTP:'کد واردشده صحیح نیست. آن را بررسی و دوباره وارد کنید.',OTP_ATTEMPTS_EXCEEDED:'تعداد تلاش مجاز تمام شده است. دوباره کد ورود بگیرید.',RATE_LIMIT_EXCEEDED:'درخواست‌های زیادی ثبت شده است. کمی صبر کنید و دوباره تلاش کنید.',CHANNEL_NOT_SUPPORTED:'روش دریافت انتخاب‌شده در دسترس نیست.',USER_NOT_FOUND:'برای این شماره یا ایمیل حساب فعالی پیدا نشد. اطلاعات ورود را بررسی کنید.'}};
+    const friendlyErrors={{INVALID_CAPTCHA:'کد امنیتی درست نیست. تصویر تازه بگیرید و دوباره وارد کنید.',INVALID_CREDENTIALS:'ایمیل یا شماره موبایل و رمز عبور را بررسی کنید.',INVALID_IDENTIFIER:'ایمیل یا شماره موبایل معتبر وارد کنید.',INVALID_OTP_FORMAT:'کد تایید باید ۶ رقم باشد.',OTP_NOT_FOUND:'کد تایید منقضی شده است. دوباره کد بگیرید.',SESSION_NOT_FOUND:'نشست ورود منقضی شده است. دوباره کد بگیرید.',INVALID_OTP:'کد واردشده صحیح نیست. آن را بررسی و دوباره وارد کنید.',OTP_ATTEMPTS_EXCEEDED:'تعداد تلاش مجاز تمام شده است. دوباره کد ورود بگیرید.',RATE_LIMIT_EXCEEDED:'درخواست‌های زیادی ثبت شده است. کمی صبر کنید و دوباره تلاش کنید.',CHANNEL_NOT_SUPPORTED:'روش دریافت انتخاب‌شده در دسترس نیست.',USER_NOT_FOUND:'برای این شماره یا ایمیل حساب فعالی پیدا نشد. اطلاعات ورود را بررسی کنید.',AI_MCP_PLUGIN_NOT_ACTIVE:'افزونه سرور MCP هوش مصنوعی برای این کسب‌وکار فعال نیست. از بازار افزونه‌ها فعال یا تمدید کنید.',AI_MCP_PLUGIN_EXPIRED:'اشتراک افزونه سرور MCP هوش مصنوعی تمام شده است. از بازار افزونه‌ها آن را تمدید کنید.'}};
     if(friendlyErrors[error?.code])throw Error(friendlyErrors[error.code]);
     if(response.status===404&&(!error?.code||error.code==='HTTP_ERROR'))throw Error(`مسیر API «${{path}}» در نسخهٔ فعلی سرور پیدا نشد (HTTP 404). صفحه را تازه کنید؛ اگر مشکل ماند، سرور باید به‌روزرسانی شود.`);
     throw Error(error?.message||payload?.detail||`درخواست ناموفق بود (HTTP ${{response.status}}).`)
@@ -587,10 +587,13 @@ async function loadConsentCatalog(){{
   try{{
     const result=await request('/ai/mcp/oauth/authorize/catalog',{{method:'POST',headers:{{'Content-Type':'application/json',Authorization:'Bearer '+sessionKey}},body:JSON.stringify({{request_id:rid,business_id:Number($('business').value)}})}});
     const plugin=result.plugin;
+    const approve=$('approve');
     if(plugin&&plugin.is_active===false){{
-      if(banner){{banner.hidden=false;banner.textContent=plugin.message||'افزونه سرور MCP هوش مصنوعی برای این کسب‌وکار فعال نیست یا اشتراک آن تمام شده است.'}}
+      if(banner){{banner.hidden=false;banner.textContent=(plugin.message||'افزونه سرور MCP هوش مصنوعی برای این کسب‌وکار فعال نیست یا اشتراک آن تمام شده است.')+' اتصال جدید تا فعال‌سازی افزونه برقرار نمی‌شود.'}}
+      if(approve)approve.disabled=true;
       consentCatalog=[];return;
     }}
+    if(approve)approve.disabled=false;
     consentCatalog=result.tools||[];const groups=new Map();
     for(const tool of consentCatalog){{const category=tool.category||'other';if(!groups.has(category))groups.set(category,[]);groups.get(category).push(tool)}}
     for(const [category,tools] of groups){{
@@ -687,8 +690,9 @@ def consent_catalog(payload: dict, request: Request, db: Session = Depends(get_d
         raise HTTPException(403, "Business access is no longer active")
     from app.core.ai_mcp_plugin_dependency import get_ai_mcp_plugin_access, mcp_oauth_catalog_envelope
 
-    catalog = _consent_tool_catalog(db, ctx, business_id)
-    return mcp_oauth_catalog_envelope(get_ai_mcp_plugin_access(db, business_id), catalog)
+    plugin_access = get_ai_mcp_plugin_access(db, business_id)
+    catalog = _consent_tool_catalog(db, ctx, business_id) if plugin_access["is_active"] else []
+    return mcp_oauth_catalog_envelope(plugin_access, catalog)
 
 
 @oauth_router.post("/authorize/consent")
@@ -739,12 +743,9 @@ def consent(payload: dict, request: Request, db: Session = Depends(get_db)) -> d
     from app.core.ai_mcp_plugin_dependency import get_ai_mcp_plugin_access
 
     plugin_access = get_ai_mcp_plugin_access(db, business_id)
-    if plugin_access["is_active"]:
-        tool_catalog = _consent_tool_catalog(db, ctx, business_id)
-    else:
-        tool_catalog = []
-        if raw_tool_permissions:
-            raise HTTPException(403, plugin_access["message"])
+    if not plugin_access["is_active"]:
+        raise HTTPException(403, plugin_access["message"])
+    tool_catalog = _consent_tool_catalog(db, ctx, business_id)
     available_tools = {tool["name"]: tool for tool in tool_catalog}
     selected_tools = set(raw_tool_permissions)
     if not selected_tools <= set(available_tools):

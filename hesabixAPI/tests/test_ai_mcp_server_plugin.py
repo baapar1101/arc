@@ -15,6 +15,7 @@ from adapters.db.seed_data.marketplace_plugins_seed import (
 )
 from app.core.ai_mcp_plugin_dependency import (
 	ERROR_CODE,
+	ERROR_CODE_EXPIRED,
 	PLUGIN_CODE,
 	STATUS_TOOL_NAME,
 	check_ai_mcp_plugin_active,
@@ -126,9 +127,13 @@ def test_plugin_access_reason_missing_expired_active():
 def test_require_blocks_new_connection_when_inactive():
 	with pytest.raises(ApiError) as exc:
 		require_ai_mcp_plugin_active(_mock_db(expired=True), 1)
-	assert exc.value.code == ERROR_CODE
+	assert exc.value.code == ERROR_CODE_EXPIRED
 	assert exc.value.status_code == 403
 	assert "تمام شده" in exc.value.message
+	assert exc.value.details["required_action"] == "renew_plugin"
+	with pytest.raises(ApiError) as missing:
+		require_ai_mcp_plugin_active(_mock_db(business_active=False), 1)
+	assert missing.value.code == ERROR_CODE
 	assert check_ai_mcp_plugin_active(_mock_db(), 1) is True
 
 
@@ -141,8 +146,9 @@ def test_mcp_initialize_warns_when_plugin_expired():
 
 def test_mcp_tools_list_only_status_when_inactive():
 	result = _run({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}, INACTIVE)
-	names = [item["name"] for item in result["result"]["tools"]]
-	assert names == [STATUS_TOOL_NAME]
+	tools = result["result"]["tools"]
+	assert [item["name"] for item in tools] == [STATUS_TOOL_NAME]
+	assert "تمام شده" in tools[0]["description"]
 
 
 def test_mcp_tools_call_data_tool_returns_user_warning():
@@ -162,6 +168,28 @@ def test_mcp_status_tool_always_callable():
 	assert result["result"]["isError"] is False
 	assert "ai_mcp_server" in result["result"]["content"][0]["text"]
 	assert "expired" in result["result"]["content"][0]["text"]
+
+
+def test_mcp_discover_is_not_publicly_cached_when_inactive():
+	result = _run(
+		{
+			"jsonrpc": "2.0",
+			"id": 8,
+			"method": "server/discover",
+			"params": {"_meta": {"io.modelcontextprotocol/protocolVersion": "2026-07-28"}},
+		},
+		INACTIVE,
+	)
+	assert result["result"]["cacheScope"] == "private"
+	assert result["result"]["ttlMs"] == 0
+	assert "تمام شده" in result["result"]["instructions"]
+
+
+def test_mcp_hides_business_overview_when_inactive():
+	listed = _run({"jsonrpc": "2.0", "id": 9, "method": "resources/list", "params": {}}, INACTIVE)
+	uris = [item["uri"] for item in listed["result"]["resources"]]
+	assert uris == ["hesabix://mcp/capabilities"]
+	assert "hesabix://business/overview" not in uris
 
 
 def test_mcp_hides_agent_and_prompts_when_inactive():
@@ -203,6 +231,9 @@ def test_manual_connection_endpoint_requires_plugin():
 	oauth = (Path(__file__).resolve().parents[1] / "adapters" / "api" / "v1" / "ai" / "mcp_oauth.py").read_text(encoding="utf-8")
 	assert "pluginBanner" in oauth
 	assert "mcp_oauth_catalog_envelope" in oauth
+	assert "approve.disabled=true" in oauth
+	assert 'raise HTTPException(403, plugin_access["message"])' in oauth
+	assert "if raw_tool_permissions:" not in oauth
 
 
 def test_in_app_chat_is_not_gated_by_mcp_plugin():

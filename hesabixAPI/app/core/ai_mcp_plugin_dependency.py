@@ -21,6 +21,7 @@ PLUGIN_NAME_FA = "سرور MCP هوش مصنوعی"
 STATUS_TOOL_NAME = "get_ai_mcp_plugin_status"
 MARKETPLACE_PATH = "/plugin-marketplace"
 ERROR_CODE = "AI_MCP_PLUGIN_NOT_ACTIVE"
+ERROR_CODE_EXPIRED = "AI_MCP_PLUGIN_EXPIRED"
 
 _STATUS_DESCRIPTION = (
 	"وضعیت افزونه سرور MCP هوش مصنوعی برای همین کسب‌وکار. "
@@ -87,10 +88,16 @@ def mcp_plugin_inactive_instructions(access: Mapping[str, Any]) -> str:
 	)
 
 
-def mcp_status_tool_descriptor() -> Dict[str, Any]:
+def mcp_status_tool_descriptor(access: Mapping[str, Any] | None = None) -> Dict[str, Any]:
+	description = _STATUS_DESCRIPTION
+	if access and not access.get("is_active"):
+		description = (
+			f"{access.get('message') or ai_mcp_plugin_user_message(PLUGIN_ACCESS_MISSING)} "
+			"این متن را عیناً به کاربر بگو و داده حسابداری را حدس نزن."
+		)
 	return {
 		"name": STATUS_TOOL_NAME,
-		"description": _STATUS_DESCRIPTION,
+		"description": description,
 		"inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
 		"annotations": {
 			"readOnlyHint": True,
@@ -140,29 +147,33 @@ def apply_visible_catalog_plugin_gate(
 	return sorted(out, key=lambda item: str(item.get("name") or ""))
 
 
-def inject_mcp_status_tool(tools: MutableSequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def inject_mcp_status_tool(
+	tools: MutableSequence[Dict[str, Any]],
+	access: Mapping[str, Any] | None = None,
+) -> List[Dict[str, Any]]:
 	filtered = [item for item in tools if item.get("name") != STATUS_TOOL_NAME]
-	filtered.append(mcp_status_tool_descriptor())
+	filtered.append(mcp_status_tool_descriptor(access))
 	filtered.sort(key=lambda item: str(item.get("name") or ""))
 	return filtered
 
 
-def restricted_mcp_tool_list() -> List[Dict[str, Any]]:
-	return [mcp_status_tool_descriptor()]
+def restricted_mcp_tool_list(access: Mapping[str, Any] | None = None) -> List[Dict[str, Any]]:
+	return [mcp_status_tool_descriptor(access)]
 
 
 def require_ai_mcp_plugin_active(db: Session, business_id: int) -> Dict[str, Any]:
 	access = get_ai_mcp_plugin_access(db, business_id)
 	if access["is_active"]:
 		return access
+	expired = access["reason"] == PLUGIN_ACCESS_EXPIRED
 	raise ApiError(
-		ERROR_CODE,
+		ERROR_CODE_EXPIRED if expired else ERROR_CODE,
 		access["message"],
 		http_status=403,
 		details={
 			"plugin_code": PLUGIN_CODE,
 			"reason": access["reason"],
-			"required_action": "activate_plugin" if access["reason"] != PLUGIN_ACCESS_EXPIRED else "renew_plugin",
+			"required_action": "renew_plugin" if expired else "activate_plugin",
 			"marketplace_url": MARKETPLACE_PATH,
 		},
 	)

@@ -13,6 +13,7 @@ from app.core.ai_mcp_plugin_dependency import (
     get_ai_mcp_plugin_access,
     inject_mcp_status_tool,
     mcp_plugin_inactive_instructions,
+    mcp_status_catalog_item,
     public_ai_mcp_plugin_access,
     restricted_mcp_tool_list,
 )
@@ -262,8 +263,8 @@ async def handle_mcp_request(
                 "prompts": {"listChanged": False},
             },
             "instructions": mcp_instructions,
-            "ttlMs": 300000,
-            "cacheScope": "public",
+            "ttlMs": 0 if not channel_open else 300000,
+            "cacheScope": "private" if not channel_open else "public",
         })
 
     if method == "initialize":
@@ -293,8 +294,15 @@ async def handle_mcp_request(
         return _jsonrpc_result(req_id, {})
 
     if method == "resources/list":
-        return _jsonrpc_result(req_id, {
-            "resources": [{
+        if not channel_open:
+            resources = [{
+                "uri": "hesabix://mcp/capabilities",
+                "name": "وضعیت افزونه MCP",
+                "description": str(plugin_public.get("message") or ""),
+                "mimeType": "application/json",
+            }]
+        else:
+            resources = [{
                 "uri": "hesabix://business/overview",
                 "name": "نمای کلی کسب‌وکار",
                 "description": "اطلاعات پایه کسب‌وکاری که این اتصال به آن محدود است.",
@@ -304,14 +312,20 @@ async def handle_mcp_request(
                 "name": "قابلیت‌های مجاز اتصال",
                 "description": "فهرست ابزارها، دسته‌ها، نوع اثر و مجوزهای لازم که برای همین کاربر و اتصال قابل استفاده‌اند.",
                 "mimeType": "application/json",
-            }],
+            }]
+        return _jsonrpc_result(req_id, {
+            "resources": resources,
             **({"resultType": "complete", "ttlMs": 0, "cacheScope": "private"} if modern else {}),
         })
 
     if method == "resources/read":
         uri = params.get("uri")
         if uri == "hesabix://mcp/capabilities":
-            catalog = _visible_tool_catalog(db, ctx, eff_business)
+            catalog = (
+                [mcp_status_catalog_item(plugin_access)]
+                if not channel_open
+                else _visible_tool_catalog(db, ctx, eff_business)
+            )
             categories: Dict[str, int] = {}
             for item in catalog:
                 categories[item["category"]] = categories.get(item["category"], 0) + 1
@@ -402,7 +416,7 @@ async def handle_mcp_request(
 
     if method == "tools/list":
         if not channel_open:
-            tools = restricted_mcp_tool_list()
+            tools = restricted_mcp_tool_list(plugin_access)
         else:
             registry, definitions = _get_tools(db, ctx, eff_business)
             tools = []
@@ -426,7 +440,7 @@ async def handle_mcp_request(
                         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": False, "openWorldHint": False},
                     }
                 )
-            tools = inject_mcp_status_tool(tools)
+            tools = inject_mcp_status_tool(tools, plugin_access)
         cursor = params.get("cursor")
         try:
             offset = max(0, int(cursor)) if cursor is not None else 0
