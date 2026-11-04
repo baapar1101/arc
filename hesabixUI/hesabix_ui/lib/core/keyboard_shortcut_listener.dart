@@ -177,20 +177,23 @@ class _KeyboardShortcutListenerState extends State<KeyboardShortcutListener> {
       return false;
     }
 
-    // شروع Hold روی Q
-    if (_keysMatch(key, LogicalKeyboardKey.keyQ) && !_aiArmed) {
-      if (_qKeyDown) return true; // تکرار auto-repeat را نادیده بگیر
-      _qKeyDown = true;
-      _keySequence.clear(); // hold نباید وارد بافر ایستر‌اگ شود
-      _cancelQHold();
-      _qHoldTimer = Timer(_qHoldDuration, _onQHoldComplete);
-      return true; // Q را برای ایستر‌اگ نگه می‌داریم تا KeyUp
+    // Auto-repeat روی Q نباید ایستر‌اگ را خراب کند یا AI را disarm کند.
+    if (_keysMatch(key, LogicalKeyboardKey.keyQ) && _qKeyDown) {
+      return true;
     }
 
-    // کلید دیگر هنگام شمارش Hold → لغو Hold (نه arm)
+    // شروع Hold روی Q — خود Q باید همان لحظه به ایستر‌اگ برسد
+    // (q+jam / q+hesabix)، وگرنه همپوشانی کلیدها قبل از KeyUp توالی را می‌شکند.
+    if (_keysMatch(key, LogicalKeyboardKey.keyQ) && !_aiArmed) {
+      _qKeyDown = true;
+      _cancelQHold();
+      _qHoldTimer = Timer(_qHoldDuration, _onQHoldComplete);
+      return false;
+    }
+
+    // کلید دیگر هنگام شمارش Hold → این Hold نیست؛ ایستر‌اگ ادامه دهد.
     if (_qHoldTimer != null && _qHoldTimer!.isActive) {
       _cancelQHold();
-      _qKeyDown = false;
       return false;
     }
 
@@ -208,8 +211,9 @@ class _KeyboardShortcutListenerState extends State<KeyboardShortcutListener> {
         }
         return true;
       }
-      // کلید اشتباه → لغو حالت AI
+      // کلید اشتباه → لغو AI و برگرداندن Q تا jam / hesabix ادامه پیدا کنند.
       _disarmAi();
+      _ensureEasterEggStartsWithQ();
       return false;
     }
 
@@ -219,24 +223,20 @@ class _KeyboardShortcutListenerState extends State<KeyboardShortcutListener> {
   void _handleKeyUp(KeyUpEvent event) {
     if (!_keysMatch(event.logicalKey, LogicalKeyboardKey.keyQ)) return;
 
-    final wasDown = _qKeyDown;
     _qKeyDown = false;
 
-    if (!wasDown) return;
-
-    // Hold هنوز کامل نشده → tap کوتاه = شروع ایستر‌اگ با Q
+    // Tap کوتاه: تایمر Hold لغو شود. Q از KeyDown در بافر ایستر‌اگ است.
     if (_qHoldTimer != null && _qHoldTimer!.isActive) {
       _cancelQHold();
-      if (!AiQuickStart.isTextInputFocused()) {
-        _keySequence
-          ..clear()
-          ..add(LogicalKeyboardKey.keyQ);
-        _lastKeyPressTime = DateTime.now();
-      }
-      return;
     }
-
     // Hold کامل شده بود؛ رها کردن Q حالت مسلح را نگه می‌دارد تا timeout
+  }
+
+  void _ensureEasterEggStartsWithQ() {
+    if (_keySequence.isNotEmpty) return;
+    if (AiQuickStart.isTextInputFocused()) return;
+    _keySequence.add(LogicalKeyboardKey.keyQ);
+    _lastKeyPressTime = DateTime.now();
   }
 
   void _onQHoldComplete() {
