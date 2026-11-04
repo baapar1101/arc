@@ -2801,6 +2801,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pluginMarketplaceViewAndBuy => 'View & purchase';
 
   @override
+  String get pluginMarketplaceViewDetails => 'View details';
+
+  @override
+  String get pluginMarketplaceIncluded =>
+      'Included for every business — no purchase needed.';
+
+  @override
+  String get pluginMarketplaceNotForSale =>
+      'This add-on is not available for purchase.';
+
+  @override
   String get pluginMarketplaceReadMore => 'Read more';
 
   @override
@@ -6582,7 +6593,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get uniqueInstanceSearchHint => 'Search serial, barcode, or attributes';
+  String get uniqueInstanceSearchHint =>
+      'Search serial, barcode, or attributes';
 
   @override
   String get uniqueWarehouseSearchHint => 'Search serial or barcode';
@@ -6646,6 +6658,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get productionLotsSaved => 'Lots saved';
+
+  @override
+  String get aiToolListInventoryLots => 'Dated lot balances';
+
+  @override
+  String get aiToolGetExpiryStockReport => 'Expiry stock report';
 
   @override
   String get productTrackExpiry => 'Track manufacturing and expiry dates';
@@ -11666,12 +11684,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiToolGetWarehouseStockSummary => 'Warehouse stock summary';
-
-  @override
-  String get aiToolListInventoryLots => 'Dated lot balances';
-
-  @override
-  String get aiToolGetExpiryStockReport => 'Expiry stock report';
 
   @override
   String get aiToolSearchChecks => 'Search checks';

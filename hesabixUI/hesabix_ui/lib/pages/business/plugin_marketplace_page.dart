@@ -129,17 +129,39 @@ class _PluginMarketplacePageState extends State<PluginMarketplacePage> with Sing
     }).toList();
   }
 
+  Map<String, dynamic> _catalogOrLicensePlugin(Map<String, dynamic> license) {
+    final id = (license['plugin_id'] as num?)?.toInt();
+    if (id != null) {
+      for (final plugin in _plugins) {
+        if ((plugin['id'] as num?)?.toInt() == id) return plugin;
+      }
+    }
+    return {
+      'id': license['plugin_id'],
+      'code': license['plugin_code'],
+      'name': license['plugin_name'] ?? license['plugin_code'] ?? '-',
+      'description': null,
+      'category': null,
+      'icon_url': null,
+      'plans': const <Map<String, dynamic>>[],
+      'trial_allowed': false,
+      'trial_days': null,
+      'purchasable': false,
+      'listed_in_marketplace': false,
+      'enabled_for_all_businesses': marketplaceJsonBool(license['globally_enabled']),
+    };
+  }
+
   List<Map<String, dynamic>> _filteredPlugins({required bool myTab}) {
     final q = _searchController.text.trim().toLowerCase();
-    Iterable<Map<String, dynamic>> list = _visiblePlugins;
+    Iterable<Map<String, dynamic>> list;
 
     if (myTab) {
-      final licensedIds = _businessPlugins
-          .where((bp) => bp.isNotEmpty)
-          .map((bp) => (bp['plugin_id'] as num?)?.toInt())
-          .whereType<int>()
-          .toSet();
-      list = list.where((p) => licensedIds.contains((p['id'] as num?)?.toInt()));
+      list = _businessPlugins
+          .where((bp) => bp.isNotEmpty && !pluginLicenseIsSystemDefault(bp))
+          .map(_catalogOrLicensePlugin);
+    } else {
+      list = _visiblePlugins;
     }
 
     if (_categoryFilter != null && _categoryFilter!.isNotEmpty) {
@@ -169,7 +191,10 @@ class _PluginMarketplacePageState extends State<PluginMarketplacePage> with Sing
   }
 
   int get _activePluginCount {
-    return _businessPlugins.where((bp) => bp['is_active'] == true || bp['is_trial'] == true).length;
+    return _businessPlugins.where((bp) {
+      if (pluginLicenseIsSystemDefault(bp)) return false;
+      return bp['is_active'] == true || bp['is_trial'] == true;
+    }).length;
   }
 
   Future<void> _startTrial(int pluginId) async {
@@ -200,6 +225,7 @@ class _PluginMarketplacePageState extends State<PluginMarketplacePage> with Sing
     if (raw.contains('TRIAL_ALREADY_USED')) return t.pluginMarketplaceStatusTrialExpired;
     if (raw.contains('TRIAL_NOT_ALLOWED')) return t.pluginMarketplaceStatusTrialExpired;
     if (raw.contains('PLUGIN_ALREADY_ACTIVE')) return t.pluginMarketplaceStatusActive;
+    if (raw.contains('PLUGIN_NOT_FOR_SALE')) return t.pluginMarketplaceNotForSale;
     return '${t.pluginMarketplaceError}: ${ErrorExtractor.forContext(e, context)}';
   }
 
@@ -239,6 +265,7 @@ class _PluginMarketplacePageState extends State<PluginMarketplacePage> with Sing
     final t = AppLocalizations.of(context);
     final raw = e.toString();
     if (raw.contains('PLUGIN_NOT_FOUND')) return t.pluginMarketplaceError;
+    if (raw.contains('PLUGIN_NOT_FOR_SALE')) return t.pluginMarketplaceNotForSale;
     if (raw.contains('PLAN_NOT_FOUND')) return t.pluginMarketplaceError;
     return '${t.pluginMarketplaceError}: ${ErrorExtractor.forContext(e, context)}';
   }
@@ -365,11 +392,13 @@ class _PluginMarketplacePageState extends State<PluginMarketplacePage> with Sing
       plugin: plugin,
       pluginStatus: status,
       walletCurrency: _walletCurrency,
-      canBuy: _canBuy,
-      trialAllowed: trialAllowed,
+      canBuy: _canBuy && pluginIsPurchasable(plugin),
+      trialAllowed: trialAllowed && pluginIsPurchasable(plugin),
       trialDays: trialDays,
       hasUsedTrial: hasUsedTrial(status),
-      onStartTrial: trialAllowed && !hasUsedTrial(status)
+      onStartTrial: trialAllowed &&
+              pluginIsPurchasable(plugin) &&
+              !hasUsedTrial(status)
           ? () => _startTrial(pluginId)
           : null,
       onPurchasePlan: (pl) {
@@ -611,7 +640,7 @@ class _PluginMarketplacePageState extends State<PluginMarketplacePage> with Sing
       plugin: plugin,
       pluginStatus: status,
       walletCurrency: _walletCurrency,
-      trialAllowed: plugin['trial_allowed'] == true,
+      trialAllowed: plugin['trial_allowed'] == true && pluginIsPurchasable(plugin),
       trialDays: plugin['trial_days'] as int?,
       onOpen: () => _openPluginDetail(plugin),
     );

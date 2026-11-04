@@ -7,6 +7,7 @@ import '../../utils/snackbar_helper.dart';
 import '../../utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
+import 'package:hesabix_ui/widgets/marketplace/plugin_marketplace_utils.dart';
 
 class MarketplacePluginsAdminPage extends StatefulWidget {
   const MarketplacePluginsAdminPage({super.key});
@@ -122,8 +123,16 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
     final categoryController = TextEditingController(text: initialData?['category'] ?? '');
     final iconUrlController = TextEditingController(text: initialData?['icon_url'] ?? '');
     final trialDaysController = TextEditingController(text: initialData?['trial_days']?.toString() ?? '');
-    bool isActive = initialData?['is_active'] ?? true;
-    bool trialAllowed = initialData?['trial_allowed'] ?? false;
+    bool isActive = initialData == null || !initialData.containsKey('is_active')
+        ? true
+        : marketplaceJsonBool(initialData['is_active']);
+    bool listedInMarketplace =
+        initialData == null || !initialData.containsKey('listed_in_marketplace')
+            ? true
+            : marketplaceJsonBool(initialData['listed_in_marketplace']);
+    bool enabledForAllBusinesses =
+        marketplaceJsonBool(initialData?['enabled_for_all_businesses']);
+    bool trialAllowed = marketplaceJsonBool(initialData?['trial_allowed']);
 
     await showDialog(
       context: context,
@@ -246,9 +255,22 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                             ),
                             const SizedBox(height: 16),
                             CheckboxListTile(
-                              title: const Text('فعال'),
+                              title: const Text('فعال در سیستم'),
+                              subtitle: const Text('اگر خاموش باشد افزونه برای هیچ کسب‌وکاری کار نمی‌کند'),
                               value: isActive,
                               onChanged: (v) => setDialogState(() => isActive = v ?? true),
+                            ),
+                            CheckboxListTile(
+                              title: const Text('نمایش در بازار افزونه‌ها'),
+                              subtitle: const Text('در کاتالوگ قابل خرید کسب‌وکارها دیده شود'),
+                              value: listedInMarketplace,
+                              onChanged: (v) => setDialogState(() => listedInMarketplace = v ?? true),
+                            ),
+                            CheckboxListTile(
+                              title: const Text('فعال برای همه کسب‌وکارها'),
+                              subtitle: const Text('بدون خرید، برای همه کسب‌وکارهای فعلی و بعدی فعال می‌ماند'),
+                              value: enabledForAllBusinesses,
+                              onChanged: (v) => setDialogState(() => enabledForAllBusinesses = v ?? false),
                             ),
                             CheckboxListTile(
                               title: const Text('مجاز به trial'),
@@ -300,6 +322,8 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                                       ? null 
                                       : iconUrlController.text.trim(),
                                   'is_active': isActive,
+                                  'listed_in_marketplace': listedInMarketplace,
+                                  'enabled_for_all_businesses': enabledForAllBusinesses,
                                   'trial_allowed': trialAllowed && trialDaysValue != null && trialDaysValue > 0,
                                   'trial_days': trialDaysValue,
                                 };
@@ -656,7 +680,16 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
             child: ExpansionTile(
               leading: Icon(Icons.extension, color: theme.colorScheme.primary),
               title: Text(plugin['name'] ?? '-'),
-              subtitle: Text(plugin['code'] ?? '-'),
+              subtitle: Text(
+                [
+                  plugin['code'] ?? '-',
+                  if (plugin['is_active'] != true) 'غیرفعال در سیستم',
+                  if (plugin.containsKey('listed_in_marketplace') &&
+                      !marketplaceJsonBool(plugin['listed_in_marketplace']))
+                    'مخفی از بازار',
+                  if (marketplaceJsonBool(plugin['enabled_for_all_businesses'])) 'سراسری',
+                ].join(' • '),
+              ),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

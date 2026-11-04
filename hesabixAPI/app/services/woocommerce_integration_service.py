@@ -21,6 +21,7 @@ from app.core.woocommerce_dev_flags import (
 )
 from app.core.woocommerce_bridge_rate_limit import enforce_woocommerce_bridge_rate_limit
 from app.core.woocommerce_bridge_security import validate_woocommerce_store_base_url
+from app.core.plugin_license import ensure_plugin_config_row, get_business_plugin_row
 from app.core.woocommerce_plugin_dependency import PLUGIN_CODE, check_woocommerce_plugin_active
 from app.services.encryption_service import get_encryption_service
 
@@ -172,18 +173,15 @@ def _find_plugin_row(db: Session) -> MarketplacePlugin:
 	return plugin
 
 
-def _find_business_plugin(db: Session, business_id: int) -> BusinessPlugin:
+def _find_business_plugin(db: Session, business_id: int, *, create_if_global: bool = False) -> BusinessPlugin:
 	plugin = _find_plugin_row(db)
-	row = (
-		db.query(BusinessPlugin)
-		.filter(
-			BusinessPlugin.business_id == int(business_id),
-			BusinessPlugin.plugin_id == plugin.id,
-		)
-		.first()
-	)
+	row = get_business_plugin_row(db, business_id, int(plugin.id))
 	if row:
 		return row
+	if create_if_global:
+		row = ensure_plugin_config_row(db, business_id, plugin)
+		if row:
+			return row
 	raise ApiError(
 		"WOOCOMMERCE_LICENSE_NOT_FOUND",
 		"افزونهٔ ووکامرس برای این کسب‌وکار از بازار فعال یا ثبت نشده است؛ ابتدا از «بازار افزونه‌ها» آن را فعال کنید.",
@@ -261,8 +259,9 @@ def get_settings(db: Session, business_id: int) -> Dict[str, Any]:
 			http_status=403,
 			details={"plugin_code": PLUGIN_CODE},
 		)
-	row = _find_business_plugin(db, business_id)
-	extra = _json_loads_safe(row.extra_info)
+	plugin = _find_plugin_row(db)
+	row = get_business_plugin_row(db, business_id, int(plugin.id))
+	extra = _json_loads_safe(row.extra_info) if row is not None else {}
 	saved = extra.get(EXTRA_INFO_KEY)
 	if not isinstance(saved, dict):
 		saved = _default_settings()
@@ -278,7 +277,7 @@ def update_settings(db: Session, business_id: int, payload: Dict[str, Any]) -> D
 			http_status=403,
 			details={"plugin_code": PLUGIN_CODE},
 		)
-	row = _find_business_plugin(db, business_id)
+	row = _find_business_plugin(db, business_id, create_if_global=True)
 	extra = _json_loads_safe(row.extra_info)
 	prev = extra.get(EXTRA_INFO_KEY) if isinstance(extra.get(EXTRA_INFO_KEY), dict) else _default_settings()
 	settings = _normalize_settings(payload or {}, prev)
@@ -309,8 +308,9 @@ def _load_bridge_credentials(db: Session, business_id: int) -> Tuple[str, str]:
 			http_status=403,
 			details={"plugin_code": PLUGIN_CODE},
 		)
-	row = _find_business_plugin(db, business_id)
-	extra = _json_loads_safe(row.extra_info)
+	plugin = _find_plugin_row(db)
+	row = get_business_plugin_row(db, business_id, int(plugin.id))
+	extra = _json_loads_safe(row.extra_info) if row is not None else {}
 	saved = extra.get(EXTRA_INFO_KEY)
 	if not isinstance(saved, dict):
 		saved = _default_settings()

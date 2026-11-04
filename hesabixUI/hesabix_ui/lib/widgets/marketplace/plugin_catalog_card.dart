@@ -38,10 +38,16 @@ class PluginCatalogCard extends StatelessWidget {
     final symbol = plans.isNotEmpty
         ? currencySymbolFromPlan(plans.first, walletCurrency)
         : walletCurrency;
-    final fromPrice = minPrice != null ? t.pluginMarketplaceFromPrice(formatPluginPrice(minPrice, symbol)) : null;
+    final purchasable = pluginIsPurchasable(plugin);
+    final fromPrice = purchasable && minPrice != null
+        ? t.pluginMarketplaceFromPrice(formatPluginPrice(minPrice, symbol))
+        : null;
     final highlights = pluginDescriptionHighlights(description);
     final isPurchased = pluginStatus != null && pluginStatus!.isNotEmpty;
     final showTrialChip = trialAllowed && !isPurchased && !hasUsedTrial(pluginStatus);
+    final actionLabel = purchasable
+        ? t.pluginMarketplaceViewAndBuy
+        : t.pluginMarketplaceViewDetails;
 
     return Semantics(
       button: true,
@@ -153,7 +159,7 @@ class PluginCatalogCard extends StatelessWidget {
                           ),
                         FilledButton.tonal(
                           onPressed: onOpen,
-                          child: Text(t.pluginMarketplaceViewAndBuy),
+                          child: Text(actionLabel),
                         ),
                       ],
                     ),

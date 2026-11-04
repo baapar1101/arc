@@ -31,6 +31,7 @@ from adapters.db.models.product import Product
 from adapters.db.models.marketplace import BusinessPlugin, MarketplacePlugin
 from fastapi import HTTPException
 from app.core.basalam_plugin_dependency import check_basalam_plugin_active
+from app.core.plugin_license import ensure_plugin_config_row, get_business_plugin_row
 from app.core.business_calendar import business_today
 from app.core.cache import get_cache
 from app.core.responses import ApiError
@@ -95,19 +96,15 @@ def _find_plugin_row(db: Session) -> MarketplacePlugin:
     return plugin
 
 
-def _find_business_plugin(db: Session, business_id: int) -> BusinessPlugin:
+def _find_business_plugin(db: Session, business_id: int, *, create_if_global: bool = False) -> BusinessPlugin:
     plugin = _find_plugin_row(db)
-    row = (
-        db.query(BusinessPlugin)
-        .filter(
-            BusinessPlugin.business_id == int(business_id),
-            BusinessPlugin.plugin_id == plugin.id,
-        )
-        .first()
-    )
+    row = get_business_plugin_row(db, business_id, int(plugin.id))
     if row:
         return row
-
+    if create_if_global:
+        row = ensure_plugin_config_row(db, business_id, plugin)
+        if row:
+            return row
     raise ApiError(
         "BASALAM_LICENSE_NOT_FOUND",
         "Basalam license row for this business was not found.",
@@ -237,7 +234,6 @@ def _normalize_settings(payload: Dict[str, Any], previous: Optional[Dict[str, An
 
 
 def get_settings(db: Session, business_id: int) -> Dict[str, Any]:
-    row = _find_business_plugin(db, business_id)
     if not check_basalam_plugin_active(db, int(business_id)):
         raise ApiError(
             "BASALAM_PLUGIN_NOT_ACTIVE",
@@ -245,7 +241,9 @@ def get_settings(db: Session, business_id: int) -> Dict[str, Any]:
             http_status=403,
             details={"plugin_code": PLUGIN_CODE},
         )
-    extra = _json_loads_safe(row.extra_info)
+    plugin = _find_plugin_row(db)
+    row = get_business_plugin_row(db, business_id, int(plugin.id))
+    extra = _json_loads_safe(row.extra_info) if row is not None else {}
     saved = extra.get(EXTRA_INFO_KEY)
     if not isinstance(saved, dict):
         saved = _default_settings()
@@ -253,7 +251,6 @@ def get_settings(db: Session, business_id: int) -> Dict[str, Any]:
 
 
 def update_settings(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
-    row = _find_business_plugin(db, business_id)
     if not check_basalam_plugin_active(db, int(business_id)):
         raise ApiError(
             "BASALAM_PLUGIN_NOT_ACTIVE",
@@ -261,6 +258,7 @@ def update_settings(db: Session, business_id: int, payload: Dict[str, Any]) -> D
             http_status=403,
             details={"plugin_code": PLUGIN_CODE},
         )
+    row = _find_business_plugin(db, business_id, create_if_global=True)
     extra = _json_loads_safe(row.extra_info)
     prev = extra.get(EXTRA_INFO_KEY) if isinstance(extra.get(EXTRA_INFO_KEY), dict) else _default_settings()
     settings = _normalize_settings(payload or {}, prev)

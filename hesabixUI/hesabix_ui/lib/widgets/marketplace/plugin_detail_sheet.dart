@@ -81,7 +81,9 @@ class _PluginDetailSheetState extends State<PluginDetailSheet> {
     final description = t.branded(widget.plugin['description']?.toString() ?? '');
     final plans = (widget.plugin['plans'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
     final isPurchased = widget.pluginStatus != null && widget.pluginStatus!.isNotEmpty;
-    final showTrial = widget.trialAllowed && !isPurchased && !widget.hasUsedTrial;
+    final purchasable = pluginIsPurchasable(widget.plugin);
+    final included = pluginIsGloballyEnabled(widget.plugin, widget.pluginStatus);
+    final showTrial = widget.trialAllowed && !isPurchased && !widget.hasUsedTrial && purchasable;
 
     final mq = MediaQuery.of(context);
     final maxH = mq.size.height * 0.92;
@@ -149,6 +151,19 @@ class _PluginDetailSheetState extends State<PluginDetailSheet> {
                           child: Text(_expandedDescription ? t.pluginMarketplaceReadLess : t.pluginMarketplaceReadMore),
                         ),
                     ],
+                    if (included) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        t.pluginMarketplaceIncluded,
+                        style: theme.textTheme.bodyMedium?.copyWith(color: cs.primary),
+                      ),
+                    ] else if (!purchasable) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        t.pluginMarketplaceNotForSale,
+                        style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                    ],
                     if (showTrial && widget.onStartTrial != null) ...[
                       const SizedBox(height: 12),
                       OutlinedButton.icon(
@@ -157,7 +172,7 @@ class _PluginDetailSheetState extends State<PluginDetailSheet> {
                         label: Text(t.pluginMarketplaceStartTrial),
                       ),
                     ],
-                    if (plans.isNotEmpty) ...[
+                    if (purchasable && plans.isNotEmpty) ...[
                       const SizedBox(height: 16),
                       PluginPricingSelector(
                         plans: plans,

@@ -282,6 +282,7 @@ def ensure_default_marketplace_plugins(db: Session) -> Dict[str, Any]:
 			row.trial_allowed = spec.trial_allowed
 			row.is_active = True
 			row.updated_at = now
+			# listed_in_marketplace و enabled_for_all_businesses تنظیمات ادمین هستند و بازنویسی نمی‌شوند.
 		else:
 			created_plugins += 1
 			row = MarketplacePlugin(
@@ -291,6 +292,8 @@ def ensure_default_marketplace_plugins(db: Session) -> Dict[str, Any]:
 				category=spec.category,
 				icon_url=spec.icon_url,
 				is_active=True,
+				listed_in_marketplace=True,
+				enabled_for_all_businesses=False,
 				trial_days=spec.trial_days,
 				trial_allowed=spec.trial_allowed,
 			)

@@ -12,6 +12,8 @@ from sqlalchemy import (
 	Numeric,
 	Boolean,
 	Text,
+	true as sa_true,
+	false as sa_false,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -31,6 +33,12 @@ class MarketplacePlugin(Base):
 	category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 	icon_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 	is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+	listed_in_marketplace: Mapped[bool] = mapped_column(
+		Boolean, nullable=False, default=True, server_default=sa_true()
+	)
+	enabled_for_all_businesses: Mapped[bool] = mapped_column(
+		Boolean, nullable=False, default=False, server_default=sa_false()
+	)
 	trial_days: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # تعداد روزهای trial (مثلاً 7 روز)
 	trial_allowed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # آیا trial مجاز است
 

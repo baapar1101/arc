@@ -8,7 +8,14 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from adapters.db.models.marketplace import MarketplacePlugin, BusinessPlugin
+from app.core.plugin_license import (
+    SOURCE_SYSTEM_DEFAULT,
+    is_plugin_active,
+    plugin_is_globally_enabled,
+)
 from app.core.responses import ApiError
+
+PLUGIN_CODE = "repair_shop_management"
 
 
 def check_repair_shop_plugin_active(db: Session, business_id: int) -> bool:
@@ -22,36 +29,7 @@ def check_repair_shop_plugin_active(db: Session, business_id: int) -> bool:
     Returns:
         True اگر افزونه فعال باشد، False در غیر این صورت
     """
-    # پیدا کردن افزونه در marketplace
-    plugin = db.query(MarketplacePlugin).filter(
-        MarketplacePlugin.code == 'repair_shop_management',
-        MarketplacePlugin.is_active == True  # noqa: E712
-    ).first()
-    
-    if not plugin:
-        return False
-    
-    # بررسی لایسنس کسب‌وکار
-    license = db.query(BusinessPlugin).filter(
-        BusinessPlugin.business_id == business_id,
-        BusinessPlugin.plugin_id == plugin.id,
-        BusinessPlugin.status == 'active'
-    ).first()
-    
-    if not license:
-        return False
-    
-    # بررسی تاریخ انقضا
-    if license.ends_at:
-        ends_at_val = (
-            license.ends_at.date()
-            if isinstance(license.ends_at, datetime)
-            else license.ends_at
-        )
-        if ends_at_val < datetime.utcnow().date():
-            return False
-    
-    return True
+    return is_plugin_active(db, business_id, PLUGIN_CODE)
 
 
 def require_repair_shop_plugin(business_id_param: str = 'business_id'):
@@ -89,7 +67,7 @@ def require_repair_shop_plugin(business_id_param: str = 'business_id'):
                 raise ApiError("PLUGIN_NOT_ACTIVE", "PLUGIN_NOT_ACTIVE",
                     http_status=403,
                     details={
-                        "plugin_code": "repair_shop_management",
+                        "plugin_code": PLUGIN_CODE,
                         "required_action": "activate_plugin",
                         "marketplace_url": "/marketplace"
                     }
@@ -108,7 +86,7 @@ def get_repair_shop_plugin_info(db: Session) -> Optional[dict]:
         دیکشنری حاوی اطلاعات افزونه یا None
     """
     plugin = db.query(MarketplacePlugin).filter(
-        MarketplacePlugin.code == 'repair_shop_management'
+        MarketplacePlugin.code == PLUGIN_CODE
     ).first()
     
     if not plugin:
@@ -135,7 +113,7 @@ def get_business_plugin_status(db: Session, business_id: int) -> dict:
         دیکشنری حاوی وضعیت افزونه
     """
     plugin = db.query(MarketplacePlugin).filter(
-        MarketplacePlugin.code == 'repair_shop_management'
+        MarketplacePlugin.code == PLUGIN_CODE
     ).first()
     
     if not plugin:
@@ -145,12 +123,22 @@ def get_business_plugin_status(db: Session, business_id: int) -> dict:
             "message": "PLUGIN_NOT_FOUND"
         }
     
+    globally_enabled = plugin_is_globally_enabled(plugin)
     license = db.query(BusinessPlugin).filter(
         BusinessPlugin.business_id == business_id,
         BusinessPlugin.plugin_id == plugin.id
     ).first()
     
     if not license:
+        if globally_enabled:
+            return {
+                "is_active": True,
+                "status": "active",
+                "source": SOURCE_SYSTEM_DEFAULT,
+                "globally_enabled": True,
+                "message": "PLUGIN_ACTIVE",
+                "plugin_info": get_repair_shop_plugin_info(db),
+            }
         return {
             "is_active": False,
             "status": "not_purchased",
@@ -169,14 +157,17 @@ def get_business_plugin_status(db: Session, business_id: int) -> dict:
         if ends_at_val < datetime.utcnow().date():
             is_expired = True
     
+    row_active = license.status == 'active' and not is_expired
+    is_active = bool(globally_enabled or row_active)
     return {
-        "is_active": license.status == 'active' and not is_expired,
-        "status": license.status,
-        "is_trial": license.is_trial,
+        "is_active": is_active,
+        "status": "active" if is_active else license.status,
+        "is_trial": False if globally_enabled else license.is_trial,
         "starts_at": license.starts_at,
-        "ends_at": license.ends_at,
-        "is_expired": is_expired,
+        "ends_at": None if globally_enabled else license.ends_at,
+        "is_expired": False if globally_enabled else is_expired,
         "auto_renew": license.auto_renew,
-        "message": "PLUGIN_ACTIVE" if (license.status == 'active' and not is_expired) else "PLUGIN_EXPIRED"
+        "globally_enabled": globally_enabled,
+        "message": "PLUGIN_ACTIVE" if is_active else "PLUGIN_EXPIRED"
     }
 

@@ -2785,6 +2785,17 @@ class AppLocalizationsFa extends AppLocalizations {
   String get pluginMarketplaceViewAndBuy => 'مشاهده و خرید';
 
   @override
+  String get pluginMarketplaceViewDetails => 'مشاهده جزئیات';
+
+  @override
+  String get pluginMarketplaceIncluded =>
+      'برای همه کسب‌وکارها فعال است و نیازی به خرید ندارد.';
+
+  @override
+  String get pluginMarketplaceNotForSale =>
+      'این افزونه برای خرید در دسترس نیست.';
+
+  @override
   String get pluginMarketplaceReadMore => 'بیشتر بخوانید';
 
   @override
@@ -6607,6 +6618,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get productionLotsSaved => 'کدهای لات ذخیره شدند';
 
   @override
+  String get aiToolListInventoryLots => 'موجودی لات‌های تاریخ‌دار';
+
+  @override
+  String get aiToolGetExpiryStockReport => 'گزارش موجودی نزدیک به انقضا';
+
+  @override
   String get productTrackExpiry => 'ردیابی تاریخ تولید و انقضا';
 
   @override
@@ -6649,8 +6666,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get productExpiredSalePolicyConfirm => 'با تأیید مدیر';
 
   @override
-  String get productMinRemainingShelfLifeDays =>
-      'حداقل روز مانده هنگام فروش';
+  String get productMinRemainingShelfLifeDays => 'حداقل روز مانده هنگام فروش';
 
   @override
   String get reportsInterWarehouseTransfersTitle =>
@@ -11599,12 +11615,6 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get aiToolGetWarehouseStockSummary => 'خلاصه موجودی انبار';
-
-  @override
-  String get aiToolListInventoryLots => 'موجودی لات‌های تاریخ‌دار';
-
-  @override
-  String get aiToolGetExpiryStockReport => 'گزارش موجودی نزدیک به انقضا';
 
   @override
   String get aiToolSearchChecks => 'جستجوی چک';

@@ -7,14 +7,20 @@ enum PluginLicenseVisualState { none, active, trial, trialExpired, expired, inac
 
 PluginLicenseVisualState licenseVisualState(Map<String, dynamic>? status) {
   if (status == null || status.isEmpty) return PluginLicenseVisualState.none;
-  final isTrial = status['is_trial'] == true;
+  if (marketplaceJsonBool(status['globally_enabled'])) {
+    return PluginLicenseVisualState.active;
+  }
+  final isTrial = marketplaceJsonBool(status['is_trial']);
   final trialDays = status['trial_remaining_days'] as int?;
   if (isTrial) {
     if (trialDays != null && trialDays > 0) return PluginLicenseVisualState.trial;
+    if (marketplaceJsonBool(status['is_active'])) {
+      return PluginLicenseVisualState.active;
+    }
     return PluginLicenseVisualState.trialExpired;
   }
-  if (status['is_active'] == true) return PluginLicenseVisualState.active;
-  if (status['is_expired'] == true) return PluginLicenseVisualState.expired;
+  if (marketplaceJsonBool(status['is_active'])) return PluginLicenseVisualState.active;
+  if (marketplaceJsonBool(status['is_expired'])) return PluginLicenseVisualState.expired;
   return PluginLicenseVisualState.inactive;
 }
 

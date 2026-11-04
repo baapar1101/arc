@@ -16,7 +16,31 @@ from adapters.db.models.marketplace import (
 from adapters.db.models.wallet import WalletTransaction
 from adapters.db.models.currency import Currency
 from adapters.db.models.business import Business
+from app.core.plugin_license import (
+	assert_plugin_purchasable,
+	column_flag,
+	get_business_plugin_row,
+	get_marketplace_plugin_by_id,
+	license_row_is_valid,
+	license_status_is_system_default,
+	list_globally_enabled_plugins,
+	merge_global_plugin_rows,
+	overlay_global_access,
+	payload_flag,
+	plugin_is_globally_enabled,
+	plugin_is_listed,
+	plugin_is_purchasable,
+	synthetic_global_license,
+)
 from app.core.responses import ApiError
+
+
+def _plugin_visibility_fields(plugin: Any) -> Dict[str, Any]:
+	return {
+		"listed_in_marketplace": column_flag(plugin, "listed_in_marketplace", default=True),
+		"enabled_for_all_businesses": column_flag(plugin, "enabled_for_all_businesses"),
+		"purchasable": plugin_is_purchasable(plugin),
+	}
 
 
 def _period_to_duration(period: str) -> Optional[timedelta]:
@@ -60,6 +84,8 @@ def list_plugins(db: Session) -> List[Dict[str, Any]]:
 	)
 	result: List[Dict[str, Any]] = []
 	for it in items:
+		if not plugin_is_listed(it):
+			continue
 		plans = (
 			db.query(MarketplacePluginPlan)
 			.filter(
@@ -90,19 +116,19 @@ def list_plugins(db: Session) -> List[Dict[str, Any]]:
 				}
 			plans_data.append(plan_data)
 		
-		result.append(
-			{
-				"id": it.id,
-				"code": it.code,
-				"name": it.name,
-				"description": it.description,
-				"category": it.category,
-				"icon_url": it.icon_url,
-				"trial_days": it.trial_days,
-				"trial_allowed": it.trial_allowed,
-				"plans": plans_data,
-			}
-		)
+		item = {
+			"id": it.id,
+			"code": it.code,
+			"name": it.name,
+			"description": it.description,
+			"category": it.category,
+			"icon_url": it.icon_url,
+			"trial_days": it.trial_days,
+			"trial_allowed": it.trial_allowed,
+			"plans": plans_data,
+		}
+		item.update(_plugin_visibility_fields(it))
+		result.append(item)
 	return result
 
 
@@ -129,6 +155,7 @@ def purchase_plugin(
 		).with_for_update().first()
 		if not plugin:
 			raise ApiError("PLUGIN_NOT_FOUND", "افزونه یافت نشد یا غیرفعال است", http_status=404)
+		assert_plugin_purchasable(plugin)
 		
 		plan = db.query(MarketplacePluginPlan).filter(
 			MarketplacePluginPlan.id == plan_id,
@@ -388,9 +415,11 @@ def create_plugin(db: Session, payload: Dict[str, Any]) -> Dict[str, Any]:
 	description = payload.get("description")
 	category = payload.get("category")
 	icon_url = payload.get("icon_url")
-	is_active = bool(payload.get("is_active", True))
+	is_active = payload_flag(payload, "is_active", default=True)
+	listed_in_marketplace = payload_flag(payload, "listed_in_marketplace", default=True)
+	enabled_for_all_businesses = payload_flag(payload, "enabled_for_all_businesses", default=False)
 	trial_days = payload.get("trial_days")
-	trial_allowed = bool(payload.get("trial_allowed", False))
+	trial_allowed = payload_flag(payload, "trial_allowed", default=False)
 
 	if not code:
 		raise ApiError("INVALID_CODE", "کد افزونه الزامی است", http_status=400)
@@ -417,6 +446,8 @@ def create_plugin(db: Session, payload: Dict[str, Any]) -> Dict[str, Any]:
 		category=category,
 		icon_url=icon_url,
 		is_active=is_active,
+		listed_in_marketplace=listed_in_marketplace,
+		enabled_for_all_businesses=enabled_for_all_businesses,
 		trial_days=trial_days,
 		trial_allowed=trial_allowed,
 	)
@@ -432,6 +463,8 @@ def create_plugin(db: Session, payload: Dict[str, Any]) -> Dict[str, Any]:
 		"category": plugin.category,
 		"icon_url": plugin.icon_url,
 		"is_active": plugin.is_active,
+		"listed_in_marketplace": plugin.listed_in_marketplace,
+		"enabled_for_all_businesses": plugin.enabled_for_all_businesses,
 		"trial_days": plugin.trial_days,
 		"trial_allowed": plugin.trial_allowed,
 		"created_at": plugin.created_at,
@@ -467,10 +500,20 @@ def update_plugin(db: Session, plugin_id: int, payload: Dict[str, Any]) -> Dict[
 		plugin.icon_url = payload.get("icon_url")
 
 	if "is_active" in payload:
-		plugin.is_active = bool(payload.get("is_active"))
+		plugin.is_active = payload_flag(payload, "is_active", default=True)
+
+	if "listed_in_marketplace" in payload:
+		plugin.listed_in_marketplace = payload_flag(
+			payload, "listed_in_marketplace", default=True
+		)
+
+	if "enabled_for_all_businesses" in payload:
+		plugin.enabled_for_all_businesses = payload_flag(
+			payload, "enabled_for_all_businesses", default=False
+		)
 
 	if "trial_allowed" in payload:
-		trial_allowed = bool(payload.get("trial_allowed", False))
+		trial_allowed = payload_flag(payload, "trial_allowed", default=False)
 		if trial_allowed:
 			trial_days = payload.get("trial_days")
 			if trial_days is None or int(trial_days or 0) <= 0:
@@ -501,6 +544,8 @@ def update_plugin(db: Session, plugin_id: int, payload: Dict[str, Any]) -> Dict[
 		"category": plugin.category,
 		"icon_url": plugin.icon_url,
 		"is_active": plugin.is_active,
+		"listed_in_marketplace": column_flag(plugin, "listed_in_marketplace", default=True),
+		"enabled_for_all_businesses": column_flag(plugin, "enabled_for_all_businesses"),
 		"trial_days": plugin.trial_days,
 		"trial_allowed": plugin.trial_allowed,
 		"created_at": plugin.created_at,
@@ -658,6 +703,8 @@ def list_all_plugins(db: Session, only_active: Optional[bool] = None) -> List[Di
 				"category": it.category,
 				"icon_url": it.icon_url,
 				"is_active": it.is_active,
+				"listed_in_marketplace": column_flag(it, "listed_in_marketplace", default=True),
+				"enabled_for_all_businesses": column_flag(it, "enabled_for_all_businesses"),
 				"trial_days": it.trial_days,
 				"trial_allowed": it.trial_allowed,
 				"created_at": it.created_at,
@@ -698,7 +745,8 @@ def start_trial_plugin(
 	).first()
 	if not plugin:
 		raise ApiError("PLUGIN_NOT_FOUND", "افزونه یافت نشد یا غیرفعال است", http_status=404)
-	
+	assert_plugin_purchasable(plugin)
+
 	# بررسی اینکه آیا trial مجاز است
 	if not plugin.trial_allowed or not plugin.trial_days or plugin.trial_days <= 0:
 		raise ApiError("TRIAL_NOT_ALLOWED", "این افزونه trial ندارد", http_status=400)
@@ -708,32 +756,13 @@ def start_trial_plugin(
 	if not business:
 		raise ApiError("BUSINESS_NOT_FOUND", "کسب‌وکار یافت نشد", http_status=404)
 	
-	# بررسی اینکه آیا قبلاً trial استفاده شده است
-	existing_trial = (
-		db.query(BusinessPlugin)
-		.filter(
-			BusinessPlugin.business_id == int(business_id),
-			BusinessPlugin.plugin_id == plugin.id,
-			BusinessPlugin.is_trial == True  # noqa: E712
-		)
-		.first()
-	)
-	if existing_trial:
-		raise ApiError("TRIAL_ALREADY_USED", "شما قبلاً از trial این افزونه استفاده کرده‌اید", http_status=400)
-	
-	# بررسی اینکه آیا لایسنس فعال (غیر trial) وجود دارد
-	existing_license = (
-		db.query(BusinessPlugin)
-		.filter(
-			BusinessPlugin.business_id == int(business_id),
-			BusinessPlugin.plugin_id == plugin.id,
-			BusinessPlugin.is_trial == False  # noqa: E712
-		)
-		.first()
-	)
-	if existing_license and existing_license.status == "active":
-		raise ApiError("PLUGIN_ALREADY_ACTIVE", "این افزونه قبلاً برای شما فعال شده است", http_status=400)
-	
+	existing = get_business_plugin_row(db, int(business_id), int(plugin.id))
+	if existing is not None:
+		if existing.is_trial or existing.trial_started_at is not None:
+			raise ApiError("TRIAL_ALREADY_USED", "شما قبلاً از trial این افزونه استفاده کرده‌اید", http_status=400)
+		if license_row_is_valid(existing):
+			raise ApiError("PLUGIN_ALREADY_ACTIVE", "این افزونه قبلاً برای شما فعال شده است", http_status=400)
+
 	# پیدا کردن اولین پلن فعال (برای ثبت در BusinessPlugin)
 	plan = (
 		db.query(MarketplacePluginPlan)
@@ -751,19 +780,28 @@ def start_trial_plugin(
 	starts_at = datetime.utcnow()
 	ends_at = starts_at + timedelta(days=plugin.trial_days)
 	
-	# ایجاد لایسنس trial
-	trial_license = BusinessPlugin(
-		business_id=int(business_id),
-		plugin_id=plugin.id,
-		plan_id=plan.id,  # استفاده از اولین پلن برای ثبت
-		status="active",
-		starts_at=starts_at,
-		ends_at=ends_at,
-		auto_renew=False,
-		is_trial=True,
-		trial_started_at=starts_at,
-	)
-	db.add(trial_license)
+	if existing is not None:
+		existing.plan_id = plan.id
+		existing.status = "active"
+		existing.starts_at = starts_at
+		existing.ends_at = ends_at
+		existing.auto_renew = False
+		existing.is_trial = True
+		existing.trial_started_at = starts_at
+		trial_license = existing
+	else:
+		trial_license = BusinessPlugin(
+			business_id=int(business_id),
+			plugin_id=plugin.id,
+			plan_id=plan.id,
+			status="active",
+			starts_at=starts_at,
+			ends_at=ends_at,
+			auto_renew=False,
+			is_trial=True,
+			trial_started_at=starts_at,
+		)
+		db.add(trial_license)
 	db.commit()
 	db.refresh(trial_license)
 	
@@ -787,6 +825,8 @@ def start_trial_plugin(
 
 def get_business_plugin_status(db: Session, business_id: int, plugin_id: int) -> Optional[Dict[str, Any]]:
 	now = datetime.utcnow()
+	plugin = get_marketplace_plugin_by_id(db, plugin_id)
+	globally_enabled = plugin_is_globally_enabled(plugin)
 	license = (
 		db.query(BusinessPlugin)
 		.filter(
@@ -796,10 +836,11 @@ def get_business_plugin_status(db: Session, business_id: int, plugin_id: int) ->
 		.first()
 	)
 
-	if not license:
+	if not license or license_status_is_system_default(license.status):
+		if globally_enabled and plugin is not None:
+			return synthetic_global_license(plugin)
 		return None
 
-	plugin = db.query(MarketplacePlugin).filter(MarketplacePlugin.id == plugin_id).first()
 	plan = db.query(MarketplacePluginPlan).filter(MarketplacePluginPlan.id == license.plan_id).first()
 
 	# بررسی انقضا
@@ -823,7 +864,7 @@ def get_business_plugin_status(db: Session, business_id: int, plugin_id: int) ->
 		remaining = (ends_at_val - now_val).days
 		trial_remaining_days = max(0, remaining)
 
-	return {
+	status_row = {
 		"license_id": license.id,
 		"plugin_id": license.plugin_id,
 		"plugin_code": plugin.code if plugin else None,
@@ -842,6 +883,9 @@ def get_business_plugin_status(db: Session, business_id: int, plugin_id: int) ->
 		"created_at": license.created_at,
 		"updated_at": license.updated_at,
 	}
+	if globally_enabled:
+		overlay_global_access(status_row)
+	return status_row
 
 
 def list_business_plugins(db: Session, business_id: int) -> List[Dict[str, Any]]:
@@ -862,6 +906,8 @@ def list_business_plugins(db: Session, business_id: int) -> List[Dict[str, Any]]
 		result: List[Dict[str, Any]] = []
 		for license in licenses:
 			try:
+				if license_status_is_system_default(getattr(license, "status", None)):
+					continue
 				plugin = db.query(MarketplacePlugin).filter(MarketplacePlugin.id == license.plugin_id).first()
 				plan = db.query(MarketplacePluginPlan).filter(MarketplacePluginPlan.id == license.plan_id).first()
 
@@ -923,7 +969,7 @@ def list_business_plugins(db: Session, business_id: int) -> List[Dict[str, Any]]
 				)
 				# ادامه می‌دهیم تا سایر licenses را پردازش کنیم
 
-		return result
+		return merge_global_plugin_rows(result, list_globally_enabled_plugins(db))
 	except SQLAlchemyError as e:
 		logger.error(
 			f"Database error in list_business_plugins for business_id={business_id}: {str(e)}",

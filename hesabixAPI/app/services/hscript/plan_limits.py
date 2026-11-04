@@ -192,36 +192,19 @@ def _license_row(db: Session, business_id: int) -> tuple[Optional[BusinessPlugin
 	return row, plan
 
 
-def resolve_hscript_entitlement(db: Session, business_id: int) -> HScriptPlanEntitlement:
-	"""بدون لایسنس = free؛ با لایسنس فعال = سقف بر اساس period پلن."""
-	license_row, plan = _license_row(db, business_id)
-	if not license_row:
-		cfg = _TIER_LIMITS["free"]
-		return HScriptPlanEntitlement(
-			tier="free",
-			plugin_active=False,
-			plugin_code=PLUGIN_CODE,
-			plan_period=None,
-			is_trial=False,
-			max_saved_reports=int(cfg["max_saved_reports"]),
-			max_schedules=int(cfg["max_schedules"]),
-			runs_per_minute=int(cfg["runs_per_minute"]),
-			async_allowed=bool(cfg["async_allowed"]),
-			excel_allowed=bool(cfg["excel_allowed"]),
-			pdf_allowed=bool(cfg["pdf_allowed"]),
-			resource=cfg["resource"],
-			preview_resource=cfg["preview_resource"],
-		)
-
-	period = (plan.period if plan else "monthly") or "monthly"
-	is_trial = bool(license_row.is_trial)
-	tier = "trial" if is_trial else (period if period in _TIER_LIMITS else "monthly")
+def _entitlement_from_tier(
+	tier: str,
+	*,
+	plugin_active: bool,
+	plan_period: Optional[str],
+	is_trial: bool,
+) -> HScriptPlanEntitlement:
 	cfg = _TIER_LIMITS[tier]
 	return HScriptPlanEntitlement(
 		tier=tier,
-		plugin_active=True,
+		plugin_active=plugin_active,
 		plugin_code=PLUGIN_CODE,
-		plan_period=period,
+		plan_period=plan_period,
 		is_trial=is_trial,
 		max_saved_reports=int(cfg["max_saved_reports"]),
 		max_schedules=int(cfg["max_schedules"]),
@@ -231,6 +214,41 @@ def resolve_hscript_entitlement(db: Session, business_id: int) -> HScriptPlanEnt
 		pdf_allowed=bool(cfg["pdf_allowed"]),
 		resource=cfg["resource"],
 		preview_resource=cfg["preview_resource"],
+	)
+
+
+def resolve_hscript_entitlement(db: Session, business_id: int) -> HScriptPlanEntitlement:
+	"""بدون لایسنس = free؛ با لایسنس فعال = سقف بر اساس period پلن."""
+	from app.core.plugin_license import column_flag, get_marketplace_plugin
+
+	plugin = get_marketplace_plugin(db, PLUGIN_CODE)
+	if plugin is not None and column_flag(plugin, "is_active") and column_flag(
+		plugin, "enabled_for_all_businesses"
+	):
+		return _entitlement_from_tier(
+			"lifetime",
+			plugin_active=True,
+			plan_period="lifetime",
+			is_trial=False,
+		)
+
+	license_row, plan = _license_row(db, business_id)
+	if not license_row:
+		return _entitlement_from_tier(
+			"free",
+			plugin_active=False,
+			plan_period=None,
+			is_trial=False,
+		)
+
+	period = (plan.period if plan else "monthly") or "monthly"
+	is_trial = bool(license_row.is_trial)
+	tier = "trial" if is_trial else (period if period in _TIER_LIMITS else "monthly")
+	return _entitlement_from_tier(
+		tier,
+		plugin_active=True,
+		plan_period=period,
+		is_trial=is_trial,
 	)
 
 

@@ -5294,6 +5294,24 @@ abstract class AppLocalizations {
   /// **'View & purchase'**
   String get pluginMarketplaceViewAndBuy;
 
+  /// No description provided for @pluginMarketplaceViewDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'View details'**
+  String get pluginMarketplaceViewDetails;
+
+  /// No description provided for @pluginMarketplaceIncluded.
+  ///
+  /// In en, this message translates to:
+  /// **'Included for every business — no purchase needed.'**
+  String get pluginMarketplaceIncluded;
+
+  /// No description provided for @pluginMarketplaceNotForSale.
+  ///
+  /// In en, this message translates to:
+  /// **'This add-on is not available for purchase.'**
+  String get pluginMarketplaceNotForSale;
+
   /// No description provided for @pluginMarketplaceReadMore.
   ///
   /// In en, this message translates to:
@@ -12126,57 +12144,323 @@ abstract class AppLocalizations {
   /// **'Sellable, near-expiry, blocked, and expired lots'**
   String get reportsExpiryStockSubtitle;
 
+  /// No description provided for @expiryStatusSellable.
+  ///
+  /// In en, this message translates to:
+  /// **'Sellable'**
   String get expiryStatusSellable;
+
+  /// No description provided for @expiryStatusNearExpiry.
+  ///
+  /// In en, this message translates to:
+  /// **'Near expiry'**
   String get expiryStatusNearExpiry;
+
+  /// No description provided for @expiryStatusBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked (off shelf)'**
   String get expiryStatusBlocked;
+
+  /// No description provided for @expiryStatusExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
   String get expiryStatusExpired;
+
+  /// No description provided for @expiryStatusUndated.
+  ///
+  /// In en, this message translates to:
+  /// **'Undated (existing stock)'**
   String get expiryStatusUndated;
+
+  /// No description provided for @expiryReportAsOf.
+  ///
+  /// In en, this message translates to:
+  /// **'As of'**
   String get expiryReportAsOf;
+
+  /// No description provided for @expiryReportAllStatuses.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
   String get expiryReportAllStatuses;
+
+  /// No description provided for @expiryColLotSerial.
+  ///
+  /// In en, this message translates to:
+  /// **'Lot / serial'**
   String get expiryColLotSerial;
+
+  /// No description provided for @expiryColManufacturing.
+  ///
+  /// In en, this message translates to:
+  /// **'Manufacturing date'**
   String get expiryColManufacturing;
+
+  /// No description provided for @expiryColExpiry.
+  ///
+  /// In en, this message translates to:
+  /// **'Expiry date'**
   String get expiryColExpiry;
+
+  /// No description provided for @expiryColRemainingDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Days remaining'**
   String get expiryColRemainingDays;
+
+  /// No description provided for @quickSalesExpiredInstanceBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'This unit is expired and cannot be sold'**
   String get quickSalesExpiredInstanceBlocked;
+
+  /// No description provided for @lotPickerTitlePrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Lot and dates —'**
   String get lotPickerTitlePrefix;
+
+  /// No description provided for @lotPickerInboundHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Dates live on the lot; a carton of 10 pieces shares the same manufacturing and expiry dates.'**
   String get lotPickerInboundHelp;
+
+  /// No description provided for @lotPickerOutboundHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Outbound picking uses nearest expiry (FEFO) by default. You can change the lot.'**
   String get lotPickerOutboundHelp;
+
+  /// No description provided for @lotPickerCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Lot code'**
   String get lotPickerCode;
+
+  /// No description provided for @lotPickerAddAnother.
+  ///
+  /// In en, this message translates to:
+  /// **'Another lot'**
   String get lotPickerAddAnother;
+
+  /// No description provided for @lotPickerDatesRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Manufacturing or expiry date is required'**
   String get lotPickerDatesRequired;
+
+  /// No description provided for @lotPickerMinOne.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter at least one lot with a quantity'**
   String get lotPickerMinOne;
+
+  /// No description provided for @lotPickerQtyMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Lot quantities must add up to the line quantity'**
   String get lotPickerQtyMismatch;
+
+  /// No description provided for @lotPickerBestBeforePrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Best before'**
   String get lotPickerBestBeforePrefix;
+
+  /// No description provided for @instanceDatesRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Perishable units need a manufacturing or expiry date'**
   String get instanceDatesRequired;
+
+  /// No description provided for @productionLotsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Material and output lots'**
   String get productionLotsTitle;
+
+  /// No description provided for @productionLotsFefoHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Materials are picked from the nearest expiry (FEFO).'**
   String get productionLotsFefoHelp;
+
+  /// No description provided for @productionPickFefo.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick from FEFO stock'**
   String get productionPickFefo;
+
+  /// No description provided for @productionEditLots.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit lots'**
   String get productionEditLots;
+
+  /// No description provided for @quickSalesFefoSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'FEFO issue from nearest expiry'**
   String get quickSalesFefoSummary;
+
+  /// No description provided for @lotAndDates.
+  ///
+  /// In en, this message translates to:
+  /// **'Lot and dates'**
   String get lotAndDates;
+
+  /// No description provided for @lotPickerInboundPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Record lot manufacturing and expiry dates'**
   String get lotPickerInboundPrompt;
+
+  /// No description provided for @openingBalanceLotCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening-balance lot / batch code'**
   String get openingBalanceLotCode;
+
+  /// No description provided for @openingBalanceManufacturing.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening-balance manufacturing date'**
   String get openingBalanceManufacturing;
+
+  /// No description provided for @openingBalanceExpiry.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening-balance expiry date'**
   String get openingBalanceExpiry;
+
+  /// No description provided for @uniqueInstanceSelectTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select unique units'**
   String get uniqueInstanceSelectTitle;
+
+  /// No description provided for @uniqueInstanceReturnTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Return sold units'**
   String get uniqueInstanceReturnTitle;
+
+  /// No description provided for @uniqueInstanceNeedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Need: {count} units'**
   String uniqueInstanceNeedCount(int count);
+
+  /// No description provided for @uniqueInstanceSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search serial, barcode, or attributes'**
   String get uniqueInstanceSearchHint;
+
+  /// No description provided for @uniqueWarehouseSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search serial or barcode'**
   String get uniqueWarehouseSearchHint;
+
+  /// No description provided for @uniqueInstanceNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No unique units found'**
   String get uniqueInstanceNotFound;
+
+  /// No description provided for @uniqueInstanceSelectExact.
+  ///
+  /// In en, this message translates to:
+  /// **'Select exactly {required} units ({selected} selected)'**
   String uniqueInstanceSelectExact(int required, int selected);
+
+  /// No description provided for @uniqueInstanceSelectedOf.
+  ///
+  /// In en, this message translates to:
+  /// **'{selected} of {required} units selected'**
   String uniqueInstanceSelectedOf(int selected, int required);
+
+  /// No description provided for @uniqueInstanceNeedMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Select {count} more units'**
   String uniqueInstanceNeedMore(int count);
+
+  /// No description provided for @uniqueInstanceMaxCount.
+  ///
+  /// In en, this message translates to:
+  /// **'You can select only {count} units'**
   String uniqueInstanceMaxCount(int count);
+
+  /// No description provided for @uniqueInstanceMinOne.
+  ///
+  /// In en, this message translates to:
+  /// **'Select at least one unit'**
   String get uniqueInstanceMinOne;
+
+  /// No description provided for @uniqueUnitsSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} units selected'**
   String uniqueUnitsSelected(int count);
+
+  /// No description provided for @uniqueSerialPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Serial: {serial}'**
   String uniqueSerialPrefix(String serial);
+
+  /// No description provided for @uniqueBarcodePrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Barcode: {barcode}'**
   String uniqueBarcodePrefix(String barcode);
+
+  /// No description provided for @uniqueWarehousePrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse: {name}'**
   String uniqueWarehousePrefix(String name);
+
+  /// No description provided for @uniqueAttributesPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Attributes: {value}'**
   String uniqueAttributesPrefix(String value);
+
+  /// No description provided for @productionOutputsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Outputs'**
   String get productionOutputsTitle;
+
+  /// No description provided for @productionPickUniqueUnits.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick unique units'**
   String get productionPickUniqueUnits;
+
+  /// No description provided for @productionLotsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Lots saved'**
   String get productionLotsSaved;
+
+  /// No description provided for @aiToolListInventoryLots.
+  ///
+  /// In en, this message translates to:
+  /// **'Dated lot balances'**
+  String get aiToolListInventoryLots;
+
+  /// No description provided for @aiToolGetExpiryStockReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Expiry stock report'**
+  String get aiToolGetExpiryStockReport;
 
   /// No description provided for @productTrackExpiry.
   ///
@@ -21303,8 +21587,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Warehouse stock summary'**
   String get aiToolGetWarehouseStockSummary;
-  String get aiToolListInventoryLots;
-  String get aiToolGetExpiryStockReport;
 
   /// No description provided for @aiToolSearchChecks.
   ///

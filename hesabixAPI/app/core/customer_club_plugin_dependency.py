@@ -2,46 +2,19 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-
 from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
-from adapters.db.models.marketplace import BusinessPlugin, MarketplacePlugin
 from adapters.db.session import get_db
 from app.core.auth_dependency import AuthContext, get_current_user
+from app.core.plugin_license import is_plugin_active
 from app.core.responses import ApiError
+
+PLUGIN_CODE = "customer_club"
 
 
 def check_customer_club_plugin_active(db: Session, business_id: int) -> bool:
-	plugin = (
-		db.query(MarketplacePlugin)
-		.filter(
-			MarketplacePlugin.code == "customer_club",
-			MarketplacePlugin.is_active == True,  # noqa: E712
-		)
-		.first()
-	)
-	if not plugin:
-		return False
-	license_row = (
-		db.query(BusinessPlugin)
-		.filter(
-			BusinessPlugin.business_id == business_id,
-			BusinessPlugin.plugin_id == plugin.id,
-			BusinessPlugin.status == "active",
-		)
-		.first()
-	)
-	if not license_row:
-		return False
-	if license_row.ends_at:
-		ea = license_row.ends_at
-		ends_at_val = ea.date() if isinstance(ea, datetime) else ea
-		now_val = datetime.utcnow().date()
-		if ends_at_val < now_val:
-			return False
-	return True
+	return is_plugin_active(db, business_id, PLUGIN_CODE)
 
 
 def require_customer_club_plugin_active(business_id_param: str = "business_id"):
@@ -75,7 +48,7 @@ def require_customer_club_plugin_active(business_id_param: str = "business_id"):
 				"Customer club add-on is not active for this business.",
 				http_status=403,
 				details={
-					"plugin_code": "customer_club",
+					"plugin_code": PLUGIN_CODE,
 					"required_action": "activate_plugin",
 					"marketplace_url": "/marketplace",
 				},

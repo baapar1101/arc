@@ -141,11 +141,37 @@ bool marketplaceJsonBool(dynamic value) {
   return false;
 }
 
+const String kPluginSourceSystemDefault = 'system_default';
+
 /// لایسنس کسب‌وکار برای افزونه فعال است (خرید فعال یا آزمایشی منقضی‌نشده).
 bool marketplacePluginLicenseActive(Map<dynamic, dynamic>? row) {
   if (row == null || row.isEmpty) return false;
   if (marketplaceJsonBool(row['is_active'])) return true;
   return marketplaceJsonBool(row['is_trial']) && !marketplaceJsonBool(row['is_expired']);
+}
+
+bool pluginLicenseIsSystemDefault(Map<dynamic, dynamic>? row) {
+  if (row == null || row.isEmpty) return false;
+  return row['source']?.toString() == kPluginSourceSystemDefault;
+}
+
+/// افزونه در بازار قابل خرید/trial است (سراسری‌ها فروخته نمی‌شوند).
+bool pluginIsPurchasable(Map<dynamic, dynamic>? plugin) {
+  if (plugin == null || plugin.isEmpty) return false;
+  if (plugin.containsKey('purchasable') &&
+      !marketplaceJsonBool(plugin['purchasable'])) {
+    return false;
+  }
+  if (marketplaceJsonBool(plugin['enabled_for_all_businesses'])) return false;
+  return true;
+}
+
+bool pluginIsGloballyEnabled(
+  Map<dynamic, dynamic>? plugin, [
+  Map<dynamic, dynamic>? status,
+]) {
+  return marketplaceJsonBool(plugin?['enabled_for_all_businesses']) ||
+      marketplaceJsonBool(status?['globally_enabled']);
 }
 
 Set<String> activeMarketplacePluginCodes(Iterable<dynamic> plugins) {
