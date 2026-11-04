@@ -1056,6 +1056,7 @@ class _ReportsPageState extends State<ReportsPage> {
             route: '/business/$b/reports/ar-aging',
             keywords: const ['سن بدهی', 'مطالبات', 'سررسید', 'aging', 'ar'],
             permissionSection: 'people',
+            marketplacePluginCode: kAdvancedAccountingPluginCode,
           ),
           _ReportLink(
             key: 'ap_aging',
@@ -1072,6 +1073,7 @@ class _ReportsPageState extends State<ReportsPage> {
               'ap',
             ],
             permissionSection: 'people',
+            marketplacePluginCode: kAdvancedAccountingPluginCode,
           ),
           _ReportLink(
             key: 'person_balances_by_currency',
@@ -1081,6 +1083,7 @@ class _ReportsPageState extends State<ReportsPage> {
             route: '/business/$b/reports/person-balances-by-currency',
             keywords: const ['مانده اشخاص', 'ارز', 'معادل پایه', 'currency'],
             permissionSection: 'people',
+            marketplacePluginCode: kAdvancedAccountingPluginCode,
           ),
           _ReportLink(
             key: 'people_transactions',
@@ -1411,6 +1414,7 @@ class _ReportsPageState extends State<ReportsPage> {
             route: '/business/$b/reports/trial-balance',
             keywords: const ['تراز', 'آزمایشی'],
             permissionSection: 'accounting_documents',
+            marketplacePluginCode: kAdvancedAccountingPluginCode,
           ),
           _ReportLink(
             key: 'balance_sheet',
@@ -1420,6 +1424,7 @@ class _ReportsPageState extends State<ReportsPage> {
             route: '/business/$b/reports/balance-sheet',
             keywords: const ['ترازنامه', 'وضعیت مالی', 'دارایی', 'بدهی'],
             permissionSection: 'accounting_documents',
+            marketplacePluginCode: kAdvancedAccountingPluginCode,
           ),
           _ReportLink(
             key: 'financial_package',
@@ -1429,6 +1434,7 @@ class _ReportsPageState extends State<ReportsPage> {
             route: '/business/$b/reports/financial-package',
             keywords: const ['بسته', 'گزارش مالی', 'تراز', 'سود و زیان'],
             permissionSection: 'accounting_documents',
+            marketplacePluginCode: kAdvancedAccountingPluginCode,
           ),
           _ReportLink(
             key: 'general_ledger',
@@ -1438,6 +1444,7 @@ class _ReportsPageState extends State<ReportsPage> {
             route: '/business/$b/reports/general-ledger',
             keywords: const ['دفتر کل', 'ledger'],
             permissionSection: 'accounting_documents',
+            marketplacePluginCode: kAdvancedAccountingPluginCode,
           ),
           _ReportLink(
             key: 'journal_ledger',
@@ -1447,6 +1454,7 @@ class _ReportsPageState extends State<ReportsPage> {
             route: '/business/$b/reports/journal-ledger',
             keywords: const ['دفتر روزنامه', 'journal'],
             permissionSection: 'accounting_documents',
+            marketplacePluginCode: kAdvancedAccountingPluginCode,
           ),
           _ReportLink(
             key: 'accounts_review',
@@ -1455,6 +1463,7 @@ class _ReportsPageState extends State<ReportsPage> {
             icon: Icons.account_tree,
             route: '/business/$b/reports/accounts-review',
             keywords: const ['مرور حساب', 'درختی'],
+            marketplacePluginCode: kAdvancedAccountingPluginCode,
           ),
           _ReportLink(
             key: 'cash_flow',
@@ -1464,6 +1473,7 @@ class _ReportsPageState extends State<ReportsPage> {
             route: '/business/$b/reports/cash-flow',
             keywords: const ['جریان نقد', 'وجوه نقد', 'cash flow'],
             permissionSection: 'accounting_documents',
+            marketplacePluginCode: kAdvancedAccountingPluginCode,
           ),
           _ReportLink(
             key: 'fx_revaluation',
@@ -1473,6 +1483,7 @@ class _ReportsPageState extends State<ReportsPage> {
             route: '/business/$b/reports/fx-revaluation',
             keywords: const ['تسعیر', 'ارز', 'fx', 'revaluation'],
             permissionSection: 'accounting_documents',
+            marketplacePluginCode: kAdvancedAccountingPluginCode,
           ),
         ],
       ),
@@ -1489,6 +1500,7 @@ class _ReportsPageState extends State<ReportsPage> {
             route: '/business/$b/reports/pnl-period',
             keywords: const ['سود و زیان', 'دوره'],
             permissionSection: 'accounting_documents',
+            marketplacePluginCode: kAdvancedAccountingPluginCode,
           ),
           _ReportLink(
             key: 'pnl_cumulative',
@@ -1498,6 +1510,7 @@ class _ReportsPageState extends State<ReportsPage> {
             route: '/business/$b/reports/pnl-cumulative',
             keywords: const ['سود و زیان', 'تجمیعی'],
             permissionSection: 'accounting_documents',
+            marketplacePluginCode: kAdvancedAccountingPluginCode,
           ),
         ],
       ),
@@ -1723,7 +1736,31 @@ class _ReportsPageState extends State<ReportsPage> {
         ),
       );
     }
-    return sections.where(_sectionVisibleForPlugins).toList();
+    final visible = <_ReportSection>[];
+    for (final section in sections.where(_sectionVisibleForPlugins)) {
+      final items = section.items.where(_pluginItemVisible).toList();
+      if (items.isEmpty) continue;
+      if (identical(items, section.items) || items.length == section.items.length) {
+        visible.add(section);
+        continue;
+      }
+      visible.add(
+        _ReportSection(
+          id: section.id,
+          title: section.title,
+          icon: section.icon,
+          initiallyExpanded: section.initiallyExpanded,
+          items: items,
+        ),
+      );
+    }
+    return visible;
+  }
+
+  bool _pluginItemVisible(_ReportLink item) {
+    if (item.marketplacePluginCode == null) return true;
+    if (!_marketplacePluginsResolved) return false;
+    return _marketplacePluginActive(item.marketplacePluginCode!);
   }
 }
 

@@ -2775,6 +2775,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pluginMarketplaceCategoryCrmMarketing => 'CRM & marketing';
 
   @override
+  String get pluginMarketplaceCategoryAccounting => 'Accounting';
+
+  @override
   String get pluginMarketplaceWalletBalance => 'Available wallet balance';
 
   @override
@@ -13214,6 +13217,17 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get payrollPluginNotActive =>
       'The payroll add-on is not active for this business. Activate it from the plugin marketplace.';
+
+  @override
+  String get advancedAccountingMenu => 'Advanced accounting pack';
+
+  @override
+  String get advancedAccountingPluginNotActive =>
+      'The advanced accounting pack is not active for this business.';
+
+  @override
+  String get advancedAccountingPluginNotActiveHint =>
+      'Start a trial or purchase it from the plugin marketplace to unlock financial statements, year-end closing, FX revaluation, check ras-giri, loan facilities, business backup, and the invoice/document template studio.';
 
   @override
   String get oaMenu => 'Office automation';

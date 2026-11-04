@@ -5246,6 +5246,12 @@ abstract class AppLocalizations {
   /// **'CRM & marketing'**
   String get pluginMarketplaceCategoryCrmMarketing;
 
+  /// No description provided for @pluginMarketplaceCategoryAccounting.
+  ///
+  /// In en, this message translates to:
+  /// **'Accounting'**
+  String get pluginMarketplaceCategoryAccounting;
+
   /// No description provided for @pluginMarketplaceWalletBalance.
   ///
   /// In en, this message translates to:
@@ -24353,6 +24359,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The payroll add-on is not active for this business. Activate it from the plugin marketplace.'**
   String get payrollPluginNotActive;
+
+  /// No description provided for @advancedAccountingMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced accounting pack'**
+  String get advancedAccountingMenu;
+
+  /// No description provided for @advancedAccountingPluginNotActive.
+  ///
+  /// In en, this message translates to:
+  /// **'The advanced accounting pack is not active for this business.'**
+  String get advancedAccountingPluginNotActive;
+
+  /// No description provided for @advancedAccountingPluginNotActiveHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Start a trial or purchase it from the plugin marketplace to unlock financial statements, year-end closing, FX revaluation, check ras-giri, loan facilities, business backup, and the invoice/document template studio.'**
+  String get advancedAccountingPluginNotActiveHint;
 
   /// No description provided for @oaMenu.
   ///

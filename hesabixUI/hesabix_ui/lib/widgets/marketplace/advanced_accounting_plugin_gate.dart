@@ -1,0 +1,129 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
+
+import '../../core/business_nav.dart';
+import '../../services/marketplace_service.dart';
+import 'plugin_marketplace_utils.dart';
+
+/// نمایش محتوا فقط وقتی بسته حسابداری پیشرفته برای کسب‌وکار فعال است.
+class AdvancedAccountingPluginGate extends StatefulWidget {
+  final int businessId;
+  final Widget child;
+
+  const AdvancedAccountingPluginGate({
+    super.key,
+    required this.businessId,
+    required this.child,
+  });
+
+  @override
+  State<AdvancedAccountingPluginGate> createState() =>
+      _AdvancedAccountingPluginGateState();
+}
+
+class _AdvancedAccountingPluginGateState
+    extends State<AdvancedAccountingPluginGate> {
+  final MarketplaceService _marketplace = MarketplaceService();
+  bool _loading = true;
+  bool _active = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final plugins = await _marketplace.listBusinessPlugins(
+        businessId: widget.businessId,
+      );
+      final row = plugins.cast<Map>().firstWhere(
+        (p) => p['plugin_code'] == kAdvancedAccountingPluginCode,
+        orElse: () => <String, dynamic>{},
+      );
+      final active = marketplacePluginLicenseActive(row);
+      if (mounted) {
+        setState(() {
+          _active = active;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _active = false;
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    if (_loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (!_active) {
+      return Scaffold(
+        appBar: AppBar(title: Text(t.advancedAccountingMenu)),
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .surfaceContainerHighest
+                          .withValues(alpha: 0.6),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.calculate_outlined,
+                      size: 56,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    t.advancedAccountingPluginNotActive,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    t.advancedAccountingPluginNotActiveHint,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                  const SizedBox(height: 24),
+                  FilledButton.icon(
+                    onPressed: () => context.go(
+                      context.businessPanelUrl(
+                        widget.businessId,
+                        'plugin-marketplace',
+                      ),
+                    ),
+                    icon: const Icon(Icons.storefront_outlined),
+                    label: Text(t.pluginMarketplace),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    return widget.child;
+  }
+}

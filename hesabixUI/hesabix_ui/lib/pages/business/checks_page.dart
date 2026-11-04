@@ -17,6 +17,8 @@ import 'check_details_dialog.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../services/list_filter_preferences_service.dart';
+import '../../services/marketplace_service.dart';
+import '../../widgets/marketplace/plugin_marketplace_utils.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class ChecksPage extends StatefulWidget {
@@ -48,12 +50,33 @@ class _ChecksPageState extends State<ChecksPage> {
   final GlobalKey _tableKey = GlobalKey();
   Person? _selectedPerson;
   final _checkService = CheckService();
+  bool _advancedAccountingActive = false;
 
   @override
   void initState() {
     super.initState();
     // Register this page instance for external refresh access
     ChecksPage._pageStates[widget.businessId] = this;
+    _loadAdvancedAccountingLicense();
+  }
+
+  Future<void> _loadAdvancedAccountingLicense() async {
+    try {
+      final list = await MarketplaceService().listBusinessPlugins(
+        businessId: widget.businessId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _advancedAccountingActive = activeMarketplacePluginCodes(
+          list,
+        ).contains(kAdvancedAccountingPluginCode);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _advancedAccountingActive = false;
+      });
+    }
   }
 
   @override
@@ -359,16 +382,18 @@ class _ChecksPageState extends State<ChecksPage> {
             hintText: 'جست‌وجوی شخص',
           ),
         ),
-        const SizedBox(width: 8),
-        Tooltip(
-          message: 'راس‌گیری چک‌ها',
-          child: IconButton(
-            onPressed: () {
-              context.go('/business/${widget.businessId}/checks/reconciliation');
-            },
-            icon: const Icon(Icons.calculate),
+        if (_advancedAccountingActive) ...[
+          const SizedBox(width: 8),
+          Tooltip(
+            message: 'راس‌گیری چک‌ها',
+            child: IconButton(
+              onPressed: () {
+                context.go('/business/${widget.businessId}/checks/reconciliation');
+              },
+              icon: const Icon(Icons.calculate),
+            ),
           ),
-        ),
+        ],
         const SizedBox(width: 8),
         PermissionButton(
           section: 'checks',

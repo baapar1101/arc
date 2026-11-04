@@ -17,6 +17,42 @@ const Map<String, String> pluginSetupRouteByCode = {
   'payroll': 'business_payroll',
   'fixed_assets': 'business_fixed_assets',
   'hscript_custom_reports': 'business_hscript_reports',
+  'advanced_accounting': 'business_reports',
+};
+
+const String kAdvancedAccountingPluginCode = 'advanced_accounting';
+
+/// آیتم‌های منوی شل که فقط با لایسنس بسته حسابداری پیشرفته دیده می‌شوند.
+const Set<String> kAdvancedAccountingMenuKeys = {
+  'year-end-closing',
+  'currency-revaluation',
+  'loan-facilities',
+  'report-templates',
+};
+
+/// مسیرهای تنظیمات کسب‌وکار که فقط با لایسنس این افزونه دیده می‌شوند.
+const Set<String> kAdvancedAccountingSettingsKeys = {
+  'backup',
+  'ftp_backup',
+  'restore',
+  'report_templates',
+};
+
+/// کلید کارت گزارش در hub که با همین افزونه گیت می‌شود.
+const Set<String> kAdvancedAccountingReportKeys = {
+  'trial_balance',
+  'balance_sheet',
+  'financial_package',
+  'general_ledger',
+  'journal_ledger',
+  'accounts_review',
+  'cash_flow',
+  'fx_revaluation',
+  'pnl_period',
+  'pnl_cumulative',
+  'ar_aging',
+  'ap_aging',
+  'person_balances_by_currency',
 };
 
 /// دسته‌های شناخته‌شده در seed/API.
@@ -27,6 +63,7 @@ const Set<String> kPluginMarketplaceCategories = {
   'sales',
   'crm_marketing',
   'reporting',
+  'accounting',
 };
 
 String pluginCategoryLabel(AppLocalizations t, String? category) {
@@ -41,6 +78,8 @@ String pluginCategoryLabel(AppLocalizations t, String? category) {
       return t.pluginMarketplaceCategorySales;
     case 'crm_marketing':
       return t.pluginMarketplaceCategoryCrmMarketing;
+    case 'accounting':
+      return t.pluginMarketplaceCategoryAccounting;
     case 'hr_payroll':
       return t.localeName.startsWith('fa') ? 'منابع انسانی و حقوق' : 'HR & Payroll';
     case 'reporting':
@@ -75,6 +114,8 @@ IconData pluginCategoryIcon(String? category) {
       return Icons.local_shipping_outlined;
     case 'crm_marketing':
       return Icons.loyalty_outlined;
+    case 'accounting':
+      return Icons.calculate_outlined;
     default:
       return Icons.extension_outlined;
   }

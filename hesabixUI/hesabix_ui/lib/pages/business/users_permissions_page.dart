@@ -1061,6 +1061,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
     'woocommerce': 'woocommerce_hesabix',
     'moadian': 'moadian_tax_integration',
     'digipay': 'digipay_credit',
+    'currency_revaluation': kAdvancedAccountingPluginCode,
   };
 
   late Map<String, dynamic> _currentPermissions;

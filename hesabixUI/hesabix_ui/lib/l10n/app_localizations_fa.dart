@@ -2759,6 +2759,9 @@ class AppLocalizationsFa extends AppLocalizations {
   String get pluginMarketplaceCategoryCrmMarketing => 'CRM و بازاریابی';
 
   @override
+  String get pluginMarketplaceCategoryAccounting => 'حسابداری';
+
+  @override
   String get pluginMarketplaceWalletBalance => 'موجودی قابل برداشت کیف‌پول';
 
   @override
@@ -13139,6 +13142,17 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get payrollPluginNotActive =>
       'افزونه حقوق و دستمزد برای این کسب‌وکار فعال نیست. از بازار افزونه‌ها آن را فعال کنید.';
+
+  @override
+  String get advancedAccountingMenu => 'بسته حسابداری پیشرفته';
+
+  @override
+  String get advancedAccountingPluginNotActive =>
+      'افزونه بسته حسابداری پیشرفته برای این کسب‌وکار فعال نیست.';
+
+  @override
+  String get advancedAccountingPluginNotActiveHint =>
+      'از بازار افزونه‌ها دوره آزمایشی را شروع کنید یا افزونه را بخرید تا صورت‌های مالی، بستن سال، تسعیر ارز، راس‌گیری چک، تسهیلات، پشتیبان‌گیری و استودیو قالب فاکتور و اسناد در دسترس قرار گیرند.';
 
   @override
   String get oaMenu => 'اتوماسیون اداری';

@@ -130,7 +130,7 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
     'transfers': 'انتقال وجه',
     'checks': 'چک‌ها',
     'documents': 'اسناد',
-    'group:chart-of-accounts': 'حسابداری پیشرفته',
+    'group:chart-of-accounts': 'حسابداری',
     'reports': 'گزارش‌ها',
     'basalam': 'باسلام',
     'woocommerce': 'ووکامرس',

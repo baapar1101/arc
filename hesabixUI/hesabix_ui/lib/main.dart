@@ -180,6 +180,7 @@ import 'widgets/marketplace/office_automation_plugin_gate.dart';
 import 'widgets/marketplace/fixed_assets_plugin_gate.dart';
 import 'widgets/marketplace/telephony_plugin_gate.dart';
 import 'widgets/marketplace/barcode_label_plugin_gate.dart';
+import 'widgets/marketplace/advanced_accounting_plugin_gate.dart';
 import 'pages/business/barcode_labels/label_templates_page.dart';
 import 'pages/business/barcode_labels/label_studio_page.dart';
 import 'pages/business/barcode_labels/label_printers_page.dart';
@@ -2493,9 +2494,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                YearEndClosingPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  authStore: _authStore!,
+                                  child: YearEndClosingPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                  ),
                                 ),
                               );
                             },
@@ -2510,17 +2514,20 @@ class _MyAppState extends State<MyApp> {
                                   !_authStore!.isMultiCurrency) {
                                 return hesabixNoTransitionPage(
                                   state,
-                                  Scaffold(
-                                    appBar: AppBar(
-                                      title: const Text('تسعیر ارز'),
-                                    ),
-                                    body: const Center(
-                                      child: Padding(
-                                        padding: EdgeInsets.all(24),
-                                        child: Text(
-                                          'این بخش فقط برای کسب‌وکارهای چندارزی فعال است.\n'
-                                          'از تنظیمات کسب‌وکار، یک ارز فرعی اضافه کنید.',
-                                          textAlign: TextAlign.center,
+                                  AdvancedAccountingPluginGate(
+                                    businessId: businessId,
+                                    child: Scaffold(
+                                      appBar: AppBar(
+                                        title: const Text('تسعیر ارز'),
+                                      ),
+                                      body: const Center(
+                                        child: Padding(
+                                          padding: EdgeInsets.all(24),
+                                          child: Text(
+                                            'این بخش فقط برای کسب‌وکارهای چندارزی فعال است.\n'
+                                            'از تنظیمات کسب‌وکار، یک ارز فرعی اضافه کنید.',
+                                            textAlign: TextAlign.center,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -2529,10 +2536,13 @@ class _MyAppState extends State<MyApp> {
                               }
                               return hesabixNoTransitionPage(
                                 state,
-                                CurrencyRevaluationPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  authStore: _authStore!,
-                                  calendarController: _calendarController!,
+                                  child: CurrencyRevaluationPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -2618,10 +2628,13 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                LoanFacilitiesPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  authStore: _authStore!,
-                                  calendarController: _calendarController!,
+                                  child: LoanFacilitiesPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -3863,9 +3876,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                ArAgingReportPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  calendarController: _calendarController!,
+                                  child: ArAgingReportPage(
+                                    businessId: businessId,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -3878,9 +3894,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                ApAgingReportPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  calendarController: _calendarController!,
+                                  child: ApAgingReportPage(
+                                    businessId: businessId,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -3893,9 +3912,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                PersonBalancesByCurrencyReportPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  calendarController: _calendarController!,
+                                  child: PersonBalancesByCurrencyReportPage(
+                                    businessId: businessId,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -3908,9 +3930,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                CashFlowReportPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  calendarController: _calendarController!,
+                                  child: CashFlowReportPage(
+                                    businessId: businessId,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -3923,9 +3948,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                FxRevaluationReportPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  calendarController: _calendarController!,
+                                  child: FxRevaluationReportPage(
+                                    businessId: businessId,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -4374,9 +4402,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                TrialBalanceReportPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  calendarController: _calendarController!,
+                                  child: TrialBalanceReportPage(
+                                    businessId: businessId,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -4392,15 +4423,18 @@ class _MyAppState extends State<MyApp> {
                               final filters = reportFiltersFromQueryParams(qp);
                               return hesabixNoTransitionPage(
                                 state,
-                                GeneralLedgerReportPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  calendarController: _calendarController!,
-                                  initialAccount: initialAccount,
-                                  initialFiscalYearId: filters.fiscalYearId,
-                                  initialDateFrom: filters.dateFrom,
-                                  initialDateTo: filters.dateTo,
-                                  initialCurrencyId: filters.currencyId,
-                                  initialProjectId: filters.projectId,
+                                  child: GeneralLedgerReportPage(
+                                    businessId: businessId,
+                                    calendarController: _calendarController!,
+                                    initialAccount: initialAccount,
+                                    initialFiscalYearId: filters.fiscalYearId,
+                                    initialDateFrom: filters.dateFrom,
+                                    initialDateTo: filters.dateTo,
+                                    initialCurrencyId: filters.currencyId,
+                                    initialProjectId: filters.projectId,
+                                  ),
                                 ),
                               );
                             },
@@ -4413,9 +4447,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                JournalLedgerReportPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  calendarController: _calendarController!,
+                                  child: JournalLedgerReportPage(
+                                    businessId: businessId,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -4428,9 +4465,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                PnlPeriodReportPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  calendarController: _calendarController!,
+                                  child: PnlPeriodReportPage(
+                                    businessId: businessId,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -4443,9 +4483,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                PnlCumulativeReportPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  calendarController: _calendarController!,
+                                  child: PnlCumulativeReportPage(
+                                    businessId: businessId,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -4458,9 +4501,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                FinancialReportsPackagePage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  calendarController: _calendarController!,
+                                  child: FinancialReportsPackagePage(
+                                    businessId: businessId,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -4473,9 +4519,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                BalanceSheetReportPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  calendarController: _calendarController!,
+                                  child: BalanceSheetReportPage(
+                                    businessId: businessId,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -4488,9 +4537,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                AccountReviewReportPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  calendarController: _calendarController!,
+                                  child: AccountReviewReportPage(
+                                    businessId: businessId,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },
@@ -4684,18 +4736,20 @@ class _MyAppState extends State<MyApp> {
                               final businessId = int.parse(
                                 state.pathParameters['business_id']!,
                               );
-                              if (!_authStore!.hasBusinessPermission(
+                              final allowed = _authStore!.hasBusinessPermission(
                                 'settings',
                                 'join',
-                              )) {
-                                return hesabixNoTransitionPage(
-                                  state,
-                                  PermissionGuard.buildAccessDeniedPage(),
-                                );
-                              }
+                              );
                               return hesabixNoTransitionPage(
                                 state,
-                                BusinessBackupPage(businessId: businessId),
+                                AdvancedAccountingPluginGate(
+                                  businessId: businessId,
+                                  child: allowed
+                                      ? BusinessBackupPage(
+                                          businessId: businessId,
+                                        )
+                                      : PermissionGuard.buildAccessDeniedPage(),
+                                ),
                               );
                             },
                           ),
@@ -4705,15 +4759,6 @@ class _MyAppState extends State<MyApp> {
                               final businessId = int.parse(
                                 state.pathParameters['business_id']!,
                               );
-                              if (!_authStore!.hasBusinessPermission(
-                                'settings',
-                                'join',
-                              )) {
-                                return hesabixNoTransitionPage(
-                                  state,
-                                  PermissionGuard.buildAccessDeniedPage(),
-                                );
-                              }
                               final isOwner =
                                   _authStore!.currentBusiness?.id ==
                                       businessId &&
@@ -4722,16 +4767,21 @@ class _MyAppState extends State<MyApp> {
                                 'settings',
                                 'manage_ftp',
                               );
-                              if (!isOwner && !hasFtp) {
-                                return hesabixNoTransitionPage(
-                                  state,
-                                  PermissionGuard.buildAccessDeniedPage(),
-                                );
-                              }
+                              final allowed =
+                                  _authStore!.hasBusinessPermission(
+                                    'settings',
+                                    'join',
+                                  ) &&
+                                  (isOwner || hasFtp);
                               return hesabixNoTransitionPage(
                                 state,
-                                BusinessFtpBackupSettingsPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
+                                  child: allowed
+                                      ? BusinessFtpBackupSettingsPage(
+                                          businessId: businessId,
+                                        )
+                                      : PermissionGuard.buildAccessDeniedPage(),
                                 ),
                               );
                             },
@@ -4770,18 +4820,20 @@ class _MyAppState extends State<MyApp> {
                               final businessId = int.parse(
                                 state.pathParameters['business_id']!,
                               );
-                              if (!_authStore!.hasBusinessPermission(
+                              final allowed = _authStore!.hasBusinessPermission(
                                 'settings',
                                 'join',
-                              )) {
-                                return hesabixNoTransitionPage(
-                                  state,
-                                  PermissionGuard.buildAccessDeniedPage(),
-                                );
-                              }
+                              );
                               return hesabixNoTransitionPage(
                                 state,
-                                BusinessRestorePage(businessId: businessId),
+                                AdvancedAccountingPluginGate(
+                                  businessId: businessId,
+                                  child: allowed
+                                      ? BusinessRestorePage(
+                                          businessId: businessId,
+                                        )
+                                      : PermissionGuard.buildAccessDeniedPage(),
+                                ),
                               );
                             },
                           ),
@@ -4821,15 +4873,16 @@ class _MyAppState extends State<MyApp> {
                                     'fiscal_years',
                                     'rollback',
                                   );
-                              if (!canRollback) {
-                                return hesabixNoTransitionPage(
-                                  state,
-                                  PermissionGuard.buildAccessDeniedPage(),
-                                );
-                              }
                               return hesabixNoTransitionPage(
                                 state,
-                                FiscalYearRollbackPage(businessId: businessId),
+                                AdvancedAccountingPluginGate(
+                                  businessId: businessId,
+                                  child: canRollback
+                                      ? FiscalYearRollbackPage(
+                                          businessId: businessId,
+                                        )
+                                      : PermissionGuard.buildAccessDeniedPage(),
+                                ),
                               );
                             },
                           ),
@@ -4886,20 +4939,20 @@ class _MyAppState extends State<MyApp> {
                               final businessId = int.parse(
                                 state.pathParameters['business_id']!,
                               );
-                              if (!_authStore!.hasBusinessPermission(
+                              final allowed = _authStore!.hasBusinessPermission(
                                 'settings',
                                 'business',
-                              )) {
-                                return hesabixNoTransitionPage(
-                                  state,
-                                  PermissionGuard.buildAccessDeniedPage(),
-                                );
-                              }
+                              );
                               return hesabixNoTransitionPage(
                                 state,
-                                FxRevaluationSettingsPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  authStore: _authStore!,
+                                  child: allowed
+                                      ? FxRevaluationSettingsPage(
+                                          businessId: businessId,
+                                          authStore: _authStore!,
+                                        )
+                                      : PermissionGuard.buildAccessDeniedPage(),
                                 ),
                               );
                             },
@@ -4910,24 +4963,25 @@ class _MyAppState extends State<MyApp> {
                               final businessId = int.parse(
                                 state.pathParameters['business_id']!,
                               );
-                              if (!_authStore!.hasBusinessPermission(
+                              final allowed =
+                                  _authStore!.hasBusinessPermission(
                                     'settings',
                                     'business',
-                                  ) &&
-                                  !_authStore!.hasBusinessPermission(
+                                  ) ||
+                                  _authStore!.hasBusinessPermission(
                                     'currency_revaluation',
                                     'view',
-                                  )) {
-                                return hesabixNoTransitionPage(
-                                  state,
-                                  PermissionGuard.buildAccessDeniedPage(),
-                                );
-                              }
+                                  );
                               return hesabixNoTransitionPage(
                                 state,
-                                FxAutoSyncSettingsPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  authStore: _authStore!,
+                                  child: allowed
+                                      ? FxAutoSyncSettingsPage(
+                                          businessId: businessId,
+                                          authStore: _authStore!,
+                                        )
+                                      : PermissionGuard.buildAccessDeniedPage(),
                                 ),
                               );
                             },
@@ -4938,26 +4992,23 @@ class _MyAppState extends State<MyApp> {
                               final businessId = int.parse(
                                 state.pathParameters['business_id']!,
                               );
+                              Widget child;
                               if (!_authStore!.isMultiCurrency) {
-                                return hesabixNoTransitionPage(
-                                  state,
-                                  Scaffold(
-                                    appBar: AppBar(
-                                      title: const Text('تسعیر پایان دوره'),
-                                    ),
-                                    body: const Center(
-                                      child: Padding(
-                                        padding: EdgeInsets.all(24),
-                                        child: Text(
-                                          'این بخش فقط برای کسب‌وکارهای چندارزی فعال است.',
-                                          textAlign: TextAlign.center,
-                                        ),
+                                child = Scaffold(
+                                  appBar: AppBar(
+                                    title: const Text('تسعیر پایان دوره'),
+                                  ),
+                                  body: const Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(24),
+                                      child: Text(
+                                        'این بخش فقط برای کسب‌وکارهای چندارزی فعال است.',
+                                        textAlign: TextAlign.center,
                                       ),
                                     ),
                                   ),
                                 );
-                              }
-                              if (!_authStore!.hasBusinessPermission(
+                              } else if (!_authStore!.hasBusinessPermission(
                                     'currency_revaluation',
                                     'view',
                                   ) &&
@@ -4965,16 +5016,18 @@ class _MyAppState extends State<MyApp> {
                                     'settings',
                                     'business',
                                   )) {
-                                return hesabixNoTransitionPage(
-                                  state,
-                                  PermissionGuard.buildAccessDeniedPage(),
+                                child = PermissionGuard.buildAccessDeniedPage();
+                              } else {
+                                child = PeriodEndFxRevaluationPage(
+                                  businessId: businessId,
+                                  authStore: _authStore!,
                                 );
                               }
                               return hesabixNoTransitionPage(
                                 state,
-                                PeriodEndFxRevaluationPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  authStore: _authStore!,
+                                  child: child,
                                 ),
                               );
                             },
@@ -6074,9 +6127,12 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                ReportTemplatesPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  authStore: _authStore!,
+                                  child: ReportTemplatesPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                  ),
                                 ),
                               );
                             },
@@ -6158,11 +6214,14 @@ class _MyAppState extends State<MyApp> {
                               final q = state.uri.queryParameters;
                               return hesabixNoTransitionPage(
                                 state,
-                                ReportTemplateStudioPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  authStore: _authStore!,
-                                  moduleKey: q['module_key'],
-                                  subtype: q['subtype'],
+                                  child: ReportTemplateStudioPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    moduleKey: q['module_key'],
+                                    subtype: q['subtype'],
+                                  ),
                                 ),
                               );
                             },
@@ -6178,10 +6237,13 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                ReportTemplateStudioPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  authStore: _authStore!,
-                                  templateId: templateId,
+                                  child: ReportTemplateStudioPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    templateId: templateId,
+                                  ),
                                 ),
                               );
                             },
@@ -6199,12 +6261,15 @@ class _MyAppState extends State<MyApp> {
                                   : null;
                               return hesabixNoTransitionPage(
                                 state,
-                                ReportTemplateHtmlEditorPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  authStore: _authStore!,
-                                  moduleKey: q['module_key'] ?? seed?.moduleKey,
-                                  subtype: q['subtype'] ?? seed?.subtype,
-                                  seed: seed,
+                                  child: ReportTemplateHtmlEditorPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    moduleKey: q['module_key'] ?? seed?.moduleKey,
+                                    subtype: q['subtype'] ?? seed?.subtype,
+                                    seed: seed,
+                                  ),
                                 ),
                               );
                             },
@@ -6224,11 +6289,14 @@ class _MyAppState extends State<MyApp> {
                                   : null;
                               return hesabixNoTransitionPage(
                                 state,
-                                ReportTemplateHtmlEditorPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  authStore: _authStore!,
-                                  templateId: templateId,
-                                  seed: seed,
+                                  child: ReportTemplateHtmlEditorPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    templateId: templateId,
+                                    seed: seed,
+                                  ),
                                 ),
                               );
                             },
@@ -6351,10 +6419,13 @@ class _MyAppState extends State<MyApp> {
                               );
                               return hesabixNoTransitionPage(
                                 state,
-                                CheckReconciliationPage(
+                                AdvancedAccountingPluginGate(
                                   businessId: businessId,
-                                  authStore: _authStore!,
-                                  calendarController: _calendarController!,
+                                  child: CheckReconciliationPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    calendarController: _calendarController!,
+                                  ),
                                 ),
                               );
                             },

@@ -123,7 +123,9 @@ class BusinessSettingsCategorizationService {
           categoryId: 'business_finance',
           order: 2,
         ),
-      if (ctx.canManageBusiness && ctx.isMultiCurrency)
+      if (ctx.canManageBusiness &&
+          ctx.isMultiCurrency &&
+          ctx.canAccessAdvancedAccounting)
         _item(
           id: 'fx_revaluation',
           title: 'settingsInvoiceFxPolicyTitle',
@@ -134,7 +136,9 @@ class BusinessSettingsCategorizationService {
           categoryId: 'business_finance',
           order: 3,
         ),
-      if (ctx.canManageBusiness && ctx.isMultiCurrency)
+      if (ctx.canManageBusiness &&
+          ctx.isMultiCurrency &&
+          ctx.canAccessAdvancedAccounting)
         _item(
           id: 'fx_auto_sync',
           title: 'settingsFxAutoSyncTitle',
@@ -145,7 +149,9 @@ class BusinessSettingsCategorizationService {
           categoryId: 'business_finance',
           order: 4,
         ),
-      if (ctx.canManageBusiness && ctx.isMultiCurrency)
+      if (ctx.canManageBusiness &&
+          ctx.isMultiCurrency &&
+          ctx.canAccessAdvancedAccounting)
         _item(
           id: 'period_end_fx',
           title: 'تسعیر پایان دوره',
@@ -271,7 +277,7 @@ class BusinessSettingsCategorizationService {
           categoryId: 'sales_documents',
           order: 6,
         ),
-      if (ctx.canJoinSettings)
+      if (ctx.canJoinSettings && ctx.canAccessAdvancedAccounting)
         _item(
           id: 'report_templates',
           title: 'templates',
@@ -597,7 +603,7 @@ class BusinessSettingsCategorizationService {
 
   static SettingsCategory _advanced(BusinessSettingsContext ctx) {
     final items = <SettingsItem>[
-      if (ctx.canJoinSettings)
+      if (ctx.canJoinSettings && ctx.canAccessAdvancedAccounting)
         _item(
           id: 'backup',
           title: 'dataBackup',
@@ -609,7 +615,7 @@ class BusinessSettingsCategorizationService {
           order: 1,
           tags: const ['advanced'],
         ),
-      if (ctx.canManageFtp)
+      if (ctx.canManageFtp && ctx.canAccessAdvancedAccounting)
         _item(
           id: 'ftp_backup',
           title: 'ftpBackupSettingsTitle',
@@ -633,7 +639,7 @@ class BusinessSettingsCategorizationService {
           order: 3,
           tags: const ['advanced', 'ai'],
         ),
-      if (ctx.canJoinSettings)
+      if (ctx.canJoinSettings && ctx.canAccessAdvancedAccounting)
         _item(
           id: 'restore',
           title: 'dataRestore',
@@ -696,7 +702,7 @@ class BusinessSettingsCategorizationService {
           order: 1,
           tags: const ['danger'],
         ),
-      if (ctx.canFiscalYearRollback)
+      if (ctx.canFiscalYearRollback && ctx.canAccessAdvancedAccounting)
         _item(
           id: 'fiscal_year_rollback',
           title: 'businessSettingsFiscalYearRollback',

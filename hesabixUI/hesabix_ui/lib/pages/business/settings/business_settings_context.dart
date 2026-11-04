@@ -162,4 +162,7 @@ class BusinessSettingsContext {
     return authStore.hasBusinessPermission('digipay', 'view') ||
         authStore.hasBusinessPermission('digipay', 'manage');
   }
+
+  bool get canAccessAdvancedAccounting =>
+      pluginActive(kAdvancedAccountingPluginCode);
 }

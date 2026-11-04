@@ -12,6 +12,23 @@ from adapters.db.models.currency import Currency
 from adapters.db.models.marketplace import MarketplacePlugin, MarketplacePluginPlan
 
 
+ADVANCED_ACCOUNTING_PLUGIN_CODE = "advanced_accounting"
+
+_ADVANCED_ACCOUNTING_DESCRIPTION = """
+بسته حسابداری پیشرفته برای حسابداران و کسب‌وکارهای حرفه‌ای:
+
+✅ صورت‌های مالی: تراز آزمایشی، ترازنامه، سود و زیان دوره و تجمیعی
+✅ دفاتر قانونی: دفتر کل، دفتر روزنامه و خروجی دفاتر الکترونیکی
+✅ مرور حساب‌ها، صورت جریان وجوه نقد و بسته گزارش‌های مالی
+✅ بستن سال مالی و برگردان سال مالی
+✅ تسعیر ارز، نرخ‌گذاری، تسعیر پایان دوره و گزارش تسعیر
+✅ راس‌گیری چک، تسهیلات دریافتی، سن بدهی و سن بستانکاری
+✅ پشتیبان‌گیری کسب‌وکار، مقصد FTP و بازیابی داخل تنظیمات
+✅ استودیو ساخت قالب فاکتور و اسناد
+
+جدول حساب‌ها، اسناد، فاکتور و تراز افتتاحیه در نسخه پایه باقی می‌مانند.
+""".strip()
+
 _REPAIR_SHOP_DESCRIPTION = """
 سیستم جامع مدیریت تعمیرگاه با قابلیت‌های زیر:
 
@@ -234,6 +251,16 @@ _DEFAULT_PLUGINS: Tuple[_PluginSeed, ...] = (
 		trial_days=14,
 		trial_allowed=True,
 		plans=(("monthly", 180_000), ("yearly", 1_800_000), ("lifetime", 7_200_000)),
+	),
+	_PluginSeed(
+		code=ADVANCED_ACCOUNTING_PLUGIN_CODE,
+		name="بسته حسابداری پیشرفته",
+		description=_ADVANCED_ACCOUNTING_DESCRIPTION,
+		category="accounting",
+		icon_url=None,
+		trial_days=14,
+		trial_allowed=True,
+		plans=(("monthly", 250_000), ("yearly", 2_500_000), ("lifetime", 9_000_000)),
 	),
 )
 

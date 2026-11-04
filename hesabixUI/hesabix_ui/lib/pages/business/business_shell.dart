@@ -1292,6 +1292,16 @@ class _BusinessShellState extends State<BusinessShell> {
     }
   }
 
+  bool _isAdvancedAccountingMenuItem(_MenuItem item) {
+    if (kAdvancedAccountingMenuKeys.contains(item.key)) return true;
+    final path = item.path;
+    if (path == null) return false;
+    return path.contains('/year-end-closing') ||
+        path.contains('/currency-revaluation') ||
+        path.contains('/loan-facilities') ||
+        path.contains('/report-templates');
+  }
+
   bool _isPayrollPluginActive() => _isPluginCodeLicensed('payroll');
 
   bool _isOfficeAutomationPluginActive() => _isPluginCodeLicensed('office_automation');
@@ -3888,6 +3898,14 @@ class _BusinessShellState extends State<BusinessShell> {
         return false;
       }
     }
+
+    if (_isAdvancedAccountingMenuItem(item)) {
+      if (!_showPluginGatedMenu(
+        _isPluginCodeLicensed(kAdvancedAccountingPluginCode),
+      )) {
+        return false;
+      }
+    }
     
     // اگر سکشن تعریف نشده، نمایش داده نشود
     if (section == null) {
@@ -3976,9 +3994,12 @@ class _BusinessShellState extends State<BusinessShell> {
         return 'moadian';
       case 'plugin-marketplace':
         return 'marketplace';
+      case 'report-templates':
+        return 'report_templates';
     }
     final path = item.path;
     if (path != null) {
+      if (path.contains('/report-templates')) return 'report_templates';
       if (path.contains('/hscript')) return 'reports';
       if (path.contains('/payroll')) return 'payroll';
       if (path.contains('/office-automation')) return 'office_automation';
@@ -4048,6 +4069,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.storageSpace) return 'storage';
     if (label == t.taxpayers) return 'moadian';
     if (label == t.settings) return 'settings';
+    if (label == t.templates) return 'report_templates';
     if (label == t.pluginMarketplace) return 'marketplace';
     if (label == t.warranty || label == 'گارانتی' || label == 'Warranty') return 'warranty';
     if (label == t.repairShopMenu || label == 'تعمیرگاه' || label == 'Repair Shop') return 'repair_shop';
