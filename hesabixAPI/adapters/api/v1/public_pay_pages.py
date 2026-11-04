@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from adapters.db.session import get_db
 from app.core.payment_response import (
 	pay_page_font_path,
+	rebrand_product_text,
 	render_public_business_pay_page,
 	resolve_payment_display_name,
 )
@@ -82,6 +83,7 @@ def _pay_page_html_context(
 	report_mobile: str = "",
 ) -> dict[str, Any]:
 	app_name = resolve_payment_display_name(db)
+	footer_credit = rebrand_product_text("نرم افزار مدیریت کسب و کار حسابیکس", app_name)
 	data = payload or {}
 	page_proto, page_host, page_origin = _public_origin(request)
 	expected_page_url = f"{page_origin}/u/{username}" if page_host else ""
@@ -111,6 +113,7 @@ def _pay_page_html_context(
 	}
 	return {
 		"app_name": app_name,
+		"footer_credit": footer_credit,
 		"username": username,
 		"page_title": title if not not_found else "صفحه پرداخت",
 		"heading": f"پرداخت به {title}" if not not_found else "صفحه پرداخت",

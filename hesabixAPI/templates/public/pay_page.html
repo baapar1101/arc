@@ -237,7 +237,7 @@
                 {% endif %}
             </div>
         </div>
-        <p class="footer">قبل از پرداخت، https و آدرس مرورگر را با لینکی که فروشنده داده تطبیق دهید.</p>
+        <p class="footer">{{ footer_credit | default('نرم افزار مدیریت کسب و کار حسابیکس') }}</p>
     </div>
 
     <dialog class="modal" id="report-dialog"{% if report_open %} data-open="1"{% endif %}>

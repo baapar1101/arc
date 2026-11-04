@@ -184,6 +184,8 @@ def test_short_pay_page_serves_backend_html_not_flutter_redirect():
 	assert "https" in res.text
 	assert "مراجع قضایی" in res.text
 	assert "لینک را فقط از خود فروشنده" in res.text
+	assert "نرم افزار مدیریت کسب و کار حسابیکس" in res.text
+	assert "قبل از پرداخت، https و آدرس مرورگر" not in res.text
 	assert 'class="brand"' not in res.text
 
 
@@ -369,6 +371,7 @@ def test_pay_page_html_loads_persian_font_and_brand_name():
 	html = render_public_business_pay_page(
 		{
 			"app_name": "آرک حسابداری",
+			"footer_credit": "نرم افزار مدیریت کسب و کار آرک حسابداری",
 			"username": "shop-ali",
 			"page_title": "فروشگاه علی",
 			"heading": "پرداخت به فروشگاه علی",
@@ -408,8 +411,8 @@ def test_pay_page_html_loads_persian_font_and_brand_name():
 	assert "font-family: 'YekanBakhFaNum'" in body
 	assert 'id="pay-btn"' in body
 	assert 'class="brand"' not in body
-	assert "آرک حسابداری" not in body
-	assert "حسابیکس" not in body
+	assert "نرم افزار مدیریت کسب و کار آرک حسابداری" in body
+	assert "نرم افزار مدیریت کسب و کار حسابیکس" not in body
 	assert "مراجع قضایی" in body
 
 
@@ -438,3 +441,7 @@ def test_resolve_payment_display_name_uses_rebrand_fa(monkeypatch, tmp_path):
 	with patch("app.services.system_settings_service.get_app_name", return_value="Hesabix API"):
 		assert resolve_payment_display_name(MagicMock()) == "فروشگاه آرک"
 	assert rebrand_product_text("پرداخت با حسابیکس", "فروشگاه آرک") == "پرداخت با فروشگاه آرک"
+	assert (
+		rebrand_product_text("نرم افزار مدیریت کسب و کار حسابیکس", "فروشگاه آرک")
+		== "نرم افزار مدیریت کسب و کار فروشگاه آرک"
+	)
