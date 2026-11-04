@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Set, Tuple
 from datetime import datetime, date, timedelta, timezone
 from app.core.datetime_utils import utc_now, utc_now_aware, utc_naive_to_iso_z
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import logging
 import re
 from collections import defaultdict, deque
@@ -7974,6 +7974,421 @@ def create_invoice(
     return result
 
 
+_INVOICE_BODY_EXTRA_KEYS = (
+    "person_id",
+    "seller_id",
+    "customer_id",
+    "supplier_id",
+    "invoice_adjustments",
+    "global_discount",
+    "installment_plan",
+    "purchase_accounting_mode",
+    "post_inventory",
+    "auto_post_warehouse",
+    "quick_sale",
+    "customer_club",
+    "production_order_id",
+    "production_operations_total",
+)
+_LINE_BODY_EXTRA_KEYS = (
+    "unit_price",
+    "line_discount",
+    "tax_amount",
+    "discount_type",
+    "discount_value",
+    "tax_rate",
+    "unit",
+    "warehouse_id",
+    "fixed_asset",
+    "fixed_asset_class_id",
+    "fixed_asset_location_id",
+    "fixed_asset_custodian_person_id",
+    "fixed_asset_salvage",
+    "fixed_asset_useful_life_months",
+    "fixed_asset_declining_annual_rate",
+    "fixed_asset_name",
+    "fixed_asset_commission_date",
+    "selected_instance_ids",
+    "returned_from_instance_ids",
+    "inventory_tracked",
+    "capitalization",
+)
+_LINE_BODY_IGNORE_EXTRA_KEYS = frozenset(
+    {
+        "fixed_asset_id",
+        "line_total",
+        "movement",
+        "tax_snapshot",
+        "inventory_posted",
+        "unit_price_source",
+    }
+)
+_LINE_BODY_OPTIONAL_EXTRA_KEYS = frozenset(
+    {
+        "discount_type",
+        "discount_value",
+        "tax_rate",
+        "unit",
+        "inventory_tracked",
+    }
+)
+
+
+def _canonical_optional_int(value: Any) -> Optional[int]:
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _canonical_amount(value: Any) -> Optional[str]:
+    if value is None or value == "":
+        return None
+    try:
+        quantized = Decimal(str(value)).quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
+    except (InvalidOperation, TypeError, ValueError):
+        text = str(value).strip()
+        return text or None
+    return format(quantized, "f")
+
+
+def _canonical_jsonish(value: Any) -> Any:
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, dict):
+        out: Dict[str, Any] = {}
+        for key in sorted(value.keys(), key=lambda item: str(item)):
+            canonical = _canonical_jsonish(value[key])
+            if canonical is None:
+                continue
+            out[str(key)] = canonical
+        return out or None
+    if isinstance(value, (list, tuple)):
+        items = [_canonical_jsonish(item) for item in value]
+        return items or None
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, (int, float, Decimal)):
+        return _canonical_amount(value)
+    text = str(value).strip()
+    return text or None
+
+
+def _picked_extra(extra: Any, keys: Tuple[str, ...]) -> Dict[str, Any]:
+    info = extra_info_dict(extra)
+    picked: Dict[str, Any] = {}
+    for key in keys:
+        if key in info:
+            picked[key] = info[key]
+    return picked
+
+
+def _invoice_line_parts(line: Any) -> Tuple[Optional[int], Optional[str], Optional[str], Dict[str, Any]]:
+    if isinstance(line, dict):
+        product_id = line.get("product_id")
+        quantity = line.get("quantity")
+        description = line.get("description")
+        extra = extra_info_dict(line.get("extra_info"))
+    else:
+        product_id = getattr(line, "product_id", None)
+        quantity = getattr(line, "quantity", None)
+        description = getattr(line, "description", None)
+        extra = extra_info_dict(getattr(line, "extra_info", None))
+    extra_part = _picked_extra(extra, _LINE_BODY_EXTRA_KEYS)
+    for key, value in extra.items():
+        key_name = str(key)
+        if key_name in _LINE_BODY_IGNORE_EXTRA_KEYS:
+            continue
+        if key_name.startswith("fixed_asset"):
+            extra_part[key_name] = value
+    desc = str(description).strip() if description is not None else ""
+    return (
+        _canonical_optional_int(product_id),
+        _canonical_amount(quantity),
+        desc or None,
+        extra_part,
+    )
+
+
+def _invoice_line_extras_equal(existing_extra: Dict[str, Any], incoming_extra: Dict[str, Any]) -> bool:
+    keys = set(existing_extra) | set(incoming_extra)
+    for key in keys:
+        if key in _LINE_BODY_OPTIONAL_EXTRA_KEYS and (key not in existing_extra or key not in incoming_extra):
+            continue
+        if _canonical_jsonish(existing_extra.get(key)) != _canonical_jsonish(incoming_extra.get(key)):
+            return False
+    return True
+
+
+def _invoice_lines_economically_equal(existing_lines: List[Any], incoming_lines: List[Any]) -> bool:
+    if len(existing_lines) != len(incoming_lines):
+        return False
+    for old, new in zip(existing_lines, incoming_lines):
+        old_pid, old_qty, old_desc, old_extra = _invoice_line_parts(old)
+        new_pid, new_qty, new_desc, new_extra = _invoice_line_parts(new)
+        if (old_pid, old_qty, old_desc) != (new_pid, new_qty, new_desc):
+            return False
+        if not _invoice_line_extras_equal(old_extra, new_extra):
+            return False
+    return True
+
+
+def _normalize_invoice_body_extra(extra: Any) -> Dict[str, Any]:
+    picked = _picked_extra(extra, _INVOICE_BODY_EXTRA_KEYS)
+    if "post_inventory" not in picked:
+        picked["post_inventory"] = True
+    if "auto_post_warehouse" not in picked:
+        picked["auto_post_warehouse"] = False
+    return picked
+
+
+def _invoice_extra_body_equal(existing_extra: Any, incoming_extra: Any) -> bool:
+    return _canonical_jsonish(_normalize_invoice_body_extra(existing_extra)) == _canonical_jsonish(
+        _normalize_invoice_body_extra(incoming_extra)
+    )
+
+
+def _invoice_payload_preserves_invoice_body(
+    db: Session,
+    document: Document,
+    data: Dict[str, Any],
+    *,
+    inv_type: str,
+    old_document_type: str,
+) -> bool:
+    """True اگر payload بدنهٔ فاکتور (اقلام، بها، طرف‌حساب، نوع) را عوض نکند."""
+    if inv_type != old_document_type:
+        return False
+    if "is_proforma" in data and bool(data.get("is_proforma")) != bool(document.is_proforma):
+        return False
+    if data.get("document_date") not in (None, ""):
+        if _parse_iso_date(data.get("document_date")) != _parse_iso_date(document.document_date):
+            return False
+    if data.get("currency_id") not in (None, ""):
+        if _canonical_optional_int(data.get("currency_id")) != _canonical_optional_int(document.currency_id):
+            return False
+    if "code" in data and str(data.get("code") or "").strip() != str(document.code or "").strip():
+        return False
+    if "project_id" in data and _canonical_optional_int(data.get("project_id")) != _canonical_optional_int(
+        document.project_id
+    ):
+        return False
+    if "description" in data:
+        incoming_desc = str(data.get("description") or "").strip() or None
+        current_desc = str(document.description or "").strip() or None
+        if incoming_desc != current_desc:
+            return False
+    if data.get("fx_rate_id") not in (None, ""):
+        extra = extra_info_dict(document.extra_info)
+        fx = extra.get("fx") if isinstance(extra.get("fx"), dict) else {}
+        current_fx_id = fx.get("rate_row_id") if fx.get("mode") == "selected" else None
+        if _canonical_optional_int(data.get("fx_rate_id")) != _canonical_optional_int(current_fx_id):
+            return False
+    if isinstance(data.get("extra_info"), dict) and not _invoice_extra_body_equal(
+        document.extra_info, data.get("extra_info")
+    ):
+        return False
+    if "lines" in data:
+        existing_lines = (
+            db.query(InvoiceItemLine)
+            .filter(InvoiceItemLine.document_id == document.id)
+            .order_by(InvoiceItemLine.id.asc())
+            .all()
+        )
+        incoming_lines = list(data.get("lines") or [])
+        if not _invoice_lines_economically_equal(existing_lines, incoming_lines):
+            return False
+    return True
+
+
+def _sync_invoice_linked_payments(
+    db: Session,
+    *,
+    document: Document,
+    user_id: int,
+    invoice_type: str,
+    old_document_type: str,
+    data: Dict[str, Any],
+    old_change_payment_id: Any,
+) -> List[int]:
+    """جایگزینی اسناد دریافت/پرداخت پیوندی فاکتور؛ بدنهٔ فاکتور را دست نمی‌زند."""
+    payment_docs: List[int] = []
+    invoice_type_changed = invoice_type != old_document_type
+    payments_provided = "payments" in data and isinstance(data.get("payments"), list)
+    payments = list(data["payments"]) if payments_provided else []
+
+    if invoice_type_changed and not document.is_proforma and not payments_provided:
+        _clear_invoice_linked_receipt_payments(
+            db,
+            int(document.business_id),
+            int(document.id),
+            document,
+        )
+        return payment_docs
+
+    if payments_provided and not document.is_proforma:
+        from app.services.receipt_payment_service import delete_receipt_payment
+
+        header_extra_pm = document.extra_info or {}
+        person_id_pm = _person_id_from_header({"extra_info": header_extra_pm})
+
+        old_receipt_payment_ids = _get_receipt_payment_ids_linked_to_invoice(
+            db,
+            document.business_id,
+            int(document.id),
+            extra_info=header_extra_pm,
+        )
+
+        has_positive_payment = any(
+            Decimal(str(p.get("amount", 0) or 0)) > 0 for p in payments
+        )
+        if payments and has_positive_payment:
+            person_id_pm = _resolve_and_validate_person_id(db, document.business_id, person_id_pm)
+            if not person_id_pm:
+                raise ApiError(
+                    "PERSON_REQUIRED",
+                    "برای ثبت تراکنش‌های پرداخت، انتخاب طرف حساب الزامی است.",
+                    http_status=400,
+                )
+
+        for old_rp_id in old_receipt_payment_ids:
+            delete_receipt_payment(db, int(old_rp_id), commit=False)
+        if old_change_payment_id is not None:
+            delete_receipt_payment(db, int(old_change_payment_id), commit=False)
+
+        extra = dict(document.extra_info) if document.extra_info else {}
+        links = dict(extra.get("links", {}))
+        links.pop(INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID, None)
+        extra["links"] = links
+        document.extra_info = _normalize_document_extra_info_for_storage(extra)
+        flag_modified(document, "extra_info")
+
+        if not payments:
+            extra = dict(document.extra_info) if document.extra_info else {}
+            links = dict(extra.get("links", {}))
+            links.pop(INVOICE_LINK_RECEIPT_PAYMENT_IDS, None)
+            extra["links"] = links
+            document.extra_info = _normalize_document_extra_info_for_storage(extra)
+            flag_modified(document, "extra_info")
+        else:
+            payment_docs = _create_receipt_payment_documents_for_invoice_payments(
+                db,
+                business_id=int(document.business_id),
+                user_id=user_id,
+                document=document,
+                person_id=int(person_id_pm),
+                payments=payments,
+                invoice_type=invoice_type,
+            )
+            if payment_docs:
+                extra = dict(document.extra_info) if document.extra_info else {}
+                links = dict(extra.get("links", {}))
+                links[INVOICE_LINK_RECEIPT_PAYMENT_IDS] = payment_docs
+                extra["links"] = links
+                document.extra_info = _normalize_document_extra_info_for_storage(extra)
+                flag_modified(document, "extra_info")
+            else:
+                extra = dict(document.extra_info) if document.extra_info else {}
+                links = dict(extra.get("links", {}))
+                links.pop(INVOICE_LINK_RECEIPT_PAYMENT_IDS, None)
+                extra["links"] = links
+                document.extra_info = _normalize_document_extra_info_for_storage(extra)
+                flag_modified(document, "extra_info")
+
+        is_quick_sale_pm = bool((document.extra_info or {}).get("quick_sale", False))
+        if payments and invoice_type == INVOICE_SALES and is_quick_sale_pm and person_id_pm:
+            change_amount = _quick_sale_change_amount(document, payments)
+            if change_amount <= Decimal("0.01"):
+                extra = dict(document.extra_info) if document.extra_info else {}
+                extra.pop("quick_sale_change", None)
+                document.extra_info = _normalize_document_extra_info_for_storage(extra)
+                flag_modified(document, "extra_info")
+            change_payment_id = _create_quick_sale_change_payment(
+                db,
+                business_id=int(document.business_id),
+                user_id=user_id,
+                document=document,
+                person_id=int(person_id_pm),
+                payments=payments,
+                change_request=(document.extra_info or {}).get("quick_sale_change"),
+            )
+            if change_payment_id:
+                extra = dict(document.extra_info) if document.extra_info else {}
+                links = dict(extra.get("links", {}))
+                links[INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID] = change_payment_id
+                extra["links"] = links
+                document.extra_info = _normalize_document_extra_info_for_storage(extra)
+                flag_modified(document, "extra_info")
+    return payment_docs
+
+
+def _apply_invoice_payments_only_update(
+    db: Session,
+    *,
+    document: Document,
+    user_id: int,
+    data: Dict[str, Any],
+    inv_type: str,
+    old_document_type: str,
+    old_change_payment_id: Any,
+) -> Dict[str, Any]:
+    """ذخیرهٔ تراکنش‌های فاکتور بدون حذف/بازایجاد اقلام، سند حسابداری و کارت دارایی."""
+    logger.info(
+        "invoice %s payments-only update; skipping line rewrite",
+        document.id,
+    )
+    _sync_invoice_linked_payments(
+        db,
+        document=document,
+        user_id=user_id,
+        invoice_type=inv_type,
+        old_document_type=old_document_type,
+        data=data,
+        old_change_payment_id=old_change_payment_id,
+    )
+    if "tag_ids" in data:
+        from app.services.invoice_tag_service import replace_document_invoice_tags
+
+        replace_document_invoice_tags(
+            db, int(document.business_id), int(document.id), data.get("tag_ids")
+        )
+    db.commit()
+    db.refresh(document)
+    result = invoice_document_to_dict(db, document)
+    invalidate_invoices_cache(
+        business_id=document.business_id,
+        fiscal_year_id=document.fiscal_year_id,
+        invoice_id=document.id,
+        document_type=document.document_type,
+        project_id=document.project_id,
+    )
+    from app.services.document_service import invalidate_documents_cache
+
+    invalidate_documents_cache(
+        business_id=document.business_id,
+        fiscal_year_id=document.fiscal_year_id,
+        document_type=document.document_type,
+    )
+    try:
+        from app.services.workflow.workflow_trigger_service import trigger_invoice_updated
+
+        trigger_invoice_updated(
+            db=db,
+            business_id=int(document.business_id),
+            document=document,
+            user_id=user_id,
+        )
+    except Exception as wfe:
+        logger.warning("invoice.updated workflow trigger failed: %s", wfe, exc_info=True)
+    return result
+
+
 def update_invoice(
     db: Session,
     document_id: int,
@@ -8043,6 +8458,23 @@ def update_invoice(
         validate_invoice_type_change_for_tax(document, _old_document_type, inv_type)
         document.document_type = inv_type
     data["invoice_type"] = inv_type
+
+    if _invoice_payload_preserves_invoice_body(
+        db,
+        document,
+        data,
+        inv_type=inv_type,
+        old_document_type=_old_document_type,
+    ):
+        return _apply_invoice_payments_only_update(
+            db,
+            document=document,
+            user_id=user_id,
+            data=data,
+            inv_type=inv_type,
+            old_document_type=_old_document_type,
+            old_change_payment_id=_old_change_payment_id,
+        )
 
     # Update header
     document_date = _parse_iso_date(data.get("document_date", document.document_date))
@@ -8936,116 +9368,16 @@ def update_invoice(
                         description="تعدیل هزینه پورسانت",
                     ))
 
-    # پردازش تراکنش‌های پرداخت (مشابه create_invoice)
-    payment_docs: List[int] = []
-    _invoice_type_changed = inv_type != _old_document_type
-    payments_provided = "payments" in data and isinstance(data.get("payments"), list)
-    payments = list(data["payments"]) if payments_provided else []
-
-    # تغییر نوع فاکتور بدون ارسال payments: اسناد دریافت/پرداخت قبلی با نوع قدیم نامعتبرند
-    if _invoice_type_changed and not document.is_proforma and not payments_provided:
-        _clear_invoice_linked_receipt_payments(
-            db,
-            int(document.business_id),
-            int(document.id),
-            document,
-        )
-
-    if payments_provided and not document.is_proforma:
-        from app.services.receipt_payment_service import delete_receipt_payment
-
-        # person_id از extra_info مرج‌شده روی خود سند (نه فقط payload خام) تا با API ناقص هم‌خوان باشد
-        header_extra_pm = document.extra_info or {}
-        person_id_pm = _person_id_from_header({"extra_info": header_extra_pm})
-
-        old_receipt_payment_ids = _get_receipt_payment_ids_linked_to_invoice(
-            db,
-            document.business_id,
-            int(document.id),
-            extra_info=header_extra_pm,
-        )
-
-        has_positive_payment = any(
-            Decimal(str(p.get("amount", 0) or 0)) > 0 for p in payments
-        )
-        if payments and has_positive_payment:
-            person_id_pm = _resolve_and_validate_person_id(db, document.business_id, person_id_pm)
-            if not person_id_pm:
-                raise ApiError(
-                    "PERSON_REQUIRED",
-                    "برای ثبت تراکنش‌های پرداخت، انتخاب طرف حساب الزامی است.",
-                    http_status=400,
-                )
-
-        # هرگاه payments در payload باشد، اسناد دریافت/پرداخت قبلی حذف می‌شوند؛ خطای حذف باید به کاربر برگردد
-        for old_rp_id in old_receipt_payment_ids:
-            delete_receipt_payment(db, int(old_rp_id), commit=False)
-        if _old_change_payment_id is not None:
-            delete_receipt_payment(db, int(_old_change_payment_id), commit=False)
-
-        extra = dict(document.extra_info) if document.extra_info else {}
-        links = dict(extra.get("links", {}))
-        links.pop(INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID, None)
-        extra["links"] = links
-        document.extra_info = _normalize_document_extra_info_for_storage(extra)
-        flag_modified(document, "extra_info")
-
-        if not payments:
-            extra = dict(document.extra_info) if document.extra_info else {}
-            links = dict(extra.get("links", {}))
-            links.pop(INVOICE_LINK_RECEIPT_PAYMENT_IDS, None)
-            extra["links"] = links
-            document.extra_info = _normalize_document_extra_info_for_storage(extra)
-            flag_modified(document, "extra_info")
-        else:
-            payment_docs = _create_receipt_payment_documents_for_invoice_payments(
-                db,
-                business_id=int(document.business_id),
-                user_id=user_id,
-                document=document,
-                person_id=int(person_id_pm),
-                payments=payments,
-                invoice_type=inv_type,
-            )
-            if payment_docs:
-                extra = dict(document.extra_info) if document.extra_info else {}
-                links = dict(extra.get("links", {}))
-                links[INVOICE_LINK_RECEIPT_PAYMENT_IDS] = payment_docs
-                extra["links"] = links
-                document.extra_info = _normalize_document_extra_info_for_storage(extra)
-                flag_modified(document, "extra_info")
-            else:
-                extra = dict(document.extra_info) if document.extra_info else {}
-                links = dict(extra.get("links", {}))
-                links.pop(INVOICE_LINK_RECEIPT_PAYMENT_IDS, None)
-                extra["links"] = links
-                document.extra_info = _normalize_document_extra_info_for_storage(extra)
-                flag_modified(document, "extra_info")
-
-        is_quick_sale_pm = bool((document.extra_info or {}).get("quick_sale", False))
-        if payments and inv_type == INVOICE_SALES and is_quick_sale_pm and person_id_pm:
-            change_amount = _quick_sale_change_amount(document, payments)
-            if change_amount <= Decimal("0.01"):
-                extra = dict(document.extra_info) if document.extra_info else {}
-                extra.pop("quick_sale_change", None)
-                document.extra_info = _normalize_document_extra_info_for_storage(extra)
-                flag_modified(document, "extra_info")
-            change_payment_id = _create_quick_sale_change_payment(
-                db,
-                business_id=int(document.business_id),
-                user_id=user_id,
-                document=document,
-                person_id=int(person_id_pm),
-                payments=payments,
-                change_request=(document.extra_info or {}).get("quick_sale_change"),
-            )
-            if change_payment_id:
-                extra = dict(document.extra_info) if document.extra_info else {}
-                links = dict(extra.get("links", {}))
-                links[INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID] = change_payment_id
-                extra["links"] = links
-                document.extra_info = _normalize_document_extra_info_for_storage(extra)
-                flag_modified(document, "extra_info")
+    # پردازش تراکنش‌های پرداخت (مشابه create_invoice) — جدا از بازنویسی اقلام
+    _sync_invoice_linked_payments(
+        db,
+        document=document,
+        user_id=user_id,
+        invoice_type=inv_type,
+        old_document_type=_old_document_type,
+        data=data,
+        old_change_payment_id=_old_change_payment_id,
+    )
 
     # SessionLocal uses autoflush=False. Persist the replacement invoice lines before
     # _remove_old_invoice_warehouse_documents queries them to distinguish unchanged
