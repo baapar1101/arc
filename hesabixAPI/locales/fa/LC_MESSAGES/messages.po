@@ -1507,3 +1507,9 @@ msgstr "واحد سازمانی نمی‌تواند زیرمجموعهٔ خود�
 
 msgid "OA_CODE_EXISTS"
 msgstr "این کد قبلاً استفاده شده است"
+
+msgid "AI_MCP_PLUGIN_NOT_ACTIVE"
+msgstr "افزونه «سرور MCP هوش مصنوعی» برای این کسب‌وکار فعال نیست."
+
+msgid "AI_MCP_PLUGIN_EXPIRED"
+msgstr "اشتراک افزونه «سرور MCP هوش مصنوعی» تمام شده است."

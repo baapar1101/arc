@@ -134,7 +134,12 @@ def visible_tool_catalog(
                 "required_permissions": [],
             }
         )
-    return sorted(catalog, key=lambda item: item["name"])
+    catalog = sorted(catalog, key=lambda item: item["name"])
+    if _channel_uses_mcp_filter(ctx):
+        from app.core.ai_mcp_plugin_dependency import apply_visible_catalog_plugin_gate
+
+        return apply_visible_catalog_plugin_gate(db, business_id, catalog)
+    return catalog
 
 
 def list_mcp_categories(

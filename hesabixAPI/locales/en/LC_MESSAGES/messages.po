@@ -1484,3 +1484,9 @@ msgstr "An organization unit cannot be nested under its own descendant"
 
 msgid "OA_CODE_EXISTS"
 msgstr "This code is already used"
+
+msgid "AI_MCP_PLUGIN_NOT_ACTIVE"
+msgstr "The AI MCP server add-on is not active for this business."
+
+msgid "AI_MCP_PLUGIN_EXPIRED"
+msgstr "The AI MCP server add-on subscription has expired."

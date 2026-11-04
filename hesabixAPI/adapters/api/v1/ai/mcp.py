@@ -56,6 +56,9 @@ def create_mcp_connection(
     except (TypeError, ValueError):
         raise ApiError("BUSINESS_ID_REQUIRED", "شناسه کسب‌وکار الزامی است", http_status=400)
     _require_business_access(ctx, business_id)
+    from app.core.ai_mcp_plugin_dependency import require_ai_mcp_plugin_active
+
+    require_ai_mcp_plugin_active(db, business_id)
     enable_writes = body.get("enable_writes") is True
     if enable_writes and not ctx.is_business_owner(business_id):
         raise ApiError("FORBIDDEN", "فعال‌سازی ابزارهای نوشتنی فقط برای مالک کسب‌وکار مجاز است", http_status=403)
@@ -134,7 +137,12 @@ def list_mcp_connections(
                 "revoked": row.revoked_at is not None,
                 "oauth": bool(row.oauth_grant_id),
             })
-    return {"items": items}
+    from app.core.ai_mcp_plugin_dependency import get_ai_mcp_plugin_access, public_ai_mcp_plugin_access
+
+    return {
+        "items": items,
+        "plugin": public_ai_mcp_plugin_access(get_ai_mcp_plugin_access(db, business_id)),
+    }
 
 
 @router.delete("/connections/{connection_id}", summary="لغو اتصال MCP")

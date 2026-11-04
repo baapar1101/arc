@@ -477,6 +477,7 @@ def _authorization_html(request_id: str, client_name: str, offline_requested: bo
     .permission small {{ color:var(--muted); font-size:12px; line-height:1.7; }}
     .permission--optional {{ background:#fff; }}
     .business-label {{ margin-bottom:7px; }}
+    .plugin-banner {{ margin:0 0 16px; padding:12px 14px; color:#8a4b12; background:#fff8ee; border:1px solid #f0d3b0; border-radius:12px; font-size:13px; line-height:1.8; }}
     .button-row {{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:17px; }}
     .footnote {{ display:flex; justify-content:center; align-items:center; gap:6px; margin:16px 0 0; color:#778b99; text-align:center; font-size:11px; }}
     .footnote svg {{ width:14px; height:14px; color:#438069; }}
@@ -535,6 +536,7 @@ def _authorization_html(request_id: str, client_name: str, offline_requested: bo
         <section id="consent" hidden aria-labelledby="consent-heading">
           <div class="divider"></div><h2 class="section-heading" id="consent-heading">اتصال را بررسی و تایید کنید</h2>
           <p class="section-hint">کسب‌وکار و سطح دسترسی را انتخاب کنید. فقط موارد انتخاب‌شده در اختیار این اتصال قرار می‌گیرد.</p>
+          <div id="pluginBanner" class="plugin-banner" hidden role="alert"></div>
           <label class="field"><span class="field-label business-label" for="business">کسب‌وکار موردنظر</span><select class="control" id="business" required><option value="" selected disabled>یک کسب‌وکار را انتخاب کنید</option></select></label>
           <div id="toolPermissionSection" hidden><h3 class="section-heading">انتخاب ابزارها</h3><p class="section-hint">فقط ابزارهای مجاز برای حساب شما نمایش داده می‌شوند. ابزارهای تغییردهنده نیز مطابق سطح دسترسی شما قابل انتخاب‌اند.</p><button class="text-button" id="grantAll" type="button">فعال‌سازی همهٔ دسترسی‌های مجاز</button><div id="toolPermissions" class="permission-list"></div></div>
           <div class="permission-list">{offline_option}</div>
@@ -580,9 +582,15 @@ let consentCatalog=[];
 const categoryLabels={{invoices:'فاکتورها',products:'کالاها',inventory:'انبار',people:'اشخاص',financial:'مالی',crm:'CRM',reports:'گزارش‌ها',workflow:'گردش‌کار',export:'خروجی‌ها',integration:'یکپارچه‌سازی',other:'سایر'}};
 async function loadConsentCatalog(){{
   const host=$('toolPermissions');host.replaceChildren();$('toolPermissionSection').hidden=true;
+  const banner=$('pluginBanner');if(banner){{banner.hidden=true;banner.textContent=''}}
   if(!$('business').value)return;
   try{{
     const result=await request('/ai/mcp/oauth/authorize/catalog',{{method:'POST',headers:{{'Content-Type':'application/json',Authorization:'Bearer '+sessionKey}},body:JSON.stringify({{request_id:rid,business_id:Number($('business').value)}})}});
+    const plugin=result.plugin;
+    if(plugin&&plugin.is_active===false){{
+      if(banner){{banner.hidden=false;banner.textContent=plugin.message||'افزونه سرور MCP هوش مصنوعی برای این کسب‌وکار فعال نیست یا اشتراک آن تمام شده است.'}}
+      consentCatalog=[];return;
+    }}
     consentCatalog=result.tools||[];const groups=new Map();
     for(const tool of consentCatalog){{const category=tool.category||'other';if(!groups.has(category))groups.set(category,[]);groups.get(category).push(tool)}}
     for(const [category,tools] of groups){{
@@ -677,8 +685,10 @@ def consent_catalog(payload: dict, request: Request, db: Session = Depends(get_d
     ctx = AuthContext(user=user, api_key_id=0, business_id=business_id, db=db)
     if not _has_explicit_business_access(db, user.id, business_id):
         raise HTTPException(403, "Business access is no longer active")
+    from app.core.ai_mcp_plugin_dependency import get_ai_mcp_plugin_access, mcp_oauth_catalog_envelope
+
     catalog = _consent_tool_catalog(db, ctx, business_id)
-    return {"tools": catalog}
+    return mcp_oauth_catalog_envelope(get_ai_mcp_plugin_access(db, business_id), catalog)
 
 
 @oauth_router.post("/authorize/consent")
@@ -726,7 +736,15 @@ def consent(payload: dict, request: Request, db: Session = Depends(get_db)) -> d
             or not all(isinstance(name, str) for name in raw_tool_permissions)
             or len(raw_tool_permissions) != len(set(raw_tool_permissions))):
         raise HTTPException(400, "Invalid tool permissions")
-    tool_catalog = _consent_tool_catalog(db, ctx, business_id)
+    from app.core.ai_mcp_plugin_dependency import get_ai_mcp_plugin_access
+
+    plugin_access = get_ai_mcp_plugin_access(db, business_id)
+    if plugin_access["is_active"]:
+        tool_catalog = _consent_tool_catalog(db, ctx, business_id)
+    else:
+        tool_catalog = []
+        if raw_tool_permissions:
+            raise HTTPException(403, plugin_access["message"])
     available_tools = {tool["name"]: tool for tool in tool_catalog}
     selected_tools = set(raw_tool_permissions)
     if not selected_tools <= set(available_tools):

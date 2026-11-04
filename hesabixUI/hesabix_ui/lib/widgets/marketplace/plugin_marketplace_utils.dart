@@ -21,6 +21,7 @@ const Map<String, String> pluginSetupRouteByCode = {
 };
 
 const String kAdvancedAccountingPluginCode = 'advanced_accounting';
+const String kAiMcpServerPluginCode = 'ai_mcp_server';
 
 /// آیتم‌های منوی شل که فقط با لایسنس بسته حسابداری پیشرفته دیده می‌شوند.
 const Set<String> kAdvancedAccountingMenuKeys = {

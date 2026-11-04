@@ -13,6 +13,7 @@ from adapters.db.models.marketplace import MarketplacePlugin, MarketplacePluginP
 
 
 ADVANCED_ACCOUNTING_PLUGIN_CODE = "advanced_accounting"
+AI_MCP_SERVER_PLUGIN_CODE = "ai_mcp_server"
 
 _ADVANCED_ACCOUNTING_DESCRIPTION = """
 بسته حسابداری پیشرفته برای حسابداران و کسب‌وکارهای حرفه‌ای:
@@ -27,6 +28,18 @@ _ADVANCED_ACCOUNTING_DESCRIPTION = """
 ✅ استودیو ساخت قالب فاکتور و اسناد
 
 جدول حساب‌ها، اسناد، فاکتور و تراز افتتاحیه در نسخه پایه باقی می‌مانند.
+""".strip()
+
+_AI_MCP_SERVER_DESCRIPTION = """
+اتصال امن دستیارهای خارجی هوش مصنوعی به داده همین کسب‌وکار از طریق MCP:
+
+✅ اتصال ChatGPT، Claude، Cursor و کلاینت‌های سازگار با MCP
+✅ خواندن و کار با فاکتور، کالا، اشخاص، خزانه، گزارش و سایر ابزارهای مجاز همان کاربر
+✅ رضایت OAuth با انتخاب کسب‌وکار و ابزار؛ توکن محدود به همان کسب‌وکار
+✅ اگر افزونه فعال نباشد یا اشتراک تمام شود، دستیار به داده دسترسی ندارد و این موضوع را به کاربر می‌گوید
+
+چت داخل حسابیکس و API معمولی نرم‌افزار بدون این افزونه در دسترس می‌مانند.
+ابزارهای افزونه‌های دیگر (حقوق، تعمیرگاه، بارکد و غیره) همچنان لایسنس خودشان را لازم دارند.
 """.strip()
 
 _REPAIR_SHOP_DESCRIPTION = """
@@ -261,6 +274,16 @@ _DEFAULT_PLUGINS: Tuple[_PluginSeed, ...] = (
 		trial_days=14,
 		trial_allowed=True,
 		plans=(("monthly", 250_000), ("yearly", 2_500_000), ("lifetime", 9_000_000)),
+	),
+	_PluginSeed(
+		code=AI_MCP_SERVER_PLUGIN_CODE,
+		name="سرور MCP هوش مصنوعی",
+		description=_AI_MCP_SERVER_DESCRIPTION,
+		category="integration",
+		icon_url=None,
+		trial_days=14,
+		trial_allowed=True,
+		plans=(("monthly", 300_000), ("yearly", 3_000_000), ("lifetime", 10_000_000)),
 	),
 )
 

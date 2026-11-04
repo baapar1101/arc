@@ -189,14 +189,37 @@ def assert_plugin_purchasable(plugin: Any) -> None:
 		)
 
 
-def is_plugin_active(db: Session, business_id: int, plugin_code: str) -> bool:
+PLUGIN_ACCESS_ACTIVE = "active"
+PLUGIN_ACCESS_MISSING = "missing"
+PLUGIN_ACCESS_EXPIRED = "expired"
+PLUGIN_ACCESS_PLUGIN_DISABLED = "plugin_disabled"
+PLUGIN_ACCESS_PLUGIN_NOT_FOUND = "plugin_not_found"
+
+
+def get_plugin_access_reason(db: Session, business_id: int, plugin_code: str) -> str:
+	"""علت دسترسی به افزونه: active / missing / expired / plugin_disabled / plugin_not_found."""
 	plugin = get_marketplace_plugin(db, plugin_code)
-	if plugin is None or not column_flag(plugin, "is_active"):
-		return False
+	if plugin is None:
+		return PLUGIN_ACCESS_PLUGIN_NOT_FOUND
+	if not column_flag(plugin, "is_active"):
+		return PLUGIN_ACCESS_PLUGIN_DISABLED
 	if column_flag(plugin, "enabled_for_all_businesses"):
-		return True
+		return PLUGIN_ACCESS_ACTIVE
 	row = get_business_plugin_row(db, business_id, int(plugin.id))
-	return license_row_is_valid(row)
+	if row is None or license_status_is_system_default(getattr(row, "status", None)):
+		return PLUGIN_ACCESS_MISSING
+	if license_row_is_valid(row):
+		return PLUGIN_ACCESS_ACTIVE
+	ends_at = _ends_at_date(getattr(row, "ends_at", None))
+	today = datetime.utcnow().date()
+	status = str(getattr(row, "status", "") or "")
+	if status == "expired" or (ends_at is not None and ends_at < today):
+		return PLUGIN_ACCESS_EXPIRED
+	return PLUGIN_ACCESS_MISSING
+
+
+def is_plugin_active(db: Session, business_id: int, plugin_code: str) -> bool:
+	return get_plugin_access_reason(db, business_id, plugin_code) == PLUGIN_ACCESS_ACTIVE
 
 
 def list_globally_enabled_plugins(db: Session) -> List[MarketplacePlugin]:
