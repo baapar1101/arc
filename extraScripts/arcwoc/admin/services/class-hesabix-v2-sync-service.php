@@ -345,6 +345,27 @@ class Hesabix_V2_Sync_Service
 				$api_last_result = $this->api->create_product($product_data);
 			}
 
+			if (self::is_duplicate_barcode_api_result($api_last_result) && isset($product_data['barcode']) && $product_data['barcode'] !== null && $product_data['barcode'] !== '') {
+				if (!$existing_mapping) {
+					$linked_id = $this->find_hesabix_product_id_by_barcode((string) $product_data['barcode']);
+					if ($linked_id > 0) {
+						$api_last_result = array(
+							'success' => true,
+							'data' => array('id' => $linked_id),
+							'_linked_by_barcode' => true,
+						);
+					}
+				}
+				if (empty($api_last_result['success'])) {
+					unset($product_data['barcode']);
+					if ($existing_mapping) {
+						$api_last_result = $this->api->update_product($existing_mapping['hesabix_id'], $product_data);
+					} else {
+						$api_last_result = $this->api->create_product($product_data);
+					}
+				}
+			}
+
 			if (isset($api_last_result['success']) && $api_last_result['success']) {
 				$hesabix_id = $api_last_result['data']['id'];
 
@@ -406,7 +427,8 @@ class Hesabix_V2_Sync_Service
 			Hesabix_V2_Log_Service::error('Product sync failed', $elog);
 
 			$msg = $e->getMessage();
-			if (strpos($msg, __('محصول یافت نشد', 'hesabix-v2')) === false) {
+			$non_retryable = self::is_duplicate_barcode_api_result($api_last_result) || self::message_is_duplicate_barcode($msg);
+			if (!$non_retryable && strpos($msg, __('محصول یافت نشد', 'hesabix-v2')) === false) {
 				$qid = $variation_id ? (int) $variation_id : (int) $product_id;
 				$qpayload = $variation_id ? array('parent_id' => (int) $product_id) : null;
 				Hesabix_V2_Queue_Service::enqueue('product', $qid, 'sync_product', $qpayload);
@@ -415,8 +437,151 @@ class Hesabix_V2_Sync_Service
 			return array(
 				'success' => false,
 				'message' => $e->getMessage(),
+				'non_retryable' => $non_retryable,
 			);
 		}
+	}
+
+	/**
+	 * اگر SKU ووکامرس همان بارکد کالای موجود در حسابیکس باشد، همان کالا را برمی‌گرداند.
+	 *
+	 * @param string $barcode
+	 * @return int
+	 */
+	private function find_hesabix_product_id_by_barcode($barcode)
+	{
+		$barcode = trim((string) $barcode);
+		if ($barcode === '') {
+			return 0;
+		}
+
+		$search = $this->api->search_products(
+			array(
+				'search' => $barcode,
+				'search_fields' => array('barcode'),
+				'take' => 10,
+				'skip' => 0,
+			)
+		);
+		if (empty($search['success']) || empty($search['data'])) {
+			return 0;
+		}
+
+		$items = array();
+		if (isset($search['data']['items']) && is_array($search['data']['items'])) {
+			$items = $search['data']['items'];
+		} elseif (isset($search['data']['results']) && is_array($search['data']['results'])) {
+			$items = $search['data']['results'];
+		} elseif (is_array($search['data']) && isset($search['data'][0])) {
+			$items = $search['data'];
+		}
+
+		$needle = function_exists('mb_strtolower') ? mb_strtolower($barcode) : strtolower($barcode);
+		$found = 0;
+		foreach ($items as $item) {
+			if (!is_array($item)) {
+				continue;
+			}
+			$hid = isset($item['id']) ? absint($item['id']) : 0;
+			if ($hid < 1) {
+				continue;
+			}
+
+			$tokens = array();
+			if (!empty($item['barcode'])) {
+				$tokens[] = (string) $item['barcode'];
+			}
+			if (!empty($item['general_barcodes'])) {
+				foreach (preg_split('/[,\s]+/', (string) $item['general_barcodes']) as $token) {
+					$token = trim($token);
+					if ($token !== '') {
+						$tokens[] = $token;
+					}
+				}
+			}
+
+			$matched = false;
+			foreach ($tokens as $token) {
+				$cmp = function_exists('mb_strtolower') ? mb_strtolower($token) : strtolower($token);
+				if ($cmp === $needle) {
+					$matched = true;
+					break;
+				}
+			}
+			if (!$matched) {
+				continue;
+			}
+			if ($found > 0 && $found !== $hid) {
+				return 0;
+			}
+			$found = $hid;
+		}
+
+		return $found;
+	}
+
+	/**
+	 * خطای یکتایی بارکد از API حسابیکس — retry بدون بارکد، بدون صف‌کردن تکراری.
+	 *
+	 * @param string $message
+	 * @return bool
+	 */
+	public static function message_is_duplicate_barcode($message)
+	{
+		$msg = trim((string) $message);
+		if ($msg === '') {
+			return false;
+		}
+
+		$fa_barcode = (function_exists('mb_stripos') ? mb_stripos($msg, 'بارکد') : strpos($msg, 'بارکد')) !== false;
+		$fa_taken = (function_exists('mb_stripos') ? mb_stripos($msg, 'قبلاً') : strpos($msg, 'قبلاً')) !== false
+			|| (function_exists('mb_stripos') ? mb_stripos($msg, 'تکراری') : strpos($msg, 'تکراری')) !== false
+			|| (function_exists('mb_stripos') ? mb_stripos($msg, 'دیگری') : strpos($msg, 'دیگری')) !== false;
+
+		if ($fa_barcode && $fa_taken) {
+			return true;
+		}
+
+		$en = strtolower($msg);
+		return strpos($en, 'barcode') !== false
+			&& (strpos($en, 'already') !== false || strpos($en, 'duplicate') !== false);
+	}
+
+	/**
+	 * @param mixed $result
+	 * @return bool
+	 */
+	private static function is_duplicate_barcode_api_result($result)
+	{
+		if (!is_array($result)) {
+			return false;
+		}
+
+		$code = '';
+		if (!empty($result['error']['code']) && is_string($result['error']['code'])) {
+			$code = $result['error']['code'];
+		} elseif (!empty($result['error_code']) && is_string($result['error_code'])) {
+			$code = $result['error_code'];
+		}
+
+		$codes = array(
+			'DUPLICATE_GENERAL_BARCODE',
+			'DUPLICATE_BARCODE',
+			'GENERAL_BARCODE_CONFLICTS_WITH_UNIQUE_INSTANCE',
+			'GENERAL_BARCODE_CONFLICTS_WITH_VARIANT',
+		);
+		if ($code !== '' && in_array($code, $codes, true)) {
+			return true;
+		}
+
+		$msg = '';
+		if (!empty($result['message']) && is_string($result['message'])) {
+			$msg = $result['message'];
+		} elseif (!empty($result['error']['message']) && is_string($result['error']['message'])) {
+			$msg = $result['error']['message'];
+		}
+
+		return self::message_is_duplicate_barcode($msg);
 	}
 
 	/**
@@ -856,7 +1021,13 @@ class Hesabix_V2_Sync_Service
 			Hesabix_V2_Log_Service::error('Guest customer creation failed', $elog);
 
 			if ($order_id > 0 && strpos($e->getMessage(), __('سفارش یافت نشد', 'hesabix-v2')) === false) {
-				Hesabix_V2_Queue_Service::enqueue('order', $order_id, 'sync_order');
+				Hesabix_V2_Queue_Service::enqueue(
+					'order',
+					$order_id,
+					'sync_order',
+					null,
+					Hesabix_V2_Queue_Service::PRIORITY_ORDER
+				);
 			}
 
 			return array(
@@ -1515,7 +1686,13 @@ class Hesabix_V2_Sync_Service
 			}
 
 			if ($should_queue) {
-				Hesabix_V2_Queue_Service::enqueue('order', $order_id, 'sync_order');
+				Hesabix_V2_Queue_Service::enqueue(
+					'order',
+					$order_id,
+					'sync_order',
+					null,
+					Hesabix_V2_Queue_Service::PRIORITY_ORDER
+				);
 			}
 
 			return array(
@@ -1666,6 +1843,9 @@ class Hesabix_V2_Sync_Service
 	{
 		$m = (string) $error_message;
 		if (strpos($m, __('محصول یافت نشد', 'hesabix-v2')) !== false) {
+			return;
+		}
+		if (self::message_is_duplicate_barcode($m)) {
 			return;
 		}
 

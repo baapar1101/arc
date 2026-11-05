@@ -1304,7 +1304,13 @@ class Hesabix_V2_Admin
 			return;
 		}
 
-		Hesabix_V2_Queue_Service::enqueue('order', $order_id, 'sync_order');
+		Hesabix_V2_Queue_Service::enqueue(
+			'order',
+			$order_id,
+			'sync_order',
+			null,
+			Hesabix_V2_Queue_Service::PRIORITY_ORDER
+		);
 
 		// بدون spawn_cron: آن درخواست loopback اغلب همان بدنهٔ ذخیرهٔ سفارش را منتظر یا PHP-FPM را اشغال می‌کند.
 		$scheduled = false;
@@ -1412,13 +1418,87 @@ class Hesabix_V2_Admin
 				}
 			}
 		}
-		$in_sync_list = !empty($allowed) && in_array($new_status, $allowed, true);
+		$in_sync_list = Hesabix_V2_Invoice_Helper::order_status_in_list($new_status, $allowed);
 		if (!$in_sync_list && !$proforma_promote) {
 			return;
 		}
 		if ($this->should_skip_auto_order_sync($order_id)) {
 			return;
 		}
+		$this->defer_auto_order_sync_to_queue($order_id);
+	}
+
+	/**
+	 * سفارش دستی پنل ادمین / REST: هوک چک‌اوت اجرا نمی‌شود.
+	 *
+	 * @param int            $order_id
+	 * @param WC_Order|null  $order
+	 * @return void
+	 */
+	public function maybe_sync_order_on_new_order($order_id, $order = null)
+	{
+		$this->maybe_queue_order_if_status_allows_auto_sync($order_id, $order);
+	}
+
+	/**
+	 * ذخیرهٔ سفارش در ادمین (HPOS و کلاسیک) بعد از ثبت اقلام.
+	 *
+	 * @param int $order_id
+	 * @return void
+	 */
+	public function maybe_sync_order_on_admin_save($order_id)
+	{
+		if (!is_admin()) {
+			return;
+		}
+		$this->maybe_queue_order_if_status_allows_auto_sync($order_id, null);
+	}
+
+	/**
+	 * اگر وضعیت سفارش در فهرست همگام‌سازی باشد و سفارش خالی/پیش‌نویس نباشد، به صف برود.
+	 *
+	 * @param int                 $order_id
+	 * @param WC_Order|null|mixed $order
+	 * @return void
+	 */
+	private function maybe_queue_order_if_status_allows_auto_sync($order_id, $order = null)
+	{
+		if (!$this->is_auto_sync_orders_enabled()) {
+			return;
+		}
+
+		$order_id = (int) $order_id;
+		if ($order_id < 1) {
+			return;
+		}
+
+		if (!$order instanceof WC_Order) {
+			$order = wc_get_order($order_id);
+		}
+		if (!$order instanceof WC_Order) {
+			return;
+		}
+
+		$slug = Hesabix_V2_Invoice_Helper::normalize_order_status_slug($order->get_status());
+		if (in_array($slug, array('auto-draft', 'checkout-draft', 'draft', 'trash'), true)) {
+			return;
+		}
+
+		if (count($order->get_items()) < 1) {
+			return;
+		}
+
+		$sync = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
+		$allowed = isset($sync['sync_order_on_statuses']) && is_array($sync['sync_order_on_statuses'])
+			? $sync['sync_order_on_statuses']
+			: array();
+		if (!Hesabix_V2_Invoice_Helper::order_status_in_list($slug, $allowed)) {
+			return;
+		}
+		if ($this->should_skip_auto_order_sync($order_id)) {
+			return;
+		}
+
 		$this->defer_auto_order_sync_to_queue($order_id);
 	}
 

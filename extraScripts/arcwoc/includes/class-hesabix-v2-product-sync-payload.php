@@ -155,6 +155,13 @@ class Hesabix_V2_Product_Sync_Payload
 				unset($data['category_id']);
 			}
 
+			$flags = self::effective_field_flags($sync_settings);
+			if (empty($flags['sync_product_barcode'])) {
+				unset($data['barcode']);
+			} elseif (!isset($data['barcode']) || $data['barcode'] === null || $data['barcode'] === '') {
+				unset($data['barcode']);
+			}
+
 			/**
 			 * فیلتر نهایی payload محصول قبل از ارسال به API حسابیکس.
 			 *

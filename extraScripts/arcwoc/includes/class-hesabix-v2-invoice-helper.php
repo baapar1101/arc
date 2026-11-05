@@ -32,6 +32,18 @@ class Hesabix_V2_Invoice_Helper
 		}
 		if (!isset($sync['sync_order_on_statuses']) || !is_array($sync['sync_order_on_statuses'])) {
 			$sync['sync_order_on_statuses'] = array('processing', 'completed');
+		} else {
+			$st_n = array();
+			foreach ($sync['sync_order_on_statuses'] as $st) {
+				$s = self::normalize_order_status_slug($st);
+				if ($s !== '') {
+					$st_n[] = $s;
+				}
+			}
+			$sync['sync_order_on_statuses'] = array_values(array_unique($st_n));
+			if ($sync['sync_order_on_statuses'] === array()) {
+				$sync['sync_order_on_statuses'] = array('processing', 'completed');
+			}
 		}
 		if (!array_key_exists('invoice_is_proforma', $sync)) {
 			$sync['invoice_is_proforma'] = false;
@@ -244,6 +256,28 @@ class Hesabix_V2_Invoice_Helper
 			return '';
 		}
 		return sanitize_key($s);
+	}
+
+	/**
+	 * آیا اسلاگ وضعیت سفارش در فهرست تنظیمات همگام‌سازی هست؟
+	 *
+	 * @param string   $status  وضعیت خام یاوکامرس (با یا بدون پیشوند wc-).
+	 * @param string[] $allowed فهرست ذخیره‌شده در تنظیمات.
+	 * @return bool
+	 */
+	public static function order_status_in_list($status, array $allowed)
+	{
+		$slug = self::normalize_order_status_slug($status);
+		if ($slug === '' || $allowed === array()) {
+			return false;
+		}
+		foreach ($allowed as $item) {
+			if ($slug === self::normalize_order_status_slug($item)) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**

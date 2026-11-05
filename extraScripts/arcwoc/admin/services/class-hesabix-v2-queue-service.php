@@ -17,6 +17,12 @@ class Hesabix_V2_Queue_Service
 	/** پیش‌فرض تعداد آیتم در هر اجرای کرون؛ مقدار واقعی از تنظیمات همگام‌سازی خوانده می‌شود. */
 	const DEFAULT_ITEMS_PER_RUN = 15;
 
+	/** اولویت پیش‌فرض محصول/مشتری. */
+	const PRIORITY_DEFAULT = 5;
+
+	/** سفارش باید جلوتر از backlog محصول پردازش شود. */
+	const PRIORITY_ORDER = 20;
+
 	/**
 	 * حداکثر تعداد کارهای صف که در هر فراخوانی process_due پردازش می‌شود (۱ تا ۵۰۰).
 	 *
@@ -60,7 +66,7 @@ class Hesabix_V2_Queue_Service
 
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT * FROM {$table} WHERE status = %s ORDER BY priority DESC, id ASC LIMIT %d",
+				"SELECT * FROM {$table} WHERE status = %s ORDER BY CASE entity_type WHEN 'order' THEN 0 WHEN 'customer' THEN 1 ELSE 2 END, priority DESC, id ASC LIMIT %d",
 				'pending',
 				$limit
 			),
@@ -153,7 +159,11 @@ class Hesabix_V2_Queue_Service
 				);
 			} else {
 				$attempts = (int) $row['attempts'] + 1;
-				$status = $attempts >= self::MAX_ATTEMPTS ? 'failed' : 'pending';
+				$permanent = is_array($res) && !empty($res['non_retryable']);
+				if (!$permanent && class_exists('Hesabix_V2_Sync_Service') && Hesabix_V2_Sync_Service::message_is_duplicate_barcode($msg)) {
+					$permanent = true;
+				}
+				$status = ($permanent || $attempts >= self::MAX_ATTEMPTS) ? 'failed' : 'pending';
 				$wpdb->update(
 					$table,
 					array(
@@ -192,11 +202,10 @@ class Hesabix_V2_Queue_Service
 
 		$exists = $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT id FROM {$table} WHERE entity_type = %s AND entity_id = %d AND action = %s AND status = %s LIMIT 1",
+				"SELECT id FROM {$table} WHERE entity_type = %s AND entity_id = %d AND action = %s AND status IN ('pending','processing') LIMIT 1",
 				$entity_type,
 				$entity_id,
-				$action,
-				'pending'
+				$action
 			)
 		);
 

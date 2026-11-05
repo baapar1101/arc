@@ -20,6 +20,35 @@ class Hesabix_V2_Native_Variation_Sync
 	const MAX_VARIANTS = 100;
 
 	/**
+	 * اگر بارکد ترکیب تکراری باشد، همان درخواست بدون بارکد تکرار می‌شود.
+	 *
+	 * @param mixed    $result
+	 * @param array    $payload
+	 * @param callable $writer
+	 * @return array
+	 */
+	private static function retry_variant_write_without_barcode($result, array $payload, $writer)
+	{
+		if (!is_array($result)) {
+			$result = array('success' => false, 'message' => '');
+		}
+		if (!empty($result['success'])) {
+			return $result;
+		}
+		if (!isset($payload['barcode']) || $payload['barcode'] === null || $payload['barcode'] === '') {
+			return $result;
+		}
+		$msg = isset($result['message']) ? (string) $result['message'] : '';
+		if (!class_exists('Hesabix_V2_Sync_Service') || !Hesabix_V2_Sync_Service::message_is_duplicate_barcode($msg)) {
+			return $result;
+		}
+		unset($payload['barcode']);
+		$retry = call_user_func($writer, $payload);
+
+		return is_array($retry) ? $retry : $result;
+	}
+
+	/**
 	 * @param array $sync
 	 * @return string
 	 */
@@ -469,6 +498,13 @@ class Hesabix_V2_Native_Variation_Sync
 					}
 					unset($upd['attribute_values']);
 					$vres = $api->update_product_variant($hesabix_product_id, $hx_variant_id, $upd);
+					$vres = self::retry_variant_write_without_barcode(
+						$vres,
+						$upd,
+						function ($payload) use ($api, $hesabix_product_id, $hx_variant_id) {
+							return $api->update_product_variant($hesabix_product_id, $hx_variant_id, $payload);
+						}
+					);
 					if (empty($vres['success'])) {
 						return array(
 							'success' => false,
@@ -478,6 +514,13 @@ class Hesabix_V2_Native_Variation_Sync
 					}
 				} else {
 					$vres = $api->create_product_variant($hesabix_product_id, $body);
+					$vres = self::retry_variant_write_without_barcode(
+						$vres,
+						$body,
+						function ($payload) use ($api, $hesabix_product_id) {
+							return $api->create_product_variant($hesabix_product_id, $payload);
+						}
+					);
 					$hx_variant_id = Hesabix_V2_Api::extract_id($vres);
 					if (empty($vres['success']) || $hx_variant_id < 1) {
 						$existing_variants = self::index_existing_variants($api, $hesabix_product_id);
