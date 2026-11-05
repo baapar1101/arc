@@ -218,6 +218,28 @@ def etags_match(if_none_match: str | None, current: str) -> bool:
 	return False
 
 
+def ui_public_origin() -> str:
+	"""آدرس پنل وب از UI_DOMAIN در env / ‎.deploy_env (بدون مسیر)."""
+	env = parse_env_assignments(deploy_env_path())
+	raw = (os.environ.get("UI_DOMAIN") or env.get("UI_DOMAIN") or "").strip()
+	if not raw:
+		return ""
+	if "://" in raw:
+		origin = raw.rstrip("/")
+		if origin.startswith("https://") or origin.startswith("http://"):
+			return origin
+		return ""
+	host = raw.split("/")[0].strip().strip(".")
+	if not host or " " in host:
+		return ""
+	scheme = (
+		os.environ.get("API_PUBLIC_SCHEME") or env.get("API_PUBLIC_SCHEME") or "https"
+	).strip().lower()
+	if scheme not in ("http", "https"):
+		scheme = "https"
+	return f"{scheme}://{host}"
+
+
 def branding_public_payload() -> Dict[str, Any]:
 	state = resolve_branding_state()
 	payload: Dict[str, Any] = {
@@ -228,6 +250,7 @@ def branding_public_payload() -> Dict[str, Any]:
 		"has_logo": bool(state.enabled and state.has_logo),
 		"logo_etag": None,
 		"logo_content_type": None,
+		"app_url": ui_public_origin(),
 	}
 	if payload["has_logo"] and state.logo_path is not None:
 		payload["logo_etag"] = logo_etag(state.logo_path)

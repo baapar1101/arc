@@ -163,9 +163,17 @@ class Hesabix_V2_Marketplace_License
 	public static function marketplace_url()
 	{
 		$bid = (int) get_option('hesabix_v2_business_id', 0);
+		$origin = 'https://app.hesabix.ir';
+		if (class_exists('Hesabix_V2_Brand', false)) {
+			$origin = Hesabix_V2_Brand::app_origin();
+		}
+		$origin = rtrim((string) $origin, '/');
+		if ($origin === '') {
+			$origin = 'https://app.hesabix.ir';
+		}
 		$path = $bid > 0
-			? sprintf('https://app.hesabix.ir/business/%d/plugin-marketplace', $bid)
-			: 'https://app.hesabix.ir/';
+			? $origin . '/business/' . $bid . '/plugin-marketplace'
+			: $origin . '/';
 
 		/**
 		 * فیلتر URL بازار افزونه.

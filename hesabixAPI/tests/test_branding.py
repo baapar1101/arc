@@ -11,6 +11,7 @@ from app.core.branding import (
 	branding_public_payload,
 	etags_match,
 	resolve_branding_state,
+	ui_public_origin,
 )
 
 _MIN_PNG = bytes.fromhex(
@@ -88,6 +89,26 @@ def test_custom_pack_logo_and_names_json(monkeypatch, tmp_path):
 	assert payload["has_logo"] is True
 	assert payload["logo_content_type"] == "image/png"
 	assert payload["logo_etag"]
+
+
+def test_ui_public_origin_from_deploy_env(monkeypatch, tmp_path):
+	env_file = _write_deploy_env(tmp_path / "deploy.env", "UI_DOMAIN=app.example.com\n")
+	monkeypatch.setenv("HESABIX_DEPLOY_ENV", str(env_file))
+	monkeypatch.delenv("UI_DOMAIN", raising=False)
+	monkeypatch.delenv("API_PUBLIC_SCHEME", raising=False)
+	assert ui_public_origin() == "https://app.example.com"
+	payload = branding_public_payload()
+	assert payload["app_url"] == "https://app.example.com"
+
+
+def test_ui_public_origin_keeps_explicit_scheme(monkeypatch, tmp_path):
+	env_file = _write_deploy_env(
+		tmp_path / "deploy.env",
+		"UI_DOMAIN=https://app.deeep.ir/\n",
+	)
+	monkeypatch.setenv("HESABIX_DEPLOY_ENV", str(env_file))
+	monkeypatch.delenv("UI_DOMAIN", raising=False)
+	assert ui_public_origin() == "https://app.deeep.ir"
 
 
 def test_etags_match_ignores_quotes_and_weak_prefix():

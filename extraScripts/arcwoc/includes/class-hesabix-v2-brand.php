@@ -109,6 +109,7 @@ class Hesabix_V2_Brand
 			'logo_rel' => '',
 			'fetched_at' => 0,
 			'source_api' => '',
+			'app_url' => '',
 		);
 
 		$raw = get_option(self::OPTION_KEY, array());
@@ -125,6 +126,7 @@ class Hesabix_V2_Brand
 		self::$config_cache['logo_rel'] = (string) self::$config_cache['logo_rel'];
 		self::$config_cache['fetched_at'] = (int) self::$config_cache['fetched_at'];
 		self::$config_cache['source_api'] = (string) self::$config_cache['source_api'];
+		self::$config_cache['app_url'] = self::sanitize_app_url(self::$config_cache['app_url']);
 
 		return self::$config_cache;
 	}
@@ -339,6 +341,55 @@ class Hesabix_V2_Brand
 	}
 
 	/**
+	 * آدرس پنل وب همان نمونهٔ متصل (نه الزاماً app.hesabix.ir).
+	 *
+	 * @return string origin بدون اسلش پایانی
+	 */
+	public static function app_origin()
+	{
+		$cfg = self::config();
+		if (!empty($cfg['app_url'])) {
+			return rtrim((string) $cfg['app_url'], '/');
+		}
+		$api_base = '';
+		if (function_exists('get_option')) {
+			$api_base = (string) get_option('hesabix_v2_api_base_url', '');
+		}
+		if ($api_base === '' && defined('HESABIX_V2_API_BASE_URL')) {
+			$api_base = (string) HESABIX_V2_API_BASE_URL;
+		}
+		return self::app_origin_from_api_base($api_base);
+	}
+
+	/**
+	 * @param string $api_base
+	 * @return string
+	 */
+	public static function app_origin_from_api_base($api_base)
+	{
+		$host = function_exists('wp_parse_url')
+			? wp_parse_url((string) $api_base, PHP_URL_HOST)
+			: parse_url((string) $api_base, PHP_URL_HOST);
+		$scheme = function_exists('wp_parse_url')
+			? wp_parse_url((string) $api_base, PHP_URL_SCHEME)
+			: parse_url((string) $api_base, PHP_URL_SCHEME);
+		if (!is_string($scheme) || $scheme === '') {
+			$scheme = 'https';
+		}
+		if (!is_string($host) || $host === '') {
+			return 'https://app.hesabix.ir';
+		}
+		$host = strtolower($host);
+		if ($host === 'hsxn.hesabix.ir' || $host === 'api.hesabix.ir') {
+			return 'https://app.hesabix.ir';
+		}
+		if (strpos($host, 'api.') === 0) {
+			return $scheme . '://app.' . substr($host, 4);
+		}
+		return $scheme . '://' . $host;
+	}
+
+	/**
 	 * تازه‌سازی دوره‌ای وقتی ادمین وردپرس باز است.
 	 *
 	 * @return void
@@ -458,9 +509,10 @@ class Hesabix_V2_Brand
 		$has_logo = $enabled && !empty($data['has_logo']);
 		$etag = isset($data['logo_etag']) ? (string) $data['logo_etag'] : '';
 		$source = (string) get_option('hesabix_v2_api_base_url', '');
+		$app_url = self::sanitize_app_url(isset($data['app_url']) ? $data['app_url'] : '');
 
 		if (!$enabled) {
-			self::store_default_brand($source);
+			self::store_default_brand($source, $app_url);
 			return;
 		}
 
@@ -496,6 +548,7 @@ class Hesabix_V2_Brand
 			'logo_rel' => $stored_has_logo ? $logo_rel : '',
 			'fetched_at' => time(),
 			'source_api' => $source,
+			'app_url' => $app_url,
 		);
 		update_option(self::OPTION_KEY, $stored);
 		self::flush_cache();
@@ -503,9 +556,10 @@ class Hesabix_V2_Brand
 
 	/**
 	 * @param string $source_api
+	 * @param string $app_url
 	 * @return void
 	 */
-	private static function store_default_brand($source_api)
+	private static function store_default_brand($source_api, $app_url = '')
 	{
 		self::delete_logo_files();
 		update_option(
@@ -519,6 +573,7 @@ class Hesabix_V2_Brand
 				'logo_rel' => '',
 				'fetched_at' => time(),
 				'source_api' => (string) $source_api,
+				'app_url' => self::sanitize_app_url($app_url),
 			)
 		);
 		self::flush_cache();
@@ -596,6 +651,21 @@ class Hesabix_V2_Brand
 		$editor->resize($max, $max, false);
 		$saved = $editor->save($abs);
 		unset($saved);
+	}
+
+	/**
+	 * @param mixed $value
+	 * @return string
+	 */
+	private static function sanitize_app_url($value)
+	{
+		$url = function_exists('esc_url_raw')
+			? esc_url_raw(trim((string) $value))
+			: trim((string) $value);
+		if ($url === '' || (strpos($url, 'https://') !== 0 && strpos($url, 'http://') !== 0)) {
+			return '';
+		}
+		return rtrim($url, '/');
 	}
 
 	/**
