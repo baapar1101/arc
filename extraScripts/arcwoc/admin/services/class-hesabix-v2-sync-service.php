@@ -1230,6 +1230,15 @@ class Hesabix_V2_Sync_Service
 				continue;
 			}
 
+			if (class_exists('Hesabix_V2_Sales_Return_Service') && Hesabix_V2_Sales_Return_Service::order_has_returns((int) $oid)) {
+				$res['per_order'][ (int) $oid ] = array(
+					'success' => false,
+					'skipped_sales_return' => true,
+					'message' => Hesabix_V2_Sales_Return_Service::sale_sync_blocked_message(),
+				);
+				continue;
+			}
+
 			if (class_exists('Hesabix_V2_Order_Sync_Meta') && Hesabix_V2_Order_Sync_Meta::is_pause_auto_sync((int) $oid)) {
 				$res['per_order'][ (int) $oid ] = array(
 					'success' => false,
@@ -1403,6 +1412,19 @@ class Hesabix_V2_Sync_Service
 			return array(
 				'success' => false,
 				'message' => __('سفارش یافت نشد', 'hesabix-v2'),
+			);
+		}
+
+		if (class_exists('Hesabix_V2_Sales_Return_Service') && Hesabix_V2_Sales_Return_Service::order_has_returns((int) $order_id)) {
+			$msg = Hesabix_V2_Sales_Return_Service::sale_sync_blocked_message();
+			if (class_exists('Hesabix_V2_Order_Sync_Meta')) {
+				Hesabix_V2_Order_Sync_Meta::set_or_update_order_system_note($order, $msg);
+			}
+
+			return array(
+				'success' => true,
+				'skipped_sales_return' => true,
+				'message' => $msg,
 			);
 		}
 

@@ -322,9 +322,9 @@ class Hesabix_V2_Admin
 							'genericError' => __('عملیات ناموفق بود.', 'hesabix-v2'),
 							'requestFailed' => __('خطا در ارتباط با سرور.', 'hesabix-v2'),
 							'confirmSync' => __('ارسال یا به‌روزرسانی این سفارش در حسابیکس انجام شود؟', 'hesabix-v2'),
-							'confirmUnsync' => __('فاکتور این سفارش در حسابیکس حذف و پیوند افزونه پاک شود؟ این کار برگشت‌پذیر نیست.', 'hesabix-v2'),
+							'confirmUnsync' => __('برای این سفارش برگشت از فروش در حسابیکس ثبت شود؟ فاکتور فروش قطعی حذف نمی‌شود. پیش‌فاکتور هنوز قطعی‌نشده حذف می‌گردد.', 'hesabix-v2'),
 							'confirmBulkSync' => __('برای همهٔ سفارش‌های انتخاب‌شده ارسال یا به‌روزرسانی انجام شود؟', 'hesabix-v2'),
-							'confirmBulkUnsync' => __('برای همهٔ موارد انتخاب‌شده لغو ارسال (حذف فاکتور) انجام شود؟', 'hesabix-v2'),
+							'confirmBulkUnsync' => __('برای موارد انتخاب‌شده برگشت از فروش ثبت شود؟ فروش قطعی حذف نمی‌شود.', 'hesabix-v2'),
 							'confirmPause' => __('همگام‌سازی خودکار این سفارش متوقف شود؟ (فاکتورهای دستی در حسابیکس با به‌روزرسانی خودکار بازنویسی نمی‌شوند.)', 'hesabix-v2'),
 							'confirmResume' => __('همگام‌سازی خودکار دوباره فعال شود؟ در رویدادهای بعدی، محتوای ووکامرس ممکن است فاکتور حسابیکس را به‌روز کند.', 'hesabix-v2'),
 							'confirmBulkProfit' => __('سود فاکتور برای سفارش‌های انتخاب‌شده از حسابیکس دریافت شود؟', 'hesabix-v2'),
@@ -1419,6 +1419,9 @@ class Hesabix_V2_Admin
 			}
 		}
 		$in_sync_list = Hesabix_V2_Invoice_Helper::order_status_in_list($new_status, $allowed);
+		if ($new_slug === 'cancelled' || $new_slug === 'refunded' || $new_slug === 'trash') {
+			return;
+		}
 		if (!$in_sync_list && !$proforma_promote) {
 			return;
 		}
@@ -1480,7 +1483,7 @@ class Hesabix_V2_Admin
 		}
 
 		$slug = Hesabix_V2_Invoice_Helper::normalize_order_status_slug($order->get_status());
-		if (in_array($slug, array('auto-draft', 'checkout-draft', 'draft', 'trash'), true)) {
+		if (in_array($slug, array('auto-draft', 'checkout-draft', 'draft', 'trash', 'cancelled', 'refunded'), true)) {
 			return;
 		}
 
@@ -1500,6 +1503,141 @@ class Hesabix_V2_Admin
 		}
 
 		$this->defer_auto_order_sync_to_queue($order_id);
+	}
+
+	/**
+	 * لغو یا وضعیت refunded بدون شیء بازپرداخت → برگشت از فروش. زباله‌دان نادیده گرفته می‌شود.
+	 *
+	 * @param int      $order_id
+	 * @param string   $old_status
+	 * @param string   $new_status
+	 * @param WC_Order $order
+	 * @return void
+	 */
+	public function maybe_reverse_order_on_status_change($order_id, $old_status, $new_status, $order)
+	{
+		if (!get_option('hesabix_v2_enabled')) {
+			return;
+		}
+
+		$order_id = (int) $order_id;
+		$slug = Hesabix_V2_Invoice_Helper::normalize_order_status_slug($new_status);
+		if ($slug === 'trash') {
+			return;
+		}
+
+		if (!$order instanceof WC_Order) {
+			$order = wc_get_order($order_id);
+		}
+		if (!$order instanceof WC_Order || $order instanceof WC_Order_Refund) {
+			return;
+		}
+
+		$map = Hesabix_V2_Invoice_Service::get_sync_status($order_id);
+		if (!$map || empty($map['hesabix_id'])) {
+			return;
+		}
+
+		if ($slug === 'cancelled') {
+			Hesabix_V2_Sales_Return_Service::enqueue_remaining($order_id, Hesabix_V2_Sales_Return_Service::REASON_CANCEL);
+			return;
+		}
+
+		if ($slug === 'refunded') {
+			$refunds = method_exists($order, 'get_refunds') ? $order->get_refunds() : array();
+			if (!empty($refunds)) {
+				return;
+			}
+			Hesabix_V2_Sales_Return_Service::enqueue_remaining(
+				$order_id,
+				Hesabix_V2_Sales_Return_Service::REASON_REFUNDED_STATUS
+			);
+		}
+	}
+
+	/**
+	 * بازپرداخت ووکامرس → برگشت از فروش به‌اندازهٔ اقلام/مبلغ بازپرداخت.
+	 *
+	 * @param int $order_id
+	 * @param int $refund_id
+	 * @return void
+	 */
+	public function maybe_reverse_order_on_refund($order_id, $refund_id)
+	{
+		if (!get_option('hesabix_v2_enabled')) {
+			return;
+		}
+
+		$order_id = (int) $order_id;
+		$refund_id = (int) $refund_id;
+		if ($order_id < 1 || $refund_id < 1) {
+			return;
+		}
+
+		$map = Hesabix_V2_Invoice_Service::get_sync_status($order_id);
+		if (!$map || empty($map['hesabix_id'])) {
+			return;
+		}
+
+		Hesabix_V2_Sales_Return_Service::enqueue_refund($order_id, $refund_id);
+	}
+
+	/**
+	 * حذف دائمی سفارش (نه انتقال به زباله‌دان) → برگشت مانده، هم‌زمان چون سفارش در حال حذف است.
+	 *
+	 * @param int            $order_id
+	 * @param WC_Order|null  $order
+	 * @return void
+	 */
+	public function maybe_reverse_order_on_permanent_delete($order_id, $order = null)
+	{
+		if (!get_option('hesabix_v2_enabled')) {
+			return;
+		}
+
+		$order_id = (int) $order_id;
+		if ($order_id < 1) {
+			return;
+		}
+
+		if (!$order instanceof WC_Order) {
+			$order = wc_get_order($order_id);
+		}
+		if ($order instanceof WC_Order_Refund) {
+			return;
+		}
+		if ($order instanceof WC_Order && method_exists($order, 'get_type') && $order->get_type() === 'shop_order_refund') {
+			return;
+		}
+
+		$map = Hesabix_V2_Invoice_Service::get_sync_status($order_id);
+		if (!$map || empty($map['hesabix_id'])) {
+			return;
+		}
+
+		Hesabix_V2_Sales_Return_Service::process_remaining(
+			$order_id,
+			Hesabix_V2_Sales_Return_Service::REASON_DELETE
+		);
+	}
+
+	/**
+	 * CPT کلاسیک: حذف دائمی shop_order.
+	 *
+	 * @param int $post_id
+	 * @return void
+	 */
+	public function maybe_reverse_shop_order_on_delete_post($post_id)
+	{
+		$post_id = (int) $post_id;
+		if ($post_id < 1) {
+			return;
+		}
+		if (get_post_type($post_id) !== 'shop_order') {
+			return;
+		}
+
+		$this->maybe_reverse_order_on_permanent_delete($post_id, null);
 	}
 
 	/**
@@ -1566,6 +1704,13 @@ class Hesabix_V2_Admin
 		}
 
 		echo '<p><strong>' . esc_html__('وضعیت حسابیکس:', 'hesabix-v2') . '</strong> ' . esc_html($hx_status) . '</p>';
+		$return_ids = Hesabix_V2_Invoice_Service::get_sales_return_invoice_ids($oid);
+		if (!empty($return_ids)) {
+			echo '<p><strong>' . esc_html__('برگشت از فروش:', 'hesabix-v2') . '</strong> ';
+			echo esc_html(implode(', ', $return_ids));
+			echo '</p>';
+			echo '<p class="description">' . esc_html__('فاکتور فروش قطعی نگه داشته شده و همگام خودکار متوقف است.', 'hesabix-v2') . '</p>';
+		}
 
 		if (class_exists('Hesabix_V2_Invoice_Profit_Service')) {
 			echo Hesabix_V2_Invoice_Profit_Service::render_meta_box_block($order); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside service
@@ -1648,10 +1793,12 @@ class Hesabix_V2_Admin
 			if (isset($bulk['per_order'][ $oid ])) {
 				$po = $bulk['per_order'][ $oid ];
 				$paused = !empty($po['skipped_pause']);
+				$skipped_return = !empty($po['skipped_sales_return']);
 				$results[] = array(
 					'order_id' => (int) $oid,
-					'success' => $paused ? true : (!empty($po['success'])),
+					'success' => ($paused || $skipped_return) ? true : (!empty($po['success'])),
 					'skipped_pause' => $paused,
+					'skipped_sales_return' => $skipped_return,
 					'message' => isset($po['message']) ? (string) $po['message'] : '',
 				);
 
@@ -1885,7 +2032,7 @@ class Hesabix_V2_Admin
 	}
 
 	/**
-	 * AJAX: لغو ارسال (حذف فاکتور) برای چند سفارش
+	 * AJAX: لغو ارسال (برگشت از فروش / حذف پیش‌فاکتور) برای چند سفارش
 	 *
 	 * @return void
 	 */

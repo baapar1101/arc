@@ -457,5 +457,40 @@ class Hesabix_V2_DB_Service
 
 		return is_array($rows) ? $rows : array();
 	}
+
+	/**
+	 * نگاشت‌های برگشت از فروش یک سفارش (کامل با wc_id=order_id یا جزئی با wc_parent_id=order_id).
+	 *
+	 * @since 4.12.6
+	 * @param int $order_id
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function get_order_return_mappings($order_id)
+	{
+		global $wpdb;
+
+		$order_id = absint($order_id);
+		if ($order_id < 1) {
+			return array();
+		}
+
+		$query = $wpdb->prepare(
+			"SELECT * FROM {$this->table}
+			WHERE entity_type = %s AND business_id = %d
+			AND (
+				(wc_id = %d AND wc_parent_id IS NULL)
+				OR wc_parent_id = %d
+			)
+			ORDER BY id ASC",
+			'order_return',
+			$this->business_id,
+			$order_id,
+			$order_id
+		);
+
+		$rows = $wpdb->get_results($query, ARRAY_A);
+
+		return is_array($rows) ? $rows : array();
+	}
 }
 

@@ -669,6 +669,10 @@ class Hesabix_V2_Mapper
 				'discount_value' => 0,
 				'tax_rate' => 0,
 				'movement' => 'out',
+				'wc_line_kind' => 'product',
+				'wc_item_id' => (int) $item->get_id(),
+				'wc_product_id' => $parent_id,
+				'wc_variation_id' => $variation_id,
 			);
 			if ($warehouse_id !== null && $warehouse_id !== '') {
 				$line_extra['warehouse_id'] = (int) $warehouse_id;
@@ -743,6 +747,7 @@ class Hesabix_V2_Mapper
 					'discount_value' => 0,
 					'tax_rate' => 0,
 					'movement' => 'out',
+					'wc_line_kind' => 'shipping',
 				);
 				if ($warehouse_id !== null && $warehouse_id !== '') {
 					$line_extra['warehouse_id'] = (int) $warehouse_id;

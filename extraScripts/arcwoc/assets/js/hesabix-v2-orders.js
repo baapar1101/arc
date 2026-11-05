@@ -55,7 +55,7 @@
 						appendFeedback('<div class="notice notice-error inline"><p>' + msg + '</p></div>');
 					} else if (res.data && res.data.results) {
 						res.data.results.forEach(function (row) {
-							var cls = row.skipped_pause
+							var cls = row.skipped_pause || row.skipped_sales_return
 								? 'notice-warning'
 								: row.success
 									? 'notice-success'

@@ -66,7 +66,7 @@ class Hesabix_V2_Queue_Service
 
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT * FROM {$table} WHERE status = %s ORDER BY CASE entity_type WHEN 'order' THEN 0 WHEN 'customer' THEN 1 ELSE 2 END, priority DESC, id ASC LIMIT %d",
+				"SELECT * FROM {$table} WHERE status = %s ORDER BY CASE entity_type WHEN 'order' THEN 0 WHEN 'order_return' THEN 0 WHEN 'customer' THEN 1 ELSE 2 END, priority DESC, id ASC LIMIT %d",
 				'pending',
 				$limit
 			),
@@ -126,6 +126,9 @@ class Hesabix_V2_Queue_Service
 							$res = $sync->sync_order((int) $row['entity_id']);
 						}
 						break;
+					case 'order_return':
+						$res = Hesabix_V2_Sales_Return_Service::process_queue_item((int) $row['entity_id'], $payload);
+						break;
 					default:
 						$res = array(
 							'success' => false,
@@ -183,7 +186,7 @@ class Hesabix_V2_Queue_Service
 	/**
 	 * افزودن به صف در صورت نبود ردیف pending تکراری.
 	 *
-	 * @param string   $entity_type product|customer|order
+	 * @param string   $entity_type product|customer|order|order_return
 	 * @param int      $entity_id
 	 * @param string   $action
 	 * @param array|null $payload
@@ -255,5 +258,77 @@ class Hesabix_V2_Queue_Service
 				$order_id
 			)
 		);
+	}
+
+	/**
+	 * حذف کارهای برگشت از فروش در انتظار برای سفارش و بازپرداخت‌هایش (مثلاً هنگام حذف دائمی).
+	 *
+	 * @param int        $order_id
+	 * @param int[]|null $refund_ids
+	 * @return int
+	 */
+	public static function cancel_pending_returns_for_order($order_id, $refund_ids = null)
+	{
+		global $wpdb;
+		$table = $wpdb->prefix . 'hesabix_v2_queue';
+		$order_id = (int) $order_id;
+		if ($order_id < 1) {
+			return 0;
+		}
+
+		$deleted = (int) $wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM {$table} WHERE entity_type = %s AND entity_id = %d AND status IN ('pending','processing')",
+				'order_return',
+				$order_id
+			)
+		);
+
+		if (!is_array($refund_ids)) {
+			$refund_ids = array();
+			$order = wc_get_order($order_id);
+			if ($order instanceof WC_Order && method_exists($order, 'get_refunds')) {
+				foreach ($order->get_refunds() as $refund) {
+					if ($refund instanceof WC_Order_Refund) {
+						$refund_ids[] = (int) $refund->get_id();
+					}
+				}
+			}
+		}
+
+		$refund_ids = array_values(array_unique(array_filter(array_map('intval', $refund_ids))));
+		foreach ($refund_ids as $rid) {
+			if ($rid < 1) {
+				continue;
+			}
+			$deleted += (int) $wpdb->query(
+				$wpdb->prepare(
+					"DELETE FROM {$table} WHERE entity_type = %s AND entity_id = %d AND status IN ('pending','processing')",
+					'order_return',
+					$rid
+				)
+			);
+		}
+
+		return $deleted;
+	}
+
+	/**
+	 * اجرای بعدی صف (Action Scheduler در صورت وجود، وگرنه رویداد تکی WP-Cron).
+	 *
+	 * @return void
+	 */
+	public static function spawn_processor()
+	{
+		$scheduled = false;
+		if (function_exists('as_enqueue_async_action')) {
+			$id = as_enqueue_async_action('hesabix_v2_async_process_queue', array(), 'hesabix-v2-queue', true);
+			$scheduled = is_int($id) && $id > 0;
+		}
+
+		if (!$scheduled && !get_transient('hesabix_v2_queue_wp_cron_sched')) {
+			set_transient('hesabix_v2_queue_wp_cron_sched', '1', 90);
+			wp_schedule_single_event(time() + 2, 'hesabix_v2_process_queue');
+		}
 	}
 }

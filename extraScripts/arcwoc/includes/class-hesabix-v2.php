@@ -130,6 +130,7 @@ class Hesabix_V2
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-product-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-customer-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-invoice-service.php';
+		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-sales-return-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-sync-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-native-variation-sync.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-orphan-product-service.php';
@@ -195,6 +196,10 @@ class Hesabix_V2
 			$this->loader->add_action('woocommerce_order_status_changed', $plugin_admin, 'maybe_sync_order_on_status_change', 10, 4);
 			$this->loader->add_action('woocommerce_new_order', $plugin_admin, 'maybe_sync_order_on_new_order', 20, 2);
 			$this->loader->add_action('woocommerce_process_shop_order_meta', $plugin_admin, 'maybe_sync_order_on_admin_save', 50, 1);
+			$this->loader->add_action('woocommerce_order_status_changed', $plugin_admin, 'maybe_reverse_order_on_status_change', 20, 4);
+			$this->loader->add_action('woocommerce_order_refunded', $plugin_admin, 'maybe_reverse_order_on_refund', 10, 2);
+			$this->loader->add_action('woocommerce_before_delete_order', $plugin_admin, 'maybe_reverse_order_on_permanent_delete', 5, 2);
+			$this->loader->add_action('before_delete_post', $plugin_admin, 'maybe_reverse_shop_order_on_delete_post', 5, 1);
 			
 			// Customer sync hooks (پروفایل وردپرس + ذخیرهٔ مشتری از «حساب کاربری من» ووکامرس)
 			$this->loader->add_action('user_register', $plugin_admin, 'on_customer_register');
