@@ -114,6 +114,23 @@ class Hesabix_V2_Invoice_Helper
 		}
 		$sync['queue_items_per_cron_run'] = max(1, min(500, absint($sync['queue_items_per_cron_run'])));
 
+		if (!array_key_exists('sales_return_on_statuses', $sync) || !is_array($sync['sales_return_on_statuses'])) {
+			$sync['sales_return_on_statuses'] = array('cancelled', 'refunded');
+		} else {
+			$sr_st = array();
+			foreach ($sync['sales_return_on_statuses'] as $st) {
+				$s = self::normalize_order_status_slug($st);
+				if ($s !== '' && $s !== 'trash' && $s !== 'auto-draft' && $s !== 'checkout-draft' && $s !== 'draft') {
+					$sr_st[] = $s;
+				}
+			}
+			$sync['sales_return_on_statuses'] = array_values(array_unique($sr_st));
+		}
+		if (!array_key_exists('sales_return_on_wc_refund', $sync)) {
+			$sync['sales_return_on_wc_refund'] = true;
+		}
+		$sync['sales_return_on_wc_refund'] = (bool) $sync['sales_return_on_wc_refund'];
+
 		if (class_exists('Hesabix_V2_Gateway_Fee_Service')) {
 			$sync = Hesabix_V2_Gateway_Fee_Service::normalize_sync_settings($sync);
 		}
@@ -278,6 +295,29 @@ class Hesabix_V2_Invoice_Helper
 		}
 
 		return false;
+	}
+
+	/**
+	 * آیا این وضعیت باید برگشت از فروش بسازد؟ زباله‌دان هرگز.
+	 *
+	 * @param string $status
+	 * @param array  $sync خروجی {@see normalize_sync_settings}
+	 * @return bool
+	 */
+	public static function status_should_create_sales_return($status, array $sync = array())
+	{
+		$slug = self::normalize_order_status_slug($status);
+		if ($slug === '' || $slug === 'trash' || $slug === 'auto-draft' || $slug === 'checkout-draft' || $slug === 'draft') {
+			return false;
+		}
+		if ($sync === array()) {
+			$sync = self::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
+		}
+		$allowed = isset($sync['sales_return_on_statuses']) && is_array($sync['sales_return_on_statuses'])
+			? $sync['sales_return_on_statuses']
+			: array('cancelled', 'refunded');
+
+		return self::order_status_in_list($slug, $allowed);
 	}
 
 	/**

@@ -28,6 +28,13 @@ class Hesabix_V2_Admin
 	private $version;
 
 	/**
+	 * سفارش‌هایی که باید بعد از ذخیرهٔ کامل اقلام (shutdown) ارزیابی شوند.
+	 *
+	 * @var array<int, array{sync:bool,reverse:bool}>
+	 */
+	private $deferred_admin_order_ids = array();
+
+	/**
 	 * Initialize the class and set its properties.
 	 *
 	 * @since    2.0.0
@@ -819,6 +826,26 @@ class Hesabix_V2_Admin
 			}
 		}
 
+		$sales_return_on_statuses = isset($prev_sync['sales_return_on_statuses']) && is_array($prev_sync['sales_return_on_statuses'])
+			? $prev_sync['sales_return_on_statuses']
+			: array('cancelled', 'refunded');
+		$sales_return_on_wc_refund = array_key_exists('sales_return_on_wc_refund', $prev_sync)
+			? !empty($prev_sync['sales_return_on_wc_refund'])
+			: true;
+		if (isset($_POST['hesabix_v2_sales_return_fields'])) {
+			$sales_return_on_statuses = array();
+			if (isset($_POST['sales_return_on_statuses']) && is_array($_POST['sales_return_on_statuses'])) {
+				foreach ($_POST['sales_return_on_statuses'] as $st) {
+					$st = sanitize_text_field(wp_unslash($st));
+					$st = Hesabix_V2_Invoice_Helper::normalize_order_status_slug($st);
+					if ($st !== '' && isset($status_choices[$st]) && !in_array($st, array('trash', 'auto-draft', 'checkout-draft', 'draft'), true)) {
+						$sales_return_on_statuses[] = $st;
+					}
+				}
+			}
+			$sales_return_on_wc_refund = isset($_POST['sales_return_on_wc_refund']);
+		}
+
 		$invoice_tab_in_post = isset($_POST['hesabix_v2_invoice_tab_fields']);
 		$finalize_proforma_on_paid = !empty($prev_sync['finalize_proforma_on_paid']);
 		$finalize_proforma_order_statuses = isset($prev_sync['finalize_proforma_order_statuses']) && is_array($prev_sync['finalize_proforma_order_statuses'])
@@ -859,6 +886,8 @@ class Hesabix_V2_Admin
 			'sync_order_on_checkout' => isset($_POST['sync_order_on_checkout']),
 			'sync_order_on_payment_complete' => isset($_POST['sync_order_on_payment_complete']),
 			'sync_order_on_statuses' => $sync_order_on_statuses,
+			'sales_return_on_statuses' => $sales_return_on_statuses,
+			'sales_return_on_wc_refund' => $sales_return_on_wc_refund,
 			'invoice_is_proforma' => isset($_POST['invoice_doc_mode']) && sanitize_text_field(wp_unslash($_POST['invoice_doc_mode'])) === 'proforma',
 			'finalize_proforma_on_paid' => $finalize_proforma_on_paid,
 			'finalize_proforma_order_statuses' => $finalize_proforma_order_statuses,
@@ -1419,13 +1448,17 @@ class Hesabix_V2_Admin
 			}
 		}
 		$in_sync_list = Hesabix_V2_Invoice_Helper::order_status_in_list($new_status, $allowed);
-		if ($new_slug === 'cancelled' || $new_slug === 'refunded' || $new_slug === 'trash') {
+		if ($new_slug === 'trash' || Hesabix_V2_Invoice_Helper::status_should_create_sales_return($new_slug, $sync)) {
 			return;
 		}
 		if (!$in_sync_list && !$proforma_promote) {
 			return;
 		}
 		if ($this->should_skip_auto_order_sync($order_id)) {
+			return;
+		}
+		if (is_admin()) {
+			$this->defer_admin_order_eval($order_id, false, true);
 			return;
 		}
 		$this->defer_auto_order_sync_to_queue($order_id);
@@ -1440,7 +1473,11 @@ class Hesabix_V2_Admin
 	 */
 	public function maybe_sync_order_on_new_order($order_id, $order = null)
 	{
-		$this->maybe_queue_order_if_status_allows_auto_sync($order_id, $order);
+		if (is_admin()) {
+			$this->defer_admin_order_eval($order_id, false, true);
+			return;
+		}
+		$this->maybe_queue_order_if_status_allows_auto_sync($order_id, null);
 	}
 
 	/**
@@ -1454,7 +1491,18 @@ class Hesabix_V2_Admin
 		if (!is_admin()) {
 			return;
 		}
-		$this->maybe_queue_order_if_status_allows_auto_sync($order_id, null);
+		$this->defer_admin_order_eval($order_id, false, true);
+	}
+
+	/**
+	 * پس از ذخیرهٔ اقلام سفارش (اغلب دیرتر از new_order در سفارش دستی).
+	 *
+	 * @param int $order_id
+	 * @return void
+	 */
+	public function maybe_sync_order_on_saved_items($order_id)
+	{
+		$this->defer_admin_order_eval($order_id, false, true);
 	}
 
 	/**
@@ -1482,8 +1530,12 @@ class Hesabix_V2_Admin
 			return;
 		}
 
+		$sync = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
 		$slug = Hesabix_V2_Invoice_Helper::normalize_order_status_slug($order->get_status());
-		if (in_array($slug, array('auto-draft', 'checkout-draft', 'draft', 'trash', 'cancelled', 'refunded'), true)) {
+		if (in_array($slug, array('auto-draft', 'checkout-draft', 'draft', 'trash'), true)) {
+			return;
+		}
+		if (Hesabix_V2_Invoice_Helper::status_should_create_sales_return($slug, $sync)) {
 			return;
 		}
 
@@ -1491,7 +1543,6 @@ class Hesabix_V2_Admin
 			return;
 		}
 
-		$sync = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
 		$allowed = isset($sync['sync_order_on_statuses']) && is_array($sync['sync_order_on_statuses'])
 			? $sync['sync_order_on_statuses']
 			: array();
@@ -1506,7 +1557,104 @@ class Hesabix_V2_Admin
 	}
 
 	/**
-	 * لغو یا وضعیت refunded بدون شیء بازپرداخت → برگشت از فروش. زباله‌دان نادیده گرفته می‌شود.
+	 * ارزیابی فروش/برگشت را تا پایان درخواست عقب بینداز تا اقلام سفارش دستی ذخیره شده باشند.
+	 *
+	 * @param int  $order_id
+	 * @param bool $reverse
+	 * @param bool $sync
+	 * @return void
+	 */
+	private function defer_admin_order_eval($order_id, $reverse = false, $sync = true)
+	{
+		$order_id = (int) $order_id;
+		if ($order_id < 1) {
+			return;
+		}
+		if (!isset($this->deferred_admin_order_ids[ $order_id ])) {
+			$this->deferred_admin_order_ids[ $order_id ] = array(
+				'sync' => false,
+				'reverse' => false,
+			);
+		}
+		if ($sync) {
+			$this->deferred_admin_order_ids[ $order_id ]['sync'] = true;
+		}
+		if ($reverse) {
+			$this->deferred_admin_order_ids[ $order_id ]['reverse'] = true;
+		}
+		if (!has_action('shutdown', array($this, 'flush_deferred_admin_order_eval'))) {
+			add_action('shutdown', array($this, 'flush_deferred_admin_order_eval'), 20);
+		}
+	}
+
+	/**
+	 * پس از ذخیرهٔ کامل سفارش ادمین: فاکتور فروش یا برگشت از فروش.
+	 *
+	 * @return void
+	 */
+	public function flush_deferred_admin_order_eval()
+	{
+		$jobs = $this->deferred_admin_order_ids;
+		$this->deferred_admin_order_ids = array();
+		foreach ($jobs as $order_id => $flags) {
+			$order_id = (int) $order_id;
+			if ($order_id < 1 || !is_array($flags)) {
+				continue;
+			}
+			if (!empty($flags['reverse'])) {
+				$this->maybe_reverse_order_if_status_requires($order_id, null);
+			}
+			if (!empty($flags['sync'])) {
+				$this->maybe_queue_order_if_status_allows_auto_sync($order_id, null);
+			}
+		}
+	}
+
+	/**
+	 * اگر وضعیت فعلی در فهرست برگشت از فروش باشد و فاکتور فروش وجود داشته باشد، برگشت صف می‌شود.
+	 *
+	 * @param int                 $order_id
+	 * @param WC_Order|null|mixed $order
+	 * @return void
+	 */
+	private function maybe_reverse_order_if_status_requires($order_id, $order = null)
+	{
+		if (!get_option('hesabix_v2_enabled')) {
+			return;
+		}
+
+		$order_id = (int) $order_id;
+		if ($order_id < 1) {
+			return;
+		}
+
+		if (!$order instanceof WC_Order) {
+			$order = wc_get_order($order_id);
+		}
+		if (!$order instanceof WC_Order || $order instanceof WC_Order_Refund) {
+			return;
+		}
+
+		$slug = Hesabix_V2_Invoice_Helper::normalize_order_status_slug($order->get_status());
+		$sync = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
+		if (!Hesabix_V2_Invoice_Helper::status_should_create_sales_return($slug, $sync)) {
+			return;
+		}
+
+		$map = Hesabix_V2_Invoice_Service::get_sync_status($order_id);
+		if (!$map || empty($map['hesabix_id'])) {
+			return;
+		}
+
+		$reason = ($slug === 'refunded')
+			? Hesabix_V2_Sales_Return_Service::REASON_REFUNDED_STATUS
+			: Hesabix_V2_Sales_Return_Service::REASON_CANCEL;
+
+		Hesabix_V2_Sales_Return_Service::enqueue_remaining($order_id, $reason);
+	}
+
+	/**
+	 * تغییر وضعیت به موارد تنظیم‌شده (پیش‌فرض لغو شده / مسترد شده) → برگشت از فروش.
 	 *
 	 * @param int      $order_id
 	 * @param string   $old_status
@@ -1521,38 +1669,20 @@ class Hesabix_V2_Admin
 		}
 
 		$order_id = (int) $order_id;
-		$slug = Hesabix_V2_Invoice_Helper::normalize_order_status_slug($new_status);
-		if ($slug === 'trash') {
+		$sync = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
+		if (!Hesabix_V2_Invoice_Helper::status_should_create_sales_return($new_status, $sync)) {
+			return;
+		}
+
+		if (is_admin()) {
+			$this->defer_admin_order_eval($order_id, true, false);
 			return;
 		}
 
 		if (!$order instanceof WC_Order) {
 			$order = wc_get_order($order_id);
 		}
-		if (!$order instanceof WC_Order || $order instanceof WC_Order_Refund) {
-			return;
-		}
-
-		$map = Hesabix_V2_Invoice_Service::get_sync_status($order_id);
-		if (!$map || empty($map['hesabix_id'])) {
-			return;
-		}
-
-		if ($slug === 'cancelled') {
-			Hesabix_V2_Sales_Return_Service::enqueue_remaining($order_id, Hesabix_V2_Sales_Return_Service::REASON_CANCEL);
-			return;
-		}
-
-		if ($slug === 'refunded') {
-			$refunds = method_exists($order, 'get_refunds') ? $order->get_refunds() : array();
-			if (!empty($refunds)) {
-				return;
-			}
-			Hesabix_V2_Sales_Return_Service::enqueue_remaining(
-				$order_id,
-				Hesabix_V2_Sales_Return_Service::REASON_REFUNDED_STATUS
-			);
-		}
+		$this->maybe_reverse_order_if_status_requires($order_id, $order);
 	}
 
 	/**
@@ -1565,6 +1695,11 @@ class Hesabix_V2_Admin
 	public function maybe_reverse_order_on_refund($order_id, $refund_id)
 	{
 		if (!get_option('hesabix_v2_enabled')) {
+			return;
+		}
+
+		$sync = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
+		if (empty($sync['sales_return_on_wc_refund'])) {
 			return;
 		}
 

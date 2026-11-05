@@ -196,6 +196,7 @@ class Hesabix_V2
 			$this->loader->add_action('woocommerce_order_status_changed', $plugin_admin, 'maybe_sync_order_on_status_change', 10, 4);
 			$this->loader->add_action('woocommerce_new_order', $plugin_admin, 'maybe_sync_order_on_new_order', 20, 2);
 			$this->loader->add_action('woocommerce_process_shop_order_meta', $plugin_admin, 'maybe_sync_order_on_admin_save', 50, 1);
+			$this->loader->add_action('woocommerce_saved_order_items', $plugin_admin, 'maybe_sync_order_on_saved_items', 20, 1);
 			$this->loader->add_action('woocommerce_order_status_changed', $plugin_admin, 'maybe_reverse_order_on_status_change', 20, 4);
 			$this->loader->add_action('woocommerce_order_refunded', $plugin_admin, 'maybe_reverse_order_on_refund', 10, 2);
 			$this->loader->add_action('woocommerce_before_delete_order', $plugin_admin, 'maybe_reverse_order_on_permanent_delete', 5, 2);

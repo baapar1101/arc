@@ -161,6 +161,8 @@ class Hesabix_V2_Activator
 			'sync_order_on_checkout' => true,
 			'sync_order_on_payment_complete' => false,
 			'sync_order_on_statuses' => array('processing', 'completed'),
+			'sales_return_on_statuses' => array('cancelled', 'refunded'),
+			'sales_return_on_wc_refund' => true,
 			'finalize_proforma_on_paid' => true,
 			'finalize_proforma_order_statuses' => array('processing', 'completed'),
 			'invoice_is_proforma' => false,

@@ -612,6 +612,37 @@ $hsx_post = ini_get('post_max_size') ?: '';
 			</tr>
 
 			<tr>
+				<th scope="row"><?php _e('برگشت از فروش: با وضعیت سفارش', 'hesabix-v2'); ?></th>
+				<td>
+					<input type="hidden" name="hesabix_v2_sales_return_fields" value="1" />
+					<fieldset style="max-height:220px;overflow:auto;border:1px solid #ccd0d4;padding:8px;">
+						<?php
+						$sr_sel = isset($sync_settings['sales_return_on_statuses']) && is_array($sync_settings['sales_return_on_statuses'])
+							? $sync_settings['sales_return_on_statuses']
+							: array('cancelled', 'refunded');
+						foreach ($wc_status_choices as $slug => $label) :
+							if (in_array($slug, array('trash', 'auto-draft', 'checkout-draft', 'draft'), true)) {
+								continue;
+							}
+							?>
+							<label style="display:block;margin:4px 0;">
+								<input type="checkbox" name="sales_return_on_statuses[]" value="<?php echo esc_attr($slug); ?>"
+									<?php checked(in_array($slug, $sr_sel, true)); ?>>
+								<?php echo esc_html($label); ?>
+								<code style="font-size:11px;">(<?php echo esc_html($slug); ?>)</code>
+							</label>
+						<?php endforeach; ?>
+					</fieldset>
+					<p class="description"><?php _e('با رسیدن سفارش همگام‌شده به این وضعیت‌ها، فاکتور فروش قطعی حذف نمی‌شود و برگشت از فروش در حسابیکس ثبت می‌شود. پیش‌فرض: لغو شده و مسترد شده. زباله‌دان رویداد مالی نیست.', 'hesabix-v2'); ?></p>
+					<p class="description"><?php _e('وضعیت‌هایی که برای صدور فاکتور فروش انتخاب کرده‌اید اینجا علامت نزنید.', 'hesabix-v2'); ?></p>
+					<label style="display:block;margin-top:8px;">
+						<input type="checkbox" name="sales_return_on_wc_refund" value="1" <?php checked(!empty($sync_settings['sales_return_on_wc_refund'])); ?>>
+						<?php _e('با ثبت بازپرداخت در ووکامرس (حتی اگر وضعیت سفارش عوض نشود) هم برگشت از فروش ساخته شود', 'hesabix-v2'); ?>
+					</label>
+				</td>
+			</tr>
+
+			<tr>
 				<th scope="row"><?php _e('ایجاد مشتری از سفارش', 'hesabix-v2'); ?></th>
 				<td>
 					<label>
