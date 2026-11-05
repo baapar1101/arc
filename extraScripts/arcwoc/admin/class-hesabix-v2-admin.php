@@ -502,7 +502,7 @@ class Hesabix_V2_Admin
 			'manage_woocommerce',
 			'hesabix-v2',
 			array($this, 'display_dashboard'),
-			HESABIX_V2_PLUGIN_URL . 'assets/img/menu-icon.png',
+			Hesabix_V2_Brand::menu_icon_url(),
 			56
 		);
 
@@ -964,8 +964,18 @@ class Hesabix_V2_Admin
 			$url = esc_url_raw(trim(wp_unslash($_POST['api_base_url'])));
 			if (!empty($url)) {
 				$url = rtrim($url, '/');
+				$previous_api = rtrim((string) get_option('hesabix_v2_api_base_url', ''), '/');
 				update_option('hesabix_v2_api_base_url', $url);
 				Hesabix_V2_Currency_Service::invalidate_list_cache();
+				if (
+					$url !== $previous_api
+					&& class_exists('Hesabix_V2_Brand', false)
+					&& get_option('hesabix_v2_enabled')
+					&& get_option('hesabix_v2_api_key')
+				) {
+					delete_transient(Hesabix_V2_Brand::REFRESH_TRANSIENT);
+					Hesabix_V2_Brand::sync_from_api(new Hesabix_V2_Api(), true);
+				}
 			}
 		}
 
@@ -2274,6 +2284,9 @@ class Hesabix_V2_Admin
 		$api = new Hesabix_V2_Api();
 		$result = $api->test_connection();
 		if (!empty($result['success'])) {
+			if (class_exists('Hesabix_V2_Brand', false)) {
+				Hesabix_V2_Brand::sync_from_api($api, true);
+			}
 			$result = $this->sanitize_connection_ajax_payload($result);
 		}
 
@@ -2300,6 +2313,9 @@ class Hesabix_V2_Admin
 		$api = new Hesabix_V2_Api();
 		$result = $api->test_connection();
 		if (!empty($result['success'])) {
+			if (class_exists('Hesabix_V2_Brand', false)) {
+				Hesabix_V2_Brand::sync_from_api($api, false);
+			}
 			$result = $this->sanitize_connection_ajax_payload($result);
 		}
 
@@ -3039,6 +3055,9 @@ class Hesabix_V2_Admin
 		update_option('hesabix_v2_setup_completed', true);
 		delete_transient('hesabix_v2_show_setup_wizard');
 		Hesabix_V2_Currency_Service::invalidate_list_cache();
+		if (class_exists('Hesabix_V2_Brand', false)) {
+			Hesabix_V2_Brand::sync_from_api($api, true);
+		}
 
 		wp_send_json(array('success' => true, 'message' => __('راه‌اندازی با موفقیت انجام شد.', 'hesabix-v2')));
 	}

@@ -66,16 +66,24 @@ class Hesabix_V2_Api
 	 * @param    string    $endpoint    API endpoint
 	 * @param    array     $data        Request data
 	 * @param    int       $timeout     Request timeout
+	 * @param    array     $options     raw=true برای بدنهٔ باینری؛ headers برای هدر اضافه
 	 * @return   array                  Response array
 	 */
-	private function request($method, $endpoint, $data = null, $timeout = 30)
+	private function request($method, $endpoint, $data = null, $timeout = 30, $options = array())
 	{
 		$url = $this->base_url . $endpoint;
+		if (!is_array($options)) {
+			$options = array();
+		}
+		$raw = !empty($options['raw']);
 
 		$headers = array(
 			'Content-Type' => 'application/json',
-			'Accept' => 'application/json',
+			'Accept' => $raw ? '*/*' : 'application/json',
 		);
+		if (!empty($options['headers']) && is_array($options['headers'])) {
+			$headers = array_merge($headers, $options['headers']);
+		}
 
 		// Add authorization header if API key is set (ApiKey ak_live_... or ak_test_...)
 		if ($this->api_key) {
@@ -163,6 +171,26 @@ class Hesabix_V2_Api
 
 		$status_code = wp_remote_retrieve_response_code($response);
 		$body = wp_remote_retrieve_body($response);
+		if ($raw) {
+			$etag = wp_remote_retrieve_header($response, 'etag');
+			$content_type = wp_remote_retrieve_header($response, 'content-type');
+			if (is_array($etag)) {
+				$etag = (string) reset($etag);
+			}
+			if (is_array($content_type)) {
+				$content_type = (string) reset($content_type);
+			}
+			$ok = ($status_code >= 200 && $status_code < 300) || (int) $status_code === 304;
+			return array(
+				'success' => $ok,
+				'status_code' => (int) $status_code,
+				'body' => is_string($body) ? $body : '',
+				'content_type' => is_string($content_type) ? $content_type : '',
+				'etag' => is_string($etag) ? $etag : '',
+				'not_modified' => ((int) $status_code === 304),
+				'_execution_time' => $execution_time,
+			);
+		}
 		$result = json_decode($body, true);
 
 		if (get_option('hesabix_v2_debug_mode')) {
@@ -357,6 +385,43 @@ class Hesabix_V2_Api
 	public function get_me()
 	{
 		return $this->request('GET', '/auth/me');
+	}
+
+	/**
+	 * برند نمونهٔ متصل از ‎.deploy_env سرور حسابیکس.
+	 *
+	 * @since 4.12.0
+	 * @return array
+	 */
+	public function get_system_branding()
+	{
+		return $this->request('GET', '/system/branding');
+	}
+
+	/**
+	 * دانلود لوگوی سفارشی برند (باینری).
+	 *
+	 * @since 4.12.0
+	 * @param string $etag
+	 * @return array
+	 */
+	public function get_system_branding_logo($etag = '')
+	{
+		$headers = array();
+		$etag = trim((string) $etag);
+		if ($etag !== '') {
+			$headers['If-None-Match'] = $etag;
+		}
+		return $this->request(
+			'GET',
+			'/system/branding/logo',
+			null,
+			30,
+			array(
+				'raw' => true,
+				'headers' => $headers,
+			)
+		);
 	}
 
 	/**

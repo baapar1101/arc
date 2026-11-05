@@ -61,6 +61,18 @@ if ($delete_data) {
 	// Delete log files
 	$upload_dir = wp_upload_dir();
 	$log_dir = $upload_dir['basedir'] . '/hesabix-v2-logs';
+	$brand_dir = $upload_dir['basedir'] . '/hesabix-v2-branding';
+	if (file_exists($brand_dir)) {
+		$brand_files = glob($brand_dir . '/*');
+		if (is_array($brand_files)) {
+			foreach ($brand_files as $file) {
+				if (is_file($file)) {
+					@unlink($file);
+				}
+			}
+		}
+		@rmdir($brand_dir);
+	}
 	
 	if (file_exists($log_dir)) {
 		$files = glob($log_dir . '/*');

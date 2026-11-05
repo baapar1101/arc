@@ -77,6 +77,7 @@ class Hesabix_V2
 		/**
 		 * The class responsible for API communication.
 		 */
+		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-brand.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-api.php';
 
 		/**
@@ -173,6 +174,7 @@ class Hesabix_V2
 
 		$plugin_admin = new Hesabix_V2_Admin($this->get_plugin_name(), $this->get_version());
 
+		$this->loader->add_action('admin_init', 'Hesabix_V2_Brand', 'maybe_refresh_from_api');
 		$this->loader->add_action('admin_enqueue_scripts', $plugin_admin, 'enqueue_styles');
 		$this->loader->add_action('admin_enqueue_scripts', $plugin_admin, 'enqueue_scripts');
 		$this->loader->add_action('admin_menu', $plugin_admin, 'add_admin_menu');

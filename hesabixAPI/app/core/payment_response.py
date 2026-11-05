@@ -146,67 +146,11 @@ def _is_generic_brand_name(value: str) -> bool:
     return _normalize_brand_key(value) in _GENERIC_BRAND_NAMES
 
 
-def _parse_env_assignments(path: Path) -> Dict[str, str]:
-    out: Dict[str, str] = {}
-    try:
-        raw = path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return out
-    for line in raw.splitlines():
-        text = line.strip()
-        if not text or text.startswith("#") or "=" not in text:
-            continue
-        key, _, value = text.partition("=")
-        out[key.strip()] = value.strip().strip('"').strip("'")
-    return out
-
-
-def _names_from_branding_json(directory: str) -> tuple[str, str]:
-    root = Path(directory)
-    for candidate in (root / "names.json", root / "meta" / "names.json"):
-        if not candidate.is_file():
-            continue
-        try:
-            data = json.loads(candidate.read_text(encoding="utf-8"))
-        except Exception:
-            continue
-        if not isinstance(data, dict):
-            continue
-        fa = str(data.get("fa") or data.get("fa_IR") or data.get("persian") or "").strip()
-        en = str(data.get("en") or data.get("en_US") or data.get("english") or "").strip()
-        if fa or en:
-            return fa, en
-    return "", ""
-
-
 def branding_display_names() -> tuple[str, str]:
     """نام فارسی/انگلیسی ریبرند از env یا ‎.deploy_env (همان منبع Flutter)."""
-    fa = (os.environ.get("APP_NAME_FA") or "").strip()
-    en = (os.environ.get("APP_NAME_EN") or "").strip()
-    mode = (os.environ.get("BRANDING_MODE") or "").strip().lower()
-    branding_dir = (os.environ.get("BRANDING_DIR") or "").strip()
-    env_path = Path(
-        os.environ.get("HESABIX_DEPLOY_ENV")
-        or os.environ.get("HESABIX_DEPLOY_ENV_FILE")
-        or "/opt/hesabix/.deploy_env"
-    )
-    if env_path.is_file():
-        parsed = _parse_env_assignments(env_path)
-        mode = (parsed.get("BRANDING_MODE") or mode).strip().lower() or mode
-        branding_dir = (parsed.get("BRANDING_DIR") or branding_dir).strip()
-        if not fa:
-            fa = (parsed.get("APP_NAME_FA") or "").strip()
-        if not en:
-            en = (parsed.get("APP_NAME_EN") or "").strip()
-    if mode == "custom" and branding_dir and (not fa or not en):
-        json_fa, json_en = _names_from_branding_json(branding_dir)
-        fa = fa or json_fa
-        en = en or json_en
-    if mode and mode not in ("custom", "1", "true", "yes"):
-        # حالت پیش‌فرض حسابیکس: نام سفارشی را اعمال نکن
-        if mode == "default":
-            return "", ""
-    return fa, en
+    from app.core.branding import branding_display_names as _branding_display_names
+
+    return _branding_display_names()
 
 
 def resolve_payment_display_name(db: Session) -> str:

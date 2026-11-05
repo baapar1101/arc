@@ -131,6 +131,9 @@ class Hesabix_V2_Connection_Service
 		self::scrub_business_scoped_preferences();
 		self::clear_bridge_local();
 		self::clear_plugin_transients();
+		if (class_exists('Hesabix_V2_Brand', false)) {
+			Hesabix_V2_Brand::clear_local();
+		}
 
 		// افزونه هنوز فعال است؛ فقط cronهای پایه را برگردان (کشش موجودی خاموش می‌ماند).
 		self::reschedule_core_crons();

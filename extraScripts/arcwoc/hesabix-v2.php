@@ -8,7 +8,7 @@
  * Plugin Name:       Hesabix V2: WooCommerce
  * Plugin URI:        https://hesabix.ir/
  * Description:       اتصال ووکامرس به نسخه جدید حسابیکس با API پیشرفته - نسخه دوم با پشتیبانی از API Key و امکانات جدید
- * Version:           4.11.0
+ * Version:           4.12.0
  * Author:            Hesabix Team
  * Author URI:        https://hesabix.ir
  * License:           GPL-3.0+
@@ -28,7 +28,7 @@ if (!defined('WPINC')) {
 /**
  * Currently plugin version.
  */
-define('HESABIX_V2_VERSION', '4.11.0');
+define('HESABIX_V2_VERSION', '4.12.0');
 define('HESABIX_V2_PLUGIN_FILE', __FILE__);
 define('HESABIX_V2_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('HESABIX_V2_PLUGIN_DIR', plugin_dir_path(__FILE__));
@@ -75,6 +75,9 @@ if (!defined('HESABIX_V2_UPDATE_ARCHIVE_URL')) {
 	define('HESABIX_V2_UPDATE_ARCHIVE_URL', HESABIX_V2_UPDATE_ARCHIVE_ZIP_URL);
 }
 
+require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-brand.php';
+Hesabix_V2_Brand::init();
+
 /**
  * Plugin updater: مخزن + یکپارچگی با صفحهٔ به‌روزرسانی افزونه‌ها و تب تنظیمات.
  */
@@ -101,7 +104,7 @@ add_filter('cron_schedules', static function ($schedules) {
 	}
 	$schedules['every_5_minutes'] = array(
 		'interval' => 300,
-		'display'  => 'Every 5 minutes (Hesabix)',
+		'display'  => Hesabix_V2_Brand::rebrand('Every 5 minutes (Hesabix)'),
 	);
 
 	return $schedules;
