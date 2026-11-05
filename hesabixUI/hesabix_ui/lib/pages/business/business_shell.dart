@@ -257,7 +257,7 @@ class _BusinessShellState extends State<BusinessShell> {
       case 'distribution':
         return t.distributionMenu;
       case 'hscript':
-        return 'گزارش‌ساز اسکریپتی';
+        return t.reportsHscriptTitle;
       default:
         break;
     }
@@ -274,7 +274,7 @@ class _BusinessShellState extends State<BusinessShell> {
       return t.oaMenu;
     }
     if (pathTailBase.startsWith('hscript')) {
-      return 'گزارش‌ساز اسکریپتی';
+      return t.reportsHscriptTitle;
     }
     if (RegExp(r'^price-lists/\d+/items$').hasMatch(pathTailBase)) {
       return t.businessPanelTabRoutePriceListItems;
@@ -1525,8 +1525,7 @@ class _BusinessShellState extends State<BusinessShell> {
     }
     _maybeRefreshPluginsAfterMarketplace(location);
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
-    final workflowLabel = _workflowMenuLabel(t);
-    
+
     // ساختار متمرکز منو
     final allMenuItems = <_MenuItem>[
       _MenuItem(
@@ -1573,7 +1572,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'product-bundles',
-            label: 'باندل‌های کالا',
+            label: t.productBundlesMenu,
             icon: Icons.inventory_2_outlined,
             selectedIcon: Icons.inventory_2,
             path: _bu('product-bundles'),
@@ -1600,7 +1599,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'catalog-spec-fields',
-            label: 'قالب مشخصات تأمین',
+            label: t.catalogSpecFieldsMenu,
             icon: Icons.view_list_outlined,
             selectedIcon: Icons.view_list,
             path: _bu('catalog-spec-fields'),
@@ -1683,7 +1682,7 @@ class _BusinessShellState extends State<BusinessShell> {
       ),
       _MenuItem(
         key: 'quick-sales',
-        label: 'فروش سریع',
+        label: t.quickSalesMenu,
         icon: Icons.point_of_sale,
         selectedIcon: Icons.point_of_sale,
         path: _bu('quick-sales'),
@@ -1837,7 +1836,7 @@ class _BusinessShellState extends State<BusinessShell> {
       ),
       _MenuItem(
         key: 'hscript',
-        label: 'گزارش‌ساز اسکریپتی',
+        label: t.reportsHscriptTitle,
         icon: Icons.code_outlined,
         selectedIcon: Icons.code,
         path: _bu('hscript'),
@@ -1863,7 +1862,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'warehouse-docs',
-            label: 'حواله‌های انبار',
+            label: t.warehouseDocsMenu,
             icon: Icons.description,
             selectedIcon: Icons.description,
             path: _bu('warehouse-docs'),
@@ -1872,7 +1871,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'stock-count',
-            label: 'انبار گردانی',
+            label: t.stockCountMenu,
             icon: Icons.inventory,
             selectedIcon: Icons.inventory,
             path: _bu('stock-count'),
@@ -1881,7 +1880,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'quick-sales-stock-discrepancies',
-            label: 'مغایرت‌های موجودی فروش سریع',
+            label: t.quickSalesStockDiscrepanciesMenu,
             icon: Icons.rule_folder_outlined,
             selectedIcon: Icons.rule_folder,
             path: _bu('quick-sales-stock-discrepancies'),
@@ -1890,7 +1889,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'goods-expense-income',
-            label: 'کالای هزینه/درآمد شده',
+            label: t.goodsExpenseIncomeMenu,
             icon: Icons.inventory_2_outlined,
             selectedIcon: Icons.inventory_2,
             path: _bu('goods-expense-income'),
@@ -1899,7 +1898,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'production-orders',
-            label: 'سفارش‌های تولید',
+            label: t.productionOrdersMenu,
             icon: Icons.precision_manufacturing_outlined,
             selectedIcon: Icons.precision_manufacturing,
             path: _bu('production-orders'),
@@ -1928,7 +1927,7 @@ class _BusinessShellState extends State<BusinessShell> {
       ),
       _MenuItem(
         key: 'group:ai',
-        label: 'هوش مصنوعی',
+        label: t.aiMenu,
         icon: Icons.smart_toy_outlined,
         selectedIcon: Icons.smart_toy,
         path: null, // برای منوی بازشونده
@@ -1936,7 +1935,7 @@ class _BusinessShellState extends State<BusinessShell> {
         children: [
           _MenuItem(
             key: 'ai/chat',
-            label: 'دستیار هوشمند',
+            label: t.aiAssistantMenu,
             icon: Icons.chat_bubble_outline,
             selectedIcon: Icons.chat_bubble,
             path: _bu('ai/chat'),
@@ -1945,7 +1944,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'ai/subscription',
-            label: 'اشتراک AI',
+            label: t.aiSubscriptionMenu,
             icon: Icons.subscriptions_outlined,
             selectedIcon: Icons.subscriptions,
             path: _bu('ai/subscription'),
@@ -1954,7 +1953,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'ai/usage',
-            label: 'آمار استفاده',
+            label: t.aiUsageMenu,
             icon: Icons.bar_chart_outlined,
             selectedIcon: Icons.bar_chart,
             path: _bu('ai/usage'),
@@ -1963,7 +1962,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'ai/skills/marketplace',
-            label: 'مارکت‌پلیس مهارت‌ها',
+            label: t.aiSkillsMarketplaceMenu,
             icon: Icons.storefront_outlined,
             selectedIcon: Icons.storefront,
             path: _bu('ai/skills/marketplace'),
@@ -1972,7 +1971,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'ai/skills/publisher',
-            label: 'درآمد مهارت‌ها',
+            label: t.aiSkillsPublisherMenu,
             icon: Icons.payments_outlined,
             selectedIcon: Icons.payments,
             path: _bu('ai/skills/publisher'),
@@ -1983,7 +1982,7 @@ class _BusinessShellState extends State<BusinessShell> {
       ),
       _MenuItem(
         key: 'workflows',
-        label: workflowLabel,
+        label: t.workflows,
         icon: Icons.hub_outlined,
         selectedIcon: Icons.hub,
         path: _bu('workflows'),
@@ -1992,7 +1991,7 @@ class _BusinessShellState extends State<BusinessShell> {
       ),
       _MenuItem(
         key: 'group:crm',
-        label: 'CRM',
+        label: t.crmMenu,
         icon: Icons.handshake_outlined,
         selectedIcon: Icons.handshake,
         path: _bu('crm/dashboard'),
@@ -2001,7 +2000,7 @@ class _BusinessShellState extends State<BusinessShell> {
           // کار روزانه
           _MenuItem(
             key: 'crm/tasks',
-            label: 'صف کار',
+            label: t.crmMenuTasks,
             icon: Icons.task_alt_outlined,
             selectedIcon: Icons.task_alt,
             path: _bu('crm/tasks'),
@@ -2010,7 +2009,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'crm/web-chat',
-            label: 'چت وب',
+            label: t.crmMenuWebChat,
             icon: Icons.chat_bubble_outline,
             selectedIcon: Icons.chat_bubble,
             path: _bu('crm/web-chat'),
@@ -2029,7 +2028,7 @@ class _BusinessShellState extends State<BusinessShell> {
           // قیف فروش
           _MenuItem(
             key: 'crm/leads',
-            label: 'سرنخ‌ها',
+            label: t.crmMenuLeads,
             icon: Icons.contact_phone_outlined,
             selectedIcon: Icons.contact_phone,
             path: _bu('crm/leads'),
@@ -2038,7 +2037,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'crm/deals',
-            label: 'فرصت‌های فروش',
+            label: t.crmMenuDeals,
             icon: Icons.trending_up_outlined,
             selectedIcon: Icons.trending_up,
             path: _bu('crm/deals'),
@@ -2047,7 +2046,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'crm/activities',
-            label: 'فعالیت‌ها',
+            label: t.crmMenuActivities,
             icon: Icons.history,
             selectedIcon: Icons.history,
             path: _bu('crm/activities'),
@@ -2056,7 +2055,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'crm/customer-360',
-            label: 'نمای ۳۶۰ مشتری',
+            label: t.crmMenuCustomer360,
             icon: Icons.person_search_outlined,
             selectedIcon: Icons.person_search,
             path: _bu('crm/customer-360'),
@@ -2066,7 +2065,7 @@ class _BusinessShellState extends State<BusinessShell> {
           // بینش
           _MenuItem(
             key: 'crm/dashboard',
-            label: 'داشبورد',
+            label: t.crmMenuDashboard,
             icon: Icons.dashboard_outlined,
             selectedIcon: Icons.dashboard,
             path: _bu('crm/dashboard'),
@@ -2075,7 +2074,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'crm/reports',
-            label: 'گزارشات',
+            label: t.crmMenuReports,
             icon: Icons.assessment_outlined,
             selectedIcon: Icons.assessment,
             path: _bu('crm/reports'),
@@ -2085,7 +2084,7 @@ class _BusinessShellState extends State<BusinessShell> {
           // پیکربندی
           _MenuItem(
             key: 'crm/process-definitions',
-            label: 'فرایندها و مراحل قیف',
+            label: t.crmMenuProcessDefinitions,
             icon: Icons.account_tree_outlined,
             selectedIcon: Icons.account_tree,
             path: _bu('crm/process-definitions'),
@@ -2094,7 +2093,7 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
           _MenuItem(
             key: 'crm/sequences',
-            label: 'توالی‌های خودکار',
+            label: t.crmMenuSequences,
             icon: Icons.timeline_outlined,
             selectedIcon: Icons.timeline,
             path: _bu('crm/sequences'),
@@ -2105,7 +2104,7 @@ class _BusinessShellState extends State<BusinessShell> {
       ),
       _MenuItem(
         key: 'warranty',
-        label: t.warranty ?? 'گارانتی',
+        label: t.warranty,
         icon: Icons.verified_user,
         selectedIcon: Icons.verified_user,
         path: _bu('warranty'),
@@ -2228,7 +2227,7 @@ class _BusinessShellState extends State<BusinessShell> {
       ),
       _MenuItem(
         key: 'zohal/inquiries',
-        label: 'استعلامات',
+        label: t.inquiries,
         icon: Icons.search_outlined,
         selectedIcon: Icons.search,
         path: _bu('zohal/inquiries'),
@@ -2329,7 +2328,7 @@ class _BusinessShellState extends State<BusinessShell> {
           if (!context.mounted) return;
           final ctx = context;
           if (GoRouterState.of(ctx).uri.toString() != item.path!) {
-            if (item.label == t.categories) {
+            if (item.key == 'categories') {
               // باز کردن دیالوگ دسته‌بندی‌ها به جای ناوبری
               if (widget.authStore.canReadSection('categories')) {
                 if (!ctx.mounted) return;
@@ -2349,7 +2348,7 @@ class _BusinessShellState extends State<BusinessShell> {
           // اگر GoRouterState در دسترس نیست، مستقیماً به مسیر برود
           if (!context.mounted) return;
           final ctx = context;
-            if (item.label == t.categories) {
+            if (item.key == 'categories') {
               if (widget.authStore.canReadSection('categories')) {
                 if (!ctx.mounted) return;
                 await showDialog<bool>(
@@ -2373,7 +2372,7 @@ class _BusinessShellState extends State<BusinessShell> {
       final parent = menuItems[parentIndex];
       if (parent.type == _MenuItemType.expandable && parent.children != null) {
         final child = parent.children![childIndex];
-        if (child.label == t.categories) {
+        if (child.key == 'categories') {
           if (widget.authStore.canReadSection('categories')) {
             await showDialog<bool>(
               context: context,
@@ -2608,6 +2607,52 @@ class _BusinessShellState extends State<BusinessShell> {
     await _handleInvoiceWizardResult(result);
   }
 
+    void openMenuAddAction(_MenuItem item) {
+      switch (item.key) {
+        case 'persons':
+          showAddPersonDialog();
+        case 'products':
+          showAddProductDialog();
+        case 'accounts':
+          showAddBankAccountDialog();
+        case 'petty-cash':
+          showAddPettyCashDialog();
+        case 'cash-box':
+          showAddCashBoxDialog();
+        case 'wallet':
+          showWalletTopUpDialog();
+        case 'checks':
+          showAddCheckDialog();
+        case 'invoice':
+          context.go(_bu('invoice/new'));
+        case 'receipts-payments':
+          showAddReceiptPaymentDialog();
+        case 'expense-income':
+          showAddExpenseIncomeDialog();
+        case 'transfers':
+          showAddTransferDialog();
+        case 'documents':
+          showAddDocumentDialog();
+        case 'warehouses':
+          showAddWarehouseDialog();
+        case 'warehouse-docs':
+          showAddWarehouseDocumentDialog();
+        case 'goods-expense-income':
+          context.go(_bu('goods-expense-income'));
+        case 'production-orders':
+          context.go(_bu('production-orders'));
+        case 'crm/process-definitions':
+          context.go('${_bu('crm/process-definitions')}?openAdd=1');
+        case 'crm/leads':
+          context.go('${_bu('crm/leads')}?openAdd=1');
+        case 'crm/deals':
+          context.go('${_bu('crm/deals')}?openAdd=1');
+        case 'crm/activities':
+          context.go('${_bu('crm/activities')}?openAdd=1');
+        case 'loan-facilities':
+          showLoanFacilityCreateDialog();
+      }
+    }
 
     bool isExpanded(_MenuItem item) => _isExpandableMenuOpen(item);
 
@@ -3065,59 +3110,14 @@ class _BusinessShellState extends State<BusinessShell> {
                                         ),
                                       ),
                                     ),
-                                    if (child.hasAddButton && _canAddForSection(_sectionForLabel(child.label, t)))
+                                    if (child.hasAddButton && _canAddForSection(_sectionForMenuItem(child, t)))
                                       _sidebarAddAffordance(
                                         nav: nav,
                                         foreground: isChildActive ? activeFg : sideFg,
                                         background: isChildActive
                                             ? activeFg.withValues(alpha: 0.15)
                                             : sideFg.withValues(alpha: 0.1),
-                                        onTap: () {
-                                          // Navigate to add new item
-                                          if (child.label == t.personsList) {
-                                            showAddPersonDialog();
-                                          } else if (child.label == t.products) {
-                                            showAddProductDialog();
-                                          } else if (child.label == t.categories) {
-                                            // Navigate to add category
-                                          } else if (child.label == t.productAttributes) {
-                                            // Navigate to add product attribute
-                                          } else if (child.label == t.accounts) {
-                                            showAddBankAccountDialog();
-                                          } else if (child.label == t.pettyCash) {
-                                            showAddPettyCashDialog();
-                                          } else if (child.label == t.cashBox) {
-                                            showAddCashBoxDialog();
-                                          } else if (child.label == t.wallet) {
-                                            showWalletTopUpDialog();
-                                          } else if (child.label == t.checks) {
-                                            showAddCheckDialog();
-                                          } else if (child.label == t.invoice) {
-                                            context.go(_bu('invoice/new'));
-                                          } else if (child.label == t.receiptsAndPayments) {
-                                            showAddReceiptPaymentDialog();
-                                          } else if (child.label == t.expenseAndIncome) {
-                                            showAddExpenseIncomeDialog();
-                                          } else if (child.label == t.warehouses) {
-                                            showAddWarehouseDialog();
-                                          } else if (child.label == 'حواله‌های انبار') {
-                                            showAddWarehouseDocumentDialog();
-                                          } else if (child.label == 'کالای هزینه/درآمد شده') {
-                                            context.go(_bu('goods-expense-income'));
-                                          } else if (child.label == 'سفارش‌های تولید') {
-                                            context.go(_bu('production-orders'));
-                                          } else if (child.label == 'فرایندها و مراحل قیف') {
-                                            context.go('${_bu('crm/process-definitions')}?openAdd=1');
-                                          } else if (child.label == 'سرنخ‌ها') {
-                                            context.go('${_bu('crm/leads')}?openAdd=1');
-                                          } else if (child.label == 'فرصت‌های فروش') {
-                                            context.go('${_bu('crm/deals')}?openAdd=1');
-                                          } else if (child.label == 'فعالیت‌ها') {
-                                            context.go('${_bu('crm/activities')}?openAdd=1');
-                                          } else if (child.label == t.loanFacilities) {
-                                            showLoanFacilityCreateDialog();
-                                          }
-                                        },
+                                        onTap: () => openMenuAddAction(child),
                                       ),
                                   ],
                                 ],
@@ -3275,34 +3275,14 @@ class _BusinessShellState extends State<BusinessShell> {
                                     )
                                   else if (item.hasAddButton)
                                     Builder(builder: (ctx) {
-                                      final section = _sectionForLabel(item.label, t);
+                                      final section = _sectionForMenuItem(item, t);
                                       final canAdd = section != null && (widget.authStore.hasBusinessPermission(section, 'add'));
                                       if (!canAdd) return const SizedBox.shrink();
                                       return _sidebarAddAffordance(
                                         nav: nav,
                                         foreground: sideFg,
                                         background: sideFg.withValues(alpha: 0.1),
-                                        onTap: () {
-                                          if (item.label == t.people) {
-                                            showAddPersonDialog();
-                                          } else if (item.label == t.accounts) {
-                                            showAddBankAccountDialog();
-                                          } else if (item.label == t.cashBox) {
-                                            showAddCashBoxDialog();
-                                          } else if (item.label == t.invoice) {
-                                            context.go(_bu('invoice/new'));
-                                          } else if (item.label == t.receiptsAndPayments) {
-                                            showAddReceiptPaymentDialog();
-                                          } else if (item.label == t.expenseAndIncome) {
-                                            showAddExpenseIncomeDialog();
-                                          } else if (item.label == t.transfers) {
-                                            showAddTransferDialog();
-                                          } else if (item.label == t.checks) {
-                                            showAddCheckDialog();
-                                          } else if (item.label == t.documents) {
-                                            showAddDocumentDialog();
-                                          }
-                                        },
+                                        onTap: () => openMenuAddAction(item),
                                       );
                                     }),
                                 ],
@@ -3399,7 +3379,7 @@ class _BusinessShellState extends State<BusinessShell> {
                       ),
                     );
                   } else if (item.type == _MenuItemType.simple) {
-                    final section = _sectionForLabel(item.label, t);
+                    final section = _sectionForMenuItem(item, t);
                     final canAdd = section != null && (widget.authStore.hasBusinessPermission(section, 'add'));
                     final chrome = _sidebarItemChrome(
                       item,
@@ -3436,25 +3416,7 @@ class _BusinessShellState extends State<BusinessShell> {
                               background: sideFg.withValues(alpha: 0.1),
                               onTap: () {
                                 context.pop();
-                                // در حال حاضر فقط اشخاص پشتیبانی می‌شود
-                                if (item.label == t.people) {
-                                  showAddPersonDialog();
-                                } else if (item.label == t.invoice) {
-                                  // Navigate to add invoice
-                                  context.go(_bu('invoice/new'));
-                                } else if (item.label == t.expenseAndIncome) {
-                                  // Show add expense/income dialog
-                                  showAddExpenseIncomeDialog();
-                                } else if (item.label == t.transfers) {
-                                  // Show add transfer dialog
-                                  showAddTransferDialog();
-                                } else if (item.label == t.checks) {
-                                  // Show add check dialog
-                                  showAddCheckDialog();
-                                } else if (item.label == t.documents) {
-                                  // Show add document dialog
-                                  showAddDocumentDialog();
-                                }
+                                openMenuAddAction(item);
                               },
                             )
                           : null,
@@ -3488,7 +3450,7 @@ class _BusinessShellState extends State<BusinessShell> {
                         setState(() => _setExpandableMenuOpen(item, expanded));
                       },
                       children: visibleChildren.map((child) {
-                        final childSection = _sectionForLabel(child.label, t);
+                        final childSection = _sectionForMenuItem(child, t);
                         final childCanAdd = child.hasAddButton && _canAddForSection(childSection);
                         return ListTile(
                         leading: SizedBox(width: nav.childIconExtended),
@@ -3504,56 +3466,7 @@ class _BusinessShellState extends State<BusinessShell> {
                           background: sideFg.withValues(alpha: 0.1),
                           onTap: () {
                             context.pop();
-                            // Navigate to add new item
-                            if (child.label == t.products) {
-                              // Show add product dialog
-                              showAddProductDialog();
-                            } else if (child.label == t.categories) {
-                              // Navigate to add category
-                            } else if (child.label == t.productAttributes) {
-                              // Navigate to add product attribute
-                            } else if (child.label == t.accounts) {
-                              // Open add bank account dialog
-                              showAddBankAccountDialog();
-                            } else if (child.label == t.pettyCash) {
-                              // Open add petty cash dialog
-                              showAddPettyCashDialog();
-                            } else if (child.label == t.cashBox) {
-                              // Open add cash register dialog
-                              showAddCashBoxDialog();
-                            } else if (child.label == t.wallet) {
-                              // Show wallet top-up dialog
-                              showWalletTopUpDialog();
-                            } else if (child.label == t.checks) {
-                              // Navigate to add check
-                            } else if (child.label == t.invoice) {
-                              // Navigate to add invoice
-                              context.go(_bu('invoice/new'));
-                            } else if (child.label == t.receiptsAndPayments) {
-                              // Show add receipt payment dialog
-                              showAddReceiptPaymentDialog();
-                            } else if (child.label == t.expenseAndIncome) {
-                              // Show add expense/income dialog
-                              showAddExpenseIncomeDialog();
-                            } else if (child.label == t.warehouses) {
-                              // Show add warehouse dialog
-                              showAddWarehouseDialog();
-                            } else if (child.label == 'حواله‌های انبار') {
-                              // Show add warehouse document dialog
-                              showAddWarehouseDocumentDialog();
-                            } else if (child.label == 'سفارش‌های تولید') {
-                              context.go(_bu('production-orders'));
-                            } else if (child.label == 'فرایندها و مراحل قیف') {
-                              context.go('${_bu('crm/process-definitions')}?openAdd=1');
-                            } else if (child.label == 'سرنخ‌ها') {
-                              context.go('${_bu('crm/leads')}?openAdd=1');
-                            } else if (child.label == 'فرصت‌های فروش') {
-                              context.go('${_bu('crm/deals')}?openAdd=1');
-                            } else if (child.label == 'فعالیت‌ها') {
-                              context.go('${_bu('crm/activities')}?openAdd=1');
-                            } else if (child.label == t.loanFacilities) {
-                              showLoanFacilityCreateDialog();
-                            }
+                            openMenuAddAction(child);
                           },
                         ) : null,
                         onTap: () {
@@ -4007,7 +3920,7 @@ class _BusinessShellState extends State<BusinessShell> {
     
     // برای کاربران عضو، بررسی دسترسی
     // تنظیمات: نیازمند دسترسی join
-    if (section == 'settings' && item.label == AppLocalizations.of(context).settings) {
+    if (section == 'settings' && item.key == 'settings') {
       final hasJoin = widget.authStore.hasBusinessPermission('settings', 'join');
       final canManageDefaultShortcuts = widget.authStore.hasBusinessPermission(
         'quick_sales',
@@ -4017,7 +3930,7 @@ class _BusinessShellState extends State<BusinessShell> {
     }
     
     // استعلامات: نیازمند دسترسی read برای settings
-    if (section == 'settings' && (item.label == 'استعلامات' || item.label == 'Inquiries')) {
+    if (section == 'settings' && item.key == 'zohal/inquiries') {
       final hasRead = widget.authStore.hasBusinessPermission('settings', 'read') || 
                       widget.authStore.hasBusinessPermission('settings', 'join');
       return hasRead;
@@ -4055,36 +3968,105 @@ class _BusinessShellState extends State<BusinessShell> {
 
   // تبدیل کلید/برچسب منو به کلید سکشن دسترسی
   String? _sectionForMenuItem(_MenuItem item, AppLocalizations t) {
-    switch (item.key) {
-      case 'hscript':
-        return 'reports';
-      case 'payroll':
-        return 'payroll';
-      case 'advanced-production':
-        return 'advanced_production';
-      case 'office-automation':
-      case 'group:office-automation':
+    final key = item.key;
+    if (key != null) {
+      if (key.startsWith('crm/') || key == 'group:crm') return 'crm';
+      if (key.startsWith('ai/') || key == 'group:ai') return 'ai';
+      if (key.startsWith('office-automation') || key == 'group:office-automation') {
         return 'office_automation';
-      case 'fixed-assets':
-        return 'fixed_assets';
-      case 'barcode-labels':
-        return 'barcode_labels';
-      case 'telephony':
-        return 'telephony';
-      case 'customer-club':
-        return 'customer_club';
-      case 'repair-shop':
-        return 'repair_shop';
-      case 'warranty':
-        return 'warranty';
-      case 'distribution':
-        return 'distribution';
-      case 'tax-workspace':
-        return 'moadian';
-      case 'plugin-marketplace':
-        return 'marketplace';
-      case 'report-templates':
-        return 'report_templates';
+      }
+      switch (key) {
+        case 'persons':
+          return 'people';
+        case 'products':
+        case 'product-bundles':
+        case 'catalog-spec-fields':
+          return 'products';
+        case 'categories':
+          return 'categories';
+        case 'product-attributes':
+          return 'product_attributes';
+        case 'barcode-labels':
+          return 'barcode_labels';
+        case 'accounts':
+          return 'bank_accounts';
+        case 'petty-cash':
+          return 'petty_cash';
+        case 'cash-box':
+          return 'cash';
+        case 'wallet':
+          return 'wallet';
+        case 'loan-facilities':
+          return 'loan_facilities';
+        case 'quick-sales':
+        case 'invoice':
+          return 'invoices';
+        case 'receipts-payments':
+          return 'people_transactions';
+        case 'expense-income':
+          return 'expenses_income';
+        case 'transfers':
+          return 'transfers';
+        case 'checks':
+          return 'checks';
+        case 'documents':
+          return 'accounting_documents';
+        case 'chart-of-accounts':
+          return 'chart_of_accounts';
+        case 'opening-balance':
+          return 'opening_balance';
+        case 'year-end-closing':
+          return 'fiscal_years';
+        case 'currency-revaluation':
+          return 'currency_revaluation';
+        case 'reports':
+        case 'hscript':
+          return 'reports';
+        case 'basalam':
+          return 'basalam';
+        case 'woocommerce':
+          return 'woocommerce';
+        case 'digipay':
+          return 'digipay';
+        case 'warehouses':
+          return 'warehouses';
+        case 'warehouse-docs':
+        case 'stock-count':
+          return 'warehouse_transfers';
+        case 'quick-sales-stock-discrepancies':
+        case 'production-orders':
+          return 'inventory';
+        case 'goods-expense-income':
+          return 'goods_expense_income';
+        case 'storage-files':
+          return 'storage';
+        case 'tax-workspace':
+          return 'moadian';
+        case 'workflows':
+        case 'zohal/inquiries':
+        case 'settings':
+          return 'settings';
+        case 'warranty':
+          return 'warranty';
+        case 'repair-shop':
+          return 'repair_shop';
+        case 'customer-club':
+          return 'customer_club';
+        case 'payroll':
+          return 'payroll';
+        case 'advanced-production':
+          return 'advanced_production';
+        case 'fixed-assets':
+          return 'fixed_assets';
+        case 'telephony':
+          return 'telephony';
+        case 'distribution':
+          return 'distribution';
+        case 'report-templates':
+          return 'report_templates';
+        case 'plugin-marketplace':
+          return 'marketplace';
+      }
     }
     final path = item.path;
     if (path != null) {
@@ -4101,29 +4083,35 @@ class _BusinessShellState extends State<BusinessShell> {
       if (path.contains('/warranty')) return 'warranty';
       if (path.contains('/distribution')) return 'distribution';
       if (path.contains('/tax-workspace')) return 'moadian';
+      if (path.contains('/crm/')) return 'crm';
+      if (path.contains('/ai/')) return 'ai';
     }
     return _sectionForLabel(item.label, t);
   }
 
-  // تبدیل برچسب محلی‌شده منو به کلید سکشن دسترسی
+  // تبدیل برچسب محلی‌شده منو به کلید سکشن دسترسی (پشتیبان برای آیتم بدون کلید)
   String? _sectionForLabel(String label, AppLocalizations t) {
-    if (label == t.reports) return 'reports';
-    if (label == 'گزارش‌ساز اسکریپتی' || label == 'HScript Reports') return 'reports';
+    if (label == t.reports || label == t.reportsHscriptTitle) return 'reports';
     if (label == t.people) return 'people';
-    if (label == 'CRM' ||
-        label == 'داشبورد' ||
-        label == 'فرایندها و مراحل قیف' ||
-        label == 'فرایندها و مراحل قیف' ||
-        label == 'سرنخ‌ها' ||
-        label == 'فرصت‌های فروش' ||
-        label == 'فعالیت‌ها' ||
-        label == 'گزارشات' ||
+    if (label == t.crmMenu ||
+        label == t.crmMenuDashboard ||
+        label == t.crmMenuProcessDefinitions ||
+        label == t.crmMenuLeads ||
+        label == t.crmMenuDeals ||
+        label == t.crmMenuActivities ||
+        label == t.crmMenuReports ||
         label == t.crmMenuNotesCalendar ||
-        label == 'چت وب') {
+        label == t.crmMenuWebChat ||
+        label == t.crmMenuTasks ||
+        label == t.crmMenuCustomer360 ||
+        label == t.crmMenuSequences) {
       return 'crm';
     }
-    if (label == t.products) return 'products';
-    if (label == 'باندل‌های کالا' || label == 'Product bundles') return 'products';
+    if (label == t.products ||
+        label == t.productBundlesMenu ||
+        label == t.catalogSpecFieldsMenu) {
+      return 'products';
+    }
     if (label == t.categories) return 'categories';
     if (label == t.productAttributes) return 'product_attributes';
     if (label == t.accounts) return 'bank_accounts';
@@ -4132,8 +4120,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.wallet) return 'wallet';
     if (label == t.loanFacilities) return 'loan_facilities';
     if (label == t.checks) return 'checks';
-    if (label == 'فروش سریع') return 'invoices'; // فروش سریع نیازمند دسترسی invoices.add است
-    if (label == t.invoice) return 'invoices';
+    if (label == t.quickSalesMenu || label == t.invoice) return 'invoices';
     if (label == t.receiptsAndPayments) return 'people_transactions';
     if (label == t.expenseAndIncome) return 'expenses_income';
     if (label == t.transfers) return 'transfers';
@@ -4143,33 +4130,25 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.openingBalance) return 'opening_balance';
     if (label == t.currencyRevaluation) return 'currency_revaluation';
     if (label == t.warehouses) return 'warehouses';
-    if (label == 'حواله‌های انبار') return 'warehouse_transfers';
-    // انبارگردانی (Stock Count) در نهایت به ایجاد/مدیریت حواله‌های تعدیل منجر می‌شود؛
-    // بنابراین در مدل دسترسی فعلی زیر مجموعه‌ی warehouse_transfers در نظر گرفته می‌شود.
-    if (label == 'انبار گردانی' || label == 'انبارگردانی' || label == 'Stock Count') return 'warehouse_transfers';
-    if (label == 'مغایرت‌های موجودی فروش سریع') return 'inventory';
-    if (label == 'کالای هزینه/درآمد شده' ||
-        label == 'کالای هزینه‌شده / کالای درآمدشده' ||
-        label == 'Goods Expense/Income') {
-      return 'goods_expense_income';
+    if (label == t.warehouseDocsMenu || label == t.stockCountMenu) {
+      return 'warehouse_transfers';
     }
-    if (label == 'سفارش‌های تولید' || label == 'Production Orders') {
+    if (label == t.quickSalesStockDiscrepanciesMenu ||
+        label == t.productionOrdersMenu) {
       return 'inventory';
     }
+    if (label == t.goodsExpenseIncomeMenu) return 'goods_expense_income';
     if (label == t.storageSpace) return 'storage';
     if (label == t.taxpayers) return 'moadian';
-    if (label == t.settings) return 'settings';
+    if (label == t.settings || label == t.inquiries || label == t.workflows) {
+      return 'settings';
+    }
     if (label == t.templates) return 'report_templates';
     if (label == t.pluginMarketplace) return 'marketplace';
-    if (label == t.warranty || label == 'گارانتی' || label == 'Warranty') return 'warranty';
-    if (label == t.repairShopMenu || label == 'تعمیرگاه' || label == 'Repair Shop') return 'repair_shop';
-    if (label == t.customerClubMenu || label == 'Customer Club') return 'customer_club';
-    if (label == t.payrollMenu ||
-        label == t.payrollTitle ||
-        label == 'Payroll' ||
-        label == 'حقوق و دستمزد') {
-      return 'payroll';
-    }
+    if (label == t.warranty) return 'warranty';
+    if (label == t.repairShopMenu) return 'repair_shop';
+    if (label == t.customerClubMenu) return 'customer_club';
+    if (label == t.payrollMenu || label == t.payrollTitle) return 'payroll';
     if (label == t.advancedProductionMenu || label == t.advancedProductionTitle) {
       return 'advanced_production';
     }
@@ -4178,33 +4157,26 @@ class _BusinessShellState extends State<BusinessShell> {
         label == t.oaCartable ||
         label == t.oaExternalOrgs ||
         label == t.oaArchiveTree ||
-        label == t.oaReports ||
-        label == 'Office automation' ||
-        label == 'اتوماسیون اداری') {
+        label == t.oaReports) {
       return 'office_automation';
     }
-    if (label == t.fixedAssetsMenu ||
-        label == t.fixedAssetsTitle ||
-        label == 'Fixed assets' ||
-        label == 'اموال و دارایی ثابت') {
+    if (label == t.fixedAssetsMenu || label == t.fixedAssetsTitle) {
       return 'fixed_assets';
     }
-    if (label == t.distributionMenu || label == 'Field distribution') return 'distribution';
-    if (label == t.telephonyMenu || label == 'مرکز تماس' || label == 'Telephony') return 'telephony';
+    if (label == t.distributionMenu) return 'distribution';
+    if (label == t.telephonyMenu) return 'telephony';
     if (label == t.basalamIntegrationMenuTitle) return 'basalam';
     if (label == t.woocommerceIntegrationMenuTitle) return 'woocommerce';
     if (label == t.digipayMenuTitle) return 'digipay';
-    if (label == 'هوش مصنوعی' || label == 'AI Tools') return 'ai';
-    if (label == 'چت با AI' || label == 'AI Chat') return 'ai';
-    if (label == 'اشتراک AI' || label == 'AI Subscription') return 'ai';
-    if (label == 'آمار استفاده' || label == 'AI Usage') return 'ai';
-    if (label == 'استعلامات' || label == 'Inquiries') return 'settings';
-    if (label == _workflowMenuLabel(t)) return 'settings';
+    if (label == t.aiMenu ||
+        label == t.aiAssistantMenu ||
+        label == t.aiSubscriptionMenu ||
+        label == t.aiUsageMenu ||
+        label == t.aiSkillsMarketplaceMenu ||
+        label == t.aiSkillsPublisherMenu) {
+      return 'ai';
+    }
     return null;
-  }
-
-  String _workflowMenuLabel(AppLocalizations t) {
-    return t.localeName.startsWith('fa') ? 'اتوماسیون‌ها' : 'Automations';
   }
 
 }

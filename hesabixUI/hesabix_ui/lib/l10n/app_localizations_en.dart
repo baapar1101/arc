@@ -2732,6 +2732,82 @@ class AppLocalizationsEn extends AppLocalizations {
   String get inquiries => 'Inquiries';
 
   @override
+  String get quickSalesMenu => 'Quick sales';
+
+  @override
+  String get productBundlesMenu => 'Product bundles';
+
+  @override
+  String get catalogSpecFieldsMenu => 'Supply spec templates';
+
+  @override
+  String get warehouseDocsMenu => 'Warehouse documents';
+
+  @override
+  String get stockCountMenu => 'Stock count';
+
+  @override
+  String get quickSalesStockDiscrepanciesMenu =>
+      'Quick sales stock discrepancies';
+
+  @override
+  String get goodsExpenseIncomeMenu => 'Expensed / income goods';
+
+  @override
+  String get productionOrdersMenu => 'Production orders';
+
+  @override
+  String get aiMenu => 'Artificial intelligence';
+
+  @override
+  String get aiAssistantMenu => 'AI assistant';
+
+  @override
+  String get aiSubscriptionMenu => 'AI subscription';
+
+  @override
+  String get aiUsageMenu => 'Usage stats';
+
+  @override
+  String get aiSkillsMarketplaceMenu => 'Skills marketplace';
+
+  @override
+  String get aiSkillsPublisherMenu => 'Skills earnings';
+
+  @override
+  String get crmMenu => 'CRM';
+
+  @override
+  String get crmMenuTasks => 'Work queue';
+
+  @override
+  String get crmMenuWebChat => 'Web chat';
+
+  @override
+  String get crmMenuLeads => 'Leads';
+
+  @override
+  String get crmMenuDeals => 'Sales opportunities';
+
+  @override
+  String get crmMenuActivities => 'Activities';
+
+  @override
+  String get crmMenuCustomer360 => 'Customer 360';
+
+  @override
+  String get crmMenuDashboard => 'Dashboard';
+
+  @override
+  String get crmMenuReports => 'Reports';
+
+  @override
+  String get crmMenuProcessDefinitions => 'Processes and funnel stages';
+
+  @override
+  String get crmMenuSequences => 'Automation sequences';
+
+  @override
   String get storageSpace => 'Storage Space';
 
   @override

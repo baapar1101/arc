@@ -2716,6 +2716,81 @@ class AppLocalizationsFa extends AppLocalizations {
   String get inquiries => 'استعلامات';
 
   @override
+  String get quickSalesMenu => 'فروش سریع';
+
+  @override
+  String get productBundlesMenu => 'باندل‌های کالا';
+
+  @override
+  String get catalogSpecFieldsMenu => 'قالب مشخصات تأمین';
+
+  @override
+  String get warehouseDocsMenu => 'حواله‌های انبار';
+
+  @override
+  String get stockCountMenu => 'انبار گردانی';
+
+  @override
+  String get quickSalesStockDiscrepanciesMenu => 'مغایرت‌های موجودی فروش سریع';
+
+  @override
+  String get goodsExpenseIncomeMenu => 'کالای هزینه/درآمد شده';
+
+  @override
+  String get productionOrdersMenu => 'سفارش‌های تولید';
+
+  @override
+  String get aiMenu => 'هوش مصنوعی';
+
+  @override
+  String get aiAssistantMenu => 'دستیار هوشمند';
+
+  @override
+  String get aiSubscriptionMenu => 'اشتراک AI';
+
+  @override
+  String get aiUsageMenu => 'آمار استفاده';
+
+  @override
+  String get aiSkillsMarketplaceMenu => 'مارکت‌پلیس مهارت‌ها';
+
+  @override
+  String get aiSkillsPublisherMenu => 'درآمد مهارت‌ها';
+
+  @override
+  String get crmMenu => 'CRM';
+
+  @override
+  String get crmMenuTasks => 'صف کار';
+
+  @override
+  String get crmMenuWebChat => 'چت وب';
+
+  @override
+  String get crmMenuLeads => 'سرنخ‌ها';
+
+  @override
+  String get crmMenuDeals => 'فرصت‌های فروش';
+
+  @override
+  String get crmMenuActivities => 'فعالیت‌ها';
+
+  @override
+  String get crmMenuCustomer360 => 'نمای ۳۶۰ مشتری';
+
+  @override
+  String get crmMenuDashboard => 'داشبورد';
+
+  @override
+  String get crmMenuReports => 'گزارشات';
+
+  @override
+  String get crmMenuProcessDefinitions => 'فرایندها و مراحل قیف';
+
+  @override
+  String get crmMenuSequences => 'توالی‌های خودکار';
+
+  @override
   String get storageSpace => 'فضای ذخیره‌سازی';
 
   @override

@@ -5162,6 +5162,156 @@ abstract class AppLocalizations {
   /// **'Inquiries'**
   String get inquiries;
 
+  /// No description provided for @quickSalesMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick sales'**
+  String get quickSalesMenu;
+
+  /// No description provided for @productBundlesMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Product bundles'**
+  String get productBundlesMenu;
+
+  /// No description provided for @catalogSpecFieldsMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Supply spec templates'**
+  String get catalogSpecFieldsMenu;
+
+  /// No description provided for @warehouseDocsMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse documents'**
+  String get warehouseDocsMenu;
+
+  /// No description provided for @stockCountMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock count'**
+  String get stockCountMenu;
+
+  /// No description provided for @quickSalesStockDiscrepanciesMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick sales stock discrepancies'**
+  String get quickSalesStockDiscrepanciesMenu;
+
+  /// No description provided for @goodsExpenseIncomeMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Expensed / income goods'**
+  String get goodsExpenseIncomeMenu;
+
+  /// No description provided for @productionOrdersMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Production orders'**
+  String get productionOrdersMenu;
+
+  /// No description provided for @aiMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Artificial intelligence'**
+  String get aiMenu;
+
+  /// No description provided for @aiAssistantMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'AI assistant'**
+  String get aiAssistantMenu;
+
+  /// No description provided for @aiSubscriptionMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'AI subscription'**
+  String get aiSubscriptionMenu;
+
+  /// No description provided for @aiUsageMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage stats'**
+  String get aiUsageMenu;
+
+  /// No description provided for @aiSkillsMarketplaceMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Skills marketplace'**
+  String get aiSkillsMarketplaceMenu;
+
+  /// No description provided for @aiSkillsPublisherMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Skills earnings'**
+  String get aiSkillsPublisherMenu;
+
+  /// No description provided for @crmMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'CRM'**
+  String get crmMenu;
+
+  /// No description provided for @crmMenuTasks.
+  ///
+  /// In en, this message translates to:
+  /// **'Work queue'**
+  String get crmMenuTasks;
+
+  /// No description provided for @crmMenuWebChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Web chat'**
+  String get crmMenuWebChat;
+
+  /// No description provided for @crmMenuLeads.
+  ///
+  /// In en, this message translates to:
+  /// **'Leads'**
+  String get crmMenuLeads;
+
+  /// No description provided for @crmMenuDeals.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales opportunities'**
+  String get crmMenuDeals;
+
+  /// No description provided for @crmMenuActivities.
+  ///
+  /// In en, this message translates to:
+  /// **'Activities'**
+  String get crmMenuActivities;
+
+  /// No description provided for @crmMenuCustomer360.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer 360'**
+  String get crmMenuCustomer360;
+
+  /// No description provided for @crmMenuDashboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Dashboard'**
+  String get crmMenuDashboard;
+
+  /// No description provided for @crmMenuReports.
+  ///
+  /// In en, this message translates to:
+  /// **'Reports'**
+  String get crmMenuReports;
+
+  /// No description provided for @crmMenuProcessDefinitions.
+  ///
+  /// In en, this message translates to:
+  /// **'Processes and funnel stages'**
+  String get crmMenuProcessDefinitions;
+
+  /// No description provided for @crmMenuSequences.
+  ///
+  /// In en, this message translates to:
+  /// **'Automation sequences'**
+  String get crmMenuSequences;
+
   /// No description provided for @storageSpace.
   ///
   /// In en, this message translates to:
