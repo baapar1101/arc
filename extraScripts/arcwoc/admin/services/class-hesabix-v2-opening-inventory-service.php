@@ -514,11 +514,18 @@ class Hesabix_V2_Opening_Inventory_Service
 		}
 
 		$price_for_tax = $raw;
+		$tax_args = array(
+			'qty' => 1,
+			'price' => $raw,
+		);
 		if (function_exists('wc_get_price_excluding_tax') && function_exists('wc_get_price_including_tax')) {
 			if ($inc_tax) {
-				$price_for_tax = (float) wc_get_price_including_tax(array('qty' => 1, 'product' => $product));
+				$calc = wc_get_price_including_tax($product, $tax_args);
 			} else {
-				$price_for_tax = (float) wc_get_price_excluding_tax(array('qty' => 1, 'product' => $product));
+				$calc = wc_get_price_excluding_tax($product, $tax_args);
+			}
+			if ($calc !== '' && $calc !== null) {
+				$price_for_tax = (float) $calc;
 			}
 		}
 
@@ -526,7 +533,7 @@ class Hesabix_V2_Opening_Inventory_Service
 			$price_for_tax = 0.0;
 		}
 
-		$gate = Hesabix_V2_Currency_Service::evaluate_currency_sync($api, $product->get_currency());
+		$gate = Hesabix_V2_Currency_Service::evaluate_currency_sync($api, null);
 		if (empty($gate['ok'])) {
 			return 0.0;
 		}
