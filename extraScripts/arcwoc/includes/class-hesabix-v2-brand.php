@@ -51,6 +51,22 @@ class Hesabix_V2_Brand
 		add_filter('ngettext', array(__CLASS__, 'filter_ngettext'), 20, 5);
 		add_filter('ngettext_with_context', array(__CLASS__, 'filter_ngettext_with_context'), 20, 6);
 		add_filter('all_plugins', array(__CLASS__, 'filter_all_plugins'));
+		add_action('admin_head', array(__CLASS__, 'print_menu_icon_styles'));
+	}
+
+	/**
+	 * وردپرس برای آیکون سفارشی منو تگ img می‌گذارد و اندازه را محدود نمی‌کند.
+	 * لوگوی ریبرند معمولاً چندصد پیکسل است؛ این استایل آن را به سایز Dashicon می‌رساند.
+	 *
+	 * @return void
+	 */
+	public static function print_menu_icon_styles()
+	{
+		echo '<style id="hesabix-v2-menu-icon">'
+			. '#adminmenu #toplevel_page_hesabix-v2 .wp-menu-image img{'
+			. 'width:20px!important;height:20px!important;max-width:20px!important;max-height:20px!important;'
+			. 'padding:7px 0 0!important;object-fit:contain;box-sizing:content-box;}'
+			. '</style>';
 	}
 
 	/**
@@ -317,6 +333,7 @@ class Hesabix_V2_Brand
 		if ($path === '' || !is_readable($path)) {
 			return $default;
 		}
+		self::constrain_menu_icon_file($path);
 		$url = self::logo_public_url($cfg);
 		return $url !== '' ? $url : $default;
 	}
@@ -544,6 +561,7 @@ class Hesabix_V2_Brand
 		if ($written === false) {
 			return false;
 		}
+		self::constrain_menu_icon_file($abs);
 
 		foreach (array('menu-icon.png', 'menu-icon.jpg', 'menu-icon.jpeg', 'menu-icon.gif', 'menu-icon.webp', 'menu-icon.ico') as $old) {
 			$old_abs = $dir . '/' . $old;
@@ -553,6 +571,31 @@ class Hesabix_V2_Brand
 		}
 
 		return self::UPLOAD_SUBDIR . '/' . $filename;
+	}
+
+	/**
+	 * آیکون منوی وردپرس ۲۰ پیکسل است؛ لوگوی برند را حداکثر ۶۴ پیکسل نگه می‌داریم.
+	 *
+	 * @param string $abs
+	 * @return void
+	 */
+	private static function constrain_menu_icon_file($abs)
+	{
+		if (!is_string($abs) || $abs === '' || !is_readable($abs) || !function_exists('wp_get_image_editor')) {
+			return;
+		}
+		$editor = wp_get_image_editor($abs);
+		if (is_wp_error($editor)) {
+			return;
+		}
+		$size = $editor->get_size();
+		$max = 64;
+		if (empty($size['width']) || empty($size['height']) || ((int) $size['width'] <= $max && (int) $size['height'] <= $max)) {
+			return;
+		}
+		$editor->resize($max, $max, false);
+		$saved = $editor->save($abs);
+		unset($saved);
 	}
 
 	/**
