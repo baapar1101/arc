@@ -1308,6 +1308,10 @@ FLUTTER_STORAGE_BASE_URL=${FLUTTER_STORAGE_BASE_URL:-}
 INSTALL_ID=${INSTALL_ID:-}
 ENV
   chmod 600 "${env_file}"
+  if getent group www-data >/dev/null 2>&1; then
+    chgrp www-data "${env_file}" 2>/dev/null || true
+  fi
+  chmod 640 "${env_file}" 2>/dev/null || true
   log_info "Saved deployment config to ${env_file}"
 
   local bin_hesabix="/usr/local/bin/hesabix"

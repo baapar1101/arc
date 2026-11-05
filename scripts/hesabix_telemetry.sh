@@ -63,7 +63,14 @@ hesabix_persist_install_id() {
     else
       printf '\nINSTALL_ID=%s\n' "${INSTALL_ID}" >> "${env_file}"
     fi
-    chmod 600 "${env_file}" 2>/dev/null || true
+    if [[ "$(basename "${env_file}")" == ".deploy_env" ]]; then
+      if getent group www-data >/dev/null 2>&1; then
+        chgrp www-data "${env_file}" 2>/dev/null || true
+      fi
+      chmod 640 "${env_file}" 2>/dev/null || true
+    else
+      chmod 600 "${env_file}" 2>/dev/null || true
+    fi
   fi
 }
 

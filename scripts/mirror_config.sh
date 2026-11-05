@@ -618,7 +618,14 @@ hesabix_persist_mirror_to_deploy_env() {
     hesabix_write_env_assignment FLUTTER_STORAGE_BASE_URL "${FLUTTER_STORAGE_BASE_URL:-}"
   } > "${env_file}.new"
   mv "${env_file}.new" "${env_file}"
-  chmod 600 "${env_file}" 2>/dev/null || true
+  if [[ "$(basename "${env_file}")" == ".deploy_env" ]]; then
+    if getent group www-data >/dev/null 2>&1; then
+      chgrp www-data "${env_file}" 2>/dev/null || true
+    fi
+    chmod 640 "${env_file}" 2>/dev/null || true
+  else
+    chmod 600 "${env_file}" 2>/dev/null || true
+  fi
   rm -f "${tmp}"
 }
 

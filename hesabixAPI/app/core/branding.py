@@ -44,6 +44,7 @@ def parse_env_assignments(path: Path) -> Dict[str, str]:
 	try:
 		raw = path.read_text(encoding="utf-8", errors="replace")
 	except OSError:
+		# API often runs as www-data; .deploy_env must be group-readable (640).
 		return out
 	for line in raw.splitlines():
 		text = line.strip()
