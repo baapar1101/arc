@@ -1631,6 +1631,9 @@ $hsx_post = ini_get('post_max_size') ?: '';
 						<li data-key="currency" class="<?php echo !empty($ob_chk['currency']) ? 'is-ok' : 'is-bad'; ?>"><?php esc_html_e('ارز سند (از تب فاکتور / حسابیکس) قابل تشخیص است', 'hesabix-v2'); ?></li>
 					</ul>
 				</div>
+				<input type="hidden" name="ob_inv_prefs_present" value="1">
+				<input type="hidden" name="ob_inv_inventory_account_id" id="ob_inv_inventory_account_id_hidden" value="<?php echo esc_attr((string) (int) $ob_inv_prefs['inventory_account_id']); ?>">
+				<input type="hidden" name="ob_inv_equity_account_id" id="ob_inv_equity_account_id_hidden" value="<?php echo esc_attr((string) (int) $ob_inv_prefs['equity_account_id']); ?>">
 				<div id="hesabix-v2-obinv-initial" hidden
 					data-inventory-id="<?php echo esc_attr((string) (int) $ob_inv_prefs['inventory_account_id']); ?>"
 					data-equity-id="<?php echo esc_attr((string) (int) $ob_inv_prefs['equity_account_id']); ?>"></div>
@@ -1675,7 +1678,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 					<tr class="hesabix-v2-obinv-equity-row">
 						<th scope="row"><?php esc_html_e('حساب حقوق صاحبان سهام', 'hesabix-v2'); ?></th>
 						<td>
-							<select name="ob_inv_equity_account_id" id="ob_inv_equity_account_id" class="regular-text hesabix-v2-obinv-accounts">
+							<select id="ob_inv_equity_account_id" class="regular-text hesabix-v2-obinv-accounts">
 								<option value="0"><?php esc_html_e('— انتخاب —', 'hesabix-v2'); ?></option>
 							</select>
 						</td>
@@ -1683,7 +1686,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 					<tr>
 						<th scope="row"><?php esc_html_e('حساب موجودی کالا', 'hesabix-v2'); ?></th>
 						<td>
-							<select name="ob_inv_inventory_account_id" id="ob_inv_inventory_account_id" class="regular-text hesabix-v2-obinv-accounts">
+							<select id="ob_inv_inventory_account_id" class="regular-text hesabix-v2-obinv-accounts">
 								<option value="0"><?php esc_html_e('— انتخاب —', 'hesabix-v2'); ?></option>
 							</select>
 							<button type="button" class="button" id="hesabix_v2_obinv_load_accounts"><?php esc_html_e('بارگذاری حساب‌ها از حسابیکس', 'hesabix-v2'); ?></button>

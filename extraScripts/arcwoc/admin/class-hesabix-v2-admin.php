@@ -943,21 +943,37 @@ class Hesabix_V2_Admin
 		update_option('hesabix_v2_debug_mode', isset($_POST['debug_mode']));
 		update_option('hesabix_v2_add_checkout_fields', isset($_POST['add_checkout_fields']));
 
-		$ob_cost = isset($_POST['ob_inv_cost_basis']) ? sanitize_key(wp_unslash($_POST['ob_inv_cost_basis'])) : 'regular';
-		if (!in_array($ob_cost, array('regular', 'sale', 'zero'), true)) {
-			$ob_cost = 'regular';
+		if (isset($_POST['ob_inv_prefs_present'])) {
+			$ob_cost = isset($_POST['ob_inv_cost_basis']) ? sanitize_key(wp_unslash($_POST['ob_inv_cost_basis'])) : 'regular';
+			if (!in_array($ob_cost, array('regular', 'sale', 'zero'), true)) {
+				$ob_cost = 'regular';
+			}
+			$prev_ob = get_option('hesabix_v2_opening_inventory_prefs', array());
+			if (!is_array($prev_ob)) {
+				$prev_ob = array();
+			}
+			$inv_acc = isset($_POST['ob_inv_inventory_account_id']) ? absint(wp_unslash($_POST['ob_inv_inventory_account_id'])) : 0;
+			$eq_acc = isset($_POST['ob_inv_equity_account_id']) ? absint(wp_unslash($_POST['ob_inv_equity_account_id'])) : 0;
+			if ($inv_acc < 1 && !empty($prev_ob['inventory_account_id'])) {
+				$inv_acc = (int) $prev_ob['inventory_account_id'];
+			}
+			if ($eq_acc < 1 && !empty($prev_ob['equity_account_id'])) {
+				$eq_acc = (int) $prev_ob['equity_account_id'];
+			}
+			update_option(
+				'hesabix_v2_opening_inventory_prefs',
+				array(
+					'include_tax' => isset($_POST['ob_inv_include_tax']),
+					'cost_basis' => $ob_cost,
+					'auto_balance_to_equity' => isset($_POST['ob_inv_auto_balance']),
+					'do_post' => isset($_POST['ob_inv_do_post']),
+					'batch_size' => isset($_POST['ob_inv_batch_size']) ? max(3, min(40, absint(wp_unslash($_POST['ob_inv_batch_size'])))) : 12,
+					'inventory_account_id' => $inv_acc,
+					'equity_account_id' => $eq_acc,
+					'warehouse_override' => isset($_POST['ob_inv_warehouse_override']) ? absint(wp_unslash($_POST['ob_inv_warehouse_override'])) : 0,
+				)
+			);
 		}
-		$ob_inv_prefs = array(
-			'include_tax' => isset($_POST['ob_inv_include_tax']),
-			'cost_basis' => $ob_cost,
-			'auto_balance_to_equity' => isset($_POST['ob_inv_auto_balance']),
-			'do_post' => isset($_POST['ob_inv_do_post']),
-			'batch_size' => isset($_POST['ob_inv_batch_size']) ? max(3, min(40, absint(wp_unslash($_POST['ob_inv_batch_size'])))) : 12,
-			'inventory_account_id' => isset($_POST['ob_inv_inventory_account_id']) ? absint(wp_unslash($_POST['ob_inv_inventory_account_id'])) : 0,
-			'equity_account_id' => isset($_POST['ob_inv_equity_account_id']) ? absint(wp_unslash($_POST['ob_inv_equity_account_id'])) : 0,
-			'warehouse_override' => isset($_POST['ob_inv_warehouse_override']) ? absint(wp_unslash($_POST['ob_inv_warehouse_override'])) : 0,
-		);
-		update_option('hesabix_v2_opening_inventory_prefs', $ob_inv_prefs);
 
 		// API base URL - allow configuring server address
 		if (isset($_POST['api_base_url'])) {
@@ -2416,11 +2432,19 @@ class Hesabix_V2_Admin
 	private function get_opening_inventory_script_payload()
 	{
 		$ui = Hesabix_V2_Opening_Inventory_Service::get_connection_prereq_for_ui();
+		$obp = get_option('hesabix_v2_opening_inventory_prefs', array());
+		if (!is_array($obp)) {
+			$obp = array();
+		}
 		return array(
 			'post_confirm_phrase' => Hesabix_V2_Opening_Inventory_Service::post_confirm_phrase(),
 			'prereq' => $ui['prereq'],
 			'checklist' => $ui['checklist'],
 			'pending_job' => Hesabix_V2_Opening_Inventory_Service::get_pending_job_summary_for_user(get_current_user_id()),
+			'savedInventoryAccountId' => (int) ($obp['inventory_account_id'] ?? 0),
+			'savedEquityAccountId' => (int) ($obp['equity_account_id'] ?? 0),
+			'defaultInventoryCodes' => array('10102', '12101', '10101'),
+			'defaultEquityCodes' => array('30201', '30106', '30101'),
 			'strings' => array(
 				'loadAccounts' => __('در حال بارگذاری حساب‌ها…', 'hesabix-v2'),
 				'accountsError' => __('خطا در دریافت حساب‌ها از حسابیکس.', 'hesabix-v2'),
