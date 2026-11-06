@@ -14,6 +14,8 @@ _ORIGIN_KEY = "arcwoc_origin"
 _ORIGIN_WC_PUSH = "wc_stock_push"
 _SESSION_QUEUE_KEY = "woocommerce_stock_push_queue"
 _SESSION_LISTENER_KEY = "woocommerce_stock_push_listener"
+_SESSION_OWNERS_KEY = "woocommerce_stock_push_transaction_owners"
+_SESSION_COMMITTED_KEY = "woocommerce_stock_push_committed_savepoints"
 
 
 def schedule_woocommerce_stock_push_after_warehouse_post(
@@ -45,7 +47,34 @@ def schedule_woocommerce_stock_push_after_warehouse_post(
 			"product_ids": clean_ids,
 		}
 	)
+	owners = db.info.setdefault(_SESSION_OWNERS_KEY, {})
+	owners[id(queue[-1])] = db.get_nested_transaction() or db.get_transaction()
 	_ensure_commit_listener(db)
+
+
+def _clear_pending_stock_pushes(session: Session) -> None:
+	"""Clear transaction data; listeners remain attached for Session reuse."""
+	session.info.pop(_SESSION_QUEUE_KEY, None)
+	session.info.pop(_SESSION_OWNERS_KEY, None)
+	session.info.pop(_SESSION_COMMITTED_KEY, None)
+
+
+def _discard_stock_push_scope(session: Session, transaction: Any) -> None:
+	"""A rolled-back savepoint also owns messages from committed descendants."""
+	queue = session.info.get(_SESSION_QUEUE_KEY, [])
+	if not queue:
+		return
+	owners = session.info.get(_SESSION_OWNERS_KEY, {})
+	kept = []
+	for payload in queue:
+		owner = owners.get(id(payload))
+		while owner is not None and owner is not transaction:
+			owner = owner.parent
+		if owner is transaction:
+			owners.pop(id(payload), None)
+		else:
+			kept.append(payload)
+	session.info[_SESSION_QUEUE_KEY] = kept
 
 
 def _ensure_commit_listener(db: Session) -> None:
@@ -54,8 +83,11 @@ def _ensure_commit_listener(db: Session) -> None:
 	db.info[_SESSION_LISTENER_KEY] = True
 
 	def _after_commit(session: Session) -> None:
+		if session.in_nested_transaction():
+			session.info.setdefault(_SESSION_COMMITTED_KEY, set()).add(session.get_nested_transaction())
+			return
 		payloads = list(session.info.pop(_SESSION_QUEUE_KEY, []) or [])
-		session.info.pop(_SESSION_LISTENER_KEY, None)
+		_clear_pending_stock_pushes(session)
 		for payload in payloads:
 			try:
 				_execute_stock_push(payload)
@@ -68,12 +100,20 @@ def _ensure_commit_listener(db: Session) -> None:
 					exc_info=True,
 				)
 
-	def _after_rollback(session: Session) -> None:
-		session.info.pop(_SESSION_QUEUE_KEY, None)
-		session.info.pop(_SESSION_LISTENER_KEY, None)
+	def _after_transaction_end(session: Session, transaction: Any) -> None:
+		if transaction.parent is None:
+			# Includes root rollback/close; sending belongs only to after_commit.
+			_clear_pending_stock_pushes(session)
+		elif transaction.nested:
+			committed = session.info.get(_SESSION_COMMITTED_KEY, set())
+			if transaction in committed:
+				committed.discard(transaction)
+			else:
+				_discard_stock_push_scope(session, transaction)
 
-	event.listen(db, "after_commit", _after_commit, once=True)
-	event.listen(db, "after_rollback", _after_rollback, once=True)
+	# once=True would consume the listener on the first nested commit.
+	event.listen(db, "after_commit", _after_commit)
+	event.listen(db, "after_transaction_end", _after_transaction_end)
 
 
 def _execute_stock_push(payload: Dict[str, Any]) -> None:
