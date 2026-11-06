@@ -2940,7 +2940,6 @@ async def delete_custom_field(
 @router.get(
     "/businesses/{business_id}/deals/{deal_id}/lines",
     summary="خطوط فرصت فروش",
-    description="ابزار MCP: `list_crm_deal_lines`.",
     description="کالا/خدمت‌های روی فرصت فروش. ابزار MCP: `list_crm_deal_lines`.",
 )
 @require_business_access("business_id")
@@ -2959,7 +2958,6 @@ async def list_deal_lines(
 @router.put(
     "/businesses/{business_id}/deals/{deal_id}/lines",
     summary="جایگزینی خطوط فرصت فروش",
-    description="ابزار MCP: `replace_deal_lines` (نیازمند تأیید).",
     description="جایگزینی کامل خطوط معامله. ابزار MCP: `replace_deal_lines` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
@@ -2986,7 +2984,6 @@ async def replace_deal_lines(
 @router.get(
     "/businesses/{business_id}/persons/{person_id}/customer-360",
     summary="دید ۳۶۰ درجه مشتری",
-    description="ابزار MCP: `get_crm_customer_360`.",
     description="تجمیع شخص، معاملات و فعالیت‌ها. ابزار MCP: `get_crm_customer_360`.",
 )
 @require_business_access("business_id")
@@ -3010,7 +3007,6 @@ async def get_customer_360(
 @router.get(
     "/businesses/{business_id}/my-work-queue",
     summary="صف کاری من",
-    description="ابزار MCP: `get_crm_my_work_queue`.",
     description="وظایف باز تخصیص‌یافته به کاربر جاری. ابزار MCP: `get_crm_my_work_queue`.",
 )
 @require_business_access("business_id")
