@@ -30,7 +30,7 @@ router = APIRouter(prefix="/bank-accounts", tags=["مدیریت مالی"])
 @router.post(
     "/businesses/{business_id}/bank-accounts",
     summary="لیست حساب‌های بانکی کسب‌وکار",
-    description="دریافت لیست حساب‌های بانکی یک کسب و کار با امکان جستجو و فیلتر",
+    description="ابزار MCP: `list_bank_accounts`.",
 )
 @require_business_access("business_id")
 async def list_bank_accounts_endpoint(
@@ -73,7 +73,7 @@ async def list_bank_accounts_endpoint(
 @router.post(
     "/businesses/{business_id}/bank-accounts/create",
     summary="ایجاد حساب بانکی جدید",
-    description="ایجاد حساب بانکی برای یک کسب‌وکار مشخص",
+    description="ابزار MCP: `create_bank_account` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_bank_account_endpoint(
@@ -92,7 +92,7 @@ async def create_bank_account_endpoint(
 @router.get(
     "/bank-accounts/{account_id}",
     summary="جزئیات حساب بانکی",
-    description="دریافت جزئیات حساب بانکی بر اساس شناسه",
+    description="ابزار MCP: `get_bank_account`.",
 )
 async def get_bank_account_endpoint(
     request: Request,
@@ -117,7 +117,7 @@ async def get_bank_account_endpoint(
 @router.put(
     "/bank-accounts/{account_id}",
     summary="ویرایش حساب بانکی",
-    description="ویرایش اطلاعات حساب بانکی",
+    description="ابزار MCP: `update_bank_account` (نیازمند تأیید).",
 )
 async def update_bank_account_endpoint(
     request: Request,
@@ -144,7 +144,7 @@ async def update_bank_account_endpoint(
 @router.delete(
     "/bank-accounts/{account_id}",
     summary="حذف حساب بانکی",
-    description="حذف یک حساب بانکی",
+    description="ابزار MCP: `delete_bank_account` (نیازمند تأیید).",
 )
 async def delete_bank_account_endpoint(
     request: Request,
@@ -175,7 +175,7 @@ async def delete_bank_account_endpoint(
 @router.post(
     "/businesses/{business_id}/bank-accounts/bulk-delete",
     summary="حذف گروهی حساب‌های بانکی",
-    description="حذف چندین حساب بانکی بر اساس شناسه‌ها",
+    description="ابزار MCP: `bulk_delete_bank_accounts` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def bulk_delete_bank_accounts_endpoint(
@@ -205,7 +205,7 @@ async def bulk_delete_bank_accounts_endpoint(
 @router.post(
     "/businesses/{business_id}/bank-accounts/export/excel",
     summary="خروجی Excel لیست حساب‌های بانکی",
-    description="خروجی Excel لیست حساب‌های بانکی با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="خروجی باینری Excel است و در MCP ثبت نشده. JSON: `list_bank_accounts`.",
 )
 @require_business_access("business_id")
 async def export_bank_accounts_excel(
@@ -337,7 +337,7 @@ async def export_bank_accounts_excel(
 @router.post(
     "/businesses/{business_id}/bank-accounts/export/pdf",
     summary="خروجی PDF لیست حساب‌های بانکی",
-    description="خروجی PDF لیست حساب‌های بانکی با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `list_bank_accounts`.",
 )
 @require_business_access("business_id")
 async def export_bank_accounts_pdf(
@@ -671,7 +671,7 @@ async def export_bank_accounts_pdf(
 
 @router.post("/businesses/{business_id}/reports/bank-accounts-turnover",
     summary="گزارش گردش حساب‌های بانکی",
-    description="گزارش برداشت‌ها و واریزهای هر حساب بانکی در یک بازه زمانی",
+    description="گزارش برداشت‌ها و واریزهای هر حساب بانکی در یک بازه زمانی. ابزار MCP: `get_report` با report_type=bank_accounts_turnover.",
 )
 @require_business_access("business_id")
 async def bank_accounts_turnover_report_endpoint(
@@ -774,7 +774,7 @@ async def bank_accounts_turnover_report_endpoint(
 
 @router.post("/businesses/{business_id}/reports/bank-accounts-turnover/export/excel",
     summary="خروجی Excel گزارش گردش حساب‌های بانکی",
-    description="خروجی Excel گزارش گردش حساب‌های بانکی با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="خروجی باینری Excel است و در MCP ثبت نشده. JSON: `get_report` با report_type=bank_accounts_turnover.",
 )
 @require_business_access("business_id")
 async def export_bank_accounts_turnover_excel(
@@ -1049,6 +1049,7 @@ async def export_bank_accounts_turnover_excel(
 @router.post(
     "/businesses/{business_id}/reports/bank-accounts-turnover/export/pdf",
     summary="خروجی PDF گزارش گردش حساب‌های بانکی",
+    description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `get_report` با report_type=bank_accounts_turnover.",
 )
 @require_business_access("business_id")
 async def export_bank_accounts_turnover_pdf(

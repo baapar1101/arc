@@ -94,6 +94,30 @@ def register_mcp_repair_functions(registry) -> None:
         return add_parts_to_repair_order(context["db"], int(context["business_id"]), int(args["order_id"]), items, ctx.get_user_id())
     part = _schema({"product_id": {"type": "integer", "minimum": 1}, "quantity": {"type": "number", "exclusiveMinimum": 0}, "unit_price": {"type": ["number", "null"], "minimum": 0}, "warehouse_id": {"type": ["integer", "null"], "minimum": 1}, "description": {"type": ["string", "null"]}}, ["product_id", "quantity"])
     _register(registry, "add_repair_parts", "افزودن حداکثر ۲۵ قطعه به سفارش؛ اگر کالا انبارگردانی شود ممکن است حواله خروج ساخته شود و موجودی بررسی می‌شود. نیازمند تأیید.", _schema({**order_id, "parts": {"type": "array", "minItems": 1, "maxItems": 25, "items": part}}, ["order_id", "parts"]), add_parts, "repair_shop.write", write=True, high=True)
+
+    def remove_part(args, context):
+        from app.services.repair_shop_operations import remove_part_from_repair_order
+
+        return remove_part_from_repair_order(
+            context["db"],
+            int(context["business_id"]),
+            int(args["order_id"]),
+            int(args["part_id"]),
+            context["user_context"].get_user_id(),
+        )
+
+    registry.register(AIFunction(
+        name="remove_repair_part",
+        description="حذف یک قطعه از سفارش تعمیر متعلق به کسب‌وکار متصل؛ سفارش فاکتورشده یا تحویل‌شده قابل ویرایش نیست. نیازمند تأیید.",
+        parameters_schema=_schema({**order_id, "part_id": {"type": "integer", "minimum": 1}}, ["order_id", "part_id"]),
+        handler=remove_part,
+        allowed_roles=_ROLES,
+        required_permissions=["repair_shop.write"],
+        category="repair",
+        requires_approval=True,
+        risk_level="high",
+        is_readonly=False,
+    ))
     def costs(args, context):
         from app.services.repair_shop_operations import calculate_repair_costs
         return calculate_repair_costs(context["db"], int(context["business_id"]), int(args["order_id"]), args["labor_cost"], context["user_context"].get_user_id())

@@ -39,7 +39,7 @@ router = APIRouter(prefix="/business", tags=["business-dashboard"])
 
 @router.post("/{business_id}/dashboard", 
     summary="دریافت داشبورد کسب و کار", 
-    description="دریافت اطلاعات کلی و آمار کسب و کار",
+    description="ابزار MCP: `get_business_dashboard`.",
     response_model=SuccessResponse,
     responses={
         200: {
@@ -114,7 +114,7 @@ async def get_business_dashboard(
 
 @router.post("/{business_id}/members", 
     summary="لیست اعضای کسب و کار", 
-    description="دریافت لیست اعضای کسب و کار",
+    description="ابزار MCP: `list_business_users`.",
     response_model=SuccessResponse,
     responses={
         200: {
@@ -176,7 +176,7 @@ def get_business_members(
 
 @router.post("/{business_id}/statistics", 
     summary="آمار کسب و کار", 
-    description="دریافت آمار تفصیلی کسب و کار",
+    description="ابزار MCP: `get_business_dashboard`.",
     response_model=SuccessResponse,
     responses={
         200: {
@@ -227,7 +227,7 @@ def get_business_statistics(
 
 @router.post("/{business_id}/info-with-permissions", 
     summary="دریافت اطلاعات کسب و کار و دسترسی‌ها", 
-    description="دریافت اطلاعات کسب و کار همراه با دسترسی‌های کاربر",
+    description="ابزار MCP: `get_business_info`.",
     response_model=SuccessResponse,
     responses={
         200: {
@@ -409,7 +409,7 @@ def get_business_info_with_permissions(
 # === Dashboard Widgets (Responsive/Per-User) ===
 @router.get("/{business_id}/dashboard/widgets/definitions",
     summary="تعاریف ویجت‌های داشبورد",
-    description="لیست ویجت‌های قابل استفاده برای کاربر فعلی (بر اساس مجوزها) + ستون‌بندی رسپانسیو",
+    description="لیست ویجت‌های قابل استفاده برای کاربر فعلی (بر اساس مجوزها) + ستون‌بندی رسپانسیو. ابزار MCP: `list_dashboard_widget_definitions`.",
     response_model=SuccessResponse,
 )
 @require_business_access("business_id")
@@ -445,7 +445,7 @@ def list_dashboard_widget_definitions(
 
 @router.get("/{business_id}/dashboard/layout",
     summary="دریافت چیدمان داشبورد (پروفایل رسپانسیو)",
-    description="چیدمان کاربر برای یک breakpoint مشخص را برمی‌گرداند. در نبود، از پیش‌فرض سیستم استفاده می‌کند.",
+    description="چیدمان کاربر برای یک breakpoint مشخص را برمی‌گرداند. در نبود، از پیش‌فرض سیستم استفاده می‌کند. ابزار MCP: `get_dashboard_layout`.",
     response_model=SuccessResponse,
 )
 @require_business_access("business_id")
@@ -479,7 +479,7 @@ def get_dashboard_layout(
 
 @router.put("/{business_id}/dashboard/layout",
     summary="ذخیره چیدمان داشبورد (پروفایل رسپانسیو)",
-    description="چیدمان کاربر برای breakpoint مشخص را ذخیره می‌کند.",
+    description="چیدمان کاربر برای breakpoint مشخص را ذخیره می‌کند. ابزار MCP: `save_dashboard_layout` (نیازمند تأیید).",
     response_model=SuccessResponse,
 )
 @require_business_access("business_id")
@@ -512,6 +512,7 @@ def put_dashboard_layout(
 @router.get(
     "/{business_id}/dashboard/quick-links/presets",
     summary="کاتالوگ presetهای دسترسی سریع",
+    description="presetهای میانبر داشبورد مجاز برای کاربر. ابزار MCP: `list_dashboard_quick_link_presets`.",
     response_model=SuccessResponse,
 )
 @require_business_access("business_id")
@@ -530,6 +531,7 @@ def get_quick_link_presets(
 @router.get(
     "/{business_id}/dashboard/quick-links",
     summary="ذخیره‌شده کاشی‌های دسترسی سریع کاربر برای این کسب‌وکار",
+    description="میانبرهای داشبورد کاربر جاری. ابزار MCP: `get_dashboard_quick_links`.",
     response_model=SuccessResponse,
 )
 @require_business_access("business_id")
@@ -547,6 +549,7 @@ def get_quick_links_saved(
 @router.put(
     "/{business_id}/dashboard/quick-links",
     summary="ذخیره کاشی‌های دسترسی سریع",
+    description="ذخیره میانبرهای داشبورد کاربر. ابزار MCP: `save_dashboard_quick_links` (نیازمند تأیید).",
     response_model=SuccessResponse,
 )
 @require_business_access("business_id")
@@ -571,6 +574,7 @@ def put_quick_links_saved(
 @router.get(
     "/{business_id}/menu-preferences",
     summary="شخصی‌سازی منوی کاربر برای این کسب‌وکار",
+    description="ترتیب و پین منوی کسب‌وکار برای کاربر جاری. ابزار MCP: `get_business_menu_preferences`.",
     response_model=SuccessResponse,
 )
 @require_business_access("business_id")
@@ -588,6 +592,7 @@ def get_menu_preferences(
 @router.put(
     "/{business_id}/menu-preferences",
     summary="ذخیره شخصی‌سازی منوی کاربر",
+    description="ذخیره ترجیحات منو. ابزار MCP: `save_business_menu_preferences` (نیازمند تأیید).",
     response_model=SuccessResponse,
 )
 @require_business_access("business_id")
@@ -610,7 +615,7 @@ def put_menu_preferences(
 
 @router.post("/{business_id}/dashboard/data",
     summary="دریافت داده‌ی ویجت‌ها (Batch)",
-    description="کلیدهای ویجت را می‌گیرد و داده‌ی هر ویجت را در یک پاسخ برمی‌گرداند. برای query های طولانی از background job استفاده می‌کند.",
+    description="کلیدهای ویجت را می‌گیرد و داده‌ی هر ویجت را در یک پاسخ برمی‌گرداند. ابزار MCP: `get_dashboard_widgets_data`.",
     response_model=SuccessResponse,
 )
 @require_business_access("business_id")
@@ -722,7 +727,7 @@ def post_dashboard_widgets_data(
 
 @router.get("/{business_id}/dashboard/layout/default",
     summary="پیش‌فرض چیدمان کسب‌وکار (GET)",
-    description="چیدمان پیش‌فرض منتشر شده توسط مالک کسب‌وکار را برمی‌گرداند (در صورت وجود).",
+    description="چیدمان پیش‌فرض منتشر شده توسط مالک کسب‌وکار را برمی‌گرداند (در صورت وجود). ابزار MCP: `get_default_dashboard_layout`.",
     response_model=SuccessResponse,
 )
 @require_business_access("business_id")
@@ -739,7 +744,7 @@ def get_business_default_dashboard_layout(
 
 @router.put("/{business_id}/dashboard/layout/default",
     summary="انتشار چیدمان پیش‌فرض کسب‌وکار (PUT)",
-    description="مالک کسب‌وکار می‌تواند چیدمان پیش‌فرض را برای breakpoint مشخص منتشر کند.",
+    description="مالک کسب‌وکار می‌تواند چیدمان پیش‌فرض را برای breakpoint مشخص منتشر کند. ابزار MCP: `save_default_dashboard_layout` (نیازمند تأیید).",
     response_model=SuccessResponse,
 )
 @require_business_access("business_id")

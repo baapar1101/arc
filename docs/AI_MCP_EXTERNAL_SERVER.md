@@ -81,11 +81,14 @@ Originهای مرورگری و hostهای callback مجاز را در deployment
 APIهای قبلی credential دستی همچنان موجودند:
 
 - `POST /api/v1/ai/mcp/connections` ساخت Bearer token محدود به کسب‌وکار
-- `GET /api/v1/ai/mcp/connections?business_id=<id>` فهرست اتصالات
+- `GET /api/v1/ai/mcp/connections?business_id=<id>` فهرست اتصال‌های MCP کسب‌وکار (مالک همه را می‌بیند؛ عضو فقط اتصال‌های خودش را). پاسخ `{success, data}` شامل `items`، وضعیت افزونه، آدرس سرور و `viewer_is_owner` است
+- `GET /api/v1/ai/mcp/connections/<connection_id>/catalog` کاتالوگ ابزار قابل اعطا برای صاحب همان اتصال
+- `PATCH /api/v1/ai/mcp/connections/<connection_id>` تغییر `tool_permissions` و `enable_writes` روی کل خانواده grant (کلیدهای دسترسی و refresh token با هم به‌روز می‌شوند). کسب‌وکار و کاربر اتصال عوض نمی‌شود
+- `POST /api/v1/ai/mcp/connections/revoke-all` قطع همه اتصال‌های کسب‌وکار؛ فقط مالک
 - `DELETE /api/v1/ai/mcp/connections/<connection_id>` لغو اتصال؛ برای OAuth، کل grant و refresh tokenهایش نیز لغو می‌شوند
 
 سرور نسخه‌های MCP `2025-03-26`، `2025-06-18` و `2025-11-25` را با `initialize` و نسخهٔ `2026-07-28` را با متادیتای هر درخواست و `server/discover` می‌پذیرد. درخواست‌های modern باید `MCP-Protocol-Version` و `Mcp-Method` را مطابق body بفرستند؛ درخواست‌های `tools/call`، `resources/read` و `prompts/get` همچنین به `Mcp-Name` منطبق نیاز دارند. Promptهای دامنه‌ای فقط زمانی فهرست می‌شوند که دستهٔ ابزار مربوطه برای اتصال موجود باشد و مدل را به همان tenant و ابزارهای مجاز محدود می‌کنند.
 
 ## عملیات نگهداری
 
-کلید `MCP_PUBLIC_BASE_URL` باید با آدرس اتصال خارجی و proxy TLS هم‌خوان باشد. بعد از تغییر دامنهٔ عمومی، metadata، redirect allowlist و URL ثبت‌شده در کلاینت‌ها را به‌روز کنید. ثبت DCR و endpointهای OAuth دارای rate limit هستند. اتصال‌ها را از API مدیریت لغو کنید؛ نشست‌های OAuth در خروجی فهرست اتصال‌ها، مثل credentialهای دستی، به شکل یکپارچهٔ قابل‌نمایش نیستند، اما با revoke اتصال OAuth هر grant از endpoint مدیریت اتصال قابل باطل‌سازی است.
+کلید `MCP_PUBLIC_BASE_URL` باید با آدرس اتصال خارجی و proxy TLS هم‌خوان باشد. بعد از تغییر دامنهٔ عمومی، metadata، redirect allowlist و URL ثبت‌شده در کلاینت‌ها را به‌روز کنید. ثبت DCR و endpointهای OAuth دارای rate limit هستند. اتصال‌های ChatGPT/Claude و credential دستی از صفحه «دستیارهای متصل» در حسابیکس و API مدیریت قابل مشاهده، محدودسازی و قطع هستند. لغو یک اتصال OAuth کل grant و refresh tokenهای همان نشست را باطل می‌کند.

@@ -33,7 +33,11 @@ from app.services.product_variant_enable_service import enable_inventory_variant
 router = APIRouter(prefix="/products", tags=["تنوع کالا", "انبارداری"])
 
 
-@router.get("/business/{business_id}/barcode-resolve")
+@router.get(
+    "/business/{business_id}/barcode-resolve",
+    summary="تطبیق بارکد کالا یا تنوع",
+    description="token بارکد را به کالا یا ترکیب تنوع همین کسب‌وکار نگاشت می‌کند. ابزار MCP: resolve_product_barcode.",
+)
 @require_business_access("business_id")
 def get_barcode_resolve(
     request: Request,
@@ -47,7 +51,11 @@ def get_barcode_resolve(
     return success_response(data=data, request=request)
 
 
-@router.put("/business/{business_id}/{product_id}/variant-dimensions")
+@router.put(
+    "/business/{business_id}/{product_id}/variant-dimensions",
+    summary="جایگزینی ابعاد تنوع کالا",
+    description="تعریف ویژگی‌های انباری کالا. پس از گردش موجودی تنوع‌دار جایگزینی رد می‌شود. ابزار MCP: replace_product_variant_dimensions.",
+)
 @require_business_access("business_id")
 def put_variant_dimensions(
     request: Request,
@@ -68,7 +76,11 @@ def put_variant_dimensions(
     return success_response(data=data, request=request, message="VARIANT_DIMENSIONS_UPDATED")
 
 
-@router.get("/business/{business_id}/{product_id}/variant-dimensions")
+@router.get(
+    "/business/{business_id}/{product_id}/variant-dimensions",
+    summary="لیست ابعاد تنوع کالا",
+    description="ویژگی‌های تنوع تعریف‌شده برای کالا. ابزار MCP: list_product_variant_dimensions.",
+)
 @require_business_access("business_id")
 def get_variant_dimensions(
     request: Request,
@@ -91,7 +103,11 @@ def get_variant_dimensions(
     return success_response(data=data, request=request)
 
 
-@router.get("/business/{business_id}/{product_id}/variants")
+@router.get(
+    "/business/{business_id}/{product_id}/variants",
+    summary="لیست ترکیب‌های تنوع کالا",
+    description="SKUهای تنوع کالا شامل قیمت و بارکد. ابزار MCP: list_product_variants.",
+)
 @require_business_access("business_id")
 def get_product_variants(
     request: Request,
@@ -105,7 +121,11 @@ def get_product_variants(
     return success_response(data=data, request=request)
 
 
-@router.get("/business/{business_id}/{product_id}/variant-balances")
+@router.get(
+    "/business/{business_id}/{product_id}/variant-balances",
+    summary="مانده موجودی تنوع کالا",
+    description="مانده هر ترکیب تنوع، اختیاری فیلتر انبار. ابزار MCP: list_product_variant_balances.",
+)
 @require_business_access("business_id")
 def get_product_variant_balances(
     request: Request,
@@ -120,7 +140,11 @@ def get_product_variant_balances(
     return success_response(data=data, request=request)
 
 
-@router.post("/business/{business_id}/{product_id}/variants")
+@router.post(
+    "/business/{business_id}/{product_id}/variants",
+    summary="ایجاد ترکیب تنوع کالا",
+    description="ساخت SKU از مقادیر ویژگی. سقف تعداد ترکیب اعمال می‌شود. ابزار MCP: create_product_variant.",
+)
 @require_business_access("business_id")
 def post_product_variant(
     request: Request,
@@ -140,7 +164,11 @@ def post_product_variant(
     )
 
 
-@router.put("/business/{business_id}/{product_id}/variants/{variant_id}")
+@router.put(
+    "/business/{business_id}/{product_id}/variants/{variant_id}",
+    summary="ویرایش ترکیب تنوع کالا",
+    description="به‌روزرسانی کد، بارکد، قیمت یا مقادیر ویژگی. ابزار MCP: update_product_variant.",
+)
 @require_business_access("business_id")
 def put_product_variant(
     request: Request,
@@ -161,7 +189,11 @@ def put_product_variant(
     )
 
 
-@router.post("/business/{business_id}/{product_id}/variants/{variant_id}/deactivate")
+@router.post(
+    "/business/{business_id}/{product_id}/variants/{variant_id}/deactivate",
+    summary="غیرفعال‌سازی ترکیب تنوع",
+    description="ترکیب از فروش/انبار جدید خارج می‌شود. ابزار MCP: deactivate_product_variant.",
+)
 @require_business_access("business_id")
 def post_deactivate_variant(
     request: Request,
@@ -181,7 +213,11 @@ def post_deactivate_variant(
     )
 
 
-@router.post("/business/{business_id}/{product_id}/enable-inventory-variants")
+@router.post(
+    "/business/{business_id}/{product_id}/enable-inventory-variants",
+    summary="فعال‌سازی تفکیک موجودی تنوع",
+    description="تقسیم موجودی انبار به ترکیب‌ها و صدور حواله. تاریخچه posted بازنویسی نمی‌شود. ابزار MCP: enable_product_inventory_variants.",
+)
 @require_business_access("business_id")
 def post_enable_inventory_variants(
     request: Request,

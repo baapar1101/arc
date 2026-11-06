@@ -64,6 +64,103 @@ def _function_blocks() -> List[str]:
     return blocks
 
 
+def _balanced_call(text: str, start: int) -> Optional[str]:
+    depth = 0
+    k = start
+    in_str = None
+    escape = False
+    while k < len(text):
+        ch = text[k]
+        if in_str:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == in_str:
+                in_str = None
+        elif ch in ("'", '"'):
+            in_str = ch
+        elif ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                return text[start:k + 1]
+        k += 1
+    return None
+
+
+def _helper_register_blocks() -> List[Tuple[str, str]]:
+    """Calls like _register(registry, \"name\", \"desc\", ...) and reg(\"name\", ...)."""
+    blocks: List[Tuple[str, str]] = []
+    for path in _AI_DIR.glob("ai_function_extensions*.py"):
+        text = path.read_text(encoding="utf-8")
+        i = 0
+        while True:
+            j_reg = text.find("_register(", i)
+            j_short = text.find("reg(", i)
+            candidates = [x for x in (j_reg, j_short) if x >= 0]
+            if not candidates:
+                break
+            j = min(candidates)
+            prefix = text[max(0, j - 8):j]
+            if j == j_reg and prefix.rstrip().endswith("def"):
+                i = j + 1
+                continue
+            if j == j_short and j > 0 and (text[j - 1].isalnum() or text[j - 1] == "_"):
+                i = j + 1
+                continue
+            block = _balanced_call(text, j)
+            if not block:
+                i = j + 1
+                continue
+            blocks.append((block, text))
+            i = j + len(block)
+    return blocks
+
+
+def _parse_helper_block(block: str, file_text: str = "") -> Optional[Tuple[str, Dict[str, Any]]]:
+    head = block[: min(len(block), 80)]
+    if not (head.startswith("_register(") or head.startswith("reg(")):
+        return None
+    strings = re.findall(r'"((?:\\.|[^"\\])*)"', block)
+    if len(strings) < 2:
+        return None
+    name = strings[0]
+    if not re.fullmatch(r"[a-z][a-z0-9_]{2,80}", name):
+        return None
+    description = " ".join(strings[1].split())
+    write = bool(re.search(r"\bwrite\s*=\s*True\b", block))
+    high = bool(re.search(r"\bhigh\s*=\s*True\b", block))
+    perm_tokens = re.findall(r'"([a-z][a-z0-9_]+(?:\.[a-z][a-z0-9_]+)+)"', block)
+    if not perm_tokens:
+        toggled = re.search(
+            r'required_permissions\s*=\s*\["([^"]+)"\s*if write else\s*"([^"]+)"\]',
+            file_text,
+        )
+        if toggled:
+            perm_tokens = [toggled.group(1) if write else toggled.group(2)]
+        elif 'if name == "bulk_delete_invoices"' in file_text:
+            if name == "bulk_delete_invoices":
+                perm_tokens = ["invoices.delete"]
+            else:
+                perm_tokens = ["invoices.write" if write else "invoices.read"]
+        elif head.startswith("reg("):
+            default = re.search(r'def reg\([^)]*permission\s*=\s*"([^"]+)"', file_text)
+            perm_tokens = [default.group(1)] if default else ["distribution.view"]
+    perms = perm_tokens or None
+    return name, {
+        "required_permissions": perms,
+        "description": description,
+        "category": None,
+        "risk_level": "high" if high else ("medium" if write else "safe"),
+        "is_readonly": not write,
+        "requires_approval": write,
+        "business_context_required": True,
+        "is_agent_internal": False,
+    }
+
+
 def parse_registered_tool_fields() -> Dict[str, Dict[str, Any]]:
     out: Dict[str, Dict[str, Any]] = {}
     for block in _function_blocks():
@@ -96,6 +193,13 @@ def parse_registered_tool_fields() -> Dict[str, Dict[str, Any]]:
             "business_context_required": biz_m.group(1) != "False" if biz_m else True,
             "is_agent_internal": int_m.group(1) == "True" if int_m else False,
         }
+    for block, file_text in _helper_register_blocks():
+        parsed = _parse_helper_block(block, file_text)
+        if not parsed:
+            continue
+        name, fields = parsed
+        if name not in out:
+            out[name] = fields
     return out
 
 

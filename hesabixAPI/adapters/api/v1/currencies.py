@@ -17,7 +17,7 @@ router = APIRouter(prefix="/currencies", tags=["currencies"])
 @router.get(
     "",
     summary="فهرست ارزها",
-    description="دریافت فهرست ارزهای قابل استفاده",
+    description="ابزار MCP: `list_currencies`.",
 )
 def list_currencies(request: Request, db: Session = Depends(get_db)) -> dict:
     cache = get_cache()
@@ -52,7 +52,7 @@ def list_currencies(request: Request, db: Session = Depends(get_db)) -> dict:
 @router.get(
     "/business/{business_id}",
     summary="فهرست ارزهای کسب‌وکار",
-    description="دریافت ارز پیش‌فرض کسب‌وکار به‌علاوه ارزهای فعال آن کسب‌وکار (بدون تکرار)",
+    description="ارز پیش‌فرض به‌علاوه ارزهای فعال همین کسب‌وکار (بدون تکرار). ابزار MCP: `list_business_currencies`.",
 )
 @require_business_access()
 def list_business_currencies(

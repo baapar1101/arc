@@ -78,7 +78,7 @@ router = APIRouter(prefix="/crm", tags=["CRM"])
 @router.get(
     "/businesses/{business_id}/summary",
     summary="خلاصه CRM",
-    description="تعداد سرنخ‌ها، فرصت‌های فروش، مبلغ کل و نرخ تبدیل",
+    description="تعداد سرنخ‌ها، فرصت‌ها، مبلغ و نرخ تبدیل. ابزار MCP: `get_crm_summary`.",
 )
 @require_business_access("business_id")
 async def get_crm_summary(
@@ -121,7 +121,7 @@ async def get_crm_summary(
 @router.get(
     "/businesses/{business_id}/follow-ups-today",
     summary="پیگیری‌های امروز",
-    description="سرنخ‌ها و فرصت‌های فروش با یادآور پیگیری در امروز یا روزهای آینده (تا ۷ روز)",
+    description="پیگیری‌های امروز تا چند روز آینده. ابزار MCP: `get_crm_follow_ups`.",
 )
 @require_business_access("business_id")
 async def get_follow_ups_today(
@@ -197,7 +197,7 @@ async def get_follow_ups_today(
 @router.get(
     "/businesses/{business_id}/reports/pipeline",
     summary="گزارش پایپلاین فروش",
-    description="تعداد و مبلغ فرصت‌ها به تفکیک مرحله. با from_date و to_date فقط فرصت‌های ایجادشده در این بازه شمرده می‌شوند.",
+    description="تعداد و مبلغ فرصت‌ها به تفکیک مرحله. ابزار MCP: `get_crm_pipeline_report`.",
 )
 @require_business_access("business_id")
 async def get_pipeline_report(
@@ -258,7 +258,7 @@ async def get_pipeline_report(
 @router.get(
     "/businesses/{business_id}/reports/lead-funnel",
     summary="گزارش قیف سرنخ",
-    description="تعداد سرنخ به تفکیک مرحله. با from_date و to_date فقط سرنخ‌های ایجادشده در این بازه شمرده می‌شوند.",
+    description="تعداد سرنخ به تفکیک مرحله. ابزار MCP: `get_lead_funnel_report`.",
 )
 @require_business_access("business_id")
 async def get_lead_funnel_report(
@@ -312,7 +312,7 @@ async def get_lead_funnel_report(
 @router.get(
     "/businesses/{business_id}/reports/lead-sources",
     summary="گزارش منبع سرنخ",
-    description="تعداد سرنخ به تفکیک منبع",
+    description="تعداد سرنخ به تفکیک منبع. ابزار MCP: `get_crm_lead_sources_report`.",
 )
 @require_business_access("business_id")
 async def get_lead_sources_report(
@@ -336,7 +336,7 @@ async def get_lead_sources_report(
 @router.get(
     "/businesses/{business_id}/reports/weighted-forecast",
     summary="پیش‌بینی درآمد (مبلغ موزون)",
-    description="مجموع مبلغ فرصت‌های باز ضرب در احتمال موفقیت (پیش‌بینی درآمد مورد انتظار)",
+    description="مبلغ موزون فرصت‌های باز. ابزار MCP: `get_crm_weighted_forecast`.",
 )
 @require_business_access("business_id")
 async def get_weighted_forecast_report(
@@ -374,7 +374,7 @@ async def get_weighted_forecast_report(
 @router.get(
     "/businesses/{business_id}/reports/employee-performance",
     summary="گزارش عملکرد کارمندان",
-    description="مقایسه عملکرد کارمندان بر اساس سرنخ، فرصت فروش و فعالیت",
+    description="مقایسه عملکرد اعضا. ابزار MCP: `get_crm_employee_performance`.",
 )
 @require_business_access("business_id")
 async def get_employee_performance_report(
@@ -471,7 +471,7 @@ async def get_employee_performance_report(
 @router.get(
     "/businesses/{business_id}/reports/sales-trend",
     summary="روند فروش در زمان",
-    description="تعداد و مبلغ فرصت‌های بسته‌شده در بازه زمانی",
+    description="روند فرصت‌های بسته‌شده. ابزار MCP: `get_crm_sales_trend`.",
 )
 @require_business_access("business_id")
 async def get_sales_trend_report(
@@ -602,7 +602,7 @@ def _log_crm_change(
 @router.get(
     "/businesses/{business_id}/process-definitions",
     summary="لیست فرایندهای CRM",
-    description="دریافت لیست فرایندهای تعریف‌شده برای کسب‌وکار (فانل سرنخ، pipeline فروش، انواع فعالیت)",
+    description="فانل سرنخ، پایپلاین فروش و انواع فعالیت. ابزار MCP: `list_crm_process_definitions`.",
 )
 @require_business_access("business_id")
 async def list_process_definitions(
@@ -631,7 +631,7 @@ async def list_process_definitions(
 @router.post(
     "/businesses/{business_id}/process-definitions",
     summary="ایجاد فرایند CRM",
-    description="تعریف فرایند جدید (فانل سرنخ یا pipeline فروش) با مراحل",
+    description="تعریف فرایند جدید با مراحل. ابزار MCP: `create_crm_process_definition` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_process_definition(
@@ -688,6 +688,7 @@ async def create_process_definition(
 @router.get(
     "/businesses/{business_id}/process-definitions/{definition_id}",
     summary="جزئیات فرایند",
+    description="ابزار MCP: `get_crm_process_definition`.",
 )
 @require_business_access("business_id")
 async def get_process_definition(
@@ -716,6 +717,7 @@ async def get_process_definition(
 @router.put(
     "/businesses/{business_id}/process-definitions/{definition_id}",
     summary="ویرایش فرایند",
+    description="ابزار MCP: `update_crm_process_definition` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def update_process_definition(
@@ -755,6 +757,7 @@ async def update_process_definition(
 @router.delete(
     "/businesses/{business_id}/process-definitions/{definition_id}",
     summary="حذف فرایند",
+    description="ابزار MCP: `delete_crm_process_definition` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def delete_process_definition(
@@ -793,6 +796,7 @@ async def delete_process_definition(
 @router.get(
     "/businesses/{business_id}/process-definitions/{definition_id}/stages",
     summary="لیست مراحل یک فرایند",
+    description="ابزار MCP: `list_crm_process_stages`.",
 )
 @require_business_access("business_id")
 async def list_stages(
@@ -823,6 +827,7 @@ async def list_stages(
 @router.post(
     "/businesses/{business_id}/process-definitions/{definition_id}/stages",
     summary="افزودن مرحله به فرایند",
+    description="ابزار MCP: `create_crm_process_stage` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_stage(
@@ -877,6 +882,7 @@ async def create_stage(
 @router.put(
     "/businesses/{business_id}/process-definitions/{definition_id}/stages/{stage_id}",
     summary="ویرایش مرحله",
+    description="ابزار MCP: `update_crm_process_stage` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def update_stage(
@@ -935,6 +941,7 @@ async def update_stage(
 @router.delete(
     "/businesses/{business_id}/process-definitions/{definition_id}/stages/{stage_id}",
     summary="حذف مرحله",
+    description="ابزار MCP: `delete_crm_process_stage` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def delete_stage(
@@ -1036,6 +1043,7 @@ def _lead_to_dict(lead: Lead, request: Request = None, tags: Optional[List[Dict[
 @router.get(
     "/businesses/{business_id}/leads",
     summary="لیست سرنخ‌ها",
+    description="ابزار MCP: `search_leads`. جزئیات تکی: `get_lead_details`.",
 )
 @require_business_access("business_id")
 async def list_leads(
@@ -1109,6 +1117,7 @@ async def list_leads(
 @router.post(
     "/businesses/{business_id}/leads",
     summary="ایجاد سرنخ",
+    description="ابزار MCP: `create_lead` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_lead(
@@ -1232,6 +1241,7 @@ async def create_lead(
 @router.get(
     "/businesses/{business_id}/leads/{lead_id}",
     summary="جزئیات سرنخ",
+    description="ابزار MCP: `get_lead_details`. تاریخچه: `get_crm_lead_history`.",
 )
 @require_business_access("business_id")
 async def get_lead(
@@ -1262,6 +1272,7 @@ async def get_lead(
 @router.get(
     "/businesses/{business_id}/leads/{lead_id}/history",
     summary="تاریخچه تغییرات سرنخ",
+    description="ابزار MCP: `get_crm_lead_history`.",
 )
 @require_business_access("business_id")
 async def get_lead_history(
@@ -1309,6 +1320,7 @@ async def get_lead_history(
 @router.put(
     "/businesses/{business_id}/leads/{lead_id}",
     summary="ویرایش سرنخ",
+    description="ابزار MCP: `update_lead` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def update_lead(
@@ -1406,7 +1418,7 @@ async def update_lead(
 @router.post(
     "/businesses/{business_id}/leads/{lead_id}/convert",
     summary="تبدیل سرنخ به مشتری",
-    description="ایجاد شخص (مشتری) از سرنخ و اتصال آن به سرنخ. با ارسال create_deal می‌توان همزمان یک فرصت فروش ایجاد کرد.",
+    description="تبدیل سرنخ به مشتری. ابزار MCP: `convert_lead_to_customer` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def convert_lead_to_customer(
@@ -1511,6 +1523,7 @@ async def convert_lead_to_customer(
 @router.delete(
     "/businesses/{business_id}/leads/{lead_id}",
     summary="حذف سرنخ",
+    description="ابزار MCP: `delete_lead` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def delete_lead(
@@ -1576,6 +1589,7 @@ def _deal_to_dict(deal: Deal, request: Request = None, tags: Optional[List[Dict[
 @router.get(
     "/businesses/{business_id}/deals",
     summary="لیست فرصت‌های فروش",
+    description="ابزار MCP: `search_deals`.",
 )
 @require_business_access("business_id")
 async def list_deals(
@@ -1650,6 +1664,7 @@ async def list_deals(
 @router.post(
     "/businesses/{business_id}/deals",
     summary="ایجاد فرصت فروش",
+    description="ابزار MCP: `create_deal` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_deal(
@@ -1750,6 +1765,7 @@ async def create_deal(
 @router.get(
     "/businesses/{business_id}/deals/{deal_id}",
     summary="جزئیات فرصت فروش",
+    description="ابزار MCP: `get_deal_details`. تاریخچه: `get_crm_deal_history`. خطوط: `list_crm_deal_lines`.",
 )
 @require_business_access("business_id")
 async def get_deal(
@@ -1780,6 +1796,7 @@ async def get_deal(
 @router.get(
     "/businesses/{business_id}/deals/{deal_id}/history",
     summary="تاریخچه تغییرات فرصت فروش",
+    description="ابزار MCP: `get_crm_deal_history`.",
 )
 @require_business_access("business_id")
 async def get_deal_history(
@@ -1827,6 +1844,7 @@ async def get_deal_history(
 @router.put(
     "/businesses/{business_id}/deals/{deal_id}",
     summary="ویرایش فرصت فروش (شامل تغییر مرحله)",
+    description="ابزار MCP: `update_deal` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def update_deal(
@@ -1972,6 +1990,7 @@ async def update_deal(
 @router.delete(
     "/businesses/{business_id}/deals/{deal_id}",
     summary="حذف فرصت فروش",
+    description="ابزار MCP: `delete_deal` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def delete_deal(
@@ -2034,6 +2053,7 @@ def _activity_to_dict(a: CrmActivity, request: Request = None) -> Dict[str, Any]
 @router.get(
     "/businesses/{business_id}/activities",
     summary="لیست فعالیت‌ها (با فیلتر شخص)",
+    description="ابزار MCP: `search_activities`. جزئیات تکی: `get_crm_activity`.",
 )
 @require_business_access("business_id")
 async def list_activities(
@@ -2085,6 +2105,7 @@ async def list_activities(
 @router.post(
     "/businesses/{business_id}/activities",
     summary="ثبت فعالیت",
+    description="ابزار MCP: `create_crm_activity` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_activity(
@@ -2184,6 +2205,7 @@ async def create_activity(
 @router.get(
     "/businesses/{business_id}/activities/{activity_id}",
     summary="جزئیات فعالیت",
+    description="ابزار MCP: `get_crm_activity`.",
 )
 @require_business_access("business_id")
 async def get_activity(
@@ -2213,6 +2235,7 @@ async def get_activity(
 @router.put(
     "/businesses/{business_id}/activities/{activity_id}",
     summary="ویرایش فعالیت",
+    description="ابزار MCP: `update_crm_activity` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def update_activity(
@@ -2289,6 +2312,7 @@ async def update_activity(
 @router.delete(
     "/businesses/{business_id}/activities/{activity_id}",
     summary="حذف فعالیت",
+    description="ابزار MCP: `delete_crm_activity` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def delete_activity(
@@ -2319,6 +2343,7 @@ def _crm_note_translator(request: Request):
 @router.get(
     "/businesses/{business_id}/note-types",
     summary="انواع یادداشت CRM",
+    description="ابزار MCP: `list_crm_note_types`.",
 )
 @require_business_access("business_id")
 async def list_crm_note_types(
@@ -2337,6 +2362,7 @@ async def list_crm_note_types(
 @router.post(
     "/businesses/{business_id}/note-types",
     summary="ایجاد نوع یادداشت سفارشی",
+    description="ابزار MCP: `create_crm_note_type` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_crm_note_type(
@@ -2367,6 +2393,7 @@ async def create_crm_note_type(
 @router.patch(
     "/businesses/{business_id}/note-types/{type_id}",
     summary="ویرایش نوع یادداشت",
+    description="ابزار MCP: `update_crm_note_type` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def update_crm_note_type(
@@ -2399,6 +2426,7 @@ async def update_crm_note_type(
 @router.delete(
     "/businesses/{business_id}/note-types/{type_id}",
     summary="حذف نوع یادداشت غیرسیستمی",
+    description="ابزار MCP: `delete_crm_note_type` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def delete_crm_note_type(
@@ -2418,6 +2446,7 @@ async def delete_crm_note_type(
 @router.get(
     "/businesses/{business_id}/notes",
     summary="لیست یادداشت‌های تقویم در بازه تاریخ",
+    description="ابزار MCP: `list_crm_notes`.",
 )
 @require_business_access("business_id")
 async def list_crm_notes(
@@ -2445,6 +2474,7 @@ async def list_crm_notes(
 @router.get(
     "/businesses/{business_id}/notes/{note_id}",
     summary="جزئیات یادداشت",
+    description="ابزار MCP: `get_crm_note`.",
 )
 @require_business_access("business_id")
 async def get_crm_note(
@@ -2465,7 +2495,8 @@ async def get_crm_note(
 
 @router.post(
     "/businesses/{business_id}/notes",
-    summary="ایجاد یادداشت",
+    summary="ایجاد یادداشت CRM",
+    description="ابزار MCP: `create_crm_note` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_crm_note(
@@ -2501,7 +2532,8 @@ async def create_crm_note(
 
 @router.patch(
     "/businesses/{business_id}/notes/{note_id}",
-    summary="ویرایش یادداشت",
+    summary="ویرایش یادداشت CRM",
+    description="ابزار MCP: `update_crm_note` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def update_crm_note(
@@ -2551,6 +2583,7 @@ async def update_crm_note(
 @router.delete(
     "/businesses/{business_id}/notes/{note_id}",
     summary="حذف نرم یادداشت",
+    description="ابزار MCP: `delete_crm_note` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def delete_crm_note(
@@ -2570,6 +2603,7 @@ async def delete_crm_note(
 @router.get(
     "/businesses/{business_id}/notes/{note_id}/comments",
     summary="کامنت‌های یادداشت",
+    description="ابزار MCP: `list_crm_note_comments`.",
 )
 @require_business_access("business_id")
 async def list_crm_note_comments(
@@ -2588,7 +2622,8 @@ async def list_crm_note_comments(
 
 @router.post(
     "/businesses/{business_id}/notes/{note_id}/comments",
-    summary="افزودن کامنت",
+    summary="افزودن کامنت یادداشت",
+    description="ابزار MCP: `add_crm_note_comment` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_crm_note_comment(
@@ -2608,7 +2643,8 @@ async def create_crm_note_comment(
 
 @router.delete(
     "/businesses/{business_id}/notes/{note_id}/comments/{comment_id}",
-    summary="حذف کامنت",
+    summary="حذف کامنت یادداشت",
+    description="ابزار MCP: `delete_crm_note_comment` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def delete_crm_note_comment(
@@ -2629,6 +2665,7 @@ async def delete_crm_note_comment(
 @router.get(
     "/businesses/{business_id}/notes/{note_id}/audit",
     summary="تاریخچه audit یادداشت",
+    description="ابزار MCP: `get_crm_note_audit`.",
 )
 @require_business_access("business_id")
 async def list_crm_note_audit(
@@ -2650,7 +2687,11 @@ async def list_crm_note_audit(
 # ============================================================================
 
 
-@router.get("/businesses/{business_id}/tags", summary="لیست برچسب‌های CRM")
+@router.get(
+    "/businesses/{business_id}/tags",
+    summary="لیست برچسب‌های CRM",
+    description="برچسب‌های CRM کسب‌وکار. ابزار MCP: `list_crm_tags`.",
+)
 @require_business_access("business_id")
 async def list_crm_tags(
     request: Request,
@@ -2664,7 +2705,7 @@ async def list_crm_tags(
     return success_response(data={"items": items}, request=request)
 
 
-@router.post("/businesses/{business_id}/tags", summary="ایجاد برچسب")
+@router.post("/businesses/{business_id}/tags", summary="ایجاد برچسب CRM", description="ابزار MCP: `create_crm_tag` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def create_crm_tag(
     request: Request,
@@ -2679,7 +2720,7 @@ async def create_crm_tag(
     return success_response(data=crm_tag_service.tag_to_dict(tag), request=request, message="CRM_TAG_CREATED")
 
 
-@router.patch("/businesses/{business_id}/tags/{tag_id}", summary="ویرایش برچسب")
+@router.patch("/businesses/{business_id}/tags/{tag_id}", summary="ویرایش برچسب CRM", description="ابزار MCP: `update_crm_tag` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def update_crm_tag(
     request: Request,
@@ -2698,7 +2739,7 @@ async def update_crm_tag(
     return success_response(data=crm_tag_service.tag_to_dict(tag), request=request, message="CRM_TAG_UPDATED")
 
 
-@router.delete("/businesses/{business_id}/tags/{tag_id}", summary="حذف برچسب")
+@router.delete("/businesses/{business_id}/tags/{tag_id}", summary="حذف برچسب CRM", description="ابزار MCP: `delete_crm_tag` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def delete_crm_tag(
     request: Request,
@@ -2713,7 +2754,7 @@ async def delete_crm_tag(
     return success_response(message="CRM_TAG_DELETED", request=request)
 
 
-@router.put("/businesses/{business_id}/leads/{lead_id}/tags", summary="تنظیم برچسب‌های سرنخ")
+@router.put("/businesses/{business_id}/leads/{lead_id}/tags", summary="تنظیم برچسب‌های سرنخ", description="ابزار MCP: `set_crm_lead_tags` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def set_lead_tags_endpoint(
     request: Request,
@@ -2729,7 +2770,7 @@ async def set_lead_tags_endpoint(
     return success_response(data={"tags": tags}, request=request, message="CRM_LEAD_TAGS_SET")
 
 
-@router.put("/businesses/{business_id}/deals/{deal_id}/tags", summary="تنظیم برچسب‌های فرصت فروش")
+@router.put("/businesses/{business_id}/deals/{deal_id}/tags", summary="تنظیم برچسب‌های فرصت فروش", description="ابزار MCP: `set_crm_deal_tags` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def set_deal_tags_endpoint(
     request: Request,
@@ -2750,7 +2791,7 @@ async def set_deal_tags_endpoint(
 # ============================================================================
 
 
-@router.get("/businesses/{business_id}/close-reasons", summary="لیست دلایل برد/باخت")
+@router.get("/businesses/{business_id}/close-reasons", summary="لیست دلایل برد/باخت", description="ابزار MCP: `list_crm_close_reasons`.")
 @require_business_access("business_id")
 async def list_close_reasons(
     request: Request,
@@ -2765,7 +2806,7 @@ async def list_close_reasons(
     return success_response(data={"items": items}, request=request)
 
 
-@router.post("/businesses/{business_id}/close-reasons", summary="ایجاد دلیل برد/باخت")
+@router.post("/businesses/{business_id}/close-reasons", summary="ایجاد دلیل برد/باخت", description="ابزار MCP: `create_crm_close_reason` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def create_close_reason(
     request: Request,
@@ -2783,7 +2824,7 @@ async def create_close_reason(
     return success_response(data=crm_close_reason_service.reason_to_dict(r), request=request, message="CRM_CLOSE_REASON_CREATED")
 
 
-@router.patch("/businesses/{business_id}/close-reasons/{reason_id}", summary="ویرایش دلیل")
+@router.patch("/businesses/{business_id}/close-reasons/{reason_id}", summary="ویرایش دلیل برد/باخت", description="ابزار MCP: `update_crm_close_reason` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def update_close_reason(
     request: Request,
@@ -2802,7 +2843,7 @@ async def update_close_reason(
     return success_response(data=crm_close_reason_service.reason_to_dict(r), request=request, message="CRM_CLOSE_REASON_UPDATED")
 
 
-@router.delete("/businesses/{business_id}/close-reasons/{reason_id}", summary="حذف دلیل")
+@router.delete("/businesses/{business_id}/close-reasons/{reason_id}", summary="حذف دلیل برد/باخت", description="ابزار MCP: `delete_crm_close_reason` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def delete_close_reason(
     request: Request,
@@ -2822,7 +2863,7 @@ async def delete_close_reason(
 # ============================================================================
 
 
-@router.get("/businesses/{business_id}/custom-fields", summary="لیست فیلدهای سفارشی")
+@router.get("/businesses/{business_id}/custom-fields", summary="لیست فیلدهای سفارشی CRM", description="ابزار MCP: `list_crm_custom_fields`.")
 @require_business_access("business_id")
 async def list_custom_fields(
     request: Request,
@@ -2836,7 +2877,7 @@ async def list_custom_fields(
     return success_response(data={"items": items}, request=request)
 
 
-@router.post("/businesses/{business_id}/custom-fields", summary="ایجاد فیلد سفارشی")
+@router.post("/businesses/{business_id}/custom-fields", summary="ایجاد فیلد سفارشی CRM", description="ابزار MCP: `create_crm_custom_field` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def create_custom_field(
     request: Request,
@@ -2856,7 +2897,7 @@ async def create_custom_field(
     return success_response(data=crm_custom_field_service.definition_to_dict(d), request=request, message="CRM_CUSTOM_FIELD_CREATED")
 
 
-@router.patch("/businesses/{business_id}/custom-fields/{field_id}", summary="ویرایش فیلد سفارشی")
+@router.patch("/businesses/{business_id}/custom-fields/{field_id}", summary="ویرایش فیلد سفارشی CRM", description="ابزار MCP: `update_crm_custom_field` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def update_custom_field(
     request: Request,
@@ -2876,7 +2917,7 @@ async def update_custom_field(
     return success_response(data=crm_custom_field_service.definition_to_dict(d), request=request, message="CRM_CUSTOM_FIELD_UPDATED")
 
 
-@router.delete("/businesses/{business_id}/custom-fields/{field_id}", summary="حذف فیلد سفارشی")
+@router.delete("/businesses/{business_id}/custom-fields/{field_id}", summary="حذف فیلد سفارشی CRM", description="ابزار MCP: `delete_crm_custom_field` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def delete_custom_field(
     request: Request,
@@ -2896,7 +2937,12 @@ async def delete_custom_field(
 # ============================================================================
 
 
-@router.get("/businesses/{business_id}/deals/{deal_id}/lines", summary="خطوط فرصت فروش")
+@router.get(
+    "/businesses/{business_id}/deals/{deal_id}/lines",
+    summary="خطوط فرصت فروش",
+    description="ابزار MCP: `list_crm_deal_lines`.",
+    description="کالا/خدمت‌های روی فرصت فروش. ابزار MCP: `list_crm_deal_lines`.",
+)
 @require_business_access("business_id")
 async def list_deal_lines(
     request: Request,
@@ -2910,7 +2956,12 @@ async def list_deal_lines(
     return success_response(data={"items": lines}, request=request)
 
 
-@router.put("/businesses/{business_id}/deals/{deal_id}/lines", summary="جایگزینی خطوط فرصت فروش")
+@router.put(
+    "/businesses/{business_id}/deals/{deal_id}/lines",
+    summary="جایگزینی خطوط فرصت فروش",
+    description="ابزار MCP: `replace_deal_lines` (نیازمند تأیید).",
+    description="جایگزینی کامل خطوط معامله. ابزار MCP: `replace_deal_lines` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 async def replace_deal_lines(
     request: Request,
@@ -2932,7 +2983,12 @@ async def replace_deal_lines(
 # ============================================================================
 
 
-@router.get("/businesses/{business_id}/persons/{person_id}/customer-360", summary="دید ۳۶۰ درجه مشتری")
+@router.get(
+    "/businesses/{business_id}/persons/{person_id}/customer-360",
+    summary="دید ۳۶۰ درجه مشتری",
+    description="ابزار MCP: `get_crm_customer_360`.",
+    description="تجمیع شخص، معاملات و فعالیت‌ها. ابزار MCP: `get_crm_customer_360`.",
+)
 @require_business_access("business_id")
 async def get_customer_360(
     request: Request,
@@ -2951,7 +3007,12 @@ async def get_customer_360(
 # ============================================================================
 
 
-@router.get("/businesses/{business_id}/my-work-queue", summary="صف کاری من")
+@router.get(
+    "/businesses/{business_id}/my-work-queue",
+    summary="صف کاری من",
+    description="ابزار MCP: `get_crm_my_work_queue`.",
+    description="وظایف باز تخصیص‌یافته به کاربر جاری. ابزار MCP: `get_crm_my_work_queue`.",
+)
 @require_business_access("business_id")
 async def my_work_queue(
     request: Request,
@@ -3024,7 +3085,11 @@ async def my_work_queue(
 # ============================================================================
 
 
-@router.get("/businesses/{business_id}/reports/lost-reasons", summary="گزارش دلایل باخت")
+@router.get(
+    "/businesses/{business_id}/reports/lost-reasons",
+    summary="گزارش دلایل باخت",
+    description="ابزار MCP: `get_crm_lost_reasons_report`.",
+)
 @require_business_access("business_id")
 async def report_lost_reasons(
     request: Request,
@@ -3062,7 +3127,11 @@ async def report_lost_reasons(
     return success_response(data=data, request=request)
 
 
-@router.get("/businesses/{business_id}/reports/won-reasons", summary="گزارش دلایل برد")
+@router.get(
+    "/businesses/{business_id}/reports/won-reasons",
+    summary="گزارش دلایل برد",
+    description="ابزار MCP: `get_crm_won_reasons_report`.",
+)
 @require_business_access("business_id")
 async def report_won_reasons(
     request: Request,
@@ -3105,7 +3174,7 @@ async def report_won_reasons(
 # ============================================================================
 
 
-@router.post("/businesses/{business_id}/deals/{deal_id}/convert-to-invoice", summary="تبدیل فرصت فروش به فاکتور/پیش‌فاکتور")
+@router.post("/businesses/{business_id}/deals/{deal_id}/convert-to-invoice", summary="تبدیل فرصت فروش به فاکتور", description="ابزار MCP: `convert_deal_to_invoice` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def convert_deal_to_invoice(
     request: Request,
@@ -3256,7 +3325,11 @@ def _sequence_to_dict(seq: CrmSequence, include_steps: bool = True) -> Dict[str,
     return d
 
 
-@router.get("/businesses/{business_id}/sequences", summary="لیست توالی‌های خودکار")
+@router.get(
+    "/businesses/{business_id}/sequences",
+    summary="لیست توالی‌های خودکار",
+    description="ابزار MCP: `list_crm_sequences`.",
+)
 @require_business_access("business_id")
 async def list_sequences(
     request: Request,
@@ -3275,7 +3348,7 @@ async def list_sequences(
     return success_response(data={"items": [_sequence_to_dict(s) for s in rows]}, request=request)
 
 
-@router.post("/businesses/{business_id}/sequences", summary="ایجاد توالی خودکار")
+@router.post("/businesses/{business_id}/sequences", summary="ایجاد توالی خودکار", description="ابزار MCP: `create_crm_sequence` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def create_sequence(
     request: Request,
@@ -3309,7 +3382,7 @@ async def create_sequence(
     return success_response(data=_sequence_to_dict(seq), request=request, message="CRM_SEQUENCE_CREATED")
 
 
-@router.get("/businesses/{business_id}/sequences/{sequence_id}", summary="جزئیات توالی")
+@router.get("/businesses/{business_id}/sequences/{sequence_id}", summary="جزئیات توالی", description="ابزار MCP: `get_crm_sequence`.")
 @require_business_access("business_id")
 async def get_sequence(
     request: Request,
@@ -3330,7 +3403,7 @@ async def get_sequence(
     return success_response(data=_sequence_to_dict(seq), request=request)
 
 
-@router.patch("/businesses/{business_id}/sequences/{sequence_id}", summary="ویرایش توالی")
+@router.patch("/businesses/{business_id}/sequences/{sequence_id}", summary="ویرایش توالی", description="ابزار MCP: `update_crm_sequence` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def update_sequence(
     request: Request,
@@ -3372,7 +3445,7 @@ async def update_sequence(
     return success_response(data=_sequence_to_dict(seq), request=request, message="CRM_SEQUENCE_UPDATED")
 
 
-@router.delete("/businesses/{business_id}/sequences/{sequence_id}", summary="حذف توالی")
+@router.delete("/businesses/{business_id}/sequences/{sequence_id}", summary="حذف توالی", description="ابزار MCP: `delete_crm_sequence` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def delete_sequence(
     request: Request,
@@ -3394,7 +3467,7 @@ async def delete_sequence(
     return success_response(message="CRM_SEQUENCE_DELETED", request=request)
 
 
-@router.post("/businesses/{business_id}/sequences/{sequence_id}/enroll", summary="ثبت‌نام در توالی")
+@router.post("/businesses/{business_id}/sequences/{sequence_id}/enroll", summary="ثبت‌نام در توالی", description="ابزار MCP: `enroll_crm_sequence` (نیازمند تأیید).")
 @require_business_access("business_id")
 async def enroll_sequence(
     request: Request,
@@ -3440,7 +3513,11 @@ def _automation_settings_to_dict(s) -> Dict[str, Any]:
     }
 
 
-@router.get("/businesses/{business_id}/automation-settings", summary="تنظیمات اتوماسیون CRM")
+@router.get(
+    "/businesses/{business_id}/automation-settings",
+    summary="تنظیمات اتوماسیون CRM",
+    description="ابزار MCP: `get_crm_automation_settings`.",
+)
 @require_business_access("business_id")
 async def get_automation_settings(
     request: Request,
@@ -3455,7 +3532,11 @@ async def get_automation_settings(
     return success_response(data=_automation_settings_to_dict(s), request=request)
 
 
-@router.patch("/businesses/{business_id}/automation-settings", summary="ویرایش تنظیمات اتوماسیون CRM")
+@router.patch(
+    "/businesses/{business_id}/automation-settings",
+    summary="ویرایش تنظیمات اتوماسیون CRM",
+    description="ابزار MCP: `update_crm_automation_settings` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 async def update_automation_settings(
     request: Request,

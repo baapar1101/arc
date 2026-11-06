@@ -39,7 +39,7 @@ class SettingsPayload(BaseModel):
 	inapp_sound_asset_id: Optional[str] = None  # default یا s_1 … s_27
 
 
-@router.get("/settings", summary="دریافت تنظیمات نوتیفیکیشن کاربر")
+@router.get("/settings", summary="دریافت تنظیمات نوتیفیکیشن کاربر", description="تنظیمات حساب شخصی است و در MCP کسب‌وکار ثبت نشده.")
 def get_settings(
 	request: Request,
 	db: Session = Depends(get_db),
@@ -102,7 +102,7 @@ def get_settings(
 	return success_response(res, request)
 
 
-@router.put("/settings", summary="به‌روزرسانی تنظیمات نوتیفیکیشن کاربر")
+@router.put("/settings", summary="به‌روزرسانی تنظیمات نوتیفیکیشن کاربر", description="تنظیمات حساب شخصی است و در MCP کسب‌وکار ثبت نشده.")
 def put_settings(
 	payload: SettingsPayload,
 	request: Request,
@@ -185,7 +185,7 @@ def put_settings(
 	return success_response({"ok": True}, request)
 
 
-@router.post("/test", summary="ارسال تست نوتیفیکیشن")
+@router.post("/test", summary="ارسال تست نوتیفیکیشن", description="مسیر حساب شخصی است و در MCP کسب‌وکار ثبت نشده.")
 def test_notification(
 	channel: str = Query(..., pattern="^(telegram|bale|email|sms|inapp)$"),
 	request: Request = None,
@@ -211,7 +211,7 @@ EVENT_KEY_TITLES = {
 }
 
 
-@router.post("/history", summary="دریافت تاریخچه ناتیفیکیشن‌های کاربر")
+@router.post("/history", summary="دریافت تاریخچه ناتیفیکیشن‌های کاربر", description="مسیر حساب شخصی است و در MCP کسب‌وکار ثبت نشده.")
 def get_notification_history(
 	request: Request,
 	query_info: QueryInfo,

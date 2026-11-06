@@ -86,7 +86,7 @@ def _body_date(value: Any) -> date:
 @router.post(
     "/invoices",
     summary="ثبت async فاکتور فروش سریع",
-    description="درخواست را در outbox پایدار ذخیره می‌کند و شناسهٔ پیگیری برمی‌گرداند.",
+    description="ابزار MCP: `enqueue_quick_sale` (نیازمند تأیید).",
 )
 def enqueue_quick_sale_invoice_endpoint(
 	request: Request,
@@ -163,6 +163,7 @@ def enqueue_quick_sale_invoice_endpoint(
 @router.get(
 	"/invoices/jobs/{request_id}",
 	summary="وضعیت ثبت async فروش سریع",
+	description="ابزار MCP: `get_quick_sale_job`.",
 )
 def get_quick_sale_invoice_job_endpoint(
 	request: Request,
@@ -194,6 +195,7 @@ def get_quick_sale_invoice_job_endpoint(
 @router.get(
 	"/invoices/jobs",
 	summary="فهرست فروش‌های سریع async جاری کاربر",
+	description="صف فروش سریع ناهمزمان کاربر جاری. ابزار MCP: `list_quick_sale_jobs`.",
 )
 def list_quick_sale_invoice_jobs_endpoint(
 	request: Request,
@@ -215,7 +217,11 @@ def list_quick_sale_invoice_jobs_endpoint(
 	)
 
 
-@router.get("/customer-balance", summary="مانده مشتری در فروش سریع")
+@router.get(
+    "/customer-balance",
+    summary="مانده مشتری در فروش سریع",
+    description="مانده مشتری به ارز انتخابی. ابزار MCP: `get_quick_sales_customer_balance`.",
+)
 def get_customer_balance_endpoint(
     request: Request,
     business_id: int,
@@ -241,7 +247,7 @@ def get_customer_balance_endpoint(
 @router.get(
     "/settings",
     summary="دریافت تنظیمات فروش سریع",
-    description="دریافت تنظیمات فروش سریع یک کسب‌وکار شامل مشتری ناشناس، انبار، صندوق و سایر تنظیمات",
+    description="ابزار MCP: `get_quick_sales_settings`.",
 )
 def get_quick_sales_settings_endpoint(
     request: Request,
@@ -258,7 +264,7 @@ def get_quick_sales_settings_endpoint(
 @router.put(
     "/settings",
     summary="ویرایش تنظیمات فروش سریع",
-    description="به‌روزرسانی تنظیمات فروش سریع یک کسب‌وکار",
+    description="ابزار MCP: `update_quick_sales_settings` (نیازمند تأیید).",
 )
 def update_quick_sales_settings_endpoint(
     request: Request,
@@ -276,6 +282,7 @@ def update_quick_sales_settings_endpoint(
 @router.get(
     "/anonymous-customer",
     summary="دریافت مشتری ناشناس تنظیم‌شده",
+    description="مشتری ناشناس از پیش تنظیم‌شده بدون ایجاد. ابزار MCP: `get_quick_sales_anonymous_customer`.",
 )
 def read_anonymous_customer_endpoint(
     request: Request,
@@ -291,7 +298,7 @@ def read_anonymous_customer_endpoint(
 @router.post(
     "/anonymous-customer",
     summary="دریافت یا ایجاد مشتری ناشناس",
-    description="دریافت مشتری ناشناس پیش‌فرض یا ایجاد آن در صورت عدم وجود",
+    description="دریافت مشتری ناشناس پیش‌فرض یا ایجاد آن در صورت عدم وجود. ابزار MCP: `ensure_quick_sales_anonymous_customer` (نیازمند تأیید).",
 )
 def get_anonymous_customer_endpoint(
     request: Request,
@@ -309,7 +316,7 @@ def get_anonymous_customer_endpoint(
         raise
 
 
-@router.get("/payment-buttons", summary="دکمه‌های پرداخت فروش سریع")
+@router.get("/payment-buttons", summary="دکمه‌های پرداخت فروش سریع", description="ابزار MCP: `list_quick_sales_payment_buttons`.")
 def list_payment_buttons_endpoint(
     request: Request,
     business_id: int,
@@ -321,7 +328,7 @@ def list_payment_buttons_endpoint(
     return success_response(data, request)
 
 
-@router.post("/payment-buttons", summary="ایجاد دکمه پرداخت فروش سریع")
+@router.post("/payment-buttons", summary="ایجاد دکمه پرداخت فروش سریع", description="ابزار MCP: `create_quick_sales_payment_button` (نیازمند تأیید).")
 def create_payment_button_endpoint(
     request: Request,
     business_id: int,
@@ -340,7 +347,7 @@ def create_payment_button_endpoint(
     return success_response(data, request, message="QUICK_SALES_PAYMENT_BUTTON_CREATED")
 
 
-@router.put("/payment-buttons/reorder", summary="تغییر ترتیب دکمه‌های پرداخت فروش سریع")
+@router.put("/payment-buttons/reorder", summary="تغییر ترتیب دکمه‌های پرداخت فروش سریع", description="ابزار MCP: `reorder_quick_sales_payment_buttons` (نیازمند تأیید).")
 def reorder_payment_buttons_endpoint(
     request: Request,
     business_id: int,
@@ -362,6 +369,7 @@ def reorder_payment_buttons_endpoint(
 @router.put(
     "/payment-buttons/{button_key}/shortcut",
     summary="تنظیم میانبر دکمه پرداخت برای کاربر جاری",
+    description="ترجیح میانبر کاربر جاری است و در MCP کسب‌وکار ثبت نشده. پیش‌فرض کسب‌وکار: `update_quick_sales_default_shortcuts`.",
 )
 def update_payment_button_shortcut_endpoint(
     request: Request,
@@ -396,6 +404,7 @@ def update_payment_button_shortcut_endpoint(
 @router.get(
     "/payment-buttons/default-shortcuts",
     summary="فهرست میانبرهای پیش‌فرض دکمه‌های مشترک فروش سریع",
+    description="میانبرهای پیش‌فرض دکمه‌های پرداخت کسب‌وکار. ابزار MCP: `list_quick_sales_default_shortcuts`.",
 )
 def list_payment_button_default_shortcuts_endpoint(
     request: Request,
@@ -414,6 +423,7 @@ def list_payment_button_default_shortcuts_endpoint(
 @router.put(
     "/payment-buttons/default-shortcuts",
     summary="ذخیره یکجای میانبرهای پیش‌فرض دکمه‌های مشترک فروش سریع",
+    description="ذخیره میانبرهای پیش‌فرض. ابزار MCP: `update_quick_sales_default_shortcuts` (نیازمند تأیید).",
 )
 def update_payment_button_default_shortcuts_endpoint(
     request: Request,
@@ -438,7 +448,7 @@ def update_payment_button_default_shortcuts_endpoint(
     )
 
 
-@router.put("/payment-buttons/{button_id}", summary="ویرایش دکمه پرداخت فروش سریع")
+@router.put("/payment-buttons/{button_id}", summary="ویرایش دکمه پرداخت فروش سریع", description="ابزار MCP: `update_quick_sales_payment_button` (نیازمند تأیید).")
 def update_payment_button_endpoint(
     request: Request,
     business_id: int,
@@ -459,7 +469,7 @@ def update_payment_button_endpoint(
     return success_response(data, request, message="QUICK_SALES_PAYMENT_BUTTON_UPDATED")
 
 
-@router.delete("/payment-buttons/{button_id}", summary="حذف دکمه پرداخت فروش سریع")
+@router.delete("/payment-buttons/{button_id}", summary="حذف دکمه پرداخت فروش سریع", description="ابزار MCP: `delete_quick_sales_payment_button` (نیازمند تأیید).")
 def delete_payment_button_endpoint(
     request: Request,
     business_id: int,
@@ -478,7 +488,7 @@ def delete_payment_button_endpoint(
     return success_response({"id": button_id}, request, message="QUICK_SALES_PAYMENT_BUTTON_DELETED")
 
 
-@router.get("/stock-discrepancies", summary="فهرست مغایرت‌های موجودی فروش سریع")
+@router.get("/stock-discrepancies", summary="فهرست مغایرت‌های موجودی فروش سریع", description="ابزار MCP: `list_quick_sales_stock_discrepancies`.")
 def list_stock_discrepancies_endpoint(
     request: Request,
     business_id: int,
@@ -494,7 +504,7 @@ def list_stock_discrepancies_endpoint(
     return success_response(list_cases(db, business_id, status), request)
 
 
-@router.post("/stock-corrections", summary="اصلاح کسری پیش از ثبت فروش سریع")
+@router.post("/stock-corrections", summary="اصلاح کسری پیش از ثبت فروش سریع", description="ابزار MCP: `create_quick_sales_stock_correction` (نیازمند تأیید).")
 def create_stock_correction_endpoint(
     request: Request,
     business_id: int,
@@ -536,7 +546,11 @@ def create_stock_correction_endpoint(
     return success_response(result, request, message="QUICK_SALES_STOCK_CORRECTED")
 
 
-@router.post("/stock-discrepancies/{case_id}/resolve", summary="رفع مغایرت با کالای درآمدشده")
+@router.post(
+    "/stock-discrepancies/{case_id}/resolve",
+    summary="رفع مغایرت با کالای درآمدشده",
+    description="رفع پرونده مغایرت موجودی با کالای درآمدشده. ابزار MCP: `resolve_quick_sales_stock_discrepancy` (نیازمند تأیید).",
+)
 def resolve_stock_discrepancy_endpoint(
     request: Request,
     business_id: int,

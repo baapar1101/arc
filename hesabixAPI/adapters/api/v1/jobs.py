@@ -31,7 +31,11 @@ def _ensure_job_access(ctx: AuthContext, job_meta: dict | None, job_id: str) -> 
         raise ApiError("FORBIDDEN", f"No access to job {job_id}", http_status=403)
 
 
-@router.get("/{job_id}")
+@router.get(
+    "/{job_id}",
+    summary="وضعیت کار پس‌زمینه",
+    description="ابزار MCP: `get_background_job`.",
+)
 async def get_job_status(
     request: Request, 
     job_id: str, 
@@ -160,7 +164,11 @@ async def get_job_status(
     raise ApiError("JOB_NOT_FOUND", "Job not found", http_status=404)
 
 
-@router.delete("/{job_id}")
+@router.delete(
+    "/{job_id}",
+    summary="لغو کار پس‌زمینه",
+    description="فقط سازندهٔ کار می‌تواند لغو کند. ابزار MCP: cancel_background_job.",
+)
 async def cancel_job(request: Request, job_id: str, ctx: AuthContext = Depends(get_current_user)):
     """لغو یا حذف job"""
     queue_service = get_queue_service()
@@ -185,7 +193,11 @@ async def cancel_job(request: Request, job_id: str, ctx: AuthContext = Depends(g
     return success_response({"job_id": job_id, "cancelled": True}, request=request)
 
 
-@router.get("/queue/stats")
+@router.get(
+    "/queue/stats",
+    summary="آمار صف کارهای پس‌زمینه",
+    description="فقط superadmin است و در MCP کسب‌وکار ثبت نشده.",
+)
 async def get_queue_stats(request: Request, ctx: AuthContext = Depends(get_current_user)):
     """دریافت آمار queues"""
     # اطلاعات عملیاتی → فقط superadmin
@@ -220,7 +232,11 @@ async def get_queue_stats(request: Request, ctx: AuthContext = Depends(get_curre
     }, request=request)
 
 
-@router.get("/failed")
+@router.get(
+    "/failed",
+    summary="کارهای پس‌زمینه ناموفق",
+    description="فقط superadmin است و در MCP کسب‌وکار ثبت نشده.",
+)
 async def get_failed_jobs(
     request: Request,
     limit: int = 10,
@@ -239,7 +255,11 @@ async def get_failed_jobs(
     return success_response({"jobs": failed_jobs}, request=request)
 
 
-@router.post("/reports")
+@router.post(
+    "/reports",
+    summary="صف‌بندی گزارش سنگین",
+    description="خروجی نهایی باینری/فایل است و در MCP ثبت نشده. JSON: `get_report`. وضعیت: `get_background_job`.",
+)
 async def enqueue_report_job(
     request: Request,
     payload: Dict[str, Any] = Body(...),

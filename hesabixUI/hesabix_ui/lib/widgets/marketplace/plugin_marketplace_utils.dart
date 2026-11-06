@@ -19,6 +19,7 @@ const Map<String, String> pluginSetupRouteByCode = {
   'fixed_assets': 'business_fixed_assets',
   'hscript_custom_reports': 'business_hscript_reports',
   'advanced_accounting': 'business_reports',
+  'ai_mcp_server': 'business_ai_mcp_connections',
 };
 
 const String kAdvancedAccountingPluginCode = 'advanced_accounting';

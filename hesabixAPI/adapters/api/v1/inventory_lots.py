@@ -14,7 +14,11 @@ from app.services.inventory_lot_service import compute_lot_dates, list_lot_balan
 router = APIRouter(prefix="/inventory-lots", tags=["inventory_lots"])
 
 
-@router.get("/business/{business_id}/products/{product_id}")
+@router.get(
+    "/business/{business_id}/products/{product_id}",
+    summary="موجودی لات‌های کالا",
+    description="مانده لات‌های تاریخ‌دار یک کالا در کسب‌وکار متصل با فیلتر انبار/تنوع و as_of_date. نیازمند inventory.read. ابزار MCP: `list_inventory_lots`.",
+)
 @require_business_access("business_id")
 def list_product_lots(
     request: Request,
@@ -50,7 +54,11 @@ def list_product_lots(
     return success_response(data={"items": items, "as_of_date": as_of.isoformat()}, request=request)
 
 
-@router.get("/business/{business_id}/products/{product_id}/preview-dates")
+@router.get(
+    "/business/{business_id}/products/{product_id}/preview-dates",
+    summary="پیش‌نمایش تاریخ لات",
+    description="تاریخ تولید و انقضا را بر اساس تنظیمات کالا محاسبه می‌کند و چیزی ثبت نمی‌کند. ابزار MCP: `preview_inventory_lot_dates`.",
+)
 @require_business_access("business_id")
 def preview_lot_dates(
     request: Request,

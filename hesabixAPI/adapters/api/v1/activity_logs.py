@@ -13,7 +13,11 @@ from app.core.cache import get_cache
 router = APIRouter(prefix="/activity-logs", tags=["activity-logs"])
 
 
-@router.post("/business/{business_id}/table")
+@router.post(
+	"/business/{business_id}/table",
+	summary="جدول لاگ فعالیت کسب‌وکار",
+	description="ابزار MCP: `search_activity_logs`.",
+)
 @require_business_access("business_id")
 def get_business_activity_logs_table(
 	request: Request,
@@ -129,7 +133,11 @@ def get_business_activity_logs_table(
 	)
 
 
-@router.get("/business/{business_id}")
+@router.get(
+	"/business/{business_id}",
+	summary="فهرست لاگ فعالیت کسب‌وکار",
+	description="ابزار MCP: `search_activity_logs`.",
+)
 @require_business_access("business_id")
 def get_business_activity_logs(
 	request: Request,
@@ -223,7 +231,11 @@ def get_business_activity_logs(
 	)
 
 
-@router.get("/entity/{entity_type}/{entity_id}")
+@router.get(
+	"/entity/{entity_type}/{entity_id}",
+	summary="تاریخچه تغییرات یک موجودیت",
+	description="لاگ فعالیت یک موجودیت. ابزار MCP: `get_entity_activity_logs`.",
+)
 def get_entity_activity_logs(
 	request: Request,
 	entity_type: str,
@@ -267,7 +279,11 @@ def get_entity_activity_logs(
 	return success_response(data={"items": logs_data}, request=request)
 
 
-@router.get("/user/me")
+@router.get(
+	"/user/me",
+	summary="لاگ فعالیت کاربر جاری",
+	description="مسیر حساب شخصی است و در MCP کسب‌وکار ثبت نشده.",
+)
 def get_my_activity_logs(
 	request: Request,
 	business_id: Optional[int] = Query(None, description="شناسه کسب و کار (اختیاری)"),

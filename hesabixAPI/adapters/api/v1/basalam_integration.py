@@ -30,7 +30,11 @@ def _ensure_plugin(db: Session, business_id: int) -> None:
         )
 
 
-@router.get("/observability/metrics-summary")
+@router.get(
+    "/observability/metrics-summary",
+    summary="متریک مشاهده‌پذیری باسلام",
+    description="ابزار MCP: `get_basalam_overview`.",
+)
 def basalam_observability_metrics_summary(
     request: Request,
     _ctx: AuthContext = Depends(get_current_user),
@@ -46,7 +50,11 @@ def basalam_observability_metrics_summary(
     return success_response(get_basalam_metrics_summary(), request)
 
 
-@router.get("/business/{business_id}/currency-readiness")
+@router.get(
+    "/business/{business_id}/currency-readiness",
+    summary="آمادگی ارز باسلام",
+    description="واحد پولی باسلام را با ارز پایه کسب‌وکار مقایسه می‌کند. ابزار MCP: get_basalam_currency_readiness.",
+)
 def get_basalam_currency_readiness(
     request: Request,
     business_id: int = Path(..., gt=0),
@@ -61,7 +69,11 @@ def get_basalam_currency_readiness(
     return success_response(data, request)
 
 
-@router.get("/business/{business_id}/reports/overview")
+@router.get(
+    "/business/{business_id}/reports/overview",
+    summary="گزارش کلی باسلام",
+    description="ابزار MCP: `get_basalam_overview`.",
+)
 def basalam_reports_overview(
     request: Request,
     business_id: int = Path(..., gt=0),
@@ -78,7 +90,11 @@ def basalam_reports_overview(
     return success_response(data, request)
 
 
-@router.get("/business/{business_id}/reports/synced-invoices")
+@router.get(
+    "/business/{business_id}/reports/synced-invoices",
+    summary="فاکتورهای همگام باسلام",
+    description="ابزار MCP: `list_basalam_synced_invoices`.",
+)
 def basalam_reports_synced_invoices(
     request: Request,
     business_id: int = Path(..., gt=0),
@@ -100,7 +116,11 @@ def basalam_reports_synced_invoices(
     return success_response(data, request)
 
 
-@router.get("/business/{business_id}/reports/dead-letter")
+@router.get(
+    "/business/{business_id}/reports/dead-letter",
+    summary="صف مرده باسلام",
+    description="ابزار MCP: `list_basalam_dead_letter`.",
+)
 def basalam_reports_dead_letter(
     request: Request,
     business_id: int = Path(..., gt=0),
@@ -121,7 +141,11 @@ def basalam_reports_dead_letter(
     return success_response(data, request)
 
 
-@router.get("/business/{business_id}/reports/product-conflicts")
+@router.get(
+    "/business/{business_id}/reports/product-conflicts",
+    summary="تعارض کالای باسلام",
+    description="ابزار MCP: `list_basalam_product_conflicts`.",
+)
 def basalam_reports_product_conflicts(
     request: Request,
     business_id: int = Path(..., gt=0),
@@ -154,7 +178,11 @@ def basalam_reports_product_conflicts(
     return success_response(data, request)
 
 
-@router.get("/business/{business_id}/settings")
+@router.get(
+    "/business/{business_id}/settings",
+    summary="تنظیمات باسلام",
+    description="پرچم همگام، استراتژی تعارض و وضعیت کلید API (در MCP ماسک می‌شود). ابزار MCP: get_basalam_settings.",
+)
 def get_basalam_settings(
     request: Request,
     business_id: int = Path(..., gt=0),
@@ -169,7 +197,11 @@ def get_basalam_settings(
     return success_response(data, request)
 
 
-@router.put("/business/{business_id}/settings")
+@router.put(
+    "/business/{business_id}/settings",
+    summary="ذخیره تنظیمات باسلام",
+    description="فعال‌سازی همگام سفارش/کالا و استراتژی تعارض. توکن از MCP پذیرفته نمی‌شود. ابزار MCP: update_basalam_settings.",
+)
 def put_basalam_settings(
     request: Request,
     business_id: int = Path(..., gt=0),
@@ -185,7 +217,11 @@ def put_basalam_settings(
     return success_response(data, request)
 
 
-@router.post("/business/{business_id}/sync/orders")
+@router.post(
+    "/business/{business_id}/sync/orders",
+    summary="همگام‌سازی دستی سفارش باسلام",
+    description="بدنه باید آرایه orders داشته باشد. فاکتور فروش طبق تنظیم ساخته می‌شود. ابزار MCP: sync_basalam_orders.",
+)
 def manual_sync_basalam_orders(
     request: Request,
     business_id: int = Path(..., gt=0),
@@ -201,7 +237,11 @@ def manual_sync_basalam_orders(
     return success_response(data, request)
 
 
-@router.post("/business/{business_id}/sync/products")
+@router.post(
+    "/business/{business_id}/sync/products",
+    summary="همگام کالاهای باسلام",
+    description="ابزار MCP: `sync_basalam_products` (نیازمند تأیید).",
+)
 def manual_sync_basalam_products(
     request: Request,
     business_id: int = Path(..., gt=0),
@@ -217,7 +257,11 @@ def manual_sync_basalam_products(
     return success_response(data, request)
 
 
-@router.post("/business/{business_id}/sync/products/publish")
+@router.post(
+    "/business/{business_id}/sync/products/publish",
+    summary="انتشار کالاهای باسلام",
+    description="ابزار MCP: `publish_basalam_products` (نیازمند تأیید).",
+)
 def publish_basalam_products(
     request: Request,
     business_id: int = Path(..., gt=0),
@@ -233,7 +277,11 @@ def publish_basalam_products(
     return success_response(data, request)
 
 
-@router.post("/business/{business_id}/sync/products/pull")
+@router.post(
+    "/business/{business_id}/sync/products/pull",
+    summary="کشیدن کالا از باسلام",
+    description="ابزار MCP: `pull_basalam_products` (نیازمند تأیید).",
+)
 def pull_basalam_products(
     request: Request,
     business_id: int = Path(..., gt=0),
@@ -249,7 +297,11 @@ def pull_basalam_products(
     return success_response(data, request)
 
 
-@router.post("/business/{business_id}/sync/products/push/incremental")
+@router.post(
+    "/business/{business_id}/sync/products/push/incremental",
+    summary="ارسال تدریجی کالا به باسلام",
+    description="ابزار MCP: `push_basalam_products_incremental` (نیازمند تأیید).",
+)
 def push_basalam_products_incremental(
     request: Request,
     business_id: int = Path(..., gt=0),
@@ -265,7 +317,11 @@ def push_basalam_products_incremental(
     return success_response(data, request)
 
 
-@router.post("/business/{business_id}/sync/products/publish/retry")
+@router.post(
+    "/business/{business_id}/sync/products/publish/retry",
+    summary="تلاش مجدد انتشار کالای باسلام",
+    description="انتشار مجدد کالاهای ناموفق صف. ابزار MCP: retry_basalam_product_publish.",
+)
 def retry_basalam_products_publish(
     request: Request,
     business_id: int = Path(..., gt=0),
@@ -281,7 +337,11 @@ def retry_basalam_products_publish(
     return success_response(data, request)
 
 
-@router.get("/business/{business_id}/sync/products/conflicts")
+@router.get(
+    "/business/{business_id}/sync/products/conflicts",
+    summary="لیست تعارض کالای باسلام",
+    description="ابزار MCP: `list_basalam_product_conflicts`.",
+)
 def list_basalam_product_conflicts(
     request: Request,
     business_id: int = Path(..., gt=0),
@@ -313,7 +373,11 @@ def list_basalam_product_conflicts(
     return success_response(data, request)
 
 
-@router.delete("/business/{business_id}/sync/products/conflicts")
+@router.delete(
+    "/business/{business_id}/sync/products/conflicts",
+    summary="پاک کردن تعارض کالای باسلام",
+    description="همه تعارض‌های کالای باسلام همین کسب‌وکار را حذف می‌کند. ابزار MCP: clear_basalam_product_conflicts.",
+)
 def clear_basalam_product_conflicts(
     request: Request,
     business_id: int = Path(..., gt=0),
@@ -328,7 +392,11 @@ def clear_basalam_product_conflicts(
     return success_response(data, request)
 
 
-@router.post("/business/{business_id}/sync/products/conflicts/resolve")
+@router.post(
+    "/business/{business_id}/sync/products/conflicts/resolve",
+    summary="رفع تعارض کالای باسلام",
+    description="ابزار MCP: `resolve_basalam_product_conflicts` (نیازمند تأیید).",
+)
 def resolve_basalam_product_conflicts(
     request: Request,
     business_id: int = Path(..., gt=0),
@@ -344,7 +412,11 @@ def resolve_basalam_product_conflicts(
     return success_response(data, request)
 
 
-@router.post("/business/{business_id}/sync/payments/unverified")
+@router.post(
+    "/business/{business_id}/sync/payments/unverified",
+    summary="همگام پرداخت تأییدنشده باسلام",
+    description="پرداخت‌های تأییدنشده را همگام می‌کند. ابزار MCP: sync_basalam_unverified_payments.",
+)
 def sync_basalam_unverified_payments(
     request: Request,
     business_id: int = Path(..., gt=0),
@@ -366,7 +438,11 @@ def sync_basalam_unverified_payments(
     return success_response(data, request)
 
 
-@router.get("/business/{business_id}/sync/dead-letter")
+@router.get(
+    "/business/{business_id}/sync/dead-letter",
+    summary="لیست صف مرده همگام باسلام",
+    description="ابزار MCP: `list_basalam_dead_letter`.",
+)
 def list_basalam_sync_dead_letter(
     request: Request,
     business_id: int = Path(..., gt=0),
@@ -390,7 +466,11 @@ def list_basalam_sync_dead_letter(
     return success_response(data, request)
 
 
-@router.post("/business/{business_id}/sync/dead-letter/clear")
+@router.post(
+    "/business/{business_id}/sync/dead-letter/clear",
+    summary="پاک کردن صف مرده باسلام",
+    description="بدنه باید all=true یا dlq_ids داشته باشد. ابزار MCP: clear_basalam_dead_letter.",
+)
 def clear_basalam_sync_dead_letter(
     request: Request,
     business_id: int = Path(..., gt=0),
@@ -416,7 +496,11 @@ def clear_basalam_sync_dead_letter(
     return success_response(data, request)
 
 
-@router.post("/business/{business_id}/sync/chats/inbound")
+@router.post(
+    "/business/{business_id}/sync/chats/inbound",
+    summary="همگام پیام ورودی چت باسلام",
+    description="پیام‌های ورودی باسلام را به کسب‌وکار می‌آورد. ابزار MCP: sync_basalam_inbound_chats.",
+)
 async def sync_basalam_inbound_chats(
     request: Request,
     business_id: int = Path(..., gt=0),
@@ -437,7 +521,11 @@ async def sync_basalam_inbound_chats(
     return success_response(data, request)
 
 
-@router.post("/business/{business_id}/chats/{conversation_id}/reply")
+@router.post(
+    "/business/{business_id}/chats/{conversation_id}/reply",
+    summary="پاسخ به گفتگوی باسلام",
+    description="ارسال متن پاسخ به گفتگوی متعلق به همین کسب‌وکار. ابزار MCP: reply_basalam_chat.",
+)
 async def send_basalam_chat_reply(
     request: Request,
     business_id: int = Path(..., gt=0),
@@ -461,7 +549,11 @@ async def send_basalam_chat_reply(
     return success_response(data, request)
 
 
-@router.post("/webhook/{business_id}")
+@router.post(
+    "/webhook/{business_id}",
+    summary="وب‌هوک باسلام",
+    description="وب‌هوک عمومی است و در MCP ثبت نشده.",
+)
 async def basalam_webhook(
     request: Request,
     business_id: int = Path(..., gt=0),

@@ -30,7 +30,11 @@ def _payroll_response(data: Any, request: Request, **kwargs) -> dict:
 # ─── تنظیمات ───────────────────────────────────────────────────────────────
 
 
-@router.get("/business/{business_id}/settings")
+@router.get(
+	"/business/{business_id}/settings",
+	summary="تنظیمات حقوق و دستمزد",
+	description="ابزار MCP: `get_payroll_settings`.",
+)
 def get_settings_endpoint(
 	request: Request,
 	business_id: int,
@@ -44,7 +48,11 @@ def get_settings_endpoint(
 	return _payroll_response(data, request)
 
 
-@router.put("/business/{business_id}/settings")
+@router.put(
+	"/business/{business_id}/settings",
+	summary="ویرایش تنظیمات حقوق",
+	description="ابزار MCP: `update_payroll_settings` (نیازمند تأیید).",
+)
 def update_settings_endpoint(
 	request: Request,
 	business_id: int,
@@ -67,7 +75,11 @@ def update_settings_endpoint(
 # ─── داشبورد ───────────────────────────────────────────────────────────────
 
 
-@router.get("/business/{business_id}/dashboard")
+@router.get(
+	"/business/{business_id}/dashboard",
+	summary="داشبورد حقوق و دستمزد",
+	description="ابزار MCP: `get_payroll_dashboard`.",
+)
 def dashboard_endpoint(
 	request: Request,
 	business_id: int,
@@ -84,7 +96,11 @@ def dashboard_endpoint(
 # ─── دسته‌بندی آیتم‌ها ─────────────────────────────────────────────────────
 
 
-@router.get("/business/{business_id}/item-categories")
+@router.get(
+	"/business/{business_id}/item-categories",
+	summary="دسته‌بندی آیتم‌های حقوق",
+	description="ابزار MCP: `list_payroll_item_categories`.",
+)
 def list_item_categories_endpoint(
 	request: Request,
 	business_id: int,
@@ -99,7 +115,11 @@ def list_item_categories_endpoint(
 	return _payroll_response({"items": items}, request)
 
 
-@router.post("/business/{business_id}/item-categories")
+@router.post(
+	"/business/{business_id}/item-categories",
+	summary="ایجاد دسته آیتم حقوق",
+	description="ابزار MCP: `create_payroll_item_category` (نیازمند تأیید).",
+)
 def create_item_category_endpoint(
 	request: Request,
 	business_id: int,
@@ -119,7 +139,11 @@ def create_item_category_endpoint(
 	return _payroll_response(data, request)
 
 
-@router.put("/business/{business_id}/item-categories/{category_id}")
+@router.put(
+	"/business/{business_id}/item-categories/{category_id}",
+	summary="ویرایش دسته آیتم حقوق",
+	description="ابزار MCP: `update_payroll_item_category` (نیازمند تأیید).",
+)
 def update_item_category_endpoint(
 	request: Request,
 	business_id: int,
@@ -140,7 +164,11 @@ def update_item_category_endpoint(
 	return _payroll_response(data, request)
 
 
-@router.delete("/business/{business_id}/item-categories/{category_id}")
+@router.delete(
+	"/business/{business_id}/item-categories/{category_id}",
+	summary="حذف دسته آیتم حقوق",
+	description="ابزار MCP: `delete_payroll_item_category` (نیازمند تأیید).",
+)
 def delete_item_category_endpoint(
 	request: Request,
 	business_id: int,
@@ -158,7 +186,11 @@ def delete_item_category_endpoint(
 # ─── آیتم‌های حقوق ─────────────────────────────────────────────────────────
 
 
-@router.get("/business/{business_id}/items")
+@router.get(
+	"/business/{business_id}/items",
+	summary="اجزای حقوق",
+	description="ابزار MCP: `list_payroll_items`.",
+)
 def list_items_endpoint(
 	request: Request,
 	business_id: int,
@@ -176,7 +208,11 @@ def list_items_endpoint(
 	return _payroll_response({"items": items}, request)
 
 
-@router.post("/business/{business_id}/items")
+@router.post(
+	"/business/{business_id}/items",
+	summary="تعریف جزء حقوق",
+	description="ابزار MCP: `create_payroll_item` (نیازمند تأیید).",
+)
 def create_item_endpoint(
 	request: Request,
 	business_id: int,
@@ -196,7 +232,11 @@ def create_item_endpoint(
 	return _payroll_response(data, request)
 
 
-@router.put("/business/{business_id}/items/{item_id}")
+@router.put(
+	"/business/{business_id}/items/{item_id}",
+	summary="ویرایش جزء حقوق",
+	description="ابزار MCP: `update_payroll_item` (نیازمند تأیید).",
+)
 def update_item_endpoint(
 	request: Request,
 	business_id: int,
@@ -217,7 +257,11 @@ def update_item_endpoint(
 	return _payroll_response(data, request)
 
 
-@router.delete("/business/{business_id}/items/{item_id}")
+@router.delete(
+	"/business/{business_id}/items/{item_id}",
+	summary="حذف جزء حقوق",
+	description="ابزار MCP: `delete_payroll_item` (نیازمند تأیید).",
+)
 def delete_item_endpoint(
 	request: Request,
 	business_id: int,
@@ -235,7 +279,11 @@ def delete_item_endpoint(
 # ─── بخش‌ها ────────────────────────────────────────────────────────────────
 
 
-@router.get("/business/{business_id}/departments")
+@router.get(
+	"/business/{business_id}/departments",
+	summary="بخش‌های سازمانی حقوق",
+	description="ابزار MCP: `list_payroll_departments`.",
+)
 def list_departments_endpoint(
 	request: Request,
 	business_id: int,
@@ -250,7 +298,11 @@ def list_departments_endpoint(
 	return _payroll_response({"items": items}, request)
 
 
-@router.post("/business/{business_id}/departments")
+@router.post(
+	"/business/{business_id}/departments",
+	summary="ایجاد بخش حقوق",
+	description="ابزار MCP: `create_payroll_department` (نیازمند تأیید).",
+)
 def create_department_endpoint(
 	request: Request,
 	business_id: int,
@@ -273,7 +325,11 @@ def create_department_endpoint(
 # ─── پرسنل ──────────────────────────────────────────────────────────────────
 
 
-@router.get("/business/{business_id}/employees")
+@router.get(
+	"/business/{business_id}/employees",
+	summary="پرسنل حقوق",
+	description="ابزار MCP: `list_payroll_employees`.",
+)
 def list_employees_endpoint(
 	request: Request,
 	business_id: int,
@@ -298,7 +354,11 @@ def list_employees_endpoint(
 	return _payroll_response({"items": items, "total": total}, request)
 
 
-@router.post("/business/{business_id}/employees")
+@router.post(
+	"/business/{business_id}/employees",
+	summary="ثبت پروفایل حقوق پرسنل",
+	description="ابزار MCP: `create_payroll_employee` (نیازمند تأیید).",
+)
 def create_employee_endpoint(
 	request: Request,
 	business_id: int,
@@ -321,7 +381,11 @@ def create_employee_endpoint(
 # ─── دوره‌ها ─────────────────────────────────────────────────────────────────
 
 
-@router.get("/business/{business_id}/periods")
+@router.get(
+	"/business/{business_id}/periods",
+	summary="دوره‌های حقوق",
+	description="ابزار MCP: `list_payroll_periods`.",
+)
 def list_periods_endpoint(
 	request: Request,
 	business_id: int,
@@ -337,7 +401,11 @@ def list_periods_endpoint(
 	return _payroll_response({"items": items, "total": total}, request)
 
 
-@router.post("/business/{business_id}/periods")
+@router.post(
+	"/business/{business_id}/periods",
+	summary="ایجاد دوره حقوق",
+	description="ابزار MCP: `create_payroll_period` (نیازمند تأیید).",
+)
 def create_period_endpoint(
 	request: Request,
 	business_id: int,
@@ -357,7 +425,11 @@ def create_period_endpoint(
 	return _payroll_response(data, request)
 
 
-@router.post("/business/{business_id}/periods/{period_id}/close")
+@router.post(
+	"/business/{business_id}/periods/{period_id}/close",
+	summary="بستن دوره حقوق",
+	description="ابزار MCP: `close_payroll_period` (نیازمند تأیید).",
+)
 def close_period_endpoint(
 	request: Request,
 	business_id: int,
@@ -375,7 +447,11 @@ def close_period_endpoint(
 # ─── اجرای حقوق ─────────────────────────────────────────────────────────────
 
 
-@router.get("/business/{business_id}/runs")
+@router.get(
+	"/business/{business_id}/runs",
+	summary="اجراهای حقوق",
+	description="ابزار MCP: `list_payroll_runs`.",
+)
 def list_runs_endpoint(
 	request: Request,
 	business_id: int,
@@ -395,7 +471,11 @@ def list_runs_endpoint(
 	return _payroll_response({"items": items, "total": total}, request)
 
 
-@router.get("/business/{business_id}/runs/{run_id}")
+@router.get(
+	"/business/{business_id}/runs/{run_id}",
+	summary="جزئیات اجرای حقوق",
+	description="ابزار MCP: `get_payroll_run`. PDF فیش جداست.",
+)
 def get_run_endpoint(
 	request: Request,
 	business_id: int,
@@ -410,7 +490,11 @@ def get_run_endpoint(
 	return _payroll_response(data, request)
 
 
-@router.post("/business/{business_id}/runs")
+@router.post(
+	"/business/{business_id}/runs",
+	summary="ایجاد اجرای حقوق",
+	description="ابزار MCP: `create_payroll_run` (نیازمند تأیید).",
+)
 def create_run_endpoint(
 	request: Request,
 	business_id: int,
@@ -430,7 +514,11 @@ def create_run_endpoint(
 	return _payroll_response(data, request)
 
 
-@router.put("/business/{business_id}/runs/{run_id}")
+@router.put(
+	"/business/{business_id}/runs/{run_id}",
+	summary="ویرایش اجرای حقوق",
+	description="ابزار MCP: `update_payroll_run` (نیازمند تأیید).",
+)
 def update_run_endpoint(
 	request: Request,
 	business_id: int,
@@ -451,7 +539,11 @@ def update_run_endpoint(
 	return _payroll_response(data, request)
 
 
-@router.delete("/business/{business_id}/runs/{run_id}")
+@router.delete(
+	"/business/{business_id}/runs/{run_id}",
+	summary="حذف پیش‌نویس اجرای حقوق",
+	description="ابزار MCP: `delete_payroll_run` (نیازمند تأیید).",
+)
 def delete_run_endpoint(
 	request: Request,
 	business_id: int,
@@ -466,7 +558,11 @@ def delete_run_endpoint(
 	return _payroll_response({"deleted": True}, request)
 
 
-@router.post("/business/{business_id}/runs/{run_id}/finalize")
+@router.post(
+	"/business/{business_id}/runs/{run_id}/finalize",
+	summary="قطعی‌سازی اجرای حقوق",
+	description="ابزار MCP: `finalize_payroll_run` (نیازمند تأیید).",
+)
 def finalize_run_endpoint(
 	request: Request,
 	business_id: int,
@@ -481,7 +577,11 @@ def finalize_run_endpoint(
 	return _payroll_response(data, request)
 
 
-@router.post("/business/{business_id}/runs/{run_id}/cancel")
+@router.post(
+	"/business/{business_id}/runs/{run_id}/cancel",
+	summary="لغو اجرای حقوق",
+	description="ابزار MCP: `cancel_payroll_run` (نیازمند تأیید).",
+)
 def cancel_run_endpoint(
 	request: Request,
 	business_id: int,
@@ -496,7 +596,11 @@ def cancel_run_endpoint(
 	return _payroll_response(data, request)
 
 
-@router.post("/business/{business_id}/runs/{run_id}/copy")
+@router.post(
+	"/business/{business_id}/runs/{run_id}/copy",
+	summary="کپی اجرای حقوق",
+	description="ابزار MCP: `copy_payroll_run` (نیازمند تأیید).",
+)
 def copy_run_endpoint(
 	request: Request,
 	business_id: int,
@@ -517,7 +621,11 @@ def copy_run_endpoint(
 	return _payroll_response(data, request)
 
 
-@router.get("/business/{business_id}/runs/{run_id}/payslip/pdf")
+@router.get(
+	"/business/{business_id}/runs/{run_id}/payslip/pdf",
+	summary="PDF فیش حقوق",
+	description="خروجی باینری PDF است و در MCP ثبت نشده.",
+)
 async def payslip_pdf_endpoint(
 	request: Request,
 	business_id: int,
@@ -567,7 +675,11 @@ async def payslip_pdf_endpoint(
 	)
 
 
-@router.get("/business/{business_id}/reports/department-summary")
+@router.get(
+	"/business/{business_id}/reports/department-summary",
+	summary="خلاصه حقوق بر اساس بخش",
+	description="ابزار MCP: `get_payroll_department_summary`.",
+)
 def department_summary_endpoint(
 	request: Request,
 	business_id: int,
@@ -583,7 +695,11 @@ def department_summary_endpoint(
 	return _payroll_response(data, request)
 
 
-@router.get("/business/{business_id}/reports/item-summary")
+@router.get(
+	"/business/{business_id}/reports/item-summary",
+	summary="خلاصه اجزای حقوق",
+	description="ابزار MCP: `get_payroll_item_summary`.",
+)
 def item_summary_report_endpoint(
 	request: Request,
 	business_id: int,
@@ -599,7 +715,11 @@ def item_summary_report_endpoint(
 	return _payroll_response(data, request)
 
 
-@router.get("/business/{business_id}/reports/employee-summary")
+@router.get(
+	"/business/{business_id}/reports/employee-summary",
+	summary="خلاصه حقوق پرسنل",
+	description="ابزار MCP: `get_payroll_employee_summary`.",
+)
 def employee_summary_report_endpoint(
 	request: Request,
 	business_id: int,
@@ -619,7 +739,11 @@ def employee_summary_report_endpoint(
 	return _payroll_response(data, request)
 
 
-@router.get("/business/{business_id}/reports/statutory-summary")
+@router.get(
+	"/business/{business_id}/reports/statutory-summary",
+	summary="خلاصه کسور قانونی حقوق",
+	description="ابزار MCP: `get_payroll_statutory_summary`.",
+)
 def statutory_summary_report_endpoint(
 	request: Request,
 	business_id: int,
@@ -635,7 +759,11 @@ def statutory_summary_report_endpoint(
 	return _payroll_response(data, request)
 
 
-@router.get("/business/{business_id}/reports/period-overview")
+@router.get(
+	"/business/{business_id}/reports/period-overview",
+	summary="نمای کلی دوره‌های حقوق",
+	description="ابزار MCP: `get_payroll_period_overview`.",
+)
 def period_overview_report_endpoint(
 	request: Request,
 	business_id: int,
@@ -650,7 +778,11 @@ def period_overview_report_endpoint(
 	return _payroll_response(data, request)
 
 
-@router.get("/business/{business_id}/employees/import/template")
+@router.get(
+	"/business/{business_id}/employees/import/template",
+	summary="قالب اکسل پرسنل حقوق",
+	description="خروجی باینری Excel است و در MCP ثبت نشده.",
+)
 def employees_import_template_endpoint(
 	request: Request,
 	business_id: int,
@@ -672,7 +804,11 @@ def employees_import_template_endpoint(
 	)
 
 
-@router.get("/business/{business_id}/employees/export/excel")
+@router.get(
+	"/business/{business_id}/employees/export/excel",
+	summary="خروجی اکسل پرسنل حقوق",
+	description="خروجی باینری Excel است و در MCP ثبت نشده.",
+)
 def export_employees_excel_endpoint(
 	request: Request,
 	business_id: int,
@@ -697,7 +833,11 @@ def export_employees_excel_endpoint(
 	)
 
 
-@router.post("/business/{business_id}/employees/import/excel")
+@router.post(
+	"/business/{business_id}/employees/import/excel",
+	summary="ورود اکسل پرسنل حقوق",
+	description="آپلود باینری Excel است و در MCP ثبت نشده.",
+)
 async def import_employees_excel_endpoint(
 	request: Request,
 	business_id: int,
@@ -718,7 +858,11 @@ async def import_employees_excel_endpoint(
 	return _payroll_response(data, request)
 
 
-@router.get("/business/{business_id}/runs/{run_id}/import/template")
+@router.get(
+	"/business/{business_id}/runs/{run_id}/import/template",
+	summary="قالب اکسل اجرای حقوق",
+	description="خروجی باینری Excel است و در MCP ثبت نشده.",
+)
 def run_lines_import_template_endpoint(
 	request: Request,
 	business_id: int,
@@ -740,7 +884,11 @@ def run_lines_import_template_endpoint(
 	)
 
 
-@router.post("/business/{business_id}/runs/{run_id}/import/excel")
+@router.post(
+	"/business/{business_id}/runs/{run_id}/import/excel",
+	summary="ورود اکسل اجرای حقوق",
+	description="آپلود باینری Excel است و در MCP ثبت نشده.",
+)
 async def import_run_lines_excel_endpoint(
 	request: Request,
 	business_id: int,
@@ -762,7 +910,11 @@ async def import_run_lines_excel_endpoint(
 	return _payroll_response(data, request)
 
 
-@router.post("/business/{business_id}/runs/{run_id}/approve")
+@router.post(
+	"/business/{business_id}/runs/{run_id}/approve",
+	summary="تأیید اجرای حقوق",
+	description="ابزار MCP: `approve_payroll_run` (نیازمند تأیید).",
+)
 def approve_run_endpoint(
 	request: Request,
 	business_id: int,
@@ -777,7 +929,11 @@ def approve_run_endpoint(
 	return _payroll_response(data, request)
 
 
-@router.post("/business/{business_id}/runs/{run_id}/reject")
+@router.post(
+	"/business/{business_id}/runs/{run_id}/reject",
+	summary="رد اجرای حقوق",
+	description="ابزار MCP: `reject_payroll_run` (نیازمند تأیید).",
+)
 def reject_run_endpoint(
 	request: Request,
 	business_id: int,
@@ -794,7 +950,11 @@ def reject_run_endpoint(
 	return _payroll_response(data, request)
 
 
-@router.post("/business/{business_id}/runs/{run_id}/post")
+@router.post(
+	"/business/{business_id}/runs/{run_id}/post",
+	summary="ثبت سند حقوق در حسابداری",
+	description="ابزار MCP: `post_payroll_run_to_accounting` (نیازمند تأیید).",
+)
 def post_run_endpoint(
 	request: Request,
 	business_id: int,
@@ -809,7 +969,11 @@ def post_run_endpoint(
 	return _payroll_response(data, request)
 
 
-@router.post("/business/{business_id}/runs/{run_id}/post-payment")
+@router.post(
+	"/business/{business_id}/runs/{run_id}/post-payment",
+	summary="ثبت پرداخت اجرای حقوق",
+	description="ابزار MCP: `post_payroll_run_payment` (نیازمند تأیید).",
+)
 def post_payment_endpoint(
 	request: Request,
 	business_id: int,
@@ -830,7 +994,11 @@ def post_payment_endpoint(
 	return _payroll_response(data, request)
 
 
-@router.put("/business/{business_id}/employees/{employee_id}")
+@router.put(
+	"/business/{business_id}/employees/{employee_id}",
+	summary="ویرایش پروفایل حقوق پرسنل",
+	description="ابزار MCP: `update_payroll_employee` (نیازمند تأیید).",
+)
 def update_employee_endpoint(
 	request: Request,
 	business_id: int,
@@ -851,7 +1019,11 @@ def update_employee_endpoint(
 	return _payroll_response(data, request)
 
 
-@router.put("/business/{business_id}/departments/{department_id}")
+@router.put(
+	"/business/{business_id}/departments/{department_id}",
+	summary="ویرایش بخش حقوق",
+	description="ابزار MCP: `update_payroll_department` (نیازمند تأیید).",
+)
 def update_department_endpoint(
 	request: Request,
 	business_id: int,

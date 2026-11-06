@@ -5246,6 +5246,300 @@ abstract class AppLocalizations {
   /// **'Skills earnings'**
   String get aiSkillsPublisherMenu;
 
+  /// No description provided for @aiMcpConnectionsMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected assistants'**
+  String get aiMcpConnectionsMenu;
+
+  /// No description provided for @aiMcpConnectionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected assistants'**
+  String get aiMcpConnectionsTitle;
+
+  /// No description provided for @aiMcpConnectionsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Review, narrow, or revoke ChatGPT and Claude access to this business.'**
+  String get aiMcpConnectionsSubtitle;
+
+  /// No description provided for @aiMcpConnectHint.
+  ///
+  /// In en, this message translates to:
+  /// **'In ChatGPT, add a custom MCP server and paste this address. After you approve access, the connection appears here so you can change or revoke it.'**
+  String get aiMcpConnectHint;
+
+  /// No description provided for @aiMcpServerUrlLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'MCP server address'**
+  String get aiMcpServerUrlLabel;
+
+  /// No description provided for @aiMcpCopyUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy address'**
+  String get aiMcpCopyUrl;
+
+  /// No description provided for @aiMcpUrlCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Address copied.'**
+  String get aiMcpUrlCopied;
+
+  /// No description provided for @aiMcpEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No assistant is connected to this business yet.'**
+  String get aiMcpEmpty;
+
+  /// No description provided for @aiMcpPluginInactiveBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'The AI MCP add-on is not active. Existing connections can still be revoked here.'**
+  String get aiMcpPluginInactiveBanner;
+
+  /// No description provided for @aiMcpPluginExpiredBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'The AI MCP add-on has expired. Existing connections no longer receive business data; revoke them or renew the add-on.'**
+  String get aiMcpPluginExpiredBanner;
+
+  /// No description provided for @aiMcpOpenMarketplace.
+  ///
+  /// In en, this message translates to:
+  /// **'Open add-on marketplace'**
+  String get aiMcpOpenMarketplace;
+
+  /// No description provided for @aiMcpClientChatgpt.
+  ///
+  /// In en, this message translates to:
+  /// **'ChatGPT'**
+  String get aiMcpClientChatgpt;
+
+  /// No description provided for @aiMcpClientClaude.
+  ///
+  /// In en, this message translates to:
+  /// **'Claude'**
+  String get aiMcpClientClaude;
+
+  /// No description provided for @aiMcpClientOauth.
+  ///
+  /// In en, this message translates to:
+  /// **'OAuth assistant'**
+  String get aiMcpClientOauth;
+
+  /// No description provided for @aiMcpClientManual.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual connection'**
+  String get aiMcpClientManual;
+
+  /// No description provided for @aiMcpStatusActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get aiMcpStatusActive;
+
+  /// No description provided for @aiMcpStatusExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get aiMcpStatusExpired;
+
+  /// No description provided for @aiMcpStatusRevoked.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoked'**
+  String get aiMcpStatusRevoked;
+
+  /// No description provided for @aiMcpStatusMembershipInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'Member no longer has access'**
+  String get aiMcpStatusMembershipInactive;
+
+  /// No description provided for @aiMcpReadOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Read only'**
+  String get aiMcpReadOnly;
+
+  /// No description provided for @aiMcpReadWrite.
+  ///
+  /// In en, this message translates to:
+  /// **'Read and write'**
+  String get aiMcpReadWrite;
+
+  /// No description provided for @aiMcpUnrestrictedTools.
+  ///
+  /// In en, this message translates to:
+  /// **'All tools allowed for this role'**
+  String get aiMcpUnrestrictedTools;
+
+  /// No description provided for @aiMcpToolCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} tools'**
+  String aiMcpToolCount(int count);
+
+  /// No description provided for @aiMcpLastUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Last used: {when}'**
+  String aiMcpLastUsed(String when);
+
+  /// No description provided for @aiMcpNeverUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Not used yet'**
+  String get aiMcpNeverUsed;
+
+  /// No description provided for @aiMcpConnectedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected: {when}'**
+  String aiMcpConnectedAt(String when);
+
+  /// No description provided for @aiMcpExpiresAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Expires: {when}'**
+  String aiMcpExpiresAt(String when);
+
+  /// No description provided for @aiMcpChangeAccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Change access'**
+  String get aiMcpChangeAccess;
+
+  /// No description provided for @aiMcpRevoke.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke access'**
+  String get aiMcpRevoke;
+
+  /// No description provided for @aiMcpRevokeConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke this assistant?'**
+  String get aiMcpRevokeConfirmTitle;
+
+  /// No description provided for @aiMcpRevokeConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'ChatGPT or Claude will lose access to this business on the next request. This cannot be undone without a new approval.'**
+  String get aiMcpRevokeConfirmBody;
+
+  /// No description provided for @aiMcpRevoked.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant access was revoked.'**
+  String get aiMcpRevoked;
+
+  /// No description provided for @aiMcpRevokeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke all assistants'**
+  String get aiMcpRevokeAll;
+
+  /// No description provided for @aiMcpRevokeAllConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke every assistant?'**
+  String get aiMcpRevokeAllConfirmTitle;
+
+  /// No description provided for @aiMcpRevokeAllConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'All ChatGPT, Claude, and manual MCP connections for this business will be revoked immediately.'**
+  String get aiMcpRevokeAllConfirmBody;
+
+  /// No description provided for @aiMcpRevokeAllDone.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} connections were revoked.'**
+  String aiMcpRevokeAllDone(int count);
+
+  /// No description provided for @aiMcpPermissionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tools for this connection'**
+  String get aiMcpPermissionsTitle;
+
+  /// No description provided for @aiMcpSearchTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Search tools'**
+  String get aiMcpSearchTools;
+
+  /// No description provided for @aiMcpEnableWrites.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow write tools'**
+  String get aiMcpEnableWrites;
+
+  /// No description provided for @aiMcpEnableWritesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Write tools can create or change invoices, documents, and other records.'**
+  String get aiMcpEnableWritesHint;
+
+  /// No description provided for @aiMcpWritesNeedConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'You are granting write access. The assistant will be able to change records in this business.'**
+  String get aiMcpWritesNeedConfirm;
+
+  /// No description provided for @aiMcpWidenConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'You are granting additional tools to this assistant.'**
+  String get aiMcpWidenConfirm;
+
+  /// No description provided for @aiMcpDenyAllConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'No tools will remain. The assistant stays connected but cannot read business data until you grant tools again.'**
+  String get aiMcpDenyAllConfirm;
+
+  /// No description provided for @aiMcpSaveAccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Save access'**
+  String get aiMcpSaveAccess;
+
+  /// No description provided for @aiMcpAccessSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection permissions were updated. The assistant may need to refresh its tool list.'**
+  String get aiMcpAccessSaved;
+
+  /// No description provided for @aiMcpNoTools.
+  ///
+  /// In en, this message translates to:
+  /// **'No tools are available for this user.'**
+  String get aiMcpNoTools;
+
+  /// No description provided for @aiMcpCannotEditInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'This connection can only be revoked because the member no longer has access.'**
+  String get aiMcpCannotEditInactive;
+
+  /// No description provided for @aiMcpCannotEditRevoked.
+  ///
+  /// In en, this message translates to:
+  /// **'This connection is no longer active.'**
+  String get aiMcpCannotEditRevoked;
+
+  /// No description provided for @aiMcpConnectedBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected by {name}'**
+  String aiMcpConnectedBy(String name);
+
   /// No description provided for @crmMenu.
   ///
   /// In en, this message translates to:

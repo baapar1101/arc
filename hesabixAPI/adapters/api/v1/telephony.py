@@ -38,7 +38,11 @@ def _bearer_token(authorization: Optional[str]) -> str:
 # ─── Settings / context ─────────────────────────────────────────────────────
 
 
-@router.get("/business/{business_id}/settings")
+@router.get(
+	"/business/{business_id}/settings",
+	summary="تنظیمات تلفن",
+	description="بدون توکن کانکتور. ابزار MCP: `get_telephony_settings`.",
+)
 def get_settings(
 	request: Request,
 	business_id: int,
@@ -53,7 +57,11 @@ def get_settings(
 	return _resp(svc.settings_to_dict(row), request)
 
 
-@router.put("/business/{business_id}/settings")
+@router.put(
+	"/business/{business_id}/settings",
+	summary="ویرایش تنظیمات تلفن",
+	description="توکن کانکتور از MCP نیست. ابزار MCP: `update_telephony_settings` (نیازمند تأیید).",
+)
 def put_settings(
 	request: Request,
 	business_id: int,
@@ -68,7 +76,7 @@ def put_settings(
 	return _resp(svc.update_settings(db, business_id, payload), request)
 
 
-@router.get("/business/{business_id}/me/context")
+@router.get("/business/{business_id}/me/context", summary="زمینه تلفن کاربر جاری", description="داخلی و وضعیت کاربر بدون توکن کانکتور. ابزار MCP: `get_telephony_my_context`.")
 def my_context(
 	request: Request,
 	business_id: int,
@@ -82,7 +90,11 @@ def my_context(
 	return _resp(svc.get_my_extension_context(db, business_id, ctx.get_user_id(), auth_ctx=ctx), request)
 
 
-@router.get("/business/{business_id}/dashboard")
+@router.get(
+	"/business/{business_id}/dashboard",
+	summary="داشبورد تلفن",
+	description="بدون افشای توکن. ابزار MCP: `get_telephony_dashboard`.",
+)
 def dashboard(
 	request: Request,
 	business_id: int,
@@ -99,7 +111,11 @@ def dashboard(
 # ─── PBX ────────────────────────────────────────────────────────────────────
 
 
-@router.get("/business/{business_id}/pbx")
+@router.get(
+	"/business/{business_id}/pbx",
+	summary="فهرست مراکز تلفن",
+	description="توکن کانکتور برنمی‌گردد. ابزار MCP: `list_telephony_pbx`.",
+)
 def list_pbx(
 	request: Request,
 	business_id: int,
@@ -114,7 +130,11 @@ def list_pbx(
 	return _resp({"items": svc.list_pbx(db, business_id, include_token_hint=scope.can_manage)}, request)
 
 
-@router.post("/business/{business_id}/pbx")
+@router.post(
+	"/business/{business_id}/pbx",
+	summary="ایجاد مرکز تلفن",
+	description="ممکن است توکن برگرداند؛ در MCP نیست. ویرایش بدون توکن: `update_telephony_pbx`.",
+)
 def create_pbx(
 	request: Request,
 	business_id: int,
@@ -129,7 +149,11 @@ def create_pbx(
 	return _resp(svc.create_pbx(db, business_id, payload), request)
 
 
-@router.patch("/business/{business_id}/pbx/{pbx_id}")
+@router.patch(
+	"/business/{business_id}/pbx/{pbx_id}",
+	summary="ویرایش مرکز تلفن",
+	description="بدون چرخش توکن. ابزار MCP: `update_telephony_pbx` (نیازمند تأیید).",
+)
 def patch_pbx(
 	request: Request,
 	business_id: int,
@@ -145,7 +169,11 @@ def patch_pbx(
 	return _resp(svc.update_pbx(db, business_id, pbx_id, payload), request)
 
 
-@router.post("/business/{business_id}/pbx/{pbx_id}/rotate-token")
+@router.post(
+	"/business/{business_id}/pbx/{pbx_id}/rotate-token",
+	summary="چرخش توکن کانکتور PBX",
+	description="خروجی شامل توکن است؛ در MCP نیست.",
+)
 def rotate_token(
 	request: Request,
 	business_id: int,
@@ -163,7 +191,11 @@ def rotate_token(
 # ─── Extensions ─────────────────────────────────────────────────────────────
 
 
-@router.get("/business/{business_id}/extensions")
+@router.get(
+	"/business/{business_id}/extensions",
+	summary="فهرست داخلی‌ها",
+	description="ابزار MCP: `list_telephony_extensions`.",
+)
 def list_extensions(
 	request: Request,
 	business_id: int,
@@ -179,7 +211,11 @@ def list_extensions(
 	return _resp({"items": svc.list_extensions(db, business_id, pbx_id=pbx_id, scope=scope)}, request)
 
 
-@router.post("/business/{business_id}/extensions")
+@router.post(
+	"/business/{business_id}/extensions",
+	summary="ثبت داخلی سانترال",
+	description="ابزار MCP: `upsert_telephony_extension` (نیازمند تأیید).",
+)
 def upsert_extension(
 	request: Request,
 	business_id: int,
@@ -194,7 +230,7 @@ def upsert_extension(
 	return _resp(svc.upsert_extension(db, business_id, payload), request)
 
 
-@router.post("/business/{business_id}/extensions/sync")
+@router.post("/business/{business_id}/extensions/sync", summary="همگام‌سازی داخلی‌های سانترال", description="upsert فهرست داخلی روی یک PBX ذخیره‌شده. ابزار MCP: `sync_telephony_extensions`.")
 def sync_extensions(
 	request: Request,
 	business_id: int,
@@ -213,7 +249,7 @@ def sync_extensions(
 	return _resp(svc.sync_extensions(db, business_id, pbx_id, items), request)
 
 
-@router.get("/business/{business_id}/assignable-users")
+@router.get("/business/{business_id}/assignable-users", summary="کاربران قابل اتصال به داخلی", description="اعضای کسب‌وکار برای اتصال به داخلی. ابزار MCP: `list_telephony_assignable_users`.")
 def assignable_users(
 	request: Request,
 	business_id: int,
@@ -227,7 +263,7 @@ def assignable_users(
 	return _resp({"items": list_assignable_users(db, business_id)}, request)
 
 
-@router.get("/business/{business_id}/team-supervisors")
+@router.get("/business/{business_id}/team-supervisors", summary="ناظران تیم تلفن", description="کاربران با نقش نظارت تیم. ابزار MCP: `list_telephony_team_supervisors`.")
 def team_supervisors(
 	request: Request,
 	business_id: int,
@@ -241,7 +277,11 @@ def team_supervisors(
 	return _resp({"items": list_team_supervisors(db, business_id)}, request)
 
 
-@router.get("/business/{business_id}/user-extensions")
+@router.get(
+	"/business/{business_id}/user-extensions",
+	summary="اتصال کاربران به داخلی",
+	description="ابزار MCP: `list_telephony_user_extensions`.",
+)
 def list_user_extensions(
 	request: Request,
 	business_id: int,
@@ -257,7 +297,11 @@ def list_user_extensions(
 	return _resp({"items": svc.list_user_extensions(db, business_id, user_id=user_id, scope=scope)}, request)
 
 
-@router.put("/business/{business_id}/user-extensions")
+@router.put(
+	"/business/{business_id}/user-extensions",
+	summary="اتصال کاربر به داخلی",
+	description="ابزار MCP: `upsert_telephony_user_extension` (نیازمند تأیید).",
+)
 def upsert_user_extension(
 	request: Request,
 	business_id: int,
@@ -272,7 +316,11 @@ def upsert_user_extension(
 	return _resp(svc.upsert_user_extension(db, business_id, payload), request)
 
 
-@router.delete("/business/{business_id}/user-extensions/{link_id}")
+@router.delete(
+	"/business/{business_id}/user-extensions/{link_id}",
+	summary="حذف اتصال کاربر به داخلی",
+	description="ابزار MCP: `delete_telephony_user_extension` (نیازمند تأیید).",
+)
 def delete_user_extension(
 	request: Request,
 	business_id: int,
@@ -291,7 +339,11 @@ def delete_user_extension(
 # ─── Calls ──────────────────────────────────────────────────────────────────
 
 
-@router.get("/business/{business_id}/calls")
+@router.get(
+	"/business/{business_id}/calls",
+	summary="فهرست تماس‌ها",
+	description="ابزار MCP: `list_telephony_calls`. ضبط صوت در MCP نیست.",
+)
 def list_calls(
 	request: Request,
 	business_id: int,
@@ -326,7 +378,11 @@ def list_calls(
 	)
 
 
-@router.get("/business/{business_id}/calls/{call_id}")
+@router.get(
+	"/business/{business_id}/calls/{call_id}",
+	summary="جزئیات تماس",
+	description="ابزار MCP: `get_telephony_call`.",
+)
 def get_call(
 	request: Request,
 	business_id: int,
@@ -341,7 +397,11 @@ def get_call(
 	return _resp(svc.get_call(db, business_id, call_id, auth_ctx=ctx), request)
 
 
-@router.patch("/business/{business_id}/calls/{call_id}")
+@router.patch(
+	"/business/{business_id}/calls/{call_id}",
+	summary="ویرایش تماس",
+	description="ابزار MCP: `update_telephony_call` (نیازمند تأیید).",
+)
 def patch_call(
 	request: Request,
 	business_id: int,
@@ -357,7 +417,7 @@ def patch_call(
 	return _resp(svc.patch_call(db, business_id, call_id, payload, auth_ctx=ctx), request)
 
 
-@router.get("/business/{business_id}/calls/{call_id}/screen-pop-context")
+@router.get("/business/{business_id}/calls/{call_id}/screen-pop-context", summary="زمینه پاپ‌آپ تماس", description="شخص/سرنخ مرتبط با تماس برای Screen-pop. ابزار MCP: `get_telephony_screen_pop`.")
 def screen_pop(
 	request: Request,
 	business_id: int,
@@ -372,7 +432,11 @@ def screen_pop(
 	return _resp(svc.screen_pop_context(db, business_id, call_id, auth_ctx=ctx), request)
 
 
-@router.post("/business/{business_id}/calls/{call_id}/create-person")
+@router.post(
+	"/business/{business_id}/calls/{call_id}/create-person",
+	summary="ساخت شخص از تماس",
+	description="ابزار MCP: `create_person_from_telephony_call` (نیازمند تأیید).",
+)
 def create_person(
 	request: Request,
 	business_id: int,
@@ -388,7 +452,11 @@ def create_person(
 	return _resp(svc.create_person_from_call(db, business_id, call_id, payload or {}, ctx.get_user_id(), auth_ctx=ctx), request)
 
 
-@router.post("/business/{business_id}/calls/{call_id}/create-lead")
+@router.post(
+	"/business/{business_id}/calls/{call_id}/create-lead",
+	summary="ساخت سرنخ از تماس",
+	description="ابزار MCP: `create_lead_from_telephony_call` (نیازمند تأیید).",
+)
 def create_lead(
 	request: Request,
 	business_id: int,
@@ -404,7 +472,11 @@ def create_lead(
 	return _resp(svc.create_lead_from_call(db, business_id, call_id, payload or {}, ctx.get_user_id(), auth_ctx=ctx), request)
 
 
-@router.post("/business/{business_id}/click-to-call")
+@router.post(
+	"/business/{business_id}/click-to-call",
+	summary="تماس خروجی Click-to-Call",
+	description="ابزار MCP: `click_to_call` (نیازمند تأیید).",
+)
 def click_to_call(
 	request: Request,
 	business_id: int,
@@ -419,7 +491,11 @@ def click_to_call(
 	return _resp(svc.click_to_call(db, business_id, ctx.get_user_id(), payload), request)
 
 
-@router.get("/business/{business_id}/lookup-number")
+@router.get(
+	"/business/{business_id}/lookup-number",
+	summary="تطبیق شماره با شخص یا سرنخ",
+	description="ابزار MCP: `lookup_telephony_number`.",
+)
 def lookup_number(
 	request: Request,
 	business_id: int,
@@ -437,7 +513,11 @@ def lookup_number(
 # ─── Connector endpoints ────────────────────────────────────────────────────
 
 
-@router.post("/connector/heartbeat")
+@router.post(
+	"/connector/heartbeat",
+	summary="heartbeat کانکتور PBX",
+	description="کانکتور بدون احراز هویت کاربر کسب‌وکار؛ در MCP نیست.",
+)
 def connector_heartbeat(
 	request: Request,
 	payload: Dict[str, Any] = Body(...),
@@ -455,7 +535,11 @@ def connector_heartbeat(
 	return _resp(svc.connector_heartbeat(db, pbx, payload), request)
 
 
-@router.post("/connector/events")
+@router.post(
+	"/connector/events",
+	summary="رویداد کانکتور PBX",
+	description="مسیر کانکتور بدون نشست MCP است و در MCP ثبت نشده.",
+)
 def connector_events(
 	request: Request,
 	payload: Dict[str, Any] = Body(...),
@@ -488,7 +572,11 @@ def connector_events(
 		raise ApiError("EVENT_PROCESSING_FAILED", "EVENT_PROCESSING_FAILED", http_status=500)
 
 
-@router.get("/connector/commands/poll")
+@router.get(
+	"/connector/commands/poll",
+	summary="نظرسنجی فرمان کانکتور PBX",
+	description="مسیر کانکتور است و در MCP ثبت نشده.",
+)
 def connector_poll(
 	request: Request,
 	authorization: Optional[str] = Header(None),
@@ -506,7 +594,11 @@ def connector_poll(
 	return _resp({"items": svc.poll_commands(db, pbx, limit=limit)}, request)
 
 
-@router.post("/connector/commands/{command_id}/ack")
+@router.post(
+	"/connector/commands/{command_id}/ack",
+	summary="تأیید فرمان کانکتور PBX",
+	description="مسیر کانکتور است و در MCP ثبت نشده.",
+)
 def connector_ack(
 	request: Request,
 	command_id: str,
@@ -525,7 +617,11 @@ def connector_ack(
 	return _resp(svc.ack_command(db, pbx, command_id, payload or {}), request)
 
 
-@router.post("/connector/recordings/meta")
+@router.post(
+	"/connector/recordings/meta",
+	summary="متادیتای ضبط کانکتور",
+	description="مسیر کانکتور/رسانه است و در MCP ثبت نشده.",
+)
 def connector_recording_meta(
 	request: Request,
 	payload: Dict[str, Any] = Body(...),
@@ -558,7 +654,11 @@ def connector_recording_meta(
 # ─── Phase 2 reports ────────────────────────────────────────────────────────
 
 
-@router.get("/business/{business_id}/reports/summary")
+@router.get(
+	"/business/{business_id}/reports/summary",
+	summary="خلاصه گزارش تماس‌ها",
+	description="ابزار MCP: `get_telephony_reports_summary`.",
+)
 def report_summary(
 	request: Request,
 	business_id: int,
@@ -576,7 +676,7 @@ def report_summary(
 	return _resp(reports.summary_report(db, business_id, date_from=date_from, date_to=date_to, auth_ctx=_ctx), request)
 
 
-@router.get("/business/{business_id}/reports/operators")
+@router.get("/business/{business_id}/reports/operators", summary="گزارش اپراتورهای تلفن", description="آمار تماس به‌تفکیک اپراتور در بازه تاریخ. ابزار MCP: `get_telephony_operators_report`.")
 def report_operators(
 	request: Request,
 	business_id: int,
@@ -594,7 +694,7 @@ def report_operators(
 	return _resp(reports.operators_report(db, business_id, date_from=date_from, date_to=date_to, auth_ctx=_ctx), request)
 
 
-@router.get("/business/{business_id}/reports/by-person")
+@router.get("/business/{business_id}/reports/by-person", summary="گزارش تماس به‌تفکیک شخص", description="ابزار MCP: `get_telephony_person_report`.")
 def report_by_person(
 	request: Request,
 	business_id: int,
@@ -612,7 +712,7 @@ def report_by_person(
 	return _resp(reports.by_person_report(db, business_id, date_from=date_from, date_to=date_to, auth_ctx=_ctx), request)
 
 
-@router.get("/business/{business_id}/reports/by-extension")
+@router.get("/business/{business_id}/reports/by-extension", summary="گزارش تماس به‌تفکیک داخلی", description="ابزار MCP: `get_telephony_extension_report`.")
 def report_by_extension(
 	request: Request,
 	business_id: int,
@@ -633,7 +733,11 @@ def report_by_extension(
 # ─── Phase 2 recording / Phase 3 live / Phase 4 ops ──────────────────────────
 
 
-@router.get("/business/{business_id}/calls/{call_id}/recording")
+@router.get(
+	"/business/{business_id}/calls/{call_id}/recording",
+	summary="دانلود ضبط تماس",
+	description="باینری/رسانه است؛ در MCP نیست.",
+)
 def get_recording(
 	request: Request,
 	business_id: int,
@@ -650,7 +754,7 @@ def get_recording(
 	return _resp(rec_svc.recording_info(db, business_id, call_id, auth_ctx=ctx), request)
 
 
-@router.get("/business/{business_id}/live/snapshot")
+@router.get("/business/{business_id}/live/snapshot", summary="نمای زنده صف تماس", description="وضعیت زنده بدون استریم صوت. ابزار MCP: `get_telephony_live_snapshot`.")
 def live_snapshot(
 	request: Request,
 	business_id: int,
@@ -666,7 +770,7 @@ def live_snapshot(
 	return _resp(live.live_snapshot(db, business_id, auth_ctx=_ctx), request)
 
 
-@router.post("/business/{business_id}/calls/{call_id}/control")
+@router.post("/business/{business_id}/calls/{call_id}/control", summary="کنترل تماس سانترال", description="hangup/transfer/hold/resume. ابزار MCP: `control_telephony_call`.")
 def control_call(
 	request: Request,
 	business_id: int,
@@ -696,7 +800,7 @@ def control_call(
 	)
 
 
-@router.get("/business/{business_id}/ops/metrics")
+@router.get("/business/{business_id}/ops/metrics", summary="متریک عملیاتی تلفن", description="بدون فایل ضبط. ابزار MCP: `get_telephony_ops_metrics`.")
 def ops_metrics(
 	request: Request,
 	business_id: int,
@@ -712,7 +816,7 @@ def ops_metrics(
 	return _resp(rec_svc.metrics_summary(db, business_id), request)
 
 
-@router.get("/business/{business_id}/ops/dead-letters")
+@router.get("/business/{business_id}/ops/dead-letters", summary="صف مرده رویداد تلفن", description="ابزار MCP: `list_telephony_dead_letters`.")
 def ops_dlq(
 	request: Request,
 	business_id: int,
@@ -728,7 +832,7 @@ def ops_dlq(
 	return _resp({"items": rec_svc.list_dead_letters(db, business_id)}, request)
 
 
-@router.post("/business/{business_id}/ops/dead-letters/{dlq_id}/resolve")
+@router.post("/business/{business_id}/ops/dead-letters/{dlq_id}/resolve", summary="بستن آیتم صف مرده تلفن", description="ابزار MCP: `resolve_telephony_dead_letter`.")
 def ops_dlq_resolve(
 	request: Request,
 	business_id: int,
@@ -776,7 +880,11 @@ def _require_media_edge() -> None:
 	require_media_edge_process()
 
 
-@router.get("/internal/media-edge/snapshot")
+@router.get(
+	"/internal/media-edge/snapshot",
+	summary="نمای داخلی لبه رسانه",
+	description="مسیر داخلی سامانه است و در MCP ثبت نشده.",
+)
 def media_edge_internal_snapshot(
 	request: Request,
 	pbx_id: Optional[int] = Query(default=None),
@@ -806,7 +914,7 @@ def media_edge_internal_snapshot(
 	return _resp(data, request)
 
 
-@router.get("/business/{business_id}/softphone/health")
+@router.get("/business/{business_id}/softphone/health", summary="سلامت سافت‌فون", description="بدون رمز SIP. ابزار MCP: `get_telephony_softphone_health`.")
 def softphone_health(
 	request: Request,
 	business_id: int,
@@ -822,7 +930,11 @@ def softphone_health(
 	return _resp(soft_svc.softphone_health(db, business_id, ctx.get_user_id()), request)
 
 
-@router.get("/business/{business_id}/softphone/devices-config")
+@router.get(
+	"/business/{business_id}/softphone/devices-config",
+	summary="پیکربندی دستگاه سافت‌فون",
+	description="ممکن است رمز SIP برگرداند؛ در MCP نیست. سلامت: `get_telephony_softphone_health`.",
+)
 def softphone_devices_config(
 	request: Request,
 	business_id: int,
@@ -838,7 +950,11 @@ def softphone_devices_config(
 	return _resp(soft_svc.softphone_devices_config(db, business_id), request)
 
 
-@router.post("/business/{business_id}/softphone/sessions")
+@router.post(
+	"/business/{business_id}/softphone/sessions",
+	summary="ایجاد نشست سافت‌فون",
+	description="نشست SIP/رسانه است و در MCP ثبت نشده.",
+)
 def softphone_create_session(
 	request: Request,
 	business_id: int,
@@ -856,7 +972,11 @@ def softphone_create_session(
 	return _resp(soft_svc.create_session(db, business_id, ctx.get_user_id(), payload or {}), request)
 
 
-@router.post("/business/{business_id}/softphone/sessions/{session_id}/heartbeat")
+@router.post(
+	"/business/{business_id}/softphone/sessions/{session_id}/heartbeat",
+	summary="heartbeat نشست سافت‌فون",
+	description="نشست SIP است و در MCP ثبت نشده.",
+)
 def softphone_session_heartbeat(
 	request: Request,
 	business_id: int,
@@ -873,7 +993,11 @@ def softphone_session_heartbeat(
 	return _resp(soft_svc.heartbeat_session(db, business_id, ctx.get_user_id(), session_id), request)
 
 
-@router.delete("/business/{business_id}/softphone/sessions/{session_id}")
+@router.delete(
+	"/business/{business_id}/softphone/sessions/{session_id}",
+	summary="پایان نشست سافت‌فون",
+	description="نشست SIP است و در MCP ثبت نشده.",
+)
 def softphone_end_session(
 	request: Request,
 	business_id: int,
@@ -902,7 +1026,11 @@ def softphone_end_session(
 	return _resp(data, request)
 
 
-@router.post("/business/{business_id}/softphone/calls")
+@router.post(
+	"/business/{business_id}/softphone/calls",
+	summary="تماس خروجی سافت‌فون",
+	description="رسانه/SIP است و در MCP ثبت نشده. JSON: `click_to_call`.",
+)
 async def softphone_outbound_call(
 	request: Request,
 	business_id: int,
@@ -940,7 +1068,11 @@ async def softphone_outbound_call(
 	return _resp(result, request)
 
 
-@router.post("/business/{business_id}/softphone/calls/{call_id}/answer")
+@router.post(
+	"/business/{business_id}/softphone/calls/{call_id}/answer",
+	summary="پاسخ تماس سافت‌فون",
+	description="رسانه/SIP است و در MCP ثبت نشده. کنترل: `control_telephony_call`.",
+)
 async def softphone_answer_call(
 	request: Request,
 	business_id: int,
@@ -976,7 +1108,11 @@ async def softphone_answer_call(
 	return _resp(result, request)
 
 
-@router.post("/business/{business_id}/softphone/calls/{call_id}/dtmf")
+@router.post(
+	"/business/{business_id}/softphone/calls/{call_id}/dtmf",
+	summary="ارسال DTMF سافت‌فون",
+	description="رسانه/SIP است و در MCP ثبت نشده.",
+)
 def softphone_dtmf(
 	request: Request,
 	business_id: int,
@@ -999,7 +1135,11 @@ def softphone_dtmf(
 	)
 
 
-@router.post("/connector/media/events")
+@router.post(
+	"/connector/media/events",
+	summary="رویداد رسانه کانکتور",
+	description="مسیر کانکتور/رسانه است و در MCP ثبت نشده.",
+)
 def connector_media_events(
 	request: Request,
 	payload: Dict[str, Any] = Body(...),
@@ -1020,7 +1160,11 @@ def connector_media_events(
 	return _resp({"ok": True, "tunnel": tunnel, "received": payload.get("type")}, request)
 
 
-@router.post("/connector/media/quality")
+@router.post(
+	"/connector/media/quality",
+	summary="کیفیت رسانه کانکتور",
+	description="مسیر کانکتور/رسانه است و در MCP ثبت نشده.",
+)
 def connector_media_quality(
 	request: Request,
 	payload: Dict[str, Any] = Body(...),

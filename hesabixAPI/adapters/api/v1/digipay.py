@@ -47,7 +47,11 @@ def _payload_from_callback(request: Request, body: Dict[str, Any] | None) -> Dic
 	return data
 
 
-@router.get("/business/{business_id}/settings")
+@router.get(
+	"/business/{business_id}/settings",
+	summary="تنظیمات دیجی‌پی کسب‌وکار",
+	description="خواندن تنظیمات افزونه پرداخت اعتباری با فیلدهای محرمانه ماسک‌شده. افزونه digipay_credit باید فعال باشد. ابزار MCP: get_digipay_settings.",
+)
 def get_settings(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -61,7 +65,11 @@ def get_settings(
 	return success_response(svc.get_settings(db, business_id, locale=_locale(request)), request)
 
 
-@router.put("/business/{business_id}/settings")
+@router.put(
+	"/business/{business_id}/settings",
+	summary="ذخیره تنظیمات دیجی‌پی",
+	description="به‌روزرسانی محیط sandbox/live، اعتبار درگاه، شخص تسویه، بانک، کارمزد و تحویل خودکار. رمز در پاسخ برنمی‌گردد. ابزار MCP (بدون رمز): update_digipay_settings.",
+)
 def put_settings(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -75,7 +83,11 @@ def put_settings(
 	return success_response(svc.update_settings(db, business_id, payload or {}, locale=_locale(request)), request)
 
 
-@router.post("/business/{business_id}/settings/test")
+@router.post(
+	"/business/{business_id}/settings/test",
+	summary="آزمون اتصال دیجی‌پی",
+	description="اتصال آزمایشی به API دیجی‌پی با اعتبار ذخیره‌شده. ابزار MCP: test_digipay_connection.",
+)
 def post_test_connection(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -88,7 +100,11 @@ def post_test_connection(
 	return success_response(svc.test_connection(db, business_id, locale=_locale(request)), request)
 
 
-@router.post("/business/{business_id}/tickets")
+@router.post(
+	"/business/{business_id}/tickets",
+	summary="صدور تیکت پرداخت اعتباری دیجی‌پی",
+	description="ایجاد تیکت و لینک هدایت مشتری. مبلغ و شماره موبایل الزامی است. callback از base_url ساخته می‌شود. ابزار MCP: create_digipay_ticket.",
+)
 def post_ticket(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -111,7 +127,11 @@ def post_ticket(
 	return success_response(data, request)
 
 
-@router.post("/business/{business_id}/purchases/manual")
+@router.post(
+	"/business/{business_id}/purchases/manual",
+	summary="ثبت خرید دستی دیجی‌پی",
+	description="ابزار MCP: `record_digipay_manual_purchase` (نیازمند تأیید).",
+)
 def post_manual_purchase(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -133,7 +153,11 @@ def post_manual_purchase(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/purchases")
+@router.get(
+	"/business/{business_id}/purchases",
+	summary="لیست خریدهای دیجی‌پی",
+	description="ابزار MCP: `list_digipay_purchases`.",
+)
 def get_purchases(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -164,7 +188,11 @@ def get_purchases(
 	)
 
 
-@router.get("/business/{business_id}/purchases/{purchase_id}")
+@router.get(
+	"/business/{business_id}/purchases/{purchase_id}",
+	summary="جزئیات خرید دیجی‌پی",
+	description="ابزار MCP: `get_digipay_purchase`.",
+)
 def get_purchase(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -181,7 +209,11 @@ def get_purchase(
 	)
 
 
-@router.post("/business/{business_id}/purchases/{purchase_id}/deliver")
+@router.post(
+	"/business/{business_id}/purchases/{purchase_id}/deliver",
+	summary="تحویل خرید دیجی‌پی",
+	description="ابزار MCP: `deliver_digipay_purchase` (نیازمند تأیید).",
+)
 def post_deliver(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -200,7 +232,11 @@ def post_deliver(
 	)
 
 
-@router.post("/business/{business_id}/purchases/{purchase_id}/refund")
+@router.post(
+	"/business/{business_id}/purchases/{purchase_id}/refund",
+	summary="استرداد خرید دیجی‌پی",
+	description="ابزار MCP: `refund_digipay_purchase` (نیازمند تأیید).",
+)
 def post_refund(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -225,7 +261,11 @@ def post_refund(
 	)
 
 
-@router.post("/business/{business_id}/purchases/{purchase_id}/attach-invoice")
+@router.post(
+	"/business/{business_id}/purchases/{purchase_id}/attach-invoice",
+	summary="اتصال خرید دیجی‌پی به فاکتور",
+	description="invoice_id الزامی است. ابزار MCP: attach_digipay_purchase_invoice.",
+)
 def post_attach_invoice(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -254,7 +294,11 @@ def post_attach_invoice(
 	)
 
 
-@router.post("/business/{business_id}/settlements/preview")
+@router.post(
+	"/business/{business_id}/settlements/preview",
+	summary="پیش‌نمایش تسویه دیجی‌پی",
+	description="ابزار MCP: `preview_digipay_settlement`.",
+)
 def post_settlement_preview(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -268,7 +312,11 @@ def post_settlement_preview(
 	return success_response(svc.preview_settlement(db, business_id, payload or {}, locale=_locale(request)), request)
 
 
-@router.post("/business/{business_id}/settlements")
+@router.post(
+	"/business/{business_id}/settlements",
+	summary="ثبت تسویه دیجی‌پی",
+	description="ثبت سند تسویه خریدهای انتخاب‌شده. ابزار MCP: `register_digipay_settlement` (نیازمند تأیید).",
+)
 def post_settlement(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -292,7 +340,11 @@ def post_settlement(
 	)
 
 
-@router.get("/business/{business_id}/settlements")
+@router.get(
+	"/business/{business_id}/settlements",
+	summary="لیست تسویه‌های دیجی‌پی",
+	description="تسویه‌های همین کسب‌وکار. ابزار MCP: list_digipay_settlements.",
+)
 def get_settlements(
 	request: Request,
 	business_id: int = Path(..., gt=0),

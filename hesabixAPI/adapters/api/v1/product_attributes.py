@@ -25,7 +25,11 @@ from adapters.db.models.product_attribute import ProductAttribute
 router = APIRouter(prefix="/product-attributes", tags=["product-attributes"])
 
 
-@router.post("/business/{business_id}")
+@router.post(
+    "/business/{business_id}",
+    summary="ایجاد ویژگی کالا",
+    description="ابزار MCP: `create_product_attribute` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def create_product_attribute(
     request: Request,
@@ -43,7 +47,11 @@ def create_product_attribute(
     )
 
 
-@router.post("/business/{business_id}/search")
+@router.post(
+    "/business/{business_id}/search",
+    summary="جستجوی ویژگی‌های کالا",
+    description="ابزار MCP: `list_product_attributes`.",
+)
 @require_business_access("business_id")
 def search_product_attributes(
     request: Request,
@@ -68,7 +76,11 @@ def search_product_attributes(
     return success_response(data=formatted, request=request)
 
 
-@router.get("/business/{business_id}/{attribute_id}")
+@router.get(
+    "/business/{business_id}/{attribute_id}",
+    summary="جزئیات ویژگی کالا",
+    description="ابزار MCP: `get_product_attribute`.",
+)
 @require_business_access("business_id")
 def get_product_attribute(
     request: Request,
@@ -84,7 +96,11 @@ def get_product_attribute(
     return success_response(data=format_datetime_fields({"item": item}, request), request=request)
 
 
-@router.put("/business/{business_id}/{attribute_id}")
+@router.put(
+    "/business/{business_id}/{attribute_id}",
+    summary="ویرایش ویژگی کالا",
+    description="ابزار MCP: `update_product_attribute` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def update_product_attribute(
     request: Request,
@@ -105,7 +121,11 @@ def update_product_attribute(
     )
 
 
-@router.delete("/business/{business_id}/{attribute_id}")
+@router.delete(
+    "/business/{business_id}/{attribute_id}",
+    summary="حذف ویژگی کالا",
+    description="ابزار MCP: `delete_product_attribute` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def delete_product_attribute(
     request: Request,

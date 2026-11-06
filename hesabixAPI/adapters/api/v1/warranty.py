@@ -31,6 +31,7 @@ router = APIRouter(prefix="/warranty", tags=["warranty"])
 @router.get(
     "/business/{business_id}/settings",
     summary="دریافت تنظیمات گارانتی",
+    description="تنظیمات تولید و فعال‌سازی. ابزار MCP: `get_warranty_settings`.",
 )
 def get_settings_endpoint(
     request: Request,
@@ -49,6 +50,7 @@ def get_settings_endpoint(
 @router.put(
     "/business/{business_id}/settings",
     summary="به‌روزرسانی تنظیمات گارانتی",
+    description="ذخیره تنظیمات افزونه گارانتی. ابزار MCP: `update_warranty_settings` (نیازمند تأیید).",
 )
 def update_settings_endpoint(
     request: Request,
@@ -70,6 +72,7 @@ def update_settings_endpoint(
 @router.post(
     "/business/{business_id}/generate",
     summary="تولید انبوه کدهای گارانتی",
+    description="تولید کد برای یک کالا. ابزار MCP: `generate_warranty_codes` (نیازمند تأیید، حداکثر ۵۰).",
 )
 def generate_codes_endpoint(
     request: Request,
@@ -102,6 +105,7 @@ def generate_codes_endpoint(
 @router.get(
     "/business/{business_id}/codes",
     summary="لیست کدهای گارانتی",
+    description="فهرست کدها با فیلتر. ابزار MCP: `list_warranty_codes`.",
 )
 def list_codes_endpoint(
     request: Request,
@@ -123,7 +127,8 @@ def list_codes_endpoint(
 
 @router.get(
     "/business/{business_id}/codes/person/{person_id}",
-    summary="لیست کدهای گارانتی یک Person",
+    summary="لیست کدهای گارانتی یک شخص",
+    description="کدهای گارانتی یک مشتری. ابزار MCP: `list_warranty_codes_by_person`.",
 )
 def list_codes_by_person_endpoint(
     request: Request,
@@ -155,6 +160,7 @@ def list_codes_by_person_endpoint(
 @router.post(
     "/public/activate/{business_id}",
     summary="فعال‌سازی گارانتی (عمومی - بدون نیاز به احراز هویت)",
+    description="مسیر عمومی بدون نشست MCP است و در MCP ثبت نشده.",
 )
 def activate_public_endpoint(
     request: Request,
@@ -193,6 +199,7 @@ def activate_public_endpoint(
 @router.get(
     "/public/track/{code_or_serial}",
     summary="رهگیری گارانتی (عمومی)",
+    description="مسیر عمومی است و در MCP ثبت نشده. JSON داخلی: `list_warranty_codes`.",
 )
 def track_public_endpoint(
     request: Request,
@@ -208,6 +215,7 @@ def track_public_endpoint(
 @router.get(
     "/public/track/link/{link_code}",
     summary="رهگیری گارانتی از طریق لینک یکتا",
+    description="مسیر عمومی است و در MCP ثبت نشده.",
 )
 def track_by_link_endpoint(
     request: Request,
@@ -222,6 +230,7 @@ def track_by_link_endpoint(
 @router.get(
     "/public/business/{business_id}/info",
     summary="دریافت اطلاعات عمومی کسب و کار برای صفحه فعال‌سازی",
+    description="مسیر عمومی است و در MCP ثبت نشده.",
 )
 def get_business_public_info_endpoint(
     request: Request,
@@ -264,6 +273,7 @@ def get_business_public_info_endpoint(
 @router.get(
     "/public/check/{business_id}/{code}",
     summary="بررسی وضعیت کد گارانتی (عمومی)",
+    description="مسیر عمومی است و در MCP ثبت نشده.",
 )
 def check_warranty_endpoint(
     request: Request,
@@ -309,6 +319,7 @@ def check_warranty_endpoint(
 @router.delete(
     "/business/{business_id}/codes/{code_id}",
     summary="حذف یک کد گارانتی",
+    description="حذف ایمن یک کد. ابزار MCP: `delete_warranty_code` (نیازمند تأیید).",
 )
 def delete_code_endpoint(
     request: Request,
@@ -335,6 +346,7 @@ def delete_code_endpoint(
 @router.post(
     "/business/{business_id}/codes/bulk-delete",
     summary="حذف گروهی کدهای گارانتی",
+    description="حذف گروهی. ابزار MCP: `bulk_delete_warranty_codes` (نیازمند تأیید، حداکثر ۵۰).",
 )
 def delete_codes_bulk_endpoint(
     request: Request,

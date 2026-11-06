@@ -32,7 +32,11 @@ def _fmt(request: Request, data: Any) -> Any:
 	return format_datetime_fields(data, request)
 
 
-@router.get("/businesses/{business_id}/chat/crm-settings")
+@router.get(
+	"/businesses/{business_id}/chat/crm-settings",
+	summary="تنظیمات چت وب CRM",
+	description="مجوز آپلود فایل و پیام صوتی ویجت چت وب. ابزار MCP: get_crm_web_chat_settings.",
+)
 @require_business_access("business_id")
 async def get_crm_business_settings(
 	request: Request,
@@ -45,7 +49,11 @@ async def get_crm_business_settings(
 	return success_response(data=_fmt(request, chat_svc.business_crm_settings_to_dict(s)), request=request)
 
 
-@router.patch("/businesses/{business_id}/chat/crm-settings")
+@router.patch(
+	"/businesses/{business_id}/chat/crm-settings",
+	summary="ویرایش تنظیمات چت وب CRM",
+	description="فعال/غیرفعال کردن آپلود فایل و ویس. ابزار MCP: update_crm_web_chat_settings.",
+)
 @require_business_access("business_id")
 async def patch_crm_business_settings(
 	request: Request,
@@ -64,7 +72,11 @@ async def patch_crm_business_settings(
 	return success_response(data=_fmt(request, chat_svc.business_crm_settings_to_dict(s)), request=request, message="CRM_CHAT_SETTINGS_SAVED")
 
 
-@router.get("/businesses/{business_id}/chat/widgets")
+@router.get(
+	"/businesses/{business_id}/chat/widgets",
+	summary="لیست ویجت‌های چت وب",
+	description="ویجت‌ها شامل public_key برای جاسازی. ابزار MCP: list_crm_chat_widgets.",
+)
 @require_business_access("business_id")
 async def list_chat_widgets(
 	request: Request,
@@ -77,7 +89,11 @@ async def list_chat_widgets(
 	return success_response(data={"items": [_fmt(request, chat_svc.widget_to_dict(w)) for w in rows]}, request=request)
 
 
-@router.post("/businesses/{business_id}/chat/widgets")
+@router.post(
+	"/businesses/{business_id}/chat/widgets",
+	summary="ایجاد ویجت چت وب",
+	description="ویجت جدید با مبدأهای مجاز. ابزار MCP: create_crm_chat_widget.",
+)
 @require_business_access("business_id")
 async def create_chat_widget(
 	request: Request,
@@ -98,7 +114,11 @@ async def create_chat_widget(
 	return success_response(data=_fmt(request, chat_svc.widget_to_dict(w)), request=request, message="CRM_CHAT_WIDGET_CREATED")
 
 
-@router.patch("/businesses/{business_id}/chat/widgets/{widget_id}")
+@router.patch(
+	"/businesses/{business_id}/chat/widgets/{widget_id}",
+	summary="ویرایش ویجت چت وب",
+	description="ابزار MCP: `update_crm_chat_widget` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 async def update_chat_widget(
 	request: Request,
@@ -121,7 +141,11 @@ async def update_chat_widget(
 	return success_response(data=_fmt(request, chat_svc.widget_to_dict(w)), request=request, message="CRM_CHAT_WIDGET_UPDATED")
 
 
-@router.get("/businesses/{business_id}/chat/conversations")
+@router.get(
+	"/businesses/{business_id}/chat/conversations",
+	summary="لیست گفتگوهای چت وب",
+	description="ابزار MCP: `list_crm_chat_conversations`.",
+)
 @require_business_access("business_id")
 async def list_chat_conversations(
 	request: Request,
@@ -143,7 +167,11 @@ async def list_chat_conversations(
 	)
 
 
-@router.delete("/businesses/{business_id}/chat/conversations")
+@router.delete(
+	"/businesses/{business_id}/chat/conversations",
+	summary="حذف گروهی گفتگوهای چت وب",
+	description="ابزار MCP: `delete_crm_chat_conversations_bulk` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 async def delete_chat_conversations_bulk(
 	request: Request,
@@ -165,7 +193,11 @@ async def delete_chat_conversations_bulk(
 	return success_response(data=_fmt(request, data), request=request, message="CRM_CHAT_CONVERSATIONS_BULK_DELETED")
 
 
-@router.delete("/businesses/{business_id}/chat/conversations/{conversation_id}")
+@router.delete(
+	"/businesses/{business_id}/chat/conversations/{conversation_id}",
+	summary="حذف یک گفتگوی چت وب",
+	description="ابزار MCP: `delete_crm_chat_conversation` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 async def delete_chat_conversation_one(
 	request: Request,
@@ -182,7 +214,11 @@ async def delete_chat_conversation_one(
 	return success_response(data=_fmt(request, data), request=request, message="CRM_CHAT_CONVERSATION_DELETED")
 
 
-@router.get("/businesses/{business_id}/chat/conversations/{conversation_id}/messages")
+@router.get(
+	"/businesses/{business_id}/chat/conversations/{conversation_id}/messages",
+	summary="پیام‌های گفتگوی چت وب",
+	description="ابزار MCP: `list_crm_chat_messages`.",
+)
 @require_business_access("business_id")
 async def list_chat_messages_agent(
 	request: Request,
@@ -205,7 +241,11 @@ async def list_chat_messages_agent(
 	)
 
 
-@router.post("/businesses/{business_id}/chat/conversations/{conversation_id}/read")
+@router.post(
+	"/businesses/{business_id}/chat/conversations/{conversation_id}/read",
+	summary="علامت خوانده‌شده چت وب",
+	description="ابزار MCP: `mark_crm_chat_read` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 async def post_chat_conversation_read(
 	request: Request,
@@ -229,7 +269,11 @@ async def post_chat_conversation_read(
 	return success_response(data=_fmt(request, data), request=request, message="")
 
 
-@router.post("/businesses/{business_id}/chat/conversations/{conversation_id}/messages")
+@router.post(
+	"/businesses/{business_id}/chat/conversations/{conversation_id}/messages",
+	summary="ارسال پیام عامل چت وب",
+	description="ابزار MCP: `send_crm_chat_agent_message` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 async def post_chat_message_agent(
 	request: Request,
@@ -268,7 +312,9 @@ async def post_chat_message_agent(
 
 
 @router.patch(
-	"/businesses/{business_id}/chat/conversations/{conversation_id}/messages/{message_id}"
+	"/businesses/{business_id}/chat/conversations/{conversation_id}/messages/{message_id}",
+	summary="ویرایش پیام عامل چت وب",
+	description="ابزار MCP: `update_crm_chat_agent_message` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def patch_chat_message_agent(
@@ -295,7 +341,9 @@ async def patch_chat_message_agent(
 
 
 @router.delete(
-	"/businesses/{business_id}/chat/conversations/{conversation_id}/messages/{message_id}"
+	"/businesses/{business_id}/chat/conversations/{conversation_id}/messages/{message_id}",
+	summary="حذف پیام چت وب",
+	description="حذف نرم پیام عامل/مشتری. ابزار MCP: `delete_crm_chat_message` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def delete_chat_message(
@@ -314,7 +362,11 @@ async def delete_chat_message(
 	return success_response(data=_fmt(request, data), request=request, message="CRM_CHAT_MESSAGE_DELETED")
 
 
-@router.patch("/businesses/{business_id}/chat/conversations/{conversation_id}")
+@router.patch(
+	"/businesses/{business_id}/chat/conversations/{conversation_id}",
+	summary="ویرایش گفتگوی چت وب",
+	description="ابزار MCP: `update_crm_chat_conversation` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 async def patch_chat_conversation(
 	request: Request,

@@ -22,7 +22,7 @@ router = APIRouter(prefix="/kardex", tags=["گزارش‌ها", "انباردا�
 @router.post(
     "/businesses/{business_id}/lines",
     summary="لیست کاردکس (خطوط اسناد)",
-    description="دریافت خطوط اسناد مرتبط با انتخاب‌های چندگانه موجودیت‌ها با فیلتر تاریخ",
+    description="دریافت خطوط اسناد مرتبط با انتخاب‌های چندگانه موجودیت‌ها با فیلتر تاریخ. ابزار MCP: `list_kardex_document_lines`.",
 )
 @require_business_access("business_id")
 async def list_kardex_lines_endpoint(
@@ -75,7 +75,7 @@ async def list_kardex_lines_endpoint(
 @router.post(
     "/businesses/{business_id}/lines/export/excel",
     summary="خروجی Excel کاردکس",
-    description="خروجی اکسل از لیست خطوط کاردکس با فیلترهای اعمال‌شده",
+    description="خروجی باینری Excel است و در MCP ثبت نشده.",
 )
 @require_business_access("business_id")
 async def export_kardex_excel_endpoint(
@@ -322,7 +322,7 @@ async def export_kardex_excel_endpoint(
 @router.post(
     "/businesses/{business_id}/lines/export/pdf",
     summary="خروجی PDF کاردکس",
-    description="خروجی PDF از لیست خطوط کاردکس با فیلترهای اعمال‌شده",
+    description="خروجی باینری PDF است و در MCP ثبت نشده.",
 )
 @require_business_access("business_id")
 async def export_kardex_pdf_endpoint(

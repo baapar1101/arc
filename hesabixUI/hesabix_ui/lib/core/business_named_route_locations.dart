@@ -18,6 +18,7 @@ abstract final class BusinessNamedRoutes {
     'business_cash_box': 'cash-box',
     'business_wallet': 'wallet',
     'business_ai_chat': 'ai/chat',
+    'business_ai_mcp_connections': 'ai/mcp-connections',
     'business_ai_subscription': 'ai/subscription',
     'business_ai_provider_settings': 'settings/ai-provider',
     'business_ai_usage': 'ai/usage',

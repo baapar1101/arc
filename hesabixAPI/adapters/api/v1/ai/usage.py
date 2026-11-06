@@ -14,7 +14,7 @@ from app.services.ai.ai_invoice_service import pay_ai_invoice_from_wallet
 router = APIRouter(prefix="/ai/usage", tags=["ai-usage"])
 
 
-@router.get("/stats", summary="آمار استفاده از AI")
+@router.get("/stats", summary="آمار استفاده از هوش مصنوعی کسب‌وکار", description="ابزار MCP: `list_ai_usage_logs`.")
 async def get_usage_stats(
     request: Request,
     business_id: Optional[int] = None,
@@ -117,7 +117,11 @@ async def get_usage_stats(
     }, request)
 
 
-@router.get("/logs", summary="لاگ استفاده از AI")
+@router.get(
+    "/logs",
+    summary="لاگ مصرف توکن هوش مصنوعی کسب‌وکار",
+    description="ردیف‌های مصرف توکن همین کسب‌وکار با فیلتر تاریخ؛ بدون کلید ارائه‌دهنده. فقط مالک یا superadmin. ابزار MCP: list_ai_usage_logs.",
+)
 async def get_usage_logs(
     request: Request,
     business_id: Optional[int] = None,
@@ -174,7 +178,7 @@ async def get_usage_logs(
     return success_response(result, request)
 
 
-@router.post("/logs/table", summary="جدول لاگ استفاده از AI")
+@router.post("/logs/table", summary="جدول لاگ استفاده از AI", description="ابزار MCP: `list_ai_usage_logs`.")
 async def get_usage_logs_table(
     request: Request,
     payload: Dict[str, Any] = Body(...),
@@ -277,7 +281,11 @@ async def get_usage_logs_table(
     return success_response(data, request)
 
 
-@router.post("/daily/table", summary="آمار روزانه AI به صورت جدول")
+@router.post(
+    "/daily/table",
+    summary="آمار روزانه AI به صورت جدول",
+    description="مصرف روزانه توکن. در MCP از `get_ai_usage_stats` (فیلد daily) استفاده شود.",
+)
 async def get_daily_usage_table(
     request: Request,
     payload: Dict[str, Any] = Body(...),
@@ -442,7 +450,7 @@ async def get_daily_usage_table(
     return success_response(data, request)
 
 
-@router.get("/invoices", summary="لیست فاکتورهای AI")
+@router.get("/invoices", summary="لیست فاکتورهای AI", description="ابزار MCP: `list_ai_invoices`.")
 async def get_ai_invoices(
     request: Request,
     business_id: Optional[int] = None,
@@ -489,7 +497,11 @@ async def get_ai_invoices(
     return success_response(result, request)
 
 
-@router.get("/invoices/{invoice_id}", summary="جزئیات فاکتور AI")
+@router.get(
+    "/invoices/{invoice_id}",
+    summary="جزئیات صورتحساب هوش مصنوعی",
+    description="جزئیات یک فاکتور AI متعلق به کسب‌وکار؛ بدون کلید ارائه‌دهنده. ابزار MCP: get_ai_invoice.",
+)
 async def get_ai_invoice_details(
     invoice_id: int = Path(...),
     request: Request = None,
@@ -526,7 +538,7 @@ async def get_ai_invoice_details(
 @router.post(
     "/invoices/{invoice_id}/pay",
     summary="پرداخت صورتحساب AI از کیف پول",
-    description="برای فاکتورهای در وضعیت issued (مثلاً قبل از اصلاح خودکار subscribe)",
+    description="ابزار MCP: `pay_ai_invoice` (نیازمند تأیید). برای فاکتورهای issued.",
 )
 async def post_pay_ai_invoice(
     request: Request,

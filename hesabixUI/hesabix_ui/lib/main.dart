@@ -303,6 +303,7 @@ import 'pages/admin/zohal_settings_page.dart';
 import 'pages/admin/zohal_services_admin_page.dart';
 import 'pages/admin/zohal_statistics_page.dart';
 import 'pages/business/ai_chat_page.dart';
+import 'pages/business/ai_mcp_connections_page.dart';
 import 'pages/business/ai_subscription_page.dart';
 import 'pages/business/ai_usage_page.dart';
 import 'pages/business/zohal_inquiries_page.dart';
@@ -642,6 +643,11 @@ class _MyAppState extends State<MyApp> {
       CashRegistersPage(businessId: dummyBusinessId, authStore: authStore);
       WalletPage(businessId: dummyBusinessId, authStore: authStore);
       AISubscriptionPage(businessId: dummyBusinessId, authStore: authStore);
+      AiMcpConnectionsPage(
+        businessId: dummyBusinessId,
+        authStore: authStore,
+        calendarController: calendarController,
+      );
       AIUsagePage(businessId: dummyBusinessId, authStore: authStore);
       ZohalInquiriesPage(businessId: dummyBusinessId, authStore: authStore);
       InvoicesListPage(
@@ -2673,6 +2679,22 @@ class _MyAppState extends State<MyApp> {
                                   authStore: _authStore!,
                                   calendarController: _calendarController,
                                   initialSessionId: sessionId,
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'ai/mcp-connections',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                AiMcpConnectionsPage(
+                                  businessId: businessId,
+                                  authStore: _authStore!,
+                                  calendarController: _calendarController,
                                 ),
                               );
                             },

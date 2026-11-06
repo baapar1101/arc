@@ -20,7 +20,11 @@ def _fa_response(data: Any, request: Request, **kwargs) -> dict:
 	return success_response(format_datetime_fields(data, request), request, **kwargs)
 
 
-@router.get("/business/{business_id}/settings")
+@router.get(
+	"/business/{business_id}/settings",
+	summary="تنظیمات دارایی ثابت",
+	description="ابزار MCP: `get_fixed_asset_settings`.",
+)
 def get_settings_endpoint(
 	request: Request,
 	business_id: int,
@@ -33,7 +37,11 @@ def get_settings_endpoint(
 	return _fa_response(svc.get_settings(db, business_id), request)
 
 
-@router.put("/business/{business_id}/settings")
+@router.put(
+	"/business/{business_id}/settings",
+	summary="ویرایش تنظیمات دارایی ثابت",
+	description="ابزار MCP: `update_fixed_asset_settings` (نیازمند تأیید).",
+)
 def update_settings_endpoint(
 	request: Request,
 	business_id: int,
@@ -47,7 +55,11 @@ def update_settings_endpoint(
 	return _fa_response(svc.update_settings(db, business_id, payload, user_id=ctx.get_user_id()), request)
 
 
-@router.get("/business/{business_id}/dashboard")
+@router.get(
+	"/business/{business_id}/dashboard",
+	summary="داشبورد دارایی ثابت",
+	description="ابزار MCP: `get_fixed_assets_dashboard`.",
+)
 def dashboard_endpoint(
 	request: Request,
 	business_id: int,
@@ -60,7 +72,11 @@ def dashboard_endpoint(
 	return _fa_response(svc.get_dashboard(db, business_id), request)
 
 
-@router.get("/business/{business_id}/classes")
+@router.get(
+	"/business/{business_id}/classes",
+	summary="طبقات دارایی ثابت",
+	description="ابزار MCP: `list_fixed_asset_classes`.",
+)
 def list_classes_endpoint(
 	request: Request,
 	business_id: int,
@@ -75,7 +91,11 @@ def list_classes_endpoint(
 	return _fa_response({"items": items}, request)
 
 
-@router.put("/business/{business_id}/classes/{class_id}")
+@router.put(
+	"/business/{business_id}/classes/{class_id}",
+	summary="ویرایش طبقه دارایی ثابت",
+	description="ابزار MCP: `update_fixed_asset_class` (نیازمند تأیید).",
+)
 def update_class_endpoint(
 	request: Request,
 	business_id: int,
@@ -90,7 +110,11 @@ def update_class_endpoint(
 	return _fa_response(svc.update_class(db, business_id, class_id, payload, user_id=ctx.get_user_id()), request)
 
 
-@router.get("/business/{business_id}/locations")
+@router.get(
+	"/business/{business_id}/locations",
+	summary="محل استقرار دارایی",
+	description="ابزار MCP: `list_fixed_asset_locations`.",
+)
 def list_locations_endpoint(
 	request: Request,
 	business_id: int,
@@ -105,7 +129,11 @@ def list_locations_endpoint(
 	return _fa_response({"items": items}, request)
 
 
-@router.post("/business/{business_id}/locations")
+@router.post(
+	"/business/{business_id}/locations",
+	summary="ایجاد محل استقرار دارایی",
+	description="ابزار MCP: `create_fixed_asset_location` (نیازمند تأیید).",
+)
 def create_location_endpoint(
 	request: Request,
 	business_id: int,
@@ -119,7 +147,11 @@ def create_location_endpoint(
 	return _fa_response(svc.create_location(db, business_id, payload, user_id=ctx.get_user_id()), request)
 
 
-@router.put("/business/{business_id}/locations/{location_id}")
+@router.put(
+	"/business/{business_id}/locations/{location_id}",
+	summary="ویرایش محل استقرار دارایی",
+	description="ابزار MCP: `update_fixed_asset_location` (نیازمند تأیید).",
+)
 def update_location_endpoint(
 	request: Request,
 	business_id: int,
@@ -137,7 +169,11 @@ def update_location_endpoint(
 	)
 
 
-@router.get("/business/{business_id}/assets")
+@router.get(
+	"/business/{business_id}/assets",
+	summary="فهرست دارایی‌های ثابت",
+	description="ابزار MCP: `list_fixed_assets`.",
+)
 def list_assets_endpoint(
 	request: Request,
 	business_id: int,
@@ -168,7 +204,11 @@ def list_assets_endpoint(
 	)
 
 
-@router.post("/business/{business_id}/assets")
+@router.post(
+	"/business/{business_id}/assets",
+	summary="ثبت دارایی ثابت",
+	description="ابزار MCP: `create_fixed_asset` (نیازمند تأیید).",
+)
 def create_asset_endpoint(
 	request: Request,
 	business_id: int,
@@ -182,7 +222,11 @@ def create_asset_endpoint(
 	return _fa_response(svc.create_asset(db, business_id, payload, user_id=ctx.get_user_id()), request)
 
 
-@router.get("/business/{business_id}/assets/{asset_id}")
+@router.get(
+	"/business/{business_id}/assets/{asset_id}",
+	summary="جزئیات دارایی ثابت",
+	description="ابزار MCP: `get_fixed_asset`.",
+)
 def get_asset_endpoint(
 	request: Request,
 	business_id: int,
@@ -196,7 +240,11 @@ def get_asset_endpoint(
 	return _fa_response(svc.get_asset(db, business_id, asset_id), request)
 
 
-@router.put("/business/{business_id}/assets/{asset_id}")
+@router.put(
+	"/business/{business_id}/assets/{asset_id}",
+	summary="ویرایش دارایی ثابت",
+	description="ابزار MCP: `update_fixed_asset` (نیازمند تأیید).",
+)
 def update_asset_endpoint(
 	request: Request,
 	business_id: int,
@@ -211,7 +259,11 @@ def update_asset_endpoint(
 	return _fa_response(svc.update_asset(db, business_id, asset_id, payload, user_id=ctx.get_user_id()), request)
 
 
-@router.delete("/business/{business_id}/assets/{asset_id}")
+@router.delete(
+	"/business/{business_id}/assets/{asset_id}",
+	summary="حذف دارایی پیش‌نویس",
+	description="ابزار MCP: `delete_fixed_asset` (نیازمند تأیید).",
+)
 def delete_asset_endpoint(
 	request: Request,
 	business_id: int,
@@ -225,7 +277,11 @@ def delete_asset_endpoint(
 	return _fa_response(svc.delete_asset(db, business_id, asset_id), request)
 
 
-@router.post("/business/{business_id}/assets/{asset_id}/capitalize")
+@router.post(
+	"/business/{business_id}/assets/{asset_id}/capitalize",
+	summary="سرمایه‌گذاری دارایی ثابت",
+	description="ابزار MCP: `capitalize_fixed_asset` (نیازمند تأیید).",
+)
 def capitalize_asset_endpoint(
 	request: Request,
 	business_id: int,
@@ -243,7 +299,11 @@ def capitalize_asset_endpoint(
 	)
 
 
-@router.post("/business/{business_id}/assets/{asset_id}/idle")
+@router.post(
+	"/business/{business_id}/assets/{asset_id}/idle",
+	summary="رکود دارایی ثابت",
+	description="ابزار MCP: `set_fixed_asset_idle` (نیازمند تأیید).",
+)
 def set_idle_endpoint(
 	request: Request,
 	business_id: int,
@@ -261,7 +321,11 @@ def set_idle_endpoint(
 	)
 
 
-@router.post("/business/{business_id}/assets/{asset_id}/resume")
+@router.post(
+	"/business/{business_id}/assets/{asset_id}/resume",
+	summary="خروج از رکود دارایی",
+	description="ابزار MCP: `resume_fixed_asset` (نیازمند تأیید).",
+)
 def resume_asset_endpoint(
 	request: Request,
 	business_id: int,
@@ -275,7 +339,11 @@ def resume_asset_endpoint(
 	return _fa_response(svc.resume_asset(db, business_id, asset_id, user_id=ctx.get_user_id()), request)
 
 
-@router.post("/business/{business_id}/assets/{asset_id}/dispose")
+@router.post(
+	"/business/{business_id}/assets/{asset_id}/dispose",
+	summary="خروج یا اسقاط دارایی",
+	description="ابزار MCP: `dispose_fixed_asset` (نیازمند تأیید).",
+)
 def dispose_asset_endpoint(
 	request: Request,
 	business_id: int,
@@ -293,7 +361,11 @@ def dispose_asset_endpoint(
 	)
 
 
-@router.post("/business/{business_id}/assets/{asset_id}/subsequent-expenditure")
+@router.post(
+	"/business/{business_id}/assets/{asset_id}/subsequent-expenditure",
+	summary="مخارج بعدی دارایی",
+	description="ابزار MCP: `post_fixed_asset_expenditure` (نیازمند تأیید).",
+)
 def subsequent_expenditure_endpoint(
 	request: Request,
 	business_id: int,
@@ -311,7 +383,11 @@ def subsequent_expenditure_endpoint(
 	)
 
 
-@router.post("/business/{business_id}/assets/{asset_id}/estimate-change")
+@router.post(
+	"/business/{business_id}/assets/{asset_id}/estimate-change",
+	summary="تغییر برآورد دارایی",
+	description="ابزار MCP: `change_fixed_asset_estimate` (نیازمند تأیید).",
+)
 def estimate_change_endpoint(
 	request: Request,
 	business_id: int,
@@ -329,7 +405,11 @@ def estimate_change_endpoint(
 	)
 
 
-@router.get("/business/{business_id}/depreciation-runs")
+@router.get(
+	"/business/{business_id}/depreciation-runs",
+	summary="فهرست اجرای استهلاک",
+	description="ابزار MCP: `list_fixed_asset_depreciation_runs`.",
+)
 def list_runs_endpoint(
 	request: Request,
 	business_id: int,
@@ -344,7 +424,11 @@ def list_runs_endpoint(
 	return _fa_response(svc.list_depreciation_runs(db, business_id, limit=limit, skip=skip), request)
 
 
-@router.post("/business/{business_id}/depreciation-runs")
+@router.post(
+	"/business/{business_id}/depreciation-runs",
+	summary="ایجاد اجرای استهلاک",
+	description="ابزار MCP: `create_fixed_asset_depreciation_run` (نیازمند تأیید).",
+)
 def create_run_endpoint(
 	request: Request,
 	business_id: int,
@@ -358,7 +442,11 @@ def create_run_endpoint(
 	return _fa_response(svc.create_depreciation_run(db, business_id, payload, user_id=ctx.get_user_id()), request)
 
 
-@router.get("/business/{business_id}/depreciation-runs/{run_id}")
+@router.get(
+	"/business/{business_id}/depreciation-runs/{run_id}",
+	summary="جزئیات اجرای استهلاک",
+	description="ابزار MCP: `get_fixed_asset_depreciation_run`.",
+)
 def get_run_endpoint(
 	request: Request,
 	business_id: int,
@@ -372,7 +460,11 @@ def get_run_endpoint(
 	return _fa_response(svc.get_depreciation_run(db, business_id, run_id), request)
 
 
-@router.post("/business/{business_id}/depreciation-runs/{run_id}/post")
+@router.post(
+	"/business/{business_id}/depreciation-runs/{run_id}/post",
+	summary="ثبت قطعی استهلاک",
+	description="ابزار MCP: `post_fixed_asset_depreciation_run` (نیازمند تأیید).",
+)
 def post_run_endpoint(
 	request: Request,
 	business_id: int,
@@ -386,7 +478,11 @@ def post_run_endpoint(
 	return _fa_response(svc.post_depreciation_run(db, business_id, run_id, user_id=ctx.get_user_id()), request)
 
 
-@router.delete("/business/{business_id}/depreciation-runs/{run_id}")
+@router.delete(
+	"/business/{business_id}/depreciation-runs/{run_id}",
+	summary="حذف پیش‌نویس استهلاک",
+	description="ابزار MCP: `delete_fixed_asset_depreciation_run` (نیازمند تأیید).",
+)
 def delete_run_endpoint(
 	request: Request,
 	business_id: int,
@@ -400,7 +496,11 @@ def delete_run_endpoint(
 	return _fa_response(svc.delete_depreciation_run(db, business_id, run_id), request)
 
 
-@router.get("/business/{business_id}/reports/{kind}")
+@router.get(
+	"/business/{business_id}/reports/{kind}",
+	summary="گزارش دارایی ثابت",
+	description="ابزار MCP: `get_fixed_asset_report`.",
+)
 def fixed_asset_report_endpoint(
 	request: Request,
 	business_id: int,

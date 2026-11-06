@@ -28,6 +28,7 @@ def _map_validation(err: ValueError) -> None:
 @router.get(
 	"",
 	summary="لیست شرح‌های پرتکرار کسب‌وکار",
+	description="ابزار MCP: `list_frequent_descriptions`.",
 )
 def list_frequent_descriptions(
 	request: Request,
@@ -44,6 +45,7 @@ def list_frequent_descriptions(
 @router.post(
 	"",
 	summary="افزودن شرح پرتکرار",
+	description="ابزار MCP: `create_frequent_description` (نیازمند تأیید).",
 )
 def create_frequent_description(
 	request: Request,
@@ -72,6 +74,7 @@ def create_frequent_description(
 @router.patch(
 	"/{row_id}",
 	summary="ویرایش شرح پرتکرار",
+	description="ابزار MCP: `update_frequent_description` (نیازمند تأیید).",
 )
 def update_frequent_description(
 	request: Request,
@@ -100,6 +103,7 @@ def update_frequent_description(
 @router.delete(
 	"/{row_id}",
 	summary="حذف شرح پرتکرار",
+	description="ابزار MCP: `delete_frequent_description` (نیازمند تأیید).",
 )
 def delete_frequent_description(
 	request: Request,

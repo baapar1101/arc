@@ -30,7 +30,11 @@ from adapters.db.models.price_list import PriceList
 router = APIRouter(prefix="/price-lists", tags=["price-lists"])
 
 
-@router.post("/business/{business_id}")
+@router.post(
+    "/business/{business_id}",
+    summary="ایجاد لیست قیمت",
+    description="ابزار MCP: `create_price_list` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def create_price_list_endpoint(
     request: Request,
@@ -44,7 +48,11 @@ def create_price_list_endpoint(
     return success_response(data=format_datetime_fields(result["data"], request), request=request, message=result.get("message"))
 
 
-@router.post("/business/{business_id}/search")
+@router.post(
+    "/business/{business_id}/search",
+    summary="جستجوی لیست قیمت",
+    description="ابزار MCP: `list_price_lists`.",
+)
 @require_business_access("business_id")
 def search_price_lists_endpoint(
     request: Request,
@@ -65,7 +73,11 @@ def search_price_lists_endpoint(
     return success_response(data=format_datetime_fields(result, request), request=request)
 
 
-@router.get("/business/{business_id}/{price_list_id}")
+@router.get(
+    "/business/{business_id}/{price_list_id}",
+    summary="جزئیات لیست قیمت",
+    description="ابزار MCP: `get_price_list`.",
+)
 @require_business_access("business_id")
 def get_price_list_endpoint(
     request: Request,
@@ -81,7 +93,11 @@ def get_price_list_endpoint(
     return success_response(data=format_datetime_fields({"item": item}, request), request=request)
 
 
-@router.put("/business/{business_id}/{price_list_id}")
+@router.put(
+    "/business/{business_id}/{price_list_id}",
+    summary="ویرایش لیست قیمت",
+    description="ابزار MCP: `update_price_list` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def update_price_list_endpoint(
     request: Request,
@@ -98,7 +114,11 @@ def update_price_list_endpoint(
     return success_response(data=format_datetime_fields(result["data"], request), request=request, message=result.get("message"))
 
 
-@router.delete("/business/{business_id}/{price_list_id}")
+@router.delete(
+    "/business/{business_id}/{price_list_id}",
+    summary="حذف لیست قیمت",
+    description="ابزار MCP: `delete_price_list` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def delete_price_list_endpoint(
     request: Request,
@@ -112,7 +132,11 @@ def delete_price_list_endpoint(
     return success_response({"deleted": ok}, request)
 
 
-@router.post("/business/{business_id}/{price_list_id}/items")
+@router.post(
+    "/business/{business_id}/{price_list_id}/items",
+    summary="ثبت یا به‌روزرسانی قلم لیست قیمت",
+    description="ابزار MCP: `upsert_price_list_item` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def upsert_price_item_endpoint(
     request: Request,
@@ -127,7 +151,11 @@ def upsert_price_item_endpoint(
     return success_response(data=format_datetime_fields(result["data"], request), request=request, message=result.get("message"))
 
 
-@router.get("/business/{business_id}/{price_list_id}/items")
+@router.get(
+    "/business/{business_id}/{price_list_id}/items",
+    summary="اقلام لیست قیمت",
+    description="ابزار MCP: `list_price_list_items`.",
+)
 @require_business_access("business_id")
 def list_price_items_endpoint(
     request: Request,
@@ -143,7 +171,11 @@ def list_price_items_endpoint(
     return success_response(data=format_datetime_fields(result, request), request=request)
 
 
-@router.delete("/business/{business_id}/items/{item_id}")
+@router.delete(
+    "/business/{business_id}/items/{item_id}",
+    summary="حذف قلم لیست قیمت",
+    description="ابزار MCP: `delete_price_list_item` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def delete_price_item_endpoint(
     request: Request,

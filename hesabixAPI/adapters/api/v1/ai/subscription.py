@@ -56,7 +56,7 @@ def _build_subscription_response(subscription, request):
     }, request)
 
 
-@router.get("", summary="دریافت اشتراک فعلی")
+@router.get("", summary="دریافت اشتراک فعلی هوش مصنوعی", description="ابزار MCP: `get_ai_subscription`. کلید ارائه‌دهنده برگردانده نمی‌شود.")
 async def get_subscription(
     request: Request,
     business_id: Optional[int] = None,
@@ -79,7 +79,7 @@ async def get_subscription(
     return _build_subscription_response(subscription, request)
 
 
-@router.get("/plans", summary="لیست پلن‌های فعال (عمومی)")
+@router.get("/plans", summary="لیست پلن‌های فعال هوش مصنوعی", description="ابزار MCP: `list_ai_plans`.")
 async def list_public_plans(
     request: Request,
     business_id: Optional[int] = None,
@@ -114,7 +114,11 @@ async def list_public_plans(
     )
 
 
-@router.put("/preferred-model", summary="تنظیم مدل ترجیحی")
+@router.put(
+    "/preferred-model",
+    summary="تنظیم مدل ترجیحی",
+    description="ابزار MCP: `set_ai_preferred_model` (نیازمند تأیید).",
+)
 async def set_preferred_model(
     request: Request,
     model_code: str = Body(..., embed=True),
@@ -163,7 +167,11 @@ async def set_preferred_model(
     )
 
 
-@router.get("/current", summary="دریافت اشتراک فعلی (alias)")
+@router.get(
+    "/current",
+    summary="دریافت اشتراک فعلی (alias)",
+    description="ابزار MCP: `get_ai_subscription`.",
+)
 async def get_subscription_current(
     request: Request,
     business_id: Optional[int] = None,
@@ -186,7 +194,11 @@ async def get_subscription_current(
     return _build_subscription_response(subscription, request)
 
 
-@router.post("/subscribe", summary="اشتراک به پلن")
+@router.post(
+    "/subscribe",
+    summary="اشتراک به پلن",
+    description="ابزار MCP: `subscribe_ai_plan` (نیازمند تأیید).",
+)
 async def subscribe_to_plan_endpoint(
     request: Request,
     plan_id: int = Body(..., embed=True),
@@ -246,7 +258,11 @@ async def subscribe_to_plan_endpoint(
     return success_response(response_data, request, "اشتراک با موفقیت ایجاد شد")
 
 
-@router.post("/upgrade", summary="ارتقا به پلن دیگر")
+@router.post(
+    "/upgrade",
+    summary="ارتقا به پلن دیگر",
+    description="ابزار MCP: `subscribe_ai_plan` (نیازمند تأیید).",
+)
 async def upgrade_to_plan(
     request: Request,
     plan_id: int = Body(..., embed=True),
@@ -266,7 +282,11 @@ async def upgrade_to_plan(
     )
 
 
-@router.get("/usage", summary="آمار استفاده")
+@router.get(
+    "/usage",
+    summary="آمار استفاده",
+    description="ابزار MCP: `list_ai_usage_logs`.",
+)
 async def get_usage_statistics(
     request: Request,
     business_id: Optional[int] = None,
@@ -297,7 +317,7 @@ async def get_usage_statistics(
     return success_response(stats, request)
 
 
-@router.post("/cancel", summary="لغو اشتراک فعال")
+@router.post("/cancel", summary="لغو اشتراک فعال هوش مصنوعی", description="ابزار MCP: `cancel_ai_subscription` (نیازمند تأیید).")
 async def cancel_subscription(
     request: Request,
     business_id: Optional[int] = Query(None),

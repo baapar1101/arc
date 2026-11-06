@@ -29,7 +29,11 @@ from app.core.cache import get_cache
 router = APIRouter(prefix="/warehouses", tags=["انبارداری"])
 
 
-@router.post("/business/{business_id}")
+@router.post(
+    "/business/{business_id}",
+    summary="ایجاد انبار",
+    description="ابزار MCP: `create_warehouse` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def create_warehouse_endpoint(
     request: Request,
@@ -43,7 +47,11 @@ def create_warehouse_endpoint(
     return success_response(data=format_datetime_fields(result["data"], request), request=request, message=result.get("message"))
 
 
-@router.get("/business/{business_id}")
+@router.get(
+    "/business/{business_id}",
+    summary="فهرست انبارها",
+    description="ابزار MCP: `list_warehouses`.",
+)
 @require_business_access("business_id")
 def list_warehouses_endpoint(
     request: Request,
@@ -83,7 +91,11 @@ def list_warehouses_endpoint(
     return success_response(data=format_datetime_fields(result, request), request=request)
 
 
-@router.get("/business/{business_id}/{warehouse_id}")
+@router.get(
+    "/business/{business_id}/{warehouse_id}",
+    summary="جزئیات انبار",
+    description="ابزار MCP: `get_warehouse`.",
+)
 @require_business_access("business_id")
 def get_warehouse_endpoint(
     request: Request,
@@ -99,7 +111,11 @@ def get_warehouse_endpoint(
     return success_response(data=format_datetime_fields({"item": item}, request), request=request)
 
 
-@router.put("/business/{business_id}/{warehouse_id}")
+@router.put(
+    "/business/{business_id}/{warehouse_id}",
+    summary="ویرایش انبار",
+    description="ابزار MCP: `update_warehouse` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def update_warehouse_endpoint(
     request: Request,
@@ -116,7 +132,11 @@ def update_warehouse_endpoint(
     return success_response(data=format_datetime_fields(result["data"], request), request=request, message=result.get("message"))
 
 
-@router.delete("/business/{business_id}/{warehouse_id}")
+@router.delete(
+    "/business/{business_id}/{warehouse_id}",
+    summary="حذف انبار",
+    description="ابزار MCP: `delete_warehouse` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def delete_warehouse_endpoint(
     request: Request,
@@ -131,7 +151,11 @@ def delete_warehouse_endpoint(
 
 
 
-@router.post("/business/{business_id}/query")
+@router.post(
+    "/business/{business_id}/query",
+    summary="جستجوی انبارها",
+    description="ابزار MCP: `list_warehouses` با فیلتر.",
+)
 @require_business_access("business_id")
 def query_warehouses_endpoint(
     request: Request,
@@ -214,7 +238,11 @@ def query_warehouses_endpoint(
     return success_response(data=data, request=request)
 
 
-@router.post("/business/{business_id}/stock-report")
+@router.post(
+    "/business/{business_id}/stock-report",
+    summary="گزارش موجودی انبار",
+    description="ابزار MCP: `get_warehouse_stock_summary`.",
+)
 @require_business_access("business_id")
 def stock_report_endpoint(
     request: Request,

@@ -25,7 +25,7 @@ router = APIRouter(
 )
 
 
-@router.get("", summary="دریافت تنظیمات ارائه‌دهنده اختصاصی")
+@router.get("", summary="دریافت تنظیمات ارائه‌دهنده اختصاصی", description="کلید ارائه‌دهنده محرمانه است و در MCP ثبت نشده.")
 async def get_business_ai_provider(
     request: Request,
     business_id: int = Path(...),
@@ -45,7 +45,7 @@ async def get_business_ai_provider(
     return success_response(data, request)
 
 
-@router.put("", summary="ذخیره تنظیمات ارائه‌دهنده اختصاصی")
+@router.put("", summary="ذخیره تنظیمات ارائه‌دهنده اختصاصی", description="مسیر کلید ارائه‌دهنده است و در MCP ثبت نشده.")
 async def put_business_ai_provider(
     request: Request,
     business_id: int = Path(...),
@@ -69,7 +69,7 @@ async def put_business_ai_provider(
     return success_response(data, request, "تنظیمات ارائه‌دهنده ذخیره شد")
 
 
-@router.post("/test", summary="تست اتصال ارائه‌دهنده اختصاصی")
+@router.post("/test", summary="تست اتصال ارائه‌دهنده اختصاصی", description="مسیر کلید ارائه‌دهنده است و در MCP ثبت نشده.")
 async def test_business_ai_provider(
     request: Request,
     business_id: int = Path(...),
@@ -86,7 +86,7 @@ async def test_business_ai_provider(
     return success_response(result, request, "اتصال برقرار شد")
 
 
-@router.delete("", summary="حذف تنظیمات ارائه‌دهنده اختصاصی")
+@router.delete("", summary="حذف تنظیمات ارائه‌دهنده اختصاصی", description="مسیر کلید ارائه‌دهنده است و در MCP ثبت نشده.")
 async def delete_business_ai_provider(
     request: Request,
     business_id: int = Path(...),

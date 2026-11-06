@@ -459,7 +459,12 @@ def _dump_business_data(db: Session, business_id: int) -> Dict[str, Any]:
     return {"metadata": metadata, "tables": data_out}
 
 
-@router.get("", dependencies=[Depends(require_business_access_dep)])
+@router.get(
+    "",
+    dependencies=[Depends(require_business_access_dep)],
+    summary="فهرست پشتیبان‌های کسب‌وکار",
+    description="ابزار MCP: `list_business_backups`. فایل‌های پشتیبان بدون محتوای باینری.",
+)
 async def list_backups(
     request: Request,
     business_id: int,
@@ -702,7 +707,12 @@ def run_workflow_business_backup(
     return out
 
 
-@router.post("", dependencies=[Depends(require_business_access_dep)])
+@router.post(
+    "",
+    dependencies=[Depends(require_business_access_dep)],
+    summary="ایجاد پشتیبان کسب‌وکار",
+    description="ابزار MCP: `create_business_backup` (نیازمند تأیید). محتوای ZIP برگردانده نمی‌شود.",
+)
 async def create_backup(
     request: Request,
     business_id: int,
@@ -857,7 +867,12 @@ async def create_backup(
         return success_response(out, request=request, message="Backup created")
 
 
-@router.get("/{backup_id}/download", dependencies=[Depends(require_business_access_dep)])
+@router.get(
+    "/{backup_id}/download",
+    dependencies=[Depends(require_business_access_dep)],
+    summary="دانلود فایل پشتیبان",
+    description="خروجی باینری ZIP است و در MCP ثبت نشده.",
+)
 async def download_backup(
     request: Request,
     business_id: int,
@@ -883,7 +898,12 @@ async def download_backup(
     )
 
 
-@router.delete("/{backup_id}", dependencies=[Depends(require_business_access_dep)])
+@router.delete(
+    "/{backup_id}",
+    dependencies=[Depends(require_business_access_dep)],
+    summary="حذف پشتیبان کسب‌وکار",
+    description="ابزار MCP: `delete_business_backup` (نیازمند تأیید). دانلود باینری در MCP نیست.",
+)
 async def delete_backup(
     request: Request,
     business_id: int,
@@ -945,7 +965,12 @@ async def delete_backup(
     return success_response({"deleted": True}, request=request)
 
 
-@router.post("/restore", dependencies=[Depends(require_business_backup_restore_dep)])
+@router.post(
+    "/restore",
+    dependencies=[Depends(require_business_backup_restore_dep)],
+    summary="بازیابی پشتیبان",
+    description="ورود ZIP است و در MCP ثبت نشده.",
+)
 async def restore_backup(
     request: Request,
     business_id: int,

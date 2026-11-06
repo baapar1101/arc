@@ -2775,6 +2775,177 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiSkillsPublisherMenu => 'Skills earnings';
 
   @override
+  String get aiMcpConnectionsMenu => 'Connected assistants';
+
+  @override
+  String get aiMcpConnectionsTitle => 'Connected assistants';
+
+  @override
+  String get aiMcpConnectionsSubtitle =>
+      'Review, narrow, or revoke ChatGPT and Claude access to this business.';
+
+  @override
+  String get aiMcpConnectHint =>
+      'In ChatGPT, add a custom MCP server and paste this address. After you approve access, the connection appears here so you can change or revoke it.';
+
+  @override
+  String get aiMcpServerUrlLabel => 'MCP server address';
+
+  @override
+  String get aiMcpCopyUrl => 'Copy address';
+
+  @override
+  String get aiMcpUrlCopied => 'Address copied.';
+
+  @override
+  String get aiMcpEmpty => 'No assistant is connected to this business yet.';
+
+  @override
+  String get aiMcpPluginInactiveBanner =>
+      'The AI MCP add-on is not active. Existing connections can still be revoked here.';
+
+  @override
+  String get aiMcpPluginExpiredBanner =>
+      'The AI MCP add-on has expired. Existing connections no longer receive business data; revoke them or renew the add-on.';
+
+  @override
+  String get aiMcpOpenMarketplace => 'Open add-on marketplace';
+
+  @override
+  String get aiMcpClientChatgpt => 'ChatGPT';
+
+  @override
+  String get aiMcpClientClaude => 'Claude';
+
+  @override
+  String get aiMcpClientOauth => 'OAuth assistant';
+
+  @override
+  String get aiMcpClientManual => 'Manual connection';
+
+  @override
+  String get aiMcpStatusActive => 'Active';
+
+  @override
+  String get aiMcpStatusExpired => 'Expired';
+
+  @override
+  String get aiMcpStatusRevoked => 'Revoked';
+
+  @override
+  String get aiMcpStatusMembershipInactive => 'Member no longer has access';
+
+  @override
+  String get aiMcpReadOnly => 'Read only';
+
+  @override
+  String get aiMcpReadWrite => 'Read and write';
+
+  @override
+  String get aiMcpUnrestrictedTools => 'All tools allowed for this role';
+
+  @override
+  String aiMcpToolCount(int count) {
+    return '$count tools';
+  }
+
+  @override
+  String aiMcpLastUsed(String when) {
+    return 'Last used: $when';
+  }
+
+  @override
+  String get aiMcpNeverUsed => 'Not used yet';
+
+  @override
+  String aiMcpConnectedAt(String when) {
+    return 'Connected: $when';
+  }
+
+  @override
+  String aiMcpExpiresAt(String when) {
+    return 'Expires: $when';
+  }
+
+  @override
+  String get aiMcpChangeAccess => 'Change access';
+
+  @override
+  String get aiMcpRevoke => 'Revoke access';
+
+  @override
+  String get aiMcpRevokeConfirmTitle => 'Revoke this assistant?';
+
+  @override
+  String get aiMcpRevokeConfirmBody =>
+      'ChatGPT or Claude will lose access to this business on the next request. This cannot be undone without a new approval.';
+
+  @override
+  String get aiMcpRevoked => 'Assistant access was revoked.';
+
+  @override
+  String get aiMcpRevokeAll => 'Revoke all assistants';
+
+  @override
+  String get aiMcpRevokeAllConfirmTitle => 'Revoke every assistant?';
+
+  @override
+  String get aiMcpRevokeAllConfirmBody =>
+      'All ChatGPT, Claude, and manual MCP connections for this business will be revoked immediately.';
+
+  @override
+  String aiMcpRevokeAllDone(int count) {
+    return '$count connections were revoked.';
+  }
+
+  @override
+  String get aiMcpPermissionsTitle => 'Tools for this connection';
+
+  @override
+  String get aiMcpSearchTools => 'Search tools';
+
+  @override
+  String get aiMcpEnableWrites => 'Allow write tools';
+
+  @override
+  String get aiMcpEnableWritesHint =>
+      'Write tools can create or change invoices, documents, and other records.';
+
+  @override
+  String get aiMcpWritesNeedConfirm =>
+      'You are granting write access. The assistant will be able to change records in this business.';
+
+  @override
+  String get aiMcpWidenConfirm =>
+      'You are granting additional tools to this assistant.';
+
+  @override
+  String get aiMcpDenyAllConfirm =>
+      'No tools will remain. The assistant stays connected but cannot read business data until you grant tools again.';
+
+  @override
+  String get aiMcpSaveAccess => 'Save access';
+
+  @override
+  String get aiMcpAccessSaved =>
+      'Connection permissions were updated. The assistant may need to refresh its tool list.';
+
+  @override
+  String get aiMcpNoTools => 'No tools are available for this user.';
+
+  @override
+  String get aiMcpCannotEditInactive =>
+      'This connection can only be revoked because the member no longer has access.';
+
+  @override
+  String get aiMcpCannotEditRevoked => 'This connection is no longer active.';
+
+  @override
+  String aiMcpConnectedBy(String name) {
+    return 'Connected by $name';
+  }
+
+  @override
   String get crmMenu => 'CRM';
 
   @override

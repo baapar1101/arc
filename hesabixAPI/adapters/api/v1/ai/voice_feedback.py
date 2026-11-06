@@ -20,7 +20,7 @@ class VoiceFeedbackRequest(BaseModel):
 	feedback_text: Optional[str] = Field(None, description="نظر کاربر درباره کیفیت صدا")
 
 
-@router.post("/interactions/{interaction_id}/feedback", summary="ثبت بازخورد کیفیت صدای AI")
+@router.post("/interactions/{interaction_id}/feedback", summary="ثبت بازخورد کیفیت صدای AI", description="بازخورد شخصی کیفیت صدا است و در MCP کسب‌وکار ثبت نشده.")
 async def submit_voice_feedback(
 	interaction_id: int = Path(...),
 	request: Request = None,

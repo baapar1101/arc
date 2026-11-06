@@ -54,7 +54,7 @@ router = APIRouter(prefix="/business/{business_id}/storage", tags=["business-sto
 @router.get(
 	"/files/{file_id}/usage",
 	summary="لیست وابستگی‌های فایل",
-	description="نمایش موجودیت‌هایی که از این فایل استفاده می‌کنند",
+	description="نمایش موجودیت‌هایی که از این فایل استفاده می‌کنند. ابزار MCP: `get_storage_file_dependencies`.",
 )
 async def get_file_usage_endpoint(
 	business_id: int,
@@ -92,7 +92,7 @@ async def get_file_usage_endpoint(
 @router.get(
 	"/subscriptions",
 	summary="لیست اشتراک‌های فعال",
-	description="دریافت تمام اشتراک‌های فعال کسب‌وکار",
+	description="ابزار MCP: `list_storage_subscriptions`.",
 )
 def list_subscriptions_endpoint(
 	business_id: int,
@@ -111,7 +111,7 @@ def list_subscriptions_endpoint(
 @router.post(
 	"/subscribe",
 	summary="اشتراک به یک پلن",
-	description="اشتراک کسب‌وکار به یک پلن ذخیره‌سازی",
+	description="ابزار MCP: `subscribe_storage_plan` (نیازمند تأیید).",
 )
 def subscribe_endpoint(
 	business_id: int,
@@ -197,7 +197,7 @@ def subscribe_endpoint(
 @router.put(
 	"/subscription/{subscription_id}/renew",
 	summary="تمدید اشتراک",
-	description="تمدید اشتراک موجود",
+	description="صدور صورتحساب تمدید اشتراک فضای ذخیره. ابزار MCP: `renew_storage_subscription` (نیازمند تأیید).",
 )
 def renew_subscription_endpoint(
 	business_id: int,
@@ -221,7 +221,7 @@ def renew_subscription_endpoint(
 @router.delete(
 	"/subscription/{subscription_id}",
 	summary="لغو اشتراک",
-	description="لغو اشتراک موجود",
+	description="ابزار MCP: `cancel_storage_subscription` (نیازمند تأیید).",
 )
 def cancel_subscription_endpoint(
 	business_id: int,
@@ -241,7 +241,7 @@ def cancel_subscription_endpoint(
 @router.get(
 	"/usage",
 	summary="آمار استفاده",
-	description="دریافت آمار استفاده از ذخیره‌سازی",
+	description="ابزار MCP: `get_storage_usage`.",
 )
 def get_usage_endpoint(
 	business_id: int,
@@ -260,7 +260,7 @@ def get_usage_endpoint(
 @router.get(
 	"/plans",
 	summary="لیست پلن‌های قابل اشتراک",
-	description="دریافت لیست پلن‌های فعال برای اشتراک",
+	description="ابزار MCP: `list_storage_plans`.",
 )
 def list_plans_endpoint(
 	business_id: int,
@@ -279,7 +279,7 @@ def list_plans_endpoint(
 @router.get(
 	"/invoices",
 	summary="لیست صورتحساب‌ها",
-	description="دریافت لیست صورتحساب‌های ذخیره‌سازی",
+	description="ابزار MCP: `list_storage_invoices`.",
 )
 def list_invoices_endpoint(
 	business_id: int,
@@ -302,7 +302,7 @@ def list_invoices_endpoint(
 @router.get(
 	"/invoices/{invoice_id}",
 	summary="جزئیات صورتحساب",
-	description="دریافت جزئیات یک صورتحساب",
+	description="ابزار MCP جداگانه ندارد؛ از `list_storage_invoices` استفاده شود.",
 )
 def get_invoice_endpoint(
 	business_id: int,
@@ -322,7 +322,7 @@ def get_invoice_endpoint(
 @router.post(
 	"/invoices/{invoice_id}/pay",
 	summary="پرداخت صورتحساب از کیف پول",
-	description="پرداخت صورتحساب ذخیره‌سازی از کیف پول",
+	description="ابزار MCP: `pay_storage_invoice` (نیازمند تأیید).",
 )
 def pay_invoice_endpoint(
 	business_id: int,
@@ -358,7 +358,7 @@ def pay_invoice_endpoint(
 @router.post(
 	"/pay-over-usage",
 	summary="پرداخت برای استفاده اضافی",
-	description="ایجاد و پرداخت صورتحساب برای استفاده اضافی از ذخیره‌سازی",
+	description="ایجاد و پرداخت صورتحساب اضافه مصرف از کیف پول. ابزار MCP: `pay_storage_over_usage` (نیازمند تأیید).",
 )
 def pay_over_usage_endpoint(
 	business_id: int,
@@ -398,7 +398,7 @@ def pay_over_usage_endpoint(
 @router.get(
 	"/export-zip",
 	summary="دانلود ZIP تمام فایل‌ها",
-	description="دانلود تمام فایل‌های کسب‌وکار به صورت ZIP",
+	description="خروجی باینری ZIP است و در MCP ثبت نشده. JSON: `get_storage_export_info`.",
 )
 async def export_zip_endpoint(
 	business_id: int,
@@ -444,8 +444,8 @@ async def export_zip_endpoint(
 
 @router.get(
 	"/export-info",
-	summary="اطلاعات فایل‌های قابل دانلود",
-	description="دریافت اطلاعات فایل‌های قابل دانلود (بدون دانلود)",
+	summary="اطلاعات فایل‌های قابل خروجی ZIP",
+	description="حجم، تعداد و گروه‌بندی فایل‌های قابل دانلود بدون خود بایت ZIP. فیلتر module_context و بازه تاریخ. ابزار MCP: get_storage_export_info.",
 )
 def get_export_info_endpoint(
 	business_id: int,
@@ -481,7 +481,7 @@ def get_export_info_endpoint(
 @router.get(
 	"/files",
 	summary="لیست فایل‌های کسب‌وکار",
-	description="دریافت لیست فایل‌های آپلود شده برای کسب‌وکار",
+	description="متادیتای فایل‌ها با فیلتر module_context و context_id و صفحه‌بندی. محتوای باینری اینجا نیست. ابزار MCP: list_storage_files.",
 )
 def list_files_endpoint(
 	business_id: int,
@@ -565,7 +565,7 @@ def list_files_endpoint(
 @router.get(
 	"/files/{file_id}/download",
 	summary="دانلود فایل",
-	description="دانلود فایل الصاق شده به کسب‌وکار",
+	description="خروجی باینری است و در MCP ثبت نشده. متادیتا: `get_storage_file` / `list_storage_files`.",
 )
 async def download_file_endpoint(
 	business_id: int,
@@ -596,7 +596,7 @@ async def download_file_endpoint(
 @router.post(
 	"/files/upload",
 	summary="آپلود فایل",
-	description="آپلود فایل برای کسب‌وکار و الصاق به سند یا بخش خاص",
+	description="آپلود باینری است و در MCP ثبت نشده.",
 )
 async def upload_file_endpoint(
 	business_id: int,
@@ -662,7 +662,7 @@ async def upload_file_endpoint(
 @router.get(
 	"/files/{file_id}/thumbnail",
 	summary="دانلود thumbnail فایل تصویر",
-	description="دانلود نسخه کم‌حجم (thumbnail) برای فایل‌های تصویری الصاق شده به کسب‌وکار",
+	description="خروجی باینری thumbnail است و در MCP ثبت نشده.",
 )
 async def download_file_thumbnail_endpoint(
 	business_id: int,
@@ -698,7 +698,7 @@ async def download_file_thumbnail_endpoint(
 @router.put(
 	"/files/{file_id}/rename",
 	summary="تغییر نام فایل",
-	description="تغییر نام فایل الصاق شده به کسب‌وکار",
+	description="ابزار MCP: `rename_storage_file` (نیازمند تأیید).",
 )
 async def rename_file_endpoint(
 	business_id: int,
@@ -745,7 +745,7 @@ async def rename_file_endpoint(
 @router.delete(
 	"/files/{file_id}",
 	summary="حذف فایل",
-	description="حذف فایل الصاق شده به کسب‌وکار",
+	description="ابزار MCP: `delete_storage_file` (نیازمند تأیید).",
 )
 async def delete_file_endpoint(
 	business_id: int,
@@ -796,6 +796,7 @@ async def delete_file_endpoint(
 @router.post(
 	"/files/{file_id}/shares",
 	summary="ایجاد لینک اشتراک برای فایل",
+	description="ابزار MCP: `create_storage_file_share` (نیازمند تأیید).",
 )
 def create_file_share_endpoint(
 	business_id: int,
@@ -838,6 +839,7 @@ def create_file_share_endpoint(
 @router.get(
 	"/files/{file_id}/shares",
 	summary="لیست لینک‌های اشتراک یک فایل",
+	description="ابزار MCP: `list_storage_file_shares`.",
 )
 def list_file_shares_endpoint(
 	business_id: int,
@@ -858,6 +860,7 @@ def list_file_shares_endpoint(
 @router.get(
 	"/shares",
 	summary="لیست همه لینک‌های اشتراک کسب‌وکار",
+	description="ابزار MCP: `list_storage_file_shares`.",
 )
 def list_business_shares_endpoint(
 	business_id: int,
@@ -877,6 +880,7 @@ def list_business_shares_endpoint(
 @router.delete(
 	"/shares/{share_id}",
 	summary="لغو یک لینک اشتراک",
+	description="ابزار MCP: `revoke_storage_file_share` (نیازمند تأیید).",
 )
 def revoke_file_share_endpoint(
 	business_id: int,
@@ -897,6 +901,7 @@ def revoke_file_share_endpoint(
 @router.post(
 	"/shares/revoke-all",
 	summary="لغو همه لینک‌های اشتراک فعال کسب‌وکار",
+	description="لغو همه لینک‌های اشتراک فایل فعال. ابزار MCP: `revoke_all_storage_file_shares` (نیازمند تأیید).",
 )
 def revoke_all_file_shares_endpoint(
 	business_id: int,
@@ -913,6 +918,7 @@ def revoke_all_file_shares_endpoint(
 @router.patch(
 	"/shares/{share_id}",
 	summary="تغییر رمز یا انقضای لینک اشتراک",
+	description="به‌روزرسانی انقضا یا حذف رمز لینک اشتراک. ابزار MCP: `update_storage_file_share` (رمز جدید فقط از UI؛ نیازمند تأیید).",
 )
 def patch_file_share_endpoint(
 	business_id: int,

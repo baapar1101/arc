@@ -56,7 +56,7 @@ router = APIRouter(tags=["دریافت و پرداخت", "مدیریت مالی"
 @router.post(
     "/businesses/{business_id}/receipts-payments",
     summary="لیست اسناد دریافت و پرداخت",
-    description="دریافت لیست اسناد دریافت و پرداخت با فیلتر و جستجو",
+    description="جستجو و فیلتر. ابزار MCP: `search_receipts_payments`.",
 )
 @require_business_access("business_id")
 async def list_receipts_payments_endpoint(
@@ -117,7 +117,7 @@ async def list_receipts_payments_endpoint(
     "/businesses/{business_id}/receipts-payments/create",
     summary="ایجاد سند دریافت یا پرداخت",
     description="""
-    ایجاد سند دریافت یا پرداخت جدید
+    ایجاد سند دریافت یا پرداخت جدید. ابزار MCP: `create_receipt_payment` (نیازمند تأیید).
     
     ### انواع سند:
     - **receipt**: دریافت وجه از مشتریان
@@ -212,7 +212,7 @@ async def create_receipt_payment_endpoint(
     summary="ایجاد/ویرایش گروهی دریافت و پرداخت",
     description=(
         "بدنه: `{ items:[{client_ref?, document_id?, payload}], migration_mode? }`؛ "
-        "حداکثر ۲۰۰ آیتم؛ payload همان بدنه ایجاد تکی است."
+        "حداکثر ۲۰۰ آیتم؛ payload همان بدنه ایجاد تکی است. ابزار MCP تکی: `create_receipt_payment` / `update_receipt_payment`."
     ),
 )
 @require_business_access("business_id")
@@ -238,7 +238,7 @@ async def bulk_upsert_receipts_payments_endpoint(
 @router.get(
     "/receipts-payments/{document_id}",
     summary="جزئیات سند دریافت/پرداخت",
-    description="دریافت جزئیات یک سند دریافت یا پرداخت",
+    description="ابزار MCP: `get_receipt_payment`. extra_info در MCP برنمی‌گردد.",
 )
 async def get_receipt_payment_endpoint(
     request: Request,
@@ -276,7 +276,7 @@ def _validate_receipt_payment_document(document: Document) -> bool:
 @router.delete(
     "/receipts-payments/{document_id}",
     summary="حذف سند دریافت/پرداخت",
-    description="حذف یک سند دریافت یا پرداخت",
+    description="ابزار MCP: `delete_receipt_payment` (نیازمند تأیید).",
 )
 async def delete_receipt_payment_endpoint(
     request: Request,
@@ -313,7 +313,7 @@ async def delete_receipt_payment_endpoint(
 @router.put(
     "/receipts-payments/{document_id}",
     summary="ویرایش سند دریافت/پرداخت",
-    description="به‌روزرسانی یک سند دریافت یا پرداخت",
+    description="ابزار MCP: `update_receipt_payment` (نیازمند تأیید).",
 )
 async def update_receipt_payment_endpoint(
     request: Request,
@@ -344,7 +344,7 @@ async def update_receipt_payment_endpoint(
 @router.post(
     "/businesses/{business_id}/receipts-payments/export/excel",
     summary="خروجی Excel لیست اسناد دریافت و پرداخت",
-    description="خروجی Excel لیست اسناد دریافت و پرداخت با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="خروجی باینری Excel است و در MCP ثبت نشده. JSON: `search_receipts_payments`.",
 )
 @require_business_access("business_id")
 async def export_receipts_payments_excel(
@@ -535,7 +535,7 @@ async def export_receipts_payments_excel(
 @router.get(
     "/receipts-payments/{document_id}/pdf",
     summary="خروجی PDF تک سند دریافت/پرداخت",
-    description="خروجی PDF یک سند دریافت یا پرداخت",
+    description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `get_receipt_payment`.",
 )
 async def export_single_receipt_payment_pdf(
     document_id: int,
@@ -807,7 +807,7 @@ async def export_single_receipt_payment_pdf(
 @router.post(
     "/businesses/{business_id}/receipts-payments/export/pdf",
     summary="خروجی PDF لیست اسناد دریافت و پرداخت",
-    description="خروجی PDF لیست اسناد دریافت و پرداخت با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `search_receipts_payments`.",
 )
 @require_business_access("business_id")
 async def export_receipts_payments_pdf(

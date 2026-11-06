@@ -135,24 +135,20 @@ def register_mcp_bulk_financial_functions(registry) -> None:
             "هزینه و درآمد",
         ),
     ]
+    bulk_kw = dict(allowed_roles=_ROLES)
     for name, permission, category, payload_schema, description, service, builder, kind, label in definitions:
-        registry.register(AIFunction(
-            name=name,
-            description=(
-                f"ثبت یا ویرایش گروهی حداکثر {_MAX_ITEMS} سند {label}. "
-                "هر آیتم payload هم‌ساخت ابزار تک‌سندی است؛ document_id را فقط برای ویرایش بفرست. "
-                "دسترسی افزودن/ویرایش هر مورد در کسب‌وکار متصل بررسی می‌شود. "
-                "خطای یک مورد بقیه را متوقف نمی‌کند. نیاز به تأیید. " + description
-            ),
-            parameters_schema=_make_schema(payload_schema, "شناسه سند برای ویرایش؛ حذف شود تا سند جدید ساخته شود"),
-            handler=_bulk_handler(service, builder, create_type=kind),
-            allowed_roles=_ROLES,
-            required_permissions=[permission],
-            category=category,
-            requires_approval=True,
-            risk_level="high",
-            is_readonly=False,
-        ))
+        desc = (
+            f"ثبت یا ویرایش گروهی حداکثر {_MAX_ITEMS} سند {label}. "
+            "هر آیتم payload هم‌ساخت ابزار تک‌سندی است؛ document_id را فقط برای ویرایش بفرست. "
+            "دسترسی افزودن/ویرایش هر مورد در کسب‌وکار متصل بررسی می‌شود. "
+            "خطای یک مورد بقیه را متوقف نمی‌کند. نیاز به تأیید. " + description
+        )
+        schema = _make_schema(payload_schema, "شناسه سند برای ویرایش؛ حذف شود تا سند جدید ساخته شود")
+        handler = _bulk_handler(service, builder, create_type=kind)
+        if name == "bulk_upsert_receipts_payments":
+            registry.register(AIFunction(name="bulk_upsert_receipts_payments", description="ثبت یا ویرایش گروهی حداکثر ۲۵ سند دریافت و پرداخت. هر آیتم payload هم‌ساخت ابزار تک‌سندی است؛ document_id را فقط برای ویرایش بفرست. دسترسی افزودن/ویرایش هر مورد در کسب‌وکار متصل بررسی می‌شود. خطای یک مورد بقیه را متوقف نمی‌کند. نیاز به تأیید.", parameters_schema=schema, handler=handler, required_permissions=["receipts_payments.write"], category=category, requires_approval=True, risk_level="high", is_readonly=False, **bulk_kw))
+        elif name == "bulk_upsert_expense_income":
+            registry.register(AIFunction(name="bulk_upsert_expense_income", description="ثبت یا ویرایش گروهی حداکثر ۲۵ سند هزینه و درآمد. هر آیتم payload هم‌ساخت ابزار تک‌سندی است؛ document_id را فقط برای ویرایش بفرست. دسترسی افزودن/ویرایش هر مورد در کسب‌وکار متصل بررسی می‌شود. خطای یک مورد بقیه را متوقف نمی‌کند. نیاز به تأیید.", parameters_schema=schema, handler=handler, required_permissions=["expenses_income.write"], category=category, requires_approval=True, risk_level="high", is_readonly=False, **bulk_kw))
 
     def bulk_delete_expense_income(args: Dict[str, Any], context: Dict[str, Any]):
         from adapters.db.models.document import Document

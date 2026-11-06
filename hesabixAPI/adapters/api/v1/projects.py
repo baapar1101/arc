@@ -77,7 +77,7 @@ def _format_project(project: Project, request: Request = None) -> Dict[str, Any]
 @router.post(
 	"/businesses/{business_id}/projects",
 	summary="ایجاد پروژه جدید",
-	description="ایجاد پروژه جدید برای کسب‌وکار"
+	description="ابزار MCP: `create_project` (نیازمند تأیید). extra_info پذیرفته نمی‌شود.",
 )
 @require_business_access("business_id")
 async def create_project_endpoint(
@@ -104,7 +104,7 @@ async def create_project_endpoint(
 @router.get(
 	"/businesses/{business_id}/projects",
 	summary="لیست پروژه‌ها",
-	description="دریافت لیست پروژه‌های یک کسب‌وکار با امکان فیلتر و جستجو"
+	description="جستجو و فیلتر پروژه‌های همین کسب‌وکار. ابزار MCP: `search_projects`.",
 )
 @require_business_access("business_id")
 async def list_projects_endpoint(
@@ -163,7 +163,7 @@ async def list_projects_endpoint(
 @router.get(
 	"/projects/{project_id}",
 	summary="جزئیات پروژه",
-	description="دریافت جزئیات یک پروژه همراه با آمار"
+	description="جزئیات پروژه به‌همراه آمار اسناد. ابزار MCP: `get_project`. extra_info در MCP برنمی‌گردد.",
 )
 async def get_project_endpoint(
 	request: Request,
@@ -197,7 +197,7 @@ async def get_project_endpoint(
 @router.put(
 	"/projects/{project_id}",
 	summary="به‌روزرسانی پروژه",
-	description="به‌روزرسانی اطلاعات یک پروژه"
+	description="ابزار MCP: `update_project` (نیازمند تأیید). extra_info پذیرفته نمی‌شود.",
 )
 async def update_project_endpoint(
 	request: Request,
@@ -237,7 +237,7 @@ async def update_project_endpoint(
 @router.delete(
 	"/projects/{project_id}",
 	summary="حذف پروژه",
-	description="حذف یک پروژه (soft delete)"
+	description="ابزار MCP: `delete_project` (نیازمند تأیید).",
 )
 async def delete_project_endpoint(
 	request: Request,
@@ -267,7 +267,7 @@ async def delete_project_endpoint(
 @router.get(
 	"/projects/{project_id}/documents",
 	summary="لیست اسناد پروژه",
-	description="دریافت لیست اسناد مرتبط با یک پروژه"
+	description="اسناد مرتبط با پروژه متعلق به کسب‌وکار. ابزار MCP: `list_project_documents`.",
 )
 async def list_project_documents_endpoint(
 	request: Request,
@@ -307,7 +307,7 @@ async def list_project_documents_endpoint(
 @router.post(
 	"/businesses/{business_id}/projects/search",
 	summary="جستجوی پروژه‌ها",
-	description="جستجوی پروژه‌ها با فیلترها و صفحه‌بندی (برای استفاده در فرانت)"
+	description="ابزار MCP: `search_projects`.",
 )
 @require_business_access("business_id")
 async def search_projects_endpoint(
@@ -391,7 +391,7 @@ async def search_projects_endpoint(
 @router.get(
 	"/businesses/{business_id}/projects/active",
 	summary="لیست پروژه‌های فعال (برای کمبوباکس)",
-	description="دریافت لیست ساده پروژه‌های فعال برای استفاده در کمبوباکس‌ها"
+	description="زیرمجموعه جستجو. ابزار MCP: `search_projects` با وضعیت فعال.",
 )
 @require_business_access("business_id")
 async def list_active_projects_simple_endpoint(

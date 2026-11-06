@@ -27,7 +27,7 @@ router = APIRouter(tags=["opening_balance"], prefix="")
 @router.get(
     "/businesses/{business_id}/opening-balance",
     summary="دریافت تراز افتتاحیه",
-    description="خواندن سند تراز افتتاحیه برای سال مالی مشخص (یا سال جاری در صورت عدم ارسال)",
+    description="سند تراز افتتاحیه سال مالی مشخص یا جاری. ابزار MCP: `get_opening_balance`.",
 )
 async def get_opening_balance_endpoint(
     request: Request,
@@ -44,7 +44,7 @@ async def get_opening_balance_endpoint(
 @router.get(
     "/businesses/{business_id}/opening-balance/person-line-eligibility",
     summary="وضعیت ثبت مانده افتتاحیه شخص",
-    description="بررسی امکان نمایش/ثبت مانده افتتاحیه در فرم افزودن شخص",
+    description="بررسی امکان نمایش/ثبت مانده افتتاحیه در فرم افزودن یا ویرایش شخص. ابزار MCP: `get_person_opening_balance_eligibility`.",
 )
 async def get_person_opening_balance_eligibility_endpoint(
     request: Request,
@@ -73,7 +73,7 @@ async def get_person_opening_balance_eligibility_endpoint(
 @router.get(
     "/businesses/{business_id}/opening-balance/product-line-eligibility",
     summary="وضعیت ثبت تعداد اولیه کالا",
-    description="بررسی امکان نمایش/ثبت تعداد اولیه در فرم افزودن یا ویرایش کالا",
+    description="بررسی امکان نمایش/ثبت تعداد اولیه در فرم افزودن یا ویرایش کالا. ابزار MCP: `get_product_opening_balance_eligibility`.",
 )
 async def get_product_opening_balance_eligibility_endpoint(
     request: Request,
@@ -104,7 +104,7 @@ async def get_product_opening_balance_eligibility_endpoint(
 @router.put(
     "/businesses/{business_id}/opening-balance",
     summary="ذخیره/به‌روزرسانی تراز افتتاحیه",
-    description="ایجاد یا بروزرسانی سند تراز افتتاحیه برای سال مالی مشخص",
+    description="ایجاد یا بروزرسانی سند تراز افتتاحیه. ابزار MCP: `upsert_opening_balance` (نیازمند تأیید).",
 )
 async def upsert_opening_balance_endpoint(
     request: Request,
@@ -121,7 +121,7 @@ async def upsert_opening_balance_endpoint(
 @router.post(
     "/businesses/{business_id}/opening-balance/preview",
     summary="پیش‌نمایش تراز افتتاحیه",
-    description="پیش‌نمایش تراز افتتاحیه بدون ذخیره",
+    description="پیش‌نمایش بدون ذخیره. ابزار MCP: `preview_opening_balance`.",
 )
 async def preview_opening_balance_endpoint(
     request: Request,
@@ -138,7 +138,7 @@ async def preview_opening_balance_endpoint(
 @router.post(
     "/businesses/{business_id}/opening-balance/post",
     summary="نهایی‌سازی تراز افتتاحیه",
-    description="قفل کردن و علامت‌گذاری سند تراز افتتاحیه به عنوان نهایی",
+    description="قفل و نهایی‌سازی سند. ابزار MCP: `post_opening_balance` (نیازمند تأیید).",
 )
 async def post_opening_balance_endpoint(
     request: Request,
@@ -155,7 +155,7 @@ async def post_opening_balance_endpoint(
 @router.post(
     "/businesses/{business_id}/opening-balance/unpost",
     summary="لغو نهایی‌سازی تراز افتتاحیه",
-    description="فقط در صورتی مجاز است که در همان سال مالی به‌جز سند افتتاحیه، سند دیگری ثبت نشده باشد",
+    description="فقط اگر در همان سال مالی سندی جز افتتاحیه نباشد. ابزار MCP: `unpost_opening_balance` (نیازمند تأیید).",
 )
 async def unpost_opening_balance_endpoint(
     request: Request,

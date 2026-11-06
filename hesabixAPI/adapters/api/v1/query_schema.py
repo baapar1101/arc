@@ -18,7 +18,7 @@ router = APIRouter(prefix="/query-schema", tags=["جستجو و فیلتر"])
 @router.get(
 	"",
 	summary="فهرست entityهای دارای schema جستجو",
-	description="نام entityهایی که برای `GET /query-schema/{entity}` پشتیبانی می‌شود.",
+	description="نام entityهایی که برای `GET /query-schema/{entity}` پشتیبانی می‌شود. ابزار MCP: `list_queryable_fields` بدون entity.",
 )
 async def list_query_schema_entities(
 	ctx: AuthContext = Depends(get_current_user),
@@ -34,7 +34,7 @@ async def list_query_schema_entities(
 	summary="اسکیمای فیلتر و جستجو برای یک entity",
 	description=(
 		"فیلدهای قابل فیلتر، عملگرها، search_fields پیش‌فرض و مثال JSON. "
-		"همان دادهٔ `list_queryable_fields` در AI."
+		"ابزار MCP: `list_queryable_fields`."
 	),
 )
 async def get_query_schema(

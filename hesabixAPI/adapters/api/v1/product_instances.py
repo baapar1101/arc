@@ -77,7 +77,11 @@ def _instance_search_payload(inst: ProductInstance) -> Dict[str, Any]:
     }
 
 
-@router.post("/business/{business_id}/search")
+@router.post(
+    "/business/{business_id}/search",
+    summary="جستجوی کالاهای یونیک",
+    description="ابزار MCP: `search_product_instances`.",
+)
 @require_business_access("business_id")
 def search_product_instances(
     request: Request,
@@ -158,7 +162,11 @@ def search_product_instances(
     return success_response(data={"items": items, "total": len(items)}, request=request)
 
 
-@router.get("/business/{business_id}/product/{product_id}/available")
+@router.get(
+    "/business/{business_id}/product/{product_id}/available",
+    summary="کالاهای یونیک موجود",
+    description="ابزار MCP: `get_available_product_instances`.",
+)
 @require_business_access("business_id")
 def get_available_instances(
     request: Request,
@@ -219,7 +227,11 @@ def get_available_instances(
     return success_response(data={"items": items, "total": len(items)}, request=request)
 
 
-@router.post("/business/{business_id}")
+@router.post(
+    "/business/{business_id}",
+    summary="ایجاد کالای یونیک",
+    description="ابزار MCP: `create_product_instance` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def create_product_instance(
     request: Request,
@@ -327,7 +339,11 @@ def create_product_instance(
     )
 
 
-@router.post("/business/{business_id}/bulk")
+@router.post(
+    "/business/{business_id}/bulk",
+    summary="ایجاد گروهی کالای یونیک",
+    description="ایجاد چند سریال در یک درخواست. ابزار MCP: `bulk_create_product_instances` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def create_bulk_product_instances(
     request: Request,
@@ -442,7 +458,11 @@ def create_bulk_product_instances(
     )
 
 
-@router.get("/business/{business_id}/search-by-code")
+@router.get(
+	"/business/{business_id}/search-by-code",
+	summary="جستجوی کالای یونیک با بارکد یا سریال",
+	description="تطابق دقیق سپس جزئی روی بارکد/سریال. ابزار MCP: `search_product_instance_by_code`.",
+)
 @require_business_access("business_id")
 def search_instance_by_code(
 	request: Request,
@@ -614,7 +634,11 @@ def search_instance_by_code(
 	)
 
 
-@router.get("/business/{business_id}/{instance_id}")
+@router.get(
+    "/business/{business_id}/{instance_id}",
+    summary="جزئیات کالای یونیک",
+    description="ابزار MCP: `search_product_instances` یا `search_product_instance_by_code`.",
+)
 @require_business_access("business_id")
 def get_product_instance(
     request: Request,
@@ -665,7 +689,11 @@ def get_product_instance(
     )
 
 
-@router.put("/business/{business_id}/{instance_id}")
+@router.put(
+    "/business/{business_id}/{instance_id}",
+    summary="ویرایش کالای یونیک",
+    description="ابزار MCP: `update_product_instance` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def update_product_instance(
     request: Request,
@@ -761,7 +789,11 @@ def update_product_instance(
     )
 
 
-@router.delete("/business/{business_id}/{instance_id}")
+@router.delete(
+    "/business/{business_id}/{instance_id}",
+    summary="حذف کالای یونیک",
+    description="ابزار MCP: `delete_product_instance` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def delete_product_instance(
     request: Request,
@@ -794,7 +826,11 @@ def delete_product_instance(
     return success_response(data={"deleted": True}, request=request)
 
 
-@router.post("/business/{business_id}/product/{product_id}/convert-to-unique")
+@router.post(
+	"/business/{business_id}/product/{product_id}/convert-to-unique",
+	summary="تبدیل کالای فله به یونیک",
+	description="ساخت سریال برای موجودی فعلی و تغییر inventory_mode. ابزار MCP: `convert_product_to_unique_instances` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def convert_product_to_unique(
 	request: Request,

@@ -25,17 +25,20 @@ def _schema(properties=None, required=()):
     return {"type": "object", "properties": properties or {}, "required": list(required), "additionalProperties": False}
 
 
-def _register(registry, name, description, schema, handler, permission, *, write=False, high=False):
-    registry.register(AIFunction(name=name, description=description, parameters_schema=schema, handler=handler,
-        allowed_roles=_ROLES, required_permissions=[permission], category="warranty", requires_approval=bool(write),
-        risk_level="high" if high else ("medium" if write else "safe"), is_readonly=not write))
-
-
 def register_mcp_warranty_functions(registry) -> None:
     def get_settings(args, context):
         from app.services.warranty_service import get_warranty_settings
         return get_warranty_settings(context["db"], int(context["business_id"]))
-    _register(registry, "get_warranty_settings", "خواندن تنظیمات فعال‌سازی، امنیت، رهگیری و اعلان گارانتی.", _schema(), get_settings, "warranty.read")
+    registry.register(AIFunction(
+        name="get_warranty_settings",
+        description="خواندن تنظیمات فعال‌سازی، امنیت، رهگیری و اعلان گارانتی.",
+        parameters_schema=_schema(),
+        handler=get_settings,
+        allowed_roles=_ROLES,
+        required_permissions=["warranty.read"],
+        category="warranty",
+        is_readonly=True,
+    ))
 
     settings = {"code_format": {"type": "string", "enum": ["random", "sequential", "custom"]}, "code_prefix": {"type": ["string", "null"], "maxLength": 20},
         "serial_format": {"type": "string", "enum": ["random", "custom"]}, "serial_length": {"type": ["integer", "null"], "minimum": 1, "maximum": 50},
@@ -46,7 +49,18 @@ def register_mcp_warranty_functions(registry) -> None:
     def update_settings(args, context):
         from app.services.warranty_service import update_warranty_settings
         return update_warranty_settings(context["db"], int(context["business_id"]), args["settings"])
-    _register(registry, "update_warranty_settings", "ویرایش تولید کد، قواعد تطبیق، قفل تلاش، رهگیری و اعلان گارانتی. این تنظیمات روی مشتریان و فعال‌سازی‌های بعدی اثر می‌گذارد؛ نیازمند تأیید.", _schema({"settings": _schema(settings)}, ["settings"]), update_settings, "warranty.manage", write=True, high=True)
+    registry.register(AIFunction(
+        name="update_warranty_settings",
+        description="ویرایش تولید کد، قواعد تطبیق، قفل تلاش، رهگیری و اعلان گارانتی. این تنظیمات روی مشتریان و فعال‌سازی‌های بعدی اثر می‌گذارد؛ نیازمند تأیید.",
+        parameters_schema=_schema({"settings": _schema(settings)}, ["settings"]),
+        handler=update_settings,
+        allowed_roles=_ROLES,
+        required_permissions=["warranty.manage"],
+        category="warranty",
+        requires_approval=True,
+        risk_level="high",
+        is_readonly=False,
+    ))
 
     def generate(args, context):
         from app.services.warranty_service import generate_warranty_codes
@@ -54,29 +68,93 @@ def register_mcp_warranty_functions(registry) -> None:
         return generate_warranty_codes(context["db"], int(context["business_id"]), int(args["product_id"]), int(args.get("quantity", 1)),
             int(args.get("warranty_duration_days", 365)), user_id=ctx.get_user_id(), serial_format=args.get("serial_format", "random"),
             custom_serials=args.get("custom_serials"), code_format=args.get("code_format"), custom_codes=args.get("custom_codes"))
-    _register(registry, "generate_warranty_codes", "تولید حداکثر ۵۰ کد گارانتی برای کالای کسب‌وکار متصل. تعداد کد/سریال سفارشی باید دقیقاً با quantity برابر باشد. نیازمند تأیید.",
-        _schema({"product_id": {"type": "integer", "minimum": 1}, "quantity": {"type": "integer", "minimum": 1, "maximum": 50},
+    registry.register(AIFunction(
+        name="generate_warranty_codes",
+        description="تولید حداکثر ۵۰ کد گارانتی برای کالای کسب‌وکار متصل. تعداد کد/سریال سفارشی باید دقیقاً با quantity برابر باشد. نیازمند تأیید.",
+        parameters_schema=_schema({"product_id": {"type": "integer", "minimum": 1}, "quantity": {"type": "integer", "minimum": 1, "maximum": 50},
             "warranty_duration_days": {"type": "integer", "minimum": 1, "maximum": 36500}, "serial_format": {"type": "string", "enum": ["random", "custom"]},
             "custom_serials": {"type": "array", "maxItems": 50, "items": {"type": "string", "minLength": 1, "maxLength": 50}},
             "code_format": {"type": "string", "enum": ["random", "sequential", "custom"]}, "custom_codes": {"type": "array", "maxItems": 50, "items": {"type": "string", "minLength": 1, "maxLength": 50}}}, ["product_id"]),
-        generate, "warranty.write", write=True, high=True)
+        handler=generate,
+        allowed_roles=_ROLES,
+        required_permissions=["warranty.write"],
+        category="warranty",
+        requires_approval=True,
+        risk_level="high",
+        is_readonly=False,
+    ))
+
+    def list_codes(args, context):
+        from app.services.warranty_service import list_warranty_codes
+        result = list_warranty_codes(
+            context["db"],
+            int(context["business_id"]),
+            args.get("status"),
+            args.get("product_id"),
+            int(args.get("limit", 100)),
+            int(args.get("skip", 0)),
+        )
+        return _redact_customer_data(result)
+    registry.register(AIFunction(
+        name="list_warranty_codes",
+        description="فهرست کدهای گارانتی کسب‌وکار متصل با فیلتر وضعیت/کالا؛ حداکثر ۱۰۰ ردیف در صفحه. افزونه باید فعال باشد. اطلاعات تماس مشتری و کد رهگیری عمومی برنمی‌گردد.",
+        parameters_schema=_schema({
+            "status": {"type": "string", "enum": ["generated", "activated", "expired", "used", "revoked"]},
+            "product_id": {"type": "integer", "minimum": 1},
+            "limit": {"type": "integer", "minimum": 1, "maximum": 100},
+            "skip": {"type": "integer", "minimum": 0},
+        }),
+        handler=list_codes,
+        allowed_roles=_ROLES,
+        required_permissions=["warranty.read"],
+        category="warranty",
+        is_readonly=True,
+    ))
 
     def list_by_person(args, context):
         from app.services.warranty_service import list_warranty_codes_by_person
         result = list_warranty_codes_by_person(context["db"], int(context["business_id"]), int(args["person_id"]), args.get("status"), int(args.get("limit", 100)), int(args.get("skip", 0)))
         return _redact_customer_data(result)
-    _register(registry, "list_warranty_codes_by_person", "فهرست کدهای گارانتی متصل به شخص کسب‌وکار، حداکثر ۱۰۰ مورد در صفحه.",
-        _schema({"person_id": {"type": "integer", "minimum": 1}, "status": {"type": "string", "enum": ["generated", "activated", "expired", "used", "revoked"]},
-            "limit": {"type": "integer", "minimum": 1, "maximum": 100}, "skip": {"type": "integer", "minimum": 0}}, ["person_id"]), list_by_person, "warranty.read")
+    registry.register(AIFunction(
+        name="list_warranty_codes_by_person",
+        description="فهرست کدهای گارانتی متصل به شخص کسب‌وکار، حداکثر ۱۰۰ مورد در صفحه. اطلاعات تماس مشتری و کد رهگیری عمومی برنمی‌گردد.",
+        parameters_schema=_schema({"person_id": {"type": "integer", "minimum": 1}, "status": {"type": "string", "enum": ["generated", "activated", "expired", "used", "revoked"]},
+            "limit": {"type": "integer", "minimum": 1, "maximum": 100}, "skip": {"type": "integer", "minimum": 0}}, ["person_id"]),
+        handler=list_by_person,
+        allowed_roles=_ROLES,
+        required_permissions=["warranty.read"],
+        category="warranty",
+        is_readonly=True,
+    ))
 
     def delete_one(args, context):
         from app.services.warranty_service import delete_warranty_code
         return delete_warranty_code(context["db"], int(context["business_id"]), int(args["code_id"]), bool(args.get("force", False)))
-    _register(registry, "delete_warranty_code", "حذف کد گارانتی؛ کد فعال/استفاده‌شده فقط با force=true حذف می‌شود و سوابق رهگیری/فعال‌سازی هم پاک می‌شوند. نیازمند تأیید.",
-        _schema({"code_id": {"type": "integer", "minimum": 1}, "force": {"type": "boolean"}}, ["code_id"]), delete_one, "warranty.delete", write=True, high=True)
+    registry.register(AIFunction(
+        name="delete_warranty_code",
+        description="حذف کد گارانتی؛ کد فعال/استفاده‌شده فقط با force=true حذف می‌شود و سوابق رهگیری/فعال‌سازی هم پاک می‌شوند. نیازمند تأیید.",
+        parameters_schema=_schema({"code_id": {"type": "integer", "minimum": 1}, "force": {"type": "boolean"}}, ["code_id"]),
+        handler=delete_one,
+        allowed_roles=_ROLES,
+        required_permissions=["warranty.delete"],
+        category="warranty",
+        requires_approval=True,
+        risk_level="high",
+        is_readonly=False,
+    ))
 
     def delete_many(args, context):
         from app.services.warranty_service import delete_warranty_codes_bulk
         return delete_warranty_codes_bulk(context["db"], int(context["business_id"]), [int(i) for i in args["code_ids"]], bool(args.get("force", False)))
-    _register(registry, "bulk_delete_warranty_codes", "حذف حداکثر ۵۰ کد گارانتی متعلق به کسب‌وکار متصل؛ نتیجهٔ حذف/رد/صرف‌نظر هر کد جداست. force=true کدهای فعال یا استفاده‌شده و سوابق وابسته را حذف می‌کند. نیازمند تأیید.",
-        _schema({"code_ids": {"type": "array", "minItems": 1, "maxItems": 50, "uniqueItems": True, "items": {"type": "integer", "minimum": 1}}, "force": {"type": "boolean"}}, ["code_ids"]), delete_many, "warranty.delete", write=True, high=True)
+    registry.register(AIFunction(
+        name="bulk_delete_warranty_codes",
+        description="حذف حداکثر ۵۰ کد گارانتی متعلق به کسب‌وکار متصل؛ نتیجهٔ حذف/رد/صرف‌نظر هر کد جداست. force=true کدهای فعال یا استفاده‌شده و سوابق وابسته را حذف می‌کند. نیازمند تأیید.",
+        parameters_schema=_schema({"code_ids": {"type": "array", "minItems": 1, "maxItems": 50, "uniqueItems": True, "items": {"type": "integer", "minimum": 1}}, "force": {"type": "boolean"}}, ["code_ids"]),
+        handler=delete_many,
+        allowed_roles=_ROLES,
+        required_permissions=["warranty.delete"],
+        category="warranty",
+        requires_approval=True,
+        risk_level="high",
+        is_readonly=False,
+    ))

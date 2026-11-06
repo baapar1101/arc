@@ -106,7 +106,11 @@ class YearEndClosingRequest(BaseModel):
         return vv
 
 
-@router.get("/{business_id}/fiscal-years")
+@router.get(
+    "/{business_id}/fiscal-years",
+    summary="فهرست سال‌های مالی",
+    description="ابزار MCP: `list_fiscal_years`.",
+)
 @require_business_access("business_id")
 def list_fiscal_years(
     request: Request,
@@ -146,7 +150,11 @@ def list_fiscal_years(
     return success_response(data=formatted, request=request, message="FISCAL_YEARS_LIST_FETCHED")
 
 
-@router.get("/{business_id}/fiscal-years/current")
+@router.get(
+    "/{business_id}/fiscal-years/current",
+    summary="سال مالی جاری",
+    description="ابزار MCP: `get_current_fiscal_year`.",
+)
 @require_business_access("business_id")
 def get_current_fiscal_year(
     request: Request,
@@ -171,7 +179,11 @@ def get_current_fiscal_year(
     return success_response(data=format_datetime_fields(data, request), request=request, message="FISCAL_YEAR_CURRENT_FETCHED")
 
 
-@router.get("/{business_id}/fiscal-years/{fiscal_year_id}/closing/preview")
+@router.get(
+    "/{business_id}/fiscal-years/{fiscal_year_id}/closing/preview",
+    summary="پیش‌نمایش بستن سال مالی",
+    description="ابزار MCP: `preview_year_end_closing`.",
+)
 @require_business_access("business_id")
 def preview_year_end_closing_endpoint(
     request: Request,
@@ -209,7 +221,11 @@ def preview_year_end_closing_endpoint(
         raise ApiError("PREVIEW_FAILED", f"خطا در پیش‌نمایش بستن سال مالی: {str(e)}", http_status=500)
 
 
-@router.post("/{business_id}/fiscal-years/{fiscal_year_id}/close")
+@router.post(
+    "/{business_id}/fiscal-years/{fiscal_year_id}/close",
+    summary="بستن سال مالی",
+    description="ابزار MCP: `close_fiscal_year` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 async def close_fiscal_year_endpoint(
     request: Request,
@@ -271,7 +287,11 @@ class FiscalYearRollbackExecuteRequest(BaseModel):
     confirmation_token: str = Field(..., min_length=10, description="توکن بازگشتی از پیش‌نمایش")
 
 
-@router.get("/{business_id}/fiscal-years/current/rollback/preview")
+@router.get(
+    "/{business_id}/fiscal-years/current/rollback/preview",
+    summary="پیش‌نمایش بازگشت سال مالی",
+    description="ابزار MCP: `preview_fiscal_year_rollback`.",
+)
 @require_business_access("business_id")
 def preview_fiscal_year_rollback(
     request: Request,
@@ -300,7 +320,11 @@ def preview_fiscal_year_rollback(
         raise ApiError("ROLLBACK_PREVIEW_FAILED", msg, http_status=500)
 
 
-@router.post("/{business_id}/fiscal-years/current/rollback/execute")
+@router.post(
+    "/{business_id}/fiscal-years/current/rollback/execute",
+    summary="اجرای بازگشت سال مالی جاری",
+    description="ابزار MCP: `execute_fiscal_year_rollback` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def execute_fiscal_year_rollback(
     request: Request,
@@ -353,7 +377,11 @@ class FiscalYearCreateRequest(BaseModel):
     )
 
 
-@router.post("/{business_id}/fiscal-years")
+@router.post(
+    "/{business_id}/fiscal-years",
+    summary="ایجاد سال مالی",
+    description="ابزار MCP: `create_fiscal_year` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def create_fiscal_year_endpoint(
     request: Request,
@@ -426,7 +454,11 @@ class MigrationEnsureYearsRequest(BaseModel):
 
 # مسیرهای migration باید قبل از .../{fiscal_year_id}/set-current ثبت شوند؛
 # وگرنه FastAPI مقدار "migration" را به‌عنوان fiscal_year_id می‌گیرد.
-@router.post("/{business_id}/fiscal-years/migration/ensure")
+@router.post(
+    "/{business_id}/fiscal-years/migration/ensure",
+    summary="ایجاد دسته‌ای سال مالی برای مهاجرت",
+    description="مخصوص مهاجرت تاریخچه؛ در MCP ثبت نشده.",
+)
 @require_business_access("business_id")
 def migration_ensure_fiscal_years(
     request: Request,
@@ -579,7 +611,11 @@ class MigrationSetCurrentRequest(BaseModel):
     fiscal_year_id: int = Field(..., gt=0)
 
 
-@router.post("/{business_id}/fiscal-years/migration/set-current")
+@router.post(
+    "/{business_id}/fiscal-years/migration/set-current",
+    summary="تنظیم سال جاری پس از مهاجرت",
+    description="مخصوص مهاجرت تاریخچه؛ در MCP ثبت نشده.",
+)
 @require_business_access("business_id")
 def migration_set_current_fiscal_year(
     request: Request,
@@ -609,7 +645,11 @@ def migration_set_current_fiscal_year(
     )
 
 
-@router.post("/{business_id}/fiscal-years/{fiscal_year_id}/set-current")
+@router.post(
+    "/{business_id}/fiscal-years/{fiscal_year_id}/set-current",
+    summary="تنظیم سال مالی جاری",
+    description="ابزار MCP: `set_current_fiscal_year` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def set_current_fiscal_year_endpoint(
     request: Request,
@@ -644,7 +684,11 @@ def set_current_fiscal_year_endpoint(
     )
 
 
-@router.put("/{business_id}/fiscal-years/current")
+@router.put(
+    "/{business_id}/fiscal-years/current",
+    summary="ویرایش سال مالی جاری",
+    description="ابزار MCP: `update_current_fiscal_year` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def update_current_fiscal_year(
     request: Request,

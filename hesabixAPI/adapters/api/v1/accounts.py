@@ -54,7 +54,7 @@ def _build_tree(nodes: list[Dict[str, Any]]) -> list[AccountTreeNode]:
 
 @router.get("/business/{business_id}/tree",
 	summary="دریافت درخت حساب‌ها برای یک کسب و کار",
-	description="لیست حساب‌های عمومی و حساب‌های اختصاصی کسب و کار به صورت درختی",
+	description="لیست حساب‌های عمومی و حساب‌های اختصاصی کسب و کار به صورت درختی. ابزار MCP: `get_accounts_tree`.",
 )
 @require_business_access("business_id")
 def get_accounts_tree(
@@ -97,7 +97,7 @@ def get_accounts_tree(
 
 @router.get("/business/{business_id}",
 	summary="دریافت لیست حساب‌ها برای یک کسب و کار",
-	description="لیست تمام حساب‌های عمومی و حساب‌های اختصاصی کسب و کار (بدون ساختار درختی)",
+	description="ابزار MCP: `list_accounts`.",
 )
 @require_business_access("business_id")
 def get_accounts_list(
@@ -130,7 +130,7 @@ def get_accounts_list(
 
 @router.get("/business/{business_id}/account/{account_id}",
 	summary="دریافت جزئیات یک حساب خاص",
-	description="دریافت اطلاعات کامل یک حساب بر اساس ID",
+	description="ابزار MCP: `get_account`.",
 )
 @require_business_access("business_id")
 def get_account_by_id(
@@ -167,7 +167,7 @@ def get_account_by_id(
 
 @router.post("/business/{business_id}",
 	summary="جستجو و فیلتر حساب‌ها",
-	description="جستجو در حساب‌ها با قابلیت فیلتر، مرتب‌سازی و صفحه‌بندی",
+	description="ابزار MCP: `list_accounts`.",
 )
 @require_business_access("business_id")
 def search_accounts(
@@ -233,7 +233,7 @@ def search_accounts(
 @router.post(
 	"/business/{business_id}/create",
 	summary="ایجاد حساب جدید برای یک کسب‌وکار",
-	description="ایجاد حساب اختصاصی (business-specific).",
+	description="ابزار MCP: `create_account` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def create_business_account(
@@ -279,7 +279,7 @@ def create_business_account(
 @router.put(
 	"/account/{account_id}",
 	summary="ویرایش حساب",
-	description="ویرایش حساب اختصاصی بیزنس (دارای دسترسی write). حساب‌های عمومی غیرقابل‌ویرایش هستند.",
+	description="ابزار MCP: `update_account` (نیازمند تأیید).",
 )
 def update_account_endpoint(
 	request: Request,
@@ -324,7 +324,7 @@ def update_account_endpoint(
 @router.delete(
 	"/account/{account_id}",
 	summary="حذف حساب",
-	description="حذف حساب اختصاصی بیزنس (دارای دسترسی write). حساب‌های عمومی غیرقابل‌حذف هستند.",
+	description="ابزار MCP: `delete_account` (نیازمند تأیید).",
 )
 def delete_account_endpoint(
 	request: Request,

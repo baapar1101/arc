@@ -44,6 +44,7 @@ TOOL_CAPABILITIES: frozenset[str] = frozenset({
     "inventory.bom",
     "inventory.product",
     "inventory.production",
+    "inventory.warranty",
     "inventory.stock",
     "inventory.warehouse",
     "inventory.barcode",
@@ -70,6 +71,7 @@ TOOL_CAPABILITIES: frozenset[str] = frozenset({
     "misc.general",
     "office_automation.correspondence",
     "payroll.payroll",
+    "repair.service",
 })
 
 # نام دقیق → capability (منبع حقیقت)

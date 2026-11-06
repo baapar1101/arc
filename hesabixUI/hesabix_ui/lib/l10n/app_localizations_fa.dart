@@ -2758,6 +2758,177 @@ class AppLocalizationsFa extends AppLocalizations {
   String get aiSkillsPublisherMenu => 'درآمد مهارت‌ها';
 
   @override
+  String get aiMcpConnectionsMenu => 'دستیارهای متصل';
+
+  @override
+  String get aiMcpConnectionsTitle => 'دستیارهای متصل';
+
+  @override
+  String get aiMcpConnectionsSubtitle =>
+      'دسترسی ChatGPT و Claude به این کسب‌وکار را ببینید، کم کنید یا قطع کنید.';
+
+  @override
+  String get aiMcpConnectHint =>
+      'در ChatGPT یک Custom MCP server بسازید و این آدرس را وارد کنید. بعد از تأیید دسترسی، اتصال اینجا دیده می‌شود تا بتوانید آن را تغییر دهید یا قطع کنید.';
+
+  @override
+  String get aiMcpServerUrlLabel => 'آدرس سرور MCP';
+
+  @override
+  String get aiMcpCopyUrl => 'کپی آدرس';
+
+  @override
+  String get aiMcpUrlCopied => 'آدرس کپی شد.';
+
+  @override
+  String get aiMcpEmpty => 'هنوز هیچ دستیاری به این کسب‌وکار وصل نشده است.';
+
+  @override
+  String get aiMcpPluginInactiveBanner =>
+      'افزونه سرور MCP فعال نیست. اتصال‌های قبلی را همچنان می‌توانید از اینجا قطع کنید.';
+
+  @override
+  String get aiMcpPluginExpiredBanner =>
+      'اشتراک افزونه سرور MCP تمام شده است. اتصال‌های موجود دیگر داده کسب‌وکار را نمی‌گیرند؛ آن‌ها را قطع کنید یا افزونه را تمدید کنید.';
+
+  @override
+  String get aiMcpOpenMarketplace => 'باز کردن بازار افزونه‌ها';
+
+  @override
+  String get aiMcpClientChatgpt => 'ChatGPT';
+
+  @override
+  String get aiMcpClientClaude => 'Claude';
+
+  @override
+  String get aiMcpClientOauth => 'دستیار OAuth';
+
+  @override
+  String get aiMcpClientManual => 'اتصال دستی';
+
+  @override
+  String get aiMcpStatusActive => 'فعال';
+
+  @override
+  String get aiMcpStatusExpired => 'منقضی';
+
+  @override
+  String get aiMcpStatusRevoked => 'قطع‌شده';
+
+  @override
+  String get aiMcpStatusMembershipInactive => 'عضو دیگر دسترسی ندارد';
+
+  @override
+  String get aiMcpReadOnly => 'فقط خواندن';
+
+  @override
+  String get aiMcpReadWrite => 'خواندن و نوشتن';
+
+  @override
+  String get aiMcpUnrestrictedTools => 'همه ابزارهای مجاز این نقش';
+
+  @override
+  String aiMcpToolCount(int count) {
+    return '$count ابزار';
+  }
+
+  @override
+  String aiMcpLastUsed(String when) {
+    return 'آخرین استفاده: $when';
+  }
+
+  @override
+  String get aiMcpNeverUsed => 'هنوز استفاده نشده';
+
+  @override
+  String aiMcpConnectedAt(String when) {
+    return 'اتصال: $when';
+  }
+
+  @override
+  String aiMcpExpiresAt(String when) {
+    return 'انقضا: $when';
+  }
+
+  @override
+  String get aiMcpChangeAccess => 'تغییر دسترسی';
+
+  @override
+  String get aiMcpRevoke => 'قطع دسترسی';
+
+  @override
+  String get aiMcpRevokeConfirmTitle => 'این دستیار قطع شود؟';
+
+  @override
+  String get aiMcpRevokeConfirmBody =>
+      'ChatGPT یا Claude از درخواست بعدی به این کسب‌وکار دسترسی نخواهد داشت. اتصال دوباره فقط با رضایت جدید ممکن است.';
+
+  @override
+  String get aiMcpRevoked => 'دسترسی دستیار قطع شد.';
+
+  @override
+  String get aiMcpRevokeAll => 'قطع همه دستیارها';
+
+  @override
+  String get aiMcpRevokeAllConfirmTitle => 'همه دستیارها قطع شوند؟';
+
+  @override
+  String get aiMcpRevokeAllConfirmBody =>
+      'همه اتصال‌های ChatGPT، Claude و اتصال‌های دستی MCP این کسب‌وکار فوراً باطل می‌شوند.';
+
+  @override
+  String aiMcpRevokeAllDone(int count) {
+    return '$count اتصال قطع شد.';
+  }
+
+  @override
+  String get aiMcpPermissionsTitle => 'ابزارهای این اتصال';
+
+  @override
+  String get aiMcpSearchTools => 'جستجوی ابزار';
+
+  @override
+  String get aiMcpEnableWrites => 'اجازه ابزارهای نوشتنی';
+
+  @override
+  String get aiMcpEnableWritesHint =>
+      'ابزارهای نوشتنی می‌توانند فاکتور، سند و سایر سوابق را بسازند یا تغییر دهند.';
+
+  @override
+  String get aiMcpWritesNeedConfirm =>
+      'در حال اعطای دسترسی نوشتن هستید. دستیار می‌تواند سوابق این کسب‌وکار را تغییر دهد.';
+
+  @override
+  String get aiMcpWidenConfirm =>
+      'در حال اعطای ابزارهای بیشتری به این دستیار هستید.';
+
+  @override
+  String get aiMcpDenyAllConfirm =>
+      'هیچ ابزاری باقی نمی‌ماند. اتصال قطع نمی‌شود، اما دستیار تا اعطای دوباره نمی‌تواند داده کسب‌وکار را بخواند.';
+
+  @override
+  String get aiMcpSaveAccess => 'ذخیره دسترسی';
+
+  @override
+  String get aiMcpAccessSaved =>
+      'مجوز اتصال به‌روز شد. ممکن است دستیار لازم باشد فهرست ابزارها را تازه‌سازی کند.';
+
+  @override
+  String get aiMcpNoTools => 'برای این کاربر ابزاری در دسترس نیست.';
+
+  @override
+  String get aiMcpCannotEditInactive =>
+      'چون عضو دیگر دسترسی ندارد، این اتصال را فقط می‌توان قطع کرد.';
+
+  @override
+  String get aiMcpCannotEditRevoked => 'این اتصال دیگر فعال نیست.';
+
+  @override
+  String aiMcpConnectedBy(String name) {
+    return 'وصل‌شده توسط $name';
+  }
+
+  @override
   String get crmMenu => 'CRM';
 
   @override

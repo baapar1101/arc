@@ -13,7 +13,7 @@ router = APIRouter(prefix="/tax-types", tags=["مالیات"])
 
 @router.get("/", 
     summary="لیست نوع‌های مالیات", 
-    description="دریافت لیست تمام نوع‌های مالیات استاندارد",
+    description="ابزار MCP: `list_tax_types`.",
     response_model=SuccessResponse,
     responses={
         200: {

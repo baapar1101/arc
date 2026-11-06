@@ -63,7 +63,11 @@ def _format_response(data, request: Request):
 
 # ========== Plugin Status ==========
 
-@router.get("/businesses/{business_id}/plugin-status")
+@router.get(
+    "/businesses/{business_id}/plugin-status",
+    summary="وضعیت افزونه تعمیرگاه",
+    description="فعال بودن لایسنس تعمیرگاه. ابزار MCP: `get_repair_shop_plugin_status`.",
+)
 def get_plugin_status(
     request: Request,
     business_id: int,
@@ -80,7 +84,11 @@ def get_plugin_status(
 
 # ========== Settings ==========
 
-@router.get("/businesses/{business_id}/settings")
+@router.get(
+    "/businesses/{business_id}/settings",
+    summary="تنظیمات تعمیرگاه",
+    description="ابزار MCP: `get_repair_shop_settings`.",
+)
 def get_settings(
     request: Request,
     business_id: int,
@@ -98,7 +106,11 @@ def get_settings(
     return success_response(data=_format_response(result, request), request=request)
 
 
-@router.put("/businesses/{business_id}/settings")
+@router.put(
+    "/businesses/{business_id}/settings",
+    summary="ویرایش تنظیمات تعمیرگاه",
+    description="ابزار MCP: `update_repair_shop_settings` (نیازمند تأیید).",
+)
 def update_settings(
     request: Request,
     business_id: int,
@@ -121,7 +133,11 @@ def update_settings(
 
 # ========== Technicians ==========
 
-@router.get("/businesses/{business_id}/technicians")
+@router.get(
+    "/businesses/{business_id}/technicians",
+    summary="فهرست تعمیرکاران",
+    description="ابزار MCP: `list_repair_technicians`.",
+)
 def list_technicians(
     request: Request,
     business_id: int,
@@ -142,7 +158,11 @@ def list_technicians(
     return success_response(data=_format_response(result, request), request=request)
 
 
-@router.get("/businesses/{business_id}/technicians/{technician_id}")
+@router.get(
+    "/businesses/{business_id}/technicians/{technician_id}",
+    summary="جزئیات تعمیرکار",
+    description="ابزار MCP جداگانه ندارد؛ از `list_repair_technicians` استفاده شود.",
+)
 def get_technician(
     request: Request,
     business_id: int,
@@ -161,7 +181,11 @@ def get_technician(
     return success_response(data=_format_response(result, request), request=request)
 
 
-@router.post("/businesses/{business_id}/technicians")
+@router.post(
+    "/businesses/{business_id}/technicians",
+    summary="ثبت تعمیرکار",
+    description="ابزار MCP: `create_repair_technician` (نیازمند تأیید).",
+)
 def create_technician(
     request: Request,
     business_id: int,
@@ -182,7 +206,11 @@ def create_technician(
     return success_response(data=_format_response(result, request), request=request, http_status=201)
 
 
-@router.put("/businesses/{business_id}/technicians/{technician_id}")
+@router.put(
+    "/businesses/{business_id}/technicians/{technician_id}",
+    summary="ویرایش تعمیرکار",
+    description="ابزار MCP: `update_repair_technician` (نیازمند تأیید).",
+)
 def update_technician(
     request: Request,
     business_id: int,
@@ -204,7 +232,11 @@ def update_technician(
     return success_response(data=_format_response(result, request), request=request)
 
 
-@router.delete("/businesses/{business_id}/technicians/{technician_id}")
+@router.delete(
+    "/businesses/{business_id}/technicians/{technician_id}",
+    summary="حذف تعمیرکار",
+    description="ابزار MCP: `delete_repair_technician` (نیازمند تأیید).",
+)
 def delete_technician(
     request: Request,
     business_id: int,
@@ -227,7 +259,11 @@ def delete_technician(
 
 # ========== Repair Orders ==========
 
-@router.get("/businesses/{business_id}/orders")
+@router.get(
+    "/businesses/{business_id}/orders",
+    summary="فهرست سفارش‌های تعمیر",
+    description="ابزار MCP: `search_repair_orders`.",
+)
 def list_repair_orders(
     request: Request,
     business_id: int,
@@ -279,7 +315,11 @@ def list_repair_orders(
     return success_response(data=_format_response(result, request), request=request)
 
 
-@router.get("/businesses/{business_id}/orders/{order_id}")
+@router.get(
+    "/businesses/{business_id}/orders/{order_id}",
+    summary="جزئیات سفارش تعمیر",
+    description="ابزار MCP: `get_repair_order_details`.",
+)
 def get_repair_order(
     request: Request,
     business_id: int,
@@ -298,7 +338,11 @@ def get_repair_order(
     return success_response(data=_format_response(result, request), request=request)
 
 
-@router.post("/businesses/{business_id}/orders")
+@router.post(
+    "/businesses/{business_id}/orders",
+    summary="ثبت سفارش تعمیر",
+    description="ابزار MCP: `create_repair_order` (نیازمند تأیید).",
+)
 def create_repair_order(
     request: Request,
     business_id: int,
@@ -320,7 +364,11 @@ def create_repair_order(
     return success_response(data=_format_response(result, request), request=request, http_status=201)
 
 
-@router.put("/businesses/{business_id}/orders/{order_id}")
+@router.put(
+    "/businesses/{business_id}/orders/{order_id}",
+    summary="ویرایش سفارش تعمیر",
+    description="ابزار MCP: `update_repair_order` (نیازمند تأیید).",
+)
 def update_repair_order(
     request: Request,
     business_id: int,
@@ -342,7 +390,11 @@ def update_repair_order(
     return success_response(data=_format_response(result, request), request=request)
 
 
-@router.delete("/businesses/{business_id}/orders/{order_id}")
+@router.delete(
+    "/businesses/{business_id}/orders/{order_id}",
+    summary="لغو سفارش تعمیر",
+    description="ابزار MCP: `cancel_repair_order` (نیازمند تأیید).",
+)
 def delete_repair_order(
     request: Request,
     business_id: int,
@@ -365,7 +417,11 @@ def delete_repair_order(
 
 # ========== Operations ==========
 
-@router.post("/businesses/{business_id}/orders/{order_id}/assign-technician")
+@router.post(
+    "/businesses/{business_id}/orders/{order_id}/assign-technician",
+    summary="اختصاص تعمیرکار",
+    description="ابزار MCP: `assign_repair_technician` (نیازمند تأیید).",
+)
 def assign_technician(
     request: Request,
     business_id: int,
@@ -387,7 +443,11 @@ def assign_technician(
     return success_response(data=_format_response(result, request), request=request)
 
 
-@router.post("/businesses/{business_id}/orders/{order_id}/update-status")
+@router.post(
+    "/businesses/{business_id}/orders/{order_id}/update-status",
+    summary="تغییر وضعیت سفارش تعمیر",
+    description="ابزار MCP: `update_repair_order_status` (نیازمند تأیید).",
+)
 def update_status(
     request: Request,
     business_id: int,
@@ -410,7 +470,11 @@ def update_status(
     return success_response(data=_format_response(result, request), request=request)
 
 
-@router.post("/businesses/{business_id}/orders/{order_id}/add-parts")
+@router.post(
+    "/businesses/{business_id}/orders/{order_id}/add-parts",
+    summary="افزودن قطعه به سفارش تعمیر",
+    description="ابزار MCP: `add_repair_parts` (نیازمند تأیید).",
+)
 def add_parts(
     request: Request,
     business_id: int,
@@ -433,7 +497,11 @@ def add_parts(
     return success_response(data=_format_response(result, request), request=request)
 
 
-@router.delete("/businesses/{business_id}/orders/{order_id}/parts/{part_id}")
+@router.delete(
+    "/businesses/{business_id}/orders/{order_id}/parts/{part_id}",
+    summary="حذف قطعه از سفارش تعمیر",
+    description="ابزار MCP: `remove_repair_part` (نیازمند تأیید).",
+)
 def remove_part(
     request: Request,
     business_id: int,
@@ -455,7 +523,11 @@ def remove_part(
     return success_response(data=_format_response(result, request), request=request)
 
 
-@router.post("/businesses/{business_id}/orders/{order_id}/calculate-costs")
+@router.post(
+    "/businesses/{business_id}/orders/{order_id}/calculate-costs",
+    summary="محاسبه هزینه تعمیر",
+    description="ابزار MCP: `calculate_repair_costs` (نیازمند تأیید).",
+)
 def calculate_costs(
     request: Request,
     business_id: int,
@@ -477,7 +549,11 @@ def calculate_costs(
     return success_response(data=_format_response(result, request), request=request)
 
 
-@router.post("/businesses/{business_id}/orders/{order_id}/complete")
+@router.post(
+    "/businesses/{business_id}/orders/{order_id}/complete",
+    summary="اتمام سفارش تعمیر",
+    description="ابزار MCP: `complete_repair_order` (نیازمند تأیید).",
+)
 def complete_repair(
     request: Request,
     business_id: int,
@@ -500,7 +576,11 @@ def complete_repair(
     return success_response(data=_format_response(result, request), request=request)
 
 
-@router.post("/businesses/{business_id}/orders/{order_id}/deliver")
+@router.post(
+    "/businesses/{business_id}/orders/{order_id}/deliver",
+    summary="تحویل سفارش تعمیر",
+    description="ابزار MCP: `deliver_repair_order` (نیازمند تأیید).",
+)
 def deliver_repair(
     request: Request,
     business_id: int,
@@ -524,7 +604,11 @@ def deliver_repair(
 
 # ========== Accounting ==========
 
-@router.post("/businesses/{business_id}/orders/{order_id}/create-invoice")
+@router.post(
+    "/businesses/{business_id}/orders/{order_id}/create-invoice",
+    summary="صدور فاکتور تعمیر",
+    description="ابزار MCP: `create_repair_invoice` (نیازمند تأیید).",
+)
 def create_repair_invoice(
     request: Request,
     business_id: int,
@@ -554,7 +638,11 @@ def create_repair_invoice(
     return success_response(data=_format_response(result, request), request=request, http_status=201)
 
 
-@router.get("/businesses/{business_id}/orders/{order_id}/accounting-summary")
+@router.get(
+    "/businesses/{business_id}/orders/{order_id}/accounting-summary",
+    summary="خلاصه حسابداری سفارش تعمیر",
+    description="ابزار MCP: `get_repair_accounting_summary`.",
+)
 def get_accounting_summary(
     request: Request,
     business_id: int,
@@ -577,7 +665,11 @@ def get_accounting_summary(
 
 # ========== Reports ==========
 
-@router.get("/businesses/{business_id}/warranty/{warranty_code_id}/history")
+@router.get(
+    "/businesses/{business_id}/warranty/{warranty_code_id}/history",
+    summary="سوابق تعمیر با گارانتی",
+    description="ابزار MCP: `get_repair_history_by_warranty`.",
+)
 def get_warranty_repair_history(
     request: Request,
     business_id: int,
@@ -598,7 +690,11 @@ def get_warranty_repair_history(
     return success_response(data=_format_response({"items": result}, request), request=request)
 
 
-@router.post("/businesses/{business_id}/orders/{order_id}/attachments")
+@router.post(
+    "/businesses/{business_id}/orders/{order_id}/attachments",
+    summary="آپلود پیوست سفارش تعمیر",
+    description="آپلود باینری است و در MCP ثبت نشده.",
+)
 def add_attachment(
     request: Request,
     business_id: int,
@@ -618,7 +714,11 @@ def add_attachment(
     return success_response(data=_format_response(result, request), request=request, http_status=201)
 
 
-@router.delete("/businesses/{business_id}/orders/{order_id}/attachments/{attachment_id}")
+@router.delete(
+    "/businesses/{business_id}/orders/{order_id}/attachments/{attachment_id}",
+    summary="حذف پیوست سفارش تعمیر",
+    description="عملیات پیوست باینری است و در MCP ثبت نشده.",
+)
 def delete_attachment(
     request: Request,
     business_id: int,

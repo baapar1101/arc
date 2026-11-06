@@ -44,7 +44,11 @@ def _ensure_plugin(db: Session, business_id: int) -> None:
 		)
 
 
-@router.get("/business/{business_id}/settings")
+@router.get(
+	"/business/{business_id}/settings",
+	summary="تنظیمات اتصال ووکامرس",
+	description="آدرس فروشگاه و وضعیت توکن پل (ماسک‌شده). افزونه ووکامرس باید فعال باشد. ابزار MCP: get_woocommerce_settings.",
+)
 def get_woocommerce_settings(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -59,7 +63,11 @@ def get_woocommerce_settings(
 	return success_response(data, request)
 
 
-@router.put("/business/{business_id}/settings")
+@router.put(
+	"/business/{business_id}/settings",
+	summary="ذخیره تنظیمات ووکامرس",
+	description="store_base_url، توکن پل و پوش موجودی. در MCP توکن پذیرفته نمی‌شود. ابزار MCP: update_woocommerce_settings.",
+)
 def put_woocommerce_settings(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -75,7 +83,11 @@ def put_woocommerce_settings(
 	return success_response(data, request)
 
 
-@router.post("/business/{business_id}/bridge/test")
+@router.post(
+	"/business/{business_id}/bridge/test",
+	summary="آزمون پل ووکامرس",
+	description="اتصال آزمایشی به پل وردپرس ArcWOC. ابزار MCP: test_woocommerce_bridge.",
+)
 def post_woocommerce_bridge_test(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -90,7 +102,11 @@ def post_woocommerce_bridge_test(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/bridge/orders")
+@router.get(
+	"/business/{business_id}/bridge/orders",
+	summary="سفارش‌های ووکامرس",
+	description="ابزار MCP: `list_woocommerce_orders`.",
+)
 def get_woocommerce_bridge_orders(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -126,7 +142,11 @@ def get_woocommerce_bridge_orders(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/bridge/products")
+@router.get(
+	"/business/{business_id}/bridge/products",
+	summary="کالاهای ووکامرس",
+	description="ابزار MCP: `list_woocommerce_products`.",
+)
 def get_woocommerce_bridge_products(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -144,7 +164,11 @@ def get_woocommerce_bridge_products(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/bridge/reports/summary")
+@router.get(
+	"/business/{business_id}/bridge/reports/summary",
+	summary="خلاصه فروش ووکامرس",
+	description="خلاصه فروش بازه after/before. ابزار MCP: get_woocommerce_sales_summary.",
+)
 def get_woocommerce_bridge_reports_summary(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -161,7 +185,11 @@ def get_woocommerce_bridge_reports_summary(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/bridge/customers")
+@router.get(
+	"/business/{business_id}/bridge/customers",
+	summary="مشتریان ووکامرس",
+	description="لیست مشتریان پل وردپرس. ابزار MCP: list_woocommerce_customers.",
+)
 def get_woocommerce_bridge_customers(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -179,7 +207,11 @@ def get_woocommerce_bridge_customers(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/bridge/control/sync-stats")
+@router.get(
+	"/business/{business_id}/bridge/control/sync-stats",
+	summary="آمار همگام ووکامرس",
+	description="ابزار MCP: `get_woocommerce_sync_stats`.",
+)
 def get_woocommerce_bridge_control_sync_stats(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -194,7 +226,11 @@ def get_woocommerce_bridge_control_sync_stats(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/bridge/control/settings-summary")
+@router.get(
+	"/business/{business_id}/bridge/control/settings-summary",
+	summary="خلاصه تنظیمات پل ووکامرس",
+	description="ابزار MCP: `get_woocommerce_settings`. توکن خام برنمی‌گردد.",
+)
 def get_woocommerce_bridge_control_settings_summary(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -209,7 +245,11 @@ def get_woocommerce_bridge_control_settings_summary(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/bridge/control/logs")
+@router.get(
+	"/business/{business_id}/bridge/control/logs",
+	summary="لاگ کنترل ووکامرس",
+	description="لاگ عملیات پل. ابزار MCP: list_woocommerce_control_logs.",
+)
 def get_woocommerce_bridge_control_logs(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -227,7 +267,11 @@ def get_woocommerce_bridge_control_logs(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/bridge/control/connection")
+@router.get(
+	"/business/{business_id}/bridge/control/connection",
+	summary="وضعیت اتصال پل ووکامرس",
+	description="وضعیت اتصال بدون توکن. ابزار MCP: get_woocommerce_connection_status.",
+)
 def get_woocommerce_bridge_control_connection(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -242,7 +286,11 @@ def get_woocommerce_bridge_control_connection(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/bridge/control/plugin")
+@router.get(
+	"/business/{business_id}/bridge/control/plugin",
+	summary="اطلاعات افزونه وردپرس ووکامرس",
+	description="نسخه افزونه پل. ابزار MCP: get_woocommerce_plugin_info.",
+)
 def get_woocommerce_bridge_control_plugin(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -257,7 +305,11 @@ def get_woocommerce_bridge_control_plugin(
 	return success_response(data, request)
 
 
-@router.post("/business/{business_id}/bridge/control/sync/product")
+@router.post(
+	"/business/{business_id}/bridge/control/sync/product",
+	summary="همگام یک کالای ووکامرس",
+	description="ابزار MCP: `sync_woocommerce_product` (نیازمند تأیید).",
+)
 def post_woocommerce_bridge_control_sync_product(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -280,7 +332,11 @@ def post_woocommerce_bridge_control_sync_product(
 	return success_response(data, request)
 
 
-@router.post("/business/{business_id}/bridge/control/sync/orders")
+@router.post(
+	"/business/{business_id}/bridge/control/sync/orders",
+	summary="همگام سفارش‌های ووکامرس",
+	description="ابزار MCP: `sync_woocommerce_orders` (نیازمند تأیید).",
+)
 def post_woocommerce_bridge_control_sync_orders(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -298,7 +354,11 @@ def post_woocommerce_bridge_control_sync_orders(
 	return success_response(data, request)
 
 
-@router.post("/business/{business_id}/bridge/control/sync/products")
+@router.post(
+	"/business/{business_id}/bridge/control/sync/products",
+	summary="همگام کالاهای ووکامرس",
+	description="ابزار MCP: `sync_woocommerce_products` (نیازمند تأیید).",
+)
 def post_woocommerce_bridge_control_sync_products(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -316,7 +376,11 @@ def post_woocommerce_bridge_control_sync_products(
 	return success_response(data, request)
 
 
-@router.post("/business/{business_id}/bridge/control/sync/customers")
+@router.post(
+	"/business/{business_id}/bridge/control/sync/customers",
+	summary="همگام مشتریان ووکامرس",
+	description="ابزار MCP: `sync_woocommerce_customers` (نیازمند تأیید).",
+)
 def post_woocommerce_bridge_control_sync_customers(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -334,7 +398,11 @@ def post_woocommerce_bridge_control_sync_customers(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/bridge/control/queue/snapshot")
+@router.get(
+	"/business/{business_id}/bridge/control/queue/snapshot",
+	summary="نمای صف همگام ووکامرس",
+	description="وضعیت صف. ابزار MCP: get_woocommerce_queue_snapshot.",
+)
 def get_woocommerce_bridge_control_queue_snapshot(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -349,7 +417,11 @@ def get_woocommerce_bridge_control_queue_snapshot(
 	return success_response(data, request)
 
 
-@router.post("/business/{business_id}/bridge/control/queue/process-once")
+@router.post(
+	"/business/{business_id}/bridge/control/queue/process-once",
+	summary="پردازش یک دور صف ووکامرس",
+	description="یک دور صف را اجرا می‌کند. ابزار MCP: process_woocommerce_queue_once.",
+)
 def post_woocommerce_bridge_control_queue_process_once(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -364,7 +436,11 @@ def post_woocommerce_bridge_control_queue_process_once(
 	return success_response(data, request)
 
 
-@router.post("/business/{business_id}/bridge/control/plugin/update-check")
+@router.post(
+	"/business/{business_id}/bridge/control/plugin/update-check",
+	summary="بررسی به‌روزرسانی افزونه ووکامرس",
+	description="force اختیاری است. ابزار MCP: check_woocommerce_plugin_update.",
+)
 def post_woocommerce_bridge_control_plugin_update_check(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -382,7 +458,11 @@ def post_woocommerce_bridge_control_plugin_update_check(
 	return success_response(data, request)
 
 
-@router.post("/business/{business_id}/bridge/control/settings/patch")
+@router.post(
+	"/business/{business_id}/bridge/control/settings/patch",
+	summary="ویرایش تنظیمات پل ووکامرس",
+	description="ابزار MCP: `update_woocommerce_settings` (نیازمند تأیید). توکن از MCP پذیرفته نمی‌شود.",
+)
 def post_woocommerce_bridge_control_settings_patch(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -398,7 +478,11 @@ def post_woocommerce_bridge_control_settings_patch(
 	return success_response(data, request)
 
 
-@router.post("/business/{business_id}/bridge/control/stock-pull/run")
+@router.post(
+	"/business/{business_id}/bridge/control/stock-pull/run",
+	summary="کشیدن موجودی از ووکامرس",
+	description="موجودی فروشگاه را به حسابیکس می‌کشد. ابزار MCP: run_woocommerce_stock_pull.",
+)
 def post_woocommerce_bridge_control_stock_pull_run(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -414,7 +498,11 @@ def post_woocommerce_bridge_control_stock_pull_run(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/bridge/control/stock-status")
+@router.get(
+	"/business/{business_id}/bridge/control/stock-status",
+	summary="وضعیت همگام موجودی ووکامرس",
+	description="وضعیت موجودی بین دو سیستم. ابزار MCP: get_woocommerce_stock_status.",
+)
 def get_woocommerce_bridge_control_stock_status(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -429,7 +517,11 @@ def get_woocommerce_bridge_control_stock_status(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/bridge/control/stock-conflicts")
+@router.get(
+	"/business/{business_id}/bridge/control/stock-conflicts",
+	summary="تعارض موجودی ووکامرس",
+	description="ابزار MCP: `get_woocommerce_stock_conflicts`.",
+)
 def get_woocommerce_bridge_control_stock_conflicts(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -445,7 +537,11 @@ def get_woocommerce_bridge_control_stock_conflicts(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/bridge/control/opening-inventory/status")
+@router.get(
+	"/business/{business_id}/bridge/control/opening-inventory/status",
+	summary="وضعیت موجودی اول دوره ووکامرس",
+	description="وضعیت پل موجودی اول دوره فروشگاه ووکامرس همین کسب‌وکار. ابزار MCP: get_woocommerce_opening_inventory_status.",
+)
 def get_woocommerce_bridge_control_opening_inventory_status(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -460,7 +556,11 @@ def get_woocommerce_bridge_control_opening_inventory_status(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/bridge/control/opening-inventory/accounts")
+@router.get(
+	"/business/{business_id}/bridge/control/opening-inventory/accounts",
+	summary="حساب‌های موجودی اول دوره ووکامرس",
+	description="حساب‌های قابل انتخاب برای سند موجودی اول دوره. ابزار MCP: get_woocommerce_opening_inventory_accounts.",
+)
 def get_woocommerce_bridge_control_opening_inventory_accounts(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -475,7 +575,11 @@ def get_woocommerce_bridge_control_opening_inventory_accounts(
 	return success_response(data, request)
 
 
-@router.post("/business/{business_id}/bridge/control/opening-inventory/preview")
+@router.post(
+	"/business/{business_id}/bridge/control/opening-inventory/preview",
+	summary="پیش‌نمایش موجودی اول دوره ووکامرس",
+	description="پیش‌نمایش سند بدون ثبت نهایی. ابزار MCP: preview_woocommerce_opening_inventory.",
+)
 def post_woocommerce_bridge_control_opening_inventory_preview(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -491,7 +595,11 @@ def post_woocommerce_bridge_control_opening_inventory_preview(
 	return success_response(data, request)
 
 
-@router.post("/business/{business_id}/bridge/control/opening-inventory/prepare")
+@router.post(
+	"/business/{business_id}/bridge/control/opening-inventory/prepare",
+	summary="آماده‌سازی موجودی اول دوره ووکامرس",
+	description="تقسیم موجودی به دسته‌ها برای ارسال به پل. ابزار MCP: prepare_woocommerce_opening_inventory.",
+)
 def post_woocommerce_bridge_control_opening_inventory_prepare(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -507,7 +615,11 @@ def post_woocommerce_bridge_control_opening_inventory_prepare(
 	return success_response(data, request)
 
 
-@router.post("/business/{business_id}/bridge/control/opening-inventory/batch")
+@router.post(
+	"/business/{business_id}/bridge/control/opening-inventory/batch",
+	summary="ارسال دسته موجودی اول دوره ووکامرس",
+	description="ارسال یک دسته از اقلام موجودی اول دوره. ابزار MCP: batch_woocommerce_opening_inventory.",
+)
 def post_woocommerce_bridge_control_opening_inventory_batch(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -523,7 +635,11 @@ def post_woocommerce_bridge_control_opening_inventory_batch(
 	return success_response(data, request)
 
 
-@router.post("/business/{business_id}/bridge/control/opening-inventory/finalize")
+@router.post(
+	"/business/{business_id}/bridge/control/opening-inventory/finalize",
+	summary="نهایی‌سازی موجودی اول دوره ووکامرس",
+	description="ثبت نهایی موجودی اول دوره در حسابیکس و پل. ابزار MCP: finalize_woocommerce_opening_inventory.",
+)
 def post_woocommerce_bridge_control_opening_inventory_finalize(
 	request: Request,
 	business_id: int = Path(..., gt=0),
@@ -539,7 +655,11 @@ def post_woocommerce_bridge_control_opening_inventory_finalize(
 	return success_response(data, request)
 
 
-@router.post("/business/{business_id}/bridge/control/opening-inventory/cancel")
+@router.post(
+	"/business/{business_id}/bridge/control/opening-inventory/cancel",
+	summary="لغو موجودی اول دوره ووکامرس",
+	description="لغو فرآیند باز موجودی اول دوره. ابزار MCP: cancel_woocommerce_opening_inventory.",
+)
 def post_woocommerce_bridge_control_opening_inventory_cancel(
 	request: Request,
 	business_id: int = Path(..., gt=0),

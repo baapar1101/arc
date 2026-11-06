@@ -24,6 +24,7 @@ router = APIRouter(prefix="/persons", tags=["گروه اشخاص"])
 @router.get(
     "/businesses/{business_id}/person-groups",
     summary="لیست گروه‌های اشخاص",
+    description="ابزار MCP: `list_person_groups`.",
 )
 def list_groups(
     request: Request,
@@ -50,6 +51,7 @@ def list_groups(
 @router.get(
     "/businesses/{business_id}/person-groups/{group_id}",
     summary="جزئیات یک گروه",
+    description="ابزار MCP: `get_person_group`.",
 )
 def get_group(
     request: Request,
@@ -69,6 +71,7 @@ def get_group(
 @router.post(
     "/businesses/{business_id}/person-groups",
     summary="ایجاد گروه اشخاص",
+    description="ابزار MCP: `create_person_group` (نیازمند تأیید).",
 )
 def create_group(
     request: Request,
@@ -85,6 +88,7 @@ def create_group(
 @router.patch(
     "/businesses/{business_id}/person-groups/{group_id}",
     summary="ویرایش گروه اشخاص",
+    description="ابزار MCP: `update_person_group` (نیازمند تأیید).",
 )
 def patch_group(
     request: Request,
@@ -104,6 +108,7 @@ def patch_group(
 @router.delete(
     "/businesses/{business_id}/person-groups/{group_id}",
     summary="حذف گروه اشخاص",
+    description="ابزار MCP: `delete_person_group` (نیازمند تأیید).",
 )
 def remove_group(
     request: Request,

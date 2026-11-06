@@ -1943,6 +1943,15 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: false,
           ),
           _MenuItem(
+            key: 'ai/mcp-connections',
+            label: t.aiMcpConnectionsMenu,
+            icon: Icons.devices_other_outlined,
+            selectedIcon: Icons.devices_other,
+            path: _bu('ai/mcp-connections'),
+            type: _MenuItemType.simple,
+            hasAddButton: false,
+          ),
+          _MenuItem(
             key: 'ai/subscription',
             label: t.aiSubscriptionMenu,
             icon: Icons.subscriptions_outlined,
@@ -4170,6 +4179,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.digipayMenuTitle) return 'digipay';
     if (label == t.aiMenu ||
         label == t.aiAssistantMenu ||
+        label == t.aiMcpConnectionsMenu ||
         label == t.aiSubscriptionMenu ||
         label == t.aiUsageMenu ||
         label == t.aiSkillsMarketplaceMenu ||

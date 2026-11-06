@@ -146,7 +146,11 @@ def _filters(
 	}
 
 
-@router.get("/business/{business_id}/settings")
+@router.get(
+	"/business/{business_id}/settings",
+	summary="تنظیمات تولید پیشرفته",
+	description="ابزار MCP: `get_advanced_production_settings`. افزونه باید فعال باشد.",
+)
 def get_settings_endpoint(
 	request: Request,
 	business_id: int,
@@ -162,7 +166,11 @@ def get_settings_endpoint(
 	return _ok(data, request)
 
 
-@router.put("/business/{business_id}/settings")
+@router.put(
+	"/business/{business_id}/settings",
+	summary="ویرایش تنظیمات تولید پیشرفته",
+	description="ابزار MCP: `update_advanced_production_settings` (نیازمند تأیید).",
+)
 def update_settings_endpoint(
 	request: Request,
 	business_id: int,
@@ -179,7 +187,11 @@ def update_settings_endpoint(
 	return _ok(data, request)
 
 
-@router.get("/business/{business_id}/dashboard")
+@router.get(
+	"/business/{business_id}/dashboard",
+	summary="داشبورد تولید پیشرفته",
+	description="ابزار MCP: `get_advanced_production_dashboard`.",
+)
 def dashboard_endpoint(
 	request: Request,
 	business_id: int,
@@ -195,7 +207,11 @@ def dashboard_endpoint(
 	return _ok(data, request)
 
 
-@router.get("/business/{business_id}/reports/{report_key}")
+@router.get(
+	"/business/{business_id}/reports/{report_key}",
+	summary="گزارش نام‌دار تولید پیشرفته",
+	description="خروجی JSON یک کلید گزارش. ابزار MCP: `get_advanced_production_report`. خروجی اکسل/PDF در MCP نیست.",
+)
 def report_endpoint(
 	request: Request,
 	business_id: int,
@@ -285,7 +301,11 @@ def _export(db: Session, business_id: int, report_key: str, body: Dict[str, Any]
 	return list_excel_response(**common)
 
 
-@router.post("/business/{business_id}/reports/{report_key}/export/excel")
+@router.post(
+	"/business/{business_id}/reports/{report_key}/export/excel",
+	summary="خروجی Excel گزارش تولید پیشرفته",
+	description="خروجی باینری Excel است و در MCP ثبت نشده. JSON: `get_advanced_production_report`.",
+)
 def export_excel_endpoint(
 	request: Request,
 	business_id: int,
@@ -301,7 +321,11 @@ def export_excel_endpoint(
 	return _export(db, business_id, report_key, body, request, "excel")
 
 
-@router.post("/business/{business_id}/reports/{report_key}/export/pdf")
+@router.post(
+	"/business/{business_id}/reports/{report_key}/export/pdf",
+	summary="خروجی PDF گزارش تولید پیشرفته",
+	description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `get_advanced_production_report`.",
+)
 def export_pdf_endpoint(
 	request: Request,
 	business_id: int,
@@ -317,7 +341,11 @@ def export_pdf_endpoint(
 	return _export(db, business_id, report_key, body, request, "pdf")
 
 
-@router.get("/business/{business_id}/masters/{kind}")
+@router.get(
+	"/business/{business_id}/masters/{kind}",
+	summary="فهرست داده‌های پایه تولید پیشرفته",
+	description="ابزار MCP: `list_advanced_production_master`.",
+)
 def list_master_endpoint(
 	request: Request,
 	business_id: int,
@@ -333,7 +361,11 @@ def list_master_endpoint(
 	return _ok(list_master(db, business_id, kind), request)
 
 
-@router.post("/business/{business_id}/masters/{kind}")
+@router.post(
+	"/business/{business_id}/masters/{kind}",
+	summary="ایجاد داده پایه تولید پیشرفته",
+	description="ابزار MCP: `create_advanced_production_master` (نیازمند تأیید).",
+)
 def create_master_endpoint(
 	request: Request,
 	business_id: int,

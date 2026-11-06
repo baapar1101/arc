@@ -62,7 +62,7 @@ router = APIRouter(tags=["حسابداری"])
 @router.post(
     "/businesses/{business_id}/documents",
     summary="لیست اسناد حسابداری",
-    description="دریافت لیست تمام اسناد حسابداری (عمومی و اتوماتیک) با فیلتر و صفحه‌بندی",
+    description="لیست اسناد با فیلتر. ابزار MCP: `search_documents`. Excel/PDF در MCP نیست.",
 )
 @require_business_access("business_id")
 async def list_documents_endpoint(
@@ -130,7 +130,7 @@ async def list_documents_endpoint(
 @router.post(
     "/businesses/{business_id}/documents/export/pdf",
     summary="خروجی PDF لیست اسناد حسابداری",
-    description="دریافت فایل PDF لیست اسناد حسابداری با پشتیبانی از قالب سفارشی (documents/list)",
+    description="باینری PDF است؛ در MCP نیست. JSON: `search_documents`.",
 )
 @require_business_access("business_id")
 async def export_documents_pdf_endpoint(
@@ -320,7 +320,7 @@ async def export_documents_pdf_endpoint(
 @router.get(
     "/documents/{document_id}",
     summary="جزئیات سند حسابداری",
-    description="دریافت جزئیات کامل یک سند شامل تمام سطرهای سند",
+    description="جزئیات سند و سطرها. ابزار MCP: `get_document_details`. extra_info در MCP برنمی‌گردد.",
 )
 async def get_document_endpoint(
     request: Request,
@@ -353,7 +353,7 @@ async def get_document_endpoint(
 @router.delete(
     "/documents/{document_id}",
     summary="حذف سند حسابداری",
-    description="حذف یک سند حسابداری (فقط اسناد عمومی manual قابل حذف هستند)",
+    description="حذف سند دستی. ابزار MCP: `delete_manual_document` (نیازمند تأیید).",
 )
 async def delete_document_endpoint(
     request: Request,
@@ -390,7 +390,7 @@ async def delete_document_endpoint(
 @router.post(
     "/documents/bulk-delete",
     summary="حذف گروهی اسناد",
-    description="حذف گروهی اسناد حسابداری (فقط اسناد manual حذف می‌شوند)",
+    description="حذف گروهی اسناد دستی. ابزار MCP: `bulk_delete_manual_documents` (نیازمند تأیید).",
 )
 async def bulk_delete_documents_endpoint(
     request: Request,
@@ -460,7 +460,7 @@ async def bulk_delete_documents_endpoint(
 @router.get(
     "/businesses/{business_id}/documents/types-summary",
     summary="خلاصه آماری انواع اسناد",
-    description="دریافت خلاصه آماری تعداد هر نوع سند",
+    description="خلاصه تعداد هر نوع سند. ابزار MCP: `get_document_types_summary`.",
 )
 @require_business_access("business_id")
 async def get_document_types_summary_endpoint(
@@ -484,7 +484,7 @@ async def get_document_types_summary_endpoint(
 @router.post(
     "/businesses/{business_id}/documents/export/excel",
     summary="خروجی Excel اسناد",
-    description="دریافت فایل Excel لیست اسناد حسابداری",
+    description="خروجی باینری Excel است و در MCP ثبت نشده. JSON: `search_documents`.",
 )
 @require_business_access("business_id")
 async def export_documents_excel_endpoint(
@@ -544,7 +544,7 @@ async def export_documents_excel_endpoint(
 @router.get(
     "/documents/{document_id}/pdf",
     summary="PDF یک سند",
-    description="دریافت فایل PDF یک سند حسابداری",
+    description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `get_document_details`.",
 )
 async def get_document_pdf_endpoint(
     request: Request,
@@ -939,7 +939,7 @@ async def get_document_pdf_endpoint(
 @router.post(
     "/businesses/{business_id}/documents/manual",
     summary="ایجاد سند حسابداری دستی",
-    description="ایجاد یک سند حسابداری دستی جدید با سطرهای مورد نظر",
+    description="ایجاد سند دستی. ابزار MCP: `create_manual_document` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_manual_document_endpoint(
@@ -1035,7 +1035,7 @@ async def create_manual_document_endpoint(
 @router.put(
     "/documents/{document_id}",
     summary="ویرایش سند حسابداری دستی",
-    description="ویرایش یک سند حسابداری دستی (فقط اسناد manual قابل ویرایش هستند)",
+    description="ویرایش سند دستی. ابزار MCP: `update_manual_document` (نیازمند تأیید).",
 )
 async def update_manual_document_endpoint(
     request: Request,
@@ -1112,7 +1112,7 @@ async def update_manual_document_endpoint(
 @router.post(
     "/businesses/{business_id}/reports/cash-flow",
     summary="صورت جریان وجوه نقد",
-    description="گردش حساب‌های نقدی/بانک/تنخواه با قرارداد چندارزی (بدون فیلتر = معادل پایه)",
+    description="صورت جریان وجوه نقد. ابزار MCP: `get_report` با report_type=`cash_flow_statement` یا `get_cash_flow`.",
 )
 @require_business_access("business_id")
 async def cash_flow_report_endpoint(
@@ -1155,7 +1155,7 @@ async def cash_flow_report_endpoint(
 @router.post(
     "/businesses/{business_id}/reports/fx-revaluation",
     summary="گزارش تسعیر ارز",
-    description="اسناد تسعیر پایان‌دوره و پیش‌نمایش موقعیت‌های ارزی باز",
+    description="ابزار MCP: `get_report` با report_type=fx_revaluation.",
 )
 @require_business_access("business_id")
 async def fx_revaluation_report_endpoint(
@@ -1192,7 +1192,7 @@ async def fx_revaluation_report_endpoint(
 @router.post(
     "/businesses/{business_id}/reports/daily-sales",
     summary="گزارش فروش روزانه",
-    description="گزارش فروش روزانه با گروه‌بندی بر اساس تاریخ",
+    description="ابزار MCP: `get_report` با report_type=daily_sales.",
 )
 @require_business_access("business_id")
 async def daily_sales_report_endpoint(
@@ -1275,7 +1275,7 @@ async def daily_sales_report_endpoint(
 @router.post(
     "/businesses/{business_id}/reports/monthly-sales",
     summary="گزارش فروش ماهانه",
-    description="گزارش فروش ماهانه با گروه‌بندی بر اساس ماه",
+    description="ابزار MCP: `get_report` با report_type=monthly_sales.",
 )
 @require_business_access("business_id")
 async def monthly_sales_report_endpoint(
@@ -1374,7 +1374,7 @@ async def monthly_sales_report_endpoint(
 @router.post(
     "/businesses/{business_id}/reports/top-customers",
     summary="گزارش برترین مشتریان",
-    description="گزارش برترین مشتریان بر اساس مبلغ فروش",
+    description="ابزار MCP: `get_report` با report_type=top_customers.",
 )
 @require_business_access("business_id")
 async def top_customers_report_endpoint(
@@ -1474,7 +1474,7 @@ async def top_customers_report_endpoint(
 @router.post(
     "/businesses/{business_id}/reports/top-suppliers",
     summary="گزارش برترین تامین‌کنندگان",
-    description="گزارش برترین تامین‌کنندگان بر اساس مبلغ خرید",
+    description="ابزار MCP: `get_report` با report_type=top_suppliers.",
 )
 @require_business_access("business_id")
 async def top_suppliers_report_endpoint(
@@ -1582,7 +1582,7 @@ async def top_suppliers_report_endpoint(
 @router.post(
     "/businesses/{business_id}/reports/top-suppliers/export/excel",
     summary="خروجی Excel گزارش برترین تامین‌کنندگان",
-    description="خروجی Excel گزارش برترین تامین‌کنندگان با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="خروجی باینری Excel است و در MCP ثبت نشده. JSON: `get_report` با report_type=top_suppliers.",
 )
 @require_business_access("business_id")
 async def export_top_suppliers_report_excel(
@@ -1917,7 +1917,7 @@ async def export_top_suppliers_report_excel(
 @router.post(
     "/businesses/{business_id}/reports/daily-purchases",
     summary="گزارش خرید روزانه",
-    description="گزارش خرید روزانه با گروه‌بندی بر اساس تاریخ",
+    description="ابزار MCP: `get_report` با report_type=daily_purchases.",
 )
 @require_business_access("business_id")
 async def daily_purchases_report_endpoint(
@@ -2000,7 +2000,7 @@ async def daily_purchases_report_endpoint(
 @router.post(
     "/businesses/{business_id}/reports/daily-purchases/export/excel",
     summary="خروجی Excel گزارش خرید روزانه",
-    description="خروجی Excel گزارش خرید روزانه با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="خروجی باینری Excel است و در MCP ثبت نشده. JSON: `get_report` با report_type=daily_purchases.",
 )
 @require_business_access("business_id")
 async def export_daily_purchases_report_excel(
@@ -2333,7 +2333,7 @@ async def export_daily_purchases_report_excel(
 @router.post(
     "/businesses/{business_id}/reports/daily-purchases/export/pdf",
     summary="خروجی PDF گزارش خرید روزانه",
-    description="خروجی PDF گزارش خرید روزانه با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `get_report` با report_type=daily_purchases.",
 )
 @require_business_access("business_id")
 async def export_daily_purchases_report_pdf(
@@ -2614,7 +2614,7 @@ async def export_daily_purchases_report_pdf(
 @router.post(
     "/businesses/{business_id}/reports/materials-consumption",
     summary="گزارش مصرف مواد",
-    description="گزارش مصرف مواد از فاکتورهای تولید",
+    description="ابزار MCP: `get_report` با report_type=materials_consumption.",
 )
 @require_business_access("business_id")
 async def materials_consumption_report_endpoint(
@@ -2714,7 +2714,7 @@ async def materials_consumption_report_endpoint(
 @router.post(
     "/businesses/{business_id}/reports/production",
     summary="گزارش تولید",
-    description="گزارش تولید (کالاهای ساخته شده) از فاکتورهای تولید",
+    description="ابزار MCP: `get_report` با report_type=production.",
 )
 @require_business_access("business_id")
 async def production_report_endpoint(
@@ -2958,7 +2958,7 @@ def _parse_financial_package_body(request: Request, body: Dict[str, Any]) -> Dic
 @router.post(
     "/businesses/{business_id}/reports/trial-balance",
     summary="گزارش تراز آزمایشی",
-    description="گزارش تراز آزمایشی برای حساب‌های حسابداری",
+    description="تراز آزمایشی. ابزار MCP: `get_report` با report_type=`trial_balance`. Excel/PDF در MCP نیست.",
 )
 @require_business_access("business_id")
 async def trial_balance_report_endpoint(
@@ -3089,7 +3089,7 @@ async def trial_balance_report_endpoint(
 @router.post(
     "/businesses/{business_id}/reports/trial-balance/export/excel",
     summary="خروجی Excel گزارش تراز آزمایشی",
-    description="خروجی Excel گزارش تراز آزمایشی با قابلیت انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="خروجی باینری Excel است و در MCP ثبت نشده. JSON: `get_report` با report_type=trial_balance.",
 )
 @require_business_access("business_id")
 async def export_trial_balance_report_excel(
@@ -3457,7 +3457,7 @@ async def export_trial_balance_report_excel(
 @router.post(
     "/businesses/{business_id}/reports/trial-balance/export/pdf",
     summary="خروجی PDF گزارش تراز آزمایشی",
-    description="خروجی PDF گزارش تراز آزمایشی با قابلیت انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `get_report` با report_type=trial_balance.",
 )
 @require_business_access("business_id")
 async def export_trial_balance_report_pdf(
@@ -4166,7 +4166,7 @@ async def export_trial_balance_report_pdf(
 @router.post(
     "/businesses/{business_id}/reports/general-ledger",
     summary="گزارش دفتر کل",
-    description="گزارش دفتر کل برای حساب‌های حسابداری",
+    description="دفتر کل. ابزار MCP: `get_report` با report_type=`general_ledger` (نیاز به account_ids).",
 )
 @require_business_access("business_id")
 async def general_ledger_report_endpoint(
@@ -4280,7 +4280,7 @@ async def general_ledger_report_endpoint(
 @router.post(
     "/businesses/{business_id}/reports/general-ledger/export/excel",
     summary="خروجی Excel گزارش دفتر کل",
-    description="خروجی Excel گزارش دفتر کل با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="خروجی باینری Excel است و در MCP ثبت نشده. JSON: `get_report` با report_type=general_ledger.",
 )
 @require_business_access("business_id")
 async def export_general_ledger_report_excel(
@@ -4536,10 +4536,7 @@ async def export_general_ledger_report_excel(
 @router.post(
     "/businesses/{business_id}/reports/general-ledger/export/electronic-books",
     summary="خروجی دفتر کل الکترونیکی (سازمان امور مالیاتی)",
-    description=(
-        "خروجی Excel یا CSV دفتر کل مطابق قالب سامانه دفاتر تجاری الکترونیکی. "
-        "شامل حساب کل، معین و تفصیلی به‌همراه گردش بدهکار/بستانکار و تاریخ گردش."
-    ),
+    description="خروجی باینری دفتر الکترونیکی است و در MCP ثبت نشده. JSON: `get_report` با report_type=general_ledger.",
 )
 @require_business_access("business_id")
 async def export_general_ledger_electronic_books(
@@ -4596,7 +4593,7 @@ async def export_general_ledger_electronic_books(
 @router.post(
     "/businesses/{business_id}/reports/general-ledger/export/pdf",
     summary="خروجی PDF گزارش دفتر کل",
-    description="خروجی PDF گزارش دفتر کل با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `get_report` با report_type=general_ledger.",
 )
 @require_business_access("business_id")
 async def export_general_ledger_report_pdf(
@@ -5043,7 +5040,7 @@ async def export_general_ledger_report_pdf(
 @router.post(
     "/businesses/{business_id}/reports/pnl-period",
     summary="گزارش سود و زیان دوره‌ای",
-    description="گزارش سود و زیان دوره‌ای (Profit & Loss Period)",
+    description="سود و زیان دوره‌ای. ابزار MCP: `get_report` با report_type مناسب سود/زیان.",
 )
 @require_business_access("business_id")
 async def pnl_period_report_endpoint(
@@ -5181,7 +5178,7 @@ def _parse_pnl_period_export_params(request: Request, body: Dict[str, Any]) -> D
 @router.post(
     "/businesses/{business_id}/reports/pnl-period/export/excel",
     summary="خروجی Excel گزارش سود و زیان دوره‌ای",
-    description="خروجی Excel گزارش سود و زیان دوره‌ای (درآمد، هزینه، سود/زیان خالص)",
+    description="خروجی باینری Excel است و در MCP ثبت نشده. JSON: `get_report` با report_type مناسب سود/زیان.",
 )
 @require_business_access("business_id")
 async def export_pnl_period_report_excel(
@@ -5225,7 +5222,7 @@ async def export_pnl_period_report_excel(
 @router.post(
     "/businesses/{business_id}/reports/pnl-period/export/pdf",
     summary="خروجی PDF گزارش سود و زیان دوره‌ای",
-    description="خروجی PDF گزارش سود و زیان دوره‌ای (درآمد، هزینه، سود/زیان خالص)",
+    description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `get_report` با report_type مناسب سود/زیان.",
 )
 @require_business_access("business_id")
 async def export_pnl_period_report_pdf(
@@ -5280,7 +5277,7 @@ async def export_pnl_period_report_pdf(
 @router.post(
     "/businesses/{business_id}/reports/balance-sheet",
     summary="گزارش ترازنامه",
-    description="صورت وضعیت مالی (ترازنامه) با طبقه‌بندی دارایی، بدهی و حقوق صاحبان سهام",
+    description="ترازنامه. ابزار MCP: `get_report` با report_type=`balance_sheet`.",
 )
 @require_business_access("business_id")
 async def balance_sheet_report_endpoint(
@@ -5321,6 +5318,7 @@ async def balance_sheet_report_endpoint(
 @router.post(
     "/businesses/{business_id}/reports/balance-sheet/export/excel",
     summary="خروجی Excel گزارش ترازنامه",
+    description="خروجی باینری Excel است و در MCP ثبت نشده. JSON: `get_report` با report_type=balance_sheet.",
 )
 @require_business_access("business_id")
 async def export_balance_sheet_report_excel(
@@ -5363,6 +5361,7 @@ async def export_balance_sheet_report_excel(
 @router.post(
     "/businesses/{business_id}/reports/balance-sheet/export/pdf",
     summary="خروجی PDF گزارش ترازنامه",
+    description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `get_report` با report_type=balance_sheet.",
 )
 @require_business_access("business_id")
 async def export_balance_sheet_report_pdf(
@@ -5417,7 +5416,7 @@ async def export_balance_sheet_report_pdf(
 @router.post(
     "/businesses/{business_id}/reports/financial-package/export/pdf",
     summary="خروجی PDF یکجای بسته گزارش‌های مالی",
-    description="تراز آزمایشی، صورت سود و زیان و ترازنامه در یک فایل PDF",
+    description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `get_report` با report_type=financial_package.",
 )
 @require_business_access("business_id")
 async def export_financial_package_report_pdf(
@@ -5471,7 +5470,7 @@ async def export_financial_package_report_pdf(
 @router.post(
     "/businesses/{business_id}/reports/financial-package/export/excel",
     summary="خروجی Excel یکجای بسته گزارش‌های مالی",
-    description="تراز آزمایشی، صورت سود و زیان و ترازنامه در یک فایل Excel با چند برگه",
+    description="خروجی باینری Excel است و در MCP ثبت نشده. JSON: `get_report` با report_type=financial_package.",
 )
 @require_business_access("business_id")
 async def export_financial_package_report_excel(
@@ -5515,7 +5514,7 @@ async def export_financial_package_report_excel(
 @router.post(
     "/businesses/{business_id}/reports/pnl-cumulative",
     summary="گزارش سود و زیان تجمعی",
-    description="گزارش سود و زیان تجمعی از ابتدای سال مالی (Profit & Loss Cumulative)",
+    description="ابزار MCP: `get_report` با report_type=pnl_cumulative.",
 )
 @require_business_access("business_id")
 async def pnl_cumulative_report_endpoint(
@@ -5649,7 +5648,7 @@ def _parse_pnl_cumulative_export_params(request: Request, body: Dict[str, Any]) 
 @router.post(
     "/businesses/{business_id}/reports/pnl-cumulative/export/excel",
     summary="خروجی Excel گزارش سود و زیان تجمعی",
-    description="خروجی Excel گزارش سود و زیان تجمعی از ابتدای سال مالی",
+    description="خروجی باینری Excel است و در MCP ثبت نشده. JSON: `get_report` با report_type=pnl_cumulative.",
 )
 @require_business_access("business_id")
 async def export_pnl_cumulative_report_excel(
@@ -5692,7 +5691,7 @@ async def export_pnl_cumulative_report_excel(
 @router.post(
     "/businesses/{business_id}/reports/pnl-cumulative/export/pdf",
     summary="خروجی PDF گزارش سود و زیان تجمعی",
-    description="خروجی PDF گزارش سود و زیان تجمعی از ابتدای سال مالی",
+    description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `get_report` با report_type=pnl_cumulative.",
 )
 @require_business_access("business_id")
 async def export_pnl_cumulative_report_pdf(
@@ -5747,7 +5746,7 @@ async def export_pnl_cumulative_report_pdf(
 @router.post(
     "/businesses/{business_id}/reports/accounts-review",
     summary="گزارش مرور حساب‌ها",
-    description="گزارش مرور حساب‌ها با ساختار درختی و مانده‌ها (Account Review Report)",
+    description="ابزار MCP: `get_report` با report_type=accounts_review.",
 )
 @require_business_access("business_id")
 async def accounts_review_report_endpoint(
@@ -5875,7 +5874,7 @@ def _flatten_accounts_review_tree(accounts: list) -> list:
 @router.post(
     "/businesses/{business_id}/reports/accounts-review/export/excel",
     summary="خروجی Excel گزارش مرور حساب‌ها",
-    description="خروجی Excel گزارش مرور حساب‌ها با ساختار درختی و مانده‌ها",
+    description="خروجی باینری Excel است و در MCP ثبت نشده. JSON: `get_report` با report_type=accounts_review.",
 )
 @require_business_access("business_id")
 async def export_accounts_review_report_excel(
@@ -6092,7 +6091,7 @@ async def export_accounts_review_report_excel(
 @router.post(
     "/businesses/{business_id}/reports/accounts-review/export/pdf",
     summary="خروجی PDF گزارش مرور حساب‌ها",
-    description="خروجی PDF گزارش مرور حساب‌ها با ساختار درختی و مانده‌ها",
+    description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `get_report` با report_type=accounts_review.",
 )
 @require_business_access("business_id")
 async def export_accounts_review_report_pdf(
@@ -6418,7 +6417,7 @@ async def export_accounts_review_report_pdf(
 @router.post(
     "/businesses/{business_id}/reports/journal-ledger",
     summary="گزارش دفتر روزنامه",
-    description="گزارش دفتر روزنامه - تمام تراکنش‌های مالی به ترتیب تاریخ (Journal Ledger)",
+    description="دفتر روزنامه. ابزار MCP: `get_report` با report_type=`journal`. Excel/PDF در MCP نیست.",
 )
 @require_business_access("business_id")
 async def journal_ledger_report_endpoint(
@@ -6538,7 +6537,7 @@ async def journal_ledger_report_endpoint(
 @router.post(
     "/businesses/{business_id}/reports/journal-ledger/export/excel",
     summary="خروجی Excel گزارش دفتر روزنامه",
-    description="خروجی Excel گزارش دفتر روزنامه با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="خروجی باینری Excel است و در MCP ثبت نشده. JSON: `get_report` با report_type=journal.",
 )
 @require_business_access("business_id")
 async def export_journal_ledger_report_excel(
@@ -6976,10 +6975,7 @@ async def export_journal_ledger_report_excel(
 @router.post(
     "/businesses/{business_id}/reports/journal-ledger/export/electronic-books",
     summary="خروجی دفتر روزنامه الکترونیکی (سازمان امور مالیاتی)",
-    description=(
-        "خروجی Excel یا CSV دفتر روزنامه مطابق قالب سامانه دفاتر تجاری الکترونیکی. "
-        "ستون‌ها، ترتیب و فرمت تاریخ/مبالغ ریالی مطابق استاندارد رسمی است."
-    ),
+    description="خروجی باینری دفتر الکترونیکی است و در MCP ثبت نشده. JSON: `get_report` با report_type=journal.",
 )
 @require_business_access("business_id")
 async def export_journal_ledger_electronic_books(
@@ -7036,7 +7032,7 @@ async def export_journal_ledger_electronic_books(
 @router.post(
     "/businesses/{business_id}/reports/journal-ledger/export/pdf",
     summary="خروجی PDF گزارش دفتر روزنامه",
-    description="خروجی PDF گزارش دفتر روزنامه با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `get_report` با report_type=journal.",
 )
 @require_business_access("business_id")
 async def export_journal_ledger_report_pdf(

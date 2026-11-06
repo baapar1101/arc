@@ -19,7 +19,11 @@ from app.core.responses import ApiError, success_response
 router = APIRouter(prefix="/system", tags=["system-branding"])
 
 
-@router.get("/branding")
+@router.get(
+	"/branding",
+	summary="برند نمونه نرم‌افزار",
+	description="نام فارسی/انگلیسی و وضعیت لوگو بدون بایت تصویر. ابزار MCP: get_system_branding.",
+)
 def get_system_branding(
 	request: Request,
 	_ctx: AuthContext = Depends(get_current_user),
@@ -27,7 +31,11 @@ def get_system_branding(
 	return success_response(branding_public_payload(), request)
 
 
-@router.get("/branding/logo")
+@router.get(
+	"/branding/logo",
+	summary="لوگوی برند نمونه",
+	description="خروجی باینری تصویر است و در MCP ثبت نشده. JSON: `get_system_branding`.",
+)
 def get_system_branding_logo(
 	if_none_match: str | None = Header(default=None, alias="If-None-Match"),
 	_ctx: AuthContext = Depends(get_current_user),

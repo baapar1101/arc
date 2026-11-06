@@ -28,6 +28,7 @@ router = APIRouter(prefix="/businesses/{business_id}/credit", tags=["اعتبا�
 @router.get(
 	"/settings",
 	summary="دریافت تنظیمات اعتبار کسب‌وکار",
+	description="ابزار MCP: `get_business_credit_settings`.",
 )
 def get_credit_settings_endpoint(
 	request: Request,
@@ -43,6 +44,7 @@ def get_credit_settings_endpoint(
 @router.put(
 	"/settings",
 	summary="ویرایش تنظیمات اعتبار کسب‌وکار",
+	description="ابزار MCP: `update_credit_settings` (نیازمند تأیید).",
 )
 def update_credit_settings_endpoint(
 	request: Request,
@@ -59,6 +61,7 @@ def update_credit_settings_endpoint(
 @router.get(
 	"/installment-plans",
 	summary="لیست پلن‌های اقساط",
+	description="ابزار MCP: `list_credit_installment_plans`.",
 )
 def list_installment_plans_endpoint(
 	request: Request,
@@ -75,6 +78,7 @@ def list_installment_plans_endpoint(
 @router.post(
 	"/installment-plans",
 	summary="ایجاد پلن اقساطی جدید",
+	description="ابزار MCP: `create_credit_installment_plan` (نیازمند تأیید).",
 )
 def create_installment_plan_endpoint(
 	request: Request,
@@ -91,6 +95,7 @@ def create_installment_plan_endpoint(
 @router.get(
 	"/installment-plans/{plan_id}",
 	summary="دریافت جزئیات پلن اقساطی",
+	description="ابزار MCP: `get_credit_installment_plan`.",
 )
 def get_installment_plan_endpoint(
 	request: Request,
@@ -107,6 +112,7 @@ def get_installment_plan_endpoint(
 @router.put(
 	"/installment-plans/{plan_id}",
 	summary="ویرایش پلن اقساطی",
+	description="ابزار MCP: `update_credit_installment_plan` (نیازمند تأیید).",
 )
 def update_installment_plan_endpoint(
 	request: Request,
@@ -124,6 +130,7 @@ def update_installment_plan_endpoint(
 @router.delete(
 	"/installment-plans/{plan_id}",
 	summary="حذف پلن اقساطی",
+	description="ابزار MCP: `delete_credit_installment_plan` (نیازمند تأیید).",
 )
 def delete_installment_plan_endpoint(
 	request: Request,
@@ -140,6 +147,7 @@ def delete_installment_plan_endpoint(
 @router.get(
 	"/persons/{person_id}",
 	summary="دریافت تنظیمات اعتبار شخص",
+	description="ابزار MCP: `get_person_credit`.",
 )
 def get_person_credit_endpoint(
 	request: Request,
@@ -156,6 +164,7 @@ def get_person_credit_endpoint(
 @router.put(
 	"/persons/{person_id}",
 	summary="ویرایش تنظیمات اعتبار شخص",
+	description="ابزار MCP: `update_person_credit` (نیازمند تأیید).",
 )
 def update_person_credit_endpoint(
 	request: Request,

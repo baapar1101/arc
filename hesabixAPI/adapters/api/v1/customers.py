@@ -110,7 +110,7 @@ def _customer_response(person: Person) -> CustomerResponse:
     summary="یافتن یا ایجاد سریع مشتری",
     description=(
         "مشتری موجود را با موبایل یا نام برمی‌گرداند و تنها در صورت "
-        "نبود نتیجه، مشتری جدید ایجاد می‌کند. هنگام ارسال موبایل، فقط موبایل معیار تطبیق است"
+        "نبود نتیجه، مشتری جدید ایجاد می‌کند. هنگام ارسال موبایل، فقط موبایل معیار تطبیق است. ابزار MCP: `resolve_or_create_quick_customer` (نیازمند تأیید)."
     ),
     response_model=CustomerQuickResolveResponse,
 )
@@ -141,7 +141,7 @@ async def quick_resolve_customer(
 
 @router.post("/search", 
     summary="جست‌وجوی مشتری‌ها", 
-    description="جست‌وجو در لیست مشتری‌ها (اشخاص) با قابلیت فیلتر و صفحه‌بندی",
+    description="ابزار MCP: `search_persons`.",
     response_model=CustomerSearchResponse,
     responses={
         200: {
@@ -223,7 +223,7 @@ async def search_customers(
 
 @router.get("/detail/{customer_id}", 
     summary="دریافت اطلاعات مشتری", 
-    description="دریافت اطلاعات کامل یک مشتری بر اساس شناسه",
+    description="ابزار MCP: `get_customer_info`.",
     response_model=CustomerResponse,
     responses={
         200: {
@@ -282,7 +282,7 @@ async def get_customer(
 
 @router.get("/check-access", 
     summary="بررسی دسترسی به مشتری‌ها", 
-    description="بررسی دسترسی کاربر به بخش مشتری‌ها",
+    description="بررسی مجوز است و ابزار MCP جدا ندارد؛ دسترسی از زمینه جلسه کنترل می‌شود.",
     responses={
         200: {
             "description": "دسترسی مجاز است"

@@ -20,6 +20,7 @@ router = APIRouter(tags=["currency_revaluation", "حسابداری"], prefix="")
 @router.get(
 	"/businesses/{business_id}/fx-global-rates/latest",
 	summary="نرخ‌های اسنپ‌شات مرکزی مرتبط با ارزهای فرعی کسب‌وکار",
+	description="آخرین نرخ جهانی برای ارزهای جانبی کسب‌وکار. ابزار MCP: `list_business_fx_global_rates`.",
 )
 def business_fx_global_rates_latest(
 	request: Request,
@@ -39,6 +40,7 @@ def business_fx_global_rates_latest(
 @router.post(
 	"/businesses/{business_id}/currency-rates/apply-from-global",
 	summary="ثبت سریع نرخ تسعیر از اسنپ‌شات مرکزی",
+	description="ثبت نرخ کسب‌وکار از اسنپ‌شات مرکزی. ابزار MCP: `apply_currency_rates_from_global` (نیازمند تأیید).",
 )
 def business_apply_currency_rates_from_global(
 	request: Request,

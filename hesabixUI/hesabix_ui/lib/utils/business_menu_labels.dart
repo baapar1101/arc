@@ -95,6 +95,8 @@ String businessMenuItemLabel(AppLocalizations t, String key) {
       return t.aiMenu;
     case 'ai/chat':
       return t.aiAssistantMenu;
+    case 'ai/mcp-connections':
+      return t.aiMcpConnectionsMenu;
     case 'ai/subscription':
       return t.aiSubscriptionMenu;
     case 'ai/usage':

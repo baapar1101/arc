@@ -14,7 +14,11 @@ from app.services.ai.ai_model_service import get_plan_default_model_code, list_m
 router = APIRouter(prefix="/ai/models", tags=["هوش مصنوعی"])
 
 
-@router.get("", summary="لیست مدل‌های مجاز برای کاربر")
+@router.get(
+    "",
+    summary="لیست مدل‌های مجاز هوش مصنوعی",
+    description="مدل‌های فعال پلن کسب‌وکار یا BYOK بدون کلید ارائه‌دهنده، به‌همراه قیمت‌گذاری پلن. ابزار MCP: list_available_ai_models.",
+)
 async def list_available_models(
     request: Request,
     business_id: Optional[int] = Query(None),

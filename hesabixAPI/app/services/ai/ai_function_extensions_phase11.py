@@ -792,7 +792,7 @@ def register_phase11_business_functions(registry: "AIFunctionRegistry") -> None:
     registry.register(
         AIFunction(
             name="list_business_users",
-            description="لیست کاربران/اعضای کسب‌وکار (مالک و اعضا) با نقش و وضعیت — فقط خواندنی.",
+            description="اعضای کسب‌وکار متصل (مالک و کاربران دعوت‌شده) با نقش، وضعیت عضویت و دسترسی‌ها. حساب شخصی/ورود اینجا نیست.",
             parameters_schema={"type": "object", "properties": {}, "required": []},
             handler=_list_business_users_handler,
             allowed_roles={AIRole.BUSINESS_OWNER, AIRole.ADMIN},

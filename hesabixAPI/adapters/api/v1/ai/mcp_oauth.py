@@ -817,7 +817,9 @@ async def token(request: Request, db: Session = Depends(get_db)) -> JSONResponse
             return _json_error("invalid_grant", "PKCE verification failed")
         code_row.consumed_at = datetime.utcnow()
         user_id, business_id, scopes = code_row.user_id, code_row.business_id, list(code_row.scopes or [])
-        tool_permissions = list(code_row.tool_permissions or [])
+        from app.services.ai.ai_mcp_connections import clone_stored_tool_permissions
+
+        tool_permissions = clone_stored_tool_permissions(code_row.tool_permissions)
         resource = code_row.resource
         db.add(code_row)
         db.flush()
@@ -860,7 +862,9 @@ async def token(request: Request, db: Session = Depends(get_db)) -> JSONResponse
             )
         refresh_row.revoked_at = datetime.utcnow()
         user_id, business_id, scopes = refresh_row.user_id, refresh_row.business_id, list(refresh_row.scopes or [])
-        tool_permissions = list(refresh_row.tool_permissions or [])
+        from app.services.ai.ai_mcp_connections import clone_stored_tool_permissions
+
+        tool_permissions = clone_stored_tool_permissions(refresh_row.tool_permissions)
         oauth_grant_id = refresh_row.grant_id
         db.add(refresh_row)
     else:

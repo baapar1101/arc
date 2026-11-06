@@ -183,6 +183,7 @@ def _activities_context(activities: list) -> str:
 @router.post(
     "/businesses/{business_id}/summarize-lead",
     summary="خلاصه و پیشنهاد مرحله بعد برای سرنخ",
+    description="استریم دستیار CRM است و در MCP ثبت نشده. داده: `get_lead_details`.",
 )
 @require_business_access("business_id")
 async def summarize_lead(
@@ -271,6 +272,7 @@ async def summarize_lead(
 @router.post(
     "/businesses/{business_id}/summarize-deal",
     summary="خلاصه و پیشنهاد مرحله بعد برای فرصت فروش",
+    description="استریم دستیار CRM است و در MCP ثبت نشده. داده: `get_deal_details`.",
 )
 @require_business_access("business_id")
 async def summarize_deal(
@@ -355,6 +357,7 @@ async def summarize_deal(
 @router.post(
     "/businesses/{business_id}/suggest-activity-text",
     summary="پیشنهاد متن فعالیت (تماس، ایمیل، جلسه، یادداشت)",
+    description="استریم دستیار CRM است و در MCP ثبت نشده. ثبت: `create_crm_activity`.",
 )
 @require_business_access("business_id")
 async def suggest_activity_text(
@@ -441,6 +444,7 @@ async def suggest_activity_text(
 @router.post(
     "/businesses/{business_id}/suggest-deal-probability",
     summary="پیشنهاد احتمال موفقیت فرصت فروش",
+    description="استریم دستیار CRM است و در MCP ثبت نشده. داده: `get_deal_details`.",
 )
 @require_business_access("business_id")
 async def suggest_deal_probability(

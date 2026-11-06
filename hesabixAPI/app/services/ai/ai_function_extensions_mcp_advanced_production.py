@@ -104,21 +104,6 @@ def _guard(handler):
 	return wrapped
 
 
-def _register(registry, name, description, schema, handler, permission, *, write=False):
-	registry.register(AIFunction(
-		name=name,
-		description=description,
-		parameters_schema=schema,
-		handler=_guard(handler),
-		allowed_roles=_ROLES,
-		required_permissions=[permission],
-		category="advanced_production",
-		requires_approval=bool(write),
-		risk_level="medium" if write else "safe",
-		is_readonly=not write,
-	))
-
-
 def register_mcp_advanced_production_functions(registry) -> None:
 	from app.services import advanced_production_service as svc
 
@@ -147,19 +132,20 @@ def register_mcp_advanced_production_functions(registry) -> None:
 		context["db"].commit()
 		return data
 
-	_register(
-		registry,
-		"get_advanced_production_settings",
-		"Read advanced production plugin settings. Valuation method affects plugin reports only and does not repost the general ledger. Plugin must be active.",
-		_schema(),
-		settings,
-		"advanced_production.view",
-	)
-	_register(
-		registry,
-		"update_advanced_production_settings",
-		"Update advanced production report valuation method and optional account links. Does not change posted production invoices. Requires confirmation.",
-		_schema({
+	registry.register(AIFunction(
+		name="get_advanced_production_settings",
+		description="تنظیمات افزونه تولید پیشرفته کسب‌وکار متصل. روش بها فقط گزارش افزونه را عوض می‌کند و دفتر کل را بازنویسی نمی‌کند. افزونه باید فعال باشد.",
+		parameters_schema=_schema(),
+		handler=_guard(settings),
+		allowed_roles=_ROLES,
+		required_permissions=["advanced_production.view"],
+		category="advanced_production",
+		is_readonly=True,
+	))
+	registry.register(AIFunction(
+		name="update_advanced_production_settings",
+		description="ویرایش روش بهای گزارش تولید پیشرفته و پیوند حساب‌های اختیاری. اسناد تولید ثبت‌شده را عوض نمی‌کند. نیازمند تأیید. افزونه باید فعال باشد.",
+		parameters_schema=_schema({
 			"payload": {
 				"type": "object",
 				"additionalProperties": False,
@@ -173,23 +159,28 @@ def register_mcp_advanced_production_functions(registry) -> None:
 				},
 			},
 		}, ["payload"]),
-		update,
-		"advanced_production.manage",
-		write=True,
-	)
-	_register(
-		registry,
-		"get_advanced_production_dashboard",
-		"Advanced production dashboard for the connected business: open, overdue and today's output. Dates follow the business calendar. Plugin must be active.",
-		_schema(),
-		dashboard,
-		"advanced_production.view",
-	)
-	_register(
-		registry,
-		"get_advanced_production_report",
-		"One advanced production report. Dates are ISO YYYY-MM-DD. Positive variance means unfavorable versus standard. Plugin must be active.",
-		_schema({
+		handler=_guard(update),
+		allowed_roles=_ROLES,
+		required_permissions=["advanced_production.manage"],
+		category="advanced_production",
+		requires_approval=True,
+		risk_level="medium",
+		is_readonly=False,
+	))
+	registry.register(AIFunction(
+		name="get_advanced_production_dashboard",
+		description="داشبورد تولید پیشرفته کسب‌وکار متصل: سفارش باز، سررسیدگذشته و خروجی امروز. تاریخ‌ها با تقویم کسب‌وکار است. افزونه باید فعال باشد.",
+		parameters_schema=_schema(),
+		handler=_guard(dashboard),
+		allowed_roles=_ROLES,
+		required_permissions=["advanced_production.view"],
+		category="advanced_production",
+		is_readonly=True,
+	))
+	registry.register(AIFunction(
+		name="get_advanced_production_report",
+		description="یک گزارش نام‌دار تولید پیشرفته. تاریخ‌ها ISO (YYYY-MM-DD) هستند. واریانس مثبت یعنی نامساعد نسبت به استاندارد. افزونه باید فعال باشد.",
+		parameters_schema=_schema({
 			"report_key": {"type": "string", "enum": _REPORTS},
 			"date_from": {"type": ["string", "null"]},
 			"date_to": {"type": ["string", "null"]},
@@ -207,9 +198,12 @@ def register_mcp_advanced_production_functions(registry) -> None:
 			"skip": {"type": "integer", "minimum": 0},
 			"take": {"type": "integer", "minimum": 1, "maximum": 200},
 		}, ["report_key"]),
-		report,
-		"advanced_production.view",
-	)
+		handler=_guard(report),
+		allowed_roles=_ROLES,
+		required_permissions=["advanced_production.view"],
+		category="advanced_production",
+		is_readonly=True,
+	))
 	kinds = ["work_centers", "lines", "machines", "shifts", "downtime", "outputs", "inspections", "maintenance", "scrap_reasons", "scrap_events", "order_holds", "order_lines", "wip_counts", "reworks", "line_returns", "stage_transfers", "labor"]
 
 	def list_master(args, context):
@@ -222,23 +216,28 @@ def register_mcp_advanced_production_functions(registry) -> None:
 		context["db"].commit()
 		return data
 
-	_register(
-		registry,
-		"list_advanced_production_master",
-		"List advanced production master data: work centers, lines, machines, shifts, downtime, output logs, or QC inspections. Plugin must be active.",
-		_schema({"kind": {"type": "string", "enum": kinds}}, ["kind"]),
-		list_master,
-		"advanced_production.view",
-	)
-	_register(
-		registry,
-		"create_advanced_production_master",
-		"Create one advanced production master record. Dates are ISO dates. Shift times are HH:MM. Requires confirmation. Plugin must be active.",
-		_schema({
+	registry.register(AIFunction(
+		name="list_advanced_production_master",
+		description="فهرست داده پایه تولید پیشرفته: مرکز کار، خط، ماشین، شیفت، توقف، خروجی یا بازرسی کیفیت. افزونه باید فعال باشد.",
+		parameters_schema=_schema({"kind": {"type": "string", "enum": kinds}}, ["kind"]),
+		handler=_guard(list_master),
+		allowed_roles=_ROLES,
+		required_permissions=["advanced_production.view"],
+		category="advanced_production",
+		is_readonly=True,
+	))
+	registry.register(AIFunction(
+		name="create_advanced_production_master",
+		description="ثبت یک رکورد داده پایه تولید پیشرفته. تاریخ ISO و ساعت شیفت HH:MM است. نیازمند تأیید. افزونه باید فعال باشد.",
+		parameters_schema=_schema({
 			"kind": {"type": "string", "enum": kinds},
 			"payload": {"type": "object"},
 		}, ["kind", "payload"]),
-		create_master,
-		"advanced_production.operate",
-		write=True,
-	)
+		handler=_guard(create_master),
+		allowed_roles=_ROLES,
+		required_permissions=["advanced_production.operate"],
+		category="advanced_production",
+		requires_approval=True,
+		risk_level="medium",
+		is_readonly=False,
+	))

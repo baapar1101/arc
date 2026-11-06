@@ -13,32 +13,52 @@ def _schema(properties, required):
     return {"type": "object", "properties": properties, "required": required, "additionalProperties": False}
 
 
-def _register(registry, name, description, schema, handler, *, write=False, high=False):
-    registry.register(AIFunction(name=name, description=description, parameters_schema=schema, handler=handler,
-        allowed_roles=_ROLES, required_permissions=["inventory.write" if write else "inventory.read"],
-        category="warehouse", requires_approval=bool(write), risk_level="high" if high else ("medium" if write else "safe"), is_readonly=not write))
-
-
 def register_mcp_stock_count_functions(registry) -> None:
-    _register(registry, "start_stock_count", "شروع انبارگردانی برای یک انبار و حداکثر ۵۰۰ کالای انتخاب‌شده؛ برای پوشش کامل کالاها چند فراخوانی محدود انجام دهید.",
-        _schema({"warehouse_id": {"type": "integer", "minimum": 1}, "product_ids": {"type": "array", "minItems": 1, "maxItems": 500, "uniqueItems": True, "items": {"type": "integer", "minimum": 1}},
-            "as_of_date": {"type": "string", "format": "date"}, "only_with_warehouse_history": {"type": "boolean"}}, ["warehouse_id", "product_ids"]), _start)
     item_schema = {"type": "object", "properties": {"product_id": {"type": "integer", "minimum": 1}, "warehouse_id": {"type": ["integer", "null"], "minimum": 1},
         "lot_id": {"type": ["integer", "null"], "minimum": 1}, "lot_code": {"type": ["string", "null"], "maxLength": 64},
         "manufacturing_date": {"type": ["string", "null"], "format": "date"}, "expiry_date": {"type": ["string", "null"], "format": "date"},
         "physical_quantity": {"type": "number", "minimum": 0}}, "required": ["product_id", "physical_quantity"], "additionalProperties": False}
-    _register(registry, "calculate_stock_count_differences", "محاسبه تفاوت موجودی فیزیکی با موجودی سیستمی؛ شناسه محصول و مقدار واقعی برای حداکثر ۵۰۰ ردیف لازم است.",
-        _schema({"items": {"type": "array", "minItems": 1, "maxItems": 500, "items": item_schema}, "as_of_date": {"type": "string", "format": "date"}}, ["items"]), _calculate)
     adjustment_item = {"type": "object", "properties": {"product_id": {"type": "integer", "minimum": 1}, "warehouse_id": {"type": ["integer", "null"], "minimum": 1},
         "lot_id": {"type": ["integer", "null"], "minimum": 1}, "lot_code": {"type": ["string", "null"], "maxLength": 64},
         "manufacturing_date": {"type": ["string", "null"], "format": "date"}, "expiry_date": {"type": ["string", "null"], "format": "date"},
         "lot_allocations": {"type": "array", "items": {"type": "object"}},
         "difference": {"type": "number"}, "movement": {"type": ["string", "null"], "enum": ["in", "out", None]}, "quantity": {"type": "number", "minimum": 0}},
         "required": ["product_id", "difference", "quantity"], "additionalProperties": False}
-    _register(registry, "create_stock_count_adjustment", "ایجاد نتیجه انبارگردانی طبق تنظیم فعلی کسب‌وکار؛ ممکن است حواله تعدیل یا اسناد کالای هزینه/درآمد ایجاد کند. نیازمند تأیید است.",
-        _schema({"items": {"type": "array", "minItems": 1, "maxItems": 500, "items": adjustment_item}, "stock_count_code": {"type": "string", "maxLength": 80},
+    registry.register(AIFunction(
+        name="start_stock_count",
+        description="شروع انبارگردانی برای یک انبار و حداکثر ۵۰۰ کالای انتخاب‌شده؛ برای پوشش کامل کالاها چند فراخوانی محدود انجام دهید.",
+        parameters_schema=_schema({"warehouse_id": {"type": "integer", "minimum": 1}, "product_ids": {"type": "array", "minItems": 1, "maxItems": 500, "uniqueItems": True, "items": {"type": "integer", "minimum": 1}},
+            "as_of_date": {"type": "string", "format": "date"}, "only_with_warehouse_history": {"type": "boolean"}}, ["warehouse_id", "product_ids"]),
+        handler=_start,
+        allowed_roles=_ROLES,
+        required_permissions=["inventory.read"],
+        category="warehouse",
+        is_readonly=True,
+    ))
+    registry.register(AIFunction(
+        name="calculate_stock_count_differences",
+        description="محاسبه تفاوت موجودی فیزیکی با موجودی سیستمی؛ شناسه محصول و مقدار واقعی برای حداکثر ۵۰۰ ردیف لازم است.",
+        parameters_schema=_schema({"items": {"type": "array", "minItems": 1, "maxItems": 500, "items": item_schema}, "as_of_date": {"type": "string", "format": "date"}}, ["items"]),
+        handler=_calculate,
+        allowed_roles=_ROLES,
+        required_permissions=["inventory.read"],
+        category="warehouse",
+        is_readonly=True,
+    ))
+    registry.register(AIFunction(
+        name="create_stock_count_adjustment",
+        description="ایجاد نتیجه انبارگردانی طبق تنظیم فعلی کسب‌وکار؛ ممکن است حواله تعدیل یا اسناد کالای هزینه/درآمد ایجاد کند. نیازمند تأیید است.",
+        parameters_schema=_schema({"items": {"type": "array", "minItems": 1, "maxItems": 500, "items": adjustment_item}, "stock_count_code": {"type": "string", "maxLength": 80},
             "stock_count_date": {"type": "string", "format": "date"}, "notes": {"type": ["string", "null"], "maxLength": 2000},
-            "result_mode": {"type": "string", "enum": ["goods_docs", "physical_adjustment"]}}, ["items"]), _create_adjustment, write=True, high=True)
+            "result_mode": {"type": "string", "enum": ["goods_docs", "physical_adjustment"]}}, ["items"]),
+        handler=_create_adjustment,
+        allowed_roles=_ROLES,
+        required_permissions=["inventory.write"],
+        category="warehouse",
+        requires_approval=True,
+        risk_level="high",
+        is_readonly=False,
+    ))
 
 
 def _require_permission(ctx, business_id: int, action: str) -> None:

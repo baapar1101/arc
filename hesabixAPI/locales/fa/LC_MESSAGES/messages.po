@@ -1514,6 +1514,30 @@ msgstr "افزونه «سرور MCP هوش مصنوعی» برای این کسب
 msgid "AI_MCP_PLUGIN_EXPIRED"
 msgstr "اشتراک افزونه «سرور MCP هوش مصنوعی» تمام شده است."
 
+msgid "MCP_CONNECTION_NOT_FOUND"
+msgstr "اتصال دستیار پیدا نشد."
+
+msgid "MCP_CONNECTION_REVOKED"
+msgstr "این اتصال قبلاً قطع شده است."
+
+msgid "MCP_CONNECTION_EXPIRED"
+msgstr "این اتصال منقضی شده است."
+
+msgid "MCP_MEMBERSHIP_INACTIVE"
+msgstr "صاحب این اتصال دیگر عضو فعال کسب‌وکار نیست."
+
+msgid "MCP_TOOL_NOT_PERMITTED"
+msgstr "یکی از ابزارهای انتخاب‌شده برای این کاربر مجاز نیست."
+
+msgid "MCP_WRITE_TOOLS_REQUIRE_WRITE_SCOPE"
+msgstr "برای اتصال فقط‌خواندنی ابزارهای نوشتنی را بردارید."
+
+msgid "MCP_INVALID_TOOL_PERMISSIONS"
+msgstr "فهرست ابزارها نامعتبر است."
+
+msgid "MCP_REVOKE_ALL_OWNER_ONLY"
+msgstr "قطع همه اتصال‌ها فقط برای مالک کسب‌وکار مجاز است."
+
 msgid "ADVANCED_PRODUCTION_PLUGIN_NOT_ACTIVE"
 msgstr "افزونه تولید پیشرفته برای این کسب‌وکار فعال نیست."
 

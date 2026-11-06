@@ -136,6 +136,7 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
     ],
     'group:ai': [
       'ai/chat',
+      'ai/mcp-connections',
       'ai/subscription',
       'ai/usage',
       'ai/skills/marketplace',

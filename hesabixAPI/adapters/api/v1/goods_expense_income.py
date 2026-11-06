@@ -55,6 +55,7 @@ def _parse_date(value: Any) -> date:
 @router.get(
 	"/businesses/{business_id}/goods-expense-income/settings",
 	summary="تنظیمات گردش‌کار کالای هزینه/درآمد",
+	description="ابزار MCP: `get_goods_expense_income_settings`.",
 )
 @require_business_access("business_id")
 async def get_settings_endpoint(
@@ -75,6 +76,7 @@ async def get_settings_endpoint(
 @router.post(
 	"/businesses/{business_id}/goods-expense-income",
 	summary="لیست اسناد کالای هزینه/درآمد",
+	description="ابزار MCP: `list_goods_expense_income`.",
 )
 @require_business_access("business_id")
 async def list_endpoint(
@@ -96,6 +98,7 @@ async def list_endpoint(
 @router.get(
 	"/businesses/{business_id}/goods-expense-income/{document_id}",
 	summary="جزئیات سند",
+	description="ابزار MCP: `get_goods_expense_income`.",
 )
 @require_business_access("business_id")
 async def get_endpoint(
@@ -117,6 +120,7 @@ async def get_endpoint(
 @router.post(
 	"/businesses/{business_id}/goods-expense-income/create",
 	summary="ایجاد سند کالای هزینه/درآمد",
+	description="ابزار MCP: `create_goods_expense_income` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_endpoint(
@@ -147,6 +151,7 @@ async def create_endpoint(
 @router.put(
 	"/businesses/{business_id}/goods-expense-income/{document_id}",
 	summary="ویرایش سند غیرقطعی",
+	description="ابزار MCP: `update_goods_expense_income` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def update_endpoint(
@@ -181,6 +186,7 @@ async def update_endpoint(
 @router.post(
 	"/businesses/{business_id}/goods-expense-income/{document_id}/submit",
 	summary="ارسال به حسابداری (گردش‌کار دو مرحله‌ای)",
+	description="ابزار MCP: `submit_goods_expense_income` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def submit_endpoint(
@@ -202,6 +208,7 @@ async def submit_endpoint(
 @router.post(
 	"/businesses/{business_id}/goods-expense-income/{document_id}/allocate",
 	summary="تخصیص/تأیید حساب معین",
+	description="ابزار MCP: `allocate_goods_expense_income` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def allocate_endpoint(
@@ -224,6 +231,7 @@ async def allocate_endpoint(
 @router.post(
 	"/businesses/{business_id}/goods-expense-income/{document_id}/post",
 	summary="قطعی‌سازی (حواله انبار + سند حسابداری)",
+	description="ابزار MCP: `post_goods_expense_income` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def post_endpoint(
@@ -245,6 +253,7 @@ async def post_endpoint(
 @router.post(
 	"/businesses/{business_id}/goods-expense-income/{document_id}/cancel",
 	summary="ابطال سند قطعی",
+	description="ابزار MCP: `cancel_goods_expense_income` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def cancel_endpoint(
@@ -266,6 +275,7 @@ async def cancel_endpoint(
 @router.delete(
 	"/businesses/{business_id}/goods-expense-income/{document_id}",
 	summary="حذف سند غیرقطعی",
+	description="ابزار MCP: `delete_goods_expense_income` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def delete_endpoint(
@@ -287,6 +297,7 @@ async def delete_endpoint(
 @router.post(
 	"/businesses/{business_id}/goods-expense-income/from-stock-count",
 	summary="ایجاد اسناد از اختلافات انبارگردانی",
+	description="ابزار MCP: `create_stock_count_adjustment` با حالت کالای هزینه/درآمد (نیازمند تأیید). ابزار جداگانه GEI ندارد.",
 )
 @require_business_access("business_id")
 async def from_stock_count_endpoint(

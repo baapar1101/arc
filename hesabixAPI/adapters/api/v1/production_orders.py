@@ -39,7 +39,11 @@ def _write_permission(ctx: AuthContext) -> None:
 		raise ApiError("FORBIDDEN", "Missing business permission: inventory.write", http_status=403)
 
 
-@router.get("/business/{business_id}")
+@router.get(
+	"/business/{business_id}",
+	summary="فهرست سفارش‌های تولید",
+	description="ابزار MCP: `list_production_orders`.",
+)
 @require_business_access("business_id")
 def list_production_orders_endpoint(
 	request: Request,
@@ -67,7 +71,11 @@ def list_production_orders_endpoint(
 	return success_response(data=format_datetime_fields(data, request), request=request)
 
 
-@router.get("/business/{business_id}/material-plan")
+@router.get(
+	"/business/{business_id}/material-plan",
+	summary="برنامه نیاز مواد تولید",
+	description="ابزار MCP: `get_production_material_plan`.",
+)
 @require_business_access("business_id")
 def get_production_material_plan_endpoint(
 	request: Request,
@@ -91,7 +99,11 @@ def get_production_material_plan_endpoint(
 	return success_response(data=format_datetime_fields(data, request), request=request)
 
 
-@router.get("/business/{business_id}/trace")
+@router.get(
+	"/business/{business_id}/trace",
+	summary="ردیابی سفارش تولید با لات",
+	description="ابزار MCP: `trace_production_orders_by_lot`.",
+)
 @require_business_access("business_id")
 def trace_production_orders_by_lot_endpoint(
 	request: Request,
@@ -106,7 +118,11 @@ def trace_production_orders_by_lot_endpoint(
 	return success_response(data=format_datetime_fields(data, request), request=request)
 
 
-@router.post("/business/{business_id}")
+@router.post(
+	"/business/{business_id}",
+	summary="ایجاد سفارش تولید",
+	description="ابزار MCP: `create_production_order` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def create_production_order_endpoint(
 	request: Request,
@@ -121,7 +137,11 @@ def create_production_order_endpoint(
 	return success_response(data=format_datetime_fields(data, request), request=request, message="PRODUCTION_ORDER_CREATED")
 
 
-@router.get("/business/{business_id}/{order_id}")
+@router.get(
+	"/business/{business_id}/{order_id}",
+	summary="جزئیات سفارش تولید",
+	description="ابزار MCP: `get_production_order`.",
+)
 @require_business_access("business_id")
 def get_production_order_endpoint(
 	request: Request,
@@ -136,7 +156,11 @@ def get_production_order_endpoint(
 	return success_response(data=format_datetime_fields(data, request), request=request)
 
 
-@router.patch("/business/{business_id}/{order_id}")
+@router.patch(
+	"/business/{business_id}/{order_id}",
+	summary="ویرایش سفارش تولید",
+	description="ابزار MCP: `update_production_order` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def update_production_order_endpoint(
 	request: Request,
@@ -168,19 +192,31 @@ def _action(
 	return success_response(data=format_datetime_fields(data, request), request=request, message=message)
 
 
-@router.post("/business/{business_id}/{order_id}/release")
+@router.post(
+	"/business/{business_id}/{order_id}/release",
+	summary="آزادسازی سفارش تولید",
+	description="ابزار MCP: `release_production_order` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def release_production_order_endpoint(request: Request, business_id: int, order_id: int, payload: ProductionOrderActionRequest, ctx: AuthContext = Depends(get_current_user), db: Session = Depends(get_db)) -> Dict[str, Any]:
 	return _action(request, business_id, order_id, payload, ctx, db, release_production_order, "PRODUCTION_ORDER_RELEASED")
 
 
-@router.post("/business/{business_id}/{order_id}/start")
+@router.post(
+	"/business/{business_id}/{order_id}/start",
+	summary="شروع سفارش تولید",
+	description="ابزار MCP: `start_production_order` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def start_production_order_endpoint(request: Request, business_id: int, order_id: int, payload: ProductionOrderActionRequest, ctx: AuthContext = Depends(get_current_user), db: Session = Depends(get_db)) -> Dict[str, Any]:
 	return _action(request, business_id, order_id, payload, ctx, db, start_production_order, "PRODUCTION_ORDER_STARTED")
 
 
-@router.post("/business/{business_id}/{order_id}/complete")
+@router.post(
+	"/business/{business_id}/{order_id}/complete",
+	summary="تکمیل سفارش تولید",
+	description="ابزار MCP: `complete_production_order` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def complete_production_order_endpoint(request: Request, business_id: int, order_id: int, payload: ProductionOrderActionRequest, ctx: AuthContext = Depends(get_current_user), db: Session = Depends(get_db)) -> Dict[str, Any]:
 	_write_permission(ctx)
@@ -189,13 +225,21 @@ def complete_production_order_endpoint(request: Request, business_id: int, order
 	return success_response(data=format_datetime_fields(data, request), request=request, message="PRODUCTION_ORDER_COMPLETED")
 
 
-@router.post("/business/{business_id}/{order_id}/cancel")
+@router.post(
+	"/business/{business_id}/{order_id}/cancel",
+	summary="لغو سفارش تولید",
+	description="ابزار MCP: `cancel_production_order` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def cancel_production_order_endpoint(request: Request, business_id: int, order_id: int, payload: ProductionOrderActionRequest, ctx: AuthContext = Depends(get_current_user), db: Session = Depends(get_db)) -> Dict[str, Any]:
 	return _action(request, business_id, order_id, payload, ctx, db, cancel_production_order, "PRODUCTION_ORDER_CANCELLED")
 
 
-@router.get("/business/{business_id}/{order_id}/costing")
+@router.get(
+	"/business/{business_id}/{order_id}/costing",
+	summary="بهای تمام‌شده سفارش تولید",
+	description="ابزار MCP: `get_production_order_costing`.",
+)
 @require_business_access("business_id")
 def get_production_order_costing_endpoint(
 	request: Request,
@@ -210,7 +254,11 @@ def get_production_order_costing_endpoint(
 	return success_response(data=format_datetime_fields(data, request), request=request)
 
 
-@router.post("/business/{business_id}/{order_id}/costing/refresh")
+@router.post(
+	"/business/{business_id}/{order_id}/costing/refresh",
+	summary="بازمحاسبه بهای سفارش تولید",
+	description="ابزار MCP: `refresh_production_order_costing` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def refresh_production_order_costing_endpoint(
 	request: Request,
@@ -225,7 +273,11 @@ def refresh_production_order_costing_endpoint(
 	return success_response(data=format_datetime_fields(data, request), request=request, message="PRODUCTION_ORDER_COSTING_REFRESHED")
 
 
-@router.patch("/business/{business_id}/{order_id}/lots")
+@router.patch(
+	"/business/{business_id}/{order_id}/lots",
+	summary="به‌روزرسانی لات سفارش تولید",
+	description="ابزار MCP: `update_production_order_lots` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def update_production_order_lots_endpoint(
 	request: Request,

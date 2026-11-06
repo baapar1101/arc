@@ -112,9 +112,18 @@ def register_mcp_payroll_functions(registry) -> None:
         ("get_payroll_employee_summary", "get_employee_summary_report", "payroll_reports", "employee_summary"),
         ("get_payroll_statutory_summary", "get_statutory_summary_report", "payroll_reports", "summary"),
     ]:
-        _register(registry, tool, "گزارش حقوق بر اساس دوره یا اجرای مشخص؛ داده فقط از کسب‌وکار متصل خوانده می‌شود.",
-            _schema({**report_schema["properties"], **({"limit": {"type": "integer", "minimum": 1, "maximum": 500}, "skip": {"type": "integer", "minimum": 0}} if call == "employee_summary" else {})}),
-            _service(method, module=module, call=call), "payroll.view")
+        desc = "گزارش حقوق بر اساس دوره یا اجرای مشخص؛ داده فقط از کسب‌وکار متصل خوانده می‌شود."
+        schema = _schema({**report_schema["properties"], **({"limit": {"type": "integer", "minimum": 1, "maximum": 500}, "skip": {"type": "integer", "minimum": 0}} if call == "employee_summary" else {})})
+        handler = _service(method, module=module, call=call)
+        read_kw = dict(allowed_roles=_ROLES, category="payroll")
+        if tool == "get_payroll_department_summary":
+            registry.register(AIFunction(name="get_payroll_department_summary", description="گزارش حقوق بر اساس دوره یا اجرای مشخص؛ داده فقط از کسب‌وکار متصل خوانده می‌شود.", parameters_schema=schema, handler=handler, required_permissions=["payroll.view"], is_readonly=True, **read_kw))
+        elif tool == "get_payroll_item_summary":
+            registry.register(AIFunction(name="get_payroll_item_summary", description="گزارش حقوق بر اساس دوره یا اجرای مشخص؛ داده فقط از کسب‌وکار متصل خوانده می‌شود.", parameters_schema=schema, handler=handler, required_permissions=["payroll.view"], is_readonly=True, **read_kw))
+        elif tool == "get_payroll_employee_summary":
+            registry.register(AIFunction(name="get_payroll_employee_summary", description="گزارش حقوق بر اساس دوره یا اجرای مشخص؛ داده فقط از کسب‌وکار متصل خوانده می‌شود.", parameters_schema=schema, handler=handler, required_permissions=["payroll.view"], is_readonly=True, **read_kw))
+        elif tool == "get_payroll_statutory_summary":
+            registry.register(AIFunction(name="get_payroll_statutory_summary", description="گزارش حقوق بر اساس دوره یا اجرای مشخص؛ داده فقط از کسب‌وکار متصل خوانده می‌شود.", parameters_schema=schema, handler=handler, required_permissions=["payroll.view"], is_readonly=True, **read_kw))
     _register(registry, "get_payroll_period_overview", "گزارش نمای کلی دوره‌های حقوق برای یک سال شمسی.", _schema({"year": {"type": ["integer", "null"], "minimum": 1300, "maximum": 1500}}), _service("get_period_overview_report", module="payroll_reports", call="period_overview"), "payroll.view")
 
     payload = {"type": "object", "properties": {"code": {"type": "string", "maxLength": 64}, "name": {"type": "string", "maxLength": 200}, "description": {"type": ["string", "null"]}, "item_kind": {"type": "string", "enum": ["earning", "deduction", "employer_cost", "informational"]}, "sort_order": {"type": "integer"}, "is_active": {"type": "boolean"}}, "additionalProperties": False}
@@ -143,12 +152,10 @@ def register_mcp_payroll_functions(registry) -> None:
     update_run_payload = {"type": "object", "properties": {k:v for k,v in run_payload["properties"].items() if k not in ("employee_ids", "code")}, "additionalProperties": False}
     _register(registry, "update_payroll_run", "ویرایش پیش‌نویس حقوق؛ خطوطی که ارسال شوند جایگزین کامل خطوط قبلی می‌شوند. نیازمند تأیید.", _schema({"run_id": {"type": "integer", "minimum": 1}, "payload": update_run_payload}, ["run_id", "payload"]), _service("update_run", call="run_id_payload"), "payroll.operate", write=True, high=True)
     _register(registry, "delete_payroll_run", "حذف اجرای حقوق در وضعیت پیش‌نویس. نیازمند تأیید.", run_schema, _delete_handler("delete_run", "run_id"), "payroll.operate", write=True, high=True)
-    for tool, method, perm, desc in [
-        ("finalize_payroll_run", "finalize_run", "payroll.operate", "نهایی‌سازی پیش‌نویس؛ ممکن است طبق تنظیمات کسب‌وکار وارد تأیید یا ثبت خودکار شود."),
-        ("cancel_payroll_run", "cancel_run", "payroll.operate", "لغو اجرای حقوق؛ نیازمند تأیید."),
-        ("approve_payroll_run", "approve_run", "payroll.approve", "تأیید اجرای حقوق؛ ممکن است طبق تنظیمات کسب‌وکار سند حسابداری خودکار بسازد."),
-    ]:
-        _register(registry, tool, desc + " نیازمند تأیید.", run_schema, _action(method), perm, write=True, high=True)
+    write_high = dict(allowed_roles=_ROLES, category="payroll")
+    registry.register(AIFunction(name="finalize_payroll_run", description="نهایی‌سازی پیش‌نویس؛ ممکن است طبق تنظیمات کسب‌وکار وارد تأیید یا ثبت خودکار شود. نیازمند تأیید.", parameters_schema=run_schema, handler=_action("finalize_run"), required_permissions=["payroll.operate"], requires_approval=True, risk_level="high", is_readonly=False, **write_high))
+    registry.register(AIFunction(name="cancel_payroll_run", description="لغو اجرای حقوق. نیازمند تأیید.", parameters_schema=run_schema, handler=_action("cancel_run"), required_permissions=["payroll.operate"], requires_approval=True, risk_level="high", is_readonly=False, **write_high))
+    registry.register(AIFunction(name="approve_payroll_run", description="تأیید اجرای حقوق؛ ممکن است طبق تنظیمات کسب‌وکار سند حسابداری خودکار بسازد. نیازمند تأیید.", parameters_schema=run_schema, handler=_action("approve_run"), required_permissions=["payroll.approve"], requires_approval=True, risk_level="high", is_readonly=False, **write_high))
     _register(registry, "reject_payroll_run", "رد اجرای حقوق در انتظار تأیید؛ وضعیت آن به پیش‌نویس برمی‌گردد. نیازمند تأیید.", _schema({"run_id": {"type": "integer", "minimum": 1}, "reason": {"type": "string", "maxLength": 2000}}, ["run_id"]), _action("reject_run", reason=True), "payroll.approve", write=True, high=True)
     _register(registry, "copy_payroll_run", "کپی اجرای حقوق به پیش‌نویس جدید؛ شناسه دوره مقصد اختیاری است. نیازمند تأیید.", _schema({"run_id": {"type": "integer", "minimum": 1}, "payload": {"type": "object", "properties": {"period_id": {"type": ["integer", "null"], "minimum": 1}, "title": {"type": "string", "maxLength": 200}, "run_date": {"type": "string", "format": "date"}}, "additionalProperties": False}} , ["run_id"]), _service("copy_run", call="run_id_payload"), "payroll.operate", write=True, high=True)
     _register(registry, "post_payroll_run_to_accounting", "ثبت سند حقوق قطعی‌شده در حسابداری؛ عملیات مالی پرخطر و نیازمند تأیید.", run_schema, _service("post_run_to_accounting", call="run_id_user"), "payroll.post", write=True, high=True)

@@ -30,7 +30,11 @@ from app.services.catalog_spec_field_service import (
 router = APIRouter(prefix="/catalog-spec-fields", tags=["catalog-spec-fields"])
 
 
-@router.post("/business/{business_id}")
+@router.post(
+	"/business/{business_id}",
+	summary="ایجاد فیلد مشخصات کاتالوگ",
+	description="ابزار MCP: `create_catalog_spec_field` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def create_business_catalog_spec_field(
 	request: Request,
@@ -48,7 +52,11 @@ def create_business_catalog_spec_field(
 	)
 
 
-@router.get("/business/{business_id}")
+@router.get(
+	"/business/{business_id}",
+	summary="فهرست فیلدهای مشخصات کاتالوگ",
+	description="ابزار MCP: `list_catalog_spec_fields`.",
+)
 @require_business_access("business_id")
 def list_business_catalog_spec_fields(
 	request: Request,
@@ -73,7 +81,11 @@ def list_business_catalog_spec_fields(
 	return success_response(data=formatted, request=request)
 
 
-@router.post("/business/{business_id}/search")
+@router.post(
+	"/business/{business_id}/search",
+	summary="جستجوی فیلدهای مشخصات کاتالوگ",
+	description="ابزار MCP: `list_catalog_spec_fields`.",
+)
 @require_business_access("business_id")
 def search_business_catalog_spec_fields(
 	request: Request,
@@ -96,7 +108,11 @@ def search_business_catalog_spec_fields(
 	return success_response(data=formatted, request=request)
 
 
-@router.get("/business/{business_id}/{field_id}")
+@router.get(
+	"/business/{business_id}/{field_id}",
+	summary="جزئیات فیلد مشخصات کاتالوگ",
+	description="ابزار MCP: `get_catalog_spec_field`.",
+)
 @require_business_access("business_id")
 def get_business_catalog_spec_field(
 	request: Request,
@@ -119,7 +135,11 @@ def get_business_catalog_spec_field(
 	return success_response(data=format_datetime_fields(data, request), request=request)
 
 
-@router.put("/business/{business_id}/{field_id}")
+@router.put(
+	"/business/{business_id}/{field_id}",
+	summary="ویرایش فیلد مشخصات کاتالوگ",
+	description="ابزار MCP: `update_catalog_spec_field` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def update_business_catalog_spec_field(
 	request: Request,
@@ -147,7 +167,11 @@ def update_business_catalog_spec_field(
 	)
 
 
-@router.delete("/business/{business_id}/{field_id}")
+@router.delete(
+	"/business/{business_id}/{field_id}",
+	summary="حذف فیلد مشخصات کاتالوگ",
+	description="ابزار MCP: `delete_catalog_spec_field` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def delete_business_catalog_spec_field(
 	request: Request,

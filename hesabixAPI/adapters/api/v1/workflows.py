@@ -214,7 +214,7 @@ def validate_workflow_data(workflow_data: Dict[str, Any]) -> List[str]:
 @router.post(
     "/businesses/{business_id}/workflows/create",
     summary="ایجاد workflow جدید",
-    description="ایجاد یک workflow جدید برای کسب‌وکار",
+    description="ابزار MCP: `create_workflow` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_workflow(
@@ -273,7 +273,7 @@ async def create_workflow(
 @router.post(
     "/businesses/{business_id}/workflows/list",
     summary="لیست workflowها",
-    description="دریافت لیست workflowهای یک کسب‌وکار",
+    description="ابزار MCP: `list_workflows`.",
 )
 @require_business_access("business_id")
 async def list_workflows(
@@ -333,7 +333,7 @@ async def list_workflows(
 @router.get(
     "/businesses/{business_id}/workflows/{workflow_id}",
     summary="دریافت workflow",
-    description="دریافت اطلاعات یک workflow",
+    description="ابزار MCP: `get_workflow`.",
 )
 @require_business_access("business_id")
 async def get_workflow(
@@ -361,7 +361,7 @@ async def get_workflow(
 @router.put(
     "/businesses/{business_id}/workflows/{workflow_id}/edit",
     summary="به‌روزرسانی workflow",
-    description="به‌روزرسانی یک workflow",
+    description="ابزار MCP: `update_workflow` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def update_workflow(
@@ -419,7 +419,7 @@ async def update_workflow(
 @router.delete(
     "/businesses/{business_id}/workflows/{workflow_id}",
     summary="حذف workflow",
-    description="حذف یک workflow",
+    description="ابزار MCP: `delete_workflow` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def delete_workflow(
@@ -448,7 +448,7 @@ async def delete_workflow(
 @router.post(
     "/businesses/{business_id}/workflows/{workflow_id}/execute",
     summary="اجرای workflow",
-    description="اجرای دستی. بدنه می‌تواند `dry_run: true` باشد (آزمایشی، بدون ارسال/ثبت واقعی).",
+    description="ابزار MCP: `execute_workflow` یا `test_workflow` با dry_run (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def execute_workflow(
@@ -505,7 +505,7 @@ async def execute_workflow(
 @router.get(
     "/businesses/{business_id}/workflows/{workflow_id}/executions",
     summary="لیست اجراهای workflow",
-    description="دریافت لیست اجراهای یک workflow",
+    description="ابزار MCP: `list_workflow_executions`.",
 )
 @require_business_access("business_id")
 async def list_workflow_executions(
@@ -552,7 +552,7 @@ async def list_workflow_executions(
 @router.get(
     "/businesses/{business_id}/workflows/{workflow_id}/executions/{execution_id}",
     summary="جزئیات یک اجرای workflow",
-    description="دریافت وضعیت یک اجرا (برای polling هنگام اجرای ناهمزمان)",
+    description="ابزار MCP: `poll_workflow_execution`.",
 )
 @require_business_access("business_id")
 async def get_workflow_execution(
@@ -581,7 +581,7 @@ async def get_workflow_execution(
 @router.get(
     "/businesses/{business_id}/workflows/{workflow_id}/executions/{execution_id}/logs",
     summary="لاگ‌های اجرای workflow",
-    description="دریافت لاگ‌های یک اجرای workflow",
+    description="ابزار MCP: `get_workflow_execution_debug` یا `get_workflow_execution_timeline`.",
 )
 @require_business_access("business_id")
 async def get_workflow_execution_logs(
@@ -623,7 +623,7 @@ async def get_workflow_execution_logs(
 @router.get(
     "/workflows/triggers",
     summary="لیست triggerهای موجود",
-    description="دریافت لیست تمام triggerهای موجود",
+    description="ابزار MCP: `list_workflow_trigger_catalog`.",
 )
 async def list_triggers(
     request: Request,
@@ -642,7 +642,7 @@ async def list_triggers(
 @router.get(
     "/workflows/actions",
     summary="لیست actionهای موجود",
-    description="دریافت لیست تمام actionهای موجود",
+    description="ابزار MCP: `list_workflow_action_catalog`.",
 )
 async def list_actions(
     request: Request,
@@ -661,7 +661,7 @@ async def list_actions(
 @router.get(
     "/businesses/{business_id}/workflows/analytics/errors",
     summary="تحلیل خطاهای workflow",
-    description="دریافت آمار و تحلیل خطاهای workflow در بازه زمانی مشخص",
+    description="دریافت آمار و تحلیل خطاهای workflow در بازه زمانی مشخص. ابزار MCP: `get_workflow_error_analytics`.",
 )
 @require_business_access("business_id")
 async def get_workflow_errors_analytics(
@@ -736,7 +736,7 @@ async def get_workflow_errors_analytics(
 @router.get(
     "/businesses/{business_id}/workflows/analytics/performance",
     summary="تحلیل عملکرد workflows",
-    description="دریافت آمار عملکرد workflows شامل تعداد اجراها، نرخ موفقیت، و میانگین زمان اجرا",
+    description="دریافت آمار عملکرد workflows شامل تعداد اجراها، نرخ موفقیت، و میانگین زمان اجرا. ابزار MCP: `get_workflow_performance_analytics`.",
 )
 @require_business_access("business_id")
 async def get_workflow_performance_analytics(
@@ -839,7 +839,7 @@ async def get_workflow_performance_analytics(
 @router.get(
     "/businesses/{business_id}/workflows/{workflow_id}/executions/{execution_id}/timeline",
     summary="Timeline اجرای workflow",
-    description="دریافت timeline دقیق اجرای workflow برای debugging",
+    description="دریافت timeline دقیق اجرای workflow برای debugging. ابزار MCP: `get_workflow_execution_timeline`.",
 )
 @require_business_access("business_id")
 async def get_execution_timeline(
@@ -945,7 +945,7 @@ async def get_execution_timeline(
 @router.get(
     "/workflows/metadata/triggers",
     summary="دریافت metadata triggerها",
-    description="دریافت لیست triggerهای موجود با metadata",
+    description="دریافت لیست triggerهای موجود با metadata. ابزار MCP: `list_workflow_trigger_catalog`.",
 )
 async def get_triggers_metadata(
     request: Request,
@@ -976,7 +976,7 @@ async def get_triggers_metadata(
 @router.get(
     "/workflows/metadata/actions",
     summary="دریافت metadata actionها",
-    description="دریافت لیست actionهای موجود با metadata",
+    description="دریافت لیست actionهای موجود با metadata. ابزار MCP: `list_workflow_action_catalog`.",
 )
 async def get_actions_metadata(
     request: Request,
@@ -1039,7 +1039,7 @@ async def get_actions_metadata(
 @router.get(
     "/workflows/translations",
     summary="دریافت تمام ترجمه‌های ورک‌فلو",
-    description="دریافت تمام رشته‌های ترجمه شده برای استفاده در UI",
+    description="دامپ ترجمه UI است و در MCP ثبت نشده.",
 )
 async def get_workflow_translations(
     request: Request,
@@ -1092,7 +1092,7 @@ async def get_workflow_translations(
 @router.get(
     "/workflows/translations/export",
     summary="صادرات ترجمه‌ها برای Flutter",
-    description="صادرات ترجمه‌های ورک‌فلو به فرمت مناسب برای فایل‌های arb",
+    description="خروجی ARB/باینری‌مانند است و در MCP ثبت نشده.",
 )
 async def export_workflow_translations(
     request: Request,
@@ -1147,7 +1147,7 @@ async def export_workflow_translations(
     "/workflow-hooks/{webhook_secret}",
     methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"],
     summary="اجرای ورک‌فلو از طریق Webhook",
-    description="بدون احراز هویت کاربر؛ فقط با webhook_secret ذخیره‌شده در تنظیمات ورک‌فلو.",
+    description="وب‌هوک عمومی بدون نشست MCP است و در MCP ثبت نشده.",
 )
 async def workflow_webhook_inbound(
     request: Request,

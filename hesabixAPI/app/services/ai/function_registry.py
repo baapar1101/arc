@@ -280,6 +280,102 @@ class AIFunctionRegistry:
         from app.services.ai.ai_function_extensions_mcp_gei import register_mcp_gei_functions
 
         register_mcp_gei_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_zohal import register_mcp_zohal_functions
+
+        register_mcp_zohal_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_digipay import register_mcp_digipay_functions
+
+        register_mcp_digipay_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_pay_page import register_mcp_pay_page_functions
+
+        register_mcp_pay_page_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_period_fx import register_mcp_period_fx_functions
+
+        register_mcp_period_fx_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_variants import register_mcp_variant_functions
+
+        register_mcp_variant_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_storage import register_mcp_storage_functions
+
+        register_mcp_storage_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_crm_chat import register_mcp_crm_chat_functions
+
+        register_mcp_crm_chat_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_doc_monetization import register_mcp_doc_monetization_functions
+
+        register_mcp_doc_monetization_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_connectors import register_mcp_connector_functions
+
+        register_mcp_connector_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_remaining_ops import register_mcp_remaining_ops_functions
+
+        register_mcp_remaining_ops_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops2 import register_mcp_ops2_functions
+
+        register_mcp_ops2_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops3 import register_mcp_ops3_functions
+
+        register_mcp_ops3_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops4 import register_mcp_ops4_functions
+
+        register_mcp_ops4_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops5 import register_mcp_ops5_functions
+
+        register_mcp_ops5_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops6 import register_mcp_ops6_functions
+
+        register_mcp_ops6_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops7 import register_mcp_ops7_functions
+
+        register_mcp_ops7_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops8 import register_mcp_ops8_functions
+
+        register_mcp_ops8_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops9 import register_mcp_ops9_functions
+
+        register_mcp_ops9_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops10 import register_mcp_ops10_functions
+
+        register_mcp_ops10_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops11 import register_mcp_ops11_functions
+
+        register_mcp_ops11_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops12 import register_mcp_ops12_functions
+
+        register_mcp_ops12_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops13 import register_mcp_ops13_functions
+
+        register_mcp_ops13_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops14 import register_mcp_ops14_functions
+
+        register_mcp_ops14_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops15 import register_mcp_ops15_functions
+
+        register_mcp_ops15_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops16 import register_mcp_ops16_functions
+
+        register_mcp_ops16_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops17 import register_mcp_ops17_functions
+
+        register_mcp_ops17_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops18 import register_mcp_ops18_functions
+
+        register_mcp_ops18_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops19 import register_mcp_ops19_functions
+
+        register_mcp_ops19_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops20 import register_mcp_ops20_functions
+
+        register_mcp_ops20_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops21 import register_mcp_ops21_functions
+
+        register_mcp_ops21_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops22 import register_mcp_ops22_functions
+
+        register_mcp_ops22_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_ops23 import register_mcp_ops23_functions
+
+        register_mcp_ops23_functions(self)
         from app.services.ai.ai_function_extensions_tax_extra import register_tax_extra_functions
 
         register_tax_extra_functions(self)

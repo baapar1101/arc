@@ -22,12 +22,23 @@ def register_mcp_check_action_functions(registry) -> None:
         ("pay_check", "پرداخت چک پرداختنی از حساب بانکی.", {"bank_account_id": {"type": "integer", "minimum": 1}, **common}, ["bank_account_id"], "pay"),
         ("deposit_check", "سپرده‌گذاری چک دریافتی برای وصول.", {"bank_account_id": {"type": "integer", "minimum": 1}, **common}, [], "deposit"),
     ]
+    suffix = " فقط برای چک متعلق به کسب‌وکار متصل و با دسترسی accounting.write. تأیید صریح لازم است."
+    write_kw = dict(allowed_roles=_ROLES, category="checks")
     for name, description, props, required, action in specs:
-        registry.register(AIFunction(name=name, description=description + " فقط برای چک متعلق به کسب‌وکار متصل و با دسترسی accounting.write. تأیید صریح لازم است.",
-            parameters_schema=_schema({"check_id": {"type": "integer", "minimum": 1}, **props}, ["check_id", *required]),
-            handler=lambda args, context, operation=action: _perform_action(operation, args, context),
-            allowed_roles=_ROLES, required_permissions=["accounting.write"], category="checks",
-            requires_approval=True, risk_level="high", is_readonly=False))
+        schema = _schema({"check_id": {"type": "integer", "minimum": 1}, **props}, ["check_id", *required])
+        handler = lambda args, context, operation=action: _perform_action(operation, args, context)
+        if name == "endorse_check":
+            registry.register(AIFunction(name="endorse_check", description="واگذاری چک دریافتی به شخص دیگر؛ سند حسابداری ایجاد می‌شود. فقط برای چک متعلق به کسب‌وکار متصل و با دسترسی accounting.write. تأیید صریح لازم است.", parameters_schema=schema, handler=handler, required_permissions=["accounting.write"], requires_approval=True, risk_level="high", is_readonly=False, **write_kw))
+        elif name == "clear_check":
+            registry.register(AIFunction(name="clear_check", description="وصول چک دریافتی به حساب بانکی؛ سند حسابداری ایجاد می‌شود. فقط برای چک متعلق به کسب‌وکار متصل و با دسترسی accounting.write. تأیید صریح لازم است.", parameters_schema=schema, handler=handler, required_permissions=["accounting.write"], requires_approval=True, risk_level="high", is_readonly=False, **write_kw))
+        elif name == "return_check":
+            registry.register(AIFunction(name="return_check", description="عودت چک دریافتی از واگذارشونده یا به صادرکننده. فقط برای چک متعلق به کسب‌وکار متصل و با دسترسی accounting.write. تأیید صریح لازم است.", parameters_schema=schema, handler=handler, required_permissions=["accounting.write"], requires_approval=True, risk_level="high", is_readonly=False, **write_kw))
+        elif name == "bounce_check":
+            registry.register(AIFunction(name="bounce_check", description="ثبت برگشت چک و هزینه احتمالی. فقط برای چک متعلق به کسب‌وکار متصل و با دسترسی accounting.write. تأیید صریح لازم است.", parameters_schema=schema, handler=handler, required_permissions=["accounting.write"], requires_approval=True, risk_level="high", is_readonly=False, **write_kw))
+        elif name == "pay_check":
+            registry.register(AIFunction(name="pay_check", description="پرداخت چک پرداختنی از حساب بانکی. فقط برای چک متعلق به کسب‌وکار متصل و با دسترسی accounting.write. تأیید صریح لازم است.", parameters_schema=schema, handler=handler, required_permissions=["accounting.write"], requires_approval=True, risk_level="high", is_readonly=False, **write_kw))
+        elif name == "deposit_check":
+            registry.register(AIFunction(name="deposit_check", description="سپرده‌گذاری چک دریافتی برای وصول. فقط برای چک متعلق به کسب‌وکار متصل و با دسترسی accounting.write. تأیید صریح لازم است.", parameters_schema=schema, handler=handler, required_permissions=["accounting.write"], requires_approval=True, risk_level="high", is_readonly=False, **write_kw))
 
     registry.register(AIFunction(name="get_check_history", description="دریافت تاریخچه وضعیت و اسناد حسابداری مرتبط با چک کسب‌وکار متصل.",
         parameters_schema=_schema({"check_id": {"type": "integer", "minimum": 1}}, ["check_id"]),

@@ -206,7 +206,8 @@ router = APIRouter(prefix="/invoices", tags=["اسناد فروش", "اسناد 
     summary="ایجاد فاکتور",
     description=(
         "ثبت فاکتور جدید برای کسب‌وکار. بدنه درخواست همان ساختار پذیرفته‌شده توسط سرویس ایجاد فاکتور است "
-        "(نوع سند، تاریخ، طرف حساب، خطوط کالا/خدمت، استعلام انبار، اقساط و غیره در `extra_info`). "
+        "(نوع سند، تاریخ، طرف حساب، خطوط کالا/خدمت، استعلام انبار، اقساط). "
+        "ابزار MCP: `create_invoice` (نیازمند تأیید). extra_info در MCP پذیرفته نمی‌شود. "
         "انتخاب دستی نرخ تسعیر ارز فقط با مجوز مشاهدهٔ تاریخچه نرخ (`currency_revaluation.view`) مجاز است."
     ),
 )
@@ -342,7 +343,7 @@ def create_invoice_endpoint(
 @router.get(
     "/business/{business_id}/{invoice_id}/installments",
     summary="طرح اقساط فاکتور",
-    description="در صورت ثبت طرح اقساط روی فاکتور، جزئیات برنامه (اقساط، مبالغ، سررسیدها) برگردانده می‌شود.",
+    description="جزئیات برنامه اقساط. ابزار MCP: `get_invoice_installments`.",
 )
 @require_business_access("business_id")
 def get_invoice_installments_endpoint(
@@ -360,7 +361,7 @@ def get_invoice_installments_endpoint(
 @router.get(
     "/business/{business_id}/{invoice_id}/share-link",
     summary="وضعیت لینک اشتراک‌گذاری فاکتور",
-    description="اگر لینک عمومی فعال برای مشاهدهٔ فاکتور وجود داشته باشد، آدرس و محدودیت‌های آن؛ در غیر این صورت بدون خطا با دادهٔ خالی.",
+    description="وضعیت لینک عمومی فاکتور. ابزار MCP: `get_invoice_share_link`.",
 )
 @require_business_access("business_id")
 def get_invoice_share_link_endpoint(
@@ -386,7 +387,7 @@ def get_invoice_share_link_endpoint(
     summary="ایجاد یا تمدید لینک اشتراک‌گذاری فاکتور",
     description=(
         "ایجاد لینک عمومی با امکان تعیین مدت اعتبار، حداکثر بازدید و جایگزینی لینک قبلی. "
-        "بدنه مطابق مدل `InvoiceShareLinkCreateRequest` است."
+        "ابزار MCP: `create_invoice_share_link` (نیازمند تأیید)."
     ),
 )
 @require_business_access("business_id")
@@ -422,7 +423,7 @@ def create_invoice_share_link_endpoint(
 @router.delete(
     "/business/{business_id}/{invoice_id}/share-link",
     summary="لغو لینک اشتراک‌گذاری فاکتور",
-    description="ابطال لینک عمومی فعال؛ در صورت نبود لینک فعال پاسخ 404 برمی‌گردد.",
+    description="ابطال لینک عمومی فعال. ابزار MCP: `revoke_invoice_share_link` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def delete_invoice_share_link_endpoint(
@@ -447,7 +448,7 @@ def delete_invoice_share_link_endpoint(
 @router.patch(
     "/business/{business_id}/{invoice_id}/share-link/payment",
     summary="تنظیم پرداخت آنلاین روی لینک عمومی فاکتور",
-    description="فعال/غیرفعال کردن پرداخت آنلاین و انتخاب درگاه برای لینک فعال.",
+    description="پرداخت آنلاین لینک فعال. ابزار MCP: `update_invoice_share_link_payment` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def patch_invoice_share_link_payment_endpoint(
@@ -483,8 +484,7 @@ def patch_invoice_share_link_payment_endpoint(
     "/business/{business_id}/installments/search",
     summary="جستجوی اقساط",
     description=(
-        "لیست اقساط با فیلترهای اختیاری: سال مالی، بازه سررسید، وضعیت، شخص، فاکتور، صفحه‌بندی (`take`/`skip`) و غیره. "
-        "جزئیات فیلدها در docstring تابع آمده است."
+        "جستجوی اقساط با فیلتر سررسید/وضعیت/شخص. ابزار MCP: `search_invoice_installments`."
     ),
 )
 @require_business_access("business_id")
@@ -522,7 +522,7 @@ def search_installments_endpoint(
 @router.post(
     "/business/{business_id}/installments/export/excel",
     summary="خروجی Excel اقساط",
-    description="همان فیلترهای `installments/search`؛ در صورت نبود کتابخانه XLSX ممکن است CSV برگردد.",
+    description="خروجی باینری Excel/CSV است و در MCP ثبت نشده. JSON: `search_invoice_installments`.",
 )
 @require_business_access("business_id")
 def export_installments_excel_endpoint(
@@ -555,7 +555,7 @@ def export_installments_excel_endpoint(
 @router.post(
     "/business/{business_id}/installments/export/pdf",
     summary="خروجی PDF گزارش اقساط",
-    description="PDF گزارش اقساط با همان فیلترهای جستجو؛ پارامترهای `paper_size` و `orientation` در بدنه اختیاری هستند.",
+    description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `search_invoice_installments`.",
 )
 @require_business_access("business_id")
 def export_installments_pdf_endpoint(
@@ -739,8 +739,8 @@ def export_installments_pdf_endpoint(
     "/business/{business_id}/{invoice_id}",
     summary="ویرایش فاکتور",
     description=(
-        "به‌روزرسانی فاکتور موجود. خطاهای رایج: شخص نامعتبر (`INVALID_PERSON`)، تکراری بودن شماره فاکتور (`DUPLICATE_DOCUMENT_CODE`). "
-        "همان قواعد انتخاب نرخ ارز دستی مانند ایجاد فاکتور اعمال می‌شود."
+        "به‌روزرسانی فاکتور موجود. ابزار MCP: `update_invoice` (نیازمند تأیید). extra_info در MCP پذیرفته نمی‌شود. "
+        "خطاهای رایج: شخص نامعتبر (`INVALID_PERSON`)، تکراری بودن شماره فاکتور (`DUPLICATE_DOCUMENT_CODE`)."
     ),
 )
 @require_business_access("business_id")
@@ -809,7 +809,7 @@ def update_invoice_endpoint(
 @router.delete(
     "/business/{business_id}/{invoice_id}",
     summary="حذف فاکتور",
-    description="حذف یک فاکتور پس از اعتبارسنجی مالکیت و نوع سند؛ در صورت وجود وابستگی به اسناد دیگر ممکن است خطای منطقی برگردد.",
+    description="حذف یک فاکتور پس از اعتبارسنجی مالکیت. ابزار MCP: `delete_invoice` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def delete_invoice_endpoint(
@@ -845,8 +845,8 @@ def delete_invoice_endpoint(
     "/business/{business_id}/bulk-delete",
     summary="حذف گروهی فاکتورها",
     description=(
-        'بدنه: `{"invoice_ids": [int, ...]}` — حذف چند فاکتور همزمان؛ '
-        "شناسه‌های حذف‌شده در `deleted` و موارد رد شده با دلیل در `skipped` برمی‌گردد."
+        "حذف گروهی حداکثر ۱۰۰ فاکتور. ابزار MCP: `bulk_delete_invoices` (نیازمند تأیید). "
+        "شناسه‌های حذف‌شده در `deleted` و موارد رد شده در `skipped`."
     ),
 )
 @require_business_access("business_id")
@@ -881,9 +881,7 @@ def bulk_delete_invoices_endpoint(
     "/business/{business_id}/bulk-upsert",
     summary="ایجاد/ویرایش گروهی فاکتورها (یکپارچه‌سازی)",
     description=(
-        "بدنه شامل `items`: آرایه‌ای از `{client_ref?، invoice_id?، payload}`؛ برای ایجاد `invoice_id` خالی؛ "
-        "برای ویرایش عدد همان شناسه سند؛ `payload` همان بدنهٔ تکی ایجاد/ویرایش فاکتور. "
-        "حداکثر ۱۰۰۰ آیتم در هر درخواست؛ نتیجهٔ per-item در `results` با status=created|updated|failed است."
+        "ایجاد/ویرایش گروهی فاکتور. ابزار MCP سقف ۲۵ مورد: `bulk_upsert_invoices` (نیازمند تأیید)."
     ),
 )
 @require_business_access("business_id")
@@ -909,8 +907,7 @@ def bulk_upsert_invoices_integration_endpoint(
     "/business/{business_id}/{invoice_id}/delete-info",
     summary="پیش‌نمایش اثرات حذف فاکتور",
     description=(
-        "قبل از حذف، ارتباطات سند را برمی‌گرداند: کارپوشه مودیان، اقساط، اسناد دریافت/پرداخت و حواله‌های انبار. "
-        "برای نمایش هشدار در رابط کاربری استفاده می‌شود."
+        "پیش‌نمایش وابستگی‌های حذف. ابزار MCP: `get_invoice_delete_info`."
     ),
 )
 @require_business_access("business_id")
@@ -1029,7 +1026,7 @@ def get_invoice_delete_info(
 @router.get(
     "/business/{business_id}/tags",
     summary="لیست برچسب‌های فاکتور",
-    description="برچسب‌های قابل انتساب به فاکتور برای این کسب‌وکار (با ایجاد خودکار پیش‌فرض در اولین بار)",
+    description="برچسب‌های قابل انتساب به فاکتور. ابزار MCP: `list_invoice_tags`.",
 )
 @require_business_access("business_id")
 def list_invoice_tags_endpoint(
@@ -1050,7 +1047,7 @@ def list_invoice_tags_endpoint(
 @router.post(
     "/business/{business_id}/tags",
     summary="ایجاد برچسب فاکتور",
-    description='بدنه: `{"name": "...", "color": "#RRGGBB?"}` — برچسب برای فیلتر و نمایش روی فاکتورها.',
+    description="ایجاد برچسب فاکتور. ابزار MCP: `create_invoice_tag` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def create_invoice_tag_endpoint(
@@ -1070,7 +1067,7 @@ def create_invoice_tag_endpoint(
 @router.patch(
     "/business/{business_id}/tags/{tag_id}",
     summary="ویرایش برچسب فاکتور",
-    description="فیلدهای ارسالی (نام، رنگ، فعال/غیرفعال و ...) طبق بدنه درخواست به‌روز می‌شوند.",
+    description="ویرایش برچسب غیرسیستمی. ابزار MCP: `update_invoice_tag` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def update_invoice_tag_endpoint(
@@ -1089,7 +1086,7 @@ def update_invoice_tag_endpoint(
 @router.get(
     "/business/{business_id}/{invoice_id}",
     summary="جزئیات یک فاکتور",
-    description="خروجی کامل سند به شکل دیکشنری (شامل خطوط، مبالغ، اضافه‌اطلاعات، برچسب‌ها پس از فرمت‌دهی).",
+    description="خروجی کامل سند شامل خطوط و مبالغ. ابزار MCP: `get_invoice_details`. extra_info در MCP برنمی‌گردد.",
 )
 @require_business_access("business_id")
 def get_invoice_endpoint(
@@ -1116,7 +1113,7 @@ def get_invoice_endpoint(
     summary="پر کردن دفتر سود قطعی (شناسایی)",
     description=(
         "برای اسناد قبلی، مقادیر بهای تمام‌شده و سود ناخالص قطعی را مطابق تنظیم «زمان شناسایی قطعی» کسب‌وکار ذخیره می‌کند. "
-        "اختیاری: `fiscal_year_id`, `invoice_ids`, `limit`, `use_background` برای صف صف پس‌زمینه."
+        "اختیاری: `fiscal_year_id`, `invoice_ids`, `limit`, `use_background` برای صف پس‌زمینه. ابزار MCP همگام: `backfill_invoice_profit_ledger` (نیازمند تأیید)."
     ),
 )
 @require_business_access("business_id")
@@ -1205,7 +1202,7 @@ def backfill_invoice_profit_ledger_endpoint(
     summary="محاسبه مجدد سود همه فاکتورها",
     description=(
         "معادل فراخوانی `recalculate-profits` بدون فیلتر؛ پس از تغییر تنظیمات محاسبه سود کسب‌وکار استفاده می‌شود. "
-        "در صورت حجم بالا، صف پس‌زمینه به‌کار می‌رود."
+        "در صورت حجم بالا، صف پس‌زمینه به‌کار می‌رود. ابزار MCP سقف ۵۰ سند: `recalculate_all_invoice_profits` (نیازمند تأیید)."
     ),
 )
 @require_business_access("business_id")
@@ -1257,7 +1254,8 @@ def recalculate_all_invoice_profits_endpoint(
     summary="محاسبه مجدد سود فاکتورها (با فیلتر)",
     description=(
         "بدنه: `invoice_ids` اختیاری، `document_type`, `fiscal_year_id`, `batch_size` (پیش‌فرض ۱۰۰)، "
-        "`use_background` (پیش‌فرض true). فقط انواع فروش/برگشت از فروش/تولید در منطق فعلی پردازش می‌شوند."
+        "`use_background` (پیش‌فرض true). فقط انواع فروش/برگشت از فروش/تولید در منطق فعلی پردازش می‌شوند. "
+        "ابزار MCP همگام حداکثر ۵۰ فاکتور: recalculate_invoice_profits."
     ),
 )
 @require_business_access("business_id")
@@ -1434,9 +1432,7 @@ def recalculate_invoice_profits_endpoint(
     "/business/{business_id}/{invoice_id}/pdf",
     summary="PDF یک فاکتور",
     description=(
-        "دریافت فایل PDF تک‌فاکتور. اولویت قالب: `template_id` منتشرشده، سپس قالب پیش‌فرض همان scope "
-        "(`invoices/detail` یا `invoices/receipt` برای سایز فیش)، در نهایت HTML پیش‌فرض. "
-        "پارامترهای query مانند `paper_size` (A4/A5/A6 یا 60mm/80mm/100mm)، `orientation` و `show_stamp` چاپ را کنترل می‌کنند."
+        "باینری PDF است؛ در MCP نیست. JSON: `get_invoice_details`."
     ),
 )
 @require_business_access("business_id")
@@ -2816,10 +2812,8 @@ def _apply_invoice_list_text_search(
     "/business/{business_id}/search",
     summary="لیست و جستجوی فاکتورها",
     description=(
-        "ترکیب استاندارد `QueryInfo` (take، skip، sort، search، filters) با فیلترهای فاکتور: "
-        "`document_type`, `is_proforma`, `currency_id`, `fiscal_year_id` (یا هدر `X-Fiscal-Year-ID`), "
-        "`project_id`, `person_id`, بازه `from_date`/`to_date`, برچسب‌ها، فاکتور اقساطی (`is_installment_sale`) و … . "
-        "خروجی شامل آیتم‌های غنی، مانده و وضعیت مودیان است؛ نتیجه ممکن است کش کوتاه‌مدت داشته باشد."
+        "جستجوی فاکتور با `QueryInfo` و فیلتر نوع/طرف‌حساب/بازه تاریخ. "
+        "ابزار MCP: `search_invoices`. خروجی Excel/PDF در MCP نیست."
     ),
 )
 @require_business_access("business_id")
@@ -3252,8 +3246,7 @@ def _add_counterparty_to_invoice_item(db: Session, item: Dict[str, Any]) -> None
     "/business/{business_id}/tax-workspace/search",
     summary="جستجو در کارپوشه مودیان",
     description=(
-        "فقط اسنادی که در کارپوشه مالیاتی علامت خورده‌اند؛ فیلتر `tax_status` در بدنه اختیاری است. "
-        "بدنه ترکیبی از `QueryInfo` و فیلدهای تخت مشابه لیست فاکتور است."
+        "جستجوی کارپوشه مالیاتی. ابزار MCP: `search_tax_workspace`."
     ),
 )
 @require_business_access("business_id")
@@ -3495,7 +3488,7 @@ def _ensure_sales_or_return(doc: Document) -> None:
     "/business/{business_id}/{invoice_id}/tax-workspace/add",
     summary="افزودن فاکتور به کارپوشه مودیان",
     description=(
-        "فقط فاکتور فروش یا برگشت از فروش. برای برگشت، `reference_invoice_id` شناسه فاکتور فروش مرجع است."
+        "افزودن به کارپوشه مودیان. ابزار MCP: `add_invoice_to_tax_workspace` (نیازمند تأیید)."
     ),
 )
 @require_business_access("business_id")
@@ -3551,7 +3544,7 @@ def add_invoice_to_tax_workspace(
 @router.post(
     "/business/{business_id}/{invoice_id}/tax-workspace/link-reference",
     summary="اتصال فاکتور مرجع برای برگشت/اصلاح",
-    description='بدنه: `{"reference_invoice_id": 123}`',
+    description='اتصال فاکتور مرجع برای برگشت/اصلاح در کارپوشه مالیاتی. بدنه: `{"reference_invoice_id": 123}`. افزونه مودیان لازم است. ابزار MCP: `link_tax_workspace_reference` (نیازمند تأیید).',
 )
 @require_business_access("business_id")
 def link_tax_workspace_reference(
@@ -3591,7 +3584,7 @@ def link_tax_workspace_reference(
 @router.get(
     "/business/{business_id}/tax-workspace/reference-candidates",
     summary="فاکتورهای مرجع قابل انتخاب برای برگشت",
-    description="فاکتورهای فروش ارسال‌شده به مودیان برای اتصال به برگشت از فروش.",
+    description="فاکتورهای فروش قابل اتصال به برگشت. ابزار MCP: `search_tax_reference_candidates`.",
 )
 @require_business_access("business_id")
 def list_tax_reference_candidates(
@@ -3641,7 +3634,7 @@ def list_tax_reference_candidates(
 @router.post(
     "/business/{business_id}/{invoice_id}/tax-workspace/remove",
     summary="حذف فاکتور از کارپوشه مودیان",
-    description="فقط در صورتی مجاز است که فاکتور هنوز به‌صورت نهایی به سامانه ارسال نشده باشد (`sent`/`finalized` ممنوع).",
+    description="حذف از کارپوشه اگر هنوز نهایی ارسال نشده باشد. ابزار MCP: `remove_invoice_from_tax_workspace` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def remove_invoice_from_tax_workspace(
@@ -3679,7 +3672,7 @@ def remove_invoice_from_tax_workspace(
 @router.post(
     "/business/{business_id}/{invoice_id}/tax-workspace/send-to-system",
     summary="ارسال تکی فاکتور به سامانه مودیان",
-    description="فاکتور باید در کارپوشه باشد و قبلاً قطعی ارسال نشده باشد؛ پس از فراخوانی، وضعیت و کدهای رهگیری در سند به‌روز می‌شوند.",
+    description="ارسال تکی به سامانه مودیان. ابزار MCP: `send_invoice_to_tax_system` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def send_invoice_to_tax_system(
@@ -3782,7 +3775,7 @@ def _finalize_tax_workspace_submission(
 @router.post(
     "/business/{business_id}/{invoice_id}/tax-workspace/cancel-in-system",
     summary="ابطال فاکتور در سامانه مودیان",
-    description="ارسال صورتحساب ابطالی (inp=3) برای فاکتور قبلاً ارسال‌شده.",
+    description="ارسال صورتحساب ابطالی. ابزار MCP: `cancel_invoice_in_tax_system` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def cancel_invoice_in_tax_system(
@@ -3809,7 +3802,7 @@ def cancel_invoice_in_tax_system(
 @router.post(
     "/business/{business_id}/{invoice_id}/tax-workspace/send-corrective",
     summary="ارسال صورتحساب اصلاحی به مودیان",
-    description="ارسال صورتحساب اصلاحی (inp=4) برای فاکتور ارسال‌شده.",
+    description="ارسال صورتحساب اصلاحی. ابزار MCP: `send_corrective_invoice_to_tax_system` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def send_corrective_invoice_to_tax_system(
@@ -3836,7 +3829,7 @@ def send_corrective_invoice_to_tax_system(
 @router.post(
     "/business/{business_id}/tax-workspace/send-to-system-batch",
     summary="ارسال گروهی به سامانه مودیان",
-    description='بدنه: `{"invoice_ids": [1,2,...]}` — برای هر شناسه نتیجه در `succeeded` یا جزئیات خطا در `failed`.',
+    description="ارسال گروهی به مودیان. ابزار MCP: `send_tax_invoice_batch` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def send_invoices_to_tax_system_batch(
@@ -3919,7 +3912,7 @@ def send_invoices_to_tax_system_batch(
 @router.post(
     "/business/{business_id}/tax-workspace/remove-batch",
     summary="حذف گروهی از کارپوشه مودیان",
-    description='بدنه: `{"invoice_ids": [...]}` — اسناد ارسال‌شده به سامانه از کارپوشه حذف نمی‌شوند.',
+    description="حذف گروهی از کارپوشه. ابزار MCP: `remove_tax_invoice_batch` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def remove_invoices_from_tax_workspace_batch(
@@ -3972,7 +3965,7 @@ def remove_invoices_from_tax_workspace_batch(
 @router.get(
     "/business/{business_id}/tax-workspace/health",
     summary="سلامت اتصال سامانه مالیاتی",
-    description="وضعیت پیکربندی و اتصال (مثلاً سامانه مودیان) برای این کسب‌وکار؛ مناسب داشبورد و عیب‌یابی.",
+    description="سلامت اتصال سامانه مالیاتی. ابزار MCP: `check_tax_system_health`.",
 )
 @require_business_access("business_id")
 def get_tax_system_health(
@@ -3997,7 +3990,7 @@ def get_tax_system_health(
 @router.get(
     "/business/{business_id}/tax-workspace/failed-invoices",
     summary="صف ارسال ناموفق (Dead Letter)",
-    description="ردیف‌های صف خطای ارسال مالیاتی با امکان فیلتر و صفحه‌بندی.",
+    description="صف ارسال ناموفق مالیاتی. ابزار MCP: `list_tax_failed_invoices`.",
 )
 @require_business_access("business_id")
 def get_failed_invoices(
@@ -4041,7 +4034,7 @@ def get_failed_invoices(
 @router.post(
     "/business/{business_id}/tax-workspace/failed-invoices/{failed_id}/retry",
     summary="تلاش مجدد ارسال رکورد ناموفق",
-    description="یک رکورد از صف Dead Letter را دوباره برای ارسال به سامانه مالیاتی تلاش می‌کند.",
+    description="تلاش مجدد صف ناموفق. ابزار MCP: `retry_tax_failed_invoice` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 def retry_failed_invoice_endpoint(
@@ -4068,7 +4061,7 @@ def retry_failed_invoice_endpoint(
 @router.get(
     "/business/{business_id}/{invoice_id}/tax-timeline",
     summary="تایم‌لاین مالیاتی فاکتور",
-    description="رویدادهای ارسال، استعلام و خطا مرتبط با وضعیت مالیاتی سند (شامل تلاقی با صف ناموفق).",
+    description="رویدادهای ارسال و استعلام مالیاتی. ابزار MCP: `get_invoice_tax_timeline`.",
 )
 @require_business_access("business_id")
 def get_invoice_tax_timeline(
@@ -4147,8 +4140,7 @@ def get_invoice_tax_timeline(
     "/business/{business_id}/tax-workspace/inquire-status",
     summary="استعلام وضعیت از سامانه مالیاتی",
     description=(
-        "حداقل یکی از `invoice_ids` یا `tracking_codes` در بدنه لازم است. "
-        "نتیجهٔ استعلام برای اسناد به‌روزرسانی و در پاسخ برمی‌گردد."
+        "استعلام زنده وضعیت مالیاتی. ابزار MCP: `inquire_invoice_tax_status` (نیازمند تأیید)."
     ),
 )
 @require_business_access("business_id")
@@ -4191,7 +4183,7 @@ def inquire_tax_status_endpoint(
 @router.post(
     "/business/{business_id}/tax-workspace/validate-batch",
     summary="اعتبارسنجی گروهی قبل از ارسال مالیاتی",
-    description='بدنه: `{"invoice_ids": [...]}` — فهرست `validated` و ردها با `issues` در `invalid`.',
+    description="اعتبارسنجی گروهی قبل از ارسال. ابزار MCP: `validate_tax_invoice_batch`.",
 )
 @require_business_access("business_id")
 def validate_invoices_for_tax_batch(
@@ -4267,8 +4259,7 @@ def validate_invoices_for_tax_batch(
     "/business/{business_id}/tax-workspace/quick-actions",
     summary="عملیات سریع کارپوشه مالیاتی",
     description=(
-        "بدنه باید شامل `action` باشد: `send_all_pending`, `inquire_all_sent`, `retry_all_failed`. "
-        "در پس‌زمینه از همان endpointهای ارسال گروهی یا استعلام استفاده می‌شود."
+        "عملیات سریع کارپوشه. در MCP جدا نیست؛ از `send_tax_invoice_batch`، `inquire_invoice_tax_status` و `retry_tax_failed_invoice` استفاده شود."
     ),
 )
 @require_business_access("business_id")
@@ -4367,8 +4358,7 @@ def tax_workspace_quick_actions(
     "/business/{business_id}/export/excel",
     summary="خروجی Excel لیست فاکتورها",
     description=(
-        "فیلتر مشابه جستجو (متن، نوع سند، پیش‌فاکتور، ارز، سال مالی، پروژه، بازه تاریخ، برچسب، تیک/اسکیپ). "
-        "`export_columns` ستون‌ها و برچسب‌ها را مشخص می‌کند؛ `selected_only` و `selected_indices` برای خروج فقط سطرهای انتخاب‌شده در گرید."
+        "خروجی Excel باینری است؛ در MCP نیست. JSON: `search_invoices`."
     ),
 )
 @require_business_access("business_id")
@@ -4729,8 +4719,7 @@ async def export_invoices_excel(
     "/business/{business_id}/export/pdf",
     summary="خروجی PDF لیست فاکتورها",
     description=(
-        "همان منطق فیلتر و ستون‌های Excel؛ علاوه بر آن `template_id` برای قالب سفارشی ماژول invoices/list، "
-        "`disposition` برای attachment/inline، `paper_size` و `orientation` برای چاپ."
+        "باینری PDF است؛ در MCP نیست. JSON: `search_invoices`."
     ),
 )
 @require_business_access("business_id")
@@ -5224,8 +5213,7 @@ async def export_invoices_pdf(
     "/business/{business_id}/import/template",
     summary="دانلود تمپلیت ایمپورت فاکتورها",
     description=(
-        "فایل XLSX با هدر ستون‌ها و چند ردیف نمونه؛ ستون `invoice_number` ردیف‌های یک فاکتور را گروه‌بندی می‌کند. "
-        "انواع مجاز در ستون invoice_type در توضیحات هدر فایل آمده است."
+        "تمپلیت Excel باینری است؛ در MCP نیست."
     ),
 )
 @require_business_access("business_id")
@@ -5330,8 +5318,7 @@ async def download_invoices_import_template(
     "/business/{business_id}/import/excel",
     summary="ایمپورت فاکتورها از فایل Excel",
     description=(
-        "فرم چندبخشی: فیلد `file` (xlsx)، فرم `dry_run` (true/false) — در حالت dry_run فقط اعتبارسنجی و خلاصه بدون ثبت سند. "
-        "خروجی شامل `summary` (تعداد، معتبر، نامعتبر، ایجادشده) و آرایه `errors` به تفکیک شماره فاکتور است."
+        "ایمپورت Excel باینری است؛ در MCP نیست. ایجاد تکی: `create_invoice`."
     ),
 )
 @require_business_access("business_id")
@@ -5759,8 +5746,7 @@ async def import_invoices_excel(
     "/business/{business_id}/invoices/calculate-remaining",
     summary="مانده چند فاکتور (پرداخت‌شده و باقیمانده)",
     description=(
-        "بدنه: `{\"invoice_ids\": [int, ...]}` — برای هر شناسه مبلغ کل، پرداخت‌شده، مانده و وضعیت تسویه برمی‌گردد. "
-        "برای نمایش در لیست یا فاکتور اقساطی کاربرد دارد."
+        "مانده چند فاکتور. ابزار MCP: `calculate_invoice_balances`."
     ),
 )
 @require_business_access("business_id")

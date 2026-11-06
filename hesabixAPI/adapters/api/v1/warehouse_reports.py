@@ -134,7 +134,7 @@ def _create_excel_export(items: List[Dict[str, Any]], headers: List[tuple], file
 
 @router.post("/businesses/{business_id}/documents-summary",
     summary="گزارش خلاصه حواله‌های انبار",
-    description="خلاصه حواله‌های انبار به تفکیک نوع با آمار ورود و خروج",
+    description="ابزار MCP: `get_warehouse_documents_summary`.",
 )
 @require_business_access("business_id")
 @cache_response(ttl=60, vary_by=["business_id"])
@@ -179,6 +179,7 @@ async def warehouse_documents_summary_endpoint(
 
 @router.post("/businesses/{business_id}/documents-summary/export/excel",
     summary="خروجی Excel گزارش خلاصه حواله‌های انبار",
+    description="خروجی باینری Excel است و در MCP ثبت نشده.",
 )
 @require_business_access("business_id")
 async def export_warehouse_documents_summary_excel(
@@ -219,7 +220,7 @@ async def export_warehouse_documents_summary_excel(
 
 @router.post("/businesses/{business_id}/slow-moving-items",
     summary="گزارش کالاهای کم‌گردش",
-    description="کالاهایی که در بازه زمانی مشخص شده هیچ حرکتی نداشته‌اند",
+    description="ابزار MCP: `get_slow_moving_warehouse_items`.",
 )
 @require_business_access("business_id")
 @cache_response(ttl=120, vary_by=["business_id"])
@@ -258,6 +259,7 @@ async def slow_moving_items_endpoint(
 
 @router.post("/businesses/{business_id}/slow-moving-items/export/excel",
     summary="خروجی Excel گزارش کالاهای کم‌گردش",
+    description="خروجی باینری Excel است و در MCP ثبت نشده.",
 )
 @require_business_access("business_id")
 async def export_slow_moving_items_excel(
@@ -296,7 +298,7 @@ async def export_slow_moving_items_excel(
 
 @router.post("/businesses/{business_id}/critical-stock",
     summary="گزارش کالاهای با موجودی بحرانی",
-    description="کالاهایی که موجودی آن‌ها کمتر از حد تعیین شده است",
+    description="ابزار MCP: `get_critical_stock_report`.",
 )
 @require_business_access("business_id")
 async def critical_stock_endpoint(
@@ -334,6 +336,7 @@ async def critical_stock_endpoint(
 
 @router.post("/businesses/{business_id}/critical-stock/export/excel",
     summary="خروجی Excel گزارش کالاهای با موجودی بحرانی",
+    description="خروجی باینری Excel است و در MCP ثبت نشده.",
 )
 @require_business_access("business_id")
 async def export_critical_stock_excel(
@@ -374,7 +377,7 @@ async def export_critical_stock_excel(
 
 @router.post("/businesses/{business_id}/inter-warehouse-transfers",
     summary="گزارش انتقالات بین انبارها",
-    description="جزئیات انتقالات بین انبارها",
+    description="ابزار MCP: `get_inter_warehouse_transfers_report`.",
 )
 @require_business_access("business_id")
 async def inter_warehouse_transfers_endpoint(
@@ -416,6 +419,7 @@ async def inter_warehouse_transfers_endpoint(
 
 @router.post("/businesses/{business_id}/inter-warehouse-transfers/export/excel",
     summary="خروجی Excel گزارش انتقالات بین انبارها",
+    description="خروجی باینری Excel است و در MCP ثبت نشده.",
 )
 @require_business_access("business_id")
 async def export_inter_warehouse_transfers_excel(
@@ -456,7 +460,7 @@ async def export_inter_warehouse_transfers_excel(
 
 @router.post("/businesses/{business_id}/adjustment-documents",
     summary="گزارش حواله‌های تعدیل",
-    description="تحلیل حواله‌های تعدیل و تفاوت‌های موجودی",
+    description="ابزار MCP: `get_warehouse_adjustment_report`.",
 )
 @require_business_access("business_id")
 async def adjustment_documents_endpoint(
@@ -496,6 +500,7 @@ async def adjustment_documents_endpoint(
 
 @router.post("/businesses/{business_id}/adjustment-documents/export/excel",
     summary="خروجی Excel گزارش حواله‌های تعدیل",
+    description="خروجی باینری Excel است و در MCP ثبت نشده.",
 )
 @require_business_access("business_id")
 async def export_adjustment_documents_excel(
@@ -535,7 +540,7 @@ async def export_adjustment_documents_excel(
 
 @router.post("/businesses/{business_id}/warehouse-performance",
     summary="گزارش عملکرد انبارها",
-    description="مقایسه عملکرد انبارها",
+    description="ابزار MCP: `get_warehouse_performance_report`.",
 )
 @require_business_access("business_id")
 async def warehouse_performance_endpoint(
@@ -568,6 +573,7 @@ async def warehouse_performance_endpoint(
 
 @router.post("/businesses/{business_id}/warehouse-performance/export/excel",
     summary="خروجی Excel گزارش عملکرد انبارها",
+    description="خروجی باینری Excel است و در MCP ثبت نشده.",
 )
 @require_business_access("business_id")
 async def export_warehouse_performance_excel(
@@ -606,7 +612,7 @@ async def export_warehouse_performance_excel(
 
 @router.post("/businesses/{business_id}/product-movement-history",
     summary="گزارش تاریخچه حرکات یک کالا",
-    description="تاریخچه کامل حرکات یک کالا در تمام انبارها",
+    description="ابزار MCP: `get_product_movement_history`.",
 )
 @require_business_access("business_id")
 async def product_movement_history_endpoint(
@@ -652,6 +658,7 @@ async def product_movement_history_endpoint(
 
 @router.post("/businesses/{business_id}/product-movement-history/export/excel",
     summary="خروجی Excel گزارش تاریخچه حرکات یک کالا",
+    description="خروجی باینری Excel است و در MCP ثبت نشده.",
 )
 @require_business_access("business_id")
 async def export_product_movement_history_excel(
@@ -697,7 +704,7 @@ async def export_product_movement_history_excel(
 
 @router.post("/businesses/{business_id}/inventory-valuation",
     summary="گزارش ارزش موجودی انبار",
-    description="ارزش موجودی انبارها به معادل ارز پایهٔ کسب‌وکار",
+    description="ابزار MCP: `get_inventory_valuation_report`. همچنین `get_inventory_valuation` برای ارزش‌گذاری موجود است.",
 )
 @require_business_access("business_id")
 async def inventory_valuation_endpoint(
@@ -737,6 +744,7 @@ async def inventory_valuation_endpoint(
 
 @router.post("/businesses/{business_id}/inventory-valuation/export/excel",
     summary="خروجی Excel گزارش ارزش موجودی انبار",
+    description="خروجی باینری Excel است و در MCP ثبت نشده.",
 )
 @require_business_access("business_id")
 async def export_inventory_valuation_excel(
@@ -778,7 +786,7 @@ async def export_inventory_valuation_excel(
 
 @router.post("/businesses/{business_id}/pending-documents",
     summary="گزارش حواله‌های در انتظار تایید",
-    description="حواله‌های draft یا در انتظار تایید",
+    description="ابزار MCP: `get_pending_warehouse_documents`.",
 )
 @require_business_access("business_id")
 async def pending_documents_endpoint(
@@ -814,6 +822,7 @@ async def pending_documents_endpoint(
 
 @router.post("/businesses/{business_id}/pending-documents/export/excel",
     summary="خروجی Excel گزارش حواله‌های در انتظار تایید",
+    description="خروجی باینری Excel است و در MCP ثبت نشده.",
 )
 @require_business_access("business_id")
 async def export_pending_documents_excel(
@@ -850,7 +859,7 @@ async def export_pending_documents_excel(
 
 @router.post("/businesses/{business_id}/inventory-turnover",
     summary="گزارش گردش موجودی",
-    description="نرخ گردش موجودی کالاها",
+    description="ابزار MCP: `get_inventory_turnover_report`.",
 )
 @require_business_access("business_id")
 async def inventory_turnover_endpoint(
@@ -890,6 +899,7 @@ async def inventory_turnover_endpoint(
 
 @router.post("/businesses/{business_id}/inventory-turnover/export/excel",
     summary="خروجی Excel گزارش گردش موجودی",
+    description="خروجی باینری Excel است و در MCP ثبت نشده.",
 )
 @require_business_access("business_id")
 async def export_inventory_turnover_excel(
@@ -930,6 +940,7 @@ async def export_inventory_turnover_excel(
 
 @router.post("/businesses/{business_id}/expiry-stock",
     summary="گزارش لات‌های نزدیک به انقضا و منقضی",
+    description="ابزار MCP: `get_expiry_stock_report`.",
 )
 @require_business_access("business_id")
 async def expiry_stock_endpoint(
@@ -956,6 +967,7 @@ async def expiry_stock_endpoint(
 
 @router.post("/businesses/{business_id}/expiry-stock/export/excel",
     summary="خروجی Excel گزارش انقضا",
+    description="خروجی باینری Excel است و در MCP ثبت نشده.",
 )
 @require_business_access("business_id")
 async def export_expiry_stock_excel(

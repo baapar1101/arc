@@ -10,12 +10,6 @@ def _schema(properties=None, required=()):
     return {"type": "object", "properties": properties or {}, "required": list(required), "additionalProperties": False}
 
 
-def _register(registry, name, description, schema, handler, permission, *, write=False, high=False):
-    registry.register(AIFunction(name=name, description=description, parameters_schema=schema, handler=handler,
-        allowed_roles=_ROLES, required_permissions=[permission], category="production", requires_approval=bool(write),
-        risk_level="high" if high else ("medium" if write else "safe"), is_readonly=not write))
-
-
 def _model(module: str, name: str, payload: dict, *, partial=False):
     import importlib
     cls = getattr(importlib.import_module(module), name)
@@ -43,8 +37,8 @@ def register_mcp_production_functions(registry) -> None:
         if df and dt and df > dt:
             raise ValueError("due_from must not be after due_to")
         return production.list_production_orders(c["db"], int(c["business_id"]), status=a.get("status"), product_id=a.get("product_id"), due_from=df, due_to=dt, skip=int(a.get("skip", 0)), take=int(a.get("take", 50)))
-    _register(registry, "list_production_orders", "فهرست سفارش‌های تولید با فیلتر وضعیت/کالا/سررسید؛ حداکثر ۲۰۰ مورد.", list_schema, list_orders, "inventory.read")
-    _register(registry, "get_production_order", "جزئیات یک سفارش تولید متعلق به کسب‌وکار متصل.", _schema(order_id, ["order_id"]), lambda a,c: production.get_production_order(c["db"], int(c["business_id"]), int(a["order_id"])), "inventory.read")
+    registry.register(AIFunction(name="list_production_orders", description="فهرست سفارش‌های تولید با فیلتر وضعیت/کالا/سررسید؛ حداکثر ۲۰۰ مورد.", parameters_schema=list_schema, handler=list_orders, allowed_roles=_ROLES, required_permissions=["inventory.read"], category="production", is_readonly=True))
+    registry.register(AIFunction(name="get_production_order", description="جزئیات یک سفارش تولید متعلق به کسب‌وکار متصل.", parameters_schema=_schema(order_id, ["order_id"]), handler=lambda a,c: production.get_production_order(c["db"], int(c["business_id"]), int(a["order_id"])), allowed_roles=_ROLES, required_permissions=["inventory.read"], category="production", is_readonly=True))
 
     def material_plan(a, c):
         df = date.fromisoformat(a["due_from"]) if a.get("due_from") else None
@@ -52,8 +46,8 @@ def register_mcp_production_functions(registry) -> None:
         if df and dt and df > dt:
             raise ValueError("due_from must not be after due_to")
         return production.get_production_material_plan(c["db"], int(c["business_id"]), due_from=df, due_to=dt)
-    _register(registry, "get_production_material_plan", "برنامه نیاز مواد سفارش‌های تولید در بازه سررسید.", _schema(date_props), material_plan, "inventory.read")
-    _register(registry, "trace_production_orders_by_lot", "ردیابی سفارش‌های تولید با کد lot.", _schema({"lot_code": {"type": "string", "minLength": 1, "maxLength": 64}}, ["lot_code"]), lambda a,c: production.list_production_orders_by_lot(c["db"], int(c["business_id"]), a["lot_code"]), "inventory.read")
+    registry.register(AIFunction(name="get_production_material_plan", description="برنامه نیاز مواد سفارش‌های تولید در بازه سررسید.", parameters_schema=_schema(date_props), handler=material_plan, allowed_roles=_ROLES, required_permissions=["inventory.read"], category="production", is_readonly=True))
+    registry.register(AIFunction(name="trace_production_orders_by_lot", description="ردیابی سفارش‌های تولید با کد lot.", parameters_schema=_schema({"lot_code": {"type": "string", "minLength": 1, "maxLength": 64}}, ["lot_code"]), handler=lambda a,c: production.list_production_orders_by_lot(c["db"], int(c["business_id"]), a["lot_code"]), allowed_roles=_ROLES, required_permissions=["inventory.read"], category="production", is_readonly=True))
 
     create_order = _schema({"product_id": {"type": "integer", "minimum": 1}, "bom_id": {"type": "integer", "minimum": 1}, "quantity": {"type": "number", "exclusiveMinimum": 0},
         "warehouse_id": {"type": "integer", "minimum": 1}, "output_warehouse_id": {"type": "integer", "minimum": 1}, "planned_start_date": {"type": ["string", "null"], "format": "date"},
@@ -64,7 +58,7 @@ def register_mcp_production_functions(registry) -> None:
         result = production.create_production_order(c["db"], int(c["business_id"]), c["user_context"].get_user_id(), payload)
         _commit(c["db"])
         return result
-    _register(registry, "create_production_order", "ایجاد سفارش تولید؛ کالا، BOM و انبارها باید متعلق به کسب‌وکار باشند. نیازمند تأیید.", create_order, create_production, "inventory.write", write=True)
+    registry.register(AIFunction(name="create_production_order", description="ایجاد سفارش تولید؛ کالا، BOM و انبارها باید متعلق به کسب‌وکار باشند. نیازمند تأیید.", parameters_schema=create_order, handler=create_production, allowed_roles=_ROLES, required_permissions=["inventory.write"], category="production", requires_approval=True, risk_level="medium", is_readonly=False))
 
     update_order_schema = _schema({"order_id": {"type": "integer", "minimum": 1}, "version": {"type": "integer", "minimum": 1}, "quantity": {"type": ["number", "null"], "exclusiveMinimum": 0},
         "warehouse_id": {"type": ["integer", "null"], "minimum": 1}, "output_warehouse_id": {"type": ["integer", "null"], "minimum": 1}, "planned_start_date": {"type": ["string", "null"], "format": "date"},
@@ -74,26 +68,30 @@ def register_mcp_production_functions(registry) -> None:
         result = production.update_production_order(c["db"], int(c["business_id"]), int(a["order_id"]), payload)
         _commit(c["db"])
         return result
-    _register(registry, "update_production_order", "ویرایش سفارش تولید با کنترل نسخه هم‌زمانی؛ نیازمند تأیید.", update_order_schema, update_production, "inventory.write", write=True)
+    registry.register(AIFunction(name="update_production_order", description="ویرایش سفارش تولید با کنترل نسخه هم‌زمانی؛ نیازمند تأیید.", parameters_schema=update_order_schema, handler=update_production, allowed_roles=_ROLES, required_permissions=["inventory.write"], category="production", requires_approval=True, risk_level="medium", is_readonly=False))
 
     action_schema = _schema({"order_id": {"type": "integer", "minimum": 1}, "version": {"type": "integer", "minimum": 1}, "close_reason": {"type": ["string", "null"], "maxLength": 2000}}, ["order_id", "version"])
-    for tool, op, desc in [("release_production_order", production.release_production_order, "آزادسازی سفارش تولید"), ("start_production_order", production.start_production_order, "شروع سفارش تولید"),
-        ("complete_production_order", production.complete_production_order, "تکمیل سفارش و ثبت اثر موجودی"), ("cancel_production_order", production.cancel_production_order, "لغو سفارش تولید")]:
-        def action(a, c, operation=op, tool_name=tool):
-            if tool_name == "complete_production_order":
+    def _prod_action(operation, *, complete=False):
+        def action(a, c):
+            if complete:
                 result = operation(c["db"], int(c["business_id"]), int(a["order_id"]), int(a["version"]), a.get("close_reason"))
             else:
                 result = operation(c["db"], int(c["business_id"]), int(a["order_id"]), int(a["version"]))
             _commit(c["db"])
             return result
-        _register(registry, tool, desc + "; تغییر lifecycle/موجودی و نیازمند تأیید.", action_schema, action, "inventory.write", write=True, high=True)
+        return action
+    prod_write = dict(allowed_roles=_ROLES, category="production")
+    registry.register(AIFunction(name="release_production_order", description="آزادسازی سفارش تولید؛ تغییر lifecycle/موجودی و نیازمند تأیید.", parameters_schema=action_schema, handler=_prod_action(production.release_production_order), required_permissions=["inventory.write"], requires_approval=True, risk_level="high", is_readonly=False, **prod_write))
+    registry.register(AIFunction(name="start_production_order", description="شروع سفارش تولید؛ تغییر lifecycle/موجودی و نیازمند تأیید.", parameters_schema=action_schema, handler=_prod_action(production.start_production_order), required_permissions=["inventory.write"], requires_approval=True, risk_level="high", is_readonly=False, **prod_write))
+    registry.register(AIFunction(name="complete_production_order", description="تکمیل سفارش و ثبت اثر موجودی؛ نیازمند تأیید.", parameters_schema=action_schema, handler=_prod_action(production.complete_production_order, complete=True), required_permissions=["inventory.write"], requires_approval=True, risk_level="high", is_readonly=False, **prod_write))
+    registry.register(AIFunction(name="cancel_production_order", description="لغو سفارش تولید؛ تغییر lifecycle/موجودی و نیازمند تأیید.", parameters_schema=action_schema, handler=_prod_action(production.cancel_production_order), required_permissions=["inventory.write"], requires_approval=True, risk_level="high", is_readonly=False, **prod_write))
 
-    _register(registry, "get_production_order_costing", "خواندن بهای تمام‌شده سفارش تولید.", _schema(order_id, ["order_id"]), lambda a,c: production.get_production_order_costing(c["db"], int(c["business_id"]), int(a["order_id"])), "inventory.read")
+    registry.register(AIFunction(name="get_production_order_costing", description="خواندن بهای تمام‌شده سفارش تولید.", parameters_schema=_schema(order_id, ["order_id"]), handler=lambda a,c: production.get_production_order_costing(c["db"], int(c["business_id"]), int(a["order_id"])), allowed_roles=_ROLES, required_permissions=["inventory.read"], category="production", is_readonly=True))
     def refresh_cost(a,c):
         result = production.refresh_production_order_actual_costs(c["db"], int(c["business_id"]), int(a["order_id"]))
         _commit(c["db"])
         return result
-    _register(registry, "refresh_production_order_costing", "بازمحاسبه بهای واقعی سفارش تولید از اسناد؛ نیازمند تأیید.", _schema(order_id, ["order_id"]), refresh_cost, "inventory.write", write=True)
+    registry.register(AIFunction(name="refresh_production_order_costing", description="بازمحاسبه بهای واقعی سفارش تولید از اسناد؛ نیازمند تأیید.", parameters_schema=_schema(order_id, ["order_id"]), handler=refresh_cost, allowed_roles=_ROLES, required_permissions=["inventory.write"], category="production", requires_approval=True, risk_level="medium", is_readonly=False))
 
     lot_line = _schema({"id": {"type": "integer", "minimum": 1}, "lot_code": {"type": ["string", "null"], "maxLength": 64}, "manufacturing_date": {"type": ["string", "null"]}, "expiry_date": {"type": ["string", "null"]}, "scrap_quantity": {"type": ["number", "null"], "minimum": 0}, "selected_instance_ids": {"type": ["array", "null"], "items": {"type": "integer"}}}, ["id"])
     def update_lots(a,c):
@@ -102,8 +100,8 @@ def register_mcp_production_functions(registry) -> None:
             material_lots=[x.model_dump() for x in (payload.materials or [])], output_lots=[x.model_dump() for x in (payload.outputs or [])])
         _commit(c["db"])
         return result
-    _register(registry, "update_production_order_lots", "ثبت lot مواد و خروجی‌های سفارش با کنترل نسخه؛ نیازمند تأیید.", _schema({"order_id": {"type": "integer", "minimum": 1}, "version": {"type": "integer", "minimum": 1},
-        "materials": {"type": ["array", "null"], "items": lot_line}, "outputs": {"type": ["array", "null"], "items": lot_line}}, ["order_id", "version"]), update_lots, "inventory.write", write=True)
+    registry.register(AIFunction(name="update_production_order_lots", description="ثبت lot مواد و خروجی‌های سفارش با کنترل نسخه؛ نیازمند تأیید.", parameters_schema=_schema({"order_id": {"type": "integer", "minimum": 1}, "version": {"type": "integer", "minimum": 1},
+        "materials": {"type": ["array", "null"], "items": lot_line}, "outputs": {"type": ["array", "null"], "items": lot_line}}, ["order_id", "version"]), handler=update_lots, allowed_roles=_ROLES, required_permissions=["inventory.write"], category="production", requires_approval=True, risk_level="medium", is_readonly=False))
 
     # BOM workflows
     item = _schema({"line_no": {"type": "integer", "minimum": 1}, "component_product_id": {"type": "integer", "minimum": 1}, "qty_per": {"type": "number", "exclusiveMinimum": 0}, "uom": {"type": ["string", "null"], "maxLength": 32},
@@ -113,20 +111,20 @@ def register_mcp_production_functions(registry) -> None:
     bom_create_schema = _schema({"product_id": {"type": "integer", "minimum": 1}, "version": {"type": "string", "maxLength": 64}, "name": {"type": "string", "maxLength": 255}, "is_default": {"type": "boolean"},
         "effective_from": {"type": ["string", "null"]}, "effective_to": {"type": ["string", "null"]}, "yield_percent": {"type": ["number", "null"]}, "wastage_percent": {"type": ["number", "null"]},
         "status": {"type": "string", "enum": ["draft", "approved", "archived"]}, "notes": {"type": ["string", "null"], "maxLength": 5000}, "items": {"type": "array", "items": item}, "outputs": {"type": "array", "items": output}, "operations": {"type": "array", "items": operation}}, ["product_id", "version", "name"])
-    _register(registry, "get_bom", "جزئیات BOM متعلق به کسب‌وکار متصل.", _schema(bom_id, ["bom_id"]), lambda a,c: bom.get_bom(c["db"], int(c["business_id"]), int(a["bom_id"])), "inventory.read")
+    registry.register(AIFunction(name="get_bom", description="جزئیات BOM متعلق به کسب‌وکار متصل.", parameters_schema=_schema(bom_id, ["bom_id"]), handler=lambda a,c: bom.get_bom(c["db"], int(c["business_id"]), int(a["bom_id"])), allowed_roles=_ROLES, required_permissions=["inventory.read"], category="production", is_readonly=True))
     def create_bom(a,c):
         result = bom.create_bom(c["db"], int(c["business_id"]), _model("adapters.api.v1.schema_models.product_bom", "ProductBOMCreateRequest", a))
         return result
-    _register(registry, "create_bom", "تعریف BOM و مواد/خروجی/عملیات؛ اعتبارسنجی تعلق کالا به کسب‌وکار انجام می‌شود. نیازمند تأیید.", bom_create_schema, create_bom, "inventory.write", write=True)
+    registry.register(AIFunction(name="create_bom", description="تعریف BOM و مواد/خروجی/عملیات؛ اعتبارسنجی تعلق کالا به کسب‌وکار انجام می‌شود. نیازمند تأیید.", parameters_schema=bom_create_schema, handler=create_bom, allowed_roles=_ROLES, required_permissions=["inventory.write"], category="production", requires_approval=True, risk_level="medium", is_readonly=False))
     update_bom_schema = _schema({**bom_id, "version": {"type": ["string", "null"], "maxLength": 64}, "name": {"type": ["string", "null"], "maxLength": 255}, "is_default": {"type": ["boolean", "null"]},
         "effective_from": {"type": ["string", "null"]}, "effective_to": {"type": ["string", "null"]}, "yield_percent": {"type": ["number", "null"]}, "wastage_percent": {"type": ["number", "null"]}, "status": {"type": ["string", "null"], "enum": ["draft", "approved", "archived", None]}, "notes": {"type": ["string", "null"], "maxLength": 5000},
         "items": {"type": ["array", "null"], "items": item}, "outputs": {"type": ["array", "null"], "items": output}, "operations": {"type": ["array", "null"], "items": operation}}, ["bom_id"])
     def update_bom(a,c):
         result = bom.update_bom(c["db"], int(c["business_id"]), int(a["bom_id"]), _model("adapters.api.v1.schema_models.product_bom", "ProductBOMUpdateRequest", {k:v for k,v in a.items() if k != "bom_id"}))
         return result
-    _register(registry, "update_bom", "ویرایش BOM؛ خطوط ارسال‌شده جایگزین مواد/خروجی/عملیات فعلی می‌شوند. نیازمند تأیید.", update_bom_schema, update_bom, "inventory.write", write=True)
-    _register(registry, "delete_bom", "حذف BOM؛ ممکن است برای سفارش‌های تولید موجود قابل استفاده نباشد. نیازمند تأیید.", _schema(bom_id, ["bom_id"]), lambda a,c: bom.delete_bom(c["db"], int(c["business_id"]), int(a["bom_id"])), "inventory.delete", write=True, high=True)
+    registry.register(AIFunction(name="update_bom", description="ویرایش BOM؛ خطوط ارسال‌شده جایگزین مواد/خروجی/عملیات فعلی می‌شوند. نیازمند تأیید.", parameters_schema=update_bom_schema, handler=update_bom, allowed_roles=_ROLES, required_permissions=["inventory.write"], category="production", requires_approval=True, risk_level="medium", is_readonly=False))
+    registry.register(AIFunction(name="delete_bom", description="حذف BOM؛ ممکن است برای سفارش‌های تولید موجود قابل استفاده نباشد. نیازمند تأیید.", parameters_schema=_schema(bom_id, ["bom_id"]), handler=lambda a,c: bom.delete_bom(c["db"], int(c["business_id"]), int(a["bom_id"])), allowed_roles=_ROLES, required_permissions=["inventory.delete"], category="production", requires_approval=True, risk_level="high", is_readonly=False))
     explode_schema = _schema({"product_id": {"type": ["integer", "null"], "minimum": 1}, "bom_id": {"type": ["integer", "null"], "minimum": 1}, "quantity": {"type": "number", "exclusiveMinimum": 0}, "date": {"type": ["string", "null"], "format": "date"}, "recursive": {"type": "boolean"}, "max_depth": {"type": "integer", "minimum": 1, "maximum": 32}}, ["quantity"])
-    _register(registry, "explode_bom", "محاسبه مواد لازم از BOM بدون ثبت موجودی یا سند؛ حداکثر عمق بازگشتی ۳۲.", explode_schema, lambda a,c: bom.explode_bom(c["db"], int(c["business_id"]), _model("adapters.api.v1.schema_models.product_bom", "BOMExplosionRequest", a)), "inventory.read")
+    registry.register(AIFunction(name="explode_bom", description="محاسبه مواد لازم از BOM بدون ثبت موجودی یا سند؛ حداکثر عمق بازگشتی ۳۲.", parameters_schema=explode_schema, handler=lambda a,c: bom.explode_bom(c["db"], int(c["business_id"]), _model("adapters.api.v1.schema_models.product_bom", "BOMExplosionRequest", a)), allowed_roles=_ROLES, required_permissions=["inventory.read"], category="production", is_readonly=True))
     draft_schema = _schema({"product_id": {"type": ["integer", "null"], "minimum": 1}, "bom_id": {"type": ["integer", "null"], "minimum": 1}, "quantity": {"type": "number", "exclusiveMinimum": 0}, "document_date": {"type": ["string", "null"], "format": "date"}, "fiscal_year_id": {"type": ["integer", "null"], "minimum": 1}, "currency_id": {"type": ["integer", "null"], "minimum": 1}}, ["quantity"])
-    _register(registry, "produce_draft_from_bom", "ساخت پیش‌نویس سند تولید بر اساس BOM؛ سند قطعی نمی‌شود. نیازمند تأیید.", draft_schema, lambda a,c: bom.produce_draft(c["db"], int(c["business_id"]), _model("adapters.api.v1.schema_models.product_bom", "ProductionDraftRequest", a)), "inventory.write", write=True)
+    registry.register(AIFunction(name="produce_draft_from_bom", description="ساخت پیش‌نویس سند تولید بر اساس BOM؛ سند قطعی نمی‌شود. نیازمند تأیید.", parameters_schema=draft_schema, handler=lambda a,c: bom.produce_draft(c["db"], int(c["business_id"]), _model("adapters.api.v1.schema_models.product_bom", "ProductionDraftRequest", a)), allowed_roles=_ROLES, required_permissions=["inventory.write"], category="production", requires_approval=True, risk_level="medium", is_readonly=False))

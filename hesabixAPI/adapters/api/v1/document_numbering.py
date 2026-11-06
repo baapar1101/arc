@@ -151,6 +151,7 @@ def _get_default_setting(document_type: str) -> dict:
 @router.get(
     "",
     summary="دریافت تمام تنظیمات شماره‌گذاری اسناد یک کسب و کار",
+    description="ابزار MCP: `get_document_numbering_settings`.",
 )
 def get_document_numbering_settings(
     request: Request,
@@ -179,6 +180,7 @@ def get_document_numbering_settings(
 @router.get(
     "/{document_type}",
     summary="دریافت تنظیمات شماره‌گذاری برای یک نوع سند خاص",
+    description="ابزار MCP: `get_document_numbering_settings`.",
 )
 def get_document_numbering_setting(
     request: Request,
@@ -218,6 +220,7 @@ def get_document_numbering_setting(
 @router.post(
     "",
     summary="ایجاد یا به‌روزرسانی تنظیمات شماره‌گذاری",
+    description="ابزار MCP: `update_document_numbering_settings` (نیازمند تأیید).",
 )
 def create_or_update_document_numbering_setting(
     request: Request,
@@ -276,6 +279,7 @@ def create_or_update_document_numbering_setting(
 @router.delete(
     "/{document_type}",
     summary="حذف تنظیمات شماره‌گذاری (بازگشت به پیش‌فرض)",
+    description="حذف تنظیم سفارشی شماره‌گذاری یک نوع سند. ابزار MCP: `delete_document_numbering_setting` (نیازمند تأیید).",
 )
 def delete_document_numbering_setting(
     request: Request,

@@ -12,14 +12,19 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 
 from adapters.db.models.api_key import ApiKey
-from adapters.db.models.ai_mcp_oauth import McpOAuthRefreshToken
 from adapters.db.models.user import User
 from adapters.db.repositories.api_key_repo import ApiKeyRepository
 from adapters.db.session import get_db
 from app.core.auth_dependency import AuthContext, get_current_user
-from app.core.responses import ApiError
+from app.core.responses import ApiError, success_response
 from app.core.security import generate_api_key, hash_api_key
-from app.core.cache import get_cache
+from app.services.ai.ai_mcp_connections import (
+    connection_catalog_payload,
+    list_managed_connections,
+    revoke_all_connections,
+    revoke_connection,
+    update_connection_permissions,
+)
 from app.services.ai.ai_mcp_service import handle_mcp_request
 from adapters.api.v1.ai.mcp_oauth import _base_url, _has_explicit_business_access, _resource
 
@@ -43,7 +48,11 @@ def _require_business_access(ctx: AuthContext, business_id: int) -> None:
         raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار مجاز نیست", http_status=403)
 
 
-@router.post("/connections", summary="ایجاد دسترسی MCP برای یک کسب‌وکار")
+@router.post(
+    "/connections",
+    summary="ایجاد دسترسی MCP برای یک کسب‌وکار",
+    description="صدور توکن یک‌بارمصرف است و در MCP ثبت نشده. فهرست: `list_mcp_connections`.",
+)
 def create_mcp_connection(
     request: Request,
     body: Dict[str, Any] = Body(...),
@@ -107,75 +116,97 @@ def create_mcp_connection(
     }
 
 
-@router.get("/connections", summary="فهرست اتصال‌های MCP")
+@router.get("/connections", summary="فهرست اتصال‌های MCP", description="ابزار MCP: `list_mcp_connections`. توکن خام برنمی‌گردد.")
 def list_mcp_connections(
+    request: Request,
     business_id: int,
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
     _require_business_access(ctx, business_id)
-    query = db.query(ApiKey).filter(ApiKey.key_type == "mcp", ApiKey.business_id == business_id)
-    if not ctx.is_business_owner(business_id):
-        query = query.filter(ApiKey.user_id == ctx.get_user_id())
-    rows = query.order_by(ApiKey.created_at.desc()).all()
-    items = []
-    seen_oauth_grants: set[str] = set()
-    for row in rows:
-        if row.oauth_grant_id:
-            if row.oauth_grant_id in seen_oauth_grants:
-                continue
-            seen_oauth_grants.add(row.oauth_grant_id)
-        items.append({
-                "id": row.id,
-                "name": row.name,
-                "business_id": row.business_id,
-                "scopes": sorted(_scopes(row)),
-                "tool_permissions": list(row.mcp_tool_permissions) if row.mcp_tool_permissions is not None else None,
-                "created_at": row.created_at.isoformat() + "Z",
-                "expires_at": row.expires_at.isoformat() + "Z" if row.expires_at else None,
-                "last_used_at": row.last_used_at.isoformat() + "Z" if row.last_used_at else None,
-                "revoked": row.revoked_at is not None,
-                "oauth": bool(row.oauth_grant_id),
-            })
     from app.core.ai_mcp_plugin_dependency import get_ai_mcp_plugin_access, public_ai_mcp_plugin_access
 
-    return {
-        "items": items,
-        "plugin": public_ai_mcp_plugin_access(get_ai_mcp_plugin_access(db, business_id)),
-    }
+    return success_response(
+        {
+            "items": list_managed_connections(db, ctx, business_id),
+            "plugin": public_ai_mcp_plugin_access(get_ai_mcp_plugin_access(db, business_id)),
+            "server_url": _base_url(request) + request.url_for("mcp_jsonrpc_endpoint").path,
+            "viewer_is_owner": ctx.is_business_owner(business_id),
+        },
+        request,
+    )
 
 
-@router.delete("/connections/{connection_id}", summary="لغو اتصال MCP")
-def revoke_mcp_connection(
-    connection_id: int,
+@router.post(
+    "/connections/revoke-all",
+    summary="لغو همه اتصال‌های MCP یک کسب‌وکار",
+    description="ابزار MCP: `revoke_all_mcp_connections` (نیازمند تأیید).",
+)
+def revoke_all_mcp_connections(
+    request: Request,
+    body: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
-    row = db.query(ApiKey).filter(ApiKey.id == connection_id, ApiKey.key_type == "mcp").first()
-    if (not row or not row.business_id or not ctx.db or
-            not _has_explicit_business_access(ctx.db, ctx.get_user_id(), row.business_id)):
-        raise ApiError("NOT_FOUND", "اتصال پیدا نشد", http_status=404)
-    if not ctx.is_business_owner(row.business_id) and row.user_id != ctx.get_user_id():
-        raise ApiError("FORBIDDEN", "لغو این اتصال مجاز نیست", http_status=403)
-    row.revoked_at = datetime.utcnow()
-    db.add(row)
-    if row.oauth_grant_id:
-        now = datetime.utcnow()
-        db.query(ApiKey).filter(
-            ApiKey.oauth_grant_id == row.oauth_grant_id,
-            ApiKey.key_type == "mcp",
-            ApiKey.revoked_at.is_(None),
-        ).update({ApiKey.revoked_at: now}, synchronize_session=False)
-        db.query(McpOAuthRefreshToken).filter(
-            McpOAuthRefreshToken.grant_id == row.oauth_grant_id,
-            McpOAuthRefreshToken.revoked_at.is_(None),
-        ).update({McpOAuthRefreshToken.revoked_at: now}, synchronize_session=False)
-    db.commit()
-    logger.info(
-        "MCP connection revoked connection_id=%s actor_user_id=%s business_id=%s",
-        row.id, ctx.get_user_id(), row.business_id,
+    try:
+        business_id = int(body.get("business_id"))
+    except (TypeError, ValueError):
+        raise ApiError("BUSINESS_ID_REQUIRED", "شناسه کسب‌وکار الزامی است", http_status=400)
+    _require_business_access(ctx, business_id)
+    return success_response(revoke_all_connections(db, ctx, business_id), request)
+
+
+@router.get(
+    "/connections/{connection_id}/catalog",
+    summary="کاتالوگ ابزار قابل اعطای یک اتصال MCP",
+    description="ابزار MCP: `get_mcp_connection_catalog`.",
+)
+def get_mcp_connection_catalog(
+    connection_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    return success_response(connection_catalog_payload(db, ctx, connection_id), request)
+
+
+@router.patch(
+    "/connections/{connection_id}",
+    summary="تغییر دسترسی اتصال MCP",
+    description="ابزار MCP: `update_mcp_connection` (نیازمند تأیید). توکن جدید صادر نمی‌شود.",
+)
+def patch_mcp_connection(
+    connection_id: int,
+    request: Request,
+    body: Dict[str, Any] = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    return success_response(
+        update_connection_permissions(
+            db,
+            ctx,
+            connection_id,
+            tool_permissions_raw=body.get("tool_permissions"),
+            enable_writes_raw=body.get("enable_writes"),
+            unrestricted_tools_raw=body.get("unrestricted_tools"),
+        ),
+        request,
     )
-    return {"revoked": True, "id": row.id}
+
+
+@router.delete(
+    "/connections/{connection_id}",
+    summary="لغو اتصال MCP",
+    description="ابزار MCP: `revoke_mcp_connection` (نیازمند تأیید).",
+)
+def revoke_mcp_connection(
+    connection_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    return success_response(revoke_connection(db, ctx, connection_id), request)
 
 
 def get_mcp_context(request: Request, db: Session = Depends(get_db)) -> AuthContext:
@@ -262,7 +293,11 @@ def get_mcp_context(request: Request, db: Session = Depends(get_db)) -> AuthCont
     return ctx
 
 
-@router.post("", summary="MCP Streamable HTTP endpoint")
+@router.post(
+    "",
+    summary="MCP Streamable HTTP endpoint",
+    description="نقطه ورود پروتکل MCP است نه یک ابزار کسب‌وکار.",
+)
 async def mcp_jsonrpc_endpoint(
     request: Request,
     body: Dict[str, Any] = Body(...),

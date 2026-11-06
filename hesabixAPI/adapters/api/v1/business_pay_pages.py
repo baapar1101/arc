@@ -23,6 +23,7 @@ router = APIRouter(prefix="/businesses/{business_id}/pay-page", tags=["business-
 @router.get(
 	"",
 	summary="تنظیمات لینک واریز عمومی کسب‌وکار",
+	description="نام کاربری، درگاه، حداقل/حداکثر مبلغ، متن راهنما و اعلان‌ها. ابزار MCP: get_pay_page_settings.",
 )
 def get_pay_page(
 	request: Request,
@@ -38,6 +39,7 @@ def get_pay_page(
 @router.put(
 	"",
 	summary="ذخیره تنظیمات لینک واریز عمومی",
+	description="ذخیره نام کاربری یکتا، درگاه و محدودیت مبلغ. تغییر نام کاربری سابقه ۳۰روزه می‌سازد. ابزار MCP: update_pay_page_settings.",
 )
 def put_pay_page(
 	request: Request,
@@ -58,6 +60,7 @@ def put_pay_page(
 @router.get(
 	"/username-availability",
 	summary="بررسی آزاد بودن نام کاربری لینک واریز",
+	description="ابزار MCP: `check_pay_page_username`.",
 )
 def username_availability(
 	request: Request,
@@ -74,6 +77,7 @@ def username_availability(
 @router.post(
 	"/payments/table",
 	summary="جدول واریزهای لینک پرداخت",
+	description="ابزار MCP: `list_pay_page_payments`.",
 )
 def pay_page_payments_table(
 	request: Request,
@@ -116,6 +120,7 @@ def pay_page_payments_table(
 @router.get(
 	"/payments/export",
 	summary="خروجی CSV واریزهای لینک پرداخت",
+	description="خروجی باینری CSV است و در MCP ثبت نشده. JSON: `list_pay_page_payments`.",
 )
 def pay_page_payments_export(
 	request: Request,

@@ -27,7 +27,7 @@ router = APIRouter(prefix="/cash-registers", tags=["مدیریت مالی"])
 @router.post(
     "/businesses/{business_id}/cash-registers",
     summary="لیست صندوق‌ها",
-    description="دریافت لیست صندوق‌های یک کسب و کار با امکان جستجو و فیلتر",
+    description="ابزار MCP: `list_cash_registers`.",
 )
 @require_business_access("business_id")
 async def list_cash_registers_endpoint(
@@ -70,7 +70,7 @@ async def list_cash_registers_endpoint(
 @router.post(
     "/businesses/{business_id}/cash-registers/create",
     summary="ایجاد صندوق جدید",
-    description="ایجاد صندوق برای یک کسب‌وکار مشخص",
+    description="ابزار MCP: `create_cash_register` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def create_cash_register_endpoint(
@@ -89,7 +89,7 @@ async def create_cash_register_endpoint(
 @router.get(
     "/cash-registers/{cash_id}",
     summary="جزئیات صندوق",
-    description="دریافت جزئیات صندوق بر اساس شناسه",
+    description="ابزار MCP: `get_cash_register`.",
 )
 async def get_cash_register_endpoint(
     request: Request,
@@ -113,7 +113,7 @@ async def get_cash_register_endpoint(
 @router.put(
     "/cash-registers/{cash_id}",
     summary="ویرایش صندوق",
-    description="ویرایش اطلاعات صندوق",
+    description="ابزار MCP: `update_cash_register` (نیازمند تأیید).",
 )
 async def update_cash_register_endpoint(
     request: Request,
@@ -139,7 +139,7 @@ async def update_cash_register_endpoint(
 @router.delete(
     "/cash-registers/{cash_id}",
     summary="حذف صندوق",
-    description="حذف یک صندوق",
+    description="ابزار MCP: `delete_cash_register` (نیازمند تأیید).",
 )
 async def delete_cash_register_endpoint(
     request: Request,
@@ -169,7 +169,7 @@ async def delete_cash_register_endpoint(
 @router.post(
     "/businesses/{business_id}/cash-registers/bulk-delete",
     summary="حذف گروهی صندوق‌ها",
-    description="حذف چندین صندوق بر اساس شناسه‌ها",
+    description="ابزار MCP: `bulk_delete_cash_registers` (نیازمند تأیید).",
 )
 @require_business_access("business_id")
 async def bulk_delete_cash_registers_endpoint(
@@ -196,7 +196,7 @@ async def bulk_delete_cash_registers_endpoint(
 @router.post(
     "/businesses/{business_id}/cash-registers/export/excel",
     summary="خروجی Excel لیست صندوق‌ها",
-    description="خروجی Excel لیست صندوق‌ها با قابلیت فیلتر و مرتب‌سازی",
+    description="خروجی باینری Excel است و در MCP ثبت نشده. JSON: `list_cash_registers`.",
 )
 @require_business_access("business_id")
 async def export_cash_registers_excel(
@@ -324,7 +324,7 @@ async def export_cash_registers_excel(
 @router.post(
     "/businesses/{business_id}/cash-registers/export/pdf",
     summary="خروجی PDF لیست صندوق‌ها",
-    description="خروجی PDF لیست صندوق‌ها با قابلیت فیلتر و مرتب‌سازی",
+    description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `list_cash_registers`.",
 )
 @require_business_access("business_id")
 async def export_cash_registers_pdf(
@@ -564,7 +564,7 @@ async def export_cash_registers_pdf(
 
 @router.post("/businesses/{business_id}/reports/cash-petty-turnover",
     summary="گزارش گردش صندوق و تنخواه",
-    description="گزارش برداشت‌ها و واریزهای هر صندوق و تنخواه در یک بازه زمانی",
+    description="گزارش برداشت‌ها و واریزهای هر صندوق و تنخواه در یک بازه زمانی. ابزار MCP: `get_report` با report_type=cash_petty_turnover.",
 )
 @require_business_access("business_id")
 async def cash_petty_turnover_report_endpoint(
@@ -672,7 +672,7 @@ async def cash_petty_turnover_report_endpoint(
 
 @router.post("/businesses/{business_id}/reports/cash-petty-turnover/export/excel",
     summary="خروجی Excel گزارش گردش صندوق و تنخواه",
-    description="خروجی Excel گزارش گردش صندوق و تنخواه با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+    description="خروجی باینری Excel است و در MCP ثبت نشده. JSON: `get_report` با report_type=cash_petty_turnover.",
 )
 @require_business_access("business_id")
 async def export_cash_petty_turnover_excel(
@@ -959,6 +959,7 @@ async def export_cash_petty_turnover_excel(
 @router.post(
     "/businesses/{business_id}/reports/cash-petty-turnover/export/pdf",
     summary="خروجی PDF گزارش گردش صندوق و تنخواه",
+    description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `get_report` با report_type=cash_petty_turnover.",
 )
 @require_business_access("business_id")
 async def export_cash_petty_turnover_pdf(

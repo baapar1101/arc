@@ -384,6 +384,7 @@ const Set<String> _level1RelativePaths = {
   'storage-files',
   'tax-workspace',
   'ai/chat',
+  'ai/mcp-connections',
   'ai/subscription',
   'ai/usage',
   'ai/skills/marketplace',

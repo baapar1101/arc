@@ -345,7 +345,7 @@ def _enqueue_products_excel_export(
     "/business/{business_id}",
     summary="ایجاد محصول جدید",
     description="""
-    ایجاد یک محصول یا خدمت جدید برای کسب‌وکار
+    ایجاد کالا. ابزار MCP: `create_product` (نیازمند تأیید). تصویر باینری در MCP نیست.
     
     ### ویژگی‌ها:
     - پشتیبانی از آپلود تصویر (multipart/form-data یا JSON)
@@ -475,7 +475,8 @@ async def create_product_endpoint(
     description=(
         "بدنه: `{\"items\":[{\"client_ref?\":\"...\",\"product_id?\":null|int شناسه کالا در حسابیکس,"
         '"payload\":{ ... فیلدهای ایجاد/ویرایش مانند endpoint تکی، از جمله opening_balance }}],'
-        '\"create_if_update_missing\":true}`. حداکثر ۱۰۰۰ آیتم. خروجی: results با status در created|updated|failed.'
+        '\"create_if_update_missing\":true}`. حداکثر ۱۰۰۰ آیتم. خروجی: results با status در created|updated|failed. '
+        "ابزار MCP تکی: `create_product` / `update_product`."
     ),
 )
 @require_business_access("business_id")
@@ -494,7 +495,7 @@ async def bulk_upsert_products_integration_endpoint(
     "/business/{business_id}/search",
     summary="جستجو و فیلتر محصولات",
     description="""
-    جستجو، فیلتر و لیست‌بندی محصولات با قابلیت‌های پیشرفته
+    جستجوی کالا. ابزار MCP: `search_products`. Excel/PDF در MCP نیست.
     
     ### قابلیت‌ها:
     - جستجو در چندین فیلد (نام، کد، توضیحات)
@@ -768,7 +769,7 @@ def search_products_endpoint(
     summary="کالاهای اخیر در فاکتورهای فروش",
     description="""
     فهرست کالاهایی که اخیراً در اسناد فروش (غیر پیش‌فاکتور) استفاده شده‌اند،
-    مرتب‌شده از جدیدترین فاکتور؛ برای پیشنهاد اولیه در جستجو (مثلاً فروش سریع).
+    مرتب‌شده از جدیدترین فاکتور؛ برای پیشنهاد اولیه در جستجو (مثلاً فروش سریع). ابزار MCP: `list_recent_sales_invoice_products`.
     """,
     response_model=SuccessResponse[ProductListResponse],
 )
@@ -812,6 +813,7 @@ def list_recent_from_sales_invoices_endpoint(
 @router.post(
     "/business/{business_id}/metadata",
     summary="دریافت گروهی فرادادهٔ کالاها",
+    description="ابزار MCP جداگانه ندارد؛ از `search_products` یا `get_product_info` استفاده شود.",
 )
 @require_business_access("business_id")
 def get_products_metadata_endpoint(
@@ -920,7 +922,7 @@ def get_products_metadata_endpoint(
     "/business/{business_id}/{product_id}",
     summary="دریافت اطلاعات محصول",
     description="""
-    دریافت اطلاعات کامل یک محصول یا خدمت
+    جزئیات کالا. ابزار MCP: `get_product_info`.
     
     ### اطلاعات برگشتی:
     - اطلاعات پایه محصول (کد، نام، نوع، توضیحات)
@@ -1010,7 +1012,7 @@ def get_product_endpoint(
     description="""
     آمار خرید/فروش و نمودار میانگین موزون قیمت واحد به **ارز پایهٔ کسب‌وکار**.
     تنها خطوط فاکتوری که مانند Kardex کنترل می‌شوند و فاکتور مربوطه **حداقل یک حوالهٔ انبار با وضعیت posted و مبدأ invoice** دارد، لحاظ می‌شوند.
-    نرخ تبدیل مانند شخص‌حساب: اولویت با `extra_info.fx` روی سند، سپس نرخ تاریخ سند مطابق تنظیم تسعیر کسب‌وکار.
+    نرخ تبدیل مانند شخص‌حساب: اولویت با `extra_info.fx` روی سند، سپس نرخ تاریخ سند مطابق تنظیم تسعیر کسب‌وکار. ابزار MCP: `get_product_commercial_insights`.
     """,
 )
 @require_business_access("business_id")
@@ -1040,6 +1042,7 @@ def get_product_commercial_insights_endpoint(
 @router.post(
     "/business/{business_id}/{product_id}/sync-base-price-from-fx",
     summary="به‌روزرسانی قیمت پایه کالا از قیمت ارزی × نرخ روز",
+    description="همگام قیمت پایه یک کالا از نرخ ارز. ابزار MCP: `sync_product_base_price_from_fx` (نیازمند تأیید).",
     tags=["products", "currency_revaluation"],
 )
 @require_business_access("business_id")
@@ -1069,6 +1072,7 @@ async def sync_product_base_price_from_fx_endpoint(
 @router.post(
     "/business/{business_id}/sync-base-prices-from-fx",
     summary="به‌روزرسانی گروهی قیمت پایه کالاها از نرخ (auto_update)",
+    description="همگام گروهی کالاهایی که auto_update دارند. ابزار MCP: `sync_products_base_prices_from_fx` (نیازمند تأیید).",
     tags=["products", "currency_revaluation"],
 )
 @require_business_access("business_id")
@@ -1092,7 +1096,7 @@ async def sync_business_product_base_prices_from_fx_endpoint(
     "/business/{business_id}/{product_id}",
     summary="ویرایش محصول",
     description="""
-    ویرایش اطلاعات یک محصول یا خدمت موجود
+    ویرایش کالا. ابزار MCP: `update_product` (نیازمند تأیید). تصویر باینری در MCP نیست.
     
     ### ویژگی‌ها:
     - پشتیبانی از آپلود تصویر جدید (multipart/form-data یا JSON)
@@ -1240,7 +1244,7 @@ async def update_product_endpoint(
     "/business/{business_id}/{product_id}",
     summary="حذف محصول",
     description="""
-    حذف یک محصول یا خدمت از سیستم
+    حذف کالا. ابزار MCP: `delete_product` (نیازمند تأیید). پیش‌نمایش: `check_product_usage`.
     
     ### نکات مهم:
     - محصولات که در فاکتورها استفاده شده‌اند ممکن است قابل حذف نباشند
@@ -1320,7 +1324,7 @@ def delete_product_endpoint(
     "/business/{business_id}/{product_id}/usage-check",
     summary="بررسی امکان حذف کالا (اسناد مرتبط)",
     description="""
-    بررسی می‌کند آیا کالا در فاکتور، سند حسابداری، حواله انبار، BOM یا سایر وابستگی‌ها استفاده شده است.
+    پیش‌نمایش وابستگی حذف کالا. ابزار MCP: `check_product_usage`.
     برای پیش‌نمایش پاک‌سازی امن (بدون حذف واقعی) مناسب است.
     """,
     response_model=SuccessResponse[Dict[str, Any]],
@@ -1363,7 +1367,7 @@ def check_product_usage_endpoint(
     "/business/{business_id}/bulk-delete",
     summary="حذف گروهی محصولات",
     description="""
-    حذف چندین محصول به صورت همزمان بر اساس شناسه‌ها یا کدها
+    ابزار MCP: `bulk_delete_products` (نیازمند تأیید). حذف چندین محصول به صورت همزمان بر اساس شناسه‌ها یا کدها
     
     ### ویژگی‌ها:
     - حذف بر اساس شناسه‌ها (ids) یا کدها (codes) یا هر دو
@@ -1497,6 +1501,7 @@ def bulk_delete_products_endpoint(
     "/business/{business_id}/export/excel",
     summary="خروجی Excel لیست محصولات",
     description="""
+    خروجی باینری Excel است و در MCP ثبت نشده. JSON: `search_products`.
     دریافت لیست محصولات به صورت فایل Excel
     
     ### قابلیت‌ها:
@@ -1597,6 +1602,7 @@ async def export_products_excel(
 @router.post(
     "/business/{business_id}/price-report/export/excel",
     summary="خروجی Excel گزارش قیمت کالا (ستون‌های محدود)",
+    description="خروجی باینری Excel است و در MCP ثبت نشده.",
 )
 @require_business_access("business_id")
 async def export_product_price_report_excel(
@@ -1623,6 +1629,7 @@ async def export_product_price_report_excel(
     "/business/{business_id}/import/template",
     summary="دانلود تمپلیت ایمپورت محصولات",
     description="""
+    خروجی باینری Excel است و در MCP ثبت نشده.
     دریافت فایل Excel تمپلیت برای ایمپورت محصولات
     
     ### ویژگی‌ها:
@@ -1694,6 +1701,7 @@ async def download_products_import_template(
     "/business/{business_id}/import/excel",
     summary="ایمپورت محصولات از فایل Excel",
     description="""
+    ایمپورت باینری Excel است و در MCP ثبت نشده. ایجاد تکی: `create_product`.
     آپلود و پردازش فایل Excel برای ایمپورت محصولات
     
     ### قابلیت‌ها:
@@ -2855,6 +2863,7 @@ def import_products_excel(
     "/business/{business_id}/export/pdf",
     summary="خروجی PDF لیست محصولات",
     description="""
+    خروجی باینری PDF است و در MCP ثبت نشده. JSON: `search_products`.
     دریافت لیست محصولات به صورت فایل PDF
     
     ### قابلیت‌ها:
@@ -3341,6 +3350,7 @@ async def export_products_pdf(
 @router.post(
     "/business/{business_id}/price-report/export/pdf",
     summary="خروجی PDF گزارش قیمت کالا (ستون‌های محدود)",
+    description="خروجی باینری PDF است و در MCP ثبت نشده.",
 )
 @require_business_access("business_id")
 async def export_product_price_report_pdf(
@@ -3367,7 +3377,7 @@ async def export_product_price_report_pdf(
     "/business/{business_id}/bulk-price-update/preview",
     summary="پیش‌نمایش تغییر قیمت‌های گروهی",
     description="""
-    پیش‌نمایش تغییرات قیمت قبل از اعمال تغییرات واقعی
+    ابزار MCP: `preview_bulk_product_price_update`. پیش‌نمایش تغییرات قیمت قبل از اعمال تغییرات واقعی
     
     ### قابلیت‌ها:
     - تغییر قیمت بر اساس درصد یا مبلغ ثابت
@@ -3447,7 +3457,7 @@ def preview_bulk_price_update_endpoint(
     "/business/{business_id}/bulk-price-update/apply",
     summary="اعمال تغییر قیمت‌های گروهی",
     description="""
-    اعمال تغییرات قیمت بر روی کالاهای انتخاب شده
+    ابزار MCP: `apply_bulk_product_price_update` (نیازمند تأیید). اعمال تغییرات قیمت بر روی کالاهای انتخاب شده
     
     ### قابلیت‌ها:
     - تغییر قیمت بر اساس درصد یا مبلغ ثابت
@@ -3506,6 +3516,7 @@ def apply_bulk_price_update_endpoint(
 @router.post(
     "/business/{business_id}/bulk-prices-sheet/price-items",
     summary="دریافت ردیف‌های قیمت لیست برای ورق ویرایش گسترده",
+    description="ستون‌های لیست قیمت برای کالاهای انتخابی. ابزار MCP: `list_bulk_product_prices_sheet_items`. خروجی اکسل جداست و در MCP نیست.",
     response_model=SuccessResponse[Dict[str, Any]],
 )
 @require_business_access("business_id")
@@ -3524,6 +3535,7 @@ def list_bulk_product_prices_sheet_items_endpoint(
 @router.post(
     "/business/{business_id}/bulk-prices-sheet/apply",
     summary="اعمال دسته‌ای قیمت پایه (نمای ویرایش گسترده)",
+    description="قیمت پایه و سلول‌های لیست قیمت. ابزار MCP: `apply_bulk_product_prices_sheet` (نیازمند تأیید). ایمپورت اکسل در MCP نیست.",
     response_model=SuccessResponse[Dict[str, Any]],
 )
 @require_business_access("business_id")
@@ -3542,6 +3554,7 @@ def apply_bulk_product_prices_sheet_endpoint(
 @router.post(
     "/business/{business_id}/bulk-prices-sheet/export/excel",
     summary="خروجی اکسل ورق ویرایش گسترده قیمت",
+    description="خروجی باینری Excel است و در MCP ثبت نشده.",
     response_class=Response,
 )
 @require_business_access("business_id")
@@ -3576,6 +3589,7 @@ async def export_bulk_product_prices_sheet_excel_endpoint(
 @router.post(
     "/business/{business_id}/bulk-prices-sheet/import/excel",
     summary="ایمپورت اکسل ورق ویرایش گسترده قیمت",
+    description="ایمپورت باینری Excel است و در MCP ثبت نشده. JSON: `apply_bulk_product_prices_sheet`.",
     response_model=SuccessResponse[Dict[str, Any]],
 )
 @require_business_access("business_id")
@@ -3609,7 +3623,7 @@ async def import_bulk_product_prices_sheet_excel_endpoint(
     "/business/{business_id}/bulk-default-warehouse/preview",
     summary="پیش‌نمایش تغییر گروهی انبار پیش‌فرض کالاها",
     description="""
-    پیش‌نمایش تغییر انبار پیش‌فرض برای چندین کالا به صورت همزمان
+    ابزار MCP: `preview_bulk_product_default_warehouse`. پیش‌نمایش تغییر انبار پیش‌فرض برای چندین کالا به صورت همزمان
     
     ### قابلیت‌ها:
     - تغییر انبار پیش‌فرض برای لیستی از کالاها
@@ -3676,7 +3690,7 @@ def preview_bulk_default_warehouse_endpoint(
     "/business/{business_id}/bulk-default-warehouse/apply",
     summary="اعمال تغییر گروهی انبار پیش‌فرض کالاها",
     description="""
-    اعمال تغییر انبار پیش‌فرض برای چندین کالا به صورت واقعی
+    ابزار MCP: `apply_bulk_product_default_warehouse` (نیازمند تأیید). اعمال تغییر انبار پیش‌فرض برای چندین کالا به صورت واقعی
     
     ### قابلیت‌ها:
     - تغییر انبار پیش‌فرض برای لیستی از کالاها
@@ -3739,7 +3753,7 @@ def apply_bulk_default_warehouse_endpoint(
     "/businesses/{business_id}/reports/item-movements",
     summary="گزارش گردش کالا",
     description="""
-    دریافت گزارش گردش کالاها در بازه زمانی مشخص
+    ابزار MCP: `get_report` با report_type=item_movements. دریافت گزارش گردش کالاها در بازه زمانی مشخص
     
     ### اطلاعات گزارش:
     - ورود و خروج کالاها در بازه زمانی
@@ -3902,6 +3916,7 @@ async def item_movements_report_endpoint(
     "/businesses/{business_id}/reports/item-movements/export/excel",
     summary="خروجی Excel گزارش گردش کالا",
     description="""
+    خروجی باینری Excel است و در MCP ثبت نشده. JSON: `get_report` با report_type=item_movements.
     دریافت گزارش گردش کالا به صورت فایل Excel
     
     ### قابلیت‌ها:
@@ -4159,6 +4174,7 @@ async def export_item_movements_report_excel(
 @router.post(
     "/businesses/{business_id}/reports/item-movements/export/pdf",
     summary="خروجی PDF گزارش گردش کالا",
+    description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `get_report` با report_type=item_movements.",
     responses={
         200: {
             "description": "فایل PDF",
@@ -4399,6 +4415,7 @@ async def export_item_movements_report_pdf(
     "/businesses/{business_id}/reports/sales-by-product",
     summary="گزارش فروش به تفکیک کالا",
     description="""
+    ابزار MCP: `get_report` با report_type=sales_by_product.
     دریافت گزارش عملکرد فروش هر کالا در بازه زمانی
     
     ### اطلاعات گزارش:
@@ -4564,6 +4581,7 @@ async def sales_by_product_report_endpoint(
     "/businesses/{business_id}/reports/inventory-kardex",
     summary="گزارش کاردکس موجودی",
     description="""
+    ابزار MCP: `get_report` با report_type=inventory_kardex.
     دریافت گزارش کاردکس (کاردکس) موجودی کالاها
     
     ### اطلاعات گزارش:
@@ -4720,6 +4738,7 @@ async def inventory_kardex_report_endpoint(
     "/businesses/{business_id}/reports/inventory-stock",
     summary="گزارش موجودی انبار",
     description="""
+    ابزار MCP: `get_report` با report_type=inventory_stock.
     دریافت گزارش موجودی فعلی محصولات در انبارها
     
     ### اطلاعات گزارش:
@@ -4886,6 +4905,7 @@ async def inventory_stock_report_endpoint(
 @router.post(
     "/businesses/{business_id}/reports/inventory-stock/export/excel",
     summary="خروجی Excel گزارش موجودی انبار",
+    description="خروجی باینری Excel است و در MCP ثبت نشده. JSON: `get_report` با report_type=inventory_stock.",
     responses={
         200: {
             "description": "فایل Excel",
@@ -5130,6 +5150,7 @@ async def export_inventory_stock_report_excel(
 @router.post(
     "/businesses/{business_id}/reports/inventory-stock/export/pdf",
     summary="خروجی PDF گزارش موجودی انبار",
+    description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `get_report` با report_type=inventory_stock.",
     responses={
         200: {
             "description": "فایل PDF",
@@ -5414,6 +5435,7 @@ async def export_inventory_stock_report_pdf(
     "/businesses/{business_id}/reports/inventory-kardex/export/excel",
     summary="خروجی Excel گزارش کاردکس موجودی",
     description="""
+    خروجی باینری Excel است و در MCP ثبت نشده. JSON: `get_report` با report_type=inventory_kardex.
     دریافت گزارش کاردکس موجودی به صورت فایل Excel
     
     ### قابلیت‌ها:
@@ -5819,6 +5841,7 @@ async def export_inventory_kardex_report_excel(
     "/businesses/{business_id}/reports/inventory-kardex/export/pdf",
     summary="خروجی PDF گزارش کاردکس موجودی",
     description="""
+    خروجی باینری PDF است و در MCP ثبت نشده. JSON: `get_report` با report_type=inventory_kardex.
     دریافت گزارش کاردکس موجودی به صورت فایل PDF
     
     ### قابلیت‌ها:
@@ -6196,6 +6219,7 @@ async def export_inventory_kardex_report_pdf(
     "/businesses/{business_id}/reports/sales-by-product/export/excel",
     summary="خروجی Excel گزارش فروش به تفکیک کالا",
     description="""
+    خروجی باینری Excel است و در MCP ثبت نشده. JSON: `get_report` با report_type=sales_by_product.
     دریافت گزارش فروش به تفکیک کالا به صورت فایل Excel
     
     ### قابلیت‌ها:
@@ -6557,6 +6581,7 @@ async def export_sales_by_product_report_excel(
 @router.post(
     "/businesses/{business_id}/reports/sales-by-product/export/pdf",
     summary="خروجی PDF گزارش فروش به تفکیک کالا",
+    description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `get_report` با report_type=sales_by_product.",
 )
 @require_business_access("business_id")
 async def export_sales_by_product_report_pdf(

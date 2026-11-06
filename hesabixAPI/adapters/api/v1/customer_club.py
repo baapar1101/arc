@@ -29,7 +29,11 @@ def _ensure_plugin(db: Session, business_id: int) -> None:
 		)
 
 
-@router.get("/business/{business_id}/settings")
+@router.get(
+	"/business/{business_id}/settings",
+	summary="تنظیمات باشگاه مشتریان",
+	description="ابزار MCP: `get_customer_club_settings`.",
+)
 def get_settings_endpoint(
 	request: Request,
 	business_id: int,
@@ -44,7 +48,11 @@ def get_settings_endpoint(
 	return success_response(data, request)
 
 
-@router.put("/business/{business_id}/settings")
+@router.put(
+	"/business/{business_id}/settings",
+	summary="ویرایش تنظیمات باشگاه مشتریان",
+	description="ابزار MCP: `update_customer_club_settings` (نیازمند تأیید).",
+)
 def update_settings_endpoint(
 	request: Request,
 	business_id: int,
@@ -65,7 +73,11 @@ def update_settings_endpoint(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/persons/{person_id}/balance")
+@router.get(
+	"/business/{business_id}/persons/{person_id}/balance",
+	summary="مانده امتیاز عضو باشگاه",
+	description="ابزار MCP: `get_customer_club_person_balance`.",
+)
 def get_balance_endpoint(
 	request: Request,
 	business_id: int,
@@ -81,7 +93,11 @@ def get_balance_endpoint(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/ledger")
+@router.get(
+	"/business/{business_id}/ledger",
+	summary="دفتر امتیاز باشگاه مشتریان",
+	description="ابزار MCP: `list_customer_club_ledger`.",
+)
 def list_ledger_endpoint(
 	request: Request,
 	business_id: int,
@@ -99,7 +115,11 @@ def list_ledger_endpoint(
 	return success_response({"items": items, "total": total}, request)
 
 
-@router.post("/business/{business_id}/adjustments")
+@router.post(
+	"/business/{business_id}/adjustments",
+	summary="تعدیل دستی امتیاز باشگاه",
+	description="ابزار MCP: `adjust_customer_club_points` (نیازمند تأیید).",
+)
 def adjustment_endpoint(
 	request: Request,
 	business_id: int,
@@ -148,7 +168,11 @@ def adjustment_endpoint(
 	return success_response(format_datetime_fields(data, request), request)
 
 
-@router.get("/business/{business_id}/tiers")
+@router.get(
+	"/business/{business_id}/tiers",
+	summary="سطح‌های باشگاه مشتریان",
+	description="ابزار MCP: `list_customer_club_tiers`.",
+)
 def list_tiers_endpoint(
 	request: Request,
 	business_id: int,
@@ -163,7 +187,11 @@ def list_tiers_endpoint(
 	return success_response({"items": items}, request)
 
 
-@router.put("/business/{business_id}/tiers")
+@router.put(
+	"/business/{business_id}/tiers",
+	summary="جایگزینی سطح‌های باشگاه",
+	description="ابزار MCP: `replace_customer_club_tiers` (نیازمند تأیید).",
+)
 def replace_tiers_endpoint(
 	request: Request,
 	business_id: int,
@@ -191,7 +219,11 @@ def replace_tiers_endpoint(
 	return success_response({"items": items}, request)
 
 
-@router.get("/business/{business_id}/analytics/rfm/summary")
+@router.get(
+	"/business/{business_id}/analytics/rfm/summary",
+	summary="خلاصه RFM باشگاه مشتریان",
+	description="سگمنت‌ها و وضعیت تحلیل. ابزار MCP: `get_customer_club_rfm_summary`.",
+)
 def rfm_summary_endpoint(
 	request: Request,
 	business_id: int,
@@ -206,7 +238,11 @@ def rfm_summary_endpoint(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/analytics/rfm/person-ids")
+@router.get(
+	"/business/{business_id}/analytics/rfm/person-ids",
+	summary="شناسه اشخاص سگمنت RFM",
+	description="ابزار MCP: `list_customer_club_rfm_person_ids` (حداکثر ۲۰۰).",
+)
 def rfm_person_ids_endpoint(
 	request: Request,
 	business_id: int,
@@ -230,7 +266,11 @@ def rfm_person_ids_endpoint(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/analytics/rfm/persons")
+@router.get(
+	"/business/{business_id}/analytics/rfm/persons",
+	summary="اشخاص سگمنت RFM",
+	description="ابزار MCP: `search_customer_club_rfm_persons`.",
+)
 def rfm_persons_endpoint(
 	request: Request,
 	business_id: int,
@@ -271,7 +311,11 @@ def rfm_persons_endpoint(
 	return success_response({"items": items, "total": total}, request)
 
 
-@router.post("/business/{business_id}/analytics/rfm/recalculate")
+@router.post(
+	"/business/{business_id}/analytics/rfm/recalculate",
+	summary="بازمحاسبه RFM باشگاه مشتریان",
+	description="از فاکتورهای فروش. ابزار MCP: `recalculate_customer_club_rfm` (نیازمند تأیید).",
+)
 def rfm_recalculate_endpoint(
 	request: Request,
 	business_id: int,
@@ -289,7 +333,11 @@ def rfm_recalculate_endpoint(
 	return success_response(data, request)
 
 
-@router.get("/business/{business_id}/rewards")
+@router.get(
+	"/business/{business_id}/rewards",
+	summary="جوایز باشگاه مشتریان",
+	description="ابزار MCP: `list_customer_club_rewards`.",
+)
 def list_rewards_endpoint(request: Request, business_id: int,
 	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("customer_club", "view")),
@@ -298,7 +346,11 @@ def list_rewards_endpoint(request: Request, business_id: int,
 	return success_response({"items": program_svc.list_rewards(db, business_id)}, request)
 
 
-@router.post("/business/{business_id}/rewards")
+@router.post(
+	"/business/{business_id}/rewards",
+	summary="ایجاد جایزه باشگاه",
+	description="ابزار MCP: `save_customer_club_reward` بدون reward_id (نیازمند تأیید).",
+)
 def create_reward_endpoint(request: Request, business_id: int, payload: Dict[str, Any] = Body(...),
 	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("customer_club", "manage")),
@@ -307,7 +359,11 @@ def create_reward_endpoint(request: Request, business_id: int, payload: Dict[str
 	return success_response(program_svc.save_reward(db, business_id, payload), request)
 
 
-@router.put("/business/{business_id}/rewards/{reward_id}")
+@router.put(
+	"/business/{business_id}/rewards/{reward_id}",
+	summary="ویرایش جایزه باشگاه",
+	description="ابزار MCP: `save_customer_club_reward` با reward_id (نیازمند تأیید).",
+)
 def update_reward_endpoint(request: Request, business_id: int, reward_id: int, payload: Dict[str, Any] = Body(...),
 	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("customer_club", "manage")),
@@ -316,7 +372,11 @@ def update_reward_endpoint(request: Request, business_id: int, reward_id: int, p
 	return success_response(program_svc.save_reward(db, business_id, payload, reward_id), request)
 
 
-@router.post("/business/{business_id}/persons/{person_id}/rewards/{reward_id}/redeem")
+@router.post(
+	"/business/{business_id}/persons/{person_id}/rewards/{reward_id}/redeem",
+	summary="مصرف جایزه باشگاه",
+	description="ابزار MCP: `redeem_customer_club_reward` (نیازمند تأیید).",
+)
 def redeem_reward_endpoint(request: Request, business_id: int, person_id: int, reward_id: int,
 	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("customer_club", "redeem")),
@@ -325,7 +385,11 @@ def redeem_reward_endpoint(request: Request, business_id: int, person_id: int, r
 	return success_response(program_svc.redeem_reward(db, business_id, person_id, reward_id), request)
 
 
-@router.get("/business/{business_id}/vouchers")
+@router.get(
+	"/business/{business_id}/vouchers",
+	summary="کوپن‌های باشگاه مشتریان",
+	description="ابزار MCP: `list_customer_club_vouchers`.",
+)
 def list_vouchers_endpoint(request: Request, business_id: int, person_id: Optional[int] = Query(None),
 	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("customer_club", "view")),
@@ -334,7 +398,11 @@ def list_vouchers_endpoint(request: Request, business_id: int, person_id: Option
 	return success_response({"items": program_svc.list_vouchers(db, business_id, person_id)}, request)
 
 
-@router.post("/business/{business_id}/persons/{person_id}/consent")
+@router.post(
+	"/business/{business_id}/persons/{person_id}/consent",
+	summary="رضایت عضو باشگاه",
+	description="ابزار MCP: `set_customer_club_consent` (نیازمند تأیید).",
+)
 def update_member_consent_endpoint(request: Request, business_id: int, person_id: int, payload: Dict[str, Any] = Body(...),
 	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("customer_club", "manage")),
@@ -343,7 +411,11 @@ def update_member_consent_endpoint(request: Request, business_id: int, person_id
 	return success_response(program_svc.set_member_consent(db, business_id, person_id, payload), request)
 
 
-@router.post("/business/{business_id}/persons/{person_id}/surveys")
+@router.post(
+	"/business/{business_id}/persons/{person_id}/surveys",
+	summary="ثبت پاسخ نظرسنجی باشگاه",
+	description="ابزار MCP: `submit_customer_club_survey` (نیازمند تأیید).",
+)
 def survey_response_endpoint(request: Request, business_id: int, person_id: int, payload: Dict[str, Any] = Body(...),
 	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("customer_club", "manage")),
@@ -352,7 +424,11 @@ def survey_response_endpoint(request: Request, business_id: int, person_id: int,
 	return success_response(program_svc.submit_survey_response(db, business_id, person_id, payload), request)
 
 
-@router.get("/business/{business_id}/persons/{person_id}/profile")
+@router.get(
+	"/business/{business_id}/persons/{person_id}/profile",
+	summary="پروفایل عضو باشگاه",
+	description="ابزار MCP: `get_customer_club_member_profile`.",
+)
 def member_profile_endpoint(request: Request, business_id: int, person_id: int,
 	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("customer_club", "view")),
@@ -361,7 +437,11 @@ def member_profile_endpoint(request: Request, business_id: int, person_id: int,
 	return success_response(program_svc.list_member_profile(db, business_id, person_id), request)
 
 
-@router.post("/business/{business_id}/segments/preview")
+@router.post(
+	"/business/{business_id}/segments/preview",
+	summary="پیش‌نمایش سگمنت باشگاه",
+	description="ابزار MCP: `preview_customer_club_segment`. خروجی کامل export در MCP نیست.",
+)
 def preview_segment_endpoint(request: Request, business_id: int, payload: Dict[str, Any] = Body(...),
 	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("customer_club", "view")),
@@ -373,7 +453,11 @@ def preview_segment_endpoint(request: Request, business_id: int, payload: Dict[s
 	return success_response(program_svc.preview_segment(db, business_id, filters, payload.get("limit", 100)), request)
 
 
-@router.get("/business/{business_id}/segments/export")
+@router.get(
+	"/business/{business_id}/segments/export",
+	summary="خروجی بخش‌بندی باشگاه مشتریان",
+	description="ابزار MCP: `preview_customer_club_segment`.",
+)
 def export_segment_endpoint(request: Request, business_id: int, filters: str = Query("{}"),
 	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("customer_club", "view")),
@@ -389,7 +473,11 @@ def export_segment_endpoint(request: Request, business_id: int, filters: str = Q
 	return success_response(program_svc.preview_segment(db, business_id, data, 10000), request)
 
 
-@router.get("/business/{business_id}/campaigns")
+@router.get(
+	"/business/{business_id}/campaigns",
+	summary="کمپین‌های باشگاه مشتریان",
+	description="ابزار MCP: `list_customer_club_campaigns`.",
+)
 def list_campaigns_endpoint(request: Request, business_id: int,
 	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("customer_club", "view")),
@@ -398,7 +486,11 @@ def list_campaigns_endpoint(request: Request, business_id: int,
 	return success_response({"items": program_svc.list_campaigns(db, business_id)}, request)
 
 
-@router.post("/business/{business_id}/campaigns")
+@router.post(
+	"/business/{business_id}/campaigns",
+	summary="ایجاد کمپین باشگاه",
+	description="ابزار MCP: `save_customer_club_campaign` بدون campaign_id (نیازمند تأیید).",
+)
 def create_campaign_endpoint(request: Request, business_id: int, payload: Dict[str, Any] = Body(...),
 	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("customer_club", "manage")),
@@ -407,7 +499,11 @@ def create_campaign_endpoint(request: Request, business_id: int, payload: Dict[s
 	return success_response(program_svc.save_campaign(db, business_id, payload, ctx.get_user_id()), request)
 
 
-@router.put("/business/{business_id}/campaigns/{campaign_id}")
+@router.put(
+	"/business/{business_id}/campaigns/{campaign_id}",
+	summary="ویرایش کمپین باشگاه",
+	description="ابزار MCP: `save_customer_club_campaign` با campaign_id (نیازمند تأیید).",
+)
 def update_campaign_endpoint(request: Request, business_id: int, campaign_id: int, payload: Dict[str, Any] = Body(...),
 	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("customer_club", "manage")),
@@ -416,7 +512,11 @@ def update_campaign_endpoint(request: Request, business_id: int, campaign_id: in
 	return success_response(program_svc.save_campaign(db, business_id, payload, ctx.get_user_id(), campaign_id), request)
 
 
-@router.post("/business/{business_id}/campaigns/{campaign_id}/run")
+@router.post(
+	"/business/{business_id}/campaigns/{campaign_id}/run",
+	summary="اجرای کمپین باشگاه",
+	description="ابزار MCP: `run_customer_club_campaign` (نیازمند تأیید).",
+)
 def run_campaign_endpoint(request: Request, business_id: int, campaign_id: int,
 	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("customer_club", "manage")),
@@ -425,7 +525,11 @@ def run_campaign_endpoint(request: Request, business_id: int, campaign_id: int,
 	return success_response(program_svc.run_campaign(db, business_id, campaign_id), request)
 
 
-@router.get("/business/{business_id}/campaigns/{campaign_id}/stats")
+@router.get(
+	"/business/{business_id}/campaigns/{campaign_id}/stats",
+	summary="آمار کمپین باشگاه",
+	description="ابزار MCP: `get_customer_club_campaign_stats`.",
+)
 def campaign_stats_endpoint(request: Request, business_id: int, campaign_id: int,
 	_: None = Depends(locale_dependency), __: None = Depends(require_business_access_dep),
 	___: None = Depends(require_business_permission_dep("customer_club", "view")),

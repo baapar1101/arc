@@ -1491,6 +1491,30 @@ msgstr "The AI MCP server add-on is not active for this business."
 msgid "AI_MCP_PLUGIN_EXPIRED"
 msgstr "The AI MCP server add-on subscription has expired."
 
+msgid "MCP_CONNECTION_NOT_FOUND"
+msgstr "The assistant connection was not found."
+
+msgid "MCP_CONNECTION_REVOKED"
+msgstr "This connection has already been revoked."
+
+msgid "MCP_CONNECTION_EXPIRED"
+msgstr "This connection has expired."
+
+msgid "MCP_MEMBERSHIP_INACTIVE"
+msgstr "The owner of this connection is no longer an active member of the business."
+
+msgid "MCP_TOOL_NOT_PERMITTED"
+msgstr "One of the selected tools is not allowed for this user."
+
+msgid "MCP_WRITE_TOOLS_REQUIRE_WRITE_SCOPE"
+msgstr "Remove write tools before saving a read-only connection."
+
+msgid "MCP_INVALID_TOOL_PERMISSIONS"
+msgstr "The tool permission list is invalid."
+
+msgid "MCP_REVOKE_ALL_OWNER_ONLY"
+msgstr "Only the business owner can revoke every connection."
+
 msgid "ADVANCED_PRODUCTION_PLUGIN_NOT_ACTIVE"
 msgstr "The advanced production add-on is not active for this business."
 

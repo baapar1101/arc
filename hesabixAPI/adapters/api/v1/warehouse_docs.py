@@ -119,7 +119,11 @@ def _load_invoice_lines(db: Session, invoice_id: int) -> List[Dict[str, Any]]:
 	return lines
 
 
-@router.get("/business/{business_id}/invoice/{invoice_id}/line-quantities")
+@router.get(
+	"/business/{business_id}/invoice/{invoice_id}/line-quantities",
+	summary="مقدار حواله ردیف‌های فاکتور",
+	description="مقدار موردنیاز، حواله‌شده و باقی‌مانده هر خط فاکتور. ابزار MCP: `get_invoice_warehouse_line_quantities`.",
+)
 @require_business_access("business_id")
 def get_invoice_line_quantities(
 	request: Request,
@@ -141,7 +145,11 @@ def get_invoice_line_quantities(
 	return success_response(data={"lines": line_quantities}, request=request)
 
 
-@router.post("/business/{business_id}/from-invoice/{invoice_id}")
+@router.post(
+	"/business/{business_id}/from-invoice/{invoice_id}",
+	summary="صدور حواله از فاکتور",
+	description="حواله پیش‌نویس از فاکتور قطعی با خطوط یا حرکت in/out. ابزار MCP: `create_warehouse_document_from_invoice` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def create_warehouse_doc_from_invoice(
 	request: Request,
@@ -203,7 +211,11 @@ def create_warehouse_doc_from_invoice(
 	return success_response(data={"id": wh.id, "code": wh.code, "status": wh.status}, request=request)
 
 
-@router.post("/business/{business_id}/sources/invoices/search")
+@router.post(
+	"/business/{business_id}/sources/invoices/search",
+	summary="جستجوی فاکتور منبع حواله",
+	description="فاکتورهای قابل صدور حواله بر اساس نوع و تکمیل مقدار. ابزار MCP: `search_warehouse_invoice_sources`.",
+)
 @require_business_access("business_id")
 def search_invoice_sources_for_warehouse(
 	request: Request,
@@ -259,7 +271,11 @@ def search_invoice_sources_for_warehouse(
 	return success_response(data=response, request=request)
 
 
-@router.post("/business/{business_id}/create")
+@router.post(
+	"/business/{business_id}/create",
+	summary="ایجاد حواله انبار دستی",
+	description="ابزار MCP: `create_warehouse_document` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def create_warehouse_doc_manual(
 	request: Request,
@@ -276,7 +292,11 @@ def create_warehouse_doc_manual(
 	return success_response(data=warehouse_document_to_dict(db, wh), request=request)
 
 
-@router.post("/business/{business_id}/{wh_id}/post")
+@router.post(
+	"/business/{business_id}/{wh_id}/post",
+	summary="پست حواله انبار",
+	description="ابزار MCP: `post_warehouse_document` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def post_warehouse_doc_endpoint(
 	request: Request,
@@ -293,7 +313,11 @@ def post_warehouse_doc_endpoint(
 	return success_response(data=res, request=request)
 
 
-@router.get("/business/{business_id}/{wh_id}")
+@router.get(
+	"/business/{business_id}/{wh_id}",
+	summary="جزئیات حواله انبار",
+	description="ابزار MCP: `get_warehouse_document_details`. PDF جداست و در MCP نیست.",
+)
 @require_business_access("business_id")
 def get_warehouse_doc(
 	request: Request,
@@ -311,7 +335,11 @@ def get_warehouse_doc(
 	return success_response(data={"item": warehouse_document_to_dict(db, wh)}, request=request)
 
 
-@router.put("/business/{business_id}/{wh_id}")
+@router.put(
+	"/business/{business_id}/{wh_id}",
+	summary="ویرایش حواله انبار پیش‌نویس",
+	description="فقط draft. ابزار MCP: `update_warehouse_document` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def update_warehouse_doc(
 	request: Request,
@@ -329,7 +357,11 @@ def update_warehouse_doc(
 	return success_response(data=warehouse_document_to_dict(db, wh), request=request)
 
 
-@router.put("/business/{business_id}/{wh_id}/lines/{line_id}")
+@router.put(
+	"/business/{business_id}/{wh_id}/lines/{line_id}",
+	summary="ویرایش خط حواله انبار",
+	description="تغییر انبار یا مقدار یک خط حواله پیش‌نویس. ابزار MCP: `update_warehouse_document_line` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def update_warehouse_doc_line(
 	request: Request,
@@ -355,7 +387,11 @@ def update_warehouse_doc_line(
 	}, request=request)
 
 
-@router.post("/business/{business_id}/search")
+@router.post(
+	"/business/{business_id}/search",
+	summary="جستجوی حواله‌های انبار",
+	description="ابزار MCP: `search_warehouse_documents`. خروجی اکسل در MCP نیست.",
+)
 @require_business_access("business_id")
 def search_warehouse_docs(
 	request: Request,
@@ -441,7 +477,11 @@ def search_warehouse_docs(
 	return success_response(data=result, request=request)
 
 
-@router.post("/business/{business_id}/export/excel")
+@router.post(
+	"/business/{business_id}/export/excel",
+	summary="خروجی Excel حواله‌های انبار",
+	description="خروجی باینری Excel است و در MCP ثبت نشده. JSON: `search_warehouse_documents`.",
+)
 @require_business_access("business_id")
 def export_warehouse_docs_excel_endpoint(
 	request: Request,
@@ -464,7 +504,11 @@ def export_warehouse_docs_excel_endpoint(
 	)
 
 
-@router.delete("/business/{business_id}/{wh_id}")
+@router.delete(
+	"/business/{business_id}/{wh_id}",
+	summary="حذف حواله انبار پیش‌نویس",
+	description="فقط draft. ابزار MCP: `delete_warehouse_document` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def delete_warehouse_doc(
 	request: Request,
@@ -481,7 +525,11 @@ def delete_warehouse_doc(
 	return success_response(data={"deleted": deleted}, request=request)
 
 
-@router.post("/business/{business_id}/bulk-delete")
+@router.post(
+	"/business/{business_id}/bulk-delete",
+	summary="حذف گروهی حواله‌های پیش‌نویس",
+	description="ابزار MCP: `bulk_delete_warehouse_documents` (نیازمند تأیید، حداکثر ۵۰). تکی: `delete_warehouse_document`.",
+)
 @require_business_access("business_id")
 def bulk_delete_warehouse_docs(
 	request: Request,
@@ -502,7 +550,11 @@ def bulk_delete_warehouse_docs(
 	return success_response(data=result, request=request)
 
 
-@router.post("/business/{business_id}/{wh_id}/cancel")
+@router.post(
+	"/business/{business_id}/{wh_id}/cancel",
+	summary="ابطال حواله انبار",
+	description="ابزار MCP: `cancel_warehouse_document` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def cancel_warehouse_doc(
 	request: Request,
@@ -519,7 +571,11 @@ def cancel_warehouse_doc(
 	return success_response(data=warehouse_document_to_dict(db, cancel_wh), request=request)
 
 
-@router.get("/business/{business_id}/{wh_id}/pdf")
+@router.get(
+	"/business/{business_id}/{wh_id}/pdf",
+	summary="PDF حواله انبار",
+	description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `get_warehouse_document_details`.",
+)
 @require_business_access("business_id")
 async def get_warehouse_doc_pdf(
 	request: Request,
@@ -801,7 +857,11 @@ async def get_warehouse_doc_pdf(
 	)
 
 
-@router.get("/business/{business_id}/{wh_id}/postal-label.pdf")
+@router.get(
+	"/business/{business_id}/{wh_id}/postal-label.pdf",
+	summary="برچسب پستی حواله انبار",
+	description="خروجی باینری PDF است و در MCP ثبت نشده. JSON: `get_warehouse_document_details`.",
+)
 @require_business_access("business_id")
 async def get_warehouse_postal_label_pdf(
 	request: Request,
@@ -952,7 +1012,11 @@ async def get_warehouse_postal_label_pdf(
 	)
 
 
-@router.post("/business/{business_id}/stock-count/start")
+@router.post(
+	"/business/{business_id}/stock-count/start",
+	summary="شروع انبارگردانی",
+	description="ابزار MCP: `start_stock_count`.",
+)
 @require_business_access("business_id")
 def start_stock_count_endpoint(
 	request: Request,
@@ -1002,7 +1066,11 @@ def start_stock_count_endpoint(
 	return success_response(data=result, request=request)
 
 
-@router.post("/business/{business_id}/stock-count/calculate")
+@router.post(
+	"/business/{business_id}/stock-count/calculate",
+	summary="محاسبه مغایرت انبارگردانی",
+	description="ابزار MCP: `calculate_stock_count_differences`.",
+)
 @require_business_access("business_id")
 def calculate_stock_count_differences_endpoint(
 	request: Request,
@@ -1033,7 +1101,11 @@ def calculate_stock_count_differences_endpoint(
 	return success_response(data=result, request=request)
 
 
-@router.post("/business/{business_id}/stock-count/create-adjustment")
+@router.post(
+	"/business/{business_id}/stock-count/create-adjustment",
+	summary="ثبت تعدیل انبارگردانی",
+	description="ابزار MCP: `create_stock_count_adjustment` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def create_stock_count_adjustment_endpoint(
 	request: Request,
@@ -1141,7 +1213,11 @@ def create_stock_count_adjustment_endpoint(
 	return success_response(data=warehouse_document_to_dict(db, wh), request=request)
 
 
-@router.post("/business/{business_id}/invoices/bulk-warehouse-operations")
+@router.post(
+	"/business/{business_id}/invoices/bulk-warehouse-operations",
+	summary="عملیات گروهی حواله روی فاکتور",
+	description="create_draft، remove_linked یا post_drafts روی چند فاکتور. ابزار MCP: `bulk_warehouse_invoice_operations` (نیازمند تأیید).",
+)
 @require_business_access("business_id")
 def bulk_warehouse_invoice_operations(
 	request: Request,

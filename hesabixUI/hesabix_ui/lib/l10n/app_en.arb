@@ -1064,6 +1064,97 @@
   "aiUsageMenu": "Usage stats",
   "aiSkillsMarketplaceMenu": "Skills marketplace",
   "aiSkillsPublisherMenu": "Skills earnings",
+  "aiMcpConnectionsMenu": "Connected assistants",
+  "aiMcpConnectionsTitle": "Connected assistants",
+  "aiMcpConnectionsSubtitle": "Review, narrow, or revoke ChatGPT and Claude access to this business.",
+  "aiMcpConnectHint": "In ChatGPT, add a custom MCP server and paste this address. After you approve access, the connection appears here so you can change or revoke it.",
+  "aiMcpServerUrlLabel": "MCP server address",
+  "aiMcpCopyUrl": "Copy address",
+  "aiMcpUrlCopied": "Address copied.",
+  "aiMcpEmpty": "No assistant is connected to this business yet.",
+  "aiMcpPluginInactiveBanner": "The AI MCP add-on is not active. Existing connections can still be revoked here.",
+  "aiMcpPluginExpiredBanner": "The AI MCP add-on has expired. Existing connections no longer receive business data; revoke them or renew the add-on.",
+  "aiMcpOpenMarketplace": "Open add-on marketplace",
+  "aiMcpClientChatgpt": "ChatGPT",
+  "aiMcpClientClaude": "Claude",
+  "aiMcpClientOauth": "OAuth assistant",
+  "aiMcpClientManual": "Manual connection",
+  "aiMcpStatusActive": "Active",
+  "aiMcpStatusExpired": "Expired",
+  "aiMcpStatusRevoked": "Revoked",
+  "aiMcpStatusMembershipInactive": "Member no longer has access",
+  "aiMcpReadOnly": "Read only",
+  "aiMcpReadWrite": "Read and write",
+  "aiMcpUnrestrictedTools": "All tools allowed for this role",
+  "aiMcpToolCount": "{count} tools",
+  "@aiMcpToolCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "aiMcpLastUsed": "Last used: {when}",
+  "@aiMcpLastUsed": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "aiMcpNeverUsed": "Not used yet",
+  "aiMcpConnectedAt": "Connected: {when}",
+  "@aiMcpConnectedAt": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "aiMcpExpiresAt": "Expires: {when}",
+  "@aiMcpExpiresAt": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "aiMcpChangeAccess": "Change access",
+  "aiMcpRevoke": "Revoke access",
+  "aiMcpRevokeConfirmTitle": "Revoke this assistant?",
+  "aiMcpRevokeConfirmBody": "ChatGPT or Claude will lose access to this business on the next request. This cannot be undone without a new approval.",
+  "aiMcpRevoked": "Assistant access was revoked.",
+  "aiMcpRevokeAll": "Revoke all assistants",
+  "aiMcpRevokeAllConfirmTitle": "Revoke every assistant?",
+  "aiMcpRevokeAllConfirmBody": "All ChatGPT, Claude, and manual MCP connections for this business will be revoked immediately.",
+  "aiMcpRevokeAllDone": "{count} connections were revoked.",
+  "@aiMcpRevokeAllDone": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "aiMcpPermissionsTitle": "Tools for this connection",
+  "aiMcpSearchTools": "Search tools",
+  "aiMcpEnableWrites": "Allow write tools",
+  "aiMcpEnableWritesHint": "Write tools can create or change invoices, documents, and other records.",
+  "aiMcpWritesNeedConfirm": "You are granting write access. The assistant will be able to change records in this business.",
+  "aiMcpWidenConfirm": "You are granting additional tools to this assistant.",
+  "aiMcpDenyAllConfirm": "No tools will remain. The assistant stays connected but cannot read business data until you grant tools again.",
+  "aiMcpSaveAccess": "Save access",
+  "aiMcpAccessSaved": "Connection permissions were updated. The assistant may need to refresh its tool list.",
+  "aiMcpNoTools": "No tools are available for this user.",
+  "aiMcpCannotEditInactive": "This connection can only be revoked because the member no longer has access.",
+  "aiMcpCannotEditRevoked": "This connection is no longer active.",
+  "aiMcpConnectedBy": "Connected by {name}",
+  "@aiMcpConnectedBy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "crmMenu": "CRM",
   "crmMenuTasks": "Work queue",
   "crmMenuWebChat": "Web chat",

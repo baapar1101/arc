@@ -26,7 +26,7 @@ router = APIRouter(tags=["currency_revaluation", "حسابداری"], prefix="")
 @router.get(
 	"/businesses/{business_id}/currency-rates",
 	summary="لیست نرخ‌های تسعیر (تاریخچه)",
-	description="نرخ‌های ثبت‌شده نسبت به ارز اصلی؛ چند نرخ در یک روز با زمان مؤثر متفاوت مجاز است",
+	description="ابزار MCP: `list_currency_rates`.",
 )
 def list_currency_rates(
 	request: Request,
@@ -54,6 +54,7 @@ def list_currency_rates(
 @router.get(
 	"/businesses/{business_id}/currency-rates/latest",
 	summary="آخرین نرخ هر ارز فرعی (نوار ابزار)",
+	description="ابزار MCP: `get_latest_currency_rates`.",
 )
 def latest_currency_rates(
 	request: Request,
@@ -73,7 +74,7 @@ def latest_currency_rates(
 @router.get(
 	"/businesses/{business_id}/currency-rates/resolve",
 	summary="تعیین نرخ در لحظه (برای تسعیر اسناد)",
-	description="بازگرداندن نرخ تبدیل ۱ واحد ارز به ارز پایه در زمان as_of (آخرین نرخ با effective_at <= as_of)",
+	description="ابزار MCP: `resolve_currency_rate`.",
 )
 def resolve_currency_rate(
 	request: Request,
@@ -101,6 +102,7 @@ def resolve_currency_rate(
 @router.post(
 	"/businesses/{business_id}/currency-rates",
 	summary="ثبت نرخ تسعیر جدید",
+	description="ابزار MCP: `create_currency_rate` (نیازمند تأیید).",
 )
 def create_currency_rate(
 	request: Request,
@@ -122,6 +124,7 @@ def create_currency_rate(
 @router.post(
 	"/businesses/{business_id}/currency-rates/bulk",
 	summary="ثبت چند نرخ تسعیر یکجا",
+	description="ثبت چند نرخ دستی در یک درخواست. ابزار MCP: `bulk_create_currency_rates` (نیازمند تأیید).",
 )
 def bulk_create_currency_rates(
 	request: Request,
@@ -147,6 +150,7 @@ def bulk_create_currency_rates(
 @router.put(
 	"/businesses/{business_id}/currency-rates/{rate_id}",
 	summary="ویرایش نرخ",
+	description="ابزار MCP: `update_currency_rate` (نیازمند تأیید).",
 )
 def update_currency_rate(
 	request: Request,
@@ -169,6 +173,7 @@ def update_currency_rate(
 @router.delete(
 	"/businesses/{business_id}/currency-rates/{rate_id}",
 	summary="حذف نرخ",
+	description="ابزار MCP: `delete_currency_rate` (نیازمند تأیید).",
 )
 def delete_currency_rate(
 	request: Request,
