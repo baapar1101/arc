@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 
 import 'reports_catalog.dart';
 import 'semantic_colors.dart';
+import 'settings_hub.dart';
 import 'shell_nav.dart';
 import 'theme_catalog.dart';
 
 export 'reports_catalog.dart';
 export 'semantic_colors.dart';
+export 'settings_hub.dart';
 export 'shell_nav.dart';
 export 'theme_catalog.dart';
 
@@ -194,6 +196,8 @@ extension AppThemeExtensions on BuildContext {
       Theme.of(this).extension<AppShellNavMetrics>() ?? const AppShellNavMetrics();
   AppReportsCatalogMetrics get reportsCatalog =>
       Theme.of(this).extension<AppReportsCatalogMetrics>() ?? const AppReportsCatalogMetrics();
+  AppSettingsHubMetrics get settingsHub =>
+      Theme.of(this).extension<AppSettingsHubMetrics>() ?? const AppSettingsHubMetrics();
   AppShellColors get shellColors =>
       Theme.of(this).extension<AppShellColors>() ??
       AppShellColors.fromScheme(Theme.of(this).colorScheme, isDark: Theme.of(this).brightness == Brightness.dark);

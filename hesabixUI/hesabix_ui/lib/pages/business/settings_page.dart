@@ -10,6 +10,7 @@ import '../../core/auth_store.dart';
 import '../../models/business_user_model.dart';
 import '../../services/business_user_service.dart';
 import '../../services/marketplace_service.dart';
+import '../../theme/tokens/extensions.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import 'settings/business_settings_categorization_service.dart';
@@ -205,18 +206,13 @@ class _SettingsPageState extends State<SettingsPage> {
         : t.businessSettingsHubDescriptionGeneric;
 
     final width = MediaQuery.sizeOf(context).width;
-    const kDesktopLoose = 900.0;
-    final isDesktopLoose = width >= kDesktopLoose;
-    final pagePadding = isDesktopLoose
-        ? const EdgeInsets.fromLTRB(16, 8, 16, 12)
-        : const EdgeInsets.all(16);
-    final sectionGap = isDesktopLoose ? 12.0 : 16.0;
-    final innerGap = isDesktopLoose ? 12.0 : 16.0;
+    final hub = context.settingsHub;
+    final isWide = hub.isWide(width);
 
     return ColoredBox(
       color: colorScheme.surface,
       child: SingleChildScrollView(
-        padding: pagePadding,
+        padding: hub.pagePaddingFor(width),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -231,33 +227,29 @@ class _SettingsPageState extends State<SettingsPage> {
               itemCount: totalItems,
               width: width,
             ),
-            SizedBox(height: sectionGap),
+            SizedBox(height: hub.sectionGapFor(width)),
             SettingsSearchBar(
               key: const ValueKey('business_settings_search'),
               onSearchChanged: _onSearchChanged,
               initialQuery: _searchQuery,
-              dense: isDesktopLoose,
+              dense: true,
             ),
             if (!_isSearching) _buildControlButtons(theme, colorScheme, t),
             if (!_isSearching && setupItems.isNotEmpty)
-              Padding(
-                padding: EdgeInsets.only(top: isDesktopLoose ? 8 : 12),
-                child: BusinessSettingsSetupChecklist(items: setupItems),
-              ),
+              BusinessSettingsSetupChecklist(items: setupItems),
             if (_pluginsLoadFailed)
               _buildPluginsErrorBanner(theme, colorScheme, t),
-            SizedBox(height: innerGap),
+            SizedBox(height: hub.innerGap),
             _isSearching
-                ? _buildSearchResults(theme, colorScheme, t, isDesktopLoose)
+                ? _buildSearchResults(theme, colorScheme, t)
                 : _buildCategoriesList(
                     categories: categories,
                     ctx: ctx,
                     theme: theme,
                     colorScheme: colorScheme,
                     t: t,
-                    compactSpacing: isDesktopLoose,
                   ),
-            SizedBox(height: isDesktopLoose ? 12 : 20),
+            SizedBox(height: isWide ? hub.bottomGap : hub.sectionGapNarrow),
           ],
         ),
       ),
@@ -276,9 +268,12 @@ class _SettingsPageState extends State<SettingsPage> {
     required double width,
   }) {
     const kNarrowWelcome = 560.0;
+    final hub = context.settingsHub;
     final statsText = '$categoryCount ${t.settingsCategoriesCount} • $itemCount ${t.settingsCount}';
     final statsStyle = theme.textTheme.bodySmall?.copyWith(
       color: colorScheme.onSurface.withValues(alpha: 0.6),
+      fontSize: hub.cardSubtitleFontSize,
+      height: hub.labelHeight,
     );
 
     final titleBlock = Column(
@@ -286,27 +281,25 @@ class _SettingsPageState extends State<SettingsPage> {
       children: [
         Text(
           title,
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: colorScheme.onSurface,
-            fontSize: 22,
-          ),
+          style: hub.pageTitleStyle(theme.textTheme, color: colorScheme.onSurface),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
-        const SizedBox(height: 4),
+        SizedBox(height: hub.headerTitleGap),
         Text(
           subtitle,
-          style: theme.textTheme.bodyMedium?.copyWith(
+          style: hub.pageSubtitleStyle(
+            theme.textTheme,
             color: colorScheme.onSurface.withValues(alpha: 0.7),
-            height: 1.4,
           ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
         ),
       ],
     );
 
     final roleBadge = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: hub.roleBadgePadding,
       decoration: BoxDecoration(
         color: (isOwner ? colorScheme.primary : colorScheme.secondary)
             .withValues(alpha: 0.1),
@@ -317,15 +310,17 @@ class _SettingsPageState extends State<SettingsPage> {
         children: [
           Icon(
             isOwner ? Icons.verified_user : Icons.person_outline,
-            size: 16,
+            size: hub.roleBadgeIconSize,
             color: isOwner ? colorScheme.primary : colorScheme.secondary,
           ),
-          const SizedBox(width: 6),
+          SizedBox(width: hub.roleBadgeGap),
           Text(
             isOwner ? t.businessSettingsOwnerRole : t.businessSettingsMemberRole,
             style: theme.textTheme.labelMedium?.copyWith(
               fontWeight: FontWeight.w600,
               color: isOwner ? colorScheme.primary : colorScheme.secondary,
+              fontSize: hub.roleBadgeFontSize,
+              height: hub.labelHeight,
             ),
           ),
         ],
@@ -337,9 +332,9 @@ class _SettingsPageState extends State<SettingsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           titleBlock,
-          const SizedBox(height: 10),
+          SizedBox(height: hub.listTitleGap),
           roleBadge,
-          const SizedBox(height: 8),
+          SizedBox(height: hub.headerTitleGap + 2),
           Text(statsText, style: statsStyle),
         ],
       );
@@ -349,12 +344,12 @@ class _SettingsPageState extends State<SettingsPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(child: titleBlock),
-        const SizedBox(width: 12),
+        SizedBox(width: hub.cardIconGap),
         Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             roleBadge,
-            const SizedBox(height: 8),
+            SizedBox(height: hub.headerTitleGap + 2),
             Text(statsText, style: statsStyle, textAlign: TextAlign.end),
           ],
         ),
@@ -367,23 +362,25 @@ class _SettingsPageState extends State<SettingsPage> {
     ColorScheme colorScheme,
     AppLocalizations t,
   ) {
+    final hub = context.settingsHub;
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      margin: EdgeInsets.only(bottom: hub.innerGap),
+      padding: hub.cardPadding,
       decoration: BoxDecoration(
         color: colorScheme.errorContainer.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(hub.cardRadius),
         border: Border.all(color: colorScheme.error.withValues(alpha: 0.25)),
       ),
       child: Row(
         children: [
-          Icon(Icons.cloud_off_outlined, size: 18, color: colorScheme.error),
-          const SizedBox(width: 8),
+          Icon(Icons.cloud_off_outlined, size: hub.cardIconSize, color: colorScheme.error),
+          SizedBox(width: hub.cardIconGap),
           Expanded(
             child: Text(
               t.businessSettingsPluginsLoadFailed,
-              style: theme.textTheme.bodySmall?.copyWith(
+              style: hub.cardSubtitleStyle(
+                theme.textTheme,
                 color: colorScheme.onErrorContainer,
               ),
             ),
@@ -396,7 +393,16 @@ class _SettingsPageState extends State<SettingsPage> {
               });
               _loadBusinessPlugins();
             },
-            child: Text(t.retry),
+            style: TextButton.styleFrom(
+              padding: hub.controlButtonPadding,
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.compact,
+            ),
+            child: Text(
+              t.retry,
+              style: TextStyle(fontSize: hub.controlButtonFontSize, height: hub.labelHeight),
+            ),
           ),
         ],
       ),
@@ -408,29 +414,28 @@ class _SettingsPageState extends State<SettingsPage> {
     ColorScheme colorScheme,
     AppLocalizations t,
   ) {
+    final hub = context.settingsHub;
+    final buttonStyle = TextButton.styleFrom(
+      foregroundColor: colorScheme.primary,
+      padding: hub.controlButtonPadding,
+      minimumSize: Size.zero,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+    );
+    final labelStyle = TextStyle(fontSize: hub.controlButtonFontSize, height: hub.labelHeight);
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         TextButton(
           onPressed: _expandAllCategories,
-          style: TextButton.styleFrom(
-            foregroundColor: colorScheme.primary,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            minimumSize: Size.zero,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          child: Text(t.expandAllCategories, style: const TextStyle(fontSize: 13)),
+          style: buttonStyle,
+          child: Text(t.expandAllCategories, style: labelStyle),
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: hub.roleBadgeGap),
         TextButton(
           onPressed: _collapseAllCategories,
-          style: TextButton.styleFrom(
-            foregroundColor: colorScheme.primary,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            minimumSize: Size.zero,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          child: Text(t.collapseAllCategories, style: const TextStyle(fontSize: 13)),
+          style: buttonStyle,
+          child: Text(t.collapseAllCategories, style: labelStyle),
         ),
       ],
     );
@@ -442,15 +447,15 @@ class _SettingsPageState extends State<SettingsPage> {
     required ThemeData theme,
     required ColorScheme colorScheme,
     required AppLocalizations t,
-    required bool compactSpacing,
   }) {
+    final hub = context.settingsHub;
     if (categories.isEmpty) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          padding: hub.emptyStatePadding,
           child: Text(
             t.noSettingsFound,
-            style: theme.textTheme.bodyLarge?.copyWith(
+            style: theme.textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurface.withValues(alpha: 0.5),
             ),
           ),
@@ -463,12 +468,9 @@ class _SettingsPageState extends State<SettingsPage> {
       children: [
         Text(
           t.availableSettings,
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: colorScheme.onSurface,
-          ),
+          style: hub.listTitleStyle(theme.textTheme, color: colorScheme.onSurface),
         ),
-        SizedBox(height: compactSpacing ? 12 : 16),
+        SizedBox(height: hub.listTitleGap),
         ...categories.map((category) {
           return BusinessSettingsCategorySection(
             key: ValueKey(category.id),
@@ -490,23 +492,23 @@ class _SettingsPageState extends State<SettingsPage> {
     ThemeData theme,
     ColorScheme colorScheme,
     AppLocalizations t,
-    bool compactSpacing,
   ) {
+    final hub = context.settingsHub;
     if (_searchResults.isEmpty) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          padding: hub.emptyStatePadding,
           child: Column(
             children: [
               Icon(
                 Icons.search_off,
-                size: 64,
+                size: hub.emptyStateIconSize,
                 color: colorScheme.onSurface.withValues(alpha: 0.3),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: hub.listTitleGap),
               Text(
                 t.noSearchResults(_searchQuery),
-                style: theme.textTheme.bodyLarge?.copyWith(
+                style: theme.textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
                 textAlign: TextAlign.center,
@@ -522,13 +524,10 @@ class _SettingsPageState extends State<SettingsPage> {
       children: [
         Text(
           t.searchResults,
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: colorScheme.onSurface,
-          ),
+          style: hub.listTitleStyle(theme.textTheme, color: colorScheme.onSurface),
         ),
-        SizedBox(height: compactSpacing ? 12 : 16),
-        BusinessSettingsLayout.buildTwoColumnGrid(
+        SizedBox(height: hub.listTitleGap),
+        BusinessSettingsLayout.buildResponsiveGrid(
           context: context,
           children: _searchResults.map((item) {
             final isDanger = item.tags.contains('danger');

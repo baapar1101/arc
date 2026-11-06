@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
+import '../../../theme/tokens/extensions.dart';
+
 /// ویجت نوار جستجوی تنظیمات
 class SettingsSearchBar extends StatefulWidget {
   final ValueChanged<String> onSearchChanged;
   final String? initialQuery;
-  /// حاشهٔ عمودی کمتر برای نمای پهن (دسکتاپ)
+  /// حاشیه و پدینگ فشرده برای نمای هاب
   final bool dense;
 
   const SettingsSearchBar({
@@ -59,12 +61,14 @@ class _SettingsSearchBarState extends State<SettingsSearchBar> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final hub = context.settingsHub;
+    final iconBox = hub.searchIconSize + 16;
 
     return Container(
-      margin: EdgeInsets.only(bottom: widget.dense ? 10 : 16),
+      margin: hub.searchMarginFor(dense: widget.dense),
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(hub.searchRadius),
         border: Border.all(
           color: colorScheme.outline.withValues(alpha: 0.1),
           width: 1,
@@ -76,20 +80,31 @@ class _SettingsSearchBarState extends State<SettingsSearchBar> {
             child: TextField(
               controller: _controller,
               focusNode: _focusNode,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontSize: widget.dense ? hub.cardTitleFontSize : 14,
+                height: hub.labelHeight,
+              ),
               decoration: InputDecoration(
                 hintText: AppLocalizations.of(context).searchSettingsPlaceholder,
+                hintStyle: theme.textTheme.bodySmall?.copyWith(
+                  fontSize: widget.dense ? hub.cardSubtitleFontSize : 13,
+                  height: hub.labelHeight,
+                ),
+                isDense: true,
                 prefixIcon: Icon(
                   Icons.search,
+                  size: hub.searchIconSize,
                   color: colorScheme.onSurfaceVariant,
+                ),
+                prefixIconConstraints: BoxConstraints(
+                  minWidth: iconBox,
+                  minHeight: iconBox,
                 ),
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
                 filled: false,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
+                contentPadding: hub.searchContentPaddingFor(dense: widget.dense),
               ),
             ),
           ),
@@ -100,7 +115,14 @@ class _SettingsSearchBarState extends State<SettingsSearchBar> {
               return IconButton(
                 icon: Icon(
                   Icons.clear,
+                  size: hub.searchIconSize,
                   color: hasText ? colorScheme.onSurfaceVariant : Colors.transparent,
+                ),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: BoxConstraints.tightFor(
+                  width: iconBox,
+                  height: iconBox,
                 ),
                 onPressed: hasText ? _clearSearch : null,
               );
@@ -111,4 +133,3 @@ class _SettingsSearchBarState extends State<SettingsSearchBar> {
     );
   }
 }
-

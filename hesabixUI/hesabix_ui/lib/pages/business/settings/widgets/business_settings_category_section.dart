@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
+import '../../../../theme/tokens/extensions.dart';
 import '../../../system_settings/models/settings_category.dart';
 import '../../../system_settings/models/settings_item.dart';
 import '../business_settings_layout.dart';
@@ -114,7 +115,7 @@ class _BusinessSettingsCategorySectionState
       );
     }).toList();
 
-    return BusinessSettingsLayout.buildTwoColumnGrid(
+    return BusinessSettingsLayout.buildResponsiveGrid(
       context: context,
       children: cards,
     );
@@ -124,17 +125,13 @@ class _BusinessSettingsCategorySectionState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final hub = context.settingsHub;
     final t = AppLocalizations.of(context);
     final items = widget.category.items;
     final categoryColor =
         _isDangerCategory ? colorScheme.error : widget.category.color;
-
-    final bool screenWideDesktop = MediaQuery.sizeOf(context).width >= 900;
-    final hzHeader = screenWideDesktop ? 10.0 : 16.0;
-    final vtHeader = screenWideDesktop ? 10.0 : 12.0;
-    final hzBody = screenWideDesktop ? 10.0 : 16.0;
-    final vtBody = screenWideDesktop ? 6.0 : 8.0;
-    final sectionBottom = screenWideDesktop ? 8.0 : 12.0;
+    final width = MediaQuery.sizeOf(context).width;
+    final radius = BorderRadius.circular(hub.categoryRadius);
 
     if (widget.showSearchResults &&
         widget.searchQuery != null &&
@@ -149,12 +146,12 @@ class _BusinessSettingsCategorySectionState
     );
 
     return Container(
-      margin: EdgeInsets.only(bottom: sectionBottom),
+      margin: EdgeInsets.only(bottom: hub.categorySectionBottomFor(width)),
       decoration: BoxDecoration(
         color: _isDangerCategory
             ? colorScheme.errorContainer.withValues(alpha: 0.15)
             : colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: radius,
         border: Border.all(
           color: _isDangerCategory
               ? colorScheme.error.withValues(alpha: 0.35)
@@ -169,18 +166,23 @@ class _BusinessSettingsCategorySectionState
             color: Colors.transparent,
             child: InkWell(
               onTap: _toggleExpansion,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(hub.categoryRadius)),
               child: Container(
-                padding: EdgeInsets.symmetric(horizontal: hzHeader, vertical: vtHeader),
+                padding: hub.categoryHeaderPaddingFor(width),
                 decoration: BoxDecoration(
                   color: categoryColor.withValues(alpha: 0.05),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(hub.categoryRadius),
+                  ),
                 ),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(widget.category.icon, color: categoryColor, size: 20),
-                    SizedBox(width: screenWideDesktop ? 10 : 12),
+                    Icon(
+                      widget.category.icon,
+                      color: categoryColor,
+                      size: hub.categoryIconSize,
+                    ),
+                    SizedBox(width: hub.categoryIconGap),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -190,23 +192,24 @@ class _BusinessSettingsCategorySectionState
                               t,
                               widget.category.title,
                             ),
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
+                            style: hub.categoryTitleStyle(
+                              theme.textTheme,
                               color: _isDangerCategory
                                   ? colorScheme.error
                                   : colorScheme.onSurface,
-                              fontSize: 15,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                           if (categorySubtitle.isNotEmpty) ...[
-                            const SizedBox(height: 4),
+                            SizedBox(height: hub.categoryTitleGap),
                             Text(
                               categorySubtitle,
-                              style: theme.textTheme.bodySmall?.copyWith(
+                              style: hub.categorySubtitleStyle(
+                                theme.textTheme,
                                 color: colorScheme.onSurface.withValues(alpha: 0.65),
-                                height: 1.3,
                               ),
-                              maxLines: 2,
+                              maxLines: hub.categorySubtitleMaxLines,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ],
@@ -215,7 +218,7 @@ class _BusinessSettingsCategorySectionState
                     ),
                     if (items.isNotEmpty)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                         decoration: BoxDecoration(
                           color: categoryColor.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(999),
@@ -225,17 +228,19 @@ class _BusinessSettingsCategorySectionState
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: categoryColor,
                             fontWeight: FontWeight.w700,
+                            fontSize: hub.categorySubtitleFontSize,
+                            height: hub.labelHeight,
                           ),
                         ),
                       ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: hub.categoryIconGap),
                     AnimatedRotation(
                       turns: _isExpanded ? 0.5 : 0,
                       duration: const Duration(milliseconds: 300),
                       child: Icon(
                         Icons.expand_more,
                         color: colorScheme.onSurface.withValues(alpha: 0.6),
-                        size: 20,
+                        size: hub.categoryIconSize,
                       ),
                     ),
                   ],
@@ -246,29 +251,25 @@ class _BusinessSettingsCategorySectionState
           SizeTransition(
             sizeFactor: _expandAnimation,
             child: ClipRect(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return Padding(
-                    padding: EdgeInsets.symmetric(horizontal: hzBody, vertical: vtBody),
-                    child: widget.pluginsLoading &&
-                            (widget.category.id == 'integrations' ||
-                                widget.category.id == 'modules')
-                        ? _buildPluginsLoading(context)
-                        : items.isEmpty
-                            ? Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(24),
-                                  child: Text(
-                                    t.noSettingsInCategory,
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      color: colorScheme.onSurface.withValues(alpha: 0.5),
-                                    ),
-                                  ),
+              child: Padding(
+                padding: hub.categoryBodyPaddingFor(width),
+                child: widget.pluginsLoading &&
+                        (widget.category.id == 'integrations' ||
+                            widget.category.id == 'modules')
+                    ? _buildPluginsLoading(context)
+                    : items.isEmpty
+                        ? Center(
+                            child: Padding(
+                              padding: hub.emptyStatePadding,
+                              child: Text(
+                                t.noSettingsInCategory,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurface.withValues(alpha: 0.5),
                                 ),
-                              )
-                            : _buildItemsGrid(context, items),
-                  );
-                },
+                              ),
+                            ),
+                          )
+                        : _buildItemsGrid(context, items),
               ),
             ),
           ),
@@ -279,24 +280,27 @@ class _BusinessSettingsCategorySectionState
 
   Widget _buildPluginsLoading(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final hub = context.settingsHub;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      padding: EdgeInsets.symmetric(vertical: hub.innerGap),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           SizedBox(
-            width: 18,
-            height: 18,
+            width: hub.categoryIconSize,
+            height: hub.categoryIconSize,
             child: CircularProgressIndicator(
               strokeWidth: 2,
               color: colorScheme.primary,
             ),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: hub.cardIconGap),
           Text(
             AppLocalizations.of(context).businessSettingsPluginsLoadingHint,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurface.withValues(alpha: 0.6),
+                  fontSize: hub.cardSubtitleFontSize,
+                  height: hub.labelHeight,
                 ),
           ),
         ],
