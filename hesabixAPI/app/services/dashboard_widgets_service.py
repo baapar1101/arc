@@ -1060,6 +1060,7 @@ def _resolve_pay_page_send_link(db: Session, business_id: int, user_id: int, fil
     return {
         "is_enabled": True,
         "username": data.get("username"),
+        "gateway_id": data.get("gateway_id"),
         "public_url": data.get("public_url"),
         "currency_title": data.get("currency_title"),
         "currency_symbol": data.get("currency_symbol"),

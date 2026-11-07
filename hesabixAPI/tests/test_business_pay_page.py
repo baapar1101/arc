@@ -690,3 +690,28 @@ def test_pay_page_send_widget_only_when_feature_enabled():
 	db.query.return_value.filter.return_value.first.return_value = row
 	on = get_widget_definitions(db, 1, 1)
 	assert "pay_page_send_link" in {i["key"] for i in on["items"]}
+
+
+def test_pay_page_send_widget_resolver_includes_gateway():
+	from app.services.dashboard_widgets_service import _resolve_pay_page_send_link
+
+	db = MagicMock()
+	with patch(
+		"app.services.business_pay_page_service.is_pay_page_feature_enabled",
+		return_value=True,
+	), patch(
+		"app.services.business_pay_page_service.get_pay_page_settings",
+		return_value={
+			"username": "shop-ali",
+			"gateway_id": 3,
+			"public_url": "https://pay.example/shop-ali",
+			"currency_title": "ریال",
+			"currency_symbol": "﷼",
+			"min_amount": 50000,
+			"max_amount": None,
+		},
+	):
+		data = _resolve_pay_page_send_link(db, 1, 1, {})
+	assert data["is_enabled"] is True
+	assert data["username"] == "shop-ali"
+	assert data["gateway_id"] == 3

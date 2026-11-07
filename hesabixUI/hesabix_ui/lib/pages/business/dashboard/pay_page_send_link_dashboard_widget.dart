@@ -27,7 +27,8 @@ class PayPageSendLinkDashboardBody extends StatelessWidget {
         ),
       );
     }
-    final enabled = payload['is_enabled'] == true;
+    // ویجت فقط وقتی در کاتالوگ است که لینک واریز فعال باشد؛ منبع حقیقت دیالوگ GET تنظیمات است.
+    final enabled = payload['is_enabled'] != false && payload['is_enabled'] != 0;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: Column(
@@ -43,7 +44,6 @@ class PayPageSendLinkDashboardBody extends StatelessWidget {
                 ? () => showPayPageSendLinkDialog(
                       context: context,
                       businessId: businessId,
-                      settings: payload,
                     )
                 : null,
             icon: const Icon(Icons.send),

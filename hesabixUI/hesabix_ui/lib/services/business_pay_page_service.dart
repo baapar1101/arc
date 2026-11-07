@@ -11,7 +11,13 @@ class BusinessPayPageService {
       '/api/v1/businesses/$businessId/pay-page/status',
     );
     final data = _data(response.data, 'خطا در دریافت وضعیت لینک واریز');
-    return data['is_enabled'] == true;
+    final value = data['is_enabled'];
+    if (value == true || value == 1) return true;
+    if (value is String) {
+      final s = value.trim().toLowerCase();
+      return s == 'true' || s == '1';
+    }
+    return false;
   }
 
   Future<Map<String, dynamic>> getSettings(int businessId) async {

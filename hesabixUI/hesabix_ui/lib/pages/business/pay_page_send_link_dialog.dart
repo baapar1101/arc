@@ -51,20 +51,38 @@ class _PayPageSendLinkDialogState extends State<PayPageSendLinkDialog> {
   Map<String, dynamic> _settings = const {};
   Map<String, dynamic>? _created;
 
-  bool get _featureOn =>
-      _settings['is_enabled'] == true &&
-      (_settings['username']?.toString().trim().isNotEmpty ?? false) &&
-      _settings['gateway_id'] != null;
+  bool _asEnabledFlag(dynamic value) {
+    if (value == true || value == 1) return true;
+    if (value is String) {
+      final s = value.trim().toLowerCase();
+      return s == 'true' || s == '1';
+    }
+    return false;
+  }
+
+  bool get _featureOn {
+    if (!_asEnabledFlag(_settings['is_enabled'])) return false;
+    final username = _settings['username']?.toString().trim() ?? '';
+    if (username.isEmpty) return false;
+    // دادهٔ ویجت داشبورد ممکن است gateway_id نداشته باشد؛ نبود کلید یعنی هنوز از API کامل نیامده
+    // یا همان وضعیت فعال منو است. فقط وقتی کلید هست و خالی است، غیرفعال حساب می‌شود.
+    if (!_settings.containsKey('gateway_id')) return true;
+    final gatewayId = _settings['gateway_id'];
+    if (gatewayId == null) return false;
+    if (gatewayId is num && gatewayId == 0) return false;
+    if ('$gatewayId'.trim().isEmpty || '$gatewayId' == '0') return false;
+    return true;
+  }
 
   @override
   void initState() {
     super.initState();
+    // همیشه از GET کامل تنظیمات را می‌گیریم. payload ویجت داشبورد ناقص است
+    // (بدون gateway_id) و نباید جلوی بارگذاری را بگیرد.
     if (widget.initialSettings != null) {
-      _settings = widget.initialSettings!;
-      _loading = false;
-    } else {
-      _load();
+      _settings = Map<String, dynamic>.from(widget.initialSettings!);
     }
+    _load();
   }
 
   @override

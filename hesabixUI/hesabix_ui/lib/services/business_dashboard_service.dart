@@ -450,7 +450,8 @@ class BusinessDashboardService {
                                  data.containsKey('debtors_summary') ||
                                  data.containsKey('pnl_summary') ||
                                  data.containsKey('quick_links') ||
-                                 data.containsKey('crm_calendar');
+                                 data.containsKey('crm_calendar') ||
+                                 data.containsKey('pay_page_send_link');
             final hasJobMetadata = data.containsKey('state') || data.containsKey('id');
             
             if (hasWidgetKeys && !hasJobMetadata) {

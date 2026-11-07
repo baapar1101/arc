@@ -438,7 +438,23 @@ def update_pay_page_settings(
 		db.rollback()
 		raise ApiError("USERNAME_TAKEN", "این نام کاربری قبلاً انتخاب شده است", http_status=409) from exc
 	db.refresh(row)
+	invalidate_pay_page_dashboard_caches(int(business_id))
 	return _serialize(db, row, business)
+
+
+def invalidate_pay_page_dashboard_caches(business_id: int) -> None:
+	"""پس از تغییر تنظیمات لینک واریز، کش ویجت/تعاریف داشبورد را پاک کن تا با منو هم‌خوان شود."""
+	try:
+		from app.core.cache import get_cache
+
+		cache = get_cache()
+		if not cache.enabled:
+			return
+		bid = int(business_id)
+		cache.delete_pattern(f"dashboard_widgets_definitions:{bid}:*")
+		cache.delete_pattern(f"dashboard_data:{bid}:*")
+	except Exception:
+		logger.warning("pay_page_dashboard_cache_invalidate_failed", extra={"business_id": business_id}, exc_info=True)
 
 
 def find_pay_page_by_username(
