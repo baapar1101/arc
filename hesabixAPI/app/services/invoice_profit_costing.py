@@ -1,7 +1,8 @@
 """Profit costing helpers: document-currency → base, and sales-return layer restore.
 
 Invoice line monetary fields (``unit_price``, ``cost_price``, ``cogs_amount``)
-are stored in the *document* currency. Inventory layers used by FIFO/LIFO/WMA
+are stored in the *document* currency by default. ``cost_price`` with
+``cost_currency_basis="base"`` is already base currency. Inventory layers used by FIFO/LIFO/WMA
 and average purchase cost must be in the business base currency, per product
 main unit.
 
@@ -20,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from adapters.db.models.business import Business
 from adapters.db.models.document import Document
+from app.core.responses import ApiError
 from app.services.invoice_unit_conversion_service import (
     extra_info_dict,
     inventory_price_to_main,
@@ -125,7 +127,11 @@ def inventory_line_unit_cost_main_base(
         return (_d(info.get("cogs_amount")) / qty_main) * rate
 
     if info.get("cost_price") is not None:
-        return inventory_price_to_main(info.get("cost_price"), product, info, strict=False) * rate
+        basis = info.get("cost_currency_basis", "document")
+        if basis not in ("base", "document"):
+            raise ApiError("INVALID_COST_CURRENCY_BASIS", "Invalid cost currency basis", http_status=422)
+        cost = inventory_price_to_main(info.get("cost_price"), product, info, strict=False)
+        return cost if basis == "base" else cost * rate
 
     if info.get("unit_price") is not None:
         if is_sales_family:

@@ -11,12 +11,19 @@
 - پس از رفع و تست هر مسئله، همین سند در شاخهٔ مربوط به‌روز می‌شود. بسته‌بودن یک مسئله در شاخهٔ قدیمی، به معنی انتقال یا رفع آن در کد تیم نیست.
 - ارسال فقط به `origin` است؛ upstream فقط خوانده می‌شود. ایجاد شاخه/کامیت، تأیید استقرار یا تغییر دیتابیس نیست.
 
+## خلاصه وضعیت
+
+| کد | عنوان | branch | commit | تاریخ | وضعیت |
+|---|---|---|---|---|---|
+| H15 | root-only drain Woo hook | codex/team-base-01-woocommerce-root-commit | 15fd8509 | ۲۰۲۶-۱۱-۰۶ | ✅ در `master` merge شد (#42) |
+| P01 | تفکیک cost_price | codex/team-base-02-cost-currency-basis | 1a003e17 | ۲۰۲۶-۱۱-۰۶ | ✅ در `master` merge شد (#43) |
+
 ## مرحلهٔ ۰۱ — H15: زمان ارسال موجودی ووکامرس
 
 | مورد | نتیجه |
 |---|---|
 | شاخه | `codex/team-base-01-woocommerce-root-commit` |
-| وضعیت | ✅ اصلاح و آزمون مستقل تکمیل شد؛ نتیجهٔ انتشار در گزارش Git این مرحله اعلام می‌شود |
+| وضعیت | ✅ اصلاح و آزمون مستقل تکمیل شد و در `master` merge شد (#42) |
 | نقص در کد تیم | listener یک‌بارمصرف `after_commit` با commit یک savepoint هم اجرا می‌شد؛ rollback داخلی صف بیرونی را حذف می‌کرد و close می‌توانست پیام کهنه باقی بگذارد |
 | انتقال از کار قبلی | فقط منطق H15 در `woocommerce_stock_push_hook.py`؛ بدون وابستگی به مدل‌ها و سرویس‌های Native |
 | قرارداد | ارسال فقط بعد از root commit؛ rollback/close نباید ارسال کند؛ rollback savepoint فقط پیام‌های همان scope و فرزندانش را حذف می‌کند |
@@ -42,6 +49,21 @@ python -m pytest -q -p no:cacheprovider tests/test_woocommerce_stock_push_transa
 
 در اجرای ثبت‌شدهٔ محلی، plugin autoload غیرفعال و pytest_asyncio صریح بارگذاری شد؛ خروجی خام قبل/بعد و JUnit خارج از مخزن نگهداری می‌شود. تست جدید، تنظیمات یا fixtureهای Native را import نمی‌کند. منطق executor، ساخت payload و کنترل license تیم تغییر نکرده‌اند.
 
+## مرحلهٔ ۰۲ — P01: تفکیک ارز cost_price
+
+| مورد | نتیجه |
+|---|---|
+| شاخه | `codex/team-base-02-cost-currency-basis` |
+| وضعیت | ✅ اصلاح و آزمون مستقل تکمیل شد و در `master` merge شد (#43) |
+| قرارداد | `cost_price` با `cost_currency_basis="base"` از قبل به ارز پایه است؛ در غیر این صورت از ارز سند به پایه تبدیل می‌شود |
+| فایل‌ها | `hesabixAPI/app/services/invoice_profit_costing.py` و `hesabixAPI/tests/test_invoice_cost_currency_basis.py` |
+
+اجرای معمول تست از پوشهٔ `hesabixAPI`:
+
+```text
+python -m pytest -q -p no:cacheprovider tests/test_invoice_cost_currency_basis.py
+```
+
 ## موارد منتقل‌نشده و ترتیب بازبینی
 
 | دسته | وضعیت انتقال به مبنای تیم | اقدام لازم |
@@ -56,11 +78,12 @@ python -m pytest -q -p no:cacheprovider tests/test_woocommerce_stock_push_transa
 ## محدودیت‌ها
 
 - ۸۹۴ آزمون تاریخی Unified، نتیجهٔ این شاخه نیستند و این مرحله حفظ/عبور آن مجموعه را ادعا نمی‌کند.
-- تست این مرحله روی Session واقعی SQLite و مرز جایگزین‌شدهٔ ارسال است؛ اجرای جدید PostgreSQL، Woo فعال، HTTP یا worker کامل انجام نشده است. proof تاریخی PostgreSQL در شاخهٔ قبلی، آزمون نسخهٔ ترکیبی امروز محسوب نمی‌شود.
+- تست H15 روی Session واقعی SQLite و مرز جایگزین‌شدهٔ ارسال است؛ اجرای جدید PostgreSQL، Woo فعال، HTTP یا worker کامل انجام نشده است. proof تاریخی PostgreSQL در شاخهٔ قبلی، آزمون نسخهٔ ترکیبی امروز محسوب نمی‌شود.
 - صف حافظه‌ای همچنان outbox پایدار نیست؛ توقف فرایند پس از commit و پیش از ارسال می‌تواند پیام را از دست بدهد. این مسئلهٔ مستقل در H15 بازطراحی نشده است.
-- مبلغ، GL، موجودی، ارز، مدل داده، سیاست restock و رفتار PHP/UI تغییر نکرده‌اند.
+- مبلغ، GL، موجودی، ارز، مدل داده، سیاست restock و رفتار PHP/UI در H15 تغییر نکرده‌اند.
 - «آزمون runtime PHP انجام نشده — prerequisite استقرار»؛ این مرحله تغییری در PHP ندارد.
 
 ## تاریخچه
 
-- ۲۰۲۶-۱۱-۰۶: مبنا به کد رسمی تیم تغییر کرد؛ master محلی تا `2b5c6a24` fast-forward شد. H15 به‌عنوان اولین اصلاح مستقل با بازتولید قبل و ۱۵ آزمون موفق پس از اصلاح منتقل شد. شاخهٔ Unified قدیمی و تست‌های آن تغییر نکردند؛ مسئلهٔ بعدی شروع نشده است.
+- ۲۰۲۶-۱۱-۰۶: مبنا به کد رسمی تیم تغییر کرد؛ master محلی تا `2b5c6a24` fast-forward شد. H15 به‌عنوان اولین اصلاح مستقل با بازتولید قبل و ۱۵ آزمون موفق پس از اصلاح منتقل شد. شاخهٔ Unified قدیمی و تست‌های آن تغییر نکردند.
+- ۲۰۲۶-۱۱-۰۷: H15 در `master` merge شد (#42). P01 (`cost_currency_basis` برای `cost_price`) پس از حل تداخل همین سند پیشرفت در `master` merge شد (#43).
