@@ -95,7 +95,7 @@
                 <div class="linkbox" id="receipt-url">{{ receipt_url }}</div>
                 <button class="btn btn-ghost" type="button" id="copy-btn">کپی لینک پیگیری</button>
                 <a class="btn btn-main" href="{{ pdf_url }}">دریافت PDF رسید</a>
-                <a class="btn btn-ghost" href="/u/{{ username }}">بازگشت به صفحه پرداخت</a>
+                <a class="btn btn-ghost" href="{{ pay_page_href or ('/u/' ~ username) }}">بازگشت به صفحه پرداخت</a>
             </div>
         </div>
         <p class="footer">{{ app_name }}</p>

@@ -525,7 +525,7 @@ def get_quick_link_presets(
     if ctx.business_id != business_id:
         ctx.business_id = business_id
         ctx.business_permissions = ctx._get_business_permissions()
-    return success_response(get_quick_link_presets_catalog(ctx), request)
+    return success_response(get_quick_link_presets_catalog(ctx, db=db, business_id=business_id), request)
 
 
 @router.get(

@@ -38,6 +38,7 @@ NOTIFY_INAPP_READ_RETENTION_DAYS = "inapp_read_retention_days"
 DEFAULT_DOCUMENT_POLICIES_KEY = "default_document_monetization_policies"
 SHARE_LINK_PUBLIC_APP_URL_KEY = "share_link_public_app_url"
 SHARE_LINK_INVOICE_GATEWAY_FEE_PERCENT_KEY = "share_link_invoice_gateway_fee_percent"
+PAY_PAGE_PUBLIC_BASE_URL_KEY = "pay_page_public_base_url"
 MARKETPLACE_PUBLISHER_SHARE_PERCENT_KEY = "marketplace_publisher_share_percent"
 DEFAULT_MARKETPLACE_PUBLISHER_SHARE_PERCENT = 70.0
 
@@ -567,6 +568,62 @@ def set_share_link_settings(
 		set_share_link_invoice_gateway_fee_percent(db, float(invoice_gateway_fee_percent))
 	db.commit()
 	return get_share_link_settings(db)
+
+
+def _normalize_pay_page_public_origin(url: str | None) -> str:
+	"""دامنهٔ مطلق لینک واریز: فقط scheme://host[:port]. خالی یعنی fallback به روش فعلی."""
+	s = (url or "").strip()
+	if not s:
+		return ""
+	parsed = urlparse(s)
+	if parsed.scheme not in ("http", "https") or not parsed.netloc:
+		raise ApiError(
+			"INVALID_PAY_PAGE_PUBLIC_BASE_URL",
+			"آدرس باید با http یا https شروع شود و دامنه داشته باشد",
+			http_status=400,
+		)
+	origin = f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+	if len(origin) > 255:
+		raise ApiError("INVALID_PAY_PAGE_PUBLIC_BASE_URL", "آدرس دامنه بیش از حد طولانی است", http_status=400)
+	return origin
+
+
+def get_pay_page_public_base_url(db: Session) -> str:
+	obj = _get_setting(db, PAY_PAGE_PUBLIC_BASE_URL_KEY)
+	raw = (obj.value_string or "").strip() if obj and obj.value_string else ""
+	if not raw:
+		return ""
+	try:
+		return _normalize_pay_page_public_origin(raw)
+	except ApiError:
+		return ""
+
+
+def resolve_pay_page_public_base_url(db: Session) -> str:
+	"""
+	پایهٔ دامنه برای لینک واریز عمومی، QR و چاپ پوستر.
+	اگر مدیر دامنهٔ اختصاصی تنظیم کرده باشد همان استفاده می‌شود؛
+	در غیر این صورت همان روش فعلی لینک‌های عمومی.
+	"""
+	custom = get_pay_page_public_base_url(db)
+	if custom:
+		return custom
+	return resolve_public_app_base_url_for_public_links(db)
+
+
+def get_pay_page_system_settings(db: Session) -> Dict[str, Any]:
+	stored = get_pay_page_public_base_url(db)
+	return {
+		"public_base_url": stored,
+		"effective_public_base_url": resolve_pay_page_public_base_url(db),
+	}
+
+
+def set_pay_page_system_settings(db: Session, *, public_base_url: str | None) -> Dict[str, Any]:
+	normalized = _normalize_pay_page_public_origin(public_base_url)
+	_upsert_setting_string(db, PAY_PAGE_PUBLIC_BASE_URL_KEY, normalized)
+	db.commit()
+	return get_pay_page_system_settings(db)
 
 
 def resolve_public_app_base_url_for_public_links(db: Session) -> str:

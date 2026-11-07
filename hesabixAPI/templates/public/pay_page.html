@@ -95,6 +95,7 @@
             font-size: 16px; background: #fff; color: var(--ink); outline: none;
         }
         input:focus, textarea:focus, select:focus { border-color: var(--teal); box-shadow: 0 0 0 4px rgba(15,118,110,.12); }
+        input[readonly] { background: #f1f5f9; color: #0f172a; cursor: default; }
         textarea { min-height: 80px; resize: vertical; }
         .check {
             display: flex; gap: 10px; align-items: flex-start; margin: 14px 0 4px;
@@ -116,6 +117,11 @@
         .btn-danger {
             background: linear-gradient(135deg, #b91c1c 0%, #9f1239 100%);
             color: #fff; margin-top: 10px;
+            font-family: 'YekanBakhFaNum', Tahoma, "Segoe UI", sans-serif;
+        }
+        .btn-security {
+            background: #fffbeb; color: #92400e; box-shadow: none;
+            border: 1px solid #fde68a; margin-top: 4px; margin-bottom: 8px;
             font-family: 'YekanBakhFaNum', Tahoma, "Segoe UI", sans-serif;
         }
         .trust { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; color: var(--muted); font-size: 12px; }
@@ -192,20 +198,7 @@
                         آدرس مرورگر با صفحه امن این کسب‌وکار یکی نیست یا اتصال https ندارد. پرداخت نکنید و لینک را فقط از خود فروشنده بگیرید.
                     </div>
 
-                    <div class="warn">
-                        <strong>قبل از واریز، آدرس و لینک را بررسی کنید</strong>
-                        لینک را فقط از خود فروشنده بگیرید. در پیامک، شبکه‌های اجتماعی و پیام‌رسان‌ها لینک جعلی برای کلاهبرداری زیاد فرستاده می‌شود و گمراه‌کننده است.
-                        <ul>
-                            <li>نوار آدرس مرورگر باید با <b>https</b> شروع شود و دقیقاً با آدرس همین صفحه یکی باشد.</li>
-                            <li>نام، لوگو، تلفن و نشانی را با اطلاعاتی که خود فروشنده به شما داده مقایسه کنید.</li>
-                            <li>رمز کارت، CVV2 و رمز پویا را فقط در درگاه بانکی وارد کنید؛ این صفحه آن‌ها را نمی‌پرسد.</li>
-                            <li>اگر لینک را از پیامک، دایرکت یا تبلیغ دیدید و فروشنده تأیید نکرده، پرداخت نکنید.</li>
-                        </ul>
-                    </div>
-                    <div class="legal">
-                        <strong>استفاده قانونی از این روش پرداخت</strong>
-                        این صفحه فقط برای انتقال وجه و پرداخت‌هایی است که خلاف قوانین نباشد. در صورت مشاهده یا کشف تخلف، اطلاعات کسب‌وکار و پرداخت در صورت درخواست مراجع قضایی ارائه خواهد شد.
-                    </div>
+                    <button type="button" class="btn btn-security" id="open-security">هشدارها و موارد امنیتی پلیس فتا</button>
 
                     {% if error_message %}
                     <div class="alert alert-error">{{ error_message }}</div>
@@ -213,9 +206,11 @@
 
                     {% if is_enabled %}
                     {% if currency_hint %}<p class="hint">{{ currency_hint }}</p>{% endif %}
-                    <form method="post" action="/u/{{ username }}" id="pay-form" novalidate>
+                    {% if amount_locked and amount_locked_hint %}<p class="hint">{{ amount_locked_hint }}</p>{% endif %}
+                    <form method="post" action="{{ form_action or ('/u/' ~ username) }}" id="pay-form" novalidate>
+                        {% if request_token %}<input type="hidden" name="request_token" value="{{ request_token }}">{% endif %}
                         <label for="amount">{{ amount_label }}</label>
-                        <input id="amount" name="amount" inputmode="numeric" autocomplete="off" required placeholder="{{ min_amount_hint }}" value="{{ form_amount }}">
+                        <input id="amount" name="amount" inputmode="numeric" autocomplete="off" required placeholder="{{ min_amount_hint }}" value="{{ form_amount }}"{% if amount_locked %} readonly{% endif %}>
                         <label for="name">{{ name_label }}</label>
                         <input id="name" name="name" maxlength="30" value="{{ form_name }}" autocomplete="name">
                         <label for="mobile">{{ mobile_label }}</label>
@@ -240,8 +235,32 @@
         <p class="footer">{{ footer_credit | default('نرم افزار مدیریت کسب و کار حسابیکس') }}</p>
     </div>
 
+    <dialog class="modal" id="security-dialog">
+        <div class="modal-head">
+            <h2>هشدارها و موارد امنیتی پلیس فتا</h2>
+            <p>قبل از پرداخت این موارد را بخوانید. لینک جعلی در پیامک و شبکه‌های اجتماعی رایج است.</p>
+        </div>
+        <div class="modal-body">
+            <div class="warn">
+                <strong>قبل از واریز، آدرس و لینک را بررسی کنید</strong>
+                لینک را فقط از خود فروشنده بگیرید. در پیامک، شبکه‌های اجتماعی و پیام‌رسان‌ها لینک جعلی برای کلاهبرداری زیاد فرستاده می‌شود و گمراه‌کننده است.
+                <ul>
+                    <li>نوار آدرس مرورگر باید با <b>https</b> شروع شود و دقیقاً با آدرس همین صفحه یکی باشد.</li>
+                    <li>نام، لوگو، تلفن و نشانی را با اطلاعاتی که خود فروشنده به شما داده مقایسه کنید.</li>
+                    <li>رمز کارت، CVV2 و رمز پویا را فقط در درگاه بانکی وارد کنید؛ این صفحه آن‌ها را نمی‌پرسد.</li>
+                    <li>اگر لینک را از پیامک، دایرکت یا تبلیغ دیدید و فروشنده تأیید نکرده، پرداخت نکنید.</li>
+                </ul>
+            </div>
+            <div class="legal">
+                <strong>استفاده قانونی از این روش پرداخت</strong>
+                این صفحه فقط برای انتقال وجه و پرداخت‌هایی است که خلاف قوانین نباشد. در صورت مشاهده یا کشف تخلف، اطلاعات کسب‌وکار و پرداخت در صورت درخواست مراجع قضایی ارائه خواهد شد.
+            </div>
+            <button class="btn" type="button" id="close-security">متوجه شدم</button>
+        </div>
+    </dialog>
+
     <dialog class="modal" id="report-dialog"{% if report_open %} data-open="1"{% endif %}>
-        <form method="post" action="/u/{{ username }}/report" id="report-form">
+        <form method="post" action="{{ report_action or ('/u/' ~ username ~ '/report') }}" id="report-form">
             <div class="modal-head">
                 <h2>گزارش تخلف یا صفحه مشکوک</h2>
                 <p>اگر این صفحه با کسب‌وکار واقعی همخوانی ندارد یا لینک جعلی به نظر می‌رسد، موضوع را برای بررسی بفرستید.</p>
@@ -335,12 +354,17 @@
             }
             var reportDlg = document.getElementById('report-dialog');
             var thanksDlg = document.getElementById('thanks-dialog');
+            var securityDlg = document.getElementById('security-dialog');
             var openBtn = document.getElementById('open-report');
             var closeBtn = document.getElementById('close-report');
             var closeThanks = document.getElementById('close-thanks');
+            var openSecurity = document.getElementById('open-security');
+            var closeSecurity = document.getElementById('close-security');
             if (openBtn) openBtn.addEventListener('click', function () { openDialog(reportDlg); });
             if (closeBtn) closeBtn.addEventListener('click', function () { closeDialog(reportDlg); });
             if (closeThanks) closeThanks.addEventListener('click', function () { closeDialog(thanksDlg); });
+            if (openSecurity) openSecurity.addEventListener('click', function () { openDialog(securityDlg); });
+            if (closeSecurity) closeSecurity.addEventListener('click', function () { closeDialog(securityDlg); });
             if (reportDlg && reportDlg.getAttribute('data-open') === '1') openDialog(reportDlg);
             if (thanksDlg && thanksDlg.getAttribute('data-open') === '1') openDialog(thanksDlg);
         })();

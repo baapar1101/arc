@@ -7,8 +7,10 @@ import 'package:flutter/services.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/core/business_panel_ui_store.dart';
 import 'package:hesabix_ui/pages/business/pay_page_payment_details_dialog.dart';
 import 'package:hesabix_ui/pages/business/pay_page_poster_pdf.dart';
+import 'package:hesabix_ui/pages/business/pay_page_send_link_dialog.dart';
 import 'package:hesabix_ui/services/business_pay_page_service.dart';
 import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/services/payment_gateway_service.dart';
@@ -218,6 +220,7 @@ class _PayPageSettingsPageState extends State<PayPageSettingsPage>
       _applySettings(saved);
       _ensureGatewaySelection();
       SnackBarHelper.showSuccess(context, message: t.settingsSavedSuccessfully);
+      BusinessPanelUiStore.instance.requestBusinessPluginsReload();
       setState(() {});
     } catch (e) {
       if (!mounted) return;
@@ -359,6 +362,21 @@ class _PayPageSettingsPageState extends State<PayPageSettingsPage>
       children: [
         Text(t.businessSettingsPayPageDescription, style: theme.textTheme.bodyMedium),
         const SizedBox(height: 12),
+        if (_enabled &&
+            (_settings['username']?.toString().trim().isNotEmpty ?? false) &&
+            _gatewayId != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: FilledButton.icon(
+              onPressed: () => showPayPageSendLinkDialog(
+                context: context,
+                businessId: widget.businessId,
+                settings: _settings,
+              ),
+              icon: const Icon(Icons.send),
+              label: Text(t.payPageSendLink),
+            ),
+          ),
         SwitchListTile(
           title: Text(t.payPageEnabled),
           subtitle: Text(t.payPageEnabledHint),

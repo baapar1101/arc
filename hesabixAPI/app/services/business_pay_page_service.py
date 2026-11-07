@@ -2,28 +2,42 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
+import secrets
 from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Dict, Optional
+from urllib.parse import quote
 
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from adapters.db.models.business import Business
-from adapters.db.models.business_pay_page import BusinessPayPage, BusinessPayPageUsernameHistory
+from adapters.db.models.business_pay_page import (
+	BusinessPayPage,
+	BusinessPayPageRequest,
+	BusinessPayPageUsernameHistory,
+)
 from adapters.db.models.person import Person
 from adapters.db.models.wallet import WalletTransaction
 from app.core.responses import ApiError
 from app.core.transaction_lock import acquire_transaction_lock
 from app.services.document_share_link_service import _assert_gateway_allowed_for_business
 from app.services.system_settings_service import (
+	get_pay_page_public_base_url,
 	get_wallet_settings,
-	resolve_public_app_base_url_for_public_links,
+	resolve_pay_page_public_base_url,
 )
 
+logger = logging.getLogger(__name__)
+
 WALLET_TX_TYPE_PUBLIC_PAY_LINK = "public_pay_link"
+PAY_PAGE_REQUEST_TTL_DAYS = 90
+PAY_PAGE_REQUEST_STATUS_OPEN = "open"
+PAY_PAGE_REQUEST_STATUS_PAID = "paid"
+PAY_PAGE_REQUEST_STATUS_CANCELLED = "cancelled"
 USERNAME_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{1,28}[a-z0-9])$|^[a-z0-9]$")
 USERNAME_MIN_LEN = 3
 USERNAME_MAX_LEN = 30
@@ -238,14 +252,48 @@ def check_username_availability(
 	return {"username": value, "available": True, "reason": None, "message": None}
 
 
+def public_pay_page_path(
+	username: str | None,
+	*,
+	vanity: bool,
+	token: str | None = None,
+) -> str | None:
+	"""مسیر عمومی لینک واریز: دامنه اختصاصی = /{username} ؛ روش فعلی = /u/{username}.
+
+	اگر token باشد مسیر /t/{token} به انتهای آن اضافه می‌شود.
+	"""
+	name = (username or "").strip()
+	if not name:
+		return None
+	enc = quote(name, safe="")
+	path = f"/{enc}" if vanity else f"/u/{enc}"
+	tok = (token or "").strip()
+	if tok:
+		path = f"{path}/t/{quote(tok, safe='')}"
+	return path
+
+
+def is_pay_page_feature_enabled(db: Session, business_id: int) -> bool:
+	"""لینک واریز وقتی برای منو/ویجت فعال است که صفحه روشن، نام کاربری و درگاه داشته باشد."""
+	row = (
+		db.query(BusinessPayPage)
+		.filter(BusinessPayPage.business_id == int(business_id))
+		.first()
+	)
+	if not row:
+		return False
+	return bool(row.is_enabled) and bool(row.username) and bool(row.gateway_id)
+
+
 def _serialize(
 	db: Session,
 	row: BusinessPayPage,
 	business: Business,
 ) -> Dict[str, Any]:
 	wallet = get_wallet_settings(db)
-	base = (resolve_public_app_base_url_for_public_links(db) or "").strip().rstrip("/")
-	public_path = f"/u/{row.username}" if row.username else None
+	vanity = bool(get_pay_page_public_base_url(db))
+	base = (resolve_pay_page_public_base_url(db) or "").strip().rstrip("/")
+	public_path = public_pay_page_path(row.username, vanity=vanity)
 	public_url = f"{base}{public_path}" if base and public_path else public_path
 	min_amt = Decimal(str(row.min_amount or GATEWAY_MIN_AMOUNT))
 	if min_amt < GATEWAY_MIN_AMOUNT:
@@ -645,3 +693,242 @@ def list_pay_page_payments(
 		"limit": take,
 		"total_pages": (total + take - 1) // take if take else 1,
 	}
+
+
+def _new_pay_page_request_token(db: Session) -> str:
+	for _ in range(12):
+		token = secrets.token_urlsafe(16)
+		exists = db.get(BusinessPayPageRequest, token)
+		if not exists:
+			return token
+	raise ApiError("TOKEN_GENERATE_FAILED", "ساخت شناسه لینک ناموفق بود", http_status=500)
+
+
+def _pay_page_request_public_url(db: Session, username: str | None, token: str) -> tuple[str | None, str | None]:
+	vanity = bool(get_pay_page_public_base_url(db))
+	base = (resolve_pay_page_public_base_url(db) or "").strip().rstrip("/")
+	public_path = public_pay_page_path(username, vanity=vanity, token=token)
+	public_url = f"{base}{public_path}" if base and public_path else public_path
+	return public_path, public_url
+
+
+def _serialize_pay_page_request(
+	db: Session,
+	row: BusinessPayPageRequest,
+	*,
+	username: str | None,
+	sms_sent: bool | None = None,
+	sms_error: str | None = None,
+) -> Dict[str, Any]:
+	public_path, public_url = _pay_page_request_public_url(db, username, row.token)
+	data: Dict[str, Any] = {
+		"token": row.token,
+		"business_id": int(row.business_id),
+		"amount": float(row.amount) if row.amount is not None else None,
+		"amount_locked": bool(row.amount_locked),
+		"payer_name": row.payer_name,
+		"payer_mobile": row.payer_mobile,
+		"payer_note": row.payer_note,
+		"status": row.status,
+		"created_at": row.created_at,
+		"expires_at": row.expires_at,
+		"public_path": public_path,
+		"public_url": public_url,
+	}
+	if sms_sent is not None:
+		data["sms_sent"] = bool(sms_sent)
+	if sms_error:
+		data["sms_error"] = sms_error
+	return data
+
+
+def get_pay_page_request_for_public(
+	db: Session,
+	*,
+	username: str,
+	token: str,
+) -> BusinessPayPageRequest:
+	page, _redirect_to = find_pay_page_by_username(db, username)
+	if not page:
+		raise ApiError("PAY_PAGE_NOT_FOUND", "صفحه پرداخت یافت نشد", http_status=404)
+	req = db.get(BusinessPayPageRequest, (token or "").strip())
+	if not req or int(req.business_id) != int(page.business_id):
+		raise ApiError("PAY_LINK_NOT_FOUND", "این لینک واریز یافت نشد", http_status=404)
+	if req.expires_at and req.expires_at < datetime.utcnow():
+		raise ApiError("PAY_LINK_EXPIRED", "اعتبار این لینک واریز به پایان رسیده است", http_status=410)
+	if (req.status or "") == PAY_PAGE_REQUEST_STATUS_CANCELLED:
+		raise ApiError("PAY_LINK_CANCELLED", "این لینک واریز لغو شده است", http_status=410)
+	if bool(req.amount_locked) and (req.status or "") == PAY_PAGE_REQUEST_STATUS_PAID:
+		raise ApiError("PAY_LINK_ALREADY_PAID", "این لینک قبلاً پرداخت شده است", http_status=409)
+	return req
+
+
+def apply_pay_page_request_to_public_payload(
+	payload: Dict[str, Any],
+	req: BusinessPayPageRequest,
+) -> Dict[str, Any]:
+	out = dict(payload or {})
+	out["request_token"] = req.token
+	out["amount_locked"] = bool(req.amount_locked)
+	if req.amount is not None:
+		out["request_amount"] = float(req.amount)
+	if req.payer_name:
+		out["request_name"] = req.payer_name
+	if req.payer_mobile:
+		out["request_mobile"] = req.payer_mobile
+	if req.payer_note:
+		out["request_note"] = req.payer_note
+	return out
+
+
+def _send_pay_page_request_sms(
+	db: Session,
+	*,
+	business_id: int,
+	user_id: int,
+	mobile: str,
+	body: str,
+	business_name: str,
+) -> tuple[bool, str | None]:
+	from app.services.business_notification_service import (
+		BusinessNotificationService,
+		calculate_sms_count,
+	)
+	from app.services.wallet_service import charge_wallet_for_notification
+	from app.utils.phone_utils import normalize_phone_number
+
+	try:
+		dest = normalize_phone_number(mobile)
+	except Exception:
+		return False, "شماره موبایل مقصد معتبر نیست"
+	try:
+		svc = BusinessNotificationService(db)
+		sms_count = calculate_sms_count(body)
+		if sms_count <= 0:
+			return False, "متن پیامک نامعتبر است"
+		total_cost = svc._calculate_sms_cost(sms_count, "pay_link.request")
+		charge_wallet_for_notification(
+			db,
+			business_id,
+			user_id,
+			total_cost,
+			sms_count,
+			"pay_link.request",
+			template_name="ارسال لینک واریز",
+			description=f"ارسال لینک واریز به مشتری — {business_name}",
+		)
+		success, _message_id, error_msg = svc.sms_provider.send_text_with_details(
+			to_phone=dest,
+			text=body,
+		)
+		if not success:
+			return False, (error_msg or "ارسال پیامک ناموفق بود")
+		return True, None
+	except Exception as exc:
+		code = getattr(exc, "code", None)
+		message = getattr(exc, "message", None) or str(exc)
+		if code == "INSUFFICIENT_FUNDS":
+			return False, "موجودی کیف پول برای ارسال پیامک کافی نیست"
+		logger.exception("pay_page_request_sms_failed business_id=%s", business_id)
+		return False, message or "ارسال پیامک ناموفق بود"
+
+
+def create_pay_page_request(
+	db: Session,
+	*,
+	business_id: int,
+	user_id: int,
+	payload: Dict[str, Any],
+) -> Dict[str, Any]:
+	business = db.query(Business).filter(Business.id == int(business_id)).first()
+	if not business:
+		raise ApiError("BUSINESS_NOT_FOUND", "کسب‌وکار یافت نشد", http_status=404)
+	row = (
+		db.query(BusinessPayPage)
+		.filter(BusinessPayPage.business_id == int(business_id))
+		.first()
+	)
+	if not row or not row.is_enabled or not row.username or not row.gateway_id:
+		raise ApiError(
+			"PAY_PAGE_DISABLED",
+			"ابتدا لینک واریز را فعال کنید و نام کاربری و درگاه را تنظیم کنید",
+			http_status=403,
+		)
+
+	body = payload or {}
+	name = validate_payer_name(body.get("name"))
+	mobile = validate_payer_mobile(body.get("mobile"))
+	note = validate_payer_note(body.get("note"))
+	send_sms = bool(body.get("send_sms"))
+	if send_sms and not mobile:
+		raise ApiError(
+			"MOBILE_REQUIRED_FOR_SMS",
+			"برای ارسال پیامک باید شماره موبایل را وارد کنید",
+			http_status=400,
+		)
+
+	raw_amount = body.get("amount")
+	amount: Decimal | None = None
+	amount_locked = False
+	if raw_amount not in (None, "", 0, "0"):
+		amount = parse_pay_amount(raw_amount)
+		min_amt = Decimal(str(row.min_amount or GATEWAY_MIN_AMOUNT))
+		if min_amt < GATEWAY_MIN_AMOUNT:
+			min_amt = GATEWAY_MIN_AMOUNT
+		if amount < min_amt:
+			raise ApiError(
+				"AMOUNT_TOO_SMALL",
+				f"حداقل مبلغ پرداخت {min_amt} است",
+				http_status=400,
+			)
+		if row.max_amount is not None:
+			max_amt = Decimal(str(row.max_amount))
+			if amount > max_amt:
+				raise ApiError("AMOUNT_TOO_LARGE", "مبلغ از سقف مجاز بیشتر است", http_status=400)
+		amount_locked = True
+
+	req = BusinessPayPageRequest(
+		token=_new_pay_page_request_token(db),
+		business_id=int(business_id),
+		pay_page_id=int(row.id),
+		amount=float(amount) if amount is not None else None,
+		amount_locked=amount_locked,
+		payer_name=name,
+		payer_mobile=mobile,
+		payer_note=note,
+		created_by_user_id=int(user_id) if user_id else None,
+		status=PAY_PAGE_REQUEST_STATUS_OPEN,
+		expires_at=datetime.utcnow() + timedelta(days=PAY_PAGE_REQUEST_TTL_DAYS),
+	)
+	db.add(req)
+	db.flush()
+
+	sms_sent: bool | None = None
+	sms_error: str | None = None
+	public_path, public_url = _pay_page_request_public_url(db, row.username, req.token)
+	share_url = public_url or public_path or ""
+	if send_sms and mobile:
+		title = row.display_title or business.name or "کسب‌وکار"
+		lines = [f"پرداخت به {title}"]
+		if amount is not None:
+			lines.append(f"مبلغ: {amount:,.0f}")
+		if note:
+			lines.append(note[:120])
+		if share_url:
+			lines.append(str(share_url))
+		sms_sent, sms_error = _send_pay_page_request_sms(
+			db,
+			business_id=int(business_id),
+			user_id=int(user_id),
+			mobile=mobile,
+			body="\n".join(lines),
+			business_name=str(title),
+		)
+
+	return _serialize_pay_page_request(
+		db,
+		req,
+		username=row.username,
+		sms_sent=sms_sent,
+		sms_error=sms_error,
+	)

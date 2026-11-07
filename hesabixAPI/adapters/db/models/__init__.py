@@ -161,6 +161,7 @@ from .wallet import WalletAccount, WalletTransaction, WalletPayout, WalletSettin
 from .payment_gateway import PaymentGateway  # noqa: F401
 from .business_pay_page import (  # noqa: F401
 	BusinessPayPage,
+	BusinessPayPageRequest,
 	BusinessPayPageUsernameHistory,
 	PublicPayPageAbuseReport,
 	PublicPayPageReceipt,

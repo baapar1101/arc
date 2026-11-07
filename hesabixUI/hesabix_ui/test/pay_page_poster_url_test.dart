@@ -19,5 +19,9 @@ void main() {
       payPagePosterDisplayUrl('hesabix.ir/u/shop-ali'),
       'hesabix.ir/u/shop-ali',
     );
+    expect(
+      payPagePosterDisplayUrl('https://hesabix.ir/shop-ali'),
+      'hesabix.ir/shop-ali',
+    );
   });
 }

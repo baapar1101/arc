@@ -39,6 +39,21 @@ class SystemSettingsService {
     return Map<String, dynamic>.from(body['data'] as Map);
   }
 
+  Future<Map<String, dynamic>> getPayPageSystemSettings() async {
+    final res = await _api.get<Map<String, dynamic>>('/admin/system-settings/pay-page');
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
+  Future<Map<String, dynamic>> updatePayPageSystemSettings(String publicBaseUrl) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/admin/system-settings/pay-page',
+      data: {'public_base_url': publicBaseUrl},
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
   Future<Map<String, dynamic>> getMarketplaceSettings() async {
     final res = await _api.get<Map<String, dynamic>>('/admin/system-settings/marketplace');
     final body = res.data as Map<String, dynamic>;

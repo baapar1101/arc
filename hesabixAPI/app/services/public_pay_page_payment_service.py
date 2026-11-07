@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 
 from adapters.api.v1.schema_models.person import PersonCreateRequest, PersonType
 from adapters.db.models.business import Business
-from adapters.db.models.business_pay_page import BusinessPayPage, PublicPayPageReceipt
+from adapters.db.models.business_pay_page import BusinessPayPage, BusinessPayPageRequest, PublicPayPageReceipt
 from adapters.db.models.person import Person
 from adapters.db.models.wallet import WalletTransaction
 from app.core.datetime_utils import (
@@ -33,11 +33,15 @@ from app.core.datetime_utils import (
 from app.core.responses import ApiError
 from app.services.business_pay_page_service import (
 	GATEWAY_MIN_AMOUNT,
+	PAY_PAGE_REQUEST_STATUS_OPEN,
+	PAY_PAGE_REQUEST_STATUS_PAID,
 	WALLET_TX_TYPE_PUBLIC_PAY_LINK,
 	find_pay_page_by_username,
 	gateway_tracking_from_extra,
+	get_pay_page_request_for_public,
 	parse_pay_amount,
 	public_business_contact_rows,
+	public_pay_page_path,
 	validate_payer_mobile,
 	validate_payer_name,
 	validate_payer_note,
@@ -54,9 +58,10 @@ from app.services.person_service import create_person
 from app.services.quick_sales_service import get_quick_sales_settings
 from app.services.receipt_payment_service import create_receipt_payment
 from app.services.system_settings_service import (
+	get_pay_page_public_base_url,
 	get_share_link_invoice_gateway_fee_percent,
 	get_wallet_settings,
-	resolve_public_app_base_url_for_public_links,
+	resolve_pay_page_public_base_url,
 )
 
 logger = logging.getLogger(__name__)
@@ -221,9 +226,30 @@ def start_public_pay_page_payment(
 	payer_name: str | None = None,
 	payer_mobile: str | None = None,
 	payer_note: str | None = None,
+	request_token: str | None = None,
 ) -> Dict[str, Any]:
 	page, business = _active_page_or_error(db, username)
 	_assert_gateway_allowed_for_business(db, int(page.business_id), int(page.gateway_id))
+
+	pay_req: BusinessPayPageRequest | None = None
+	req_token = (request_token or "").strip()
+	if req_token:
+		from app.core.transaction_lock import acquire_transaction_lock
+
+		acquire_transaction_lock(db, f"pay_page_request:{req_token}")
+		pay_req = get_pay_page_request_for_public(db, username=username, token=req_token)
+		if (pay_req.status or "") != PAY_PAGE_REQUEST_STATUS_OPEN:
+			raise ApiError("PAY_LINK_NOT_OPEN", "این لینک واریز قابل پرداخت نیست", http_status=409)
+		if pay_req.amount_locked:
+			if pay_req.amount is None:
+				raise ApiError("PAY_LINK_INVALID", "مبلغ این لینک نامعتبر است", http_status=400)
+			amount = pay_req.amount
+		if not payer_name and pay_req.payer_name:
+			payer_name = pay_req.payer_name
+		if not payer_mobile and pay_req.payer_mobile:
+			payer_mobile = pay_req.payer_mobile
+		if not payer_note and pay_req.payer_note:
+			payer_note = pay_req.payer_note
 
 	amt = parse_pay_amount(amount)
 	min_amt = Decimal(str(page.min_amount or GATEWAY_MIN_AMOUNT))
@@ -282,6 +308,9 @@ def start_public_pay_page_payment(
 		"create_customer_if_missing": bool(page.create_customer_if_missing),
 		"use_anonymous_if_no_mobile": bool(page.use_anonymous_if_no_mobile),
 	}
+	if pay_req is not None:
+		extra_info["pay_page_request_token"] = pay_req.token
+		extra_info["amount_locked"] = bool(pay_req.amount_locked)
 
 	tx = WalletTransaction(
 		business_id=int(page.business_id),
@@ -488,6 +517,15 @@ def confirm_public_pay_page_payment(
 	tx.extra_info = json.dumps(ex, ensure_ascii=False)
 	db.flush()
 
+	req_token = str(ex.get("pay_page_request_token") or "").strip()
+	if req_token:
+		pay_req = db.get(BusinessPayPageRequest, req_token)
+		if pay_req and int(pay_req.business_id) == int(tx.business_id):
+			if pay_req.amount_locked:
+				pay_req.status = PAY_PAGE_REQUEST_STATUS_PAID
+			pay_req.paid_wallet_transaction_id = int(tx.id)
+			db.flush()
+
 	try:
 		_notify_owner_after_payment(
 			db,
@@ -577,14 +615,14 @@ def maybe_redirect_public_pay_page_payment_return(
 	username = (ex.get("username") or "").strip()
 	if not username:
 		return None
-	base = (resolve_public_app_base_url_for_public_links(db) or "").strip().rstrip("/")
+	base = (resolve_pay_page_public_base_url(db) or "").strip().rstrip("/")
 	if not base:
 		return None
 	token = (ex.get("receipt_token") or "").strip()
 	if not token:
 		token = ensure_public_pay_receipt_token(db, tx, username=username)
-	enc = quote(username, safe="")
-	return RedirectResponse(url=f"{base}/u/{enc}/r/{quote(token, safe='')}", status_code=302)
+	path = public_pay_page_path(username, vanity=bool(get_pay_page_public_base_url(db)))
+	return RedirectResponse(url=f"{base}{path}/r/{quote(token, safe='')}", status_code=302)
 
 
 def ensure_public_pay_receipt_token(db: Session, tx: WalletTransaction, *, username: str) -> str:
@@ -623,10 +661,11 @@ def public_pay_receipt_url(db: Session, *, username: str, token: str, request_ba
 
 	from app.core.payment_response import join_frontend_url
 
-	base = (resolve_public_app_base_url_for_public_links(db) or "").strip().rstrip("/")
+	base = (resolve_pay_page_public_base_url(db) or "").strip().rstrip("/")
 	if not base:
 		base = (request_base or "").rstrip("/")
-	path = f"/u/{quote(username, safe='')}/r/{quote(token, safe='')}"
+	path = public_pay_page_path(username, vanity=bool(get_pay_page_public_base_url(db))) or ""
+	path = f"{path}/r/{quote(token, safe='')}"
 	return join_frontend_url(base, path)
 
 

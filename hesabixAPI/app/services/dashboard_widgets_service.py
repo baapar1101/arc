@@ -291,6 +291,22 @@ DEFAULT_WIDGET_DEFINITIONS: List[Dict[str, Any]] = [
         },
         "cache_ttl": 30,
     },
+    {
+        "key": "pay_page_send_link",
+        "title": "ارسال لینک واریز",
+        "icon": "send",
+        "version": 1,
+        "permissions_required": [],
+        "requires_pay_page": True,
+        "defaults": {
+            "xs": {"colSpan": 4, "rowSpan": 2},
+            "sm": {"colSpan": 6, "rowSpan": 2},
+            "md": {"colSpan": 4, "rowSpan": 2},
+            "lg": {"colSpan": 4, "rowSpan": 2},
+            "xl": {"colSpan": 4, "rowSpan": 2},
+        },
+        "cache_ttl": 15,
+    },
 ]
 
 
@@ -348,20 +364,17 @@ def get_widget_definitions(
         user_id: User ID
         ctx: AuthContext for permission checking (optional)
     """
-    # اگر ctx ارائه نشده، همه ویجت‌ها را برمی‌گردانیم (برای سازگاری)
-    if ctx is None:
-        return {
-            "columns": COLUMNS_BY_BREAKPOINT,
-            "items": DEFAULT_WIDGET_DEFINITIONS,
-        }
-    
-    # فیلتر ویجت‌ها بر اساس دسترسی
+    from app.services.business_pay_page_service import is_pay_page_feature_enabled
+
+    pay_page_on = is_pay_page_feature_enabled(db, business_id)
     filtered_widgets = []
     for widget_def in DEFAULT_WIDGET_DEFINITIONS:
+        if widget_def.get("requires_pay_page") and not pay_page_on:
+            continue
         permissions_required = widget_def.get("permissions_required", [])
-        if _check_widget_permissions(permissions_required, ctx):
+        if ctx is None or _check_widget_permissions(permissions_required, ctx):
             filtered_widgets.append(widget_def)
-    
+
     return {
         "columns": COLUMNS_BY_BREAKPOINT,
         "items": filtered_widgets,
@@ -384,6 +397,8 @@ def _default_layout_items(breakpoint: str) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
     order = 1
     for d in DEFAULT_WIDGET_DEFINITIONS:
+        if d.get("requires_pay_page"):
+            continue
         defaults = (d.get("defaults") or {}).get(breakpoint) or {}
         out.append({
             "key": d["key"],
@@ -1036,6 +1051,23 @@ def _resolve_top_suppliers(
     return {"items": r.get("items", []), "summary": r.get("summary", {}), "pagination": r.get("pagination", {})}
 
 
+def _resolve_pay_page_send_link(db: Session, business_id: int, user_id: int, filters: Dict[str, Any]) -> Dict[str, Any]:
+    from app.services.business_pay_page_service import get_pay_page_settings, is_pay_page_feature_enabled
+
+    if not is_pay_page_feature_enabled(db, business_id):
+        return {"is_enabled": False}
+    data = get_pay_page_settings(db, business_id)
+    return {
+        "is_enabled": True,
+        "username": data.get("username"),
+        "public_url": data.get("public_url"),
+        "currency_title": data.get("currency_title"),
+        "currency_symbol": data.get("currency_symbol"),
+        "min_amount": data.get("min_amount"),
+        "max_amount": data.get("max_amount"),
+    }
+
+
 def _resolve_pnl_summary(
     db: Session, business_id: int, user_id: int, filters: Dict[str, Any]
 ) -> Dict[str, Any]:
@@ -1069,6 +1101,7 @@ WIDGET_RESOLVERS: Dict[str, WidgetResolver] = {
     "top_customers": _resolve_top_customers,
     "top_suppliers": _resolve_top_suppliers,
     "pnl_summary": _resolve_pnl_summary,
+    "pay_page_send_link": _resolve_pay_page_send_link,
 }
 
 

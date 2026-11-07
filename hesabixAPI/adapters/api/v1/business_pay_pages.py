@@ -12,12 +12,31 @@ from app.core.permissions import require_business_access_dep, require_business_p
 from app.core.responses import format_datetime_fields, success_response
 from app.services.business_pay_page_service import (
 	check_username_availability,
+	create_pay_page_request,
 	get_pay_page_settings,
+	is_pay_page_feature_enabled,
 	list_pay_page_payments,
 	update_pay_page_settings,
 )
 
 router = APIRouter(prefix="/businesses/{business_id}/pay-page", tags=["business-pay-page"])
+
+
+@router.get(
+	"/status",
+	summary="وضعیت فعال بودن لینک واریز برای منو و داشبورد",
+)
+def get_pay_page_status(
+	request: Request,
+	business_id: int,
+	db: Session = Depends(get_db),
+	_: None = Depends(require_business_access_dep),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	return success_response(
+		{"is_enabled": is_pay_page_feature_enabled(db, business_id)},
+		request,
+	)
 
 
 @router.get(
@@ -54,6 +73,32 @@ def put_pay_page(
 		format_datetime_fields(data, request, business_id=business_id),
 		request,
 		message="PAY_PAGE_SETTINGS_UPDATED",
+	)
+
+
+@router.post(
+	"/requests",
+	summary="ساخت لینک واریز اختصاصی برای ارسال به مشتری",
+	description="اگر مبلغ وارد شود در صفحه عمومی قفل می‌شود. send_sms=true پیامک را با کسر از کیف‌پول می‌فرستد.",
+)
+def create_pay_page_payment_request(
+	request: Request,
+	business_id: int,
+	payload: Dict[str, Any] = Body(default_factory=dict),
+	db: Session = Depends(get_db),
+	_: None = Depends(require_business_access_dep),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	data = create_pay_page_request(
+		db,
+		business_id=business_id,
+		user_id=int(ctx.get_user_id()),
+		payload=payload or {},
+	)
+	return success_response(
+		format_datetime_fields(data, request, business_id=business_id),
+		request,
+		message="PAY_PAGE_REQUEST_CREATED",
 	)
 
 

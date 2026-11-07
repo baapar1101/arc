@@ -25,6 +25,7 @@ import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/document/document_details_dialog.dart';
 import 'quick_links_dashboard_widget.dart';
 import 'crm_calendar_dashboard_widget.dart';
+import 'pay_page_send_link_dashboard_widget.dart';
 
 typedef DashboardWidgetBuilder = Widget Function(BuildContext, dynamic, DashboardLayoutItem, {VoidCallback? onRefresh});
 
@@ -278,6 +279,9 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
   List<String> _visiblePermittedKeys(DashboardLayoutProfile layout, DashboardDefinitionsResponse defs) {
     final visibleItems = layout.items.where((e) => !e.hidden).toList();
     return visibleItems.where((item) {
+      if (item.key == 'pay_page_send_link' && !defs.items.any((d) => d.key == item.key)) {
+        return false;
+      }
       final widgetDef = defs.items.firstWhere(
         (d) => d.key == item.key,
         orElse: () => DashboardWidgetDefinition(
@@ -679,6 +683,10 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
   Widget _buildGridTile(DashboardLayoutItem item, int totalColumns) {
     // بررسی دسترسی قبل از نمایش ویجت
     if (_definitions != null) {
+      if (item.key == 'pay_page_send_link' &&
+          !_definitions!.items.any((d) => d.key == item.key)) {
+        return const SizedBox.shrink();
+      }
       final widgetDef = _definitions!.items.firstWhere(
         (d) => d.key == item.key,
         orElse: () => DashboardWidgetDefinition(
@@ -960,6 +968,8 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
         return _quickLinksWidget;
       case 'crm_calendar':
         return _crmCalendarWidget;
+      case 'pay_page_send_link':
+        return _payPageSendLinkWidget;
       default:
         return null;
     }
@@ -982,7 +992,15 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
         'pnl_summary': _pnlSummaryWidget,
         'quick_links': _quickLinksWidget,
         'crm_calendar': _crmCalendarWidget,
+        'pay_page_send_link': _payPageSendLinkWidget,
       };
+
+  Widget _payPageSendLinkWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
+    return PayPageSendLinkDashboardBody(
+      businessId: widget.businessId,
+      data: data,
+    );
+  }
 
   Widget _quickLinksWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
     return QuickLinksDashboardBody(
@@ -2481,6 +2499,8 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
         return 'دسترسی سریع';
       case 'crm_calendar':
         return 'تقویم CRM';
+      case 'pay_page_send_link':
+        return 'ارسال لینک واریز';
       default:
         return key;
     }

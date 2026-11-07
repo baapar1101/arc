@@ -12883,6 +12883,29 @@ class AppLocalizationsFa extends AppLocalizations {
       'گزارش‌های فیشینگ و تخلف صفحات پرداخت عمومی';
 
   @override
+  String get settingsPayPageDomain => 'دامنه لینک واریز';
+
+  @override
+  String get settingsPayPageDomainDescription =>
+      'دامنهٔ نمایش‌داده‌شده در پوستر و QR لینک واریز عمومی';
+
+  @override
+  String get payPageDomainUrlLabel => 'آدرس پایه لینک واریز';
+
+  @override
+  String get payPageDomainUrlHint =>
+      'مثلاً https://hesabix.ir — لینک نهایی https://hesabix.ir/username می‌شود (بدون /u/). اگر خالی باشد روش فعلی با مسیر /u/username استفاده می‌شود.';
+
+  @override
+  String get payPageDomainUrlInvalid => 'آدرس باید با http:// یا https:// شروع شود';
+
+  @override
+  String get payPageDomainEffectiveUrl => 'دامنهٔ مؤثر فعلی';
+
+  @override
+  String get payPageDomainSaved => 'تنظیمات دامنه لینک واریز ذخیره شد';
+
+  @override
   String get payPageAbuseStatusNew => 'جدید';
 
   @override
@@ -20632,6 +20655,50 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get payPageNoAccountingDocument =>
       'برای این واریز سند حسابداری ثبت نشده است';
+
+  @override
+  String get payPageMenu => 'لینک واریز';
+
+  @override
+  String get payPageSendLink => 'ارسال لینک واریز';
+
+  @override
+  String get payPageSendLinkHint =>
+      'نام، موبایل و توضیح را پر کنید. اگر مبلغ را وارد کنید مشتری نمی‌تواند آن را تغییر دهد.';
+
+  @override
+  String get payPageSendLinkAmountHint => 'مبلغ (اختیاری)';
+
+  @override
+  String get payPageSendLinkAmountLockedHint =>
+      'اگر مبلغ را وارد کنید، در لینک قفل می‌شود';
+
+  @override
+  String get payPageSendSms => 'ارسال پیامک به مشتری';
+
+  @override
+  String get payPageShareLink => 'اشتراک‌گذاری لینک';
+
+  @override
+  String get payPageRequestCreated => 'لینک واریز آماده شد';
+
+  @override
+  String get payPageSmsSent => 'پیامک ارسال شد';
+
+  @override
+  String get payPageSmsNotSent => 'پیامک ارسال نشد';
+
+  @override
+  String get payPageMobileRequiredForSms =>
+      'برای ارسال پیامک، موبایل را وارد کنید';
+
+  @override
+  String get payPageSendLinkDisabled =>
+      'ابتدا لینک واریز را در تنظیمات فعال کنید و نام کاربری و درگاه را مشخص کنید';
+
+  @override
+  String get payPageAmountLocked =>
+      'مبلغ توسط فروشنده تعیین شده و قابل تغییر نیست';
 
   @override
   String get businessSettingsTemplatesDescription =>

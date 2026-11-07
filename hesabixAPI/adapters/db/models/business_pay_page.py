@@ -130,3 +130,39 @@ class PublicPayPageAbuseReport(Base):
 	)
 
 	business = relationship("Business")
+
+
+class BusinessPayPageRequest(Base):
+	"""درخواست لینک واریز اختصاصی (توکن‌دار) برای ارسال به مشتری."""
+
+	__tablename__ = "business_pay_page_requests"
+	__table_args__ = (
+		Index("ix_pay_page_requests_business", "business_id"),
+		Index("ix_pay_page_requests_page", "pay_page_id"),
+		Index("ix_pay_page_requests_status", "status"),
+	)
+
+	token: Mapped[str] = mapped_column(String(48), primary_key=True)
+	business_id: Mapped[int] = mapped_column(
+		Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False
+	)
+	pay_page_id: Mapped[int] = mapped_column(
+		Integer, ForeignKey("business_pay_pages.id", ondelete="CASCADE"), nullable=False
+	)
+	amount: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
+	amount_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+	payer_name: Mapped[str | None] = mapped_column(String(30), nullable=True)
+	payer_mobile: Mapped[str | None] = mapped_column(String(20), nullable=True)
+	payer_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+	created_by_user_id: Mapped[int | None] = mapped_column(
+		Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+	)
+	status: Mapped[str] = mapped_column(String(20), nullable=False, default="open", server_default="open")
+	paid_wallet_transaction_id: Mapped[int | None] = mapped_column(
+		Integer, ForeignKey("wallet_transactions.id", ondelete="SET NULL"), nullable=True
+	)
+	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+	expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+	business = relationship("Business")
+	pay_page = relationship("BusinessPayPage")

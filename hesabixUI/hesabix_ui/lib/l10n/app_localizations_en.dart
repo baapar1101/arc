@@ -12957,6 +12957,29 @@ class AppLocalizationsEn extends AppLocalizations {
       'Phishing and abuse reports from public payment pages';
 
   @override
+  String get settingsPayPageDomain => 'Pay-link domain';
+
+  @override
+  String get settingsPayPageDomainDescription =>
+      'Domain shown on the public pay-link poster and QR code';
+
+  @override
+  String get payPageDomainUrlLabel => 'Pay-link base URL';
+
+  @override
+  String get payPageDomainUrlHint =>
+      'For example https://hesabix.ir — the public link becomes https://hesabix.ir/username (without /u/). Leave empty to keep the current /u/username links.';
+
+  @override
+  String get payPageDomainUrlInvalid => 'URL must start with http:// or https://';
+
+  @override
+  String get payPageDomainEffectiveUrl => 'Effective domain';
+
+  @override
+  String get payPageDomainSaved => 'Pay-link domain settings saved';
+
+  @override
   String get payPageAbuseStatusNew => 'New';
 
   @override
@@ -20755,6 +20778,50 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get payPageNoAccountingDocument =>
       'No accounting document was recorded for this deposit';
+
+  @override
+  String get payPageMenu => 'Pay link';
+
+  @override
+  String get payPageSendLink => 'Send pay link';
+
+  @override
+  String get payPageSendLinkHint =>
+      'Fill in name, mobile and a note. If you enter an amount, the payer cannot change it.';
+
+  @override
+  String get payPageSendLinkAmountHint => 'Amount (optional)';
+
+  @override
+  String get payPageSendLinkAmountLockedHint =>
+      'If you enter an amount, it is locked on the link';
+
+  @override
+  String get payPageSendSms => 'Send SMS to customer';
+
+  @override
+  String get payPageShareLink => 'Share link';
+
+  @override
+  String get payPageRequestCreated => 'Pay link is ready';
+
+  @override
+  String get payPageSmsSent => 'SMS sent';
+
+  @override
+  String get payPageSmsNotSent => 'SMS was not sent';
+
+  @override
+  String get payPageMobileRequiredForSms =>
+      'Enter a mobile number to send SMS';
+
+  @override
+  String get payPageSendLinkDisabled =>
+      'Enable the pay link in settings and set a username and gateway first';
+
+  @override
+  String get payPageAmountLocked =>
+      'The amount was set by the seller and cannot be changed';
 
   @override
   String get businessSettingsTemplatesDescription =>

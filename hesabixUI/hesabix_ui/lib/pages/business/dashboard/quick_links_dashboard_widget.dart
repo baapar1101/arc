@@ -8,6 +8,7 @@ import '../../../services/business_dashboard_service.dart';
 import '../../../core/business_named_route_locations.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
+import '../pay_page_send_link_dialog.dart';
 
 const double _kMinTileTouchSize = 48;
 const double _kMobileEditorBreakpoint = 600;
@@ -53,6 +54,8 @@ IconData _iconFromKey(String name) {
       return Icons.settings;
     case 'hub':
       return Icons.hub;
+    case 'send':
+      return Icons.send;
     case 'link':
     default:
       return Icons.open_in_new;
@@ -719,6 +722,10 @@ class QuickLinksDashboardBody extends StatelessWidget {
     }
     final name = it.routeName;
     if (name == null || name.isEmpty) return;
+    if (name == 'pay_page_send_dialog') {
+      await showPayPageSendLinkDialog(context: context, businessId: businessId);
+      return;
+    }
     try {
       if (!context.mounted) return;
       BusinessNamedRoutes.goNamed(

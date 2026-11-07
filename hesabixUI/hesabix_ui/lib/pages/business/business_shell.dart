@@ -64,6 +64,8 @@ import 'transfers_page.dart';
 import 'documents_page.dart';
 import 'loan_facilities_page.dart';
 import 'business_shell_side_nav_scope.dart';
+import 'pay_page_send_link_dialog.dart';
+import '../../services/business_pay_page_service.dart';
 
 class BusinessShell extends StatefulWidget {
   final int businessId;
@@ -110,6 +112,8 @@ class _BusinessShellState extends State<BusinessShell> {
   int? _pluginsLoadedForBusinessId;
   String? _lastRouteLocation;
   int _lastPluginsRefreshNonce = 0;
+  bool _payPageEnabled = false;
+  int? _payPageLoadedForBusinessId;
   bool _isBusinessLoading = false;
   String? _businessLoadError;
   Timer? _dateTimeUpdateTimer;
@@ -126,6 +130,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (nonce != _lastPluginsRefreshNonce) {
       _lastPluginsRefreshNonce = nonce;
       _loadBusinessPlugins(force: true);
+      _loadPayPageEnabled(force: true);
     }
     setState(() {});
   }
@@ -893,6 +898,7 @@ class _BusinessShellState extends State<BusinessShell> {
     // بارگذاری اطلاعات کسب و کار و دسترسی‌ها
     _loadBusinessInfo();
     _loadBusinessPlugins();
+    _loadPayPageEnabled();
     _loadMenuPreferences();
     // به‌روزرسانی خودکار ساعت در نوار بالا هر دقیقه
     _dateTimeUpdateTimer = Timer.periodic(const Duration(minutes: 1), (_) {
@@ -913,8 +919,10 @@ class _BusinessShellState extends State<BusinessShell> {
     if (oldWidget.businessId != widget.businessId) {
       _pluginsLoaded = false;
       _pluginsLoadedForBusinessId = null;
+      _payPageLoadedForBusinessId = null;
       unawaited(FiscalYearController.load(widget.businessId));
       _loadBusinessPlugins(force: true);
+      _loadPayPageEnabled(force: true);
       _loadMenuPreferences();
     }
   }
@@ -1237,6 +1245,30 @@ class _BusinessShellState extends State<BusinessShell> {
         });
       }
     }
+  }
+
+  Future<void> _loadPayPageEnabled({bool force = false}) async {
+    if (!force && _payPageLoadedForBusinessId == widget.businessId) return;
+    try {
+      final on = await BusinessPayPageService().isFeatureEnabled(widget.businessId);
+      if (!mounted) return;
+      setState(() {
+        _payPageEnabled = on;
+        _payPageLoadedForBusinessId = widget.businessId;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _payPageEnabled = false;
+        _payPageLoadedForBusinessId = widget.businessId;
+      });
+    }
+  }
+
+  bool _canShowMenuAddButton(_MenuItem item) {
+    if (item.key == 'pay-page') return _hasAccessToMenuItem(item);
+    final t = AppLocalizations.of(context);
+    return _canAddForSection(_sectionForMenuItem(item, t));
   }
 
   Future<void> _loadBusinessPlugins({bool force = false}) async {
@@ -1704,6 +1736,15 @@ class _BusinessShellState extends State<BusinessShell> {
         icon: Icons.account_balance_wallet,
         selectedIcon: Icons.account_balance_wallet,
         path: _bu('receipts-payments'),
+        type: _MenuItemType.simple,
+        hasAddButton: true,
+      ),
+      _MenuItem(
+        key: 'pay-page',
+        label: t.payPageMenu,
+        icon: Icons.link,
+        selectedIcon: Icons.link,
+        path: _bu('settings/pay-page'),
         type: _MenuItemType.simple,
         hasAddButton: true,
       ),
@@ -2636,6 +2677,8 @@ class _BusinessShellState extends State<BusinessShell> {
           context.go(_bu('invoice/new'));
         case 'receipts-payments':
           showAddReceiptPaymentDialog();
+        case 'pay-page':
+          showPayPageSendLinkDialog(context: context, businessId: widget.businessId);
         case 'expense-income':
           showAddExpenseIncomeDialog();
         case 'transfers':
@@ -3119,7 +3162,7 @@ class _BusinessShellState extends State<BusinessShell> {
                                         ),
                                       ),
                                     ),
-                                    if (child.hasAddButton && _canAddForSection(_sectionForMenuItem(child, t)))
+                                    if (child.hasAddButton && _canShowMenuAddButton(child))
                                       _sidebarAddAffordance(
                                         nav: nav,
                                         foreground: isChildActive ? activeFg : sideFg,
@@ -3284,8 +3327,7 @@ class _BusinessShellState extends State<BusinessShell> {
                                     )
                                   else if (item.hasAddButton)
                                     Builder(builder: (ctx) {
-                                      final section = _sectionForMenuItem(item, t);
-                                      final canAdd = section != null && (widget.authStore.hasBusinessPermission(section, 'add'));
+                                      final canAdd = _canShowMenuAddButton(item);
                                       if (!canAdd) return const SizedBox.shrink();
                                       return _sidebarAddAffordance(
                                         nav: nav,
@@ -3388,8 +3430,7 @@ class _BusinessShellState extends State<BusinessShell> {
                       ),
                     );
                   } else if (item.type == _MenuItemType.simple) {
-                    final section = _sectionForMenuItem(item, t);
-                    final canAdd = section != null && (widget.authStore.hasBusinessPermission(section, 'add'));
+                    final canAdd = _canShowMenuAddButton(item);
                     final chrome = _sidebarItemChrome(
                       item,
                       selected: active,
@@ -3459,8 +3500,7 @@ class _BusinessShellState extends State<BusinessShell> {
                         setState(() => _setExpandableMenuOpen(item, expanded));
                       },
                       children: visibleChildren.map((child) {
-                        final childSection = _sectionForMenuItem(child, t);
-                        final childCanAdd = child.hasAddButton && _canAddForSection(childSection);
+                        final childCanAdd = child.hasAddButton && _canShowMenuAddButton(child);
                         return ListTile(
                         leading: SizedBox(width: nav.childIconExtended),
                         title: Text(
@@ -3793,6 +3833,12 @@ class _BusinessShellState extends State<BusinessShell> {
 
   bool _hasAccessToMenuItem(_MenuItem item) {
     final t = AppLocalizations.of(context);
+    if (item.key == 'pay-page') {
+      if (!_payPageEnabled) return false;
+      if (_isBusinessOwner()) return true;
+      return widget.authStore.canReadSection('people_transactions') ||
+          widget.authStore.hasBusinessPermission('settings', 'join');
+    }
     final section = _sectionForMenuItem(item, t);
 
     if (item.path != null && item.path!.contains('/woocommerce')) {
@@ -4011,6 +4057,8 @@ class _BusinessShellState extends State<BusinessShell> {
         case 'invoice':
           return 'invoices';
         case 'receipts-payments':
+          return 'people_transactions';
+        case 'pay-page':
           return 'people_transactions';
         case 'expense-income':
           return 'expenses_income';

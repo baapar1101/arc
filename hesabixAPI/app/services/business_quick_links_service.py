@@ -123,6 +123,14 @@ QUICK_LINK_PRESETS: List[Dict[str, Any]] = [
 		"route_name": "business_crm_dashboard_page",
 		"permissions_required": ["crm.view"],
 	},
+	{
+		"id": "send_pay_link",
+		"title": "ارسال لینک واریز",
+		"icon": "send",
+		"route_name": "pay_page_send_dialog",
+		"permissions_required": [],
+		"requires_pay_page": True,
+	},
 ]
 
 _PRESET_BY_ID: Dict[str, Dict[str, Any]] = {p["id"]: p for p in QUICK_LINK_PRESETS}
@@ -144,10 +152,17 @@ def _check_preset_permissions(permissions_required: List[str], ctx: Any) -> bool
 	return True
 
 
-def get_quick_link_presets_catalog(ctx: Any) -> Dict[str, Any]:
+def get_quick_link_presets_catalog(ctx: Any, db: Optional[Session] = None, business_id: Optional[int] = None) -> Dict[str, Any]:
 	"""فقط presetهایی که کاربر مجاز است."""
+	pay_page_on = True
+	if db is not None and business_id:
+		from app.services.business_pay_page_service import is_pay_page_feature_enabled
+
+		pay_page_on = is_pay_page_feature_enabled(db, int(business_id))
 	items: List[Dict[str, Any]] = []
 	for p in QUICK_LINK_PRESETS:
+		if p.get("requires_pay_page") and not pay_page_on:
+			continue
 		perms = p.get("permissions_required") or []
 		if not _check_preset_permissions(perms, ctx):
 			continue
@@ -211,6 +226,13 @@ def _sanitize_stored_item(raw: Dict[str, Any], ctx: Any) -> Optional[Dict[str, A
 		if pid not in _PRESET_BY_ID:
 			return None
 		p = _PRESET_BY_ID[pid]
+		if p.get("requires_pay_page"):
+			from app.services.business_pay_page_service import is_pay_page_feature_enabled
+
+			bid = getattr(ctx, "business_id", None) if ctx is not None else None
+			db = getattr(ctx, "db", None) if ctx is not None else None
+			if db is None or not bid or not is_pay_page_feature_enabled(db, int(bid)):
+				return None
 		if not _check_preset_permissions(p.get("permissions_required") or [], ctx):
 			return None
 		out: Dict[str, Any] = {
@@ -317,6 +339,13 @@ def _resolve_item_for_client(stored: Dict[str, Any], ctx: Any) -> Optional[Dict[
 		p = _PRESET_BY_ID.get(pid)
 		if p is None:
 			return None
+		if p.get("requires_pay_page"):
+			from app.services.business_pay_page_service import is_pay_page_feature_enabled
+
+			bid = getattr(ctx, "business_id", None) if ctx is not None else None
+			db = getattr(ctx, "db", None) if ctx is not None else None
+			if db is None or not bid or not is_pay_page_feature_enabled(db, int(bid)):
+				return None
 		if not _check_preset_permissions(p.get("permissions_required") or [], ctx):
 			return None
 		title = p["title"]

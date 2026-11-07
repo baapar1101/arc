@@ -13,11 +13,13 @@ import 'package:url_launcher/url_launcher.dart';
 
 class PublicPayPage extends StatefulWidget {
   final String username;
+  final String? requestToken;
   final Map<String, String> paymentReturnQuery;
 
   const PublicPayPage({
     super.key,
     required this.username,
+    this.requestToken,
     this.paymentReturnQuery = const {},
   });
 
@@ -80,19 +82,45 @@ class _PublicPayPageState extends State<PublicPayPage> {
     }
   }
 
+  bool get _amountLocked => _payload?['amount_locked'] == true;
+
+  void _applyRequestPrefill(Map<String, dynamic> data) {
+    final amt = data['request_amount'];
+    if (amt != null && _amountCtrl.text.trim().isEmpty) {
+      final n = (amt is num) ? amt.toDouble() : double.tryParse('$amt');
+      if (n != null) {
+        _amountCtrl.text = n.toStringAsFixed(n.truncateToDouble() == n ? 0 : 2);
+      }
+    }
+    final name = data['request_name']?.toString() ?? '';
+    if (name.isNotEmpty && _nameCtrl.text.trim().isEmpty) _nameCtrl.text = name;
+    final mobile = data['request_mobile']?.toString() ?? '';
+    if (mobile.isNotEmpty && _mobileCtrl.text.trim().isEmpty) _mobileCtrl.text = mobile;
+    final note = data['request_note']?.toString() ?? '';
+    if (note.isNotEmpty && _noteCtrl.text.trim().isEmpty) _noteCtrl.text = note;
+  }
+
   Future<void> _fetch() async {
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final data = await _service.fetch(widget.username);
+      final data = await _service.fetch(widget.username, token: widget.requestToken);
       final redirect = data['redirect_to']?.toString();
       if (redirect != null && redirect.isNotEmpty && redirect != widget.username) {
-        if (mounted) context.go('/public/pay/${Uri.encodeComponent(redirect)}');
+        final tok = widget.requestToken;
+        if (mounted) {
+          if (tok != null && tok.isNotEmpty) {
+            context.go('/public/pay/${Uri.encodeComponent(redirect)}/t/${Uri.encodeComponent(tok)}');
+          } else {
+            context.go('/public/pay/${Uri.encodeComponent(redirect)}');
+          }
+        }
         return;
       }
       if (!mounted) return;
+      _applyRequestPrefill(data);
       setState(() {
         _payload = data;
         _loading = false;
@@ -159,6 +187,7 @@ class _PublicPayPageState extends State<PublicPayPage> {
         name: _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text.trim(),
         mobile: _mobileCtrl.text.trim().isEmpty ? null : _mobileCtrl.text.trim(),
         note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+        requestToken: widget.requestToken ?? _payload?['request_token']?.toString(),
       );
       final url = started['payment_url']?.toString();
       if (url == null || url.isEmpty) {
@@ -286,8 +315,14 @@ class _PublicPayPageState extends State<PublicPayPage> {
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Text(t.payPageCurrencyHint(currency), style: theme.textTheme.bodySmall),
                 ),
+              if (_amountLocked)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(t.payPageAmountLocked, style: theme.textTheme.bodySmall),
+                ),
               TextFormField(
                 controller: _amountCtrl,
+                readOnly: _amountLocked,
                 keyboardType: TextInputType.number,
                 inputFormatters: const [
                   EnglishDigitsFormatter(),

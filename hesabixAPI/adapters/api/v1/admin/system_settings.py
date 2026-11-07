@@ -28,6 +28,8 @@ from app.services.system_settings_service import (
 	set_notifications_settings,
 	get_share_link_settings,
 	set_share_link_settings,
+	get_pay_page_system_settings,
+	set_pay_page_system_settings,
 	get_marketplace_settings,
 	set_marketplace_settings,
 	get_effective_notifications_settings,
@@ -216,6 +218,46 @@ def set_share_link_settings_endpoint(
 		invoice_gateway_fee_percent=payload.invoice_gateway_fee_percent,
 	)
 	return success_response(data, request, message="SHARE_LINK_PUBLIC_APP_URL_UPDATED")
+
+
+class PayPageSystemSettingsPayload(BaseModel):
+	public_base_url: Optional[str] = Field(
+		default="",
+		description="دامنه نمایش لینک واریز در پوستر و QR. خالی = رفتار فعلی (دامنه لینک‌های اشتراک)",
+	)
+
+
+@router.get(
+	"/pay-page",
+	summary="دریافت تنظیمات دامنه لینک واریز عمومی",
+	description="دامنه اختیاری پوستر و QR لینک واریز. اگر خالی باشد از دامنه لینک‌های اشتراک استفاده می‌شود.",
+)
+def get_pay_page_system_settings_endpoint(
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	if not ctx.has_any_permission("system_settings", "superadmin"):
+		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
+	data = get_pay_page_system_settings(db)
+	return success_response(data, request)
+
+
+@router.put(
+	"/pay-page",
+	summary="تنظیم دامنه لینک واریز عمومی",
+	description="ثبت دامنه نمایش پوستر و QR (مثلاً https://hesabix.ir). خالی یعنی بازگشت به روش فعلی.",
+)
+def set_pay_page_system_settings_endpoint(
+	payload: PayPageSystemSettingsPayload,
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	if not ctx.has_any_permission("system_settings", "superadmin"):
+		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
+	data = set_pay_page_system_settings(db, public_base_url=payload.public_base_url)
+	return success_response(data, request, message="PAY_PAGE_PUBLIC_BASE_URL_UPDATED")
 
 
 class MarketplaceSettingsPayload(BaseModel):

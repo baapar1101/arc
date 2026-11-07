@@ -77,6 +77,7 @@ import 'pages/admin/support_billing_stats_admin_page.dart';
 import 'pages/profile/support_billing_page.dart';
 import 'pages/admin/document_monetization_page.dart';
 import 'pages/admin/share_link_settings_page.dart';
+import 'pages/admin/pay_page_system_settings_page.dart';
 import 'pages/admin/pay_page_abuse_reports_admin_page.dart';
 import 'pages/admin/marketplace_plugins_admin_page.dart';
 import 'pages/admin/wallet_payouts_admin_page.dart';
@@ -600,6 +601,7 @@ class _MyAppState extends State<MyApp> {
       const AdminStorageManagementPage();
       const SystemConfigurationPage();
       const ShareLinkSettingsPage();
+      const PayPageSystemSettingsPage();
       const PayPageAbuseReportsAdminPage();
       const UserManagementPage();
       const SystemReportsHubPage();
@@ -1085,6 +1087,16 @@ class _MyAppState extends State<MyApp> {
           name: 'public_pay_page',
           builder: (context, state) => PublicPayPage(
             username: state.pathParameters['username'] ?? '',
+            requestToken: state.uri.queryParameters['token'],
+            paymentReturnQuery: state.uri.queryParameters,
+          ),
+        ),
+        GoRoute(
+          path: '/public/pay/:username/t/:token',
+          name: 'public_pay_page_token',
+          builder: (context, state) => PublicPayPage(
+            username: state.pathParameters['username'] ?? '',
+            requestToken: state.pathParameters['token'],
             paymentReturnQuery: state.uri.queryParameters,
           ),
         ),
@@ -1097,6 +1109,18 @@ class _MyAppState extends State<MyApp> {
               return '/';
             }
             return '/public/pay/${Uri.encodeComponent(u)}';
+          },
+        ),
+        GoRoute(
+          path: '/u/:username/t/:token',
+          name: 'short_pay_page_token_redirect',
+          redirect: (context, state) {
+            final u = state.pathParameters['username'] ?? '';
+            final tok = state.pathParameters['token'] ?? '';
+            if (u.isEmpty || tok.isEmpty) {
+              return '/';
+            }
+            return '/public/pay/${Uri.encodeComponent(u)}/t/${Uri.encodeComponent(tok)}';
           },
         ),
         GoRoute(
@@ -1737,6 +1761,22 @@ class _MyAppState extends State<MyApp> {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const ShareLinkSettingsPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'pay-page',
+                  name: 'system_settings_pay_page',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed =
+                        _authStore!.isSuperAdmin ||
+                        _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const PayPageSystemSettingsPage();
                   },
                 ),
                 GoRoute(
@@ -5588,10 +5628,11 @@ class _MyAppState extends State<MyApp> {
                               final businessId = int.parse(
                                 state.pathParameters['business_id']!,
                               );
-                              if (!_authStore!.hasBusinessPermission(
-                                'settings',
-                                'join',
-                              )) {
+                              final auth = _authStore!;
+                              final canOpenPayPage = auth.currentBusiness?.isOwner == true ||
+                                  auth.hasBusinessPermission('settings', 'join') ||
+                                  auth.canReadSection('people_transactions');
+                              if (!canOpenPayPage) {
                                 return hesabixNoTransitionPage(
                                   state,
                                   PermissionGuard.buildAccessDeniedPage(),

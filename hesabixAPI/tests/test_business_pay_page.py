@@ -17,7 +17,10 @@ from app.core.responses import ApiError
 from app.services.business_pay_page_service import (
 	GATEWAY_MIN_AMOUNT,
 	RESERVED_USERNAMES,
+	_serialize,
+	apply_pay_page_request_to_public_payload,
 	parse_pay_amount,
+	public_pay_page_path,
 	validate_payer_mobile,
 	validate_payer_name,
 	validate_payer_note,
@@ -184,9 +187,41 @@ def test_short_pay_page_serves_backend_html_not_flutter_redirect():
 	assert "https" in res.text
 	assert "مراجع قضایی" in res.text
 	assert "لینک را فقط از خود فروشنده" in res.text
+	assert "هشدارها و موارد امنیتی پلیس فتا" in res.text
+	assert 'id="open-security"' in res.text
+	assert 'id="security-dialog"' in res.text
 	assert "نرم افزار مدیریت کسب و کار حسابیکس" in res.text
 	assert "قبل از پرداخت، https و آدرس مرورگر" not in res.text
 	assert 'class="brand"' not in res.text
+
+
+def test_vanity_host_serves_username_without_u_prefix():
+	client = _public_pay_html_client()
+	with patch(
+		"adapters.api.v1.public_pay_pages.get_public_pay_page",
+		return_value=_enabled_page_payload(),
+	), patch(
+		"adapters.api.v1.public_pay_pages.resolve_payment_display_name",
+		return_value="حسابیکس",
+	), patch(
+		"adapters.api.v1.public_pay_pages.get_pay_page_public_base_url",
+		return_value="https://hesabix.ir",
+	):
+		res = client.get("/shop-ali", headers={"host": "hesabix.ir"}, follow_redirects=False)
+	assert res.status_code == 200
+	assert 'action="/shop-ali"' in res.text
+	assert "hesabix.ir/shop-ali" in res.text
+	assert 'action="/u/shop-ali"' not in res.text
+
+
+def test_username_without_u_is_404_on_non_vanity_host():
+	client = _public_pay_html_client()
+	with patch(
+		"adapters.api.v1.public_pay_pages.get_pay_page_public_base_url",
+		return_value="",
+	):
+		res = client.get("/shop-ali", follow_redirects=False)
+	assert res.status_code == 404
 
 
 def test_short_pay_page_unknown_username_is_html_404():
@@ -246,8 +281,11 @@ def test_gateway_return_redirects_to_backend_short_url():
 	tx.extra_info = '{"username": "ali", "receipt_token": "tok123"}'
 	db.query.return_value.filter.return_value.first.return_value = tx
 	with patch(
-		"app.services.public_pay_page_payment_service.resolve_public_app_base_url_for_public_links",
+		"app.services.public_pay_page_payment_service.resolve_pay_page_public_base_url",
 		return_value="https://app.example",
+	), patch(
+		"app.services.public_pay_page_payment_service.get_pay_page_public_base_url",
+		return_value="",
 	):
 		resp = maybe_redirect_public_pay_page_payment_return(
 			db,
@@ -259,6 +297,32 @@ def test_gateway_return_redirects_to_backend_short_url():
 	location = resp.headers["location"]
 	assert location == "https://app.example/u/ali/r/tok123"
 	assert "/public/pay/" not in location
+
+
+def test_gateway_return_redirects_to_vanity_url_without_u():
+	db = MagicMock()
+	tx = WalletTransaction(
+		business_id=1,
+		type="public_pay_link",
+		status="pending",
+		amount=100000,
+	)
+	tx.extra_info = '{"username": "ali", "receipt_token": "tok123"}'
+	db.query.return_value.filter.return_value.first.return_value = tx
+	with patch(
+		"app.services.public_pay_page_payment_service.resolve_pay_page_public_base_url",
+		return_value="https://hesabix.ir",
+	), patch(
+		"app.services.public_pay_page_payment_service.get_pay_page_public_base_url",
+		return_value="https://hesabix.ir",
+	):
+		resp = maybe_redirect_public_pay_page_payment_return(
+			db,
+			tx_id=9,
+			verify_data={"success": True, "external_ref": "R1"},
+		)
+	assert resp is not None
+	assert resp.headers["location"] == "https://hesabix.ir/ali/r/tok123"
 
 
 def test_public_business_contact_rows_skip_empty():
@@ -445,3 +509,184 @@ def test_resolve_payment_display_name_uses_rebrand_fa(monkeypatch, tmp_path):
 		rebrand_product_text("نرم افزار مدیریت کسب و کار حسابیکس", "فروشگاه آرک")
 		== "نرم افزار مدیریت کسب و کار فروشگاه آرک"
 	)
+
+
+def test_serialize_public_url_uses_pay_page_domain():
+	db = MagicMock()
+	row = MagicMock()
+	row.business_id = 7
+	row.username = "shop-ali"
+	row.is_enabled = True
+	row.display_title = "فروشگاه علی"
+	row.show_logo = True
+	row.intro_text = ""
+	row.gateway_id = 3
+	row.min_amount = 50000
+	row.max_amount = None
+	row.notify_inapp = True
+	row.notify_sms = False
+	row.match_customer_by_mobile = True
+	row.create_customer_if_missing = True
+	row.use_anonymous_if_no_mobile = True
+	business = MagicMock()
+	business.name = "فروشگاه علی"
+	business.logo_file_id = 11
+	with patch(
+		"app.services.business_pay_page_service.get_wallet_settings",
+		return_value={"wallet_base_currency_code": "IRR"},
+	), patch(
+		"app.services.business_pay_page_service.get_pay_page_public_base_url",
+		return_value="https://hesabix.ir",
+	), patch(
+		"app.services.business_pay_page_service.resolve_pay_page_public_base_url",
+		return_value="https://hesabix.ir",
+	):
+		data = _serialize(db, row, business)
+	assert data["public_path"] == "/shop-ali"
+	assert data["public_url"] == "https://hesabix.ir/shop-ali"
+
+
+def test_serialize_public_url_falls_back_when_base_empty():
+	db = MagicMock()
+	row = MagicMock()
+	row.business_id = 7
+	row.username = "shop-ali"
+	row.is_enabled = True
+	row.display_title = None
+	row.show_logo = False
+	row.intro_text = None
+	row.gateway_id = None
+	row.min_amount = 50000
+	row.max_amount = None
+	row.notify_inapp = True
+	row.notify_sms = False
+	row.match_customer_by_mobile = True
+	row.create_customer_if_missing = True
+	row.use_anonymous_if_no_mobile = True
+	business = MagicMock()
+	business.name = "فروشگاه علی"
+	business.logo_file_id = None
+	with patch(
+		"app.services.business_pay_page_service.get_wallet_settings",
+		return_value={},
+	), patch(
+		"app.services.business_pay_page_service.get_pay_page_public_base_url",
+		return_value="",
+	), patch(
+		"app.services.business_pay_page_service.resolve_pay_page_public_base_url",
+		return_value="",
+	):
+		data = _serialize(db, row, business)
+	assert data["public_path"] == "/u/shop-ali"
+	assert data["public_url"] == "/u/shop-ali"
+
+
+def test_public_pay_page_path_appends_request_token():
+	assert public_pay_page_path("shop-ali", vanity=False, token="tok123") == "/u/shop-ali/t/tok123"
+	assert public_pay_page_path("shop-ali", vanity=True, token="tok123") == "/shop-ali/t/tok123"
+
+
+def test_apply_pay_page_request_locks_amount_and_prefills():
+	req = MagicMock()
+	req.token = "tok123"
+	req.amount_locked = True
+	req.amount = 150000
+	req.payer_name = "علی"
+	req.payer_mobile = "09121234567"
+	req.payer_note = "بابت فاکتور"
+	out = apply_pay_page_request_to_public_payload({"is_enabled": True}, req)
+	assert out["request_token"] == "tok123"
+	assert out["amount_locked"] is True
+	assert out["request_amount"] == 150000
+	assert out["request_name"] == "علی"
+	assert out["request_mobile"] == "09121234567"
+	assert out["request_note"] == "بابت فاکتور"
+
+
+def test_token_html_page_locks_amount_and_posts_to_token_path():
+	client = _public_pay_html_client()
+	req = MagicMock()
+	req.token = "tok123"
+	req.amount_locked = True
+	req.amount = 150000
+	req.payer_name = "علی"
+	req.payer_mobile = None
+	req.payer_note = None
+	with patch(
+		"adapters.api.v1.public_pay_pages.get_public_pay_page",
+		return_value=_enabled_page_payload(),
+	), patch(
+		"adapters.api.v1.public_pay_pages.get_pay_page_request_for_public",
+		return_value=req,
+	), patch(
+		"adapters.api.v1.public_pay_pages.resolve_payment_display_name",
+		return_value="حسابیکس",
+	):
+		res = client.get("/u/shop-ali/t/tok123", follow_redirects=False)
+	assert res.status_code == 200
+	assert 'action="/u/shop-ali/t/tok123"' in res.text
+	assert 'name="request_token"' in res.text
+	assert 'value="tok123"' in res.text
+	assert "readonly" in res.text
+	assert "قابل تغییر نیست" in res.text
+	assert 'value="علی"' in res.text
+
+
+def test_token_form_post_forwards_request_token():
+	client = _public_pay_html_client()
+	req = MagicMock()
+	req.token = "tok123"
+	req.amount_locked = True
+	req.amount = 150000
+	req.payer_name = None
+	req.payer_mobile = None
+	req.payer_note = None
+	start = MagicMock(return_value={"payment_url": "https://bank.example/pay"})
+	with patch(
+		"adapters.api.v1.public_pay_pages.get_public_pay_page",
+		return_value=_enabled_page_payload(),
+	), patch(
+		"adapters.api.v1.public_pay_pages.get_pay_page_request_for_public",
+		return_value=req,
+	), patch(
+		"adapters.api.v1.public_pay_pages.start_public_pay_page_payment",
+		start,
+	), patch(
+		"adapters.api.v1.public_pay_pages.resolve_payment_display_name",
+		return_value="حسابیکس",
+	):
+		res = client.post(
+			"/u/shop-ali/t/tok123",
+			data={"amount": "1", "confirm_business": "1", "request_token": "tok123"},
+			follow_redirects=False,
+		)
+	assert res.status_code == 303
+	assert start.call_args.kwargs["request_token"] == "tok123"
+
+
+def test_former_username_token_redirect_keeps_token():
+	client = _public_pay_html_client()
+	with patch(
+		"adapters.api.v1.public_pay_pages.get_public_pay_page",
+		return_value=_enabled_page_payload(username="shop-ali", redirect_to="shop-ali"),
+	):
+		res = client.get("/u/old-shop/t/tok123", follow_redirects=False)
+	assert res.status_code == 302
+	assert res.headers["location"] == "/u/shop-ali/t/tok123"
+
+
+def test_pay_page_send_widget_only_when_feature_enabled():
+	from app.services.dashboard_widgets_service import get_widget_definitions
+
+	db = MagicMock()
+	db.query.return_value.filter.return_value.first.return_value = None
+	off = get_widget_definitions(db, 1, 1)
+	assert "pay_page_send_link" not in {i["key"] for i in off["items"]}
+
+	row = MagicMock()
+	row.is_enabled = True
+	row.username = "shop-ali"
+	row.gateway_id = 3
+	db.query.return_value.filter.return_value.first.return_value = row
+	on = get_widget_definitions(db, 1, 1)
+	assert "pay_page_send_link" in {i["key"] for i in on["items"]}

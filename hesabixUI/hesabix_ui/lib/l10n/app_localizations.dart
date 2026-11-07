@@ -23874,6 +23874,48 @@ abstract class AppLocalizations {
   /// **'Phishing and abuse reports from public payment pages'**
   String get settingsPayPageAbuseReportsDescription;
 
+  /// No description provided for @settingsPayPageDomain.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay-link domain'**
+  String get settingsPayPageDomain;
+
+  /// No description provided for @settingsPayPageDomainDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Domain shown on the public pay-link poster and QR code'**
+  String get settingsPayPageDomainDescription;
+
+  /// No description provided for @payPageDomainUrlLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay-link base URL'**
+  String get payPageDomainUrlLabel;
+
+  /// No description provided for @payPageDomainUrlHint.
+  ///
+  /// In en, this message translates to:
+  /// **'For example https://hesabix.ir — the public link becomes https://hesabix.ir/username (without /u/). Leave empty to keep the current /u/username links.'**
+  String get payPageDomainUrlHint;
+
+  /// No description provided for @payPageDomainUrlInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'URL must start with http:// or https://'**
+  String get payPageDomainUrlInvalid;
+
+  /// No description provided for @payPageDomainEffectiveUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Effective domain'**
+  String get payPageDomainEffectiveUrl;
+
+  /// No description provided for @payPageDomainSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay-link domain settings saved'**
+  String get payPageDomainSaved;
+
   /// No description provided for @payPageAbuseStatusNew.
   ///
   /// In en, this message translates to:
@@ -38039,6 +38081,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No accounting document was recorded for this deposit'**
   String get payPageNoAccountingDocument;
+
+  /// No description provided for @payPageMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay link'**
+  String get payPageMenu;
+
+  /// No description provided for @payPageSendLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Send pay link'**
+  String get payPageSendLink;
+
+  /// No description provided for @payPageSendLinkHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill in name, mobile and a note. If you enter an amount, the payer cannot change it.'**
+  String get payPageSendLinkHint;
+
+  /// No description provided for @payPageSendLinkAmountHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount (optional)'**
+  String get payPageSendLinkAmountHint;
+
+  /// No description provided for @payPageSendLinkAmountLockedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'If you enter an amount, it is locked on the link'**
+  String get payPageSendLinkAmountLockedHint;
+
+  /// No description provided for @payPageSendSms.
+  ///
+  /// In en, this message translates to:
+  /// **'Send SMS to customer'**
+  String get payPageSendSms;
+
+  /// No description provided for @payPageShareLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Share link'**
+  String get payPageShareLink;
+
+  /// No description provided for @payPageRequestCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay link is ready'**
+  String get payPageRequestCreated;
+
+  /// No description provided for @payPageSmsSent.
+  ///
+  /// In en, this message translates to:
+  /// **'SMS sent'**
+  String get payPageSmsSent;
+
+  /// No description provided for @payPageSmsNotSent.
+  ///
+  /// In en, this message translates to:
+  /// **'SMS was not sent'**
+  String get payPageSmsNotSent;
+
+  /// No description provided for @payPageMobileRequiredForSms.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a mobile number to send SMS'**
+  String get payPageMobileRequiredForSms;
+
+  /// No description provided for @payPageSendLinkDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable the pay link in settings and set a username and gateway first'**
+  String get payPageSendLinkDisabled;
+
+  /// No description provided for @payPageAmountLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'The amount was set by the seller and cannot be changed'**
+  String get payPageAmountLocked;
 
   /// No description provided for @businessSettingsTemplatesDescription.
   ///
