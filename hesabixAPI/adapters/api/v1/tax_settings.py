@@ -445,12 +445,6 @@ def save_tax_settings_endpoint(
             "فن‌آوا محیط آزمایشی ندارد؛ ابتدا روش ارسال مستقیم را انتخاب کنید.",
             http_status=400,
         )
-    if current_setting and current_setting.submission_provider == MOTAMED_ASA_PROVIDER and payload.sandbox_mode:
-        raise ApiError(
-            "MOTAMED_ASA_SANDBOX_UNAVAILABLE",
-            "ارسال از طریق معتمد آسا فقط در محیط اصلی سامانهٔ مؤدیان انجام می‌شود؛ ابتدا روش ارسال مستقیم را انتخاب کنید.",
-            http_status=400,
-        )
 
     setting = upsert_tax_setting(
         db,

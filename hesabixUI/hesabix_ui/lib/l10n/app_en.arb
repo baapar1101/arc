@@ -8556,7 +8556,7 @@
   "taxSubmissionMotamedAsa": "Send through Motamed ASA",
   "taxSubmissionMotamedAsaDescription": "Sign up on the Motamed ASA page; the trusted company signs and sends the invoices, so the business private key and memory ID are not needed here.",
   "motamedAsaUnavailable": "The Motamed ASA connection has not been set up by the system administrator yet.",
-  "motamedAsaSandboxUnavailable": "Motamed ASA sends to the production tax system only. Turn off sandbox mode to select it.",
+  "motamedAsaSandboxNote": "Sandbox mode is on: invoices go through Motamed ASA to the sandbox of the tax system and are not registered in the live tax system. The Sandbox fiscal memory ID of this business, issued in that sandbox, must be registered with Motamed ASA. Invoices registered in the live tax system are only inquired in this mode; correct, cancel or add payments to them after turning sandbox mode off.",
   "motamedAsaEconomicCodeRequired": "Enter the 11 or 14 digit economic code of the business first.",
   "motamedAsaConsentTitle": "Send invoices through Motamed ASA",
   "motamedAsaConsentDescription": "Motamed ASA is a trusted tax service provider. If you continue, the Motamed ASA sign-up page opens. There the business owner signs in with the one-time code of the tax system, accepts the Motamed ASA terms and allows the API key of this business to be handed to Hesabix.",

@@ -414,12 +414,6 @@ def start_motamed_asa_onboarding(
         raise ApiError("BUSINESS_NOT_FOUND", "کسب‌وکار پیدا نشد.", http_status=404)
     setting = db.query(TaxSetting).filter(TaxSetting.business_id == int(business_id)).first()
     setting = _ensure_economic_code(db, business_id, setting, economic_code, consented_by_user_id)
-    if setting.sandbox_mode:
-        raise ApiError(
-            "MOTAMED_ASA_SANDBOX_UNAVAILABLE",
-            "ارسال از طریق معتمد آسا فقط در محیط اصلی سامانهٔ مؤدیان انجام می‌شود؛ حالت آزمایشی را خاموش کنید.",
-            http_status=400,
-        )
 
     account = _get_account(db, business_id, lock=True)
     if account is None:
@@ -560,12 +554,6 @@ def save_motamed_asa_business_credentials(
         raise ApiError("BUSINESS_NOT_FOUND", "کسب‌وکار پیدا نشد.", http_status=404)
     setting = db.query(TaxSetting).filter(TaxSetting.business_id == int(business_id)).first()
     setting = _ensure_economic_code(db, business_id, setting, economic_code, consented_by_user_id)
-    if setting.sandbox_mode:
-        raise ApiError(
-            "MOTAMED_ASA_SANDBOX_UNAVAILABLE",
-            "ارسال از طریق معتمد آسا فقط در محیط اصلی سامانهٔ مؤدیان انجام می‌شود؛ حالت آزمایشی را خاموش کنید.",
-            http_status=400,
-        )
 
     client = MotamedAsaClient(credential.base_url)
     try:
