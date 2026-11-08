@@ -66,7 +66,8 @@ def ensure_person_snapshot_on_document_dict(db: Any, document_dict: Dict[str, An
     قبل از ارسال به مودیان، person_snapshot را از طرف‌حساب زنده می‌سازد/تازه‌سازی می‌کند.
 
     snapshot قدیمی (مثلاً کد ملی «0» بعد از پاک‌شدن در کارت شخص) نباید نوع فاکتور
-    یا فیلدهای خریدار را منحرف کند. اگر هویت کامل نباشد، builder عمداً نوع ۲ می‌سازد.
+    یا فیلدهای خریدار را منحرف کند. شخص حقوقی با شناسه ملی ۱۱ رقمی نوع ۱ می‌شود؛
+    اگر هویت کامل نباشد، builder عمداً نوع ۲ می‌سازد.
     """
     extra = dict(document_dict.get("extra_info") or {})
     person_id = extra.get("person_id")
@@ -89,13 +90,18 @@ def ensure_person_snapshot_on_document_dict(db: Any, document_dict: Dict[str, An
 
 
 def _resolve_buyer_tin(national_id: str, economic_code: str) -> str | None:
-    """شناسهٔ خریدار برای tinb: اولویت با کد اقتصادی معتبر، سپس کد/شناسه ملی."""
+    """
+    شناسهٔ خریدار برای tinb مطابق مودیان:
+    شخص حقوقی با شناسه ملی ۱۱ رقمی، وگرنه کد اقتصادی معتبر ۱۱ یا ۱۴ رقمی.
+    کد اقتصادی ۱۲ رقمی قدیم و کد ملی ۱۰ رقمی حقیقی tinb نیستند.
+    """
+    nid = _clean_digits(national_id)
+    nid_valid, nid_type = validate_national_id(nid) if nid else (False, None)
+    if nid_valid and nid_type == "legal":
+        return nid
     ec = _clean_digits(economic_code)
     if ec and validate_economic_code(ec):
         return ec
-    nid = _clean_digits(national_id)
-    if len(nid) in (10, 11) and nid.isdigit():
-        return nid
     return None
 
 
@@ -259,7 +265,7 @@ class InvoiceBuilder:
 
         buyer_national_id = (person_snapshot.get("national_id") or "").strip()
         buyer_economic_code = (person_snapshot.get("economic_code") or "").strip()
-        # کد اقتصادی نامعتبر را مثل نبودن در نظر بگیر
+        # کد اقتصادی نامعتبر (از جمله ۱۲ رقمی قدیم) را مثل نبودن در نظر بگیر
         if buyer_economic_code and not validate_economic_code(buyer_economic_code):
             buyer_economic_code = ""
 
@@ -267,12 +273,15 @@ class InvoiceBuilder:
         nid_valid, nid_type = validate_national_id(nid_clean) if nid_clean else (False, None)
         has_valid_economic = bool(buyer_economic_code and validate_economic_code(buyer_economic_code))
         postal_code = _clean_digits(person_snapshot.get("postal_code") or "")
+        tinb = _resolve_buyer_tin(buyer_national_id, buyer_economic_code)
 
-        # صورتحساب نوع ۱ فقط وقتی هویت خریدار برای مودیان قابل قبول است:
-        # - کد اقتصادی معتبر (tinb) داشته باشیم، یا
+        # صورتحساب نوع ۱ وقتی هویت خریدار برای مودیان قابل قبول است:
+        # - حقوقی با شناسه ملی ۱۱ رقمی (tinb)، یا کد اقتصادی معتبر ۱۱/۱۴ رقمی
         # - حقیقی با کد ملی معتبر + کد پستی (الزام رایج نوع ۱)
         # در غیر این صورت نوع ۲ (ساده/مصرف‌کننده) بدون اطلاعات خریدار.
         has_buyer_info = has_valid_economic or (
+            nid_valid and nid_type == "legal"
+        ) or (
             nid_valid and nid_type == "natural" and len(postal_code) >= 10
         )
 
@@ -302,14 +311,13 @@ class InvoiceBuilder:
         if inty == 1:
             if tob is not None:
                 header.tob = tob
-            if has_valid_economic:
-                header.tinb = buyer_economic_code
+            if tinb:
+                header.tinb = tinb
             if tob == 1 and nid_valid and nid_type == "natural":
                 header.bid = nid_clean
                 if postal_code:
                     header.bpc = postal_code
-            elif tob == 2 and nid_valid and nid_type == "legal" and not has_valid_economic:
-                header.bid = nid_clean
+            # حقوقی: شناسه در tinb است؛ bid مخصوص حقیقی است و نباید ۱۱ رقم حقوقی برود.
         # else: نوع ۲ — بدون فیلد خریدار
 
         resolved_irtaxid = irtaxid or (document.get("extra_info") or {}).get("reference_tax_id")
