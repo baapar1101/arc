@@ -28,21 +28,38 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
   String? _invoiceStatus;
   final TextEditingController _searchCtrl = TextEditingController();
 
-  static const _statusLabels = <String, String>{
-    'draft': adminTx(context, 'پیش‌نویس', 'Draft'),
-    'awaiting_payment': adminTx(context, 'در انتظار پرداخت', 'Awaiting payment'),
-    'paid': adminTx(context, 'پرداخت‌شده', 'Paid'),
-    'failed': adminTx(context, 'ناموفق', 'Failed'),
-    'expired': adminTx(context, 'منقضی', 'Expired'),
-    'void': adminTx(context, 'ابطال‌شده', 'Voided'),
-    'refunded': adminTx(context, 'بازگشت وجه', 'Refunded'),
+  static const _statusFa = <String, String>{
+    'draft': 'پیش‌نویس',
+    'awaiting_payment': 'در انتظار پرداخت',
+    'paid': 'پرداخت‌شده',
+    'failed': 'ناموفق',
+    'expired': 'منقضی',
+    'void': 'ابطال‌شده',
+    'refunded': 'بازگشت وجه',
   };
 
-  static const _invoiceTypes = <String, String>{
-    'purchase': adminTx(context, 'خرید', 'Purchase'),
-    'renewal': adminTx(context, 'تمدید', 'Renewal'),
-    'upgrade': adminTx(context, 'ارتقاء', 'Upgrade'),
-    'trial': adminTx(context, 'آزمایشی', 'Trial'),
+  static const _statusEn = <String, String>{
+    'draft': 'Draft',
+    'awaiting_payment': 'Awaiting payment',
+    'paid': 'Paid',
+    'failed': 'Failed',
+    'expired': 'Expired',
+    'void': 'Voided',
+    'refunded': 'Refunded',
+  };
+
+  static const _invoiceTypeFa = <String, String>{
+    'purchase': 'خرید',
+    'renewal': 'تمدید',
+    'upgrade': 'ارتقاء',
+    'trial': 'آزمایشی',
+  };
+
+  static const _invoiceTypeEn = <String, String>{
+    'purchase': 'Purchase',
+    'renewal': 'Renewal',
+    'upgrade': 'Upgrade',
+    'trial': 'Trial',
   };
 
   @override
@@ -133,7 +150,19 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
     }
   }
 
-  String _statusLabel(String? status) => _statusLabels[status] ?? (status ?? '—');
+  String _statusLabel(String? status) {
+    final fa = _statusFa[status];
+    final en = _statusEn[status];
+    if (fa == null || en == null) return status ?? '—';
+    return adminTx(context, fa, en);
+  }
+
+  String _invoiceTypeLabel(String? type) {
+    final fa = _invoiceTypeFa[type];
+    final en = _invoiceTypeEn[type];
+    if (fa == null || en == null) return type ?? '—';
+    return adminTx(context, fa, en);
+  }
 
   Future<void> _pickCustomRange() async {
     final now = DateTime.now();
@@ -165,7 +194,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
         money: _money,
         formatDate: _fmtDate,
         statusLabel: _statusLabel,
-        invoiceTypeLabel: (t) => _invoiceTypes[t] ?? (t ?? '—'),
+        invoiceTypeLabel: _invoiceTypeLabel,
       ),
     );
     if (result == 'voided' && mounted) {
@@ -659,9 +688,11 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                                 leading: const Icon(Icons.data_usage),
                                 title: Text(adminTx(context, 'سهمیه hybrid (${hybrid['billing_mode'] ?? '-'})', 'Hybrid quota (${hybrid['billing_mode'] ?? '-'})')),
                                 subtitle: Text(
-                                  adminTx(context, 'دوره ${hybrid['period_key'] ?? '-'} · میانگین مصرف ${hybrid['avg_tickets_created'] ?? 0}', 'Period ${hybrid['period_key'] ?? '-'} · avg usage ${hybrid['avg_tickets_created'] ?? 0}')
-                                  adminTx(context, '${hybrid['free_quota_per_month'] != null ? ' از ${hybrid['free_quota_per_month']}' : ''}', '${hybrid['free_quota_per_month'] != null ? ' of ${hybrid['free_quota_per_month']}' : ''}')
-                                  '${hybrid['quota_utilization_pct'] != null ? ' · ${hybrid['quota_utilization_pct']}%' : ''}',
+                                  adminTx(
+                                    context,
+                                    'دوره ${hybrid['period_key'] ?? '-'} · میانگین مصرف ${hybrid['avg_tickets_created'] ?? 0}${hybrid['free_quota_per_month'] != null ? ' از ' : ''}${hybrid['free_quota_per_month'] ?? ''}${hybrid['quota_utilization_pct'] != null ? ' · ' : ''}${hybrid['quota_utilization_pct'] ?? ''}${hybrid['quota_utilization_pct'] != null ? '%' : ''}',
+                                    'Period ${hybrid['period_key'] ?? '-'} · avg usage ${hybrid['avg_tickets_created'] ?? 0}${hybrid['free_quota_per_month'] != null ? ' of ' : ''}${hybrid['free_quota_per_month'] ?? ''}${hybrid['quota_utilization_pct'] != null ? ' · ' : ''}${hybrid['quota_utilization_pct'] ?? ''}${hybrid['quota_utilization_pct'] != null ? '%' : ''}',
+                                  ),
                                 ),
                                 onTap: () => _showBreakdownDialog(
                                   title: adminTx(context, 'جزئیات سهمیه hybrid', 'Hybrid quota details'),
@@ -789,8 +820,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                               ),
                               title: Text(inv['code']?.toString() ?? ''),
                               subtitle: Text(
-                                '$userLabel · ${inv['plan_name'] ?? '-'} · '
-                                adminTx(context, '${_money(inv['amount'])} ریال · ${_statusLabel(status)}', '${_money(inv['amount'])} IRR · ${_statusLabel(status)}'),
+                                '$userLabel · ${inv['plan_name'] ?? '-'} · ${adminTx(context, '${_money(inv['amount'])} ریال · ${_statusLabel(status)}', '${_money(inv['amount'])} IRR · ${_statusLabel(status)}')}',
                               ),
                               trailing: const Icon(Icons.chevron_left),
                             ),

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../core/auth_store.dart';
-import '../../services/procurement_api.dart';
+import '../../../core/auth_store.dart';
+import '../../../services/procurement_api.dart';
 
 class ProcurementPage extends StatefulWidget {
   final int businessId;
@@ -454,7 +454,10 @@ class _ProcurementPageState extends State<ProcurementPage> with SingleTickerProv
               for (final line in _maps(row['lines']))
                 ListTile(
                   title: Text('${line['description']}'),
-                  subtitle: Text(_t('مقدار ${line['qty']} — برآورد ${line['unit_price_estimate'] ?? 0}${line['product_id'] != null ? ' — کالا ${line['product_id']}' : ''}', 'Qty ${line['qty']} — estimate ${line['unit_price_estimate'] ?? 0}${line['product_id'] != null ? ' — product ${line['product_id']}' : ''}')),
+                  subtitle: Text(_t(
+                    'مقدار ${line['qty']} — برآورد ${line['unit_price_estimate'] ?? 0}${line['product_id'] != null ? ' — کالا ' : ''}${line['product_id'] ?? ''}',
+                    'Qty ${line['qty']} — estimate ${line['unit_price_estimate'] ?? 0}${line['product_id'] != null ? ' — product ' : ''}${line['product_id'] ?? ''}',
+                  )),
                 ),
             ],
           ),
@@ -471,7 +474,10 @@ class _ProcurementPageState extends State<ProcurementPage> with SingleTickerProv
         for (final row in rows)
           ExpansionTile(
             title: Text('${row['code']}'),
-            subtitle: Text(_t('شخص ${row['person_id']} — جمع ${row['total']}${row['cost_center_id'] == null ? '' : ' — مرکز ${row['cost_center_id']}'}${row['delivery_date'] == null ? '' : ' — تحویل ${row['delivery_date']}'}', 'Person ${row['person_id']} — total ${row['total']}${row['cost_center_id'] == null ? '' : ' — cost center ${row['cost_center_id']}'}${row['delivery_date'] == null ? '' : ' — delivery ${row['delivery_date']}'}')),
+            subtitle: Text(_t(
+              'شخص ${row['person_id']} — جمع ${row['total']}${row['cost_center_id'] == null ? '' : ' — مرکز '}${row['cost_center_id'] ?? ''}${row['delivery_date'] == null ? '' : ' — تحویل '}${row['delivery_date'] ?? ''}',
+              'Person ${row['person_id']} — total ${row['total']}${row['cost_center_id'] == null ? '' : ' — cost center '}${row['cost_center_id'] ?? ''}${row['delivery_date'] == null ? '' : ' — delivery '}${row['delivery_date'] ?? ''}',
+            )),
             trailing: Chip(label: Text('${row['status']}')),
             children: [
               if (_can('operate') && row['status'] == 'draft') ...[
@@ -528,8 +534,11 @@ class _ProcurementPageState extends State<ProcurementPage> with SingleTickerProv
                 ListTile(title: Text(_t('پیش‌پرداخت', 'Prepayment')), subtitle: Text(_t('سند ${payment['document_id']} — مبلغ ${payment['amount']}', 'Document ${payment['document_id']} — amount ${payment['amount']}'))),
               for (final line in _maps(row['lines']))
                 ListTile(
-                  title: Text('${line['description']}${line['product_id'] != null ? ' · ${line['product_id']}' : ''}'),
-                  subtitle: Text(_t('سفارش ${line['qty']}، قیمت ${line['unit_price']}، تخفیف ${line['discount'] ?? 0}، مالیات ${line['tax'] ?? 0}، پذیرفته ${line['accepted_qty']}، فاکتور ${line['invoiced_qty']}${line['requisition_line_id'] == null ? '' : '، قلم درخواست ${line['requisition_line_id']}'}', 'Ordered ${line['qty']}, price ${line['unit_price']}, discount ${line['discount'] ?? 0}, tax ${line['tax'] ?? 0}, accepted ${line['accepted_qty']}, invoiced ${line['invoiced_qty']}${line['requisition_line_id'] == null ? '' : ', requisition line ${line['requisition_line_id']}'})),
+                  title: Text('${line['description']}${line['product_id'] != null ? ' · ' : ''}${line['product_id'] ?? ''}'),
+                  subtitle: Text(_t(
+                    'سفارش ${line['qty']}، قیمت ${line['unit_price']}، تخفیف ${line['discount'] ?? 0}، مالیات ${line['tax'] ?? 0}، پذیرفته ${line['accepted_qty']}، فاکتور ${line['invoiced_qty']}${line['requisition_line_id'] == null ? '' : '، قلم درخواست '}${line['requisition_line_id'] ?? ''}',
+                    'Ordered ${line['qty']}, price ${line['unit_price']}, discount ${line['discount'] ?? 0}, tax ${line['tax'] ?? 0}, accepted ${line['accepted_qty']}, invoiced ${line['invoiced_qty']}${line['requisition_line_id'] == null ? '' : ', requisition line '}${line['requisition_line_id'] ?? ''}',
+                  )),
                   trailing: _can('operate') && (_lineReceivable(row, line) || _lineReturnable(row, line))
                       ? Wrap(
                           spacing: 4,
@@ -575,7 +584,10 @@ class _ProcurementPageState extends State<ProcurementPage> with SingleTickerProv
           for (final line in _maps(event['lines']))
             ListTile(
               title: Text('${line['description']}'),
-              subtitle: Text(_t('مقدار ${line['qty']}${line['product_id'] == null ? '' : ' — کالا ${line['product_id']}'}${line['warehouse_id'] == null ? '' : ' — انبار ${line['warehouse_id']}'}', 'Qty ${line['qty']}${line['product_id'] == null ? '' : ' — product ${line['product_id']}'}${line['warehouse_id'] == null ? '' : ' — warehouse ${line['warehouse_id']}'})),
+              subtitle: Text(_t(
+                'مقدار ${line['qty']}${line['product_id'] == null ? '' : ' — کالا '}${line['product_id'] ?? ''}${line['warehouse_id'] == null ? '' : ' — انبار '}${line['warehouse_id'] ?? ''}',
+                'Qty ${line['qty']}${line['product_id'] == null ? '' : ' — product '}${line['product_id'] ?? ''}${line['warehouse_id'] == null ? '' : ' — warehouse '}${line['warehouse_id'] ?? ''}',
+              )),
             ),
           if (_can('approve') && event['status'] != 'cancelled' && event['status'] != 'awarded') TextButton(onPressed: _technicalScore, child: Text(_t('امتیاز فنی', 'Technical score'))),
           if (event['event_type'] == 'tender' && _can('approve') && event['status'] != 'cancelled' && event['status'] != 'awarded') ...[
@@ -690,7 +702,10 @@ class _ProcurementPageState extends State<ProcurementPage> with SingleTickerProv
         for (final row in rows)
           ListTile(
             title: Text('${row['code']} ${row['title'] ?? ''}'),
-            subtitle: Text(_t('پایان ${row['end_date'] ?? '—'} — سقف ${row['ceiling_amount'] ?? '—'} — آزادشده ${row['released_amount'] ?? 0}${_maps(row['lines']).isEmpty || _asNum(_maps(row['lines']).first['discount_percent']) == 0 ? '' : ' — تخفیف ${_maps(row['lines']).first['discount_percent']}٪'}${_maps(row['lines']).isEmpty || _maps(row['lines']).first['warehouse_id'] == null ? '' : ' — انبار ${_maps(row['lines']).first['warehouse_id']}'}', 'Ends ${row['end_date'] ?? '—'} — ceiling ${row['ceiling_amount'] ?? '—'} — released ${row['released_amount'] ?? 0}${_maps(row['lines']).isEmpty || _asNum(_maps(row['lines']).first['discount_percent']) == 0 ? '' : ' — discount ${_maps(row['lines']).first['discount_percent']}%'}${_maps(row['lines']).isEmpty || _maps(row['lines']).first['warehouse_id'] == null ? '' : ' — warehouse ${_maps(row['lines']).first['warehouse_id']}'}')),
+            subtitle: Text(_t(
+              'پایان ${row['end_date'] ?? '—'} — سقف ${row['ceiling_amount'] ?? '—'} — آزادشده ${row['released_amount'] ?? 0}${_maps(row['lines']).isEmpty || _asNum(_maps(row['lines']).first['discount_percent']) == 0 ? '' : ' — تخفیف '}${_maps(row['lines']).isEmpty || _asNum(_maps(row['lines']).first['discount_percent']) == 0 ? '' : _maps(row['lines']).first['discount_percent']}${_maps(row['lines']).isEmpty || _asNum(_maps(row['lines']).first['discount_percent']) == 0 ? '' : '٪'}${_maps(row['lines']).isEmpty || _maps(row['lines']).first['warehouse_id'] == null ? '' : ' — انبار '}${_maps(row['lines']).isEmpty || _maps(row['lines']).first['warehouse_id'] == null ? '' : _maps(row['lines']).first['warehouse_id']}',
+              'Ends ${row['end_date'] ?? '—'} — ceiling ${row['ceiling_amount'] ?? '—'} — released ${row['released_amount'] ?? 0}${_maps(row['lines']).isEmpty || _asNum(_maps(row['lines']).first['discount_percent']) == 0 ? '' : ' — discount '}${_maps(row['lines']).isEmpty || _asNum(_maps(row['lines']).first['discount_percent']) == 0 ? '' : _maps(row['lines']).first['discount_percent']}${_maps(row['lines']).isEmpty || _asNum(_maps(row['lines']).first['discount_percent']) == 0 ? '' : '%'}${_maps(row['lines']).isEmpty || _maps(row['lines']).first['warehouse_id'] == null ? '' : ' — warehouse '}${_maps(row['lines']).isEmpty || _maps(row['lines']).first['warehouse_id'] == null ? '' : _maps(row['lines']).first['warehouse_id']}',
+            )),
             trailing: Wrap(spacing: 4, children: [
               Chip(label: Text('${row['status']}')),
               if (_can('manage') && row['status'] == 'draft')

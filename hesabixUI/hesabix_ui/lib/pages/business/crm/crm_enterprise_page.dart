@@ -293,7 +293,10 @@ class _CrmEnterprisePageState extends State<CrmEnterprisePage> {
       await _crm.setRecordAclEnabled(businessId: widget.businessId, enabled: value);
       if (!mounted) return;
       setState(() => _aclEnabled = value);
-      SnackBarHelper.showSuccess(context, value ? 'مجوز سطح رکورد فعال شد' : 'مجوز سطح رکورد خاموش شد');
+      SnackBarHelper.showSuccess(
+        context,
+        message: value ? 'مجوز سطح رکورد فعال شد' : 'مجوز سطح رکورد خاموش شد',
+      );
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));

@@ -216,7 +216,7 @@ class _BusinessActivityLogsAdminPageState
 
   String _categoryLabel(String? c) {
     if (c == null) return '';
-    const m = {
+    final m = {
       'accounting': adminTx(context, 'حسابداری', 'Accounting'),
       'warehouse': adminTx(context, 'انبار', 'Warehouse'),
       'product': adminTx(context, 'کالا', 'Product'),
@@ -241,7 +241,7 @@ class _BusinessActivityLogsAdminPageState
 
   String _actionLabel(String? a) {
     if (a == null) return '';
-    const m = {
+    final m = {
       'create': adminTx(context, 'ایجاد', 'Create'),
       'update': adminTx(context, 'ویرایش', 'Edit'),
       'delete': adminTx(context, 'حذف', 'Delete'),

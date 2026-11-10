@@ -68,9 +68,11 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
       final reactivated = res['plans_reactivated'] ?? 0;
       SnackBarHelper.show(
         context,
-        message:
-            adminTx(context, 'همگام‌سازی انجام شد. افزونه جدید: $createdP، به‌روزشده: $updatedP، ', 'Sync finished. New plugins: $createdP, updated: $updatedP, ')
-            adminTx(context, 'پلن جدید: $createdPlans، پلن فعال‌شده: $reactivated', 'new plans: $createdPlans, reactivated: $reactivated'),
+        message: adminTx(
+          context,
+          'همگام‌سازی انجام شد. افزونه جدید: $createdP، به‌روزشده: $updatedP، پلن جدید: $createdPlans، پلن فعال‌شده: $reactivated',
+          'Sync finished. New plugins: $createdP, updated: $updatedP, new plans: $createdPlans, reactivated: $reactivated',
+        ),
         backgroundColor: SemanticColorResolver.positive(context),
       );
       await _load();

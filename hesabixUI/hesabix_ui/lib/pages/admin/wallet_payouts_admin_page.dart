@@ -30,7 +30,7 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
   bool _loadingStats = true;
   final GlobalKey<RefreshIndicatorState> _refreshKey = GlobalKey<RefreshIndicatorState>();
 
-  static const List<Map<String, String>> _statusOptions = [
+  List<Map<String, String>> get _statusOptions => [
     {'value': 'requested', 'label': adminTx(context, 'در انتظار تایید', 'Awaiting approval'), 'icon': 'pending'},
     {'value': 'approved', 'label': adminTx(context, 'تایید شده', 'Approved'), 'icon': 'check_circle'},
     {'value': 'processing', 'label': adminTx(context, 'در حال پردازش', 'Processing'), 'icon': 'sync'},
