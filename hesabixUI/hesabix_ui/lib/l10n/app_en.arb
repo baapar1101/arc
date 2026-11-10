@@ -2593,6 +2593,20 @@
   "expiryColExpiry": "Expiry date",
   "expiryColRemainingDays": "Days remaining",
   "quickSalesExpiredInstanceBlocked": "This unit is expired and cannot be sold",
+  "quickSalesPinnedProductsTitle": "My pinned products",
+  "quickSalesRecentProductsTitle": "Recent products",
+  "quickSalesPinnedAndRecentTitle": "Pinned and recent products",
+  "quickSalesPinProduct": "Pin in my quick sales",
+  "quickSalesUnpinProduct": "Remove from my pinned products",
+  "quickSalesPinProductHint": "This product stays at the start of your quick-sales list, only for you",
+  "quickSalesPinnedLimitReached": "You can pin at most {max} products",
+  "@quickSalesPinnedLimitReached": {
+    "placeholders": {
+      "max": {"type": "int"}
+    }
+  },
+  "quickSalesProductPinned": "Product pinned for you",
+  "quickSalesProductUnpinned": "Product removed from your pinned list",
   "lotPickerTitlePrefix": "Lot and dates —",
   "lotPickerInboundHelp": "Dates live on the lot; a carton of 10 pieces shares the same manufacturing and expiry dates.",
   "lotPickerOutboundHelp": "Outbound picking uses nearest expiry (FEFO) by default. You can change the lot.",

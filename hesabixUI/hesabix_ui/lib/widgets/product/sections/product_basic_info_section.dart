@@ -17,6 +17,7 @@ import '../../../utils/snackbar_helper.dart';
 import '../../../utils/responsive_helper.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 import '../product_variant_inventory_section.dart';
+import '../../quick_sales/quick_sales_personal_pin_toggle.dart';
 
 
 class ProductBasicInfoSection extends StatefulWidget {
@@ -289,6 +290,14 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
           ),
           SizedBox(height: spacing),
           _buildUnitsSection(context),
+        ],
+        if (widget.productId != null) ...[
+          SizedBox(height: spacing),
+          QuickSalesPersonalPinToggle(
+            businessId: widget.businessId,
+            productId: widget.productId!,
+            authStore: widget.authStore,
+          ),
         ],
         
         if (widget.attributes.isNotEmpty) ...[

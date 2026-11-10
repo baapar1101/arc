@@ -221,6 +221,20 @@
   "expiryColExpiry": "تاریخ انقضا",
   "expiryColRemainingDays": "روز مانده",
   "quickSalesExpiredInstanceBlocked": "این واحد منقضی است و فروش آن مجاز نیست",
+  "quickSalesPinnedProductsTitle": "کالاهای ثابت من",
+  "quickSalesRecentProductsTitle": "محصولات اخیر",
+  "quickSalesPinnedAndRecentTitle": "کالاهای ثابت و اخیر",
+  "quickSalesPinProduct": "ثابت کردن در فروش سریع من",
+  "quickSalesUnpinProduct": "برداشتن از کالاهای ثابت من",
+  "quickSalesPinProductHint": "این کالا فقط برای شما همیشه اولِ فهرست فروش سریع می‌ماند",
+  "quickSalesPinnedLimitReached": "حداکثر {max} کالا را می‌توان ثابت کرد",
+  "@quickSalesPinnedLimitReached": {
+    "placeholders": {
+      "max": {"type": "int"}
+    }
+  },
+  "quickSalesProductPinned": "کالا برای شما ثابت شد",
+  "quickSalesProductUnpinned": "کالا از فهرست ثابت شما برداشته شد",
   "lotPickerTitlePrefix": "لات و تاریخ —",
   "lotPickerInboundHelp": "تاریخ روی لات است؛ اگر ۱ کارتن ۱۰ عددی وارد شود هر عدد همان تاریخ تولید و انقضا را دارد.",
   "lotPickerOutboundHelp": "خروج به‌صورت پیش‌فرض از نزدیک‌ترین انقضا (FEFO) است. می‌توانید لات را عوض کنید.",

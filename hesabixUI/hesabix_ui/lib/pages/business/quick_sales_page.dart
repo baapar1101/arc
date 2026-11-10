@@ -27,6 +27,7 @@ import '../../utils/number_formatters.dart';
 import '../../utils/product_search_overlay_policy.dart';
 import '../../utils/invoice_global_discount_calculator.dart';
 import '../../utils/quick_sales_customer_balance.dart';
+import '../../utils/quick_sales_pinned_products.dart';
 import '../../utils/quick_sales_stock_correction.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/business_api_service.dart';
@@ -39,6 +40,7 @@ import '../../widgets/invoice/customer_combobox_widget.dart';
 import '../../widgets/invoice/invoice_line_lot_picker_dialog.dart';
 import '../../widgets/quick_sales/quick_sales_parked_sales_bar.dart';
 import '../../widgets/quick_sales/quick_sales_payment_dock.dart';
+import '../../widgets/quick_sales/quick_sales_product_chip_strip.dart';
 import '../../widgets/quick_sales/quick_sales_stock_shortage_dialog.dart';
 import '../../widgets/quick_sales/quick_sales_change_resolution_dialog.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
@@ -205,6 +207,11 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   static const String _recentProductsKey = 'quick_sales_recent_products';
   static const int _maxRecentProducts = 10;
 
+  // کالاهای ثابت شخصی همین کاربر
+  List<Map<String, dynamic>> _pinnedProducts = [];
+  int _pinnedMaxCount = kQuickSalesMaxPinnedProducts;
+  int? _pinningProductId;
+
   // مشتری
   Customer? _selectedCustomer;
   num? _customerBalance;
@@ -344,6 +351,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     _documentDescriptionController.addListener(_onParkedSaleDescriptionChanged);
     _loadSettings();
     _loadRecentProducts();
+    _loadPinnedProducts();
     _barcodeFocus.addListener(_onBarcodeFocusChanged);
     _barcodeOverlayScrollController.addListener(_onBarcodeOverlayScroll);
     // فوکوس خودکار روی فیلد بارکد
@@ -497,6 +505,139 @@ class _QuickSalesPageState extends State<QuickSalesPage>
 
     // جمع‌آوری تمام IDهای زیردسته‌ها
     return getAllCategoryIds(node);
+  }
+
+  Future<void> _loadPinnedProducts() async {
+    try {
+      final data = await _quickSalesService.listPinnedProducts(
+        businessId: widget.businessId,
+      );
+      final items = (data['items'] as List? ?? const [])
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        _pinnedProducts = items;
+        _pinnedMaxCount =
+            (data['max_count'] as num?)?.toInt() ?? kQuickSalesMaxPinnedProducts;
+      });
+    } catch (_) {
+      // فهرست ثابت شخصی در دسترس نبود؛ فروش سریع بدون آن ادامه می‌یابد.
+    }
+  }
+
+  List<int> _currentPinnedIds() {
+    final fromItems = _pinnedProducts
+        .map(quickSalesProductIntId)
+        .whereType<int>()
+        .toList();
+    return normalizePinnedProductIds(fromItems, max: _pinnedMaxCount);
+  }
+
+  Future<void> _persistPinnedIds(List<int> ids) async {
+    final data = await _quickSalesService.updatePinnedProducts(
+      businessId: widget.businessId,
+      productIds: ids,
+    );
+    final items = (data['items'] as List? ?? const [])
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+    if (!mounted) return;
+    setState(() {
+      _pinnedProducts = items;
+      _pinnedMaxCount =
+          (data['max_count'] as num?)?.toInt() ?? _pinnedMaxCount;
+    });
+  }
+
+  Future<void> _pinQuickAccessProduct(Map<String, dynamic> product) async {
+    final productId = _productIntId(product);
+    if (productId == null || _pinningProductId != null) return;
+    final result = pinProductId(
+      _currentPinnedIds(),
+      productId,
+      max: _pinnedMaxCount,
+    );
+    if (result.atLimit) {
+      if (!mounted) return;
+      SnackBarHelper.show(
+        context,
+        message: AppLocalizations.of(context).quickSalesPinnedLimitReached(
+          _pinnedMaxCount,
+        ),
+        isError: true,
+      );
+      return;
+    }
+    if (!result.changed) return;
+    setState(() => _pinningProductId = productId);
+    try {
+      await _persistPinnedIds(result.ids);
+      if (!mounted) return;
+      SnackBarHelper.show(
+        context,
+        message: AppLocalizations.of(context).quickSalesProductPinned,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.show(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+        isError: true,
+      );
+    } finally {
+      if (mounted && _pinningProductId == productId) {
+        setState(() => _pinningProductId = null);
+      }
+    }
+  }
+
+  Future<void> _unpinQuickAccessProduct(Map<String, dynamic> product) async {
+    final productId = _productIntId(product);
+    if (productId == null || _pinningProductId != null) return;
+    setState(() => _pinningProductId = productId);
+    try {
+      await _persistPinnedIds(unpinProductId(_currentPinnedIds(), productId));
+      if (!mounted) return;
+      SnackBarHelper.show(
+        context,
+        message: AppLocalizations.of(context).quickSalesProductUnpinned,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.show(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+        isError: true,
+      );
+    } finally {
+      if (mounted && _pinningProductId == productId) {
+        setState(() => _pinningProductId = null);
+      }
+    }
+  }
+
+  String _quickAccessPriceText(Map<String, dynamic> product) {
+    return _formatNumber(
+      _toNum(product['base_sales_price'] ?? product['sales_price']),
+    );
+  }
+
+  Widget _buildQuickAccessStrip({required bool isCompact}) {
+    return QuickSalesProductChipStrip(
+      pinnedProducts: _pinnedProducts,
+      recentProducts: _recentProducts,
+      showRecents: _cartItems.isEmpty,
+      compact: isCompact,
+      loadingProductId: _recentProductLoadingId,
+      pinningProductId: _pinningProductId,
+      formatPrice: _quickAccessPriceText,
+      onAdd: _onRecentProductTap,
+      onPin: _pinQuickAccessProduct,
+      onUnpin: _unpinQuickAccessProduct,
+    );
   }
 
   Future<void> _loadRecentProducts() async {
@@ -5013,115 +5154,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
                         ],
                       ),
               ),
-              // تاریخچه محصولات اخیر
-              if (_recentProducts.isNotEmpty && _cartItems.isEmpty)
-                Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isCompact ? 12 : 16,
-                    vertical: 8,
-                  ),
-                  color: cs.surfaceContainerHighest,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.history,
-                            size: 18,
-                            color: cs.onSurface.withOpacity(0.7),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'محصولات اخیر',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: cs.onSurface.withOpacity(0.7),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        height: 60,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _recentProducts.length,
-                          itemBuilder: (context, index) {
-                            final product = _recentProducts[index];
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: InkWell(
-                                onTap: () => _onRecentProductTap(product),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 8,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: cs.surface,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color:
-                                          _recentProductLoadingId ==
-                                              _productIntId(product)
-                                          ? cs.primary
-                                          : cs.outline.withOpacity(0.3),
-                                    ),
-                                  ),
-                                  child:
-                                      _recentProductLoadingId ==
-                                          _productIntId(product)
-                                      ? SizedBox(
-                                          width: 80,
-                                          child: Center(
-                                            child: SizedBox(
-                                              width: 18,
-                                              height: 18,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                color: cs.primary,
-                                              ),
-                                            ),
-                                          ),
-                                        )
-                                      : Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              product['name']?.toString() ??
-                                                  'نامشخص',
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              '${_formatNumber(_toNum(product['base_sales_price'] ?? product['sales_price']))}',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                color: cs.primary,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              _buildQuickAccessStrip(isCompact: isCompact),
               // لیست سبد خرید
               Expanded(
                 child: _cartItems.isEmpty
@@ -5522,113 +5555,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             ],
           ),
         ),
-        if (_recentProducts.isNotEmpty && _cartItems.isEmpty)
-          Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: isCompact ? 12 : 16,
-              vertical: 8,
-            ),
-            color: cs.surfaceContainerHighest,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.history,
-                      size: 18,
-                      color: cs.onSurface.withOpacity(0.7),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'محصولات اخیر',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: cs.onSurface.withOpacity(0.7),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: 60,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _recentProducts.length,
-                    itemBuilder: (context, index) {
-                      final product = _recentProducts[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: InkWell(
-                          onTap: () => _onRecentProductTap(product),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: cs.surface,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color:
-                                    _recentProductLoadingId ==
-                                        _productIntId(product)
-                                    ? cs.primary
-                                    : cs.outline.withOpacity(0.3),
-                              ),
-                            ),
-                            child:
-                                _recentProductLoadingId ==
-                                    _productIntId(product)
-                                ? SizedBox(
-                                    width: 80,
-                                    child: Center(
-                                      child: SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: cs.primary,
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                : Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        product['name']?.toString() ?? 'نامشخص',
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        '${_formatNumber(_toNum(product['base_sales_price'] ?? product['sales_price']))}',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: cs.primary,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
+        _buildQuickAccessStrip(isCompact: isCompact),
         Expanded(
           child: _cartItems.isEmpty
               ? Center(

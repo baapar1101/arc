@@ -12774,6 +12774,60 @@ abstract class AppLocalizations {
   /// **'This unit is expired and cannot be sold'**
   String get quickSalesExpiredInstanceBlocked;
 
+  /// No description provided for @quickSalesPinnedProductsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'My pinned products'**
+  String get quickSalesPinnedProductsTitle;
+
+  /// No description provided for @quickSalesRecentProductsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent products'**
+  String get quickSalesRecentProductsTitle;
+
+  /// No description provided for @quickSalesPinnedAndRecentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned and recent products'**
+  String get quickSalesPinnedAndRecentTitle;
+
+  /// No description provided for @quickSalesPinProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin in my quick sales'**
+  String get quickSalesPinProduct;
+
+  /// No description provided for @quickSalesUnpinProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from my pinned products'**
+  String get quickSalesUnpinProduct;
+
+  /// No description provided for @quickSalesPinProductHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This product stays at the start of your quick-sales list, only for you'**
+  String get quickSalesPinProductHint;
+
+  /// No description provided for @quickSalesPinnedLimitReached.
+  ///
+  /// In en, this message translates to:
+  /// **'You can pin at most {max} products'**
+  String quickSalesPinnedLimitReached(int max);
+
+  /// No description provided for @quickSalesProductPinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Product pinned for you'**
+  String get quickSalesProductPinned;
+
+  /// No description provided for @quickSalesProductUnpinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Product removed from your pinned list'**
+  String get quickSalesProductUnpinned;
+
   /// No description provided for @lotPickerTitlePrefix.
   ///
   /// In en, this message translates to:

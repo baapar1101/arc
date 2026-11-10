@@ -39,10 +39,12 @@ from app.services.quick_sales_service import (
     get_quick_sales_settings,
     list_quick_sales_payment_default_shortcuts,
     list_quick_sales_payment_buttons,
+    list_quick_sales_pinned_products,
     reorder_quick_sales_payment_buttons,
     set_quick_sales_payment_default_shortcuts,
     set_quick_sales_payment_button_shortcut,
     set_quick_sales_payment_button_shortcuts,
+    set_quick_sales_pinned_products,
     update_quick_sales_payment_button,
     update_quick_sales_settings,
 )
@@ -314,6 +316,66 @@ def get_anonymous_customer_endpoint(
     except Exception as e:
         logger.error(f"Error in get_anonymous_customer_endpoint for business {business_id}: {type(e).__name__}: {str(e)}", exc_info=True)
         raise
+
+
+@router.get(
+    "/pinned-products",
+    summary="کالاهای ثابت شخصی فروش سریع",
+    description="فهرست مرتب کالاهایی که کاربر جاری برای خودش در فروش سریع ثابت کرده است.",
+)
+def list_pinned_products_endpoint(
+    request: Request,
+    business_id: int,
+    _: None = Depends(require_business_permission_dep("invoices", "add")),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+    from adapters.api.v1.products import _apply_pricing_visibility_for_user
+
+    data = list_quick_sales_pinned_products(
+        db,
+        business_id=business_id,
+        user_id=ctx.get_user_id(),
+    )
+    data["items"] = [
+        _apply_pricing_visibility_for_user(ctx, db, business_id, item)
+        for item in (data.get("items") or [])
+    ]
+    return success_response(data, request)
+
+
+@router.put(
+    "/pinned-products",
+    summary="ذخیره کالاهای ثابت شخصی فروش سریع",
+    description="جایگزینی کامل فهرست مرتب کالاهای ثابت کاربر جاری در این کسب‌وکار.",
+)
+def update_pinned_products_endpoint(
+    request: Request,
+    business_id: int,
+    payload: Dict[str, Any] = Body(...),
+    _: None = Depends(require_business_permission_dep("invoices", "add")),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+    from adapters.api.v1.products import _apply_pricing_visibility_for_user
+
+    if "product_ids" not in payload:
+        raise ApiError(
+            "INVALID_PINNED_PRODUCTS",
+            "فهرست کالاهای ثابت باید آرایه باشد",
+            http_status=400,
+        )
+    data = set_quick_sales_pinned_products(
+        db,
+        business_id=business_id,
+        user_id=ctx.get_user_id(),
+        product_ids=payload.get("product_ids"),
+    )
+    data["items"] = [
+        _apply_pricing_visibility_for_user(ctx, db, business_id, item)
+        for item in (data.get("items") or [])
+    ]
+    return success_response(data, request, message="QUICK_SALES_PINNED_PRODUCTS_UPDATED")
 
 
 @router.get("/payment-buttons", summary="دکمه‌های پرداخت فروش سریع", description="ابزار MCP: `list_quick_sales_payment_buttons`.")

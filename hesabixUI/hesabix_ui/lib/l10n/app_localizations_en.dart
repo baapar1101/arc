@@ -6823,6 +6823,37 @@ class AppLocalizationsEn extends AppLocalizations {
       'This unit is expired and cannot be sold';
 
   @override
+  String get quickSalesPinnedProductsTitle => 'My pinned products';
+
+  @override
+  String get quickSalesRecentProductsTitle => 'Recent products';
+
+  @override
+  String get quickSalesPinnedAndRecentTitle => 'Pinned and recent products';
+
+  @override
+  String get quickSalesPinProduct => 'Pin in my quick sales';
+
+  @override
+  String get quickSalesUnpinProduct => 'Remove from my pinned products';
+
+  @override
+  String get quickSalesPinProductHint =>
+      'This product stays at the start of your quick-sales list, only for you';
+
+  @override
+  String quickSalesPinnedLimitReached(int max) {
+    return 'You can pin at most $max products';
+  }
+
+  @override
+  String get quickSalesProductPinned => 'Product pinned for you';
+
+  @override
+  String get quickSalesProductUnpinned =>
+      'Product removed from your pinned list';
+
+  @override
   String get lotPickerTitlePrefix => 'Lot and dates —';
 
   @override

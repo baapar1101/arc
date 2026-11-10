@@ -6783,6 +6783,36 @@ class AppLocalizationsFa extends AppLocalizations {
       'این واحد منقضی است و فروش آن مجاز نیست';
 
   @override
+  String get quickSalesPinnedProductsTitle => 'کالاهای ثابت من';
+
+  @override
+  String get quickSalesRecentProductsTitle => 'محصولات اخیر';
+
+  @override
+  String get quickSalesPinnedAndRecentTitle => 'کالاهای ثابت و اخیر';
+
+  @override
+  String get quickSalesPinProduct => 'ثابت کردن در فروش سریع من';
+
+  @override
+  String get quickSalesUnpinProduct => 'برداشتن از کالاهای ثابت من';
+
+  @override
+  String get quickSalesPinProductHint =>
+      'این کالا فقط برای شما همیشه اولِ فهرست فروش سریع می‌ماند';
+
+  @override
+  String quickSalesPinnedLimitReached(int max) {
+    return 'حداکثر $max کالا را می‌توان ثابت کرد';
+  }
+
+  @override
+  String get quickSalesProductPinned => 'کالا برای شما ثابت شد';
+
+  @override
+  String get quickSalesProductUnpinned => 'کالا از فهرست ثابت شما برداشته شد';
+
+  @override
   String get lotPickerTitlePrefix => 'لات و تاریخ —';
 
   @override
