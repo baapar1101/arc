@@ -22,7 +22,7 @@ router = APIRouter(prefix="/admin/currencies", tags=["مدیریت ارزها"])
 
 
 def _require_system(ctx: AuthContext) -> None:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 
 

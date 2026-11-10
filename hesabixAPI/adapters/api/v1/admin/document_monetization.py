@@ -31,7 +31,7 @@ router = APIRouter(prefix="/admin/document-monetization", tags=["admin-document-
 
 
 def _require_admin(ctx: AuthContext) -> None:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "دسترسی به این بخش ندارید", http_status=403)
 
 

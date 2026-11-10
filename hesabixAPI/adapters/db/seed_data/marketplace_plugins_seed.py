@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 from adapters.db.models.currency import Currency
@@ -299,7 +300,27 @@ _DEFAULT_PLUGINS: Tuple[_PluginSeed, ...] = (
 		trial_allowed=True,
 		plans=(("monthly", 300_000), ("yearly", 3_000_000), ("lifetime", 10_000_000)),
 	),
+	_PluginSeed(
+		code="procurement",
+		name="مدیریت خرید و تدارکات",
+		description="درخواست خرید، استعلام و مناقصه، سفارش، رسید و کنترل کیفیت، تطبیق سه‌جانبه، بودجه تعهدی، قرارداد و امتیاز تأمین‌کننده.",
+		category="operations",
+		icon_url=None,
+		trial_days=14,
+		trial_allowed=True,
+		plans=(("monthly", 320_000), ("yearly", 3_200_000)),
+	),
 )
+
+
+def _existing_columns(db: Session, table: str) -> Optional[set[str]]:
+	getter = getattr(db, "get_bind", None)
+	if getter is None:
+		return None
+	try:
+		return {col["name"] for col in inspect(getter()).get_columns(table)}
+	except Exception:
+		return None
 
 
 def _resolve_currency_id(db: Session) -> Optional[int]:
@@ -333,38 +354,77 @@ def ensure_default_marketplace_plugins(db: Session) -> Dict[str, Any]:
 	reactivated_plans = 0
 	codes: List[str] = []
 
+	plugin_columns = _existing_columns(db, "marketplace_plugins")
 	for spec in _DEFAULT_PLUGINS:
 		codes.append(spec.code)
-		row = db.query(MarketplacePlugin).filter(MarketplacePlugin.code == spec.code).first()
-		if row:
-			updated_plugins += 1
-			row.name = spec.name
-			row.description = spec.description
-			row.category = spec.category
-			row.icon_url = spec.icon_url
-			row.trial_days = spec.trial_days
-			row.trial_allowed = spec.trial_allowed
-			row.is_active = True
-			row.updated_at = now
-			# listed_in_marketplace و enabled_for_all_businesses تنظیمات ادمین هستند و بازنویسی نمی‌شوند.
+		if plugin_columns is None:
+			row = db.query(MarketplacePlugin).filter(MarketplacePlugin.code == spec.code).first()
+			if row:
+				updated_plugins += 1
+				row.name = spec.name
+				row.description = spec.description
+				row.category = spec.category
+				row.icon_url = spec.icon_url
+				row.trial_days = spec.trial_days
+				row.trial_allowed = spec.trial_allowed
+				row.is_active = True
+				row.updated_at = now
+			else:
+				created_plugins += 1
+				row = MarketplacePlugin(
+					code=spec.code,
+					name=spec.name,
+					description=spec.description,
+					category=spec.category,
+					icon_url=spec.icon_url,
+					is_active=True,
+					listed_in_marketplace=True,
+					enabled_for_all_businesses=False,
+					trial_days=spec.trial_days,
+					trial_allowed=spec.trial_allowed,
+				)
+				db.add(row)
+				db.flush()
+			plugin_id = int(row.id)
 		else:
-			created_plugins += 1
-			row = MarketplacePlugin(
-				code=spec.code,
-				name=spec.name,
-				description=spec.description,
-				category=spec.category,
-				icon_url=spec.icon_url,
-				is_active=True,
-				listed_in_marketplace=True,
-				enabled_for_all_businesses=False,
-				trial_days=spec.trial_days,
-				trial_allowed=spec.trial_allowed,
-			)
-			db.add(row)
-			db.flush()
-
-		plugin_id = int(row.id)
+			found = db.execute(text("SELECT id FROM marketplace_plugins WHERE code = :code"), {"code": spec.code}).first()
+			if found:
+				updated_plugins += 1
+				values = {
+					"name": spec.name,
+					"description": spec.description,
+					"category": spec.category,
+					"icon_url": spec.icon_url,
+					"trial_days": spec.trial_days,
+					"trial_allowed": spec.trial_allowed,
+					"is_active": True,
+					"updated_at": now,
+				}
+				present = {key: value for key, value in values.items() if key in plugin_columns}
+				assignments = ", ".join(f"{key} = :{key}" for key in present)
+				db.execute(text(f"UPDATE marketplace_plugins SET {assignments} WHERE id = :id"), {**present, "id": int(found[0])})
+				plugin_id = int(found[0])
+			else:
+				created_plugins += 1
+				values = {
+					"code": spec.code,
+					"name": spec.name,
+					"description": spec.description,
+					"category": spec.category,
+					"icon_url": spec.icon_url,
+					"is_active": True,
+					"listed_in_marketplace": True,
+					"enabled_for_all_businesses": False,
+					"trial_days": spec.trial_days,
+					"trial_allowed": spec.trial_allowed,
+					"created_at": now,
+					"updated_at": now,
+				}
+				present = {key: value for key, value in values.items() if key in plugin_columns}
+				columns = ", ".join(present)
+				params = ", ".join(f":{key}" for key in present)
+				inserted = db.execute(text(f"INSERT INTO marketplace_plugins ({columns}) VALUES ({params}) RETURNING id"), present).first()
+				plugin_id = int(inserted[0])
 		for period, default_price in spec.plans:
 			plan = (
 				db.query(MarketplacePluginPlan)
@@ -392,12 +452,20 @@ def ensure_default_marketplace_plugins(db: Session) -> Dict[str, Any]:
 			created_plans += 1
 
 	grandfather_result: Dict[str, Any] = {}
-	try:
-		from app.services.moadian_grandfather_service import grant_moadian_grandfather_licenses
+	if plugin_columns is not None and "listed_in_marketplace" not in plugin_columns:
+		grandfather_result = {"ok": False, "skipped": "schema"}
+	else:
+		nested = db.begin_nested() if hasattr(db, "begin_nested") else None
+		try:
+			from app.services.moadian_grandfather_service import grant_moadian_grandfather_licenses
 
-		grandfather_result = grant_moadian_grandfather_licenses(db)
-	except Exception as exc:  # noqa: BLE001
-		grandfather_result = {"ok": False, "error": str(exc)}
+			grandfather_result = grant_moadian_grandfather_licenses(db)
+			if nested is not None:
+				nested.commit()
+		except Exception as exc:  # noqa: BLE001
+			if nested is not None:
+				nested.rollback()
+			grandfather_result = {"ok": False, "error": str(exc)}
 
 	return {
 		"ok": True,

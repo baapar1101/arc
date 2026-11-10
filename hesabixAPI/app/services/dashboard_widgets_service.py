@@ -1519,17 +1519,16 @@ def _resolve_crm_calendar(
     start_dt = datetime.combine(start_d, time.min)
     end_dt_excl = datetime.combine(end_d + timedelta(days=1), time.min)
 
-    activities = (
-        db.query(CrmActivity)
-        .filter(
+    from app.services.crm_enterprise_service import restrict_activity_query
+
+    activities = restrict_activity_query(
+        db.query(CrmActivity).filter(
             CrmActivity.business_id == business_id,
             CrmActivity.activity_date >= start_dt,
             CrmActivity.activity_date < end_dt_excl,
-        )
-        .order_by(CrmActivity.activity_date.asc())
-        .limit(500)
-        .all()
-    )
+        ),
+        db, business_id, ctx, CrmActivity,
+    ).order_by(CrmActivity.activity_date.asc()).limit(500).all()
     events: List[Dict[str, Any]] = []
     for a in activities:
         ad = a.activity_date

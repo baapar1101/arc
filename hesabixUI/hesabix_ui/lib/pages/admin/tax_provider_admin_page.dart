@@ -5,6 +5,7 @@ import '../../l10n/app_localizations.dart';
 import '../../services/tax_provider_admin_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'admin_compact_scaffold.dart';
 
 class TaxProviderAdminPage extends StatefulWidget {
   const TaxProviderAdminPage({super.key});
@@ -168,8 +169,9 @@ class _TaxProviderAdminPageState extends State<TaxProviderAdminPage> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final cs = Theme.of(context).colorScheme;
-    return Scaffold(
-      appBar: AppBar(title: Text(t.taxProviderAdminTitle)),
+    return AdminCompactScaffold(
+      title: t.taxProviderAdminTitle,
+      subtitle: adminTx(context, 'ارائه‌دهندهٔ ارسال صورتحساب مالیاتی', 'Tax invoice provider'),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _loadError != null

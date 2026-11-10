@@ -67,6 +67,9 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
   List<Map<String, dynamic>> _archiveFolders = [];
   List<Map<String, dynamic>> _signPaths = [];
   List<Map<String, dynamic>> _versions = [];
+  List<Map<String, dynamic>> _commercialLinks = [];
+  List<Map<String, dynamic>> _providers = [];
+  List<Map<String, dynamic>> _providerRequests = [];
   Map<String, dynamic> _settings = const {};
   int? _secretariatId;
   int? _externalOrgId;
@@ -105,6 +108,11 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
       widget.authStore.hasBusinessPermission('office_automation', 'admin');
   bool get _canSecretariat =>
       _canAdmin || widget.authStore.hasBusinessPermission('office_automation', 'secretariat');
+  bool get _ownsCurrentSign {
+    if (_positionId == null) return false;
+    final steps = List<Map>.from(_letter['sign_steps'] as List? ?? const []);
+    return steps.any((step) => oaId(step['position_id']) == _positionId && step['status'] == 'current');
+  }
 
   @override
   void initState() {
@@ -166,6 +174,55 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
         _letterhead = head;
         _background = bg;
       });
+    }
+  }
+
+  Future<void> _linkCommercial() async {
+    if (widget.letterId == null || _positionId == null) return;
+    final t = AppLocalizations.of(context);
+    var kind = 'document';
+    final target = TextEditingController();
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(t.oaAddCommercialLink),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: kind,
+                decoration: InputDecoration(labelText: t.oaCommercialLinks),
+                items: [
+                  DropdownMenuItem(value: 'document', child: Text(t.oaLinkDocument)),
+                  DropdownMenuItem(value: 'deal', child: Text(t.oaLinkDeal)),
+                ],
+                onChanged: (value) => setLocal(() => kind = value ?? 'document'),
+              ),
+              TextField(controller: target, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: t.oaCommercialTargetId)),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.oaAddCommercialLink)),
+          ],
+        ),
+      ),
+    );
+    final raw = int.tryParse(target.text.trim());
+    target.dispose();
+    if (accepted != true || raw == null || raw < 1) return;
+    try {
+      await _svc.linkCommercial(
+        businessId: widget.businessId,
+        letterId: widget.letterId!,
+        positionId: _positionId!,
+        targetKind: kind,
+        targetId: raw,
+      );
+      await _load();
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     }
   }
 
@@ -247,10 +304,21 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
         _receiptNumber.text = (_letter['receipt_number'] ?? '').toString();
         _receiptDate = HesabixDateUtils.parseApiDate(_letter['receipt_date'], rawValue: _letter['receipt_date_raw']);
         if (widget.letterId != null) {
+          _commercialLinks = await _svc.listCommercialLinks(
+            businessId: widget.businessId,
+            letterId: widget.letterId!,
+            positionId: _positionId!,
+          );
           _versions = await _svc.listLetterVersions(
             businessId: widget.businessId,
             letterId: widget.letterId!,
             positionId: _positionId,
+          );
+          _providers = await _svc.listSignatureProviders(businessId: widget.businessId);
+          _providerRequests = await _svc.listQualifiedRequests(
+            businessId: widget.businessId,
+            letterId: widget.letterId!,
+            positionId: _positionId!,
           );
         }
       }
@@ -368,6 +436,37 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
         await _load();
         if (mounted) SnackBarHelper.showSuccess(context, message: AppLocalizations.of(context).oaRegister);
       }
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
+
+  IconData _timelineIcon(String kind) {
+    switch (kind) {
+      case 'referral':
+        return Icons.forward_outlined;
+      case 'paraph':
+        return Icons.draw_outlined;
+      default:
+        return Icons.history;
+    }
+  }
+
+  Future<void> _reply() async {
+    if (_positionId == null || widget.letterId == null) return;
+    try {
+      final created = await _svc.replyToLetter(
+        businessId: widget.businessId,
+        letterId: widget.letterId!,
+        positionId: _positionId!,
+      );
+      if (!mounted) return;
+      final letterId = oaId(created['id']);
+      if (letterId == null) return;
+      context.go(
+        context.businessPanelUrl(widget.businessId, 'office-automation/letters/$letterId'),
+        extra: {'positionId': _positionId},
+      );
     } catch (e) {
       if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     }
@@ -654,6 +753,7 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
           'body': _body.text,
           'body_format': _bodyFormat,
           'format_id': _formatId,
+          if (widget.letterId != null) 'source_letter_id': widget.letterId,
         },
       );
       _templates = await _svc.listTemplates(businessId: widget.businessId);
@@ -1009,8 +1109,244 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
     );
   }
 
+  Future<void> _requestProviderSignature() async {
+    if (_positionId == null || widget.letterId == null || _providers.isEmpty) return;
+    final t = AppLocalizations.of(context);
+    var providerId = oaId(_providers.first['id']);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(t.oaRequestProviderSignature),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(t.oaProviderSignatureNote),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<int?>(
+                initialValue: providerId,
+                items: [
+                  for (final provider in _providers)
+                    DropdownMenuItem(
+                      value: oaId(provider['id']),
+                      child: Text('${provider['name'] ?? ''}'),
+                    ),
+                ],
+                onChanged: (value) => setLocal(() => providerId = value),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.oaRequestProviderSignature)),
+          ],
+        ),
+      ),
+    );
+    final chosenProvider = providerId;
+    if (ok != true || chosenProvider == null || !mounted) return;
+    try {
+      await _svc.requestQualifiedSignature(
+        businessId: widget.businessId,
+        letterId: widget.letterId!,
+        positionId: _positionId!,
+        providerId: chosenProvider,
+      );
+      await _load();
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
+
+  Future<void> _recordProviderResult(int requestId) async {
+    final t = AppLocalizations.of(context);
+    final reference = TextEditingController();
+    var outcome = 'completed';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(t.oaRecordProviderResult),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(t.oaProviderSignatureNote),
+              const SizedBox(height: 12),
+              TextField(controller: reference, decoration: InputDecoration(labelText: t.oaProviderExternalRef)),
+              DropdownButtonFormField<String>(
+                initialValue: outcome,
+                items: [
+                  DropdownMenuItem(value: 'completed', child: Text(t.oaProviderCompleted)),
+                  DropdownMenuItem(value: 'rejected', child: Text(t.oaProviderRejected)),
+                ],
+                onChanged: (value) => setLocal(() => outcome = value ?? 'completed'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.save)),
+          ],
+        ),
+      ),
+    );
+    final externalRef = reference.text.trim();
+    reference.dispose();
+    if (ok != true || externalRef.length < 4) return;
+    try {
+      await _svc.recordQualifiedResult(
+        businessId: widget.businessId,
+        requestId: requestId,
+        externalRef: externalRef,
+        outcome: outcome,
+      );
+      await _load();
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
+
+  Future<void> _exchangeLetter() async {
+    if (_positionId == null || widget.letterId == null) return;
+    final t = AppLocalizations.of(context);
+    final business = TextEditingController();
+    final position = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.oaExchangeLetter),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(t.oaExchangeNormalOnly),
+            const SizedBox(height: 12),
+            TextField(controller: business, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: t.oaTargetBusinessId)),
+            TextField(controller: position, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: t.oaTargetPositionId)),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.oaExchangeLetter)),
+        ],
+      ),
+    );
+    final targetBusinessId = int.tryParse(business.text.trim());
+    final targetPositionId = int.tryParse(position.text.trim());
+    business.dispose();
+    position.dispose();
+    if (ok != true || targetBusinessId == null || targetPositionId == null) return;
+    try {
+      await _svc.exchangeLetter(
+        businessId: widget.businessId,
+        letterId: widget.letterId!,
+        positionId: _positionId!,
+        targetBusinessId: targetBusinessId,
+        targetPositionId: targetPositionId,
+      );
+      await _load();
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
+
+  Future<void> _rejectSign() async {
+    if (_positionId == null || widget.letterId == null) return;
+    final t = AppLocalizations.of(context);
+    final note = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.oaRejectSign),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(t.oaRejectSignNote),
+            const SizedBox(height: 12),
+            TextField(controller: note, decoration: InputDecoration(labelText: t.oaInstruction)),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.oaRejectSign)),
+        ],
+      ),
+    );
+    final text = note.text.trim();
+    note.dispose();
+    if (ok != true || !mounted) return;
+    try {
+      await _svc.rejectSign(
+        businessId: widget.businessId,
+        letterId: widget.letterId!,
+        positionId: _positionId!,
+        note: text,
+      );
+      await _load();
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
+
+  Future<void> _unarchive() async {
+    if (_positionId == null || widget.letterId == null) return;
+    try {
+      await _svc.unarchiveLetter(
+        businessId: widget.businessId,
+        letterId: widget.letterId!,
+        positionId: _positionId!,
+      );
+      await _load();
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
+
+  Future<void> _cancelReferral(int referralId) async {
+    if (_positionId == null) return;
+    final t = AppLocalizations.of(context);
+    final note = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.oaCancelReferral),
+        content: TextField(controller: note, decoration: InputDecoration(labelText: t.oaInstruction)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.oaCancelReferral)),
+        ],
+      ),
+    );
+    final text = note.text.trim();
+    note.dispose();
+    if (ok != true) return;
+    try {
+      await _svc.cancelReferral(
+        businessId: widget.businessId,
+        referralId: referralId,
+        positionId: _positionId!,
+        note: text,
+      );
+      await _load();
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
+
   Future<void> _sign() async {
     if (_positionId == null || widget.letterId == null) return;
+    final t = AppLocalizations.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.oaSign),
+        content: Text(t.oaImageSignatureNote),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.oaSign)),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
     try {
       await _svc.signLetter(businessId: widget.businessId, letterId: widget.letterId!, positionId: _positionId!);
       await _load();
@@ -1074,13 +1410,20 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) => AlertDialog(
           title: Text(t.oaSignPath),
-          content: DropdownButtonFormField<int?>(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(t.oaImageSignatureNote),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<int?>(
             initialValue: templateId,
             items: [
               for (final p in _signPaths)
                 DropdownMenuItem(value: oaId(p['id']), child: Text('${p['name']}')),
             ],
             onChanged: (v) => setLocal(() => templateId = v),
+              ),
+            ],
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
@@ -1256,8 +1599,10 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
         FilledButton.icon(onPressed: _saveDraft, icon: const Icon(Icons.save_outlined), label: Text(t.oaSaveDraft)),
       if (_isDraft && _canCompose)
         FilledButton.icon(onPressed: _register, icon: const Icon(Icons.verified_outlined), label: Text(t.oaRegister)),
-      if (_isDraft && _canAdmin)
+      if (_isDraft && _canAdmin && _confidentiality == 'normal')
         OutlinedButton.icon(onPressed: _saveAsTemplate, icon: const Icon(Icons.bookmark_add_outlined), label: Text(t.oaSaveAsTemplate)),
+      if (!_isDraft && !_isArchived && _canCompose)
+        FilledButton.tonalIcon(onPressed: _reply, icon: const Icon(Icons.reply_outlined), label: Text(t.oaLinkReply)),
       if (!_isDraft && !_isArchived && _canRefer)
         FilledButton.icon(onPressed: _refer, icon: const Icon(Icons.forward_outlined), label: Text(t.oaRefer)),
       if (!_isDraft && !_isArchived && _canRefer)
@@ -1274,17 +1619,25 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
         OutlinedButton.icon(onPressed: _linkRelated, icon: const Icon(Icons.link), label: Text(t.oaLink)),
       if (!_isDraft && !_isArchived && _canRefer)
         FilledButton.tonalIcon(onPressed: _sign, icon: const Icon(Icons.draw), label: Text(t.oaSign)),
+      if (!_isDraft && !_isArchived && _canRefer && _ownsCurrentSign)
+        OutlinedButton.icon(onPressed: _rejectSign, icon: const Icon(Icons.draw_outlined), label: Text(t.oaRejectSign)),
       if (!_isDraft && !_isArchived && _canRefer)
         OutlinedButton.icon(onPressed: _dispatch, icon: const Icon(Icons.campaign_outlined), label: Text(t.oaDispatch)),
       if (!_isDraft && _canAdmin)
         OutlinedButton.icon(onPressed: _startSignPath, icon: const Icon(Icons.account_tree_outlined), label: Text(t.oaSignPath)),
-      if (!_isDraft && _canSecretariat)
+      if (!_isDraft && _canRefer && _providers.isNotEmpty)
+        OutlinedButton.icon(onPressed: _requestProviderSignature, icon: const Icon(Icons.draw_outlined), label: Text(t.oaRequestProviderSignature)),
+      if (!_isDraft && _canSecretariat && _confidentiality == 'normal')
+        OutlinedButton.icon(onPressed: _exchangeLetter, icon: const Icon(Icons.swap_horiz), label: Text(t.oaExchangeLetter)),
+      if (!_isDraft && _confidentiality != 'normal')
+        Text(t.oaClassifiedStaysInside, style: Theme.of(context).textTheme.bodySmall),
+      if (!_isDraft && _canSecretariat && _confidentiality == 'normal')
         OutlinedButton.icon(onPressed: _exportEce, icon: const Icon(Icons.outbox_outlined), label: Text(t.oaExportEce)),
-      if (!_isDraft && _canSecretariat)
+      if (!_isDraft && _canSecretariat && _confidentiality == 'normal')
         OutlinedButton.icon(onPressed: _sendEce, icon: const Icon(Icons.outgoing_mail), label: Text(t.oaSendEce)),
-      if (!_isDraft && _canRefer)
+      if (!_isDraft && _canRefer && _confidentiality == 'normal')
         OutlinedButton.icon(onPressed: _sendEmail, icon: const Icon(Icons.email_outlined), label: Text(t.oaSendEmail)),
-      if (!_isDraft && _canRefer)
+      if (!_isDraft && _canRefer && _confidentiality == 'normal')
         OutlinedButton.icon(onPressed: _aiSummary, icon: const Icon(Icons.auto_awesome), label: Text(t.oaAiSummary)),
       if (!_isDraft && _canCompose)
         OutlinedButton.icon(onPressed: _runOcr, icon: const Icon(Icons.document_scanner_outlined), label: Text(t.oaOcr)),
@@ -1313,6 +1666,8 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
           icon: const Icon(Icons.inventory_2_outlined),
           label: Text(t.oaArchive),
         ),
+      if (_isArchived && _canArchive)
+        OutlinedButton.icon(onPressed: _unarchive, icon: const Icon(Icons.unarchive_outlined), label: Text(t.oaUnarchive)),
       if (_isDraft && widget.letterId != null && _canCompose)
         TextButton.icon(
           onPressed: () async {
@@ -1366,14 +1721,18 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
         if ((_letter['tracking_token'] ?? '').toString().isNotEmpty) const SizedBox(height: 12),
         OaSectionCard(
           title: t.oaSignPath,
-          child: List<Map>.from(_letter['sign_steps'] as List? ?? const []).isEmpty
-              ? Text(t.oaEmptyFolder)
-              : Column(
-                  children: [
-                    for (final s in List<Map>.from(_letter['sign_steps'] as List? ?? const []))
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(t.oaImageSignatureNote, style: Theme.of(context).textTheme.bodySmall),
+              const SizedBox(height: 8),
+              if (List<Map>.from(_letter['sign_steps'] as List? ?? const []).isEmpty)
+                Text(t.oaEmptyFolder)
+              else
+                for (final s in List<Map>.from(_letter['sign_steps'] as List? ?? const []))
                       ListTile(
                         contentPadding: EdgeInsets.zero,
-                        leading: Icon(s['status'] == 'signed' ? Icons.verified : Icons.pending_outlined),
+                        leading: Icon(s['status'] == 'signed' ? Icons.draw : Icons.pending_outlined),
                         title: Text('${s['position_title'] ?? s['position_id']}'),
                         subtitle: Text(
                           [oaSignStatusLabel(t, '${s['status'] ?? ''}'), s['note'] ?? '']
@@ -1381,8 +1740,40 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
                               .join(' · '),
                         ),
                       ),
-                  ],
-                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        OaSectionCard(
+          title: t.oaRequestProviderSignature,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(t.oaProviderSignatureNote, style: Theme.of(context).textTheme.bodySmall),
+              const SizedBox(height: 8),
+              if (_providerRequests.isEmpty)
+                Text(t.oaNoProviderRequests)
+              else
+                for (final request in _providerRequests)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('${request['provider_name'] ?? ''}'),
+                    subtitle: Text(
+                      [
+                        '${request['status'] ?? ''}',
+                        request['live'] == true ? t.oaProviderLive : t.oaProviderManual,
+                        request['external_ref'] ?? '',
+                      ].where((item) => item.toString().trim().isNotEmpty).join(' · '),
+                    ),
+                    trailing: _canAdmin && request['status'] == 'awaiting_provider' && request['live'] != true && oaId(request['id']) != null
+                        ? TextButton(
+                            onPressed: () => _recordProviderResult(oaId(request['id'])!),
+                            child: Text(t.oaRecordProviderResult),
+                          )
+                        : null,
+                  ),
+            ],
+          ),
         ),
         const SizedBox(height: 12),
         OaSectionCard(
@@ -1513,6 +1904,12 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
                         ),
                         title: Text('${r['from_position_title'] ?? ''} → ${r['to_position_title'] ?? ''}'),
                         subtitle: Text('${r['kind']} · ${r['status']} ${r['instruction'] ?? ''}'),
+                        trailing: _canRefer &&
+                                oaId(r['from_position_id']) == _positionId &&
+                                (r['status'] == 'pending' || r['status'] == 'seen') &&
+                                oaId(r['id']) != null
+                            ? TextButton(onPressed: () => _cancelReferral(oaId(r['id'])!), child: Text(t.oaCancelReferral))
+                            : null,
                       ),
                   ],
                 ),
@@ -1542,6 +1939,33 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
                   ],
                 ),
         ),
+        if (widget.letterId != null) ...[
+          const SizedBox(height: 12),
+          OaSectionCard(
+            title: t.oaCommercialLinks,
+            child: Column(
+              children: [
+                if (_commercialLinks.isEmpty) Text(t.oaNoCommercialLinks),
+                for (final link in _commercialLinks)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(link['target_kind'] == 'deal' ? Icons.handshake_outlined : Icons.receipt_long_outlined),
+                    title: Text('${link['label'] ?? link['target_id']}'),
+                    subtitle: Text(link['target_kind'] == 'deal' ? t.oaLinkDeal : t.oaLinkDocument),
+                  ),
+                if (_canCompose && _positionId != null)
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: TextButton.icon(
+                      onPressed: _linkCommercial,
+                      icon: const Icon(Icons.add_link),
+                      label: Text(t.oaAddCommercialLink),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
         if (timeline.isNotEmpty) ...[
           const SizedBox(height: 12),
           OaSectionCard(
@@ -1552,8 +1976,9 @@ class _OaLetterPageState extends State<OaLetterPage> with SingleTickerProviderSt
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     dense: true,
-                    leading: const Icon(Icons.history, size: 18),
-                    title: Text('${a['action']}'),
+                    leading: Icon(_timelineIcon('${a['kind']}'), size: 18),
+                    title: Text('${a['summary'] ?? a['action']}', maxLines: 2, overflow: TextOverflow.ellipsis),
+                    subtitle: Text('${a['action'] ?? ''}'),
                   ),
               ],
             ),

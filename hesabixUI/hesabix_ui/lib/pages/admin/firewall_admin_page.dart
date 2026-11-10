@@ -3,6 +3,7 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/admin_firewall_service.dart';
+import 'admin_compact_scaffold.dart';
 
 /// مدیریت فایروال داخلی، لاگ مسدودشده‌ها و گزارش.
 class FirewallAdminPage extends StatefulWidget {
@@ -31,20 +32,21 @@ class _FirewallAdminPageState extends State<FirewallAdminPage> with SingleTicker
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(t.settingsFirewall),
-        bottom: TabBar(
-          controller: _tabs,
-          isScrollable: true,
-          tabs: [
-            Tab(text: t.firewallTabRules),
-            Tab(text: t.firewallTabRatePolicies),
-            Tab(text: t.firewallTabBlockLogs),
-            Tab(text: t.firewallTabAudit),
-            Tab(text: t.firewallTabReports),
-          ],
-        ),
+    return AdminCompactScaffold(
+      title: t.settingsFirewall,
+      subtitle: adminTx(context, 'قواعد، محدودیت نرخ و گزارش مسدودسازی', 'Rules, rate limits, and block reports'),
+      bottom: TabBar(
+        controller: _tabs,
+        isScrollable: true,
+        labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        unselectedLabelStyle: const TextStyle(fontSize: 12),
+        tabs: [
+          Tab(text: t.firewallTabRules),
+          Tab(text: t.firewallTabRatePolicies),
+          Tab(text: t.firewallTabBlockLogs),
+          Tab(text: t.firewallTabAudit),
+          Tab(text: t.firewallTabReports),
+        ],
       ),
       body: TabBarView(
         controller: _tabs,

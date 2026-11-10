@@ -178,6 +178,7 @@ def _notify(
         }
         if deep_link:
             context["deep_link"] = deep_link
+            context["action_url"] = deep_link
         return NotificationService(db).send(
             user_id=int(user_id),
             event_key=event_key,
@@ -317,7 +318,75 @@ def enroll_in_sequence(
     return enrollment
 
 
-def _execute_sequence_step(db: Session, enrollment: CrmSequenceEnrollment, step: CrmSequenceStep) -> None:
+def cancel_sequence_enrollments(
+    db: Session,
+    business_id: int,
+    *,
+    entity_type: str,
+    entity_id: int,
+    reason: str,
+    when: str,
+) -> int:
+    """توقف ثبت‌نام فعال. when برابر reply یا close است و به پرچم توالی نگاه می‌کند."""
+    rows = (
+        db.query(CrmSequenceEnrollment)
+        .filter(
+            CrmSequenceEnrollment.business_id == business_id,
+            CrmSequenceEnrollment.entity_type == entity_type,
+            CrmSequenceEnrollment.entity_id == entity_id,
+            CrmSequenceEnrollment.status == "active",
+        )
+        .all()
+    )
+    now = datetime.utcnow()
+    stopped = 0
+    for row in rows:
+        sequence = row.sequence or db.get(CrmSequence, row.sequence_id)
+        if when == "reply" and sequence is not None and not sequence.stop_on_reply:
+            continue
+        if when == "close" and sequence is not None and not sequence.stop_on_close:
+            continue
+        row.status = "cancelled"
+        row.completed_at = now
+        row.next_run_at = None
+        row.last_error = reason[:1000]
+        stopped += 1
+    return stopped
+
+
+def stop_sequences_for_customer_reply(
+    db: Session,
+    business_id: int,
+    *,
+    lead_id: int | None = None,
+    person_id: int | None = None,
+) -> int:
+    stopped = 0
+    if lead_id:
+        stopped += cancel_sequence_enrollments(
+            db, business_id, entity_type="lead", entity_id=int(lead_id), reason="customer_reply", when="reply"
+        )
+    if person_id:
+        lead_ids = [
+            row[0]
+            for row in db.query(Lead.id).filter(Lead.business_id == business_id, Lead.person_id == person_id).all()
+        ]
+        deal_ids = [
+            row[0]
+            for row in db.query(Deal.id).filter(Deal.business_id == business_id, Deal.person_id == person_id).all()
+        ]
+        for item_id in lead_ids:
+            stopped += cancel_sequence_enrollments(
+                db, business_id, entity_type="lead", entity_id=int(item_id), reason="customer_reply", when="reply"
+            )
+        for item_id in deal_ids:
+            stopped += cancel_sequence_enrollments(
+                db, business_id, entity_type="deal", entity_id=int(item_id), reason="customer_reply", when="reply"
+            )
+    return stopped
+
+
+def _execute_sequence_step(db: Session, enrollment: CrmSequenceEnrollment, step: CrmSequenceStep) -> str | None:
     """اجرای یک گام از توالی."""
     from app.services.document_numbering_service import generate_document_code
 
@@ -369,20 +438,50 @@ def _execute_sequence_step(db: Session, enrollment: CrmSequenceEnrollment, step:
         db.add(task)
 
     elif action == "send_sms":
+        from app.services.crm_sequence_runtime import render_sequence_sms, sms_send_allowed
+
+        sequence = enrollment.sequence or db.get(CrmSequence, enrollment.sequence_id)
+        cap = int(sequence.sms_daily_cap) if sequence is not None and sequence.sms_daily_cap else None
+        today_key = f"seq_sms:{enrollment.sequence_id}:{date.today().isoformat()}:"
+        sent_today = (
+            db.query(CrmReminderDedup)
+            .filter(
+                CrmReminderDedup.business_id == business_id,
+                CrmReminderDedup.reminder_key.like(f"{today_key}%"),
+            )
+            .count()
+        )
+        if not sms_send_allowed(sent_today, cap):
+            return "deferred"
+        mark_key = f"{today_key}{enrollment.id}:{step.id}"
+        if _already_sent(db, business_id, enrollment.entity_type, enrollment.entity_id, mark_key):
+            return None
         mobile = None
+        values = {"code": enrollment.entity_id}
         if lead:
             mobile = lead.mobile
+            values.update({"name": lead.name, "company": lead.company_name, "mobile": lead.mobile, "code": lead.code})
         elif deal:
             person = db.get(Person, deal.person_id) if deal.person_id else None
             mobile = person.mobile if person else None
-        text = config.get("message") or config.get("text") or ""
-        _send_customer_sms(db, mobile, text)
+            values.update(
+                {
+                    "name": person.alias_name if person else deal.title,
+                    "title": deal.title,
+                    "mobile": mobile,
+                    "code": deal.code,
+                }
+            )
+        text = render_sequence_sms(config.get("message") or config.get("text") or "", values)
+        if _send_customer_sms(db, mobile, text):
+            _mark_sent(db, business_id, enrollment.entity_type, enrollment.entity_id, mark_key)
 
     elif action == "notify_assignee":
         assigned = (lead.assigned_to_user_id if lead else deal.assigned_to_user_id)
         target = _resolve_target_user_id(db, business_id, assigned)
         title = config.get("title") or "یادآوری توالی CRM"
         message = config.get("message") or "گام توالی خودکار برای پیگیری فرا رسید."
+        section = "leads" if enrollment.entity_type == "lead" else "deals"
         _notify(
             db,
             user_id=target,
@@ -392,6 +491,7 @@ def _execute_sequence_step(db: Session, enrollment: CrmSequenceEnrollment, step:
             business_id=business_id,
             entity_type=enrollment.entity_type,
             entity_id=enrollment.entity_id,
+            deep_link=f"/business/{business_id}/crm/{section}/{enrollment.entity_id}",
         )
 
     elif action == "update_lead_stage" and lead:
@@ -405,8 +505,19 @@ def _execute_sequence_step(db: Session, enrollment: CrmSequenceEnrollment, step:
                 )
                 .first()
             )
-            if stage:
+            if stage and stage.id != lead.stage_id:
+                old_stage_id = lead.stage_id
                 lead.stage_id = stage.id
+                from app.services.workflow.workflow_trigger_service import trigger_lead_stage_changed
+
+                trigger_lead_stage_changed(
+                    db,
+                    business_id,
+                    lead_id=lead.id,
+                    old_stage_id=old_stage_id,
+                    new_stage_id=stage.id,
+                    user_id=None,
+                )
 
     elif action == "update_deal_stage" and deal:
         stage_id = config.get("stage_id")
@@ -419,9 +530,33 @@ def _execute_sequence_step(db: Session, enrollment: CrmSequenceEnrollment, step:
                 )
                 .first()
             )
-            if stage:
+            if stage and stage.id != deal.stage_id:
+                if stage.is_win or stage.is_lost:
+                    from app.services import crm_close_reason_service
+
+                    reason_type = "won" if stage.is_win else "lost"
+                    reason_code = config.get("won_reason_code") if stage.is_win else config.get("lost_reason_code")
+                    if not reason_code or not crm_close_reason_service.is_valid_reason_code(
+                        db, business_id, reason_type, str(reason_code)
+                    ):
+                        raise ValueError("sequence stage move to win/loss requires a valid reason code")
+                    if stage.is_win:
+                        deal.won_reason_code = str(reason_code)
+                    else:
+                        deal.lost_reason_code = str(reason_code)
+                old_stage_id = deal.stage_id
                 deal.stage_id = stage.id
                 deal.stage_entered_at = now
+                from app.services.workflow.workflow_trigger_service import trigger_deal_stage_changed
+
+                trigger_deal_stage_changed(
+                    db,
+                    business_id,
+                    deal_id=deal.id,
+                    old_stage_id=old_stage_id,
+                    new_stage_id=stage.id,
+                    user_id=None,
+                )
 
 
 def tick_sequences(db: Session) -> Dict[str, int]:
@@ -454,7 +589,20 @@ def tick_sequences(db: Session) -> Dict[str, int]:
                 enr.completed_at = now
                 stats["completed"] += 1
                 continue
-            _execute_sequence_step(db, enr, next_step)
+            sequence = enr.sequence or db.get(CrmSequence, enr.sequence_id)
+            if enr.entity_type == "deal" and sequence is not None and sequence.stop_on_close:
+                deal = db.get(Deal, enr.entity_id)
+                if deal is not None and deal.closed_at is not None:
+                    enr.status = "cancelled"
+                    enr.completed_at = now
+                    enr.next_run_at = None
+                    enr.last_error = "deal_closed"
+                    continue
+            outcome = _execute_sequence_step(db, enr, next_step)
+            if outcome == "deferred":
+                enr.next_run_at = now + timedelta(hours=1)
+                enr.last_error = "sms_daily_cap"
+                continue
             enr.current_step_order = next_step.step_order
             enr.last_error = None
             stats["processed"] += 1
@@ -534,6 +682,7 @@ def process_follow_up_reminders(db: Session) -> Dict[str, int]:
             business_id=lead.business_id,
             entity_type="lead",
             entity_id=lead.id,
+            deep_link=f"/business/{lead.business_id}/crm/leads/{lead.id}",
         )
         _mark_sent(db, lead.business_id, "lead", lead.id, key)
         if ok:
@@ -566,6 +715,7 @@ def process_follow_up_reminders(db: Session) -> Dict[str, int]:
             business_id=deal.business_id,
             entity_type="deal",
             entity_id=deal.id,
+            deep_link=f"/business/{deal.business_id}/crm/deals/{deal.id}",
         )
         _mark_sent(db, deal.business_id, "deal", deal.id, key)
         if ok:
@@ -600,6 +750,13 @@ def process_follow_up_reminders(db: Session) -> Dict[str, int]:
             business_id=task.business_id,
             entity_type="activity",
             entity_id=task.id,
+            deep_link=(
+                f"/business/{task.business_id}/crm/deals/{task.deal_id}"
+                if task.deal_id
+                else f"/business/{task.business_id}/crm/leads/{task.lead_id}"
+                if task.lead_id
+                else f"/business/{task.business_id}/crm/tasks"
+            ),
         )
         _mark_sent(db, task.business_id, "activity", task.id, key)
         if ok:
@@ -633,6 +790,7 @@ def process_follow_up_reminders(db: Session) -> Dict[str, int]:
             business_id=lead.business_id,
             entity_type="lead",
             entity_id=lead.id,
+            deep_link=f"/business/{lead.business_id}/crm/leads/{lead.id}",
         )
         _mark_sent(db, lead.business_id, "lead", lead.id, key)
         if ok:
@@ -646,57 +804,56 @@ def process_follow_up_reminders(db: Session) -> Dict[str, int]:
 
 
 def flag_stale_deals(db: Session) -> Dict[str, int]:
-    """اعلان برای فرصت‌های بازی که مدت طولانی در یک مرحله راکد مانده‌اند."""
+    """اعلان فرصت‌های راکد، جدا برای هر کسب‌وکاری که اعلان پیگیری را روشن کرده است."""
     now = datetime.utcnow()
     stats = {"stale": 0}
-    # کش تنظیمات هر کسب‌وکار برای اجتناب از کوئری تکراری
-    settings_by_biz: Dict[int, BusinessCrmSettings] = {}
-
-    deals = (
-        db.query(Deal)
-        .filter(Deal.closed_at.is_(None))
-        .limit(1000)
+    settings_rows = (
+        db.query(BusinessCrmSettings)
+        .filter(BusinessCrmSettings.follow_up_notify_enabled.is_(True))
         .all()
     )
-    for deal in deals:
-        try:
-            settings = settings_by_biz.get(deal.business_id)
-            if settings is None:
-                settings = _get_settings(db, deal.business_id)
-                settings_by_biz[deal.business_id] = settings
-            if not settings.follow_up_notify_enabled:
-                continue
-            stale_days = int(settings.stale_deal_days or 0)
-            if stale_days <= 0:
-                continue
-            reference = deal.stage_entered_at or deal.updated_at or deal.created_at
-            if not reference:
-                continue
-            if (now - reference).days < stale_days:
-                continue
-            # کلید dedup بر اساس مرحله فعلی تا در هر مرحله فقط یک‌بار اعلان شود
-            key = f"deal_stale:{deal.stage_id}"
-            if _already_sent(db, deal.business_id, "deal", deal.id, key):
-                continue
-            target = _resolve_target_user_id(db, deal.business_id, deal.assigned_to_user_id)
-            ok = _notify(
-                db,
-                user_id=target,
-                event_key="crm.deal_stale",
-                title="فرصت فروش راکد",
-                message=f"فرصت فروش «{deal.title}» بیش از {stale_days} روز در یک مرحله باقی مانده است.",
-                business_id=deal.business_id,
-                entity_type="deal",
-                entity_id=deal.id,
-            )
-            _mark_sent(db, deal.business_id, "deal", deal.id, key)
-            if ok:
-                stats["stale"] += 1
-        except Exception:
-            logger.exception("flag_stale_deals deal=%s failed", deal.id)
+    for settings in settings_rows:
+        stale_days = int(settings.stale_deal_days or 0)
+        if stale_days <= 0:
+            continue
+        deals = (
+            db.query(Deal)
+            .filter(Deal.business_id == settings.business_id, Deal.closed_at.is_(None))
+            .order_by(Deal.updated_at.asc())
+            .limit(200)
+            .all()
+        )
+        for deal in deals:
+            try:
+                reference = deal.stage_entered_at or deal.updated_at or deal.created_at
+                if not reference:
+                    continue
+                if (now - reference).days < stale_days:
+                    continue
+                key = f"deal_stale:{deal.stage_id}"
+                if _already_sent(db, deal.business_id, "deal", deal.id, key):
+                    continue
+                target = _resolve_target_user_id(db, deal.business_id, deal.assigned_to_user_id)
+                ok = _notify(
+                    db,
+                    user_id=target,
+                    event_key="crm.deal_stale",
+                    title="فرصت فروش راکد",
+                    message=f"فرصت فروش «{deal.title}» بیش از {stale_days} روز در یک مرحله باقی مانده است.",
+                    business_id=deal.business_id,
+                    entity_type="deal",
+                    entity_id=deal.id,
+                    deep_link=f"/business/{deal.business_id}/crm/deals/{deal.id}",
+                )
+                _mark_sent(db, deal.business_id, "deal", deal.id, key)
+                if ok:
+                    stats["stale"] += 1
+            except Exception:
+                logger.exception("flag_stale_deals deal=%s failed", deal.id)
 
     try:
         db.commit()
     except Exception:
+        logger.exception("flag_stale_deals commit failed")
         db.rollback()
     return stats

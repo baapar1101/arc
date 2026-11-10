@@ -48,14 +48,21 @@ def list_wallets_admin(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
+	from adapters.db.models.business import Business
 	q = db.query(WalletAccount).order_by(WalletAccount.id.desc())
 	items = q.offset(skip).limit(limit).all()
+	business_ids = [it.business_id for it in items if it.business_id is not None]
+	names = {}
+	if business_ids:
+		for business in db.query(Business).filter(Business.id.in_(business_ids)).all():
+			names[business.id] = business.name
 	data = [
 		{
 			"id": it.id,
 			"business_id": it.business_id,
+			"business_name": names.get(it.business_id),
 			"available_balance": float(it.available_balance or 0),
 			"pending_balance": float(it.pending_balance or 0),
 			"status": it.status,
@@ -76,13 +83,34 @@ def create_refund_admin(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
-		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
+	if not ctx.is_superadmin():
+		raise ApiError("FORBIDDEN", "فقط superadmin می‌تواند استرداد مدیریتی ثبت کند.", http_status=403)
+	confirmation = str(payload.get("confirmation") or "").strip()
+	if confirmation not in ("استرداد", "REFUND"):
+		raise ApiError("CONFIRMATION_REQUIRED", "برای استرداد عبارت 'استرداد' یا 'REFUND' را وارد کنید.", http_status=400)
 	tx_id = int(payload.get("transaction_id") or 0)
+	if tx_id <= 0:
+		raise ApiError("TX_NOT_REFUNDABLE", "شناسه تراکنش نامعتبر است", http_status=400)
+	from adapters.db.models.wallet import WalletTransaction
+	source = db.query(WalletTransaction).filter(WalletTransaction.id == tx_id).first()
+	if source is None or int(source.business_id) != int(business_id):
+		raise ApiError("TX_NOT_REFUNDABLE", "تراکنش متعلق به این کسب‌وکار نیست", http_status=400)
 	amount = payload.get("amount")
 	reason = payload.get("reason")
 	from decimal import Decimal
 	data = refund_transaction(db, tx_id, amount=Decimal(str(amount)) if amount is not None else None, reason=reason)
+	db.commit()
+	from app.services.admin_audit_service import client_ip_from_request, record_admin_action
+	record_admin_action(
+		db,
+		actor_user_id=ctx.get_user_id(),
+		action="wallet.refund",
+		summary=f"استرداد تراکنش {tx_id} کسب‌وکار {business_id}",
+		target_type="wallet_transaction",
+		target_id=str(tx_id),
+		metadata={"business_id": business_id, "amount": amount},
+		client_ip=client_ip_from_request(request),
+	)
 	return success_response(data, request, message="REFUND_CREATED")
 
 
@@ -95,7 +123,7 @@ def get_wallet_payouts_stats_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	data = get_wallet_payouts_stats_admin(db)
 	return success_response(data, request)
@@ -111,7 +139,7 @@ def list_wallet_payouts_admin_table_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	
 	# Extract pagination params
@@ -176,7 +204,7 @@ def get_wallet_payout_admin_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	data = get_wallet_payout_admin(db, payout_id)
 	return success_response(data, request)
@@ -192,7 +220,7 @@ def approve_payout_admin(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	data = approve_payout_request(db, payout_id, ctx.get_user_id())
 	return success_response(data, request, message="PAYOUT_APPROVED")
@@ -209,7 +237,7 @@ def settle_payout_admin(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	track_code = str(payload.get("bank_tracking_code") or "").strip()
 	if not track_code:

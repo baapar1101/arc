@@ -6,6 +6,7 @@ import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
+import 'admin_compact_scaffold.dart';
 
 /// صفحه مدیریت صف بررسی قالب‌های نوتیفیکیشن
 class NotificationModerationQueuePage extends StatefulWidget {
@@ -82,7 +83,7 @@ class _NotificationModerationQueuePageState
       } else {
         if (mounted) {
           setState(() {
-            _error = 'خطا در بارگذاری صف (${response.statusCode})';
+            _error = adminTx(context, 'خطا در بارگذاری صف (${response.statusCode})', 'Could not load the queue (${response.statusCode})');
             _cachedFilteredItems = [];
             _isLoading = false;
           });
@@ -91,7 +92,7 @@ class _NotificationModerationQueuePageState
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = 'خطا: ${ErrorExtractor.userMessage(e)}';
+          _error = adminTx(context, 'خطا: ${ErrorExtractor.userMessage(e)}', '${ErrorExtractor.userMessage(e)}');
           _cachedFilteredItems = [];
           _isLoading = false;
         });
@@ -129,12 +130,12 @@ class _NotificationModerationQueuePageState
 
   String _statusLabel(String? status) {
     return switch (status) {
-      'pending' => 'در انتظار',
-      'ai_reviewing' => 'در حال بررسی AI',
-      'ai_reviewed' => 'بررسی شده AI',
-      'admin_reviewing' => 'در بررسی مدیر',
-      'completed' => 'بررسی شده',
-      _ => status ?? 'نامعلوم',
+      'pending' => adminTx(context, 'در انتظار', 'Pending'),
+      'ai_reviewing' => adminTx(context, 'در حال بررسی AI', 'AI reviewing'),
+      'ai_reviewed' => adminTx(context, 'بررسی شده AI', 'AI reviewed'),
+      'admin_reviewing' => adminTx(context, 'در بررسی مدیر', 'In admin review'),
+      'completed' => adminTx(context, 'بررسی شده', 'Reviewed'),
+      _ => status ?? adminTx(context, 'نامعلوم', 'Unknown'),
     };
   }
 
@@ -144,8 +145,8 @@ class _NotificationModerationQueuePageState
     final d = ai['decision'] as String?;
     final c = ai['confidence'] as num?;
     if (d == null) return '-';
-    final label = d == 'approve' ? 'تایید' : (d == 'reject' ? 'رد' : 'نیاز به بررسی');
-    if (c != null) return '$label (${c.toStringAsFixed(0)}٪)';
+    final label = d == 'approve' ? adminTx(context, 'تایید', 'Approve') : (d == 'reject' ? adminTx(context, 'رد', 'Reject') : adminTx(context, 'نیاز به بررسی', 'Needs review'));
+    if (c != null) return adminTx(context, '$label (${c.toStringAsFixed(0)}٪)', '$label (${c.toStringAsFixed(0)}%)');
     return label;
   }
 
@@ -164,18 +165,18 @@ class _NotificationModerationQueuePageState
       );
       if (response.statusCode == 200 && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ قالب تایید شد')),
+          SnackBar(content: Text(adminTx(context, '✅ قالب تایید شد', 'Template approved'))),
         );
         await _loadQueue();
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: کد ${response.statusCode}')),
+          SnackBar(content: Text(adminTx(context, 'خطا: کد ${response.statusCode}', 'Error ${response.statusCode}'))),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: ${ErrorExtractor.forContext(e, context)}')),
+          SnackBar(content: Text(adminTx(context, 'خطا: ${ErrorExtractor.forContext(e, context)}', '${ErrorExtractor.forContext(e, context)}'))),
         );
       }
     } finally {
@@ -196,18 +197,18 @@ class _NotificationModerationQueuePageState
       );
       if (response.statusCode == 200 && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('❌ قالب رد شد')),
+          SnackBar(content: Text(adminTx(context, '❌ قالب رد شد', 'Template rejected'))),
         );
         await _loadQueue();
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: کد ${response.statusCode}')),
+          SnackBar(content: Text(adminTx(context, 'خطا: کد ${response.statusCode}', 'Error ${response.statusCode}'))),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: ${ErrorExtractor.forContext(e, context)}')),
+          SnackBar(content: Text(adminTx(context, 'خطا: ${ErrorExtractor.forContext(e, context)}', '${ErrorExtractor.forContext(e, context)}'))),
         );
       }
     } finally {
@@ -227,18 +228,18 @@ class _NotificationModerationQueuePageState
       );
       if (response.statusCode == 200 && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('قالب به‌روزرسانی شد')),
+          SnackBar(content: Text(adminTx(context, 'قالب به‌روزرسانی شد', 'Template updated'))),
         );
         await _loadQueue();
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: کد ${response.statusCode}')),
+          SnackBar(content: Text(adminTx(context, 'خطا: کد ${response.statusCode}', 'Error ${response.statusCode}'))),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: ${ErrorExtractor.forContext(e, context)}')),
+          SnackBar(content: Text(adminTx(context, 'خطا: ${ErrorExtractor.forContext(e, context)}', '${ErrorExtractor.forContext(e, context)}'))),
         );
       }
     } finally {
@@ -253,14 +254,14 @@ class _NotificationModerationQueuePageState
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('تایید قالب'),
+        title: Text(adminTx(context, 'تایید قالب', 'Approve template')),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (aiReview != null) ...[
-                const Text('نظر هوش مصنوعی:', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(adminTx(context, 'نظر هوش مصنوعی:', 'AI note:'), style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -277,9 +278,9 @@ class _NotificationModerationQueuePageState
               ],
               TextField(
                 controller: notesController,
-                decoration: const InputDecoration(
-                  labelText: 'یادداشت برای مالک کسب‌وکار (اختیاری)',
-                  hintText: 'دلیل تایید یا توضیح برای مالک',
+                decoration: InputDecoration(
+                  labelText: adminTx(context, 'یادداشت برای مالک کسب‌وکار (اختیاری)', 'Note for the business owner (optional)'),
+                  hintText: adminTx(context, 'دلیل تایید یا توضیح برای مالک', 'Approval note for the owner'),
                 ),
                 maxLines: 3,
               ),
@@ -289,14 +290,14 @@ class _NotificationModerationQueuePageState
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('انصراف'),
+            child: Text(adminTx(context, 'انصراف', 'Cancel')),
           ),
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
               _approveWithNotes(queueId, {'_approve_notes': notesController.text});
             },
-            child: const Text('تایید قالب'),
+            child: Text(adminTx(context, 'تایید قالب', 'Approve template')),
           ),
         ],
       ),
@@ -311,14 +312,14 @@ class _NotificationModerationQueuePageState
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('رد قالب'),
+        title: Text(adminTx(context, 'رد قالب', 'Reject template')),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (aiReview != null) ...[
-                const Text('نظر هوش مصنوعی:', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(adminTx(context, 'نظر هوش مصنوعی:', 'AI note:'), style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -335,17 +336,17 @@ class _NotificationModerationQueuePageState
               ],
               TextField(
                 controller: reasonController,
-                decoration: const InputDecoration(
-                  labelText: 'دلیل رد (الزامی)',
-                  hintText: 'مثلاً: محتوای تبلیغاتی',
+                decoration: InputDecoration(
+                  labelText: adminTx(context, 'دلیل رد (الزامی)', 'Rejection reason (required)'),
+                  hintText: adminTx(context, 'مثلاً: محتوای تبلیغاتی', 'Example: promotional content'),
                 ),
                 maxLines: 2,
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: notesController,
-                decoration: const InputDecoration(
-                  labelText: 'یادداشت برای مالک کسب‌وکار (اختیاری)',
+                decoration: InputDecoration(
+                  labelText: adminTx(context, 'یادداشت برای مالک کسب‌وکار (اختیاری)', 'Note for the business owner (optional)'),
                 ),
                 maxLines: 2,
               ),
@@ -355,7 +356,7 @@ class _NotificationModerationQueuePageState
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('انصراف'),
+            child: Text(adminTx(context, 'انصراف', 'Cancel')),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -365,14 +366,14 @@ class _NotificationModerationQueuePageState
               final reason = reasonController.text.trim();
               if (reason.isEmpty) {
                 ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(content: Text('دلیل رد را وارد کنید')),
+                  SnackBar(content: Text(adminTx(context, 'دلیل رد را وارد کنید', 'Enter a rejection reason'))),
                 );
                 return;
               }
               Navigator.pop(ctx);
               _rejectWithReasonAndNotes(queueId, reason, notesController.text.trim().isEmpty ? null : notesController.text.trim());
             },
-            child: const Text('رد قالب'),
+            child: Text(adminTx(context, 'رد قالب', 'Reject template')),
           ),
         ],
       ),
@@ -383,15 +384,15 @@ class _NotificationModerationQueuePageState
     final parts = <String>[];
     final d = aiReview['decision'] as String?;
     if (d != null) {
-      final label = d == 'approve' ? 'تایید' : (d == 'reject' ? 'رد' : 'نیاز به بررسی مدیر');
-      parts.add('تصمیم: $label');
+      final label = d == 'approve' ? adminTx(context, 'تایید', 'Approve') : (d == 'reject' ? adminTx(context, 'رد', 'Reject') : adminTx(context, 'نیاز به بررسی مدیر', 'Needs an admin review'));
+      parts.add(adminTx(context, 'تصمیم: $label', 'Decision: $label'));
     }
     final c = aiReview['confidence'] as num?;
-    if (c != null) parts.add('اطمینان: ${c.toStringAsFixed(0)}٪');
+    if (c != null) parts.add(adminTx(context, 'اطمینان: ${c.toStringAsFixed(0)}٪', 'Confidence: ${c.toStringAsFixed(0)}%'));
     final s = aiReview['suggestions'] as String?;
-    if (s != null && s.trim().isNotEmpty) parts.add('پیشنهادات: $s');
+    if (s != null && s.trim().isNotEmpty) parts.add(adminTx(context, 'پیشنهادات: $s', 'Suggestions: $s'));
     final f = aiReview['flags'];
-    if (f is List && f.isNotEmpty) parts.add('موارد: ${f.join('؛ ')}');
+    if (f is List && f.isNotEmpty) parts.add(adminTx(context, 'موارد: ${f.join('؛ ')}', 'Flags: ${f.join('; ')}'));
     return parts.isEmpty ? '-' : parts.join('\n');
   }
 
@@ -403,20 +404,20 @@ class _NotificationModerationQueuePageState
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('ویرایش قالب توسط مدیر'),
+        title: Text(adminTx(context, 'ویرایش قالب توسط مدیر', 'Edit template')),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: subjectController,
-                decoration: const InputDecoration(labelText: 'موضوع'),
+                decoration: InputDecoration(labelText: adminTx(context, 'موضوع', 'Subject')),
                 maxLines: 1,
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: bodyController,
-                decoration: const InputDecoration(labelText: 'متن قالب'),
+                decoration: InputDecoration(labelText: adminTx(context, 'متن قالب', 'Template body')),
                 maxLines: 8,
               ),
             ],
@@ -425,7 +426,7 @@ class _NotificationModerationQueuePageState
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('انصراف'),
+            child: Text(adminTx(context, 'انصراف', 'Cancel')),
           ),
           FilledButton(
             onPressed: () {
@@ -436,7 +437,7 @@ class _NotificationModerationQueuePageState
                 body: bodyController.text,
               );
             },
-            child: const Text('ذخیره'),
+            child: Text(adminTx(context, 'ذخیره', 'Save')),
           ),
         ],
       ),
@@ -453,22 +454,22 @@ class _NotificationModerationQueuePageState
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('جزئیات قالب'),
+        title: Text(adminTx(context, 'جزئیات قالب', 'Template details')),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (template != null) ...[
-                Text('نام: ${template['name'] ?? '-'}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text('کد: ${template['code'] ?? '-'}'),
-                Text('وضعیت: ${_statusLabel(status)}'),
+                Text(adminTx(context, 'نام: ${template['name'] ?? '-'}', 'Name: ${template['name'] ?? '-'}'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(adminTx(context, 'کد: ${template['code'] ?? '-'}', 'Code: ${template['code'] ?? '-'}')),
+                Text(adminTx(context, 'وضعیت: ${_statusLabel(status)}', 'Status: ${_statusLabel(status)}')),
                 if (aiReview != null) ...[
                   const SizedBox(height: 8),
-                  Text('نظر AI: ${_buildAiSummaryText(aiReview)}', style: Theme.of(ctx).textTheme.bodySmall),
+                  Text(adminTx(context, 'نظر AI: ${_buildAiSummaryText(aiReview)}', 'AI note: ${_buildAiSummaryText(aiReview)}'), style: Theme.of(ctx).textTheme.bodySmall),
                 ],
                 const SizedBox(height: 12),
-                const Text('محتوا:', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(adminTx(context, 'محتوا:', 'Content:'), style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
                 SelectableText(fullBody, style: Theme.of(ctx).textTheme.bodyMedium),
               ],
@@ -478,7 +479,7 @@ class _NotificationModerationQueuePageState
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('بستن'),
+            child: Text(adminTx(context, 'بستن', 'Close')),
           ),
         ],
       ),
@@ -488,7 +489,7 @@ class _NotificationModerationQueuePageState
   DataTableConfig<Map<String, dynamic>> _buildTableConfig(ThemeData theme, ColorScheme cs) {
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/api/v1/admin/notification-moderation/queue',
-      title: 'صف بررسی قالب‌های نوتیفیکیشن',
+      title: adminTx(context, 'صف بررسی قالب‌های نوتیفیکیشن', 'Notification template review'),
       tableId: 'admin_notification_moderation_queue',
       showSearch: true,
       showPagination: true,
@@ -498,20 +499,20 @@ class _NotificationModerationQueuePageState
       expandBodyHeightToFitRows: true,
       pageSizeOptions: const [10, 20, 50, 100],
       searchFields: const ['business.name', 'template.name', 'template.code', 'template.event_type'],
-      emptyStateMessage: 'هیچ قالبی در صف نیست',
+      emptyStateMessage: adminTx(context, 'هیچ قالبی در صف نیست', 'The queue is empty'),
       enableColumnSettings: false,
       showTableIcon: false,
       columns: [
         TextColumn(
           'id',
-          'شناسه',
+          adminTx(context, 'شناسه', 'Id'),
           width: ColumnWidth.small,
           sortable: true,
           formatter: (item) => '${item['queue_id'] ?? item['id']}',
         ),
         TextColumn(
           'business_name',
-          'کسب‌وکار',
+          adminTx(context, 'کسب‌وکار', 'Business'),
           width: ColumnWidth.medium,
           formatter: (item) {
             final b = item['business'] as Map<String, dynamic>?;
@@ -520,7 +521,7 @@ class _NotificationModerationQueuePageState
         ),
         TextColumn(
           'template_name',
-          'قالب',
+          adminTx(context, 'قالب', 'Template'),
           width: ColumnWidth.medium,
           formatter: (item) {
             final t = item['template'] as Map<String, dynamic>?;
@@ -529,7 +530,7 @@ class _NotificationModerationQueuePageState
         ),
         CustomColumn(
           'channel',
-          'کانال',
+          adminTx(context, 'کانال', 'Channel'),
           width: ColumnWidth.small,
           builder: (item, _) {
             final t = item['template'] as Map<String, dynamic>?;
@@ -539,32 +540,32 @@ class _NotificationModerationQueuePageState
               children: [
                 Icon(ch == 'sms' ? Icons.sms : Icons.email, size: 18, color: cs.primary),
                 const SizedBox(width: 4),
-                Text(ch == 'sms' ? 'پیامک' : 'ایمیل', style: theme.textTheme.bodySmall),
+                Text(ch == 'sms' ? adminTx(context, 'پیامک', 'SMS') : adminTx(context, 'ایمیل', 'Email'), style: theme.textTheme.bodySmall),
               ],
             );
           },
         ),
         TextColumn(
           'status',
-          'وضعیت',
+          adminTx(context, 'وضعیت', 'Status'),
           width: ColumnWidth.medium,
           formatter: (item) => _statusLabel(item['status'] as String?),
         ),
         TextColumn(
           'created_at',
-          'تاریخ',
+          adminTx(context, 'تاریخ', 'Date'),
           width: ColumnWidth.medium,
           formatter: _formatCreatedAt,
         ),
         TextColumn(
           'ai_decision',
-          'نظر AI',
+          adminTx(context, 'نظر AI', 'AI note'),
           width: ColumnWidth.medium,
           formatter: _aiDecisionLabel,
         ),
         CustomColumn(
           'actions',
-          'عملیات',
+          adminTx(context, 'عملیات', 'Actions'),
           width: ColumnWidth.large,
           sortable: false,
           searchable: false,
@@ -577,27 +578,27 @@ class _NotificationModerationQueuePageState
                 IconButton(
                   icon: Icon(Icons.visibility_outlined),
                   onPressed: () => _showDetailsDialog(item),
-                  tooltip: 'جزئیات',
+                  tooltip: adminTx(context, 'جزئیات', 'Details'),
                   iconSize: 20,
                 ),
                 if (canAct) ...[
                   IconButton(
                     icon: Icon(Icons.edit_outlined),
                     onPressed: _isProcessing ? null : () => _showEditDialog(item),
-                    tooltip: 'ویرایش',
+                    tooltip: adminTx(context, 'ویرایش', 'Edit'),
                     iconSize: 20,
                   ),
                   IconButton(
                     icon: const Icon(Icons.close),
                     onPressed: _isProcessing ? null : () => _showRejectDialog(item),
-                    tooltip: 'رد',
+                    tooltip: adminTx(context, 'رد', 'Reject'),
                     color: cs.error,
                     iconSize: 20,
                   ),
                   IconButton(
                     icon: const Icon(Icons.check),
                     onPressed: _isProcessing ? null : () => _showApproveDialog(item),
-                    tooltip: 'تایید',
+                    tooltip: adminTx(context, 'تایید', 'Approve'),
                     color: SemanticColorResolver.positive(context),
                     iconSize: 20,
                   ),
@@ -615,19 +616,16 @@ class _NotificationModerationQueuePageState
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('صف بررسی قالب‌های نوتیفیکیشن'),
-        backgroundColor: cs.surface,
-        foregroundColor: cs.onSurface,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _loadQueue,
-            tooltip: 'بروزرسانی',
-          ),
-        ],
-      ),
+    return AdminCompactScaffold(
+      title: adminTx(context, 'صف بررسی قالب‌ها', 'Template review queue'),
+      subtitle: adminTx(context, 'قالب‌های اعلان در انتظار بررسی', 'Notification templates waiting for review'),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh, size: 20),
+          onPressed: _isLoading ? null : _loadQueue,
+          tooltip: adminTx(context, 'بازخوانی', 'Refresh'),
+        ),
+      ],
       body: Column(
         children: [
           Container(
@@ -638,13 +636,13 @@ class _NotificationModerationQueuePageState
             ),
             child: Row(
               children: [
-                _buildFilterChip('همه', 'all'),
+                _buildFilterChip(adminTx(context, 'همه', 'All'), 'all'),
                 const SizedBox(width: 8),
-                _buildFilterChip('در انتظار', 'pending'),
+                _buildFilterChip(adminTx(context, 'در انتظار', 'Pending'), 'pending'),
                 const SizedBox(width: 8),
-                _buildFilterChip('بررسی شده AI', 'ai_reviewed'),
+                _buildFilterChip(adminTx(context, 'بررسی‌شده توسط AI', 'Reviewed by AI'), 'ai_reviewed'),
                 const SizedBox(width: 8),
-                _buildFilterChip('در بررسی مدیر', 'admin_reviewing'),
+                _buildFilterChip(adminTx(context, 'در بررسی مدیر', 'Admin review'), 'admin_reviewing'),
               ],
             ),
           ),
@@ -663,7 +661,7 @@ class _NotificationModerationQueuePageState
                             ElevatedButton.icon(
                               onPressed: _loadQueue,
                               icon: const Icon(Icons.refresh),
-                              label: const Text('تلاش مجدد'),
+                              label: Text(adminTx(context, 'تلاش مجدد', 'Retry')),
                             ),
                           ],
                         ),
@@ -676,7 +674,7 @@ class _NotificationModerationQueuePageState
                                 Icon(Icons.inbox_outlined, size: 64, color: cs.outline),
                                 const SizedBox(height: 16),
                                 Text(
-                                  'هیچ قالبی در صف نیست',
+                                  adminTx(context, 'هیچ قالبی در صف نیست', 'The queue is empty'),
                                   style: theme.textTheme.titleMedium?.copyWith(color: cs.outline),
                                 ),
                               ],
@@ -700,6 +698,7 @@ class _NotificationModerationQueuePageState
   Widget _buildFilterChip(String label, String value) {
     final isSelected = _filter == value;
     return FilterChip(
+      visualDensity: VisualDensity.compact,
       label: Text(label),
       selected: isSelected,
       onSelected: (_) {

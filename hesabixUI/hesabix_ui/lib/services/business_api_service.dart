@@ -422,9 +422,11 @@ class BusinessApiService {
     required double amount,
     String? description,
     String? reason,
+    required String confirmation,
   }) async {
     final payload = <String, dynamic>{
       'amount': amount,
+      'confirmation': confirmation,
     };
     if (description != null && description.isNotEmpty) {
       payload['description'] = description;

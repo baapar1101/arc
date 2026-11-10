@@ -443,6 +443,7 @@ class CrmService {
     DateTime? nextFollowUpAt,
     List<int>? tagIds,
     Map<String, dynamic>? customFields,
+    bool allowSimilar = false,
   }) async {
     final body = <String, dynamic>{
       'process_definition_id': processDefinitionId,
@@ -459,6 +460,7 @@ class CrmService {
     if (nextFollowUpAt != null) body['next_follow_up_at'] = nextFollowUpAt.toIso8601String();
     if (tagIds != null) body['tag_ids'] = tagIds;
     if (customFields != null) body['custom_fields'] = customFields;
+    if (allowSimilar) body['allow_similar'] = true;
     final res = await _apiClient.post<dynamic>(
       '/api/v1/crm/businesses/$businessId/leads',
       data: body,
@@ -518,6 +520,16 @@ class CrmService {
     return _extractData(res.data);
   }
 
+  Future<Map<String, dynamic>> getActivity({
+    required int businessId,
+    required int activityId,
+  }) async {
+    final res = await _apiClient.get<dynamic>(
+      '/api/v1/crm/businesses/$businessId/activities/$activityId',
+    );
+    return Map<String, dynamic>.from(_extractData(res.data) as Map);
+  }
+
   /// ویرایش فعالیت
   Future<Map<String, dynamic>> updateActivity({
     required int businessId,
@@ -528,6 +540,7 @@ class CrmService {
     String? description,
     DateTime? activityDate,
     int? dealId,
+    bool clearDeal = false,
     bool? isTask,
     DateTime? dueAt,
     String? status,
@@ -543,7 +556,11 @@ class CrmService {
     if (subject != null) body['subject'] = subject;
     if (description != null) body['description'] = description;
     if (activityDate != null) body['activity_date'] = activityDate.toIso8601String();
-    if (dealId != null) body['deal_id'] = dealId;
+    if (clearDeal) {
+      body['clear_deal'] = true;
+    } else if (dealId != null) {
+      body['deal_id'] = dealId;
+    }
     if (isTask != null) body['is_task'] = isTask;
     if (dueAt != null) body['due_at'] = dueAt.toIso8601String();
     if (status != null) body['status'] = status;
@@ -669,6 +686,7 @@ class CrmService {
   Future<Map<String, dynamic>> updateDeal({
     required int businessId,
     required int dealId,
+    int? personId,
     int? stageId,
     String? code,
     String? title,
@@ -676,7 +694,9 @@ class CrmService {
     int? currencyId,
     int? probabilityPercent,
     DateTime? expectedCloseDate,
+    bool clearExpectedCloseDate = false,
     DateTime? nextFollowUpAt,
+    bool clearNextFollowUp = false,
     int? assignedToUserId,
     String? description,
     int? documentId,
@@ -688,14 +708,23 @@ class CrmService {
     Map<String, dynamic>? customFields,
   }) async {
     final body = <String, dynamic>{};
+    if (personId != null) body['person_id'] = personId;
     if (stageId != null) body['stage_id'] = stageId;
     if (code != null && code.trim().isNotEmpty) body['code'] = code.trim();
     if (title != null) body['title'] = title;
     if (amount != null) body['amount'] = amount;
     if (currencyId != null) body['currency_id'] = currencyId;
     if (probabilityPercent != null) body['probability_percent'] = probabilityPercent;
-    if (expectedCloseDate != null) body['expected_close_date'] = expectedCloseDate.toIso8601String().split('T')[0];
-    if (nextFollowUpAt != null) body['next_follow_up_at'] = nextFollowUpAt.toIso8601String();
+    if (clearExpectedCloseDate) {
+      body['clear_expected_close_date'] = true;
+    } else if (expectedCloseDate != null) {
+      body['expected_close_date'] = expectedCloseDate.toIso8601String().split('T')[0];
+    }
+    if (clearNextFollowUp) {
+      body['clear_next_follow_up'] = true;
+    } else if (nextFollowUpAt != null) {
+      body['next_follow_up_at'] = nextFollowUpAt.toIso8601String();
+    }
     if (assignedToUserId != null) body['assigned_to_user_id'] = assignedToUserId;
     if (description != null) body['description'] = description;
     if (documentId != null) body['document_id'] = documentId;
@@ -791,9 +820,12 @@ class CrmService {
     String? email,
     String? description,
     int? assignedToUserId,
+    bool clearAssignedTo = false,
     DateTime? nextFollowUpAt,
+    bool clearNextFollowUp = false,
     List<int>? tagIds,
     Map<String, dynamic>? customFields,
+    bool allowSimilar = false,
   }) async {
     final body = <String, dynamic>{};
     if (stageId != null) body['stage_id'] = stageId;
@@ -804,10 +836,19 @@ class CrmService {
     if (mobile != null) body['mobile'] = mobile;
     if (email != null) body['email'] = email;
     if (description != null) body['description'] = description;
-    if (assignedToUserId != null) body['assigned_to_user_id'] = assignedToUserId;
-    if (nextFollowUpAt != null) body['next_follow_up_at'] = nextFollowUpAt.toIso8601String();
+    if (clearAssignedTo) {
+      body['clear_assigned_to'] = true;
+    } else if (assignedToUserId != null) {
+      body['assigned_to_user_id'] = assignedToUserId;
+    }
+    if (clearNextFollowUp) {
+      body['clear_next_follow_up'] = true;
+    } else if (nextFollowUpAt != null) {
+      body['next_follow_up_at'] = nextFollowUpAt.toIso8601String();
+    }
     if (tagIds != null) body['tag_ids'] = tagIds;
     if (customFields != null) body['custom_fields'] = customFields;
+    if (allowSimilar) body['allow_similar'] = true;
     final res = await _apiClient.put<dynamic>(
       '/api/v1/crm/businesses/$businessId/leads/$leadId',
       data: body,
@@ -928,6 +969,64 @@ class CrmService {
   // ==========================================================================
   // صف کاری من (My Work Queue)
   // ==========================================================================
+
+  Future<Map<String, dynamic>> searchCrm({required int businessId, required String query, int limit = 12}) async {
+    final res = await _apiClient.get<dynamic>(
+      '/api/v1/crm/businesses/$businessId/search',
+      query: {'q': query, 'limit': limit},
+    );
+    final data = _extractData(res.data);
+    return data is Map<String, dynamic> ? data : Map<String, dynamic>.from(data as Map);
+  }
+
+  Future<Map<String, dynamic>> listStaleDeals({required int businessId, int limit = 20}) async {
+    final res = await _apiClient.get<dynamic>(
+      '/api/v1/crm/businesses/$businessId/stale-deals',
+      query: {'limit': limit},
+    );
+    final data = _extractData(res.data);
+    return data is Map<String, dynamic> ? data : Map<String, dynamic>.from(data as Map);
+  }
+
+  Future<List<Map<String, dynamic>>> listSavedViews({
+    required int businessId,
+    required String entityType,
+  }) async {
+    final res = await _apiClient.get<dynamic>(
+      '/api/v1/crm/businesses/$businessId/saved-views',
+      query: {'entity_type': entityType},
+    );
+    final data = _extractData(res.data);
+    final items = data is Map ? data['items'] : null;
+    if (items is List) {
+      return items.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    }
+    return [];
+  }
+
+  Future<Map<String, dynamic>> createSavedView({
+    required int businessId,
+    required String entityType,
+    required String name,
+    required Map<String, dynamic> filters,
+    bool isShared = false,
+  }) async {
+    final res = await _apiClient.post<dynamic>(
+      '/api/v1/crm/businesses/$businessId/saved-views',
+      data: {
+        'entity_type': entityType,
+        'name': name,
+        'filters': filters,
+        'is_shared': isShared,
+      },
+    );
+    final data = _extractData(res.data);
+    return data is Map<String, dynamic> ? data : Map<String, dynamic>.from(data as Map);
+  }
+
+  Future<void> deleteSavedView({required int businessId, required int viewId}) async {
+    await _apiClient.delete<void>('/api/v1/crm/businesses/$businessId/saved-views/$viewId');
+  }
 
   /// صف کاری کاربر: تسک‌های باز، پیگیری سرنخ/فرصت و نقض SLA
   Future<Map<String, dynamic>> getMyWorkQueue({required int businessId}) async {
@@ -1264,10 +1363,19 @@ class CrmService {
     required String name,
     String? description,
     bool isActive = true,
+    int? smsDailyCap,
+    bool stopOnReply = true,
+    bool stopOnClose = true,
     List<Map<String, dynamic>>? steps,
   }) async {
-    final body = <String, dynamic>{'name': name, 'is_active': isActive};
+    final body = <String, dynamic>{
+      'name': name,
+      'is_active': isActive,
+      'stop_on_reply': stopOnReply,
+      'stop_on_close': stopOnClose,
+    };
     if (description != null) body['description'] = description;
+    if (smsDailyCap != null) body['sms_daily_cap'] = smsDailyCap;
     if (steps != null) body['steps'] = steps;
     final res = await _apiClient.post<dynamic>(
       '/api/v1/crm/businesses/$businessId/sequences',
@@ -1282,18 +1390,47 @@ class CrmService {
     String? name,
     String? description,
     bool? isActive,
+    int? smsDailyCap,
+    bool clearSmsDailyCap = false,
+    bool? stopOnReply,
+    bool? stopOnClose,
     List<Map<String, dynamic>>? steps,
   }) async {
     final body = <String, dynamic>{};
     if (name != null) body['name'] = name;
     if (description != null) body['description'] = description;
     if (isActive != null) body['is_active'] = isActive;
+    if (clearSmsDailyCap) body['clear_sms_daily_cap'] = true;
+    if (smsDailyCap != null) body['sms_daily_cap'] = smsDailyCap;
+    if (stopOnReply != null) body['stop_on_reply'] = stopOnReply;
+    if (stopOnClose != null) body['stop_on_close'] = stopOnClose;
     if (steps != null) body['steps'] = steps;
     final res = await _apiClient.patch<dynamic>(
       '/api/v1/crm/businesses/$businessId/sequences/$sequenceId',
       data: body,
     );
     return _extractData(res.data);
+  }
+
+  Future<Map<String, dynamic>> dryRunSequence({
+    required int businessId,
+    required int sequenceId,
+  }) async {
+    final res = await _apiClient.post<dynamic>(
+      '/api/v1/crm/businesses/$businessId/sequences/$sequenceId/dry-run',
+      data: const <String, dynamic>{},
+    );
+    final data = _extractData(res.data);
+    return data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+  }
+
+  Future<Map<String, dynamic>> installDiscountApprovalTemplate({required int businessId}) async {
+    final res = await _apiClient.post<dynamic>(
+      '/api/v1/crm/businesses/$businessId/sequence-templates/discount-approval',
+      data: const <String, dynamic>{},
+    );
+    final data = _extractData(res.data);
+    return data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
   }
 
   Future<void> deleteSequence({required int businessId, required int sequenceId}) async {
@@ -1347,5 +1484,192 @@ class CrmService {
     );
     final data = _extractData(res.data);
     return data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+  }
+
+  Future<List<Map<String, dynamic>>> listOrganizations({required int businessId}) async {
+    final res = await _apiClient.get<dynamic>('/api/v1/crm/businesses/$businessId/organizations');
+    final data = _extractData(res.data);
+    final items = data is Map ? data['items'] : null;
+    if (items is! List) return [];
+    return items.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+  }
+
+  Future<Map<String, dynamic>> createOrganization({
+    required int businessId,
+    required String name,
+    required int billingPersonId,
+    List<int> contactIds = const [],
+  }) async {
+    final res = await _apiClient.post<dynamic>(
+      '/api/v1/crm/businesses/$businessId/organizations',
+      data: {'name': name, 'billing_person_id': billingPersonId, 'contact_ids': contactIds},
+    );
+    final data = _extractData(res.data);
+    return data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+  }
+
+  Future<void> deleteOrganization({required int businessId, required int organizationId}) async {
+    await _apiClient.delete<dynamic>('/api/v1/crm/businesses/$businessId/organizations/$organizationId');
+  }
+
+  Future<Map<String, dynamic>> updateOrganizationContacts({
+    required int businessId,
+    required int organizationId,
+    required List<int> contactIds,
+  }) async {
+    final res = await _apiClient.patch<dynamic>(
+      '/api/v1/crm/businesses/$businessId/organizations/$organizationId',
+      data: {'contact_ids': contactIds},
+    );
+    final data = _extractData(res.data);
+    return data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+  }
+
+  Future<List<Map<String, dynamic>>> listQuotas({required int businessId}) async {
+    final res = await _apiClient.get<dynamic>('/api/v1/crm/businesses/$businessId/quotas');
+    final data = _extractData(res.data);
+    final items = data is Map ? data['items'] : null;
+    if (items is! List) return [];
+    return items.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+  }
+
+  Future<void> deleteQuota({required int businessId, required int quotaId}) async {
+    await _apiClient.delete<dynamic>('/api/v1/crm/businesses/$businessId/quotas/$quotaId');
+  }
+
+  Future<List<Map<String, dynamic>>> listManagerLinks({required int businessId}) async {
+    final res = await _apiClient.get<dynamic>('/api/v1/crm/businesses/$businessId/manager-links');
+    final data = _extractData(res.data);
+    final items = data is Map ? data['items'] : null;
+    if (items is! List) return [];
+    return items.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+  }
+
+  Future<void> deleteManagerLink({required int businessId, required int linkId}) async {
+    await _apiClient.delete<dynamic>('/api/v1/crm/businesses/$businessId/manager-links/$linkId');
+  }
+
+  Future<void> createQuota({
+    required int businessId,
+    required int userId,
+    required String periodStart,
+    required String periodEnd,
+    required double amount,
+    required int currencyId,
+  }) async {
+    await _apiClient.post<dynamic>(
+      '/api/v1/crm/businesses/$businessId/quotas',
+      data: {
+        'user_id': userId,
+        'period_start': periodStart,
+        'period_end': periodEnd,
+        'amount': amount,
+        'currency_id': currencyId,
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> managerRollup({required int businessId, required int managerUserId}) async {
+    final res = await _apiClient.get<dynamic>('/api/v1/crm/businesses/$businessId/manager-rollup/$managerUserId');
+    final data = _extractData(res.data);
+    return data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+  }
+
+  Future<void> setManager({
+    required int businessId,
+    required int managerUserId,
+    required int memberUserId,
+  }) async {
+    await _apiClient.post<dynamic>(
+      '/api/v1/crm/businesses/$businessId/manager-links',
+      data: {'manager_user_id': managerUserId, 'member_user_id': memberUserId},
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> listLeadQueues({required int businessId}) async {
+    final res = await _apiClient.get<dynamic>('/api/v1/crm/businesses/$businessId/lead-queues');
+    final data = _extractData(res.data);
+    final items = data is Map ? data['items'] : null;
+    if (items is! List) return [];
+    return items.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+  }
+
+  Future<void> createLeadQueue({
+    required int businessId,
+    required String name,
+    required List<int> memberIds,
+  }) async {
+    await _apiClient.post<dynamic>(
+      '/api/v1/crm/businesses/$businessId/lead-queues',
+      data: {'name': name, 'member_ids': memberIds},
+    );
+  }
+
+  Future<void> claimLead({required int businessId, required int leadId}) async {
+    await _apiClient.post<dynamic>('/api/v1/crm/businesses/$businessId/leads/$leadId/claim');
+  }
+
+  Future<void> setLeadOrganization({required int businessId, required int leadId, int? organizationId}) async {
+    await _apiClient.patch<dynamic>(
+      '/api/v1/crm/businesses/$businessId/leads/$leadId/organization',
+      data: {'organization_id': organizationId},
+    );
+  }
+
+  Future<void> setDealOrganization({required int businessId, required int dealId, int? organizationId}) async {
+    await _apiClient.patch<dynamic>(
+      '/api/v1/crm/businesses/$businessId/deals/$dealId/organization',
+      data: {'organization_id': organizationId},
+    );
+  }
+
+  Future<void> setDealForecast({required int businessId, required int dealId, String? forecastCategory}) async {
+    await _apiClient.patch<dynamic>(
+      '/api/v1/crm/businesses/$businessId/deals/$dealId/forecast',
+      data: {'forecast_category': forecastCategory},
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> listRecordAccess({required int businessId}) async {
+    final res = await _apiClient.get<dynamic>('/api/v1/crm/businesses/$businessId/record-acl');
+    final data = _extractData(res.data);
+    final items = data is Map ? data['items'] : null;
+    if (items is! List) return [];
+    return items.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+  }
+
+  Future<void> revokeRecordAccess({required int businessId, required int aclId}) async {
+    await _apiClient.delete<dynamic>('/api/v1/crm/businesses/$businessId/record-acl/$aclId');
+  }
+
+  Future<void> grantRecordAccess({
+    required int businessId,
+    required String entityType,
+    required int entityId,
+    required int userId,
+    required String access,
+  }) async {
+    await _apiClient.put<dynamic>(
+      '/api/v1/crm/businesses/$businessId/record-acl',
+      data: {'entity_type': entityType, 'entity_id': entityId, 'user_id': userId, 'access': access},
+    );
+  }
+
+  Future<void> deleteLeadQueue({required int businessId, required int queueId}) async {
+    await _apiClient.delete<dynamic>('/api/v1/crm/businesses/$businessId/lead-queues/$queueId');
+  }
+
+  Future<void> assignLeadQueue({required int businessId, required int leadId, int? queueId}) async {
+    await _apiClient.patch<dynamic>(
+      '/api/v1/crm/businesses/$businessId/leads/$leadId/queue',
+      data: {'queue_id': queueId},
+    );
+  }
+
+  Future<void> setRecordAclEnabled({required int businessId, required bool enabled}) async {
+    await _apiClient.put<dynamic>(
+      '/api/v1/crm/businesses/$businessId/record-acl/enabled',
+      data: {'enabled': enabled},
+    );
   }
 }

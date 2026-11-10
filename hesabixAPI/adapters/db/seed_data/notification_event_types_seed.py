@@ -751,7 +751,62 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
         "is_active": True,
         "requires_approval": False,
     },
+    {
+        "code": "procurement.requisition.approved",
+        "name": "تأیید درخواست خرید",
+        "description": "پس از تأیید نهایی درخواست خرید",
+        "category": "procurement",
+        "available_variables": [
+            {"key": "code", "type": "string", "description": "شماره درخواست"},
+            {"key": "business_name", "type": "string", "description": "نام کسب‌وکار"},
+        ],
+        "default_sms_template": "درخواست خرید {{ code }} تأیید شد. {{ business_name }}",
+        "default_email_template": "درخواست خرید {{ code }} تأیید شد.\n\n{{ business_name }}",
+        "default_email_subject": "تأیید درخواست خرید — {{ code }}",
+        "is_active": True,
+        "requires_approval": False,
+    },
+    {
+        "code": "procurement.order.approved",
+        "name": "تأیید سفارش خرید",
+        "description": "پس از تأیید سفارش خرید",
+        "category": "procurement",
+        "available_variables": [
+            {"key": "code", "type": "string", "description": "شماره سفارش"},
+            {"key": "business_name", "type": "string", "description": "نام کسب‌وکار"},
+        ],
+        "default_sms_template": "سفارش خرید {{ code }} تأیید شد. {{ business_name }}",
+        "default_email_template": "سفارش خرید {{ code }} تأیید شد.\n\n{{ business_name }}",
+        "default_email_subject": "تأیید سفارش خرید — {{ code }}",
+        "is_active": True,
+        "requires_approval": False,
+    },
+    {
+        "code": "procurement.contract.expiring",
+        "name": "نزدیک شدن انقضای قرارداد تأمین",
+        "description": "وقتی قرارداد فعال در ۳۰ روز آینده تمام می‌شود",
+        "category": "procurement",
+        "available_variables": [
+            {"key": "code", "type": "string", "description": "شماره قرارداد"},
+            {"key": "end_date", "type": "string", "description": "تاریخ پایان"},
+            {"key": "business_name", "type": "string", "description": "نام کسب‌وکار"},
+        ],
+        "default_sms_template": "قرارداد {{ code }} در تاریخ {{ end_date }} تمام می‌شود. {{ business_name }}",
+        "default_email_template": "قرارداد {{ code }} در تاریخ {{ end_date }} به پایان می‌رسد.\n\n{{ business_name }}",
+        "default_email_subject": "انقضای قرارداد تأمین — {{ code }}",
+        "is_active": True,
+        "requires_approval": False,
+    },
 ]
+
+
+PROCUREMENT_EVENT_CODES: frozenset[str] = frozenset(
+    {
+        "procurement.requisition.approved",
+        "procurement.order.approved",
+        "procurement.contract.expiring",
+    }
+)
 
 
 def event_type_row_by_code(code: str) -> dict | None:

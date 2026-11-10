@@ -25,7 +25,7 @@ router = APIRouter(prefix="/admin/ai/provider-credentials", tags=["admin-ai-prov
 
 
 def _require_admin(ctx: AuthContext) -> None:
-    if not ctx.has_any_permission("system_settings", "superadmin"):
+    if not ctx.has_app_permission("system_settings"):
         raise ApiError("FORBIDDEN", "فقط مدیر سیستم می‌تواند credentialها را مدیریت کند", http_status=403)
 
 
@@ -59,6 +59,20 @@ async def upsert_provider_credential(
         is_active=bool(payload.get("is_active", True)),
         function_calling_enabled=bool(payload.get("function_calling_enabled", True)),
     )
+    from app.services.admin_audit_service import client_ip_from_request, record_admin_action
+    record_admin_action(
+        db,
+        actor_user_id=ctx.get_user_id(),
+        action="ai.credential_update",
+        summary=f"به‌روزرسانی اعتبارنامه {provider.strip().lower()}",
+        target_type="ai_provider_credential",
+        target_id=provider.strip().lower(),
+        metadata={
+            "fields": sorted(k for k in payload.keys() if k != "api_key"),
+            "api_key_changed": bool(str(payload.get("api_key") or "").strip()),
+        },
+        client_ip=client_ip_from_request(request),
+    )
     return success_response(serialize_credential(cred), request, "credential ذخیره شد")
 
 
@@ -72,9 +86,22 @@ async def sync_credentials_from_config(
     config = AIConfigRepository(db).get_active_config()
     if not config:
         raise ApiError("CONFIG_NOT_FOUND", "تنظیمات AI فعالی وجود ندارد", http_status=400)
+    existing = AIProviderCredentialRepository(db).get_by_provider(config.provider)
+    had_key = bool(existing and existing.api_key)
     cred = upsert_credential_from_legacy_config(db, config)
     db.commit()
     db.refresh(cred)
+    from app.services.admin_audit_service import client_ip_from_request, record_admin_action
+    record_admin_action(
+        db,
+        actor_user_id=ctx.get_user_id(),
+        action="ai.credential_update",
+        summary=f"پر کردن اعتبارنامهٔ خالی از تنظیمات قدیمی {config.provider}",
+        target_type="ai_provider_credential",
+        target_id=str(config.provider),
+        metadata={"source": "legacy_config", "api_key_changed": (not had_key) and bool(cred.api_key)},
+        client_ip=client_ip_from_request(request),
+    )
     return success_response(serialize_credential(cred), request, "همگام‌سازی انجام شد")
 
 

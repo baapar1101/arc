@@ -41,7 +41,7 @@ def basalam_observability_metrics_summary(
     _: None = Depends(locale_dependency),
 ) -> Dict[str, Any]:
     """شمارندهٔ تجمیعی عملیات باسلام (Redis). نیازمند دسترسی مدیر سیستم یا سوپرادمین."""
-    if not _ctx.has_any_permission("system_settings", "superadmin"):
+    if not _ctx.has_app_permission("system_settings"):
         raise ApiError(
             "FORBIDDEN",
             "برای مشاهدهٔ متریک‌های باسلام نیاز به دسترسی مدیر سیستم است.",

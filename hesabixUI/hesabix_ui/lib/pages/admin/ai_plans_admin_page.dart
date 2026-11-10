@@ -6,9 +6,12 @@ import 'package:hesabix_ui/services/system_settings_service.dart';
 import 'package:hesabix_ui/models/ai_models.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
+import 'admin_compact_scaffold.dart';
+import '../../theme/tokens/extensions.dart';
 
 class AIPlansAdminPage extends StatefulWidget {
-  const AIPlansAdminPage({super.key});
+  final bool embedded;
+  const AIPlansAdminPage({super.key, this.embedded = false});
 
   @override
   State<AIPlansAdminPage> createState() => _AIPlansAdminPageState();
@@ -31,6 +34,21 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
     _aiService = AIService(api);
     _settingsService = SystemSettingsService(api);
     _load();
+  }
+
+  String _planTypeLabel(AIPlanType type) {
+    switch (type) {
+      case AIPlanType.free:
+        return adminTx(context, 'رایگان', 'Free');
+      case AIPlanType.subscription:
+        return adminTx(context, 'اشتراک', 'Subscription');
+      case AIPlanType.payAsGo:
+        return adminTx(context, 'پرداخت به ازای استفاده', 'Pay as you go');
+      case AIPlanType.hybrid:
+        return adminTx(context, 'ترکیبی', 'Hybrid');
+      case AIPlanType.byok:
+        return adminTx(context, 'ارائه‌دهنده اختصاصی', 'Bring your own key');
+    }
   }
 
   String get _walletCurrencyLabel {
@@ -233,8 +251,16 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
         builder: (context, setDialogState) {
           final currencySuffix = _walletCurrencyLabel.isNotEmpty ? ' ($_walletCurrencyLabel)' : '';
           final pricingHint = _walletCurrencyLabel.isEmpty
-              ? 'مبالغ قیمت اشتراک و نرخ توکن در همان واحد ارز پایه کیف پول سیستم (تنظیمات کیف پول) ثبت می‌شوند.'
-              : 'مبالغ زیر به واحد ارز پایه کیف پول است: $_walletCurrencyLabel';
+              ? adminTx(
+                  context,
+                  'قیمت اشتراک و نرخ توکن با ارز پایه کیف پول سیستم ثبت می‌شود.',
+                  'Subscription prices and token rates use the system wallet currency.',
+                )
+              : adminTx(
+                  context,
+                  'مبالغ زیر با ارز پایه کیف پول است: $_walletCurrencyLabel',
+                  'Amounts below use the wallet currency: $_walletCurrencyLabel',
+                );
 
           return Dialog(
             child: Container(
@@ -244,27 +270,21 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(12),
-                        topRight: Radius.circular(12),
-                      ),
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
                     child: Row(
                       children: [
                         Expanded(
                           child: Text(
-                            isEdit ? 'ویرایش پلن' : 'ایجاد پلن جدید',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                  color: Theme.of(context).colorScheme.onPrimary,
-                                ),
+                            isEdit ? adminTx(context, 'ویرایش پلن', 'Edit plan') : adminTx(context, 'پلن جدید', 'New plan'),
+                            style: context.settingsHub.cardTitleStyle(
+                              Theme.of(context).textTheme,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close),
-                          color: Theme.of(context).colorScheme.onPrimary,
+                          icon: const Icon(Icons.close, size: 20),
                           onPressed: () => Navigator.pop(context),
                         ),
                       ],
@@ -272,7 +292,7 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                   ),
                   Flexible(
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(24),
+                      padding: const EdgeInsets.all(12),
                       child: Form(
                         key: formKey,
                         child: Column(
@@ -301,60 +321,46 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                             const SizedBox(height: 16),
                             TextFormField(
                               controller: nameController,
-                              decoration: const InputDecoration(labelText: 'نام پلن'),
-                              validator: (v) => v?.isEmpty ?? true ? 'الزامی است' : null,
+                              decoration: InputDecoration(isDense: true, labelText: adminTx(context, 'نام پلن', 'Plan name')),
+                              validator: (v) => (v?.isEmpty ?? true) ? adminTx(context, 'الزامی است', 'Required') : null,
                             ),
                             const SizedBox(height: 16),
                             TextFormField(
                               controller: codeController,
-                              decoration: const InputDecoration(labelText: 'کد پلن'),
+                              decoration: InputDecoration(isDense: true, labelText: adminTx(context, 'کد پلن', 'Plan code')),
                               enabled: !isEdit,
-                              validator: (v) => v?.isEmpty ?? true ? 'الزامی است' : null,
+                              validator: (v) => (v?.isEmpty ?? true) ? adminTx(context, 'الزامی است', 'Required') : null,
                             ),
                             const SizedBox(height: 16),
                             DropdownButtonFormField<AIPlanType>(
                               key: ValueKey<AIPlanType>(selectedPlanType),
                               initialValue: selectedPlanType,
-                              decoration: const InputDecoration(labelText: 'نوع پلن'),
+                              decoration: InputDecoration(isDense: true, labelText: adminTx(context, 'نوع پلن', 'Plan type')),
                               items: AIPlanType.values.map((type) {
-                                String label;
-                                switch (type) {
-                                  case AIPlanType.free:
-                                    label = 'رایگان';
-                                    break;
-                                  case AIPlanType.subscription:
-                                    label = 'اشتراک';
-                                    break;
-                                  case AIPlanType.payAsGo:
-                                    label = 'پرداخت به ازای استفاده';
-                                    break;
-                                  case AIPlanType.hybrid:
-                                    label = 'ترکیبی';
-                                    break;
-                                  case AIPlanType.byok:
-                                    label = 'ارائه‌دهنده اختصاصی (BYOK)';
-                                    break;
-                                }
-                                return DropdownMenuItem(value: type, child: Text(label));
+                                return DropdownMenuItem(value: type, child: Text(_planTypeLabel(type)));
                               }).toList(),
                               onChanged: (v) => setDialogState(() => selectedPlanType = v!),
                             ),
                             if (selectedPlanType == AIPlanType.byok) ...[
                               const SizedBox(height: 12),
                               Text(
-                                'مالک کسب‌وکار URL و API Key خودش را تنظیم می‌کند و هزینه مدل را مستقیم به ارائه‌دهنده می‌پردازد.',
+                                adminTx(
+                                  context,
+                                  'مالک کسب‌وکار آدرس و کلید خودش را تنظیم می‌کند و هزینه مدل را مستقیم به ارائه‌دهنده می‌پردازد.',
+                                  'The business owner sets their own address and key, and pays the provider directly.',
+                                ),
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
                               const SizedBox(height: 12),
                               Text(
-                                'کارمزد پلتفرم (اختیاری)$currencySuffix',
+                                adminTx(context, 'کارمزد پلتفرم (اختیاری)$currencySuffix', 'Platform fee (optional)$currencySuffix'),
                                 style: Theme.of(context).textTheme.titleSmall,
                               ),
                               const SizedBox(height: 8),
                               TextFormField(
                                 controller: monthlyPriceController,
                                 decoration: InputDecoration(
-                                  labelText: 'کارمزد ماهانه$currencySuffix',
+                                  labelText: adminTx(context, 'کارمزد ماهانه$currencySuffix', 'Monthly fee$currencySuffix'),
                                 ),
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                 inputFormatters: [
@@ -365,7 +371,7 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                               TextFormField(
                                 controller: yearlyPriceController,
                                 decoration: InputDecoration(
-                                  labelText: 'کارمزد سالانه$currencySuffix',
+                                  labelText: adminTx(context, 'کارمزد سالانه$currencySuffix', 'Yearly fee$currencySuffix'),
                                 ),
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                 inputFormatters: [
@@ -373,7 +379,7 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                                 ],
                               ),
                               const SizedBox(height: 12),
-                              Text('ارائه‌دهندگان مجاز', style: Theme.of(context).textTheme.titleSmall),
+                              Text(adminTx(context, 'ارائه‌دهندگان مجاز', 'Allowed providers'), style: Theme.of(context).textTheme.titleSmall),
                               const SizedBox(height: 8),
                               Wrap(
                                 spacing: 8,
@@ -396,7 +402,7 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                               ),
                               SwitchListTile(
                                 contentPadding: EdgeInsets.zero,
-                                title: const Text('الزام تست اتصال موفق قبل از استفاده'),
+                                title: Text(adminTx(context, 'الزام تست اتصال موفق قبل از استفاده', 'Require a successful connection test before use')),
                                 value: requireConnectionTest,
                                 onChanged: (v) => setDialogState(() => requireConnectionTest = v),
                               ),
@@ -405,14 +411,14 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                                 selectedPlanType == AIPlanType.hybrid) ...[
                               const SizedBox(height: 16),
                               Text(
-                                'قیمت اشتراک$currencySuffix',
+                                adminTx(context, 'قیمت اشتراک$currencySuffix', 'Subscription price$currencySuffix'),
                                 style: Theme.of(context).textTheme.titleSmall,
                               ),
                               const SizedBox(height: 8),
                               TextFormField(
                                 controller: monthlyPriceController,
                                 decoration: InputDecoration(
-                                  labelText: 'قیمت ماهانه$currencySuffix',
+                                  labelText: adminTx(context, 'قیمت ماهانه$currencySuffix', 'Monthly price$currencySuffix'),
                                 ),
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                 inputFormatters: [
@@ -423,7 +429,7 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                               TextFormField(
                                 controller: yearlyPriceController,
                                 decoration: InputDecoration(
-                                  labelText: 'قیمت سالانه$currencySuffix',
+                                  labelText: adminTx(context, 'قیمت سالانه$currencySuffix', 'Yearly price$currencySuffix'),
                                 ),
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                 inputFormatters: [
@@ -435,19 +441,19 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                                 selectedPlanType == AIPlanType.hybrid) ...[
                               const SizedBox(height: 16),
                               Text(
-                                'نرخ پرداخت به‌ازای استفاده (هر ۱۰۰۰ توکن)$currencySuffix',
+                                adminTx(context, 'نرخ پرداخت به‌ازای استفاده (هر ۱۰۰۰ توکن)$currencySuffix', 'Pay-as-you-go rate (per 1,000 tokens)$currencySuffix'),
                                 style: Theme.of(context).textTheme.titleSmall,
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'نرخ پیش‌فرض (اگر برای مدل خاصی نرخ جدا نباشد)',
+                                adminTx(context, 'نرخ پیش‌فرض، اگر برای مدلی نرخ جدا نباشد', 'Default rate when a model has no separate rate'),
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
                               const SizedBox(height: 8),
                               TextFormField(
                                 controller: payInput1kController,
                                 decoration: InputDecoration(
-                                  labelText: 'قیمت هر ۱۰۰۰ توکن ورودی$currencySuffix',
+                                  labelText: adminTx(context, 'قیمت هر ۱۰۰۰ توکن ورودی$currencySuffix', 'Price per 1,000 input tokens$currencySuffix'),
                                 ),
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                 inputFormatters: [
@@ -458,7 +464,7 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                               TextFormField(
                                 controller: payOutput1kController,
                                 decoration: InputDecoration(
-                                  labelText: 'قیمت هر ۱۰۰۰ توکن خروجی$currencySuffix',
+                                  labelText: adminTx(context, 'قیمت هر ۱۰۰۰ توکن خروجی$currencySuffix', 'Price per 1,000 output tokens$currencySuffix'),
                                 ),
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                 inputFormatters: [
@@ -468,7 +474,7 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                               if (modelRates.isNotEmpty) ...[
                                 const SizedBox(height: 16),
                                 Text(
-                                  'نرخ اختصاصی هر مدل',
+                                  adminTx(context, 'نرخ اختصاصی هر مدل', 'Rate for each model'),
                                   style: Theme.of(context).textTheme.titleSmall,
                                 ),
                                 const SizedBox(height: 8),
@@ -487,7 +493,7 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                                               child: TextFormField(
                                                 controller: entry.value['input'],
                                                 decoration: InputDecoration(
-                                                  labelText: 'ورودی / ۱k$currencySuffix',
+                                                  labelText: adminTx(context, 'ورودی / ۱k$currencySuffix', 'Input / 1k$currencySuffix'),
                                                 ),
                                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                               ),
@@ -497,7 +503,7 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                                               child: TextFormField(
                                                 controller: entry.value['output'],
                                                 decoration: InputDecoration(
-                                                  labelText: 'خروجی / ۱k$currencySuffix',
+                                                  labelText: adminTx(context, 'خروجی / ۱k$currencySuffix', 'Output / 1k$currencySuffix'),
                                                 ),
                                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                               ),
@@ -513,13 +519,13 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                             if (selectedPlanType != AIPlanType.byok) ...[
                             const SizedBox(height: 16),
                             Text(
-                              'مدل‌های مجاز در این پلن',
+                              adminTx(context, 'مدل‌های مجاز در این پلن', 'Models allowed on this plan'),
                               style: Theme.of(context).textTheme.titleSmall,
                             ),
                             const SizedBox(height: 8),
                             if (_catalogModels.isEmpty)
                               Text(
-                                'ابتدا از بخش «مدل‌های AI» حداقل یک مدل تعریف کنید.',
+                                adminTx(context, 'ابتدا در زبانهٔ مدل‌ها حداقل یک مدل تعریف کنید.', 'Define at least one model on the Models tab first.'),
                                 style: Theme.of(context).textTheme.bodySmall,
                               )
                             else
@@ -560,8 +566,9 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                               const SizedBox(height: 12),
                               DropdownButtonFormField<String>(
                                 value: selectedDefault,
-                                decoration: const InputDecoration(
-                                  labelText: 'مدل پیش‌فرض پلن',
+                                decoration: InputDecoration(
+                                  isDense: true,
+                                  labelText: adminTx(context, 'مدل پیش‌فرض پلن', 'Default plan model'),
                                 ),
                                 items: selectedAllowed
                                     .map(
@@ -577,18 +584,24 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                             const SizedBox(height: 16),
                             TextFormField(
                               controller: tokensLimitController,
-                              decoration: const InputDecoration(
-                                labelText: 'محدودیت توکن (کل / سقف کمکی)',
-                                helperText: 'اختیاری؛ اگر سقف ماهانه خالی باشد برای سهمیه ماهانه استفاده می‌شود',
+                              decoration: InputDecoration(
+                                isDense: true,
+                                labelText: adminTx(context, 'محدودیت توکن', 'Token limit'),
+                                helperText: adminTx(
+                                  context,
+                                  'اختیاری؛ اگر سقف ماهانه خالی باشد برای سهمیه ماهانه استفاده می‌شود',
+                                  'Optional. Used as the monthly quota when the monthly cap is empty',
+                                ),
                               ),
                               keyboardType: TextInputType.number,
                             ),
                             const SizedBox(height: 16),
                             TextFormField(
                               controller: monthlyTokensLimitController,
-                              decoration: const InputDecoration(
-                                labelText: 'محدودیت ماهانه توکن',
-                                helperText: 'برای پلن‌های رایگان، اشتراک و ترکیبی؛ اولویت با این مقدار است',
+                              decoration: InputDecoration(
+                                isDense: true,
+                                labelText: adminTx(context, 'محدودیت ماهانه توکن', 'Monthly token limit'),
+                                helperText: adminTx(context, 'برای پلن رایگان، اشتراک و ترکیبی؛ این مقدار اولویت دارد', 'For free, subscription, and hybrid plans; this value takes priority'),
                               ),
                               keyboardType: TextInputType.number,
                             ),
@@ -596,17 +609,17 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                             const SizedBox(height: 16),
                             TextFormField(
                               controller: descriptionController,
-                              decoration: const InputDecoration(labelText: 'توضیحات'),
+                              decoration: InputDecoration(isDense: true, labelText: adminTx(context, 'توضیحات', 'Description')),
                               maxLines: 3,
                             ),
                             const SizedBox(height: 16),
                             SwitchListTile(
-                              title: const Text('فعال'),
+                              title: Text(adminTx(context, 'فعال', 'Active')),
                               value: isActive,
                               onChanged: (v) => setDialogState(() => isActive = v),
                             ),
                             SwitchListTile(
-                              title: const Text('تمدید خودکار'),
+                              title: Text(adminTx(context, 'تمدید خودکار', 'Auto renew')),
                               value: autoRenew,
                               onChanged: (v) => setDialogState(() => autoRenew = v),
                             ),
@@ -622,7 +635,7 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                       children: [
                         TextButton(
                           onPressed: () => Navigator.pop(context),
-                          child: const Text('لغو'),
+                          child: Text(adminTx(context, 'لغو', 'Cancel')),
                         ),
                         const SizedBox(width: 12),
                         FilledButton(
@@ -676,11 +689,11 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                             } catch (e) {
                               if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('خطا: ${ErrorExtractor.forContext(e, context)}')),
+                                SnackBar(content: Text('${adminTx(context, 'خطا', 'Error')}: ${ErrorExtractor.forContext(e, context)}')),
                               );
                             }
                           },
-                          child: Text(isEdit ? 'ذخیره' : 'ایجاد'),
+                          child: Text(isEdit ? adminTx(context, 'ذخیره', 'Save') : adminTx(context, 'ایجاد', 'Create')),
                         ),
                       ],
                     ),
@@ -708,23 +721,29 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('پلن‌های AI')),
+        appBar: aiHubAppBar(
+          embedded: widget.embedded,
+          title: Text(adminTx(context, 'پلن‌های AI', 'AI plans')),
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_error != null && _plans.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: const Text('پلن‌های AI')),
+        appBar: aiHubAppBar(
+          embedded: widget.embedded,
+          title: Text(adminTx(context, 'پلن‌های AI', 'AI plans')),
+        ),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text('خطا: $_error'),
-              const SizedBox(height: 16),
-              ElevatedButton(
+              Text('${adminTx(context, 'خطا', 'Error')}: $_error'),
+              const SizedBox(height: 12),
+              FilledButton(
                 onPressed: _load,
-                child: const Text('تلاش مجدد'),
+                child: Text(adminTx(context, 'تلاش مجدد', 'Retry')),
               ),
             ],
           ),
@@ -733,48 +752,39 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('پلن‌های AI'),
+      appBar: aiHubAppBar(
+        embedded: widget.embedded,
+        title: Text(adminTx(context, 'پلن‌های AI', 'AI plans')),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add),
+            icon: const Icon(Icons.add, size: 20),
             onPressed: () => _showPlanFormDialog(),
-            tooltip: 'ایجاد پلن جدید',
+            tooltip: adminTx(context, 'پلن جدید', 'New plan'),
           ),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: _plans.isEmpty
-            ? const Center(child: Text('پلنی وجود ندارد'))
+            ? Center(child: Text(adminTx(context, 'پلنی وجود ندارد', 'No plans yet')))
             : ListView.builder(
-                padding: const EdgeInsets.all(16),
+                padding: context.settingsHub.pagePadding,
                 itemCount: _plans.length,
                 itemBuilder: (context, index) {
                   final plan = _plans[index];
-                  String planTypeLabel;
-                  switch (plan.planType) {
-                    case AIPlanType.free:
-                      planTypeLabel = 'رایگان';
-                      break;
-                    case AIPlanType.subscription:
-                      planTypeLabel = 'اشتراک';
-                      break;
-                    case AIPlanType.payAsGo:
-                      planTypeLabel = 'پرداخت به ازای استفاده';
-                      break;
-                    case AIPlanType.hybrid:
-                      planTypeLabel = 'ترکیبی';
-                      break;
-                    case AIPlanType.byok:
-                      planTypeLabel = 'ارائه‌دهنده اختصاصی';
-                      break;
-                  }
+                  String planTypeLabel = _planTypeLabel(plan.planType);
                   return Card(
-                    margin: const EdgeInsets.only(bottom: 12),
+                    margin: const EdgeInsets.only(bottom: 6),
                     child: ListTile(
-                      title: Text(plan.name),
-                      subtitle: Text('$planTypeLabel • ${plan.code}'),
+                      dense: true,
+                      title: Text(
+                        plan.name,
+                        style: context.settingsHub.cardTitleStyle(
+                          Theme.of(context).textTheme,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                      subtitle: Text('$planTypeLabel · ${plan.code}'),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -792,17 +802,17 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                             onPressed: () async {
                               if (await showDialog<bool>(
                                     context: context,
-                                    builder: (context) => AlertDialog(
-                                      title: const Text('حذف پلن'),
-                                      content: const Text('آیا از حذف این پلن اطمینان دارید؟'),
+                                    builder: (dialogContext) => AlertDialog(
+                                      title: Text(adminTx(context, 'حذف پلن', 'Delete plan')),
+                                      content: Text(adminTx(context, 'این پلن حذف شود؟', 'Delete this plan?')),
                                       actions: [
                                         TextButton(
-                                          onPressed: () => Navigator.pop(context, false),
-                                          child: const Text('لغو'),
+                                          onPressed: () => Navigator.pop(dialogContext, false),
+                                          child: Text(adminTx(context, 'لغو', 'Cancel')),
                                         ),
                                         FilledButton(
-                                          onPressed: () => Navigator.pop(context, true),
-                                          child: const Text('حذف'),
+                                          onPressed: () => Navigator.pop(dialogContext, true),
+                                          child: Text(adminTx(context, 'حذف', 'Delete')),
                                         ),
                                       ],
                                     ),
@@ -816,7 +826,7 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                                 } catch (e) {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('خطا: ${ErrorExtractor.forContext(e, context)}')),
+                                      SnackBar(content: Text('${adminTx(context, 'خطا', 'Error')}: ${ErrorExtractor.forContext(e, context)}')),
                                     );
                                   }
                                 }

@@ -5,7 +5,7 @@ import secrets
 import uuid
 import json
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from sqlalchemy import and_, func, or_
 from sqlalchemy.exc import IntegrityError
@@ -1016,6 +1016,99 @@ def call_to_dict(
 	}
 
 
+def _hidden_crm_ids(db: Session, business_id: int, ctx: Any, entity_type: str, ids: List[int]) -> set[int]:
+	"""شناسه‌هایی که بینندهٔ فعلی حق دیدنشان را ندارد. مجموعهٔ خالی یعنی چیزی پنهان نیست."""
+	wanted = {int(item) for item in ids if item}
+	if ctx is None or not wanted:
+		return set()
+	from adapters.db.models.crm import Deal, Lead
+	from app.services.crm_enterprise_service import record_acl_enforced, restrict_visibility_query
+
+	if not record_acl_enforced(db, business_id, ctx):
+		return set()
+	model = Lead if entity_type == "lead" else Deal
+	visible = restrict_visibility_query(
+		db.query(model.id).filter(model.business_id == business_id, model.id.in_(wanted)),
+		db, business_id, ctx, model, entity_type,
+	)
+	seen = {int(row[0]) for row in visible.all()}
+	return wanted - seen
+
+
+def _scrub_one_call(data: Dict[str, Any], hidden_leads: set[int], hidden_deals: set[int]) -> Dict[str, Any]:
+	if not hidden_leads and not hidden_deals:
+		return data
+	data = dict(data)
+	lead_id = data.get("lead_id")
+	if lead_id and int(lead_id) in hidden_leads:
+		if data.get("party_name") == data.get("lead_name"):
+			data["party_name"] = data.get("person_name") or data.get("peer_number")
+		data["lead_id"] = None
+		data["lead_name"] = None
+	if data.get("deal_id") and int(data["deal_id"]) in hidden_deals:
+		data["deal_id"] = None
+	extra = data.get("extra_info")
+	if isinstance(extra, dict) and isinstance(extra.get("match"), dict):
+		data["extra_info"] = {**extra, "match": _scrub_match_dict(extra["match"], hidden_leads)}
+	return data
+
+
+def _scrub_match_dict(match: Dict[str, Any], hidden_leads: set[int]) -> Dict[str, Any]:
+	if not hidden_leads:
+		return match
+	cleaned = dict(match)
+	lead = cleaned.get("lead")
+	if isinstance(lead, dict) and int(lead.get("id") or 0) in hidden_leads:
+		cleaned["lead"] = None
+	leads = []
+	for item in cleaned.get("leads") or []:
+		if isinstance(item, dict) and int(item.get("id") or 0) in hidden_leads:
+			continue
+		leads.append(item)
+	cleaned["leads"] = leads
+	return cleaned
+
+
+def scrub_calls_for_viewer(db: Session, business_id: int, ctx: Any, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+	if ctx is None or not items:
+		return items
+	lead_ids: List[int] = []
+	deal_ids: List[int] = []
+	for data in items:
+		if data.get("lead_id"):
+			lead_ids.append(int(data["lead_id"]))
+		if data.get("deal_id"):
+			deal_ids.append(int(data["deal_id"]))
+		extra = data.get("extra_info") if isinstance(data.get("extra_info"), dict) else None
+		match = extra.get("match") if isinstance(extra, dict) else None
+		if isinstance(match, dict):
+			lead = match.get("lead")
+			if isinstance(lead, dict) and lead.get("id"):
+				lead_ids.append(int(lead["id"]))
+			for item in match.get("leads") or []:
+				if isinstance(item, dict) and item.get("id"):
+					lead_ids.append(int(item["id"]))
+	hidden_leads = _hidden_crm_ids(db, business_id, ctx, "lead", lead_ids)
+	hidden_deals = _hidden_crm_ids(db, business_id, ctx, "deal", deal_ids)
+	if not hidden_leads and not hidden_deals:
+		return items
+	return [_scrub_one_call(item, hidden_leads, hidden_deals) for item in items]
+
+
+def scrub_match_for_viewer(db: Session, business_id: int, ctx: Any, match: Dict[str, Any]) -> Dict[str, Any]:
+	if ctx is None or not match:
+		return match
+	lead_ids: List[int] = []
+	lead = match.get("lead")
+	if isinstance(lead, dict) and lead.get("id"):
+		lead_ids.append(int(lead["id"]))
+	for item in match.get("leads") or []:
+		if isinstance(item, dict) and item.get("id"):
+			lead_ids.append(int(item["id"]))
+	hidden = _hidden_crm_ids(db, business_id, ctx, "lead", lead_ids)
+	return _scrub_match_dict(match, hidden)
+
+
 def list_calls(
 	db: Session,
 	business_id: int,
@@ -1057,8 +1150,11 @@ def list_calls(
 	total = query.count()
 	rows = query.order_by(TelephonyCall.started_at.desc()).offset(offset).limit(min(limit, 200)).all()
 	pnames, lnames = _load_party_names(db, rows)
-	return {
-		"items": [
+	items = scrub_calls_for_viewer(
+		db,
+		business_id,
+		auth_ctx,
+		[
 			call_to_dict(
 				r,
 				person_name=pnames.get(int(r.person_id)) if r.person_id else None,
@@ -1066,6 +1162,9 @@ def list_calls(
 			)
 			for r in rows
 		],
+	)
+	return {
+		"items": items,
 		"total": total,
 		"limit": limit,
 		"offset": offset,
@@ -1084,11 +1183,18 @@ def get_call(db: Session, business_id: int, call_id: int, *, auth_ctx=None, scop
 		if not row:
 			raise ApiError("CALL_NOT_FOUND", "CALL_NOT_FOUND", http_status=404)
 	pnames, lnames = _load_party_names(db, [row])
-	data = call_to_dict(
-		row,
-		person_name=pnames.get(int(row.person_id)) if row.person_id else None,
-		lead_name=lnames.get(int(row.lead_id)) if row.lead_id else None,
-	)
+	data = scrub_calls_for_viewer(
+		db,
+		business_id,
+		auth_ctx,
+		[
+			call_to_dict(
+				row,
+				person_name=pnames.get(int(row.person_id)) if row.person_id else None,
+				lead_name=lnames.get(int(row.lead_id)) if row.lead_id else None,
+			)
+		],
+	)[0]
 	events = (
 		db.query(TelephonyCallEvent)
 		.filter(TelephonyCallEvent.call_id == call_id)
@@ -1141,6 +1247,23 @@ def patch_call(
 	]
 	if resolved is None or resolved.can_manage or resolved.can_supervise:
 		keys.append("assigned_user_id")
+	if payload.get("lead_id"):
+		linked_lead = db.query(Lead).filter(Lead.id == int(payload["lead_id"]), Lead.business_id == business_id).first()
+		if linked_lead is None:
+			raise ApiError("NOT_FOUND", "سرنخ یافت نشد.", http_status=404)
+		if auth_ctx is not None:
+			from app.services.crm_enterprise_service import assert_can_view_record
+
+			assert_can_view_record(db, business_id, auth_ctx, "lead", linked_lead, write=True)
+	if payload.get("deal_id"):
+		from adapters.db.models.crm import Deal
+		from app.services.crm_enterprise_service import assert_can_view_record
+
+		linked_deal = db.query(Deal).filter(Deal.id == int(payload["deal_id"]), Deal.business_id == business_id).first()
+		if linked_deal is None:
+			raise ApiError("NOT_FOUND", "فرصت فروش یافت نشد.", http_status=404)
+		if auth_ctx is not None:
+			assert_can_view_record(db, business_id, auth_ctx, "deal", linked_deal, write=True)
 	for key in keys:
 		if key in payload:
 			setattr(row, key, payload[key])
@@ -1149,7 +1272,7 @@ def patch_call(
 	row.updated_at = _now()
 	db.commit()
 	db.refresh(row)
-	return call_to_dict(row)
+	return scrub_calls_for_viewer(db, business_id, auth_ctx, [call_to_dict(row)])[0]
 
 
 def _ensure_extension_catalog(db: Session, pbx: TelephonyPbxConnection, extension: str) -> None:
@@ -1213,6 +1336,35 @@ def _notify_users_sync(user_ids: List[int], message: Dict[str, Any]) -> None:
 			pass
 
 
+def _softphone_lead_audience(
+	db: Session,
+	business_id: int,
+	lead: Optional[Lead],
+	user_ids: List[int],
+) -> Optional[Set[int]]:
+	"""None یعنی فیلتر لازم نیست. مجموعه یعنی فقط همین کاربران نام سرنخ را می‌بینند."""
+	if lead is None:
+		return None
+	from adapters.db.models.business_crm_settings import BusinessCrmSettings
+	from app.services.crm_enterprise_service import acl_actor, assert_can_view_record, record_acl_enforced
+
+	settings = db.query(BusinessCrmSettings).filter(BusinessCrmSettings.business_id == business_id).first()
+	if settings is None or not settings.record_acl_enabled:
+		return None
+	allowed: Set[int] = set()
+	for user_id in {int(item) for item in user_ids}:
+		ctx = acl_actor(db, user_id)
+		if not record_acl_enforced(db, business_id, ctx):
+			allowed.add(user_id)
+			continue
+		try:
+			assert_can_view_record(db, business_id, ctx, "lead", lead, write=False)
+		except ApiError:
+			continue
+		allowed.add(user_id)
+	return allowed
+
+
 def _notify_softphone_incoming_sync(
 	*,
 	pbx_id: int,
@@ -1222,6 +1374,7 @@ def _notify_softphone_incoming_sync(
 	channel: Optional[str] = None,
 	person: Optional[Dict[str, Any]] = None,
 	lead: Optional[Dict[str, Any]] = None,
+	lead_visible_user_ids: Optional[Set[int]] = None,
 	ambiguous: bool = False,
 ) -> None:
 	import anyio
@@ -1237,6 +1390,7 @@ def _notify_softphone_incoming_sync(
 			channel=channel,
 			person=person,
 			lead=lead,
+			lead_visible_user_ids=lead_visible_user_ids,
 			ambiguous=ambiguous,
 		)
 
@@ -1542,8 +1696,19 @@ def process_connector_event(
 		and call.status == "ringing"
 	):
 		person_brief = _person_brief(db.get(Person, call.person_id)) if call.person_id else None
-		lead_brief = _lead_brief(db.get(Lead, call.lead_id)) if call.lead_id else None
+		lead_row = db.get(Lead, call.lead_id) if call.lead_id else None
+		if lead_row is not None and int(lead_row.business_id) != int(pbx.business_id):
+			lead_row = None
 		match_info = (call.extra_info or {}).get("match") if isinstance(call.extra_info, dict) else None
+		if lead_row is None and isinstance(match_info, dict) and isinstance(match_info.get("lead"), dict):
+			raw_lead_id = match_info["lead"].get("id")
+			if raw_lead_id:
+				candidate = db.get(Lead, int(raw_lead_id))
+				if candidate is not None and int(candidate.business_id) == int(pbx.business_id):
+					lead_row = candidate
+		from app.services.telephony.media_hub import media_hub
+
+		online_users = media_hub.extension_user_ids(pbx.id, str(call.extension))
 		_notify_softphone_incoming_sync(
 			pbx_id=pbx.id,
 			extension=str(call.extension),
@@ -1551,7 +1716,8 @@ def process_connector_event(
 			from_number=call.from_number_normalized or call.from_number_raw,
 			channel=str(payload.get("channel") or "") or None,
 			person=person_brief or ((match_info or {}).get("person") if isinstance(match_info, dict) else None),
-			lead=lead_brief or ((match_info or {}).get("lead") if isinstance(match_info, dict) else None),
+			lead=_lead_brief(lead_row),
+			lead_visible_user_ids=_softphone_lead_audience(db, pbx.business_id, lead_row, online_users),
 			ambiguous=bool(isinstance(match_info, dict) and match_info.get("ambiguous")),
 		)
 
@@ -1763,24 +1929,26 @@ def screen_pop_context(db: Session, business_id: int, call_id: int, *, auth_ctx=
 				for ch in checks
 			]
 			from adapters.db.models.crm import Deal
+			from app.services.crm_enterprise_service import restrict_visibility_query
 
-			deals = (
-				db.query(Deal)
-				.filter(Deal.business_id == business_id, Deal.person_id == person_id, Deal.closed_at.is_(None))
-				.order_by(Deal.created_at.desc())
-				.limit(5)
-				.all()
+			deal_query = db.query(Deal).filter(
+				Deal.business_id == business_id, Deal.person_id == person_id, Deal.closed_at.is_(None)
 			)
+			if auth_ctx is not None:
+				deal_query = restrict_visibility_query(deal_query, db, business_id, auth_ctx, Deal, "deal")
+			deals = deal_query.order_by(Deal.created_at.desc()).limit(5).all()
 			open_deals = [
 				{"id": d.id, "title": d.title, "code": d.code, "amount": float(d.amount or 0)}
 				for d in deals
 			]
 
+	safe_match = scrub_match_for_viewer(db, business_id, auth_ctx, match if isinstance(match, dict) else {})
+	safe_call = scrub_calls_for_viewer(db, business_id, auth_ctx, [call_to_dict(call)])[0]
 	return {
-		"call": call_to_dict(call),
-		"person": _person_brief(person) if person else match.get("person"),
-		"lead": match.get("lead"),
-		"match": match,
+		"call": safe_call,
+		"person": _person_brief(person) if person else safe_match.get("person"),
+		"lead": safe_match.get("lead"),
+		"match": safe_match,
 		"balance": balance,
 		"recent_documents": recent_docs,
 		"overdue_checks": overdue_checks,

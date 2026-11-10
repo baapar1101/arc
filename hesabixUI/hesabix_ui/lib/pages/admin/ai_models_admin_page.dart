@@ -5,9 +5,12 @@ import 'package:hesabix_ui/models/ai_models.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'admin_compact_scaffold.dart';
+import '../../theme/tokens/extensions.dart';
 
 class AIModelsAdminPage extends StatefulWidget {
-  const AIModelsAdminPage({super.key});
+  final bool embedded;
+  const AIModelsAdminPage({super.key, this.embedded = false});
 
   @override
   State<AIModelsAdminPage> createState() => _AIModelsAdminPageState();
@@ -30,14 +33,17 @@ class _AIModelsAdminPageState extends State<AIModelsAdminPage> {
     final force = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('ایجاد خودکار مدل‌ها'),
-        content: const Text(
-          'مدل فعال تنظیمات AI و presetهای همان provider اضافه می‌شوند.\n'
-          'اگر کاتالوگ خالی نباشد، عملیات نادیده گرفته می‌شود.',
+        title: Text(adminTx(context, 'ایجاد خودکار مدل‌ها', 'Create models automatically')),
+        content: Text(
+          adminTx(
+            context,
+            'مدل فعال تنظیمات و پیش‌تنظیم‌های همان ارائه‌دهنده اضافه می‌شوند. اگر فهرست خالی نباشد، کاری انجام نمی‌شود.',
+            'The active settings model and that provider’s presets are added. Nothing happens if the catalog is not empty.',
+          ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('لغو')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('اجرا')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(adminTx(context, 'لغو', 'Cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(adminTx(context, 'اجرا', 'Run'))),
         ],
       ),
     );
@@ -46,7 +52,7 @@ class _AIModelsAdminPageState extends State<AIModelsAdminPage> {
       final result = await _aiService.seedAIModelsFromConfig(includePresets: true);
       if (!mounted) return;
       final created = result['created'] ?? 0;
-      SnackBarHelper.show(context, message: '$created مدل ایجاد شد');
+      SnackBarHelper.show(context, message: adminTx(context, '$created مدل ایجاد شد', '$created models created'));
       _load();
     } catch (e) {
       if (!mounted) return;
@@ -105,7 +111,7 @@ class _AIModelsAdminPageState extends State<AIModelsAdminPage> {
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
-            title: Text(isEdit ? 'ویرایش مدل' : 'مدل جدید'),
+            title: Text(isEdit ? adminTx(context, 'ویرایش مدل', 'Edit model') : adminTx(context, 'مدل جدید', 'New model')),
             content: SizedBox(
               width: 520,
               child: SingleChildScrollView(
@@ -116,22 +122,20 @@ class _AIModelsAdminPageState extends State<AIModelsAdminPage> {
                     children: [
                       TextFormField(
                         controller: codeCtrl,
-                        decoration: const InputDecoration(labelText: 'کد مدل'),
+                        decoration: InputDecoration(isDense: true, labelText: adminTx(context, 'کد مدل', 'Model code')),
                         enabled: !isEdit,
-                        validator: (v) =>
-                            v == null || v.trim().isEmpty ? 'الزامی' : null,
+                        validator: (v) => v == null || v.trim().isEmpty ? adminTx(context, 'الزامی', 'Required') : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: nameCtrl,
-                        decoration: const InputDecoration(labelText: 'نام نمایشی'),
-                        validator: (v) =>
-                            v == null || v.trim().isEmpty ? 'الزامی' : null,
+                        decoration: InputDecoration(isDense: true, labelText: adminTx(context, 'نام نمایشی', 'Display name')),
+                        validator: (v) => v == null || v.trim().isEmpty ? adminTx(context, 'الزامی', 'Required') : null,
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
                         value: provider,
-                        decoration: const InputDecoration(labelText: 'Provider'),
+                        decoration: InputDecoration(isDense: true, labelText: adminTx(context, 'ارائه‌دهنده', 'Provider')),
                         items: const [
                           DropdownMenuItem(value: 'openai', child: Text('OpenAI')),
                           DropdownMenuItem(value: 'anthropic', child: Text('Anthropic')),
@@ -143,60 +147,61 @@ class _AIModelsAdminPageState extends State<AIModelsAdminPage> {
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: modelIdCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'شناسه API مدل',
-                          helperText: 'نام مدل ارسالی به provider (مثلاً gpt-4o-mini)',
+                        decoration: InputDecoration(
+                          isDense: true,
+                          labelText: adminTx(context, 'شناسه API مدل', 'Model API id'),
+                          helperText: adminTx(context, 'نامی که به ارائه‌دهنده فرستاده می‌شود، مثل gpt-4o-mini', 'Name sent to the provider, for example gpt-4o-mini'),
                         ),
-                        validator: (v) =>
-                            v == null || v.trim().isEmpty ? 'الزامی' : null,
+                        validator: (v) => v == null || v.trim().isEmpty ? adminTx(context, 'الزامی', 'Required') : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: maxTokensCtrl,
-                        decoration: const InputDecoration(labelText: 'حداکثر توکن پیش‌فرض'),
+                        decoration: InputDecoration(isDense: true, labelText: adminTx(context, 'حداکثر توکن پیش‌فرض', 'Default max tokens')),
                         keyboardType: TextInputType.number,
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: tierCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'سطح (اختیاری)',
-                          helperText: 'مثلاً basic, pro, enterprise',
+                        decoration: InputDecoration(
+                          isDense: true,
+                          labelText: adminTx(context, 'سطح (اختیاری)', 'Tier (optional)'),
+                          helperText: 'basic, pro, enterprise',
                         ),
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: descCtrl,
-                        decoration: const InputDecoration(labelText: 'توضیحات'),
+                        decoration: InputDecoration(isDense: true, labelText: adminTx(context, 'توضیحات', 'Description')),
                         maxLines: 2,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: refInCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'هزینه مرجع ورودی / ۱۰۰۰ توکن (اختیاری)',
+                        decoration: InputDecoration(
+                          isDense: true,
+                          labelText: adminTx(context, 'هزینه مرجع ورودی / ۱۰۰۰ توکن', 'Reference input cost / 1k tokens'),
                         ),
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: refOutCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'هزینه مرجع خروجی / ۱۰۰۰ توکن (اختیاری)',
+                        decoration: InputDecoration(
+                          isDense: true,
+                          labelText: adminTx(context, 'هزینه مرجع خروجی / ۱۰۰۰ توکن', 'Reference output cost / 1k tokens'),
                         ),
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       ),
                       SwitchListTile(
-                        title: const Text('پشتیبانی از ابزارها'),
+                        title: Text(adminTx(context, 'پشتیبانی از ابزارها', 'Tool support')),
                         value: supportsTools,
                         onChanged: (v) => setDialogState(() => supportsTools = v),
                       ),
                       SwitchListTile(
-                        title: const Text('مدل استدلالی (reasoning)'),
-                        subtitle: const Text(
-                          'برای o-series، gpt-5 و Claude extended thinking',
-                        ),
+                        title: Text(adminTx(context, 'مدل استدلالی', 'Reasoning model')),
+                        subtitle: Text(adminTx(context, 'برای سری o، gpt-5 و تفکر گستردهٔ Claude', 'For o-series, gpt-5, and Claude extended thinking')),
                         value: supportsReasoning,
                         onChanged: (v) => setDialogState(() {
                           supportsReasoning = v;
@@ -206,15 +211,13 @@ class _AIModelsAdminPageState extends State<AIModelsAdminPage> {
                       if (supportsReasoning)
                         DropdownButtonFormField<String?>(
                           value: reasoningEffort,
-                          decoration: const InputDecoration(
-                            labelText: 'سطح تلاش استدلال',
-                            helperText: 'خالی = خودکار بر اساس پیچیدگی سوال',
+                          decoration: InputDecoration(
+                            isDense: true,
+                            labelText: adminTx(context, 'سطح تلاش استدلال', 'Reasoning effort'),
+                            helperText: adminTx(context, 'خالی یعنی خودکار', 'Empty means automatic'),
                           ),
-                          items: const [
-                            DropdownMenuItem<String?>(
-                              value: null,
-                              child: Text('خودکار'),
-                            ),
+                          items: [
+                            DropdownMenuItem<String?>(value: null, child: Text(adminTx(context, 'خودکار', 'Automatic'))),
                             DropdownMenuItem(value: 'minimal', child: Text('minimal')),
                             DropdownMenuItem(value: 'low', child: Text('low')),
                             DropdownMenuItem(value: 'medium', child: Text('medium')),
@@ -224,7 +227,7 @@ class _AIModelsAdminPageState extends State<AIModelsAdminPage> {
                               setDialogState(() => reasoningEffort = v),
                         ),
                       SwitchListTile(
-                        title: const Text('فعال'),
+                        title: Text(adminTx(context, 'فعال', 'Active')),
                         value: isActive,
                         onChanged: (v) => setDialogState(() => isActive = v),
                       ),
@@ -236,7 +239,7 @@ class _AIModelsAdminPageState extends State<AIModelsAdminPage> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('لغو'),
+                child: Text(adminTx(context, 'لغو', 'Cancel')),
               ),
               FilledButton(
                 onPressed: () async {
@@ -280,7 +283,7 @@ class _AIModelsAdminPageState extends State<AIModelsAdminPage> {
                     );
                   }
                 },
-                child: Text(isEdit ? 'ذخیره' : 'ایجاد'),
+                child: Text(isEdit ? adminTx(context, 'ذخیره', 'Save') : adminTx(context, 'ایجاد', 'Create')),
               ),
             ],
           );
@@ -302,17 +305,23 @@ class _AIModelsAdminPageState extends State<AIModelsAdminPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('مدیریت مدل‌های هوش مصنوعی'),
+      appBar: aiHubAppBar(
+        embedded: widget.embedded,
+        title: Text(adminTx(context, 'مدل‌های هوش مصنوعی', 'AI models')),
         actions: [
           IconButton(
-            tooltip: 'ایجاد خودکار از تنظیمات',
-            icon: const Icon(Icons.auto_fix_high),
+            tooltip: adminTx(context, 'ایجاد خودکار از تنظیمات', 'Create from settings'),
+            icon: const Icon(Icons.auto_fix_high, size: 20),
             onPressed: _seedFromConfig,
           ),
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
           IconButton(
-            icon: const Icon(Icons.add),
+            tooltip: adminTx(context, 'بازخوانی', 'Refresh'),
+            icon: const Icon(Icons.refresh, size: 20),
+            onPressed: _load,
+          ),
+          IconButton(
+            tooltip: adminTx(context, 'مدل جدید', 'New model'),
+            icon: const Icon(Icons.add, size: 20),
             onPressed: () => _showModelDialog(),
           ),
         ],
@@ -322,15 +331,16 @@ class _AIModelsAdminPageState extends State<AIModelsAdminPage> {
           : _error != null
               ? Center(child: Text(_error!))
               : _models.isEmpty
-                  ? const Center(child: Text('مدلی تعریف نشده است'))
+                  ? Center(child: Text(adminTx(context, 'مدلی تعریف نشده است', 'No models yet')))
                   : ListView.separated(
-                      padding: const EdgeInsets.all(16),
+                      padding: context.settingsHub.pagePadding,
                       itemCount: _models.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 8),
                       itemBuilder: (context, index) {
                         final m = _models[index];
                         return Card(
                           child: ListTile(
+                            dense: true,
                             leading: CircleAvatar(
                               backgroundColor: m.isActive
                                   ? theme.colorScheme.primaryContainer
@@ -340,7 +350,10 @@ class _AIModelsAdminPageState extends State<AIModelsAdminPage> {
                                 color: theme.colorScheme.onPrimaryContainer,
                               ),
                             ),
-                            title: Text(m.displayName),
+                            title: Text(
+                              m.displayName,
+                              style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.onSurface),
+                            ),
                             subtitle: Text(
                               '${m.code} · ${m.provider} · ${m.modelId}'
                               '${m.tier != null ? ' · ${m.tier}' : ''}'
@@ -351,9 +364,12 @@ class _AIModelsAdminPageState extends State<AIModelsAdminPage> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 if (!m.isActive)
-                                  const Padding(
-                                    padding: EdgeInsets.only(left: 8),
-                                    child: Chip(label: Text('غیرفعال')),
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 8),
+                                    child: Chip(
+                                      visualDensity: VisualDensity.compact,
+                                      label: Text(adminTx(context, 'غیرفعال', 'Inactive'), style: const TextStyle(fontSize: 11)),
+                                    ),
                                   ),
                                 IconButton(
                                   icon: const Icon(Icons.edit_outlined),
@@ -365,18 +381,16 @@ class _AIModelsAdminPageState extends State<AIModelsAdminPage> {
                                     final ok = await showDialog<bool>(
                                       context: context,
                                       builder: (ctx) => AlertDialog(
-                                        title: const Text('غیرفعال کردن مدل'),
-                                        content: Text(
-                                          'مدل «${m.displayName}» غیرفعال شود؟',
-                                        ),
+                                        title: Text(adminTx(context, 'غیرفعال کردن مدل', 'Deactivate model')),
+                                        content: Text(adminTx(context, 'مدل «${m.displayName}» غیرفعال شود؟', 'Deactivate “${m.displayName}”?')),
                                         actions: [
                                           TextButton(
                                             onPressed: () => Navigator.pop(ctx, false),
-                                            child: const Text('لغو'),
+                                            child: Text(adminTx(context, 'لغو', 'Cancel')),
                                           ),
                                           FilledButton(
                                             onPressed: () => Navigator.pop(ctx, true),
-                                            child: const Text('تأیید'),
+                                            child: Text(adminTx(context, 'تأیید', 'Confirm')),
                                           ),
                                         ],
                                       ),

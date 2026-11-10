@@ -79,6 +79,9 @@ class CrmChatConversationPatch(BaseModel):
 	assigned_to_user_id: Optional[int] = Field(None, ge=1)
 	lead_id: Optional[int] = Field(None, ge=1)
 	person_id: Optional[int] = Field(None, ge=1)
+	clear_lead: bool = False
+	clear_person: bool = False
+	clear_assignee: bool = False
 
 
 class BusinessCrmSettingsUpdate(BaseModel):

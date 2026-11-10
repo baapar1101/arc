@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.responses import success_response, ApiError
+from app.core.responses import ApiError, success_response
+from app.services.admin_audit_service import client_ip_from_request, record_admin_action
 from app.services.database_backup_service import DatabaseBackupService, DatabaseBackupError
 from app.services.database_restore_service import (
 	DatabaseRestoreService,
@@ -81,12 +82,12 @@ def _mask_notifications_secrets(data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _is_masked_or_unchanged_secret(value: str | None) -> bool:
-	"""اگر کلاینت مقدار ماسک‌شده را دوباره بفرستد، آن را به‌عنوان «بدون تغییر» در نظر بگیر."""
+	"""ماسک برگشتی از فرم یعنی «دست نزن». رشتهٔ خالی یعنی پاک کردن عمدی."""
 	if value is None:
 		return True
 	v = value.strip()
 	if not v:
-		return True
+		return False
 	if v == "***":
 		return True
 	if "***" in v and len(v) <= 12:
@@ -113,7 +114,7 @@ def get_wallet_settings_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	data = get_wallet_settings(db)
 	return success_response(data, request)
@@ -130,7 +131,7 @@ def set_wallet_settings_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	code = str(payload.get("wallet_base_currency_code") or "").strip().upper()
 	data = set_wallet_base_currency_code(db, code)
@@ -167,7 +168,7 @@ def get_notifications_settings_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	data = get_notifications_settings(db)
 	return success_response(_mask_notifications_secrets(data), request)
@@ -193,7 +194,7 @@ def get_share_link_settings_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	data = get_share_link_settings(db)
 	return success_response(data, request)
@@ -210,7 +211,7 @@ def set_share_link_settings_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	data = set_share_link_settings(
 		db,
@@ -237,7 +238,7 @@ def get_pay_page_system_settings_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	data = get_pay_page_system_settings(db)
 	return success_response(data, request)
@@ -254,7 +255,7 @@ def set_pay_page_system_settings_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	data = set_pay_page_system_settings(db, public_base_url=payload.public_base_url)
 	return success_response(data, request, message="PAY_PAGE_PUBLIC_BASE_URL_UPDATED")
@@ -278,7 +279,7 @@ def get_marketplace_settings_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	data = get_marketplace_settings(db)
 	return success_response(data, request)
@@ -294,7 +295,7 @@ def set_marketplace_settings_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	data = set_marketplace_settings(
 		db,
@@ -314,7 +315,7 @@ def put_notifications_settings_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	fields = _unwrap_notifications_payload(payload)
 	data = set_notifications_settings(
@@ -338,6 +339,16 @@ def put_notifications_settings_endpoint(
 		inapp_read_retention_enabled=fields.get("inapp_read_retention_enabled"),
 		inapp_read_retention_days=fields.get("inapp_read_retention_days"),
 	)
+	changed = sorted(key for key, value in fields.items() if value is not None)
+	record_admin_action(
+		db,
+		actor_user_id=ctx.get_user_id(),
+		action="notifications.channels_update",
+		summary="به‌روزرسانی کانال‌های اعلان سیستم",
+		target_type="notification_channels",
+		metadata={"fields": changed},
+		client_ip=client_ip_from_request(request),
+	)
 	return success_response(_mask_notifications_secrets(data), request)
 
 
@@ -351,7 +362,7 @@ def register_telegram_webhook_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 
 	logger.info("telegram_webhook_register_start", user_id=ctx.get_user_id())
@@ -449,7 +460,7 @@ def register_bale_webhook_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 
 	cfg = get_effective_notifications_settings(db)
@@ -580,7 +591,7 @@ def get_system_configuration_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	data = get_system_configuration(db)
 	return success_response(data, request)
@@ -597,7 +608,7 @@ def set_system_configuration_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	data = set_system_configuration(
 		db,
@@ -657,6 +668,17 @@ def set_system_configuration_endpoint(
 		firewall_auto_ban_on_login_fail=payload.firewall_auto_ban_on_login_fail,
 		firewall_auto_ban_duration_sec=payload.firewall_auto_ban_duration_sec,
 	)
+	raw = payload.model_dump(exclude_none=True) if hasattr(payload, "model_dump") else payload.dict(exclude_none=True)
+	changed = sorted(raw.keys())
+	record_admin_action(
+		db,
+		actor_user_id=ctx.get_user_id(),
+		action="system_configuration.update",
+		summary="به‌روزرسانی پیکربندی سیستم",
+		target_type="system_configuration",
+		metadata={"fields": changed},
+		client_ip=client_ip_from_request(request),
+	)
 	return success_response(data, request, message="SYSTEM_CONFIGURATION_UPDATED")
 
 
@@ -672,7 +694,7 @@ def get_auth_security_report_endpoint(
 	hours: int = Query(24, ge=1, le=2160),
 	limit: int = Query(80, ge=1, le=500),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	data = get_auth_security_report(db, hours=hours, limit=limit)
 	return success_response(data, request)
@@ -697,7 +719,7 @@ def get_redis_configuration_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	
 	data = get_redis_configuration(db)
@@ -719,7 +741,7 @@ def set_redis_configuration_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	
 	# اگر password خالی ارسال شده (برای حذف password)
@@ -767,7 +789,7 @@ def test_redis_connection_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	
 	from app.core.cache import get_redis_client
@@ -828,7 +850,7 @@ def get_zohal_settings_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	data = get_zohal_settings(db)
 	return success_response(data, request)
@@ -845,7 +867,7 @@ def set_zohal_settings_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	data = set_zohal_settings(
 		db,
@@ -871,7 +893,7 @@ def get_notification_sms_pricing_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	data = get_notification_sms_pricing(db)
 	return success_response(data, request)
@@ -888,7 +910,7 @@ def set_notification_sms_pricing_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	data = set_notification_sms_pricing(
 		db,
@@ -920,8 +942,8 @@ def create_database_backup_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ):
-	if not ctx.has_any_permission("system_settings", "superadmin"):
-		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
+	if not ctx.is_superadmin():
+		raise ApiError("FORBIDDEN", "فقط superadmin می‌تواند بکاپ کامل دیتابیس بگیرد.", http_status=403)
 
 	service = DatabaseBackupService(db)
 	delivery_lower = (delivery or "").lower().strip()
@@ -929,6 +951,15 @@ def create_database_backup_endpoint(
 	try:
 		if delivery_lower == "download":
 			content, filename = service.deliver_download(compress=compress)
+			record_admin_action(
+				db,
+				actor_user_id=ctx.get_user_id(),
+				action="database.backup",
+				summary="بکاپ دیتابیس (دانلود)",
+				target_type="database",
+				metadata={"delivery": "download", "compress": compress},
+				client_ip=client_ip_from_request(request),
+			)
 			return Response(
 				content=content,
 				media_type="application/octet-stream",
@@ -944,6 +975,15 @@ def create_database_backup_endpoint(
 			ok = service.deliver_email(to_email=email_val, compress=compress)
 			if not ok:
 				raise ApiError("EMAIL_SEND_FAILED", "ارسال ایمیل ناموفق بود.", http_status=500)
+			record_admin_action(
+				db,
+				actor_user_id=ctx.get_user_id(),
+				action="database.backup",
+				summary="بکاپ دیتابیس (ایمیل)",
+				target_type="database",
+				metadata={"delivery": "email", "compress": compress},
+				client_ip=client_ip_from_request(request),
+			)
 			return success_response(
 				{"sent": True, "to": email_val},
 				request,
@@ -955,6 +995,15 @@ def create_database_backup_endpoint(
 			if not config_id:
 				raise ApiError("STORAGE_CONFIG_REQUIRED", "شناسه تنظیمات FTP الزامی است.", http_status=400)
 			result = service.deliver_ftp(storage_config_id=config_id, compress=compress)
+			record_admin_action(
+				db,
+				actor_user_id=ctx.get_user_id(),
+				action="database.backup",
+				summary="بکاپ دیتابیس (FTP)",
+				target_type="database",
+				metadata={"delivery": "ftp", "compress": compress},
+				client_ip=client_ip_from_request(request),
+			)
 			return success_response(result, request, message="DATABASE_BACKUP_FTP_UPLOADED")
 
 		else:
@@ -1056,6 +1105,16 @@ async def create_database_restore_endpoint(
 
 	background_tasks.add_task(task)
 
+	record_admin_action(
+		db,
+		actor_user_id=ctx.get_user_id(),
+		action="database.restore",
+		summary=f"شروع ریستور دیتابیس از {filename}",
+		target_type="database",
+		target_id=job_id,
+		metadata={"filename": filename},
+		client_ip=client_ip_from_request(request),
+	)
 	return success_response(
 		{"job_id": job_id, "message": "ریستور در پس‌زمینه شروع شد"},
 		request,

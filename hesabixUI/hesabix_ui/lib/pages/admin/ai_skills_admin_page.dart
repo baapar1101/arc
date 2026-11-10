@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
+import 'admin_compact_scaffold.dart';
+import '../../theme/tokens/extensions.dart';
 
 /// تأیید/رد مهارت‌های AI در انتظار بررسی (مدیر سیستم).
 class AISkillsAdminPage extends StatefulWidget {
-  const AISkillsAdminPage({super.key});
+  final bool embedded;
+  const AISkillsAdminPage({super.key, this.embedded = false});
 
   @override
   State<AISkillsAdminPage> createState() => _AISkillsAdminPageState();
@@ -47,7 +49,7 @@ class _AISkillsAdminPageState extends State<AISkillsAdminPage> {
       final res = await _api.post<Map<String, dynamic>>('/api/v1/admin/ai/skills/seed-official');
       final created = res.data?['data']?['created'] ?? 0;
       if (!mounted) return;
-      SnackBarHelper.show(context, message: '$created مهارت رسمی اضافه شد');
+      SnackBarHelper.show(context, message: adminTx(context, '$created مهارت رسمی اضافه شد', '$created official skills added'));
       await _load();
     } catch (e) {
       if (mounted) {
@@ -63,7 +65,7 @@ class _AISkillsAdminPageState extends State<AISkillsAdminPage> {
     try {
       await _api.post('/api/v1/admin/ai/skills/packages/$packageId/approve');
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'مهارت تأیید و منتشر شد');
+      SnackBarHelper.show(context, message: adminTx(context, 'مهارت تأیید و منتشر شد', 'Skill approved and published'));
       await _load();
     } catch (e) {
       if (mounted) {
@@ -79,15 +81,18 @@ class _AISkillsAdminPageState extends State<AISkillsAdminPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('رد مهارت'),
+        title: Text(adminTx(context, 'رد مهارت', 'Reject skill')),
         content: TextField(
           controller: reasonCtrl,
-          decoration: const InputDecoration(labelText: 'دلیل (اختیاری)'),
+          decoration: InputDecoration(
+            isDense: true,
+            labelText: adminTx(context, 'دلیل (اختیاری)', 'Reason (optional)'),
+          ),
           maxLines: 3,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('رد')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(adminTx(context, 'انصراف', 'Cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(adminTx(context, 'رد', 'Reject'))),
         ],
       ),
     );
@@ -99,7 +104,7 @@ class _AISkillsAdminPageState extends State<AISkillsAdminPage> {
         data: {'reason': reasonCtrl.text.trim()},
       );
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'مهارت رد شد');
+      SnackBarHelper.show(context, message: adminTx(context, 'مهارت رد شد', 'Skill rejected'));
       await _load();
     } catch (e) {
       if (mounted) {
@@ -113,27 +118,28 @@ class _AISkillsAdminPageState extends State<AISkillsAdminPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('بررسی مهارت‌های AI'),
+      appBar: aiHubAppBar(
+        embedded: widget.embedded,
+        title: Text(adminTx(context, 'بررسی مهارت‌ها', 'Skill review')),
         actions: [
           IconButton(
-            onPressed: _busy ? null : () => context.push('/user/profile/system-settings/ai-marketplace'),
-            tooltip: 'تنظیمات مارکت‌پلیس',
-            icon: const Icon(Icons.settings_outlined),
+            onPressed: _busy ? null : _seedOfficial,
+            tooltip: adminTx(context, 'افزودن مهارت‌های رسمی', 'Add official skills'),
+            icon: const Icon(Icons.cloud_download_outlined, size: 20),
           ),
           IconButton(
-            onPressed: _busy ? null : _seedOfficial,
-            tooltip: 'Seed مهارت‌های رسمی',
-            icon: const Icon(Icons.cloud_download_outlined),
+            onPressed: _busy ? null : _load,
+            tooltip: adminTx(context, 'بازخوانی', 'Refresh'),
+            icon: const Icon(Icons.refresh, size: 20),
           ),
-          IconButton(onPressed: _busy ? null : _load, icon: const Icon(Icons.refresh)),
         ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _items.isEmpty
-              ? const Center(child: Text('مهارتی در انتظار تأیید نیست'))
+              ? Center(child: Text(adminTx(context, 'مهارتی در انتظار تأیید نیست', 'No skills waiting for review')))
               : ListView.separated(
+                  padding: context.settingsHub.pagePadding,
                   itemCount: _items.length,
                   separatorBuilder: (_, __) => const Divider(height: 1),
                   itemBuilder: (context, i) {
@@ -147,16 +153,23 @@ class _AISkillsAdminPageState extends State<AISkillsAdminPage> {
                         ? Map<String, dynamic>.from(mod['moderation'] as Map)
                         : null;
                     return ListTile(
-                      title: Text(item['title']?.toString() ?? ''),
+                      dense: true,
+                      title: Text(
+                        item['title']?.toString() ?? '',
+                        style: context.settingsHub.cardTitleStyle(
+                          Theme.of(context).textTheme,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(item['description']?.toString() ?? '', maxLines: 2, overflow: TextOverflow.ellipsis),
                           if (item['price_amount'] != null)
-                            Text('قیمت: ${item['price_amount']}'),
+                            Text('${adminTx(context, 'قیمت', 'Price')}: ${item['price_amount']}'),
                           if (moderation != null)
                             Text(
-                              'moderation: ${moderation['decision']} (spam: ${moderation['spam_score']})',
+                              '${adminTx(context, 'بررسی', 'Review')}: ${moderation['decision']} (${adminTx(context, 'هرزنامه', 'Spam')}: ${moderation['spam_score']})',
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
                         ],
@@ -168,10 +181,12 @@ class _AISkillsAdminPageState extends State<AISkillsAdminPage> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 IconButton(
+                                  tooltip: adminTx(context, 'تأیید', 'Approve'),
                                   icon: Icon(Icons.check_circle_outline, color: SemanticColorResolver.positive(context)),
                                   onPressed: _busy ? null : () => _approve(packageId),
                                 ),
                                 IconButton(
+                                  tooltip: adminTx(context, 'رد', 'Reject'),
                                   icon: Icon(Icons.cancel_outlined, color: SemanticColorResolver.negative(context)),
                                   onPressed: _busy ? null : () => _reject(packageId),
                                 ),

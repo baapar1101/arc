@@ -8,14 +8,29 @@ import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/crm_service.dart';
 import 'package:hesabix_ui/services/errors/api_error.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/widgets/crm/crm_deal_picker_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_lead_picker_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
+import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
+
+Person _notePerson(int businessId, int id, String? name) {
+  final label = name?.trim();
+  return Person(
+    id: id,
+    businessId: businessId,
+    aliasName: (label != null && label.isNotEmpty) ? label : 'شخص',
+    personTypes: const [PersonType.customer],
+    createdAt: DateTime(2020, 1, 1),
+    updatedAt: DateTime(2020, 1, 1),
+  );
+}
 
 /// نمایش دیالوگ ایجاد/ویرایش یادداشت CRM با تب‌ها، کارت‌های بخش و UX بهبود یافته.
 Future<void> showCrmNoteEditorDialog(
@@ -84,6 +99,11 @@ class _CrmNoteEditorDialogState extends State<CrmNoteEditorDialog> with SingleTi
   DateTime? _endAt;
   int? _leadId;
   String _leadLabel = '';
+  int? _personId;
+  Person? _selectedPerson;
+  int? _dealId;
+  int? _dealPersonId;
+  String _dealLabel = '';
   final Set<int> _sharedIds = {};
   List<Map<String, dynamic>> _members = [];
   bool _saving = false;
@@ -126,6 +146,16 @@ class _CrmNoteEditorDialogState extends State<CrmNoteEditorDialog> with SingleTi
         final nm = (e['lead_name'] ?? '').toString();
         _leadLabel = cn.isNotEmpty ? '$cn — $nm' : nm;
       }
+      _personId = (e['person_id'] as num?)?.toInt();
+      if (_personId != null) {
+        _selectedPerson = _notePerson(widget.businessId, _personId!, e['person_name']?.toString());
+      }
+      _dealId = (e['deal_id'] as num?)?.toInt();
+      _dealPersonId = (e['deal_person_id'] as num?)?.toInt() ?? _personId;
+      final dealCode = (e['deal_code'] ?? '').toString();
+      final dealTitle = (e['deal_title'] ?? '').toString();
+      _dealLabel = [dealCode, dealTitle].where((part) => part.isNotEmpty).join(' — ');
+      if (_dealId != null && _dealLabel.isEmpty) _dealLabel = 'فرصت';
       final sh = e['shared_user_ids'];
       if (sh is List) {
         for (final x in sh) {
@@ -276,6 +306,35 @@ class _CrmNoteEditorDialogState extends State<CrmNoteEditorDialog> with SingleTi
     }
   }
 
+  Future<void> _pickDeal() async {
+    final chosen = await showCrmDealPickerDialog(
+      context,
+      businessId: widget.businessId,
+      personId: _personId,
+    );
+    if (chosen == null || !mounted) return;
+    setState(() {
+      _dealId = (chosen['id'] as num?)?.toInt();
+      _dealPersonId = (chosen['person_id'] as num?)?.toInt();
+      final code = (chosen['code'] ?? '').toString();
+      final title = (chosen['title'] ?? '').toString();
+      _dealLabel = [code, title].where((part) => part.isNotEmpty).join(' — ');
+      if (_personId == null && _dealPersonId != null) {
+        _personId = _dealPersonId;
+        _selectedPerson = _notePerson(widget.businessId, _dealPersonId!, chosen['person_name']?.toString());
+      }
+    });
+  }
+
+  String _partySubtitle(AppLocalizations t) {
+    final parts = <String>[
+      if ((_selectedPerson?.aliasName ?? '').trim().isNotEmpty) _selectedPerson!.aliasName.trim(),
+      if (_leadLabel.trim().isNotEmpty) _leadLabel.trim(),
+      if (_dealLabel.trim().isNotEmpty) _dealLabel.trim(),
+    ];
+    return parts.isEmpty ? t.crmNotesEditorMoreOptions : parts.join(' · ');
+  }
+
   Future<void> _save() async {
     final t = AppLocalizations.of(context);
     final mode = _schedulingModeForType(_typeId);
@@ -310,6 +369,8 @@ class _CrmNoteEditorDialogState extends State<CrmNoteEditorDialog> with SingleTi
         if (mode == 'meeting' && _startAt != null) 'starts_at': _startAt!.toIso8601String(),
         if (mode == 'meeting' && _endAt != null) 'ends_at': _endAt!.toIso8601String(),
         if (_leadId != null) 'lead_id': _leadId,
+        if (_personId != null) 'person_id': _personId,
+        if (_dealId != null) 'deal_id': _dealId,
         if (_visibility == 'shared') 'shared_user_ids': _sharedIds.toList(),
       };
       final existingId = (widget.existing?['id'] as num?)?.toInt();
@@ -320,6 +381,14 @@ class _CrmNoteEditorDialogState extends State<CrmNoteEditorDialog> with SingleTi
         final hadLead = (widget.existing?['lead_id'] as num?) != null;
         if (hadLead && _leadId == null) {
           patch['clear_lead'] = true;
+        }
+        final hadPerson = (widget.existing?['person_id'] as num?) != null;
+        if (hadPerson && _personId == null) {
+          patch['clear_person'] = true;
+        }
+        final hadDeal = (widget.existing?['deal_id'] as num?) != null;
+        if (hadDeal && _dealId == null) {
+          patch['clear_deal'] = true;
         }
         await _crm.updateCrmNote(businessId: widget.businessId, noteId: existingId, body: patch);
       }
@@ -836,11 +905,11 @@ class _CrmNoteEditorDialogState extends State<CrmNoteEditorDialog> with SingleTi
             side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
           ),
           child: ExpansionTile(
-            initiallyExpanded: _leadId != null,
+            initiallyExpanded: _leadId != null || _personId != null || _dealId != null,
             leading: Icon(Icons.person_search_outlined, color: cs.primary),
             title: Text(t.crmNotesLeadOptional),
             subtitle: Text(
-              _leadLabel.isNotEmpty ? _leadLabel : t.crmNotesEditorMoreOptions,
+              _partySubtitle(t),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
@@ -865,6 +934,50 @@ class _CrmNoteEditorDialogState extends State<CrmNoteEditorDialog> with SingleTi
                         onPressed: canWrite ? _pickLead : null,
                         icon: const Icon(Icons.search),
                         label: Text(t.crmNotesSearchLeads),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    PersonComboboxWidget(
+                      businessId: widget.businessId,
+                      selectedPerson: _selectedPerson,
+                      isRequired: false,
+                      label: t.crmWebChatOptionalPersonId,
+                      hintText: t.crmWebChatOptionalPersonId,
+                      onChanged: canWrite
+                          ? (person) {
+                              setState(() {
+                                _selectedPerson = person;
+                                _personId = person?.id;
+                                if (_dealId != null && _dealPersonId != null && person?.id != _dealPersonId) {
+                                  _dealId = null;
+                                  _dealPersonId = null;
+                                  _dealLabel = '';
+                                }
+                              });
+                            }
+                          : (_) {},
+                    ),
+                    const SizedBox(height: 12),
+                    if (_dealId != null && _dealLabel.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: InputChip(
+                          label: Text(_dealLabel),
+                          onDeleted: canWrite
+                              ? () => setState(() {
+                                    _dealId = null;
+                                    _dealPersonId = null;
+                                    _dealLabel = '';
+                                  })
+                              : null,
+                        ),
+                      ),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: canWrite ? _pickDeal : null,
+                        icon: const Icon(Icons.handshake_outlined),
+                        label: Text(t.crmActivityPickDeal),
                       ),
                     ),
                   ],

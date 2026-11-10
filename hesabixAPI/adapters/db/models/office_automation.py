@@ -303,6 +303,10 @@ class OaLetter(Base):
 	receipt_number: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 	receipt_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
 	sign_status: Mapped[str] = mapped_column(String(16), nullable=False, default="none")
+	branch_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+	retain_until: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+	retention_status: Mapped[str] = mapped_column(String(16), nullable=False, default="none")
+	qualified_sign_status: Mapped[str] = mapped_column(String(16), nullable=False, default="none")
 	keywords: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 	search_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 	ocr_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -485,6 +489,7 @@ class OaSecretariat(Base):
 	org_unit_id: Mapped[Optional[int]] = mapped_column(
 		Integer, ForeignKey("oa_org_units.id", ondelete="SET NULL"), nullable=True
 	)
+	branch_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 	code: Mapped[str] = mapped_column(String(64), nullable=False)
 	name_i18n: Mapped[dict] = mapped_column(JSON, nullable=False)
 	incoming_prefix: Mapped[str] = mapped_column(String(16), nullable=False, default="IN")
@@ -705,6 +710,31 @@ class OaCartableRule(Base):
 	is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 	conditions: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
 	actions: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+	updated_at: Mapped[datetime] = mapped_column(
+		DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+	)
+
+
+class OaCartableSavedFilter(Base):
+	__tablename__ = "oa_cartable_saved_filters"
+	__table_args__ = (
+		UniqueConstraint("business_id", "user_id", "name", name="uq_oa_cartable_saved_filters_name"),
+		Index("ix_oa_cartable_saved_filters_business_user", "business_id", "user_id"),
+	)
+
+	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+	business_id: Mapped[int] = mapped_column(
+		Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False
+	)
+	user_id: Mapped[int] = mapped_column(
+		Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+	)
+	name: Mapped[str] = mapped_column(String(80), nullable=False)
+	folder: Mapped[str] = mapped_column(String(32), nullable=False, default="inbox")
+	query_text: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+	date_from: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+	date_to: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(
 		DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False

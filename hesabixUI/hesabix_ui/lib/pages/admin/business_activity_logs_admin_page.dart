@@ -1,13 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/services/admin_activity_log_service.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table.dart';
+import 'admin_compact_scaffold.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
@@ -146,15 +146,15 @@ class _BusinessActivityLogsAdminPageState
     final selected = await showDialog<Map<String, dynamic>?>(
       context: context,
       builder: (ctx) => _SearchPickerDialog(
-        title: 'انتخاب کسب‌وکار',
-        searchHint: 'جستجوی نام کسب‌وکار...',
+        title: adminTx(context, 'انتخاب کسب‌وکار', 'Choose a business'),
+        searchHint: adminTx(context, 'جستجوی نام کسب‌وکار...', 'Search business name...'),
         fetcher: (q) => _service.searchBusinesses(query: q),
         itemTitle: (item) => (item['name'] ?? '').toString(),
         itemSubtitle: (item) {
           final type = item['business_type']?.toString();
           return type == null || type.isEmpty
-              ? 'شناسه: ${item['id']}'
-              : '$type • شناسه: ${item['id']}';
+              ? adminTx(context, 'شناسه: ${item['id']}', 'Id: ${item['id']}')
+              : adminTx(context, '$type • شناسه: ${item['id']}', '$type • Id: ${item['id']}');
         },
       ),
     );
@@ -173,9 +173,9 @@ class _BusinessActivityLogsAdminPageState
       context: context,
       builder: (ctx) => _SearchPickerDialog(
         title: businessId == null
-            ? 'انتخاب کاربر (همه کاربران)'
-            : 'انتخاب کاربر عضو کسب‌وکار',
-        searchHint: 'نام/ایمیل/موبایل...',
+            ? adminTx(context, 'انتخاب کاربر (همه کاربران)', 'Choose a user (all users)')
+            : adminTx(context, 'انتخاب کاربر عضو کسب‌وکار', 'Choose a business member'),
+        searchHint: adminTx(context, 'نام/ایمیل/موبایل...', 'Name, email, or mobile...'),
         fetcher: (q) =>
             _service.searchUsers(query: q, businessId: businessId),
         itemTitle: (item) => (item['full_name'] ?? '').toString(),
@@ -185,7 +185,7 @@ class _BusinessActivityLogsAdminPageState
           final parts = <String>[];
           if (email != null && email.isNotEmpty) parts.add(email);
           if (mobile != null && mobile.isNotEmpty) parts.add(mobile);
-          return parts.isEmpty ? 'شناسه: ${item['id']}' : parts.join(' • ');
+          return parts.isEmpty ? adminTx(context, 'شناسه: ${item['id']}', 'Id: ${item['id']}') : parts.join(' • ');
         },
       ),
     );
@@ -207,7 +207,7 @@ class _BusinessActivityLogsAdminPageState
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطا در دریافت جزئیات: $e')),
+        SnackBar(content: Text(adminTx(context, 'خطا در دریافت جزئیات: $e', 'Could not load details: $e'))),
       );
     }
   }
@@ -217,24 +217,24 @@ class _BusinessActivityLogsAdminPageState
   String _categoryLabel(String? c) {
     if (c == null) return '';
     const m = {
-      'accounting': 'حسابداری',
-      'warehouse': 'انبار',
-      'product': 'کالا',
-      'person': 'شخص',
-      'business': 'کسب و کار',
-      'user': 'کاربر',
-      'settings': 'تنظیمات',
-      'invoice': 'فاکتور',
-      'document': 'سند',
-      'workflow': 'گردش کار',
-      'marketplace': 'مارکت‌پلیس',
-      'storage': 'ذخیره‌سازی',
-      'payment': 'پرداخت',
-      'wallet': 'کیف پول',
-      'warranty': 'گارانتی',
-      'ai': 'هوش مصنوعی',
-      'support': 'پشتیبانی',
-      'other': 'سایر',
+      'accounting': adminTx(context, 'حسابداری', 'Accounting'),
+      'warehouse': adminTx(context, 'انبار', 'Warehouse'),
+      'product': adminTx(context, 'کالا', 'Product'),
+      'person': adminTx(context, 'شخص', 'Person'),
+      'business': adminTx(context, 'کسب و کار', 'Business'),
+      'user': adminTx(context, 'کاربر', 'User'),
+      'settings': adminTx(context, 'تنظیمات', 'Settings'),
+      'invoice': adminTx(context, 'فاکتور', 'Invoice'),
+      'document': adminTx(context, 'سند', 'Document'),
+      'workflow': adminTx(context, 'گردش کار', 'Workflow'),
+      'marketplace': adminTx(context, 'مارکت‌پلیس', 'Marketplace'),
+      'storage': adminTx(context, 'ذخیره‌سازی', 'Storage'),
+      'payment': adminTx(context, 'پرداخت', 'Payment'),
+      'wallet': adminTx(context, 'کیف پول', 'Wallet'),
+      'warranty': adminTx(context, 'گارانتی', 'Warranty'),
+      'ai': adminTx(context, 'هوش مصنوعی', 'AI'),
+      'support': adminTx(context, 'پشتیبانی', 'Support'),
+      'other': adminTx(context, 'سایر', 'Other'),
     };
     return m[c] ?? c;
   }
@@ -242,23 +242,23 @@ class _BusinessActivityLogsAdminPageState
   String _actionLabel(String? a) {
     if (a == null) return '';
     const m = {
-      'create': 'ایجاد',
-      'update': 'ویرایش',
-      'delete': 'حذف',
-      'post': 'ثبت',
-      'cancel': 'لغو',
-      'approve': 'تایید',
-      'reject': 'رد',
-      'export': 'خروجی',
-      'import': 'ورودی',
-      'login': 'ورود',
-      'logout': 'خروج',
-      'logout_all': 'خروج از همه',
-      'login_failed': 'ورود ناموفق',
-      'password_change': 'تغییر رمز',
-      'execute': 'اجرا',
-      'execute_failed': 'اجرا ناموفق',
-      'restart_service': 'راه‌اندازی مجدد',
+      'create': adminTx(context, 'ایجاد', 'Create'),
+      'update': adminTx(context, 'ویرایش', 'Edit'),
+      'delete': adminTx(context, 'حذف', 'Delete'),
+      'post': adminTx(context, 'ثبت', 'Post'),
+      'cancel': adminTx(context, 'لغو', 'Cancel'),
+      'approve': adminTx(context, 'تایید', 'Approve'),
+      'reject': adminTx(context, 'رد', 'Reject'),
+      'export': adminTx(context, 'خروجی', 'Export'),
+      'import': adminTx(context, 'ورودی', 'Import'),
+      'login': adminTx(context, 'ورود', 'Sign in'),
+      'logout': adminTx(context, 'خروج', 'Sign out'),
+      'logout_all': adminTx(context, 'خروج از همه', 'Sign out everywhere'),
+      'login_failed': adminTx(context, 'ورود ناموفق', 'Failed sign-in'),
+      'password_change': adminTx(context, 'تغییر رمز', 'Password change'),
+      'execute': adminTx(context, 'اجرا', 'Run'),
+      'execute_failed': adminTx(context, 'اجرا ناموفق', 'Run failed'),
+      'restart_service': adminTx(context, 'راه‌اندازی مجدد', 'Restart'),
     };
     return m[a] ?? a;
   }
@@ -301,8 +301,8 @@ class _BusinessActivityLogsAdminPageState
   DataTableConfig<Map<String, dynamic>> _buildTableConfig() {
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/api/v1/admin/activity-logs/table',
-      title: 'لاگ کسب و کارها',
-      subtitle: 'مشاهده فعالیت کاربران در همه کسب و کارها',
+      title: adminTx(context, 'لاگ کسب و کارها', 'Business activity'),
+      subtitle: adminTx(context, 'مشاهده فعالیت کاربران در همه کسب و کارها', 'User activity across businesses'),
       httpMethod: 'POST',
       // صفحه‌بندی سمت سرور
       showPagination: true,
@@ -328,7 +328,7 @@ class _BusinessActivityLogsAdminPageState
       columns: [
         DateColumn(
           'created_at',
-          'تاریخ و زمان',
+          adminTx(context, 'تاریخ و زمان', 'Date and time'),
           width: ColumnWidth.medium,
           formatter: (item) {
             final m = item as Map<String, dynamic>;
@@ -337,7 +337,7 @@ class _BusinessActivityLogsAdminPageState
         ),
         TextColumn(
           'business_name',
-          'کسب و کار',
+          adminTx(context, 'کسب و کار', 'Business'),
           width: ColumnWidth.medium,
           formatter: (item) {
             final m = item as Map<String, dynamic>;
@@ -348,7 +348,7 @@ class _BusinessActivityLogsAdminPageState
         ),
         TextColumn(
           'user_name',
-          'کاربر',
+          adminTx(context, 'کاربر', 'User'),
           width: ColumnWidth.medium,
           formatter: (item) {
             final m = item as Map<String, dynamic>;
@@ -358,12 +358,12 @@ class _BusinessActivityLogsAdminPageState
             if (name != null && name.isNotEmpty) return name;
             if (email != null && email.isNotEmpty) return email;
             if (mobile != null && mobile.isNotEmpty) return mobile;
-            return 'نامشخص';
+            return adminTx(context, 'نامشخص', 'Unknown');
           },
         ),
         CustomColumn(
           'category',
-          'دسته فعالیت',
+          adminTx(context, 'دسته فعالیت', 'Category'),
           width: ColumnWidth.small,
           builder: (item, _) {
             final m = item as Map<String, dynamic>;
@@ -390,7 +390,7 @@ class _BusinessActivityLogsAdminPageState
         ),
         TextColumn(
           'action',
-          'نوع عمل',
+          adminTx(context, 'نوع عمل', 'Action'),
           width: ColumnWidth.small,
           formatter: (item) {
             final m = item as Map<String, dynamic>;
@@ -399,7 +399,7 @@ class _BusinessActivityLogsAdminPageState
         ),
         TextColumn(
           'description',
-          'توضیحات',
+          adminTx(context, 'توضیحات', 'Description'),
           width: ColumnWidth.large,
           formatter: (item) {
             final m = item as Map<String, dynamic>;
@@ -408,7 +408,7 @@ class _BusinessActivityLogsAdminPageState
         ),
         TextColumn(
           'entity_info',
-          'موجودیت',
+          adminTx(context, 'موجودیت', 'Entity'),
           width: ColumnWidth.medium,
           formatter: (item) {
             final m = item as Map<String, dynamic>;
@@ -427,7 +427,7 @@ class _BusinessActivityLogsAdminPageState
           actions: [
             DataTableAction(
               icon: Icons.info_outline,
-              label: 'جزئیات',
+              label: adminTx(context, 'جزئیات', 'Details'),
               onTap: (item) {
                 final m = item as Map<String, dynamic>;
                 final id = m['id'];
@@ -447,29 +447,16 @@ class _BusinessActivityLogsAdminPageState
     final cs = Theme.of(context).colorScheme;
     final calendar = _calendarController;
 
-    return Scaffold(
-      backgroundColor: cs.surface,
-      appBar: AppBar(
-        title: const Text('لاگ کسب و کارها'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            // بازگشت به صفحه تنظیمات سیستم
-            if (Navigator.of(context).canPop()) {
-              Navigator.of(context).pop();
-            } else {
-              context.go('/user/profile/system-settings');
-            }
-          },
+    return AdminCompactScaffold(
+      title: adminTx(context, 'لاگ کسب‌وکارها', 'Business activity logs'),
+      subtitle: adminTx(context, 'رویدادهای ثبت‌شده در کسب‌وکارها', 'Events recorded in businesses'),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh, size: 20),
+          tooltip: adminTx(context, 'بروزرسانی', 'Refresh'),
+          onPressed: _refreshTable,
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'بروزرسانی',
-            onPressed: _refreshTable,
-          ),
-        ],
-      ),
+      ],
       body: calendar == null
           ? const Center(child: CircularProgressIndicator())
           : Column(
@@ -508,7 +495,7 @@ class _BusinessActivityLogsAdminPageState
                 Icon(Icons.filter_list, color: cs.primary, size: 20),
                 const SizedBox(width: 8),
                 Text(
-                  'فیلترها',
+                  adminTx(context, 'فیلترها', 'Filters'),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -517,7 +504,7 @@ class _BusinessActivityLogsAdminPageState
                 TextButton.icon(
                   onPressed: _clearAllFilters,
                   icon: const Icon(Icons.clear_all, size: 18),
-                  label: const Text('پاک کردن فیلترها'),
+                  label: Text(adminTx(context, 'پاک کردن فیلترها', 'Clear filters')),
                 ),
               ],
             ),
@@ -529,7 +516,7 @@ class _BusinessActivityLogsAdminPageState
                 SizedBox(
                   width: 170,
                   child: DateInputField(
-                    labelText: 'از تاریخ',
+                    labelText: adminTx(context, 'از تاریخ', 'From'),
                     value: _startDate,
                     calendarController: calendar,
                     onChanged: (d) => setState(() => _startDate = d),
@@ -538,14 +525,14 @@ class _BusinessActivityLogsAdminPageState
                 SizedBox(
                   width: 170,
                   child: DateInputField(
-                    labelText: 'تا تاریخ',
+                    labelText: adminTx(context, 'تا تاریخ', 'To'),
                     value: _endDate,
                     calendarController: calendar,
                     onChanged: (d) => setState(() => _endDate = d),
                   ),
                 ),
                 _PickerField(
-                  label: 'کسب و کار',
+                  label: adminTx(context, 'کسب و کار', 'Business'),
                   icon: Icons.business_outlined,
                   selectedLabel: _selectedBusiness?['name']?.toString(),
                   onTap: _pickBusiness,
@@ -557,7 +544,7 @@ class _BusinessActivityLogsAdminPageState
                           }),
                 ),
                 _PickerField(
-                  label: 'کاربر',
+                  label: adminTx(context, 'کاربر', 'User'),
                   icon: Icons.person_outline,
                   selectedLabel: _selectedUser?['full_name']?.toString(),
                   onTap: _pickUser,
@@ -570,16 +557,16 @@ class _BusinessActivityLogsAdminPageState
                   child: DropdownButtonFormField<String>(
                     value: _selectedCategory,
                     isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'دسته فعالیت',
+                    decoration: InputDecoration(
+                      labelText: adminTx(context, 'دسته فعالیت', 'Category'),
                       border: OutlineInputBorder(),
                       contentPadding:
                           EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                     ),
                     items: [
-                      const DropdownMenuItem<String>(
+                      DropdownMenuItem<String>(
                         value: null,
-                        child: Text('همه'),
+                        child: Text(adminTx(context, 'همه', 'All')),
                       ),
                       ..._categoryOptions.map(
                         (c) => DropdownMenuItem<String>(
@@ -596,16 +583,16 @@ class _BusinessActivityLogsAdminPageState
                   child: DropdownButtonFormField<String>(
                     value: _selectedAction,
                     isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'نوع عمل',
+                    decoration: InputDecoration(
+                      labelText: adminTx(context, 'نوع عمل', 'Action'),
                       border: OutlineInputBorder(),
                       contentPadding:
                           EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                     ),
                     items: [
-                      const DropdownMenuItem<String>(
+                      DropdownMenuItem<String>(
                         value: null,
-                        child: Text('همه'),
+                        child: Text(adminTx(context, 'همه', 'All')),
                       ),
                       ..._actionOptions.map(
                         (a) => DropdownMenuItem<String>(
@@ -622,16 +609,16 @@ class _BusinessActivityLogsAdminPageState
                   child: DropdownButtonFormField<String>(
                     value: _selectedEntityType,
                     isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'نوع موجودیت',
+                    decoration: InputDecoration(
+                      labelText: adminTx(context, 'نوع موجودیت', 'Entity type'),
                       border: OutlineInputBorder(),
                       contentPadding:
                           EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                     ),
                     items: [
-                      const DropdownMenuItem<String>(
+                      DropdownMenuItem<String>(
                         value: null,
-                        child: Text('همه'),
+                        child: Text(adminTx(context, 'همه', 'All')),
                       ),
                       ..._entityTypeOptions.map(
                         (t) => DropdownMenuItem<String>(
@@ -648,7 +635,7 @@ class _BusinessActivityLogsAdminPageState
                   child: TextField(
                     controller: _searchCtrl,
                     decoration: InputDecoration(
-                      labelText: 'جستجو در توضیحات',
+                      labelText: adminTx(context, 'جستجو در توضیحات', 'Search descriptions'),
                       prefixIcon: const Icon(Icons.search, size: 20),
                       suffixIcon: _searchCtrl.text.isEmpty
                           ? null
@@ -718,7 +705,7 @@ class _PickerField extends StatelessWidget {
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
           ),
           child: Text(
-            hasValue ? selectedLabel! : 'همه',
+            hasValue ? selectedLabel! : adminTx(context, 'همه', 'All'),
             overflow: TextOverflow.ellipsis,
             maxLines: 1,
             style: TextStyle(
@@ -863,12 +850,12 @@ class _SearchPickerDialogState extends State<_SearchPickerDialog> {
     if (_error != null) {
       return Padding(
         padding: const EdgeInsets.all(16),
-        child: Text('خطا: $_error',
+        child: Text(adminTx(context, 'خطا: $_error', '$_error'),
             style: TextStyle(color: SemanticColorResolver.negative(context))),
       );
     }
     if (_items.isEmpty) {
-      return const Center(child: Text('نتیجه‌ای یافت نشد'));
+      return Center(child: Text(adminTx(context, 'نتیجه‌ای یافت نشد', 'No results')));
     }
     return ListView.separated(
       itemCount: _items.length,
@@ -910,7 +897,7 @@ class _LogDetailDialog extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'جزئیات لاگ #${log['id'] ?? ''}',
+                      adminTx(context, 'جزئیات لاگ #${log['id'] ?? ''}', 'Log #${log['id'] ?? ''}'),
                       style: Theme.of(context)
                           .textTheme
                           .titleMedium
@@ -931,24 +918,24 @@ class _LogDetailDialog extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _kv('توضیحات', log['description']?.toString()),
-                    _kv('کسب و کار',
+                    _kv(adminTx(context, 'توضیحات', 'Description'), log['description']?.toString()),
+                    _kv(adminTx(context, 'کسب و کار', 'Business'),
                         '${log['business_name'] ?? '-'} (#${log['business_id'] ?? '-'})'),
-                    _kv('کاربر',
+                    _kv(adminTx(context, 'کاربر', 'User'),
                         '${log['user_name'] ?? '-'} (#${log['user_id'] ?? '-'})'),
-                    _kv('دسته', log['category']?.toString()),
-                    _kv('عمل', log['action']?.toString()),
+                    _kv(adminTx(context, 'دسته', 'Category'), log['category']?.toString()),
+                    _kv(adminTx(context, 'عمل', 'Action'), log['action']?.toString()),
                     _kv(
-                      'موجودیت',
+                      adminTx(context, 'موجودیت', 'Entity'),
                       log['entity_type'] == null
                           ? null
                           : '${log['entity_type']} #${log['entity_id'] ?? '-'}',
                     ),
-                    _kv('تاریخ', log['created_at']?.toString()),
+                    _kv(adminTx(context, 'تاریخ', 'Date'), log['created_at']?.toString()),
                     const SizedBox(height: 8),
-                    _jsonBlock('قبل از تغییر', log['before_data']),
-                    _jsonBlock('بعد از تغییر', log['after_data']),
-                    _jsonBlock('اطلاعات اضافی', log['extra_info']),
+                    _jsonBlock(adminTx(context, 'قبل از تغییر', 'Before'), log['before_data']),
+                    _jsonBlock(adminTx(context, 'بعد از تغییر', 'After'), log['after_data']),
+                    _jsonBlock(adminTx(context, 'اطلاعات اضافی', 'Extra'), log['extra_info']),
                   ],
                 ),
               ),

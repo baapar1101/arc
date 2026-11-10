@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/admin_fx_providers_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'admin_compact_scaffold.dart';
+import '../../theme/tokens/extensions.dart';
 
 /// مدیریت ارائه‌دهندگان نرخ ارز در سطح سیستم + مشاهده اسنپ‌شات مرکزی.
 class FxProvidersAdminPage extends StatefulWidget {
@@ -88,7 +89,7 @@ class _FxProvidersAdminPageState extends State<FxProvidersAdminPage> {
         return StatefulBuilder(
           builder: (context, setLocal) {
             return AlertDialog(
-              title: Text('ویرایش $code'),
+              title: Text('${adminTx(context, 'ویرایش', 'Edit')} $code'),
               content: SizedBox(
                 width: 480,
                 child: SingleChildScrollView(
@@ -97,63 +98,68 @@ class _FxProvidersAdminPageState extends State<FxProvidersAdminPage> {
                     children: [
                       TextField(
                         controller: nameCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'نام نمایشی',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          labelText: adminTx(context, 'نام نمایشی', 'Display name'),
+                          border: const OutlineInputBorder(),
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                       TextField(
                         controller: urlCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'آدرس پایه API',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          labelText: adminTx(context, 'آدرس پایه API', 'API base address'),
+                          border: const OutlineInputBorder(),
                         ),
                       ),
                       if (code == 'navasan') ...[
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 8),
                         DropdownButtonFormField<String>(
                           value: quoteUnit == 'IRR' ? 'IRR' : 'IRT',
-                          decoration: const InputDecoration(
-                            labelText: 'واحد قیمت‌های نوسان',
-                            helperText: 'پیش‌فرض نوسان تومان است؛ فقط در صورت دریافت ریال تغییر دهید.',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            labelText: adminTx(context, 'واحد قیمت‌های نوسان', 'Navasan quote unit'),
+                            helperText: adminTx(context, 'پیش‌فرض تومان است؛ فقط اگر قیمت‌ها ریال باشند تغییر دهید.', 'Default is toman. Change this only if prices are in rial.'),
+                            border: const OutlineInputBorder(),
                           ),
-                          items: const [
-                            DropdownMenuItem(value: 'IRT', child: Text('تومان (IRT)')),
-                            DropdownMenuItem(value: 'IRR', child: Text('ریال (IRR)')),
+                          items: [
+                            DropdownMenuItem(value: 'IRT', child: Text(adminTx(context, 'تومان (IRT)', 'Toman (IRT)'))),
+                            DropdownMenuItem(value: 'IRR', child: Text(adminTx(context, 'ریال (IRR)', 'Rial (IRR)'))),
                           ],
                           onChanged: (value) {
                             if (value != null) setLocal(() => quoteUnit = value);
                           },
                         ),
                       ],
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                       TextField(
                         controller: keyCtrl,
                         obscureText: true,
                         decoration: InputDecoration(
+                          isDense: true,
                           labelText: hasKey
-                              ? 'کلید API (خالی = بدون تغییر)'
-                              : 'کلید API',
+                              ? adminTx(context, 'کلید API (خالی = بدون تغییر)', 'API key (empty keeps the current key)')
+                              : adminTx(context, 'کلید API', 'API key'),
                           border: const OutlineInputBorder(),
-                          helperText: hasKey ? 'کلید فعلی ذخیره شده است (***)' : null,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: intervalCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'بازه واکشی (ثانیه)',
-                          helperText: 'پیش‌فرض ۹۰۰ = هر ۱۵ دقیقه؛ حداقل ۶۰',
-                          border: OutlineInputBorder(),
+                          helperText: hasKey ? adminTx(context, 'کلید فعلی ذخیره شده است', 'A key is already saved') : null,
                         ),
                       ),
                       const SizedBox(height: 8),
+                      TextField(
+                        controller: intervalCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          isDense: true,
+                          labelText: adminTx(context, 'بازه واکشی (ثانیه)', 'Fetch interval (seconds)'),
+                          helperText: adminTx(context, 'پیش‌فرض ۹۰۰، یعنی هر ۱۵ دقیقه. حداقل ۶۰.', 'Default is 900, every 15 minutes. Minimum is 60.'),
+                          border: const OutlineInputBorder(),
+                        ),
+                      ),
                       SwitchListTile(
+                        dense: true,
                         contentPadding: EdgeInsets.zero,
-                        title: const Text('فعال برای واکشی خودکار'),
+                        title: Text(adminTx(context, 'فعال برای واکشی خودکار', 'Enabled for automatic fetch')),
                         value: isActive,
                         onChanged: (v) => setLocal(() => isActive = v),
                       ),
@@ -162,8 +168,8 @@ class _FxProvidersAdminPageState extends State<FxProvidersAdminPage> {
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
-                FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('ذخیره')),
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(adminTx(context, 'انصراف', 'Cancel'))),
+                FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(adminTx(context, 'ذخیره', 'Save'))),
               ],
             );
           },
@@ -187,7 +193,7 @@ class _FxProvidersAdminPageState extends State<FxProvidersAdminPage> {
         },
       );
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'ذخیره شد');
+      SnackBarHelper.show(context, message: adminTx(context, 'ذخیره شد', 'Saved'));
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -203,7 +209,7 @@ class _FxProvidersAdminPageState extends State<FxProvidersAdminPage> {
       final n = r['rates_upserted'];
       SnackBarHelper.show(
         context,
-        message: n != null ? '$okMsg ($n نرخ)' : okMsg,
+        message: n != null ? adminTx(context, '$okMsg ($n نرخ)', '$okMsg ($n rates)') : okMsg,
       );
       await _load();
     } catch (e) {
@@ -217,17 +223,16 @@ class _FxProvidersAdminPageState extends State<FxProvidersAdminPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+    return AdminCompactScaffold(
+      title: adminTx(context, 'ارائه‌دهندگان نرخ ارز', 'Exchange-rate providers'),
+      subtitle: adminTx(context, 'منبع نرخ و تصویر لحظه‌ای مرکزی', 'Rate source and the central snapshot'),
+      actions: [
+        IconButton(
+          tooltip: adminTx(context, 'بازخوانی', 'Refresh'),
+          onPressed: _loading ? null : _load,
+          icon: const Icon(Icons.refresh, size: 20),
         ),
-        title: const Text('ارائه‌دهندگان نرخ ارز'),
-        actions: [
-          IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh)),
-        ],
-      ),
+      ],
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -235,11 +240,14 @@ class _FxProvidersAdminPageState extends State<FxProvidersAdminPage> {
               : RefreshIndicator(
                   onRefresh: _load,
                   child: ListView(
-                    padding: const EdgeInsets.all(16),
+                    padding: context.settingsHub.pagePadding,
                     children: [
                       Text(
-                        'واکشی نرخ به‌صورت متمرکز انجام می‌شود (نه به‌ازای هر کسب‌وکار) تا محدودیت API رعایت شود. '
-                        'کسب‌وکارها فقط از اسنپ‌شات ذخیره‌شده ثبت تسعیر می‌کنند.',
+                        adminTx(
+                          context,
+                          'واکشی نرخ متمرکز است تا محدودیت API رعایت شود. کسب‌وکارها فقط از تصویر ذخیره‌شده تسعیر می‌کنند.',
+                          'Rates are fetched centrally so API limits are respected. Businesses revalue only from the stored snapshot.',
+                        ),
                         style: theme.textTheme.bodyMedium,
                       ),
                       const SizedBox(height: 16),
@@ -263,16 +271,16 @@ class _FxProvidersAdminPageState extends State<FxProvidersAdminPage> {
                                       ),
                                     ),
                                     if (p['is_active'] == true)
-                                      const Chip(label: Text('فعال'), visualDensity: VisualDensity.compact)
+                                      Chip(label: Text(adminTx(context, 'فعال', 'Active')), visualDensity: VisualDensity.compact)
                                     else
-                                      const Chip(label: Text('غیرفعال'), visualDensity: VisualDensity.compact),
+                                      Chip(label: Text(adminTx(context, 'غیرفعال', 'Inactive')), visualDensity: VisualDensity.compact),
                                   ],
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'بازه: ${p['fetch_interval_seconds'] ?? 900} ثانیه · '
-                                  'کلید: ${p['has_db_api_key'] == true ? 'دیتابیس' : (p['api_key_source'] == 'env' ? 'env' : 'ندارد')} · '
-                                  'وضعیت: ${status ?? '—'}'
+                                  '${adminTx(context, 'بازه', 'Interval')}: ${p['fetch_interval_seconds'] ?? 900} ${adminTx(context, 'ثانیه', 'sec')} · '
+                                  '${adminTx(context, 'کلید', 'Key')}: ${p['has_db_api_key'] == true ? adminTx(context, 'دیتابیس', 'Database') : (p['api_key_source'] == 'env' ? 'env' : adminTx(context, 'ندارد', 'None'))} · '
+                                  '${adminTx(context, 'وضعیت', 'Status')}: ${status ?? '—'}'
                                   '${p['last_fetch_at'] != null ? ' · ${p['last_fetch_at']}' : ''}',
                                   style: theme.textTheme.bodySmall,
                                 ),
@@ -293,25 +301,25 @@ class _FxProvidersAdminPageState extends State<FxProvidersAdminPage> {
                                   children: [
                                     OutlinedButton(
                                       onPressed: busy ? null : () => _edit(p),
-                                      child: const Text('ویرایش'),
+                                      child: Text(adminTx(context, 'ویرایش', 'Edit')),
                                     ),
                                     FilledButton.tonal(
                                       onPressed: busy
                                           ? null
-                                          : () => _run(code, () => _service.testProvider(code), 'تست موفق'),
+                                          : () => _run(code, () => _service.testProvider(code), adminTx(context, 'تست موفق', 'Test succeeded')),
                                       child: busy
                                           ? const SizedBox(
                                               width: 16,
                                               height: 16,
                                               child: CircularProgressIndicator(strokeWidth: 2),
                                             )
-                                          : const Text('تست و ذخیره'),
+                                          : Text(adminTx(context, 'تست و ذخیره', 'Test and save')),
                                     ),
                                     FilledButton(
                                       onPressed: busy
                                           ? null
-                                          : () => _run(code, () => _service.fetchNow(code), 'واکشی انجام شد'),
-                                      child: const Text('واکشی اکنون'),
+                                          : () => _run(code, () => _service.fetchNow(code), adminTx(context, 'واکشی انجام شد', 'Fetch completed')),
+                                      child: Text(adminTx(context, 'واکشی اکنون', 'Fetch now')),
                                     ),
                                   ],
                                 ),
@@ -321,7 +329,7 @@ class _FxProvidersAdminPageState extends State<FxProvidersAdminPage> {
                         );
                       }),
                       const SizedBox(height: 8),
-                      Text('اسنپ‌شات مرکزی', style: theme.textTheme.titleMedium),
+                      Text(adminTx(context, 'نرخ‌های ذخیره‌شده', 'Stored rates'), style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.onSurface)),
                       const SizedBox(height: 8),
                       if (_loadingRates)
                         const Padding(
@@ -329,7 +337,7 @@ class _FxProvidersAdminPageState extends State<FxProvidersAdminPage> {
                           child: Center(child: CircularProgressIndicator()),
                         )
                       else if (_rates.isEmpty)
-                        const Text('هنوز نرخی واکشی نشده است.')
+                        Text(adminTx(context, 'هنوز نرخی واکشی نشده است.', 'No rates have been fetched yet.'))
                       else
                         ..._rates.take(40).map((r) {
                           return ListTile(
@@ -338,15 +346,15 @@ class _FxProvidersAdminPageState extends State<FxProvidersAdminPage> {
                               '${r['currency_code']} (${r['symbol']}) — ${r['name_fa'] ?? ''}',
                             ),
                             subtitle: Text(
-                              'نقل: ${formatFxRateForDisplay(r['price_quote'])} ${r['quote_unit']} · '
-                              'ریال: ${formatFxRateForDisplay(r['price_irr'])}',
+                              '${adminTx(context, 'نقل', 'Quote')}: ${formatFxRateForDisplay(r['price_quote'])} ${r['quote_unit']} · '
+                              '${adminTx(context, 'ریال', 'IRR')}: ${formatFxRateForDisplay(r['price_irr'])}',
                             ),
                           );
                         }),
                       if (_rates.length > 40)
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
-                          child: Text('… و ${_rates.length - 40} مورد دیگر'),
+                          child: Text(adminTx(context, '… و ${_rates.length - 40} مورد دیگر', '… and ${_rates.length - 40} more')),
                         ),
                     ],
                   ),

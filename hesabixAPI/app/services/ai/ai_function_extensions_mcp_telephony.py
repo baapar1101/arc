@@ -245,7 +245,8 @@ def lookup_telephony_number_handler(args, context):
 
     db, bid, _ = _ctx(context)
     _ensure_plugin(db, bid)
-    return _run(svc.match_caller, db, bid, args["number"])
+    match = _run(svc.match_caller, db, bid, args["number"])
+    return svc.scrub_match_for_viewer(db, bid, context["user_context"], match)
 
 
 def get_telephony_reports_summary_handler(args, context):

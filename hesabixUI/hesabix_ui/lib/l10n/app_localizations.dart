@@ -5606,6 +5606,12 @@ abstract class AppLocalizations {
   /// **'Automation sequences'**
   String get crmMenuSequences;
 
+  /// No description provided for @crmMenuEnterprise.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales organization'**
+  String get crmMenuEnterprise;
+
   /// No description provided for @storageSpace.
   ///
   /// In en, this message translates to:
@@ -22851,8 +22857,116 @@ abstract class AppLocalizations {
   /// No description provided for @settingsCategoryMonitoringLogsDescription.
   ///
   /// In en, this message translates to:
-  /// **'System monitoring and logging'**
+  /// **'Health, service logs, and business activity'**
   String get settingsCategoryMonitoringLogsDescription;
+
+  /// No description provided for @settingsCategoryMaintenance.
+  ///
+  /// In en, this message translates to:
+  /// **'Sensitive maintenance'**
+  String get settingsCategoryMaintenance;
+
+  /// No description provided for @settingsCategoryMaintenanceDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup, import, and scripts — open only when needed'**
+  String get settingsCategoryMaintenanceDescription;
+
+  /// No description provided for @systemAdminQuickAccessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick access'**
+  String get systemAdminQuickAccessTitle;
+
+  /// No description provided for @systemAdminQuickAccessDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Tasks system administrators use most often'**
+  String get systemAdminQuickAccessDescription;
+
+  /// No description provided for @systemAdminSuperAdminRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Super admin'**
+  String get systemAdminSuperAdminRole;
+
+  /// No description provided for @systemAdminLimitedRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Limited access'**
+  String get systemAdminLimitedRole;
+
+  /// No description provided for @settingsSupportPlans.
+  ///
+  /// In en, this message translates to:
+  /// **'Support plans'**
+  String get settingsSupportPlans;
+
+  /// No description provided for @settingsSupportPlansDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Price and duration of user support subscriptions'**
+  String get settingsSupportPlansDescription;
+
+  /// No description provided for @settingsSupportBillingStats.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid support stats'**
+  String get settingsSupportBillingStats;
+
+  /// No description provided for @settingsSupportBillingStatsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Revenue, active subscriptions, and support invoices'**
+  String get settingsSupportBillingStatsDescription;
+
+  /// No description provided for @settingsNotificationEventDefaults.
+  ///
+  /// In en, this message translates to:
+  /// **'Default business templates'**
+  String get settingsNotificationEventDefaults;
+
+  /// No description provided for @settingsNotificationEventDefaultsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Default SMS and email text when a business has no template'**
+  String get settingsNotificationEventDefaultsDescription;
+
+  /// No description provided for @settingsLegacyDatabaseImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Legacy database import'**
+  String get settingsLegacyDatabaseImport;
+
+  /// No description provided for @settingsLegacyDatabaseImportDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Move data from an old Hesabix MySQL dump'**
+  String get settingsLegacyDatabaseImportDescription;
+
+  /// No description provided for @settingsAIEval.
+  ///
+  /// In en, this message translates to:
+  /// **'AI quality evaluation'**
+  String get settingsAIEval;
+
+  /// No description provided for @settingsAIEvalDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Regression scenarios and scheduled response checks'**
+  String get settingsAIEvalDescription;
+
+  /// No description provided for @settingsZohalStatistics.
+  ///
+  /// In en, this message translates to:
+  /// **'Zohal statistics'**
+  String get settingsZohalStatistics;
+
+  /// No description provided for @settingsZohalStatisticsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage and inquiry statistics for Zohal'**
+  String get settingsZohalStatisticsDescription;
 
   /// No description provided for @settingsShareLinks.
   ///
@@ -25104,11 +25218,232 @@ abstract class AppLocalizations {
   /// **'Follow-up'**
   String get oaFollowUp;
 
+  /// Overdue cartable referrals.
+  String get oaOverdue;
+
+  String get oaSaveFilter;
+
+  String get oaSavedFilters;
+
+  String get oaFilterName;
+
+  String get oaNoSavedFilters;
+
+  String get oaBoardView;
+
+  String get oaListView;
+
+  String get oaColumnPending;
+
+  String get oaColumnSeen;
+
+  String get oaColumnDone;
+
+  String get oaColumnReturned;
+
+  String get oaDropHere;
+
+  String get oaOpenLetter;
+
+  String get oaDropAttachment;
+
+  String get oaMyDesk;
+
+  String get oaDueSoon;
+
+  String get oaFollowUpsDue;
+
+  String get oaProcesses;
+
+  String get oaProcessTasks;
+
+  String get oaStartProcess;
+
+  String get oaCompleteTask;
+
+  String get oaPublishProcess;
+
+  String get oaProcessName;
+
+  String get oaFormLabel;
+
+  String get oaAssignee;
+
+  String get oaProcessDesigner;
+
+  String get oaProcessDrafts;
+
+  String get oaProcessCode;
+
+  String get oaProcessCodeName;
+
+  String get oaNewProcess;
+
+  String get oaProcessInspector;
+
+  String get oaSelectNode;
+
+  String get oaConnectNodes;
+
+  String get oaPickTarget;
+
+  String get oaDeleteNode;
+
+  String get oaGatewayField;
+
+  String get oaEdgeWhen;
+
+  String get oaEdgeDefault;
+
+  String get oaTimerHours;
+
+  String get oaSlaHours;
+
+  String get oaEscalateTo;
+
+  String get oaSubprocessVersion;
+
+  String get oaNodeStart;
+
+  String get oaNodeTask;
+
+  String get oaNodeExclusive;
+
+  String get oaNodeSplit;
+
+  String get oaNodeJoin;
+
+  String get oaNodeTimer;
+
+  String get oaNodeSubprocess;
+
+  String get oaNodeEnd;
+
+  String get oaDocuments;
+
+  String get oaDocumentSearch;
+
+  String get oaRegisterDocument;
+
+  String get oaDocumentTitle;
+
+  String get oaConfidentiality;
+
+  String get oaAddVersion;
+
+  String get oaAcceptSuggestion;
+
+  String get oaRejectSuggestion;
+
+  String get oaNoDocuments;
+
+  String get oaDocumentVersions;
+
+  String get oaPendingConfirmations;
+
+  String get oaNoPendingConfirmations;
+
+  String get oaApproveAction;
+
+  String get oaRejectAction;
+
+  String get oaEnterprise;
+
+  String get oaBranches;
+
+  String get oaBranchCode;
+
+  String get oaBranchName;
+
+  String get oaCreateBranch;
+
+  String get oaNoBranches;
+
+  String get oaRetentionDue;
+
+  String get oaNoRetentionDue;
+
+  String get oaHoldLetter;
+
+  String get oaRetentionDocuments;
+
+  String get oaHoldDocument;
+
+  String get oaHoldDocumentKeepsFile;
+
+  String get oaRetentionPolicy;
+
+  String get oaRetainDays;
+
+  String get oaNoRetentionPolicies;
+
+  String get oaRetentionKeepsLetters;
+
+  String get oaSignatureProviders;
+
+  String get oaNoSignatureProviders;
+
+  String get oaProviderLive;
+
+  String get oaProviderManual;
+
+  String get oaRequestProviderSignature;
+
+  String get oaNoProviderRequests;
+
+  String get oaRecordProviderResult;
+
+  String get oaProviderExternalRef;
+
+  String get oaProviderCompleted;
+
+  String get oaProviderRejected;
+
+  String get oaExchangeLetter;
+
+  String get oaTargetBusinessId;
+
+  String get oaTargetPositionId;
+
+  String get oaExchangeNormalOnly;
+
+  String get oaProviderSignatureNote;
+
+  String get oaCreateProvider;
+
+  String get oaProviderCode;
+
+  String get oaProviderName;
+
+  String get oaProviderEndpoint;
+
+  String get oaProviderToken;
+
+  String get oaCommercialLinks;
+
+  String get oaNoCommercialLinks;
+
+  String get oaAddCommercialLink;
+
+  String get oaLinkDocument;
+
+  String get oaLinkDeal;
+
+  String get oaCommercialTargetId;
+
   /// No description provided for @oaArchive.
   ///
   /// In en, this message translates to:
   /// **'Archive'**
   String get oaArchive;
+
+  String get oaUnarchive;
+
+  String get oaRejectSign;
+
+  String get oaRejectSignNote;
+
+  String get oaCancelReferral;
 
   /// No description provided for @oaRegistry.
   ///
@@ -26004,6 +26339,10 @@ abstract class AppLocalizations {
   /// **'New secretariat'**
   String get oaNewSecretariat;
 
+  String get oaSecretariatBranch;
+
+  String get oaNoBranch;
+
   /// No description provided for @oaSecretariat.
   ///
   /// In en, this message translates to:
@@ -26124,6 +26463,8 @@ abstract class AppLocalizations {
   /// **'Letter status'**
   String get oaPublicTrackResult;
 
+  String get oaPublicTrackRestricted;
+
   /// No description provided for @oaTrackingToken.
   ///
   /// In en, this message translates to:
@@ -26237,6 +26578,10 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sign'**
   String get oaSign;
+
+  String get oaImageSignatureNote;
+
+  String get oaClassifiedStaysInside;
 
   /// No description provided for @oaDispatch.
   ///
@@ -31013,7 +31358,7 @@ abstract class AppLocalizations {
   /// No description provided for @crmNotesLeadOptional.
   ///
   /// In en, this message translates to:
-  /// **'Lead (optional)'**
+  /// **'Customer, lead, or deal'**
   String get crmNotesLeadOptional;
 
   /// No description provided for @crmNotesClearLead.
@@ -31565,7 +31910,7 @@ abstract class AppLocalizations {
   /// No description provided for @crmSectionActivityLink.
   ///
   /// In en, this message translates to:
-  /// **'Customer or lead'**
+  /// **'Customer, lead, or deal'**
   String get crmSectionActivityLink;
 
   /// No description provided for @crmSectionActivityScheduling.
@@ -31609,6 +31954,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Clear lead'**
   String get crmActivityClearLead;
+
+  /// No description provided for @crmActivityPickDeal.
+  ///
+  /// In en, this message translates to:
+  /// **'Search & select deal'**
+  String get crmActivityPickDeal;
+
+  /// No description provided for @crmActivityClearDeal.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear deal'**
+  String get crmActivityClearDeal;
+
+  /// No description provided for @crmActivityDealSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Title, code, or customer…'**
+  String get crmActivityDealSearchHint;
+
+  /// No description provided for @crmActivityDealSearchEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No deal matches this search.'**
+  String get crmActivityDealSearchEmpty;
 
   /// No description provided for @crmActivityTypeCall.
   ///
@@ -36063,14 +36432,20 @@ abstract class AppLocalizations {
   /// No description provided for @crmWebChatOptionalLeadId.
   ///
   /// In en, this message translates to:
-  /// **'Lead id (optional)'**
+  /// **'Search and select a lead (optional)'**
   String get crmWebChatOptionalLeadId;
 
   /// No description provided for @crmWebChatOptionalPersonId.
   ///
   /// In en, this message translates to:
-  /// **'Person id (optional)'**
+  /// **'Search and select a person (optional)'**
   String get crmWebChatOptionalPersonId;
+
+  /// No description provided for @crmWebChatClearLead.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear lead'**
+  String get crmWebChatClearLead;
 
   /// No description provided for @crmWebChatUnassigned.
   ///

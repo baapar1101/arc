@@ -442,3 +442,77 @@ def reverse_purchase_grni_clearance_for_warehouse(
 	invoice.extra_info = extra
 	db.flush()
 	return True
+
+
+def post_grni_clearance_for_receipt_invoice(
+	db: Session,
+	*,
+	invoice_id: int,
+	warehouse_document_id: int,
+) -> bool:
+	"""تسویه GRNI برای رسیدی که از سفارش خرید آمده و بعداً به فاکتور خرید وصل شده است.
+
+	رسید تدارکات source_type برابر purchase_order دارد، پس تسویهٔ مخصوص حوالهٔ
+	فاکتور اجرا نمی‌شود. این تابع همان سند موجودی/GRNI را روی فاکتور مشخص می‌نویسد.
+	"""
+	wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == int(warehouse_document_id)).first()
+	if not wh or str(wh.status or "").lower() != "posted":
+		return False
+	if str(wh.doc_type or "").strip().lower() != "receipt":
+		return False
+	invoice = (
+		db.query(Document)
+		.filter(Document.id == int(invoice_id), Document.business_id == int(wh.business_id))
+		.first()
+	)
+	if not invoice or str(invoice.document_type or "") != "invoice_purchase":
+		return False
+	mode = resolve_purchase_accounting_mode(
+		db, int(wh.business_id), extra_info=dict(invoice.extra_info or {})
+	)
+	if mode != PURCHASE_ACCOUNTING_GRNI:
+		return False
+	extra = dict(invoice.extra_info or {})
+	if _clearance_already_recorded(extra, int(wh.id)):
+		return False
+	wh_lines = (
+		db.query(WarehouseDocumentLine)
+		.filter(WarehouseDocumentLine.warehouse_document_id == int(wh.id))
+		.all()
+	)
+	receipt_amount = compute_warehouse_receipt_inventory_amount(db, int(wh.business_id), wh_lines)
+	if receipt_amount <= 0:
+		return False
+	from app.services.invoice_service import _get_fixed_account_by_code
+
+	grni_account = resolve_grni_account_for_mode(db, mode)
+	inventory_account = _get_fixed_account_by_code(db, INVENTORY_ACCOUNT_CODE)
+	remaining = _grni_net_on_document(db, int(invoice.id), int(grni_account.id))
+	if remaining <= 0:
+		return False
+	amount = min(remaining, receipt_amount)
+	if amount <= 0:
+		return False
+	db.add(
+		DocumentLine(
+			document_id=int(invoice.id),
+			account_id=int(inventory_account.id),
+			debit=amount,
+			credit=Decimal(0),
+			description=GRNI_CLEARANCE_DESC,
+			extra_info={"warehouse_document_id": int(wh.id), "side": "grni_clearance", "procurement": True},
+		)
+	)
+	db.add(
+		DocumentLine(
+			document_id=int(invoice.id),
+			account_id=int(grni_account.id),
+			debit=Decimal(0),
+			credit=amount,
+			description=GRNI_CLEARANCE_DESC,
+			extra_info={"warehouse_document_id": int(wh.id), "side": "grni_clearance", "procurement": True},
+		)
+	)
+	invoice.extra_info = _append_clearance_record(extra, warehouse_document_id=int(wh.id), amount=amount)
+	db.flush()
+	return True

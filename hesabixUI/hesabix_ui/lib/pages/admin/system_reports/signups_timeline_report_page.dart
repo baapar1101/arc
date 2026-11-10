@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/utils/date_formatters.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+
+import '../admin_compact_scaffold.dart';
 
 /// گزارش تعداد عضویت در بازهٔ تاریخی با تجمیع روز/هفته/ماه.
 class SignupsTimelineReportPage extends StatefulWidget {
@@ -114,31 +115,20 @@ class _SignupsTimelineReportPageState extends State<SignupsTimelineReportPage> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(t.systemReportSignupsTitle),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/user/profile/system-settings/reports'),
+    return AdminCompactScaffold(
+      title: t.systemReportSignupsTitle,
+      subtitle: t.systemReportSignupsDescription,
+      backFallback: '/user/profile/system-settings/reports',
+      actions: [
+        IconButton(
+          tooltip: t.systemReportRefresh,
+          icon: const Icon(Icons.refresh, size: 20),
+          onPressed: _load,
         ),
-        actions: [
-          IconButton(
-            tooltip: t.systemReportRefresh,
-            icon: const Icon(Icons.refresh),
-            onPressed: _load,
-          ),
-        ],
-      ),
+      ],
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text(
-            t.systemReportSignupsDescription,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: scheme.onSurface.withValues(alpha: 0.75),
-            ),
-          ),
-          const SizedBox(height: 16),
           OutlinedButton.icon(
             onPressed: _pickRange,
             icon: const Icon(Icons.date_range),

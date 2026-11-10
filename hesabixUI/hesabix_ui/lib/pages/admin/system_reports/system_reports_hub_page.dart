@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
+import '../../../theme/tokens/extensions.dart';
+import '../admin_compact_scaffold.dart';
 import 'system_report_registry.dart';
 
-/// صفحهٔ فهرست گزارش‌های مدیریت سیستم (هاب).
+/// فهرست فشردهٔ گزارش‌های مدیریت سیستم.
 class SystemReportsHubPage extends StatelessWidget {
   const SystemReportsHubPage({super.key});
 
@@ -13,66 +15,68 @@ class SystemReportsHubPage extends StatelessWidget {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final hub = context.settingsHub;
+    final rtl = Directionality.of(context) == TextDirection.rtl;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(t.settingsSystemReports),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/user/profile/system-settings'),
-        ),
-      ),
+    return AdminCompactScaffold(
+      title: t.settingsSystemReports,
+      subtitle: t.systemReportsHubIntro,
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: hub.pagePadding,
         children: [
-          Text(
-            t.systemReportsHubIntro,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: scheme.onSurface.withValues(alpha: 0.75),
-            ),
-          ),
-          const SizedBox(height: 20),
           ...SystemReportRegistry.items.map((def) {
             return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
+              padding: EdgeInsets.only(bottom: hub.gridRunSpacing),
               child: Material(
-                color: scheme.surfaceContainerHighest.withValues(alpha: 0.35),
-                borderRadius: BorderRadius.circular(12),
+                color: scheme.surface,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(hub.cardRadius),
+                  side: BorderSide(color: scheme.outline.withValues(alpha: 0.1)),
+                ),
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(hub.cardRadius),
                   onTap: () => context.push(def.fullPath),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    padding: hub.cardPadding,
                     child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        CircleAvatar(
-                          backgroundColor: def.iconColor.withValues(alpha: 0.15),
-                          foregroundColor: def.iconColor,
-                          child: Icon(def.icon, size: 22),
+                        Container(
+                          padding: hub.cardIconPadding,
+                          decoration: BoxDecoration(
+                            color: def.iconColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(hub.cardIconRadius),
+                          ),
+                          child: Icon(def.icon, color: def.iconColor, size: hub.cardIconSize),
                         ),
-                        const SizedBox(width: 14),
+                        SizedBox(width: hub.cardIconGap),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 def.titleBuilder(t),
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
+                                maxLines: hub.cardTitleMaxLines,
+                                overflow: TextOverflow.ellipsis,
+                                style: hub.cardTitleStyle(theme.textTheme, color: scheme.onSurface),
                               ),
-                              const SizedBox(height: 4),
+                              SizedBox(height: hub.cardTitleGap),
                               Text(
                                 def.descriptionBuilder(t),
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: scheme.onSurface.withValues(alpha: 0.7),
+                                maxLines: hub.cardSubtitleMaxLines,
+                                overflow: TextOverflow.ellipsis,
+                                style: hub.cardSubtitleStyle(
+                                  theme.textTheme,
+                                  color: scheme.onSurface.withValues(alpha: 0.6),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        Icon(Icons.chevron_right, color: scheme.outline),
+                        Icon(
+                          rtl ? Icons.chevron_left : Icons.chevron_right,
+                          size: hub.chevronSize,
+                          color: scheme.onSurface.withValues(alpha: 0.4),
+                        ),
                       ],
                     ),
                   ),

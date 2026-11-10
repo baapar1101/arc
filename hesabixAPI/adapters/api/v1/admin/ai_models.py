@@ -17,7 +17,7 @@ router = APIRouter(prefix="/admin/ai/models", tags=["admin-ai-models"])
 
 
 def _require_admin(ctx: AuthContext) -> None:
-    if not ctx.has_any_permission("system_settings", "superadmin"):
+    if not ctx.has_app_permission("system_settings"):
         raise ApiError("FORBIDDEN", "فقط مدیر سیستم می‌تواند مدل‌ها را مدیریت کند", http_status=403)
 
 

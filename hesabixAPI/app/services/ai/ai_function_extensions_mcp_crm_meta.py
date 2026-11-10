@@ -84,6 +84,8 @@ def register_mcp_crm_meta_functions(registry) -> None:
             "occurs_on": {"type": ["string", "null"], "format": "date"},
             "starts_at": {"type": ["string", "null"], "format": "date-time"}, "ends_at": {"type": ["string", "null"], "format": "date-time"},
             "lead_id": {"type": ["integer", "null"], "minimum": 1},
+            "person_id": {"type": ["integer", "null"], "minimum": 1},
+            "deal_id": {"type": ["integer", "null"], "minimum": 1},
             "shared_user_ids": {"type": ["array", "null"], "maxItems": 100, "items": {"type": "integer", "minimum": 1}},
         }, ["note_type_id", "visibility", "body"]), lambda a, c: _create_note(a, c), write=True)
 
@@ -94,6 +96,8 @@ def register_mcp_crm_meta_functions(registry) -> None:
             "body": {"type": "string", "minLength": 1}, "occurs_on": {"type": ["string", "null"], "format": "date"},
             "starts_at": {"type": ["string", "null"], "format": "date-time"}, "ends_at": {"type": ["string", "null"], "format": "date-time"},
             "lead_id": {"type": ["integer", "null"], "minimum": 1}, "clear_lead": {"type": "boolean"},
+            "person_id": {"type": ["integer", "null"], "minimum": 1}, "clear_person": {"type": "boolean"},
+            "deal_id": {"type": ["integer", "null"], "minimum": 1}, "clear_deal": {"type": "boolean"},
             "status": {"type": "string", "enum": ["active", "archived", "cancelled"]},
             "shared_user_ids": {"type": "array", "maxItems": 100, "items": {"type": "integer", "minimum": 1}},
         }, ["note_id"]), lambda a, c: _update_note(a, c), write=True)
@@ -192,6 +196,8 @@ def _create_note(args, context):
         "starts_at": args.get("starts_at"),
         "ends_at": args.get("ends_at"),
         "lead_id": args.get("lead_id"),
+        "person_id": args.get("person_id"),
+        "deal_id": args.get("deal_id"),
         "shared_user_ids": args.get("shared_user_ids"),
     }
     data["occurs_on"] = date.fromisoformat(data["occurs_on"]) if data.get("occurs_on") else None
@@ -209,18 +215,31 @@ def _update_note(args, context):
     data = dict(args)
     note_id = int(data.pop("note_id"))
     clear_lead = bool(data.pop("clear_lead", False))
+    clear_person = bool(data.pop("clear_person", False))
+    clear_deal = bool(data.pop("clear_deal", False))
     lead_field_set = clear_lead or "lead_id" in data
+    person_field_set = clear_person or "person_id" in data
+    deal_field_set = clear_deal or "deal_id" in data
     if clear_lead:
         data["lead_id"] = None
+    if clear_person:
+        data["person_id"] = None
+    if clear_deal:
+        data["deal_id"] = None
     for key in ("occurs_on",):
         if data.get(key) is not None:
             data[key] = date.fromisoformat(data[key])
     for key in ("starts_at", "ends_at"):
         if data.get(key) is not None:
             data[key] = datetime.fromisoformat(data[key].replace("Z", "+00:00"))
-    allowed = {"note_type_id", "visibility", "title", "body", "occurs_on", "starts_at", "ends_at", "lead_id", "status", "shared_user_ids"}
+    allowed = {
+        "note_type_id", "visibility", "title", "body", "occurs_on", "starts_at", "ends_at",
+        "lead_id", "person_id", "deal_id", "status", "shared_user_ids",
+    }
     values = {key: data.get(key) for key in allowed}
     values["lead_field_set"] = lead_field_set
+    values["person_field_set"] = person_field_set
+    values["deal_field_set"] = deal_field_set
     row = svc.update_note(db, user, bid, note_id, **values, translator=None)
     result = svc.get_note(db, user, bid, note_id, getattr(user, "language", None) or "fa")
     db.commit()
@@ -282,10 +301,17 @@ def _tag_mutation(action, args, context):
 
 
 def _set_tags(entity, args, context):
+    from adapters.db.models.crm import Deal, Lead
     from app.services import crm_tag_service as svc
+    from app.services.crm_enterprise_service import guard_record
     db, bid = context["db"], int(context["business_id"])
     method = svc.set_lead_tags if entity == "lead" else svc.set_deal_tags
     key = "lead_id" if entity == "lead" else "deal_id"
+    model = Lead if entity == "lead" else Deal
+    row = db.query(model).filter(model.id == int(args[key]), model.business_id == bid).first()
+    if row is None:
+        raise ValueError("رکورد در کسب‌وکار متصل پیدا نشد")
+    guard_record(db, bid, context["user_context"], entity, row, write=True)
     result = method(db, bid, int(args[key]), args["tag_ids"])
     db.commit()
     return result
@@ -476,8 +502,11 @@ def _history(entity, args, context):
     db, bid = context["db"], int(context["business_id"])
     entity_id = int(args["lead_id"] if entity == "lead" else args["deal_id"])
     model = Lead if entity == "lead" else Deal
-    if not db.query(model.id).filter(model.id == entity_id, model.business_id == bid).first():
+    row = db.query(model).filter(model.id == entity_id, model.business_id == bid).first()
+    if row is None:
         raise ValueError(f"{entity_id} در کسب‌وکار متصل پیدا نشد")
+    from app.services.crm_enterprise_service import guard_record
+    guard_record(db, bid, context["user_context"], entity, row)
     rows = db.query(CrmChangeHistory).options(joinedload(CrmChangeHistory.changed_by)).filter(
         CrmChangeHistory.business_id == bid, CrmChangeHistory.entity_type == entity, CrmChangeHistory.entity_id == entity_id
     ).order_by(CrmChangeHistory.changed_at.desc()).limit(int(args.get("limit", 50))).all()
@@ -488,7 +517,9 @@ def _history(entity, args, context):
 
 def _customer_360(args, context):
     from app.services import crm_customer_360_service
-    return crm_customer_360_service.get_customer_360(context["db"], int(context["business_id"]), int(args["person_id"]))
+    return crm_customer_360_service.get_customer_360(
+        context["db"], int(context["business_id"]), int(args["person_id"]), context.get("user_context")
+    )
 
 
 def _work_queue(context):
@@ -500,8 +531,12 @@ def _work_queue(context):
     user_id = user.get_user_id()
     now = datetime.utcnow()
     horizon = now + timedelta(hours=24)
-    tasks = db.query(CrmActivity).options(selectinload(CrmActivity.assigned_to), selectinload(CrmActivity.created_by)).filter(
-        CrmActivity.business_id == bid, CrmActivity.is_task.is_(True), CrmActivity.status == "open", CrmActivity.assigned_to_user_id == user_id
+    from app.services.crm_enterprise_service import restrict_activity_query
+    tasks = restrict_activity_query(
+        db.query(CrmActivity).options(selectinload(CrmActivity.assigned_to), selectinload(CrmActivity.created_by)).filter(
+            CrmActivity.business_id == bid, CrmActivity.is_task.is_(True), CrmActivity.status == "open", CrmActivity.assigned_to_user_id == user_id
+        ),
+        db, bid, user, CrmActivity,
     ).order_by(CrmActivity.due_at.asc().nullslast()).limit(100).all()
     leads = db.query(Lead).filter(Lead.business_id == bid, Lead.assigned_to_user_id == user_id, Lead.person_id.is_(None),
         Lead.next_follow_up_at.isnot(None), Lead.next_follow_up_at <= horizon).order_by(Lead.next_follow_up_at.asc()).limit(100).all()
@@ -509,6 +544,15 @@ def _work_queue(context):
         Deal.next_follow_up_at.isnot(None), Deal.next_follow_up_at <= horizon).order_by(Deal.next_follow_up_at.asc()).limit(100).all()
     return {"tasks": [_crm_activity_result(t) for t in tasks], "overdue_tasks_count": sum(1 for t in tasks if t.due_at and t.due_at < now),
         "lead_follow_ups": [_crm_lead_result(db, bid, lead) for lead in leads], "deal_follow_ups": [_crm_deal_result(db, bid, deal) for deal in deals]}
+
+
+def _scope_records(query, context, model, entity_type: str):
+    from app.services.crm_enterprise_service import restrict_visibility_query
+
+    ctx = context.get("user_context")
+    if ctx is None:
+        return query
+    return restrict_visibility_query(query, context["db"], int(context["business_id"]), ctx, model, entity_type)
 
 
 def _follow_ups(args, context):
@@ -532,6 +576,8 @@ def _follow_ups(args, context):
     if restrict:
         ql = ql.filter(or_(Lead.assigned_to_user_id.is_(None), Lead.assigned_to_user_id == uid))
         qd = qd.filter(or_(Deal.assigned_to_user_id.is_(None), Deal.assigned_to_user_id == uid))
+    ql = _scope_records(ql, context, Lead, "lead")
+    qd = _scope_records(qd, context, Deal, "deal")
     leads = ql.order_by(Lead.next_follow_up_at).limit(50).all()
     deals = qd.order_by(Deal.next_follow_up_at).limit(50).all()
     return {"leads": [_crm_lead_result(db, bid, x) for x in leads], "deals": [_crm_deal_result(db, bid, x) for x in deals]}
@@ -548,7 +594,7 @@ def _parse_report_dates(args):
 
 
 def _pipeline_report(args, context):
-    from sqlalchemy import and_, func
+    from sqlalchemy import and_, func, or_
     from adapters.db.models.crm import Deal, CrmProcessStage, CrmProcessDefinition
     db, bid = context["db"], int(context["business_id"])
     start, end = _parse_report_dates(args)
@@ -563,6 +609,10 @@ def _pipeline_report(args, context):
     q = q.filter(CrmProcessDefinition.business_id == bid, CrmProcessDefinition.process_type == "sales_pipeline")
     if args.get("process_definition_id"):
         q = q.filter(CrmProcessDefinition.id == int(args["process_definition_id"]))
+    from sqlalchemy.orm import aliased
+    deal_alias = aliased(Deal)
+    visible = _scope_records(db.query(deal_alias.id).filter(deal_alias.business_id == bid), context, deal_alias, "deal")
+    q = q.filter(or_(Deal.id.is_(None), Deal.id.in_(visible)))
     rows = q.group_by(CrmProcessStage.id, CrmProcessStage.name, CrmProcessStage.order_index).order_by(CrmProcessStage.order_index).all()
     return [{"stage_id": r.id, "stage_name": r.name, "order_index": r.order_index, "deal_count": r.deal_count,
         "total_amount": float(r.total_amount or 0)} for r in rows]
@@ -571,8 +621,12 @@ def _pipeline_report(args, context):
 def _lead_sources_report(context):
     from sqlalchemy import func
     from adapters.db.models.crm import Lead
-    rows = context["db"].query(Lead.source_code, func.count(Lead.id).label("count")).filter(
-        Lead.business_id == int(context["business_id"]), Lead.source_code.isnot(None), Lead.source_code != "").group_by(Lead.source_code).all()
+    db, bid = context["db"], int(context["business_id"])
+    source_query = _scope_records(
+        db.query(Lead).filter(Lead.business_id == bid, Lead.source_code.isnot(None), Lead.source_code != ""),
+        context, Lead, "lead",
+    )
+    rows = source_query.with_entities(Lead.source_code, func.count(Lead.id).label("count")).group_by(Lead.source_code).all()
     return [{"source_code": r.source_code, "count": r.count} for r in rows]
 
 
@@ -583,6 +637,7 @@ def _weighted_forecast(args, context):
     q = db.query(func.coalesce(func.sum(Deal.amount * func.coalesce(Deal.probability_percent, 50) / 100), 0).label("weighted_total"),
         func.count(Deal.id).label("deal_count"), func.coalesce(func.sum(Deal.amount), 0).label("total_amount")).filter(
         Deal.business_id == bid, Deal.closed_at.is_(None))
+    q = _scope_records(q, context, Deal, "deal")
     if args.get("process_definition_id"):
         q = q.filter(Deal.process_definition_id == int(args["process_definition_id"]))
     row = q.first()
@@ -597,9 +652,9 @@ def _sales_trend(args, context):
     period, months = args.get("period", "month"), int(args.get("months", 6))
     end = datetime.utcnow()
     start = end - timedelta(days=months * 31)
-    rows = db.query(func.date(Deal.closed_at).label("period"), func.count(Deal.id).label("count"),
-        func.coalesce(func.sum(Deal.amount), 0).label("amount")).filter(Deal.business_id == bid,
-        Deal.closed_at.isnot(None), Deal.closed_at >= start, Deal.closed_at <= end).group_by(func.date(Deal.closed_at)).all()
+    trend = _scope_records(db.query(Deal).filter(Deal.business_id == bid, Deal.closed_at.isnot(None), Deal.closed_at >= start, Deal.closed_at <= end), context, Deal, "deal")
+    rows = trend.with_entities(func.date(Deal.closed_at).label("period"), func.count(Deal.id).label("count"),
+        func.coalesce(func.sum(Deal.amount), 0).label("amount")).group_by(func.date(Deal.closed_at)).all()
     grouped = {}
     for row in rows:
         d = date.fromisoformat(str(row.period))
@@ -630,12 +685,19 @@ def _employee_performance(context):
         ids = {int(uid)} if uid else set()
     if not ids:
         return {"items": [], "restricted_to_self": not team_allowed}
-    lead_rows = db.query(Lead.assigned_to_user_id, func.count(Lead.id), func.sum(case((Lead.person_id.isnot(None), 1), else_=0))).filter(
-        Lead.business_id == bid, Lead.assigned_to_user_id.in_(ids)).group_by(Lead.assigned_to_user_id).all()
-    deal_rows = db.query(Deal.assigned_to_user_id, func.count(Deal.id), func.sum(case((Deal.closed_at.isnot(None), 1), else_=0)), func.coalesce(func.sum(Deal.amount), 0)).filter(
-        Deal.business_id == bid, Deal.assigned_to_user_id.in_(ids)).group_by(Deal.assigned_to_user_id).all()
-    activity_rows = db.query(CrmActivity.created_by_user_id, func.count(CrmActivity.id)).filter(
-        CrmActivity.business_id == bid, CrmActivity.created_by_user_id.in_(ids)).group_by(CrmActivity.created_by_user_id).all()
+    lead_base = _scope_records(db.query(Lead).filter(Lead.business_id == bid, Lead.assigned_to_user_id.in_(ids)), context, Lead, "lead")
+    deal_base = _scope_records(db.query(Deal).filter(Deal.business_id == bid, Deal.assigned_to_user_id.in_(ids)), context, Deal, "deal")
+    lead_rows = lead_base.with_entities(Lead.assigned_to_user_id, func.count(Lead.id), func.sum(case((Lead.person_id.isnot(None), 1), else_=0))).group_by(Lead.assigned_to_user_id).all()
+    deal_rows = deal_base.with_entities(Deal.assigned_to_user_id, func.count(Deal.id), func.sum(case((Deal.closed_at.isnot(None), 1), else_=0)), func.coalesce(func.sum(Deal.amount), 0)).group_by(Deal.assigned_to_user_id).all()
+    from app.services.crm_enterprise_service import record_acl_enforced
+    activity_query = db.query(CrmActivity).filter(CrmActivity.business_id == bid, CrmActivity.created_by_user_id.in_(ids))
+    if record_acl_enforced(db, bid, ctx):
+        from sqlalchemy import or_ as sql_or
+        activity_query = activity_query.filter(
+            sql_or(CrmActivity.lead_id.is_(None), CrmActivity.lead_id.in_(lead_base.with_entities(Lead.id))),
+            sql_or(CrmActivity.deal_id.is_(None), CrmActivity.deal_id.in_(deal_base.with_entities(Deal.id))),
+        )
+    activity_rows = activity_query.with_entities(CrmActivity.created_by_user_id, func.count(CrmActivity.id)).group_by(CrmActivity.created_by_user_id).all()
     lm = {int(r[0]): (int(r[1] or 0), int(r[2] or 0)) for r in lead_rows}
     dm = {int(r[0]): (int(r[1] or 0), int(r[2] or 0), float(r[3] or 0)) for r in deal_rows}
     am = {int(r[0]): int(r[1] or 0) for r in activity_rows}
@@ -661,8 +723,8 @@ def _close_reason_report(reason_type, context):
     from app.services import crm_close_reason_service
     db, bid = context["db"], int(context["business_id"])
     column = Deal.won_reason_code if reason_type == "won" else Deal.lost_reason_code
-    rows = db.query(column, func.count(Deal.id).label("count"), func.coalesce(func.sum(Deal.amount), 0).label("total_amount")).filter(
-        Deal.business_id == bid, column.isnot(None), column != "").group_by(column).all()
+    reason_query = _scope_records(db.query(Deal).filter(Deal.business_id == bid, column.isnot(None), column != ""), context, Deal, "deal")
+    rows = reason_query.with_entities(column, func.count(Deal.id).label("count"), func.coalesce(func.sum(Deal.amount), 0).label("total_amount")).group_by(column).all()
     names = {r["code"]: r["name"] for r in crm_close_reason_service.list_reasons(db, bid, reason_type=reason_type)}
     db.commit()
     return [{"reason_code": r[0], "reason_name": names.get(r[0], r[0]), "count": int(r.count or 0),

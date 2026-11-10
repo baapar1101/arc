@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/storage_plan_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
+import 'admin_compact_scaffold.dart';
+import '../../theme/tokens/extensions.dart';
 
 class StoragePlansAdminPage extends StatefulWidget {
   const StoragePlansAdminPage({super.key});
@@ -102,16 +103,9 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                 children: [
                   // Header
                   Container(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          theme.colorScheme.primary,
-                          theme.colorScheme.primary.withValues(alpha: 0.8),
-                        ],
-                      ),
+                      color: theme.colorScheme.surfaceContainerHighest,
                       borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(20),
                         topRight: Radius.circular(20),
@@ -119,32 +113,22 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                     ),
                     child: Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.onPrimary.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            isEdit ? Icons.edit_outlined : Icons.add_circle_outline,
-                            color: theme.colorScheme.onPrimary,
-                            size: 28,
-                          ),
+                        Icon(
+                          isEdit ? Icons.edit_outlined : Icons.add_circle_outline,
+                          size: 18,
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            isEdit ? 'ویرایش پلن' : 'ایجاد پلن جدید',
-                            style: theme.textTheme.headlineSmall?.copyWith(
-                              color: theme.colorScheme.onPrimary,
-                              fontWeight: FontWeight.bold,
-                            ),
+                            isEdit
+                                ? adminTx(context, 'ویرایش پلن', 'Edit plan')
+                                : adminTx(context, 'پلن جدید', 'New plan'),
+                            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                           ),
                         ),
                         IconButton(
                           onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.close),
-                          color: theme.colorScheme.onPrimary,
+                          icon: const Icon(Icons.close, size: 18),
                         ),
                       ],
                     ),
@@ -165,7 +149,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                                   child: TextFormField(
                                     controller: nameController,
                                     decoration: InputDecoration(
-                                      labelText: 'نام پلن',
+                                      labelText: adminTx(context, 'نام پلن', 'Plan name'),
                                       prefixIcon: const Icon(Icons.label_outline),
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),
@@ -173,7 +157,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                                       filled: true,
                                       fillColor: theme.colorScheme.surfaceContainerHighest,
                                     ),
-                                    validator: (v) => v?.isEmpty ?? true ? 'نام الزامی است' : null,
+                                    validator: (v) => v?.isEmpty ?? true ? adminTx(context, 'نام الزامی است', 'Name is required') : null,
                                   ),
                                 ),
                                 const SizedBox(width: 16),
@@ -181,7 +165,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                                   child: TextFormField(
                                     controller: codeController,
                                     decoration: InputDecoration(
-                                      labelText: 'کد پلن (یکتا)',
+                                      labelText: adminTx(context, 'کد یکتا', 'Unique code'),
                                       prefixIcon: const Icon(Icons.code_outlined),
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),
@@ -190,7 +174,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                                       fillColor: theme.colorScheme.surfaceContainerHighest,
                                     ),
                                     enabled: !isEdit,
-                                    validator: (v) => v?.isEmpty ?? true ? 'کد الزامی است' : null,
+                                    validator: (v) => v?.isEmpty ?? true ? adminTx(context, 'کد الزامی است', 'Code is required') : null,
                                   ),
                                 ),
                               ],
@@ -203,7 +187,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                                   child: TextFormField(
                                     controller: storageLimitController,
                                     decoration: InputDecoration(
-                                      labelText: 'محدودیت حجم (گیگابایت)',
+                                      labelText: adminTx(context, 'سقف حجم (گیگابایت)', 'Storage limit (GB)'),
                                       prefixIcon: const Icon(Icons.storage_outlined),
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),
@@ -214,9 +198,9 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                     inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,3}'))],
                                     validator: (v) {
-                                      if (v?.isEmpty ?? true) return 'محدودیت حجم الزامی است';
+                                      if (v?.isEmpty ?? true) return adminTx(context, 'سقف حجم الزامی است', 'Storage limit is required');
                                       final val = double.tryParse(v!);
-                                      if (val == null || val <= 0) return 'مقدار باید بیشتر از صفر باشد';
+                                      if (val == null || val <= 0) return adminTx(context, 'مقدار باید بیشتر از صفر باشد', 'Value must be greater than zero');
                                       return null;
                                     },
                                   ),
@@ -226,7 +210,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                                   child: DropdownButtonFormField<String>(
                                     initialValue: selectedPeriod,
                                     decoration: InputDecoration(
-                                      labelText: 'دوره',
+                                      labelText: adminTx(context, 'دوره', 'Period'),
                                       prefixIcon: const Icon(Icons.calendar_today_outlined),
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),
@@ -234,10 +218,10 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                                       filled: true,
                                       fillColor: theme.colorScheme.surfaceContainerHighest,
                                     ),
-                                    items: const [
-                                      DropdownMenuItem(value: 'monthly', child: Text('ماهانه')),
-                                      DropdownMenuItem(value: 'yearly', child: Text('سالانه')),
-                                      DropdownMenuItem(value: 'lifetime', child: Text('مادام‌العمر')),
+                                    items: [
+                                      DropdownMenuItem(value: 'monthly', child: Text(adminTx(context, 'ماهانه', 'Monthly'))),
+                                      DropdownMenuItem(value: 'yearly', child: Text(adminTx(context, 'سالانه', 'Yearly'))),
+                                      DropdownMenuItem(value: 'lifetime', child: Text(adminTx(context, 'مادام‌العمر', 'Lifetime'))),
                                     ],
                                     onChanged: (v) {
                                       setDialogState(() => selectedPeriod = v);
@@ -254,7 +238,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                               TextFormField(
                                 controller: periodMonthsController,
                                 decoration: InputDecoration(
-                                  labelText: 'تعداد ماه‌ها',
+                                  labelText: adminTx(context, 'تعداد ماه', 'Months'),
                                   prefixIcon: const Icon(Icons.numbers_outlined),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
@@ -266,9 +250,9 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                                 validator: (v) {
                                   if (selectedPeriod == 'lifetime') return null;
-                                  if (v?.isEmpty ?? true) return 'تعداد ماه‌ها الزامی است';
+                                  if (v?.isEmpty ?? true) return adminTx(context, 'تعداد ماه الزامی است', 'Month count is required');
                                   final val = int.tryParse(v!);
-                                  if (val == null || val <= 0) return 'مقدار باید بیشتر از صفر باشد';
+                                  if (val == null || val <= 0) return adminTx(context, 'مقدار باید بیشتر از صفر باشد', 'Value must be greater than zero');
                                   return null;
                                 },
                               ),
@@ -277,7 +261,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                             DropdownButtonFormField<int>(
                               initialValue: selectedCurrencyId,
                               decoration: InputDecoration(
-                                labelText: 'ارز',
+                                labelText: adminTx(context, 'ارز', 'Currency'),
                                 prefixIcon: const Icon(Icons.currency_exchange_outlined),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -290,7 +274,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                                 child: Text('${c['title']} (${c['code']})'),
                               )).toList(),
                               onChanged: (v) => setDialogState(() => selectedCurrencyId = v),
-                              validator: (v) => v == null ? 'ارز الزامی است' : null,
+                              validator: (v) => v == null ? adminTx(context, 'ارز الزامی است', 'Currency is required') : null,
                             ),
                             const SizedBox(height: 20),
                             // Row 3: قیمت‌ها
@@ -300,7 +284,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                                   child: TextFormField(
                                     controller: priceController,
                                     decoration: InputDecoration(
-                                      labelText: 'قیمت کل پلن',
+                                      labelText: adminTx(context, 'قیمت کل', 'Total price'),
                                       prefixIcon: const Icon(Icons.attach_money_outlined),
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),
@@ -313,9 +297,9 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                                     enabled: !isFree,
                                     validator: (v) {
                                       if (isFree) return null;
-                                      if (v?.isEmpty ?? true) return 'قیمت الزامی است';
+                                      if (v?.isEmpty ?? true) return adminTx(context, 'قیمت الزامی است', 'Price is required');
                                       final val = double.tryParse(v!);
-                                      if (val == null || val < 0) return 'قیمت نامعتبر است';
+                                      if (val == null || val < 0) return adminTx(context, 'قیمت نامعتبر است', 'Invalid price');
                                       return null;
                                     },
                                   ),
@@ -325,7 +309,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                                   child: TextFormField(
                                     controller: pricePerGbController,
                                     decoration: InputDecoration(
-                                      labelText: 'قیمت هر گیگابایت اضافی (اختیاری)',
+                                      labelText: adminTx(context, 'قیمت هر گیگابایت اضافه', 'Price per extra GB'),
                                       prefixIcon: const Icon(Icons.price_check_outlined),
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),
@@ -343,7 +327,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                             TextFormField(
                               controller: gracePeriodController,
                               decoration: InputDecoration(
-                                labelText: 'مدت مهلت حذف فایل‌ها (روز)',
+                                labelText: adminTx(context, 'مهلت حذف فایل (روز)', 'File deletion grace (days)'),
                                 prefixIcon: const Icon(Icons.timer_outlined),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -354,9 +338,9 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                               keyboardType: TextInputType.number,
                               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                               validator: (v) {
-                                if (v?.isEmpty ?? true) return 'مدت مهلت الزامی است';
+                                if (v?.isEmpty ?? true) return adminTx(context, 'مهلت الزامی است', 'Grace period is required');
                                 final val = int.tryParse(v!);
-                                if (val == null || val < 0) return 'مقدار نامعتبر است';
+                                if (val == null || val < 0) return adminTx(context, 'مقدار نامعتبر است', 'Invalid value');
                                 return null;
                               },
                             ),
@@ -364,7 +348,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                             TextFormField(
                               controller: descriptionController,
                               decoration: InputDecoration(
-                                labelText: 'توضیحات (اختیاری)',
+                                labelText: adminTx(context, 'توضیح', 'Description'),
                                 prefixIcon: const Icon(Icons.description_outlined),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -392,7 +376,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                                       ),
                                     ),
                                     child: CheckboxListTile(
-                                      title: const Text('پلن رایگان'),
+                                      title: Text(adminTx(context, 'رایگان', 'Free'), style: const TextStyle(fontSize: 13)),
                                       value: isFree,
                                       onChanged: (v) {
                                         setDialogState(() {
@@ -419,7 +403,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                                       ),
                                     ),
                                     child: CheckboxListTile(
-                                      title: const Text('فعال'),
+                                      title: Text(adminTx(context, 'فعال', 'Active'), style: const TextStyle(fontSize: 13)),
                                       value: isActive,
                                       onChanged: (v) => setDialogState(() => isActive = v ?? true),
                                       controlAffinity: ListTileControlAffinity.leading,
@@ -451,7 +435,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                           style: TextButton.styleFrom(
                             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                           ),
-                          child: const Text('لغو'),
+                          child: Text(adminTx(context, 'انصراف', 'Cancel')),
                         ),
                         const SizedBox(width: 12),
                         FilledButton.icon(
@@ -459,7 +443,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                 if (!(formKey.currentState?.validate() ?? false)) return;
                 if (selectedCurrencyId == null) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('لطفاً ارز را انتخاب کنید')),
+                    SnackBar(content: Text(adminTx(context, 'ارز را انتخاب کنید', 'Select a currency'))),
                   );
                   return;
                 }
@@ -491,7 +475,9 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                   _load();
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(isEdit ? 'پلن با موفقیت به‌روزرسانی شد' : 'پلن با موفقیت ایجاد شد'),
+                      content: Text(isEdit
+                          ? adminTx(context, 'پلن ذخیره شد', 'Plan saved')
+                          : adminTx(context, 'پلن ایجاد شد', 'Plan created')),
                       backgroundColor: SemanticColorResolver.positive(context),
                     ),
                   );
@@ -499,14 +485,14 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('خطا: ${ErrorExtractor.forContext(e, context)}'),
+                      content: Text(ErrorExtractor.forContext(e, context)),
                       backgroundColor: SemanticColorResolver.negative(context),
                     ),
                   );
                 }
                           },
-                          icon: Icon(isEdit ? Icons.save_outlined : Icons.add_circle_outline),
-                          label: Text(isEdit ? 'ذخیره' : 'ایجاد'),
+                          icon: Icon(isEdit ? Icons.save_outlined : Icons.add_circle_outline, size: 18),
+                          label: Text(isEdit ? adminTx(context, 'ذخیره', 'Save') : adminTx(context, 'ایجاد', 'Create')),
                           style: FilledButton.styleFrom(
                             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                           ),
@@ -527,17 +513,17 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('حذف پلن'),
-        content: Text('آیا از حذف این پلن اطمینان دارید؟'),
+        title: Text(adminTx(context, 'حذف پلن', 'Delete plan'), style: const TextStyle(fontSize: 16)),
+        content: Text(adminTx(context, 'این پلن حذف شود؟', 'Delete this plan?')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('لغو'),
+            child: Text(adminTx(context, 'انصراف', 'Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(backgroundColor: SemanticColorResolver.negative(context)),
-            child: const Text('حذف'),
+            child: Text(adminTx(context, 'حذف', 'Delete')),
           ),
         ],
       ),
@@ -551,7 +537,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
         _load();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('پلن با موفقیت حذف شد'),
+            content: Text(adminTx(context, 'پلن حذف شد', 'Plan deleted')),
             backgroundColor: SemanticColorResolver.positive(context),
           ),
         );
@@ -560,7 +546,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('خطا: ${ErrorExtractor.forContext(e, context)}'),
+            content: Text(ErrorExtractor.forContext(e, context)),
             backgroundColor: SemanticColorResolver.negative(context),
           ),
         );
@@ -572,160 +558,123 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'پلن‌های ذخیره‌سازی',
-          style: TextStyle(fontWeight: FontWeight.bold),
+    return AdminCompactScaffold(
+      title: adminTx(context, 'پلن‌های ذخیره‌سازی', 'Storage plans'),
+      subtitle: adminTx(context, 'بسته‌های فضای فایل', 'File storage packages'),
+      actions: [
+        IconButton(
+          tooltip: adminTx(context, 'پلن جدید', 'New plan'),
+          onPressed: _showCreateDialog,
+          icon: const Icon(Icons.add, size: 20),
         ),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/user/profile/system-settings'),
+        IconButton(
+          tooltip: adminTx(context, 'بازخوانی', 'Refresh'),
+          onPressed: _load,
+          icon: const Icon(Icons.refresh, size: 20),
         ),
-        actions: [
-          IconButton(
-            onPressed: _load,
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              theme.colorScheme.primary.withValues(alpha: 0.1),
-              theme.colorScheme.surface,
-            ],
-          ),
-        ),
-        child: _loading
+      ],
+      body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
                 ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(_error!),
-                        const SizedBox(height: 16),
+                        Text(_error!, style: const TextStyle(fontSize: 12)),
+                        const SizedBox(height: 12),
                         FilledButton(
                           onPressed: _load,
-                          child: const Text('تلاش مجدد'),
+                          child: Text(adminTx(context, 'تلاش مجدد', 'Retry')),
                         ),
                       ],
                     ),
                   )
                 : _plans.isEmpty
                     ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.storage_outlined,
-                              size: 64,
-                              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'هیچ پلنی یافت نشد',
-                              style: theme.textTheme.titleLarge,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'برای ایجاد پلن جدید روی دکمه + کلیک کنید',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          adminTx(context, 'پلنی ثبت نشده است', 'No plans yet'),
+                          style: context.settingsHub.cardSubtitleStyle(theme.textTheme, color: theme.colorScheme.onSurfaceVariant),
                         ),
                       )
                     : ListView.separated(
-                        padding: const EdgeInsets.all(16),
+                        padding: context.settingsHub.pagePadding,
                         itemCount: _plans.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
                         itemBuilder: (context, index) {
                           final plan = _plans[index];
                           final isActive = (plan['is_active'] ?? false) == true;
                           final isFree = plan['is_free'] == true;
                           final period = plan['period'] ?? 'monthly';
-                          String periodText = '';
-                          switch (period) {
-                            case 'monthly':
-                              periodText = 'ماهانه';
-                              break;
-                            case 'yearly':
-                              periodText = 'سالانه';
-                              break;
-                            case 'lifetime':
-                              periodText = 'مادام‌العمر';
-                              break;
-                          }
-                          if (plan['period_months'] != null) {
-                            periodText += ' (${plan['period_months']} ماه)';
-                          }
+                          final periodText = switch (period) {
+                            'yearly' => adminTx(context, 'سالانه', 'Yearly'),
+                            'lifetime' => adminTx(context, 'مادام‌العمر', 'Lifetime'),
+                            _ => adminTx(context, 'ماهانه', 'Monthly'),
+                          };
+                          final months = plan['period_months'];
+                          final periodLine = months == null
+                              ? periodText
+                              : '$periodText ($months ${adminTx(context, 'ماه', 'mo')})';
+                          final price = isFree
+                              ? adminTx(context, 'رایگان', 'Free')
+                              : '${plan['price']} ${plan['currency_code'] ?? ''}';
 
                           return Card(
-                            elevation: 2,
+                            elevation: 0,
                             child: ExpansionTile(
+                              tilePadding: const EdgeInsets.symmetric(horizontal: 12),
                               leading: Icon(
                                 isActive ? Icons.check_circle : Icons.cancel,
-                                color: isActive ? SemanticColorResolver.positive(context) : Colors.grey,
+                                size: 18,
+                                color: isActive ? SemanticColorResolver.positive(context) : theme.colorScheme.outline,
                               ),
                               title: Text(
                                 plan['name'] ?? '-',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: isActive ? null : Colors.grey,
+                                style: context.settingsHub.cardTitleStyle(
+                                  theme.textTheme,
+                                  color: isActive ? theme.colorScheme.onSurface : theme.colorScheme.outline,
                                 ),
                               ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('کد: ${plan['code'] ?? '-'}'),
-                                  Text('حجم: ${plan['storage_limit_gb']} GB'),
-                                  Text('دوره: $periodText'),
-                                  Text('قیمت: ${isFree ? 'رایگان' : '${plan['price']} ${plan['currency_code'] ?? ''}'}'),
-                                  if (plan['price_per_gb'] != null)
-                                    Text('قیمت هر GB اضافی: ${plan['price_per_gb']} ${plan['currency_code'] ?? ''}'),
-                                ],
+                              subtitle: Text(
+                                '${plan['code'] ?? '-'} · ${plan['storage_limit_gb']} GB · $periodLine · $price',
+                                style: context.settingsHub.cardSubtitleStyle(theme.textTheme, color: theme.colorScheme.onSurfaceVariant),
                               ),
                               trailing: Wrap(
-                                spacing: 8,
+                                spacing: 0,
                                 children: [
                                   IconButton(
-                                    tooltip: 'ویرایش',
+                                    tooltip: adminTx(context, 'ویرایش', 'Edit'),
                                     onPressed: () => _showEditDialog(plan),
-                                    icon: Icon(Icons.edit_outlined),
+                                    icon: const Icon(Icons.edit_outlined, size: 18),
                                   ),
                                   IconButton(
-                                    tooltip: 'حذف',
+                                    tooltip: adminTx(context, 'حذف', 'Delete'),
                                     onPressed: () => _deletePlan(plan['id']),
-                                    icon: Icon(Icons.delete_outline, color: SemanticColorResolver.negative(context)),
+                                    icon: Icon(Icons.delete_outline, size: 18, color: SemanticColorResolver.negative(context)),
                                   ),
                                 ],
                               ),
                               children: [
-                                if (plan['description'] != null)
-                                  Padding(
-                                    padding: const EdgeInsets.all(16),
-                                    child: Text(
-                                      'توضیحات: ${plan['description']}',
-                                      style: theme.textTheme.bodyMedium,
-                                    ),
-                                  ),
                                 Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      _buildInfoChip('مهلت حذف', '${plan['grace_period_days']} روز'),
-                                      _buildInfoChip('وضعیت', isActive ? 'فعال' : 'غیرفعال'),
-                                      _buildInfoChip('نوع', isFree ? 'رایگان' : 'پولی'),
+                                      if (plan['price_per_gb'] != null)
+                                        Text(
+                                          '${adminTx(context, 'هر گیگابایت اضافه', 'Extra GB')}: ${plan['price_per_gb']} ${plan['currency_code'] ?? ''}',
+                                          style: context.settingsHub.cardSubtitleStyle(theme.textTheme, color: theme.colorScheme.onSurfaceVariant),
+                                        ),
+                                      if (plan['description'] != null)
+                                        Text('${plan['description']}', style: context.settingsHub.cardSubtitleStyle(theme.textTheme, color: theme.colorScheme.onSurfaceVariant)),
+                                      const SizedBox(height: 8),
+                                      Wrap(
+                                        spacing: 8,
+                                        children: [
+                                          _buildInfoChip(adminTx(context, 'مهلت حذف', 'Grace'), '${plan['grace_period_days']} ${adminTx(context, 'روز', 'days')}'),
+                                          _buildInfoChip(adminTx(context, 'وضعیت', 'Status'), isActive ? adminTx(context, 'فعال', 'Active') : adminTx(context, 'غیرفعال', 'Inactive')),
+                                          _buildInfoChip(adminTx(context, 'نوع', 'Type'), isFree ? adminTx(context, 'رایگان', 'Free') : adminTx(context, 'پولی', 'Paid')),
+                                        ],
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -734,14 +683,6 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                           );
                         },
                       ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showCreateDialog,
-        icon: const Icon(Icons.add),
-        label: const Text('ایجاد پلن جدید'),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
-      ),
     );
   }
 

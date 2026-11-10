@@ -528,7 +528,17 @@ class _OaSettingsPageState extends State<OaSettingsPage> with SingleTickerProvid
                       ),
                   ],
                 ),
-                _listPane(
+                Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                      child: Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Text(t.oaImageSignatureNote),
+                      ),
+                    ),
+                    Expanded(
+                      child: _listPane(
                   empty: t.oaEmptySignatures,
                   onAdd: () => _editSignature(),
                   children: [
@@ -539,6 +549,9 @@ class _OaSettingsPageState extends State<OaSettingsPage> with SingleTickerProvid
                         subtitle: Text(s['is_default'] == true ? t.oaMakeDefault : ''),
                         onTap: () => _editSignature(existing: s),
                       ),
+                  ],
+                      ),
+                    ),
                   ],
                 ),
                 _listPane(

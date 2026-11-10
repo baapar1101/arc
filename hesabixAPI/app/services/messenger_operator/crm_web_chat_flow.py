@@ -338,12 +338,15 @@ class CrmWebChatMessengerFlow:
 			return
 		ctx = ctx_get(sess)
 		offset = 0 if reset_offset else int(ctx.get("list_offset", 0))
+		from app.services.crm_enterprise_service import acl_actor
+
 		items, has_more = chat_svc.list_conversations_agent(
 			db,
 			int(sess.business_id),
 			limit=LIST_PAGE_SIZE,
 			offset=offset,
 			search=None,
+			ctx=acl_actor(db, int(user.id)),
 		)
 		if not items:
 			send("مکالمه‌ای نیست.", inline_keyboard=_kb_nav_common())

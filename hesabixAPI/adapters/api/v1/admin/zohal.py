@@ -29,7 +29,7 @@ router = APIRouter(prefix="/admin/zohal", tags=["admin-zohal"])
 
 def _require_admin(ctx: AuthContext) -> None:
 	"""بررسی دسترسی مدیر سیستم"""
-	if not ctx.has_any_permission("system_settings", "superadmin"):
+	if not ctx.has_app_permission("system_settings"):
 		raise ApiError("FORBIDDEN", "دسترسی به این بخش ندارید", http_status=403)
 
 

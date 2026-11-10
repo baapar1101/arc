@@ -9,6 +9,7 @@ import '../../services/document_monetization_service.dart';
 import '../../services/business_api_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'admin_compact_scaffold.dart';
 
 class DocumentMonetizationAdminPage extends StatefulWidget {
   const DocumentMonetizationAdminPage({super.key});
@@ -109,14 +110,14 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
     final raw = _businessIdController.text.trim();
     if (raw.isEmpty) {
       setState(() {
-        _error = 'شناسه کسب‌وکار را وارد کنید';
+        _error = adminTx(context, 'شناسه کسب‌وکار را وارد کنید', 'Enter a business id');
       });
       return;
     }
     final id = int.tryParse(raw);
     if (id == null) {
       setState(() {
-        _error = 'شناسه کسب‌وکار نامعتبر است';
+        _error = adminTx(context, 'شناسه کسب‌وکار نامعتبر است', 'Invalid business id');
       });
       return;
     }
@@ -152,7 +153,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setInnerState) => AlertDialog(
-          title: Text(initial == null ? 'پلن جدید' : 'ویرایش پلن'),
+          title: Text(initial == null ? adminTx(context, 'پلن جدید', 'New plan') : adminTx(context, 'ویرایش پلن', 'Edit plan')),
           content: SizedBox(
             width: 420,
             child: Form(
@@ -163,47 +164,47 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                   children: [
                     TextFormField(
                       controller: nameCtrl,
-                      decoration: const InputDecoration(labelText: 'نام پلن'),
-                      validator: (v) => v == null || v.isEmpty ? 'نام الزامی است' : null,
+                      decoration: InputDecoration(labelText: adminTx(context, 'نام پلن', 'Plan name')),
+                      validator: (v) => v == null || v.isEmpty ? adminTx(context, 'نام الزامی است', 'Name is required') : null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: codeCtrl,
-                      decoration: const InputDecoration(labelText: 'کد پلن'),
+                      decoration: InputDecoration(labelText: adminTx(context, 'کد پلن', 'Plan code')),
                       enabled: initial == null,
-                      validator: (v) => v == null || v.isEmpty ? 'کد الزامی است' : null,
+                      validator: (v) => v == null || v.isEmpty ? adminTx(context, 'کد الزامی است', 'Code is required') : null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: periodCtrl,
-                      decoration: const InputDecoration(labelText: 'مدت (ماه)'),
+                      decoration: InputDecoration(labelText: adminTx(context, 'مدت (ماه)', 'Term (months)')),
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       validator: (v) {
-                        if (v == null || v.isEmpty) return 'مدت الزامی است';
+                        if (v == null || v.isEmpty) return adminTx(context, 'مدت الزامی است', 'Term is required');
                         final val = int.tryParse(v);
-                        if (val == null || val <= 0) return 'مدت نامعتبر است';
+                        if (val == null || val <= 0) return adminTx(context, 'مدت نامعتبر است', 'Invalid term');
                         return null;
                       },
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: priceCtrl,
-                      decoration: InputDecoration(labelText: 'قیمت ($_walletCurrencyLabel)'),
+                      decoration: InputDecoration(labelText: adminTx(context, 'قیمت ($_walletCurrencyLabel)', 'Price ($_walletCurrencyLabel)')),
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: (v) => v == null || v.isEmpty ? 'قیمت الزامی است' : null,
+                      validator: (v) => v == null || v.isEmpty ? adminTx(context, 'قیمت الزامی است', 'Price is required') : null,
                     ),
                     const SizedBox(height: 12),
                     InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'ارز پایه',
+                      decoration: InputDecoration(
+                        labelText: adminTx(context, 'ارز پایه', 'Base currency'),
                         prefixIcon: Icon(Icons.currency_exchange),
                       ),
                       child: Text(_walletCurrencyLabel),
                     ),
                     const SizedBox(height: 12),
                     SwitchListTile(
-                      title: const Text('فعال'),
+                      title: Text(adminTx(context, 'فعال', 'Active')),
                       value: isActive,
                       onChanged: (v) => setInnerState(() => isActive = v),
                     ),
@@ -215,7 +216,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('انصراف'),
+              child: Text(adminTx(context, 'انصراف', 'Cancel')),
             ),
             FilledButton(
               onPressed: () async {
@@ -244,7 +245,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                   );
                 }
               },
-              child: const Text('ذخیره'),
+              child: Text(adminTx(context, 'ذخیره', 'Save')),
             ),
           ],
           ),
@@ -268,7 +269,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setInnerState) => AlertDialog(
-          title: Text(initial == null ? 'سیاست جدید' : 'ویرایش سیاست'),
+          title: Text(initial == null ? adminTx(context, 'سیاست جدید', 'New policy') : adminTx(context, 'ویرایش سیاست', 'Edit policy')),
           content: SizedBox(
             width: 480,
             child: Form(
@@ -279,51 +280,51 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                   children: [
                     TextFormField(
                       controller: titleCtrl,
-                      decoration: const InputDecoration(labelText: 'عنوان'),
-                      validator: (v) => v == null || v.isEmpty ? 'عنوان الزامی است' : null,
+                      decoration: InputDecoration(labelText: adminTx(context, 'عنوان', 'Title')),
+                      validator: (v) => v == null || v.isEmpty ? adminTx(context, 'عنوان الزامی است', 'Title is required') : null,
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       initialValue: policyType,
-                      decoration: const InputDecoration(labelText: 'نوع سیاست'),
-                      items: const [
-                        DropdownMenuItem(value: 'free', child: Text('رایگان')),
-                        DropdownMenuItem(value: 'subscription', child: Text('اشتراک')),
-                        DropdownMenuItem(value: 'per_document', child: Text('به‌ازای هر سند')),
-                        DropdownMenuItem(value: 'volume', child: Text('حجمی/تناوبی')),
-                        DropdownMenuItem(value: 'hybrid', child: Text('ترکیبی')),
+                      decoration: InputDecoration(labelText: adminTx(context, 'نوع سیاست', 'Policy type')),
+                      items: [
+                        DropdownMenuItem(value: 'free', child: Text(adminTx(context, 'رایگان', 'Free'))),
+                        DropdownMenuItem(value: 'subscription', child: Text(adminTx(context, 'اشتراک', 'Subscription'))),
+                        DropdownMenuItem(value: 'per_document', child: Text(adminTx(context, 'به‌ازای هر سند', 'Per document'))),
+                        DropdownMenuItem(value: 'volume', child: Text(adminTx(context, 'حجمی/تناوبی', 'Volume'))),
+                        DropdownMenuItem(value: 'hybrid', child: Text(adminTx(context, 'ترکیبی', 'Hybrid'))),
                       ],
                       onChanged: (v) => setInnerState(() => policyType = v ?? policyType),
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: priorityCtrl,
-                      decoration: const InputDecoration(labelText: 'اولویت'),
+                      decoration: InputDecoration(labelText: adminTx(context, 'اولویت', 'Priority')),
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      validator: (v) => v == null || v.isEmpty ? 'اولویت الزامی است' : null,
+                      validator: (v) => v == null || v.isEmpty ? adminTx(context, 'اولویت الزامی است', 'Priority is required') : null,
                     ),
                     const SizedBox(height: 12),
                     SwitchListTile(
-                      title: const Text('فعال'),
+                      title: Text(adminTx(context, 'فعال', 'Active')),
                       value: isActive,
                       onChanged: (v) => setInnerState(() => isActive = v),
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: configCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'پیکربندی (JSON)',
+                      decoration: InputDecoration(
+                        labelText: adminTx(context, 'پیکربندی (JSON)', 'Configuration (JSON)'),
                         alignLabelWithHint: true,
                       ),
                       maxLines: 8,
                       validator: (v) {
-                        if (v == null || v.isEmpty) return 'پیکربندی الزامی است';
+                        if (v == null || v.isEmpty) return adminTx(context, 'پیکربندی الزامی است', 'Configuration is required');
                         try {
                           jsonDecode(v);
                           return null;
                         } catch (_) {
-                          return 'فرمت JSON نامعتبر است';
+                          return adminTx(context, 'فرمت JSON نامعتبر است', 'Invalid JSON');
                         }
                       },
                     ),
@@ -335,13 +336,13 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('انصراف'),
+              child: Text(adminTx(context, 'انصراف', 'Cancel')),
             ),
             FilledButton(
               onPressed: () async {
                 if (!formKey.currentState!.validate()) return;
                 if (_selectedBusinessId == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ابتدا کسب‌وکار را انتخاب کنید')));
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(adminTx(context, 'ابتدا کسب‌وکار را انتخاب کنید', 'Select a business first'))));
                   return;
                 }
                 try {
@@ -368,7 +369,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                   );
                 }
               },
-              child: const Text('ذخیره'),
+              child: Text(adminTx(context, 'ذخیره', 'Save')),
             ),
           ],
           ),
@@ -389,10 +390,9 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('سناریوی درآمدزایی اسناد'),
-      ),
+    return AdminCompactScaffold(
+      title: adminTx(context, 'درآمدزایی اسناد', 'Document monetization'),
+      subtitle: adminTx(context, 'سناریو و سیاست هزینهٔ سند', 'Document fee scenario and policies'),
       body: _loadingPlans && _plans.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -436,7 +436,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
           ? FloatingActionButton.extended(
               onPressed: () => _showPolicyDialog(),
               icon: const Icon(Icons.add),
-              label: const Text('سیاست جدید'),
+              label: Text(adminTx(context, 'سیاست جدید', 'New policy')),
             )
           : null,
     );
@@ -458,12 +458,12 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'سیاست‌های پیش‌فرض کسب‌وکارهای جدید',
+                        adminTx(context, 'سیاست‌های پیش‌فرض کسب‌وکارهای جدید', 'Default policies for new businesses'),
                         style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'این سیاست‌ها به صورت خودکار برای هر کسب‌وکار جدید اعمال می‌شوند. اولویت‌ها به ترتیب از کم به زیاد بررسی می‌شوند.',
+                        adminTx(context, 'این سیاست‌ها به صورت خودکار برای هر کسب‌وکار جدید اعمال می‌شوند. اولویت‌ها به ترتیب از کم به زیاد بررسی می‌شوند.', 'These policies are applied automatically to every new business. Lower priority numbers are checked first.'),
                         style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
                       ),
                     ],
@@ -471,7 +471,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                 ),
                 IconButton(
                   icon: const Icon(Icons.info_outline),
-                  tooltip: 'سیاست‌ها به ترتیب اولویت بررسی می‌شوند. عدد کمتر = اولویت بالاتر',
+                  tooltip: adminTx(context, 'سیاست‌ها به ترتیب اولویت بررسی می‌شوند. عدد کمتر = اولویت بالاتر', 'Policies are checked by priority. A lower number wins.'),
                   onPressed: () {},
                 ),
               ],
@@ -480,7 +480,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
             if (_loadingDefaultPolicies)
               const Center(child: CircularProgressIndicator())
             else if (_defaultPolicies.isEmpty)
-              const Text('هیچ سیاست پیش‌فرضی تعریف نشده است')
+              Text(adminTx(context, 'هیچ سیاست پیش‌فرضی تعریف نشده است', 'No default policies yet'))
             else
               ..._defaultPolicies.asMap().entries.map((entry) {
                 final index = entry.key;
@@ -496,7 +496,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                   icon: _savingDefaultPolicies
                       ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.save),
-                  label: const Text('ذخیره تغییرات'),
+                  label: Text(adminTx(context, 'ذخیره تغییرات', 'Save changes')),
                 ),
               ],
             ),
@@ -517,23 +517,23 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
     IconData typeIcon = Icons.policy;
     switch (policyType) {
       case 'free':
-        typeLabel = 'رایگان';
+        typeLabel = adminTx(context, 'رایگان', 'Free');
         typeIcon = Icons.check_circle_outline;
         break;
       case 'subscription':
-        typeLabel = 'پکیج نامحدود';
+        typeLabel = adminTx(context, 'پکیج نامحدود', 'Unlimited package');
         typeIcon = Icons.all_inclusive;
         break;
       case 'volume':
-        typeLabel = 'حجمی';
+        typeLabel = adminTx(context, 'حجمی', 'Volume');
         typeIcon = Icons.analytics;
         break;
       case 'per_document':
-        typeLabel = 'تک سند';
+        typeLabel = adminTx(context, 'تک سند', 'Single document');
         typeIcon = Icons.receipt;
         break;
       case 'hybrid':
-        typeLabel = 'ترکیبی';
+        typeLabel = adminTx(context, 'ترکیبی', 'Hybrid');
         typeIcon = Icons.merge_type;
         break;
     }
@@ -543,7 +543,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
       child: ExpansionTile(
         leading: Icon(typeIcon),
         title: Text(title),
-        subtitle: Text('نوع: $typeLabel | اولویت: $priority'),
+        subtitle: Text(adminTx(context, 'نوع: $typeLabel | اولویت: $priority', 'Type: $typeLabel | Priority: $priority')),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -572,9 +572,9 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                   children: [
                     Expanded(
                       child: TextField(
-                        decoration: const InputDecoration(
-                          labelText: 'اولویت',
-                          helperText: 'عدد کمتر = اولویت بالاتر',
+                        decoration: InputDecoration(
+                          labelText: adminTx(context, 'اولویت', 'Priority'),
+                          helperText: adminTx(context, 'عدد کمتر = اولویت بالاتر', 'Lower number = higher priority'),
                         ),
                         keyboardType: TextInputType.number,
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -592,7 +592,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                     const SizedBox(width: 16),
                     Expanded(
                       child: TextField(
-                        decoration: const InputDecoration(labelText: 'عنوان'),
+                        decoration: InputDecoration(labelText: adminTx(context, 'عنوان', 'Title')),
                         controller: TextEditingController(text: title),
                         onChanged: (value) {
                           setState(() {
@@ -615,7 +615,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'تنظیمات:',
+                          adminTx(context, 'تنظیمات:', 'Settings:'),
                           style: theme.textTheme.labelMedium,
                         ),
                         const SizedBox(height: 8),
@@ -645,7 +645,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('ویرایش تنظیمات: ${policy['title']}'),
+          title: Text(adminTx(context, 'ویرایش تنظیمات: ${policy['title']}', 'Edit settings: ${policy['title']}')),
           content: SizedBox(
             width: 500,
             child: SingleChildScrollView(
@@ -659,7 +659,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('بستن'),
+              child: Text(adminTx(context, 'بستن', 'Close')),
             ),
           ],
         );
@@ -696,7 +696,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
           if (policyType == 'per_document') ...[
             TextFormField(
               controller: controllers['fee_amount'],
-              decoration: const InputDecoration(labelText: 'هزینه هر سند'),
+              decoration: InputDecoration(labelText: adminTx(context, 'هزینه هر سند', 'Fee per document')),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               onChanged: (_) {
                 final newConfig = {
@@ -709,7 +709,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
               },
             ),
             SwitchListTile(
-              title: const Text('کسر خودکار از کیف‌پول'),
+              title: Text(adminTx(context, 'کسر خودکار از کیف‌پول', 'Charge the wallet automatically')),
               value: controllers['auto_charge_wallet']!.text == 'true',
               onChanged: (value) {
                 controllers['auto_charge_wallet']!.text = value.toString();
@@ -723,7 +723,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
               },
             ),
             SwitchListTile(
-              title: const Text('اجازه ادامه سیاست‌های بعدی (cascade)'),
+              title: Text(adminTx(context, 'اجازه ادامه سیاست‌های بعدی (cascade)', 'Continue to later policies (cascade)')),
               value: controllers['cascade']!.text == 'true',
               onChanged: (value) {
                 controllers['cascade']!.text = value.toString();
@@ -738,7 +738,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
             ),
             TextFormField(
               controller: controllers['description'],
-              decoration: const InputDecoration(labelText: 'توضیح (اختیاری)'),
+              decoration: InputDecoration(labelText: adminTx(context, 'توضیح (اختیاری)', 'Description (optional)')),
               onChanged: (_) {
                 final newConfig = {
                   'fee_amount': double.tryParse(controllers['fee_amount']!.text) ?? 0,
@@ -751,12 +751,12 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
             ),
           ] else if (policyType == 'volume') ...[
             DropdownButtonFormField<String>(
-              decoration: const InputDecoration(labelText: 'دوره'),
+              decoration: InputDecoration(labelText: adminTx(context, 'دوره', 'Cycle')),
               initialValue: controllers['cycle']!.text,
-              items: const [
-                DropdownMenuItem(value: 'weekly', child: Text('هفتگی')),
-                DropdownMenuItem(value: 'monthly', child: Text('ماهانه')),
-                DropdownMenuItem(value: 'yearly', child: Text('سالانه')),
+              items: [
+                DropdownMenuItem(value: 'weekly', child: Text(adminTx(context, 'هفتگی', 'Weekly'))),
+                DropdownMenuItem(value: 'monthly', child: Text(adminTx(context, 'ماهانه', 'Monthly'))),
+                DropdownMenuItem(value: 'yearly', child: Text(adminTx(context, 'سالانه', 'Yearly'))),
               ],
               onChanged: (value) {
                 if (value != null) {
@@ -774,7 +774,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
             ),
             TextFormField(
               controller: controllers['tier_amount'],
-              decoration: const InputDecoration(labelText: 'مبلغ هر پله'),
+              decoration: InputDecoration(labelText: adminTx(context, 'مبلغ هر پله', 'Amount per tier')),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               onChanged: (_) {
                 final newConfig = {
@@ -789,7 +789,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
             ),
             TextFormField(
               controller: controllers['price_per_tier'],
-              decoration: const InputDecoration(labelText: 'قیمت هر پله'),
+              decoration: InputDecoration(labelText: adminTx(context, 'قیمت هر پله', 'Price per tier')),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               onChanged: (_) {
                 final newConfig = {
@@ -804,7 +804,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
             ),
             TextFormField(
               controller: controllers['free_threshold_amount'],
-              decoration: const InputDecoration(labelText: 'آستانه رایگان'),
+              decoration: InputDecoration(labelText: adminTx(context, 'آستانه رایگان', 'Free threshold')),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               onChanged: (_) {
                 final newConfig = {
@@ -818,7 +818,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
               },
             ),
             SwitchListTile(
-              title: const Text('اجازه ادامه سیاست‌های بعدی (cascade)'),
+              title: Text(adminTx(context, 'اجازه ادامه سیاست‌های بعدی (cascade)', 'Continue to later policies (cascade)')),
               value: controllers['cascade']!.text == 'true',
               onChanged: (value) {
                 controllers['cascade']!.text = value.toString();
@@ -834,7 +834,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
             ),
           ] else if (policyType == 'subscription') ...[
             SwitchListTile(
-              title: const Text('اجازه ادامه سیاست‌های بعدی (cascade)'),
+              title: Text(adminTx(context, 'اجازه ادامه سیاست‌های بعدی (cascade)', 'Continue to later policies (cascade)')),
               value: controllers['cascade']!.text == 'true',
               onChanged: (value) {
                 controllers['cascade']!.text = value.toString();
@@ -842,7 +842,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
               },
             ),
           ] else ...[
-            const Text('این نوع سیاست تنظیمات خاصی ندارد'),
+            Text(adminTx(context, 'این نوع سیاست تنظیمات خاصی ندارد', 'This policy type has no extra settings')),
           ],
         ],
       ),
@@ -866,12 +866,12 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
         _savingDefaultPolicies = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('سیاست‌های پیش‌فرض با موفقیت ذخیره شدند')),
+        SnackBar(content: Text(adminTx(context, 'سیاست‌های پیش‌فرض با موفقیت ذخیره شدند', 'Default policies saved'))),
       );
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'خطا در ذخیره: ${ErrorExtractor.forContext(e, context)}';
+        _error = adminTx(context, 'خطا در ذخیره: ${ErrorExtractor.forContext(e, context)}', 'Save failed: ${ErrorExtractor.forContext(e, context)}');
         _savingDefaultPolicies = false;
       });
     }
@@ -893,12 +893,12 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'اعمال سیاست به کسب‌وکارهای موجود',
+                        adminTx(context, 'اعمال سیاست به کسب‌وکارهای موجود', 'Apply a policy to existing businesses'),
                         style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'اعمال سیاست‌های مختلف به صورت انبوه برای کسب‌وکارهای موجود',
+                        adminTx(context, 'اعمال سیاست‌های مختلف به صورت انبوه برای کسب‌وکارهای موجود', 'Apply policies in bulk to existing businesses'),
                         style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
                       ),
                     ],
@@ -906,24 +906,24 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                 ),
                 IconButton(
                   icon: const Icon(Icons.info_outline),
-                  tooltip: 'می‌توانید سیاست‌های مختلف را به صورت انبوه برای کسب‌وکارهای موجود اعمال کنید',
+                  tooltip: adminTx(context, 'می‌توانید سیاست‌های مختلف را به صورت انبوه برای کسب‌وکارهای موجود اعمال کنید', 'Apply different policies in bulk to businesses that already exist'),
                   onPressed: () {},
                 ),
               ],
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: 'نوع سیاست',
+              decoration: InputDecoration(
+                labelText: adminTx(context, 'نوع سیاست', 'Policy type'),
                 prefixIcon: Icon(Icons.policy),
               ),
               initialValue: _selectedBulkPolicyType,
-              items: const [
-                DropdownMenuItem(value: 'free', child: Text('رایگان')),
-                DropdownMenuItem(value: 'subscription', child: Text('پکیج نامحدود')),
-                DropdownMenuItem(value: 'volume', child: Text('حجمی')),
-                DropdownMenuItem(value: 'per_document', child: Text('تک سند')),
-                DropdownMenuItem(value: 'hybrid', child: Text('ترکیبی')),
+              items: [
+                DropdownMenuItem(value: 'free', child: Text(adminTx(context, 'رایگان', 'Free'))),
+                DropdownMenuItem(value: 'subscription', child: Text(adminTx(context, 'پکیج نامحدود', 'Unlimited package'))),
+                DropdownMenuItem(value: 'volume', child: Text(adminTx(context, 'حجمی', 'Volume'))),
+                DropdownMenuItem(value: 'per_document', child: Text(adminTx(context, 'تک سند', 'Single document'))),
+                DropdownMenuItem(value: 'hybrid', child: Text(adminTx(context, 'ترکیبی', 'Hybrid'))),
               ],
               onChanged: (value) {
                 setState(() {
@@ -935,17 +935,17 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
               const SizedBox(height: 16),
               TextField(
                 controller: _bulkPolicyTitleController,
-                decoration: const InputDecoration(
-                  labelText: 'عنوان سیاست',
+                decoration: InputDecoration(
+                  labelText: adminTx(context, 'عنوان سیاست', 'Policy title'),
                   prefixIcon: Icon(Icons.title),
                 ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _bulkPolicyPriorityController,
-                decoration: const InputDecoration(
-                  labelText: 'اولویت',
-                  helperText: 'عدد کمتر = اولویت بالاتر',
+                decoration: InputDecoration(
+                  labelText: adminTx(context, 'اولویت', 'Priority'),
+                  helperText: adminTx(context, 'عدد کمتر = اولویت بالاتر', 'Lower number = higher priority'),
                   prefixIcon: Icon(Icons.sort),
                 ),
                 keyboardType: TextInputType.number,
@@ -965,7 +965,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                       groupValue: _bulkPolicyApplyToAll,
                       // ignore: deprecated_member_use
                       onChanged: (v) => setState(() => _bulkPolicyApplyToAll = v ?? true),
-                      title: const Text('همه کسب‌وکارها'),
+                      title: Text(adminTx(context, 'همه کسب‌وکارها', 'All businesses')),
                     ),
                   ),
                   Expanded(
@@ -975,7 +975,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                       groupValue: _bulkPolicyApplyToAll,
                       // ignore: deprecated_member_use
                       onChanged: (v) => setState(() => _bulkPolicyApplyToAll = v ?? false),
-                      title: const Text('لیست شناسه‌ها'),
+                      title: Text(adminTx(context, 'لیست شناسه‌ها', 'Id list')),
                     ),
                   ),
                 ],
@@ -989,8 +989,8 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                   child: TextField(
                     controller: _bulkPolicyBusinessIdsController,
                     maxLines: 3,
-                    decoration: const InputDecoration(
-                      labelText: 'شناسه کسب‌وکارها (با ویرگول یا خط جدید جدا کنید)',
+                    decoration: InputDecoration(
+                      labelText: adminTx(context, 'شناسه کسب‌وکارها (با ویرگول یا خط جدید جدا کنید)', 'Business ids (comma or new line)'),
                       prefixIcon: Icon(Icons.list_alt_outlined),
                     ),
                   ),
@@ -1000,7 +1000,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
               FilledButton.icon(
                 onPressed: _applyingBulkPolicyToExisting ? null : _applyBulkPolicyToExisting,
                 icon: const Icon(Icons.playlist_add_check),
-                label: const Text('اعمال سیاست'),
+                label: Text(adminTx(context, 'اعمال سیاست', 'Apply policy')),
               ),
               if (_applyingBulkPolicyToExisting) ...[
                 const SizedBox(height: 12),
@@ -1030,7 +1030,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
         return Column(
           children: [
             SwitchListTile(
-              title: const Text('اجازه ادامه سیاست‌های بعدی (cascade)'),
+              title: Text(adminTx(context, 'اجازه ادامه سیاست‌های بعدی (cascade)', 'Continue to later policies (cascade)')),
               value: _bulkPolicyCascade,
               onChanged: (value) => setState(() => _bulkPolicyCascade = value),
             ),
@@ -1042,7 +1042,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
             TextField(
               controller: _bulkPerDocFeeController,
               decoration: InputDecoration(
-                labelText: 'هزینه هر سند ($_walletCurrencyLabel)',
+                labelText: adminTx(context, 'هزینه هر سند ($_walletCurrencyLabel)', 'Fee per document ($_walletCurrencyLabel)'),
                 prefixIcon: const Icon(Icons.price_change_outlined),
               ),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -1050,19 +1050,19 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
             ),
             const SizedBox(height: 12),
             SwitchListTile(
-              title: const Text('کسر خودکار از کیف‌پول'),
+              title: Text(adminTx(context, 'کسر خودکار از کیف‌پول', 'Charge the wallet automatically')),
               value: _bulkPolicyAutoCharge,
               onChanged: (value) => setState(() => _bulkPolicyAutoCharge = value),
             ),
             SwitchListTile(
-              title: const Text('اجازه ادامه سیاست‌های بعدی (cascade)'),
+              title: Text(adminTx(context, 'اجازه ادامه سیاست‌های بعدی (cascade)', 'Continue to later policies (cascade)')),
               value: _bulkPolicyCascade,
               onChanged: (value) => setState(() => _bulkPolicyCascade = value),
             ),
             TextField(
               controller: _bulkPerDocDescriptionController,
-              decoration: const InputDecoration(
-                labelText: 'توضیح (اختیاری)',
+              decoration: InputDecoration(
+                labelText: adminTx(context, 'توضیح (اختیاری)', 'Description (optional)'),
                 prefixIcon: Icon(Icons.notes_outlined),
               ),
             ),
@@ -1072,15 +1072,15 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
         return Column(
           children: [
             DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: 'دوره',
+              decoration: InputDecoration(
+                labelText: adminTx(context, 'دوره', 'Cycle'),
                 prefixIcon: Icon(Icons.calendar_today),
               ),
               initialValue: _bulkVolumeCycle,
-              items: const [
-                DropdownMenuItem(value: 'weekly', child: Text('هفتگی')),
-                DropdownMenuItem(value: 'monthly', child: Text('ماهانه')),
-                DropdownMenuItem(value: 'yearly', child: Text('سالانه')),
+              items: [
+                DropdownMenuItem(value: 'weekly', child: Text(adminTx(context, 'هفتگی', 'Weekly'))),
+                DropdownMenuItem(value: 'monthly', child: Text(adminTx(context, 'ماهانه', 'Monthly'))),
+                DropdownMenuItem(value: 'yearly', child: Text(adminTx(context, 'سالانه', 'Yearly'))),
               ],
               onChanged: (value) => setState(() => _bulkVolumeCycle = value),
             ),
@@ -1088,7 +1088,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
             TextField(
               controller: _bulkVolumeTierAmountController,
               decoration: InputDecoration(
-                labelText: 'مبلغ هر پله ($_walletCurrencyLabel)',
+                labelText: adminTx(context, 'مبلغ هر پله ($_walletCurrencyLabel)', 'Amount per tier ($_walletCurrencyLabel)'),
                 prefixIcon: const Icon(Icons.analytics),
               ),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -1098,7 +1098,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
             TextField(
               controller: _bulkVolumePricePerTierController,
               decoration: InputDecoration(
-                labelText: 'قیمت هر پله ($_walletCurrencyLabel)',
+                labelText: adminTx(context, 'قیمت هر پله ($_walletCurrencyLabel)', 'Price per tier ($_walletCurrencyLabel)'),
                 prefixIcon: const Icon(Icons.attach_money),
               ),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -1108,7 +1108,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
             TextField(
               controller: _bulkVolumeFreeThresholdController,
               decoration: InputDecoration(
-                labelText: 'آستانه رایگان ($_walletCurrencyLabel)',
+                labelText: adminTx(context, 'آستانه رایگان ($_walletCurrencyLabel)', 'Free threshold ($_walletCurrencyLabel)'),
                 prefixIcon: const Icon(Icons.free_breakfast),
               ),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -1116,7 +1116,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
             ),
             const SizedBox(height: 12),
             SwitchListTile(
-              title: const Text('اجازه ادامه سیاست‌های بعدی (cascade)'),
+              title: Text(adminTx(context, 'اجازه ادامه سیاست‌های بعدی (cascade)', 'Continue to later policies (cascade)')),
               value: _bulkPolicyCascade,
               onChanged: (value) => setState(() => _bulkPolicyCascade = value),
             ),
@@ -1126,7 +1126,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
         return Column(
           children: [
             SwitchListTile(
-              title: const Text('اجازه ادامه سیاست‌های بعدی (cascade)'),
+              title: Text(adminTx(context, 'اجازه ادامه سیاست‌های بعدی (cascade)', 'Continue to later policies (cascade)')),
               value: _bulkPolicyCascade,
               onChanged: (value) => setState(() => _bulkPolicyCascade = value),
             ),
@@ -1139,19 +1139,19 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
 
   Future<void> _applyBulkPolicyToExisting() async {
     if (_selectedBulkPolicyType == null) {
-      _showSnack('نوع سیاست را انتخاب کنید');
+      _showSnack(adminTx(context, 'نوع سیاست را انتخاب کنید', 'Select a policy type'));
       return;
     }
 
     final title = _bulkPolicyTitleController.text.trim();
     if (title.isEmpty) {
-      _showSnack('عنوان سیاست را وارد کنید');
+      _showSnack(adminTx(context, 'عنوان سیاست را وارد کنید', 'Enter a policy title'));
       return;
     }
 
     final priority = int.tryParse(_bulkPolicyPriorityController.text.trim());
     if (priority == null || priority < 0) {
-      _showSnack('اولویت معتبر وارد کنید');
+      _showSnack(adminTx(context, 'اولویت معتبر وارد کنید', 'Enter a valid priority'));
       return;
     }
 
@@ -1160,7 +1160,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
     if (_selectedBulkPolicyType == 'per_document') {
       final fee = double.tryParse(_bulkPerDocFeeController.text.replaceAll(',', '').trim());
       if (fee == null || fee <= 0) {
-        _showSnack('مبلغ معتبر وارد کنید');
+        _showSnack(adminTx(context, 'مبلغ معتبر وارد کنید', 'Enter a valid amount'));
         return;
       }
       config = {
@@ -1177,7 +1177,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
       final pricePerTier = double.tryParse(_bulkVolumePricePerTierController.text.replaceAll(',', '').trim());
       final freeThreshold = double.tryParse(_bulkVolumeFreeThresholdController.text.replaceAll(',', '').trim());
       if (tierAmount == null || tierAmount <= 0 || pricePerTier == null || pricePerTier <= 0) {
-        _showSnack('مقادیر معتبر وارد کنید');
+        _showSnack(adminTx(context, 'مقادیر معتبر وارد کنید', 'Enter valid values'));
         return;
       }
       config = {
@@ -1197,7 +1197,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
     List<int> targetIds = <int>[];
     try {
       if (_bulkPolicyApplyToAll) {
-        _showSnack('در حال آماده‌سازی لیست کسب‌وکارها...');
+        _showSnack(adminTx(context, 'در حال آماده‌سازی لیست کسب‌وکارها...', 'Preparing the business list...'));
         targetIds = await _fetchAllBusinessIds();
       } else {
         targetIds = _parseBusinessIds(_bulkPolicyBusinessIdsController.text);
@@ -1205,14 +1205,14 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
     } catch (e) {
       if (mounted) {
         _showSnack(
-          'خطا در دریافت لیست کسب‌وکارها: ${ErrorExtractor.forContext(e, context)}',
+          adminTx(context, 'خطا در دریافت لیست کسب‌وکارها: ${ErrorExtractor.forContext(e, context)}', 'Could not load businesses: ${ErrorExtractor.forContext(e, context)}'),
         );
       }
       return;
     }
 
     if (targetIds.isEmpty) {
-      _showSnack('هیچ کسب‌وکاری برای اعمال سیاست مشخص نشد');
+      _showSnack(adminTx(context, 'هیچ کسب‌وکاری برای اعمال سیاست مشخص نشد', 'No business was selected'));
       return;
     }
 
@@ -1227,7 +1227,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
     setState(() {
       _applyingBulkPolicyToExisting = true;
       _bulkPolicyProgress = 0;
-      _bulkPolicyStatus = 'در حال اعمال برای ${targetIds.length} کسب‌وکار';
+      _bulkPolicyStatus = adminTx(context, 'در حال اعمال برای ${targetIds.length} کسب‌وکار', 'Applying to ${targetIds.length} businesses');
     });
 
     int success = 0;
@@ -1244,7 +1244,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
       if (!mounted) return;
       setState(() {
         _bulkPolicyProgress = (i + 1) / targetIds.length;
-        _bulkPolicyStatus = 'اعمال ${i + 1} از ${targetIds.length} (موفق: $success | ناموفق: $failed)';
+        _bulkPolicyStatus = adminTx(context, 'اعمال ${i + 1} از ${targetIds.length} (موفق: $success | ناموفق: $failed)', 'Applying ${i + 1} of ${targetIds.length} (ok: $success | failed: $failed)');
       });
     }
 
@@ -1252,9 +1252,9 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
     setState(() {
       _applyingBulkPolicyToExisting = false;
       _bulkPolicyProgress = 0;
-      _bulkPolicyStatus = 'موفق: $success | ناموفق: $failed';
+      _bulkPolicyStatus = adminTx(context, 'موفق: $success | ناموفق: $failed', 'Ok: $success | Failed: $failed');
     });
-    _showSnack('اعمال سیاست انجام شد (موفق: $success | ناموفق: $failed)');
+    _showSnack(adminTx(context, 'اعمال سیاست انجام شد (موفق: $success | ناموفق: $failed)', 'Policy applied (ok: $success | failed: $failed)'));
   }
 
   Widget _buildSingleDocumentPolicyCard(ThemeData theme) {
@@ -1273,12 +1273,12 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'هزینه ثبت تکی اسناد',
+                        adminTx(context, 'هزینه ثبت تکی اسناد', 'Per-document registration fee'),
                         style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'تعیین نرخ پایه برای ثبت هر سند حسابداری و اعمال آن بر روی همه یا بخشی از کسب‌وکارها',
+                        adminTx(context, 'تعیین نرخ پایه برای ثبت هر سند حسابداری و اعمال آن بر روی همه یا بخشی از کسب‌وکارها', 'Set the base fee for each accounting document and apply it to all or some businesses'),
                         style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
                       ),
                     ],
@@ -1286,7 +1286,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                 ),
                 IconButton(
                   icon: const Icon(Icons.info_outline),
-                  tooltip: 'با این قابلیت می‌توانید سیاست per_document را به صورت انبوه برای کسب‌وکارها ثبت کنید.',
+                  tooltip: adminTx(context, 'با این قابلیت می‌توانید سیاست per_document را به صورت انبوه برای کسب‌وکارها ثبت کنید.', 'This registers a per-document policy in bulk.'),
                   onPressed: () {},
                 ),
               ],
@@ -1301,7 +1301,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                   child: TextField(
                     controller: _singleDocPriceController,
                     decoration: InputDecoration(
-                      labelText: 'هزینه هر سند ($_walletCurrencyLabel)',
+                      labelText: adminTx(context, 'هزینه هر سند ($_walletCurrencyLabel)', 'Fee per document ($_walletCurrencyLabel)'),
                       prefixIcon: Icon(Icons.price_change_outlined),
                     ),
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -1311,8 +1311,8 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                 SizedBox(
                   width: 220,
                   child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'ارز پایه',
+                    decoration: InputDecoration(
+                      labelText: adminTx(context, 'ارز پایه', 'Base currency'),
                       prefixIcon: Icon(Icons.currency_exchange),
                     ),
                     child: Text(_walletCurrencyLabel),
@@ -1322,8 +1322,8 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                   width: 320,
                   child: TextField(
                     controller: _singleDocDescriptionController,
-                    decoration: const InputDecoration(
-                      labelText: 'توضیح سیاست (اختیاری)',
+                    decoration: InputDecoration(
+                      labelText: adminTx(context, 'توضیح سیاست (اختیاری)', 'Policy description (optional)'),
                       prefixIcon: Icon(Icons.notes_outlined),
                     ),
                   ),
@@ -1335,12 +1335,12 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
               spacing: 12,
               children: [
                 FilterChip(
-                  label: const Text('کسر خودکار از کیف‌پول'),
+                  label: Text(adminTx(context, 'کسر خودکار از کیف‌پول', 'Charge the wallet automatically')),
                   selected: _singleDocAutoCharge,
                   onSelected: (v) => setState(() => _singleDocAutoCharge = v),
                 ),
                 FilterChip(
-                  label: const Text('اجازهٔ ادامه سیاست‌های بعدی (cascade)'),
+                  label: Text(adminTx(context, 'اجازهٔ ادامه سیاست‌های بعدی (cascade)', 'Continue to later policies (cascade)')),
                   selected: _singleDocCascade,
                   onSelected: (v) => setState(() => _singleDocCascade = v),
                 ),
@@ -1356,7 +1356,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                     groupValue: _applyToAllBusinesses,
                     // ignore: deprecated_member_use
                     onChanged: (v) => setState(() => _applyToAllBusinesses = v ?? true),
-                    title: const Text('همهٔ کسب‌وکارها'),
+                    title: Text(adminTx(context, 'همهٔ کسب‌وکارها', 'All businesses')),
                   ),
                 ),
                 Expanded(
@@ -1366,7 +1366,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                     groupValue: _applyToAllBusinesses,
                     // ignore: deprecated_member_use
                     onChanged: (v) => setState(() => _applyToAllBusinesses = v ?? false),
-                    title: const Text('شناسه‌های دلخواه'),
+                    title: Text(adminTx(context, 'شناسه‌های دلخواه', 'Selected ids')),
                   ),
                 ),
               ],
@@ -1380,8 +1380,8 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                 child: TextField(
                   controller: _targetBusinessIdsController,
                   maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'شناسه کسب‌وکارها (با ویرگول یا خط جدید جدا کنید)',
+                  decoration: InputDecoration(
+                    labelText: adminTx(context, 'شناسه کسب‌وکارها (با ویرگول یا خط جدید جدا کنید)', 'Business ids (comma or new line)'),
                     prefixIcon: Icon(Icons.list_alt_outlined),
                   ),
                 ),
@@ -1394,7 +1394,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                   child: ElevatedButton.icon(
                     onPressed: _applyingBulkPolicy ? null : _applySingleDocumentPolicy,
                     icon: const Icon(Icons.playlist_add_check),
-                    label: const Text('اعمال سیاست'),
+                    label: Text(adminTx(context, 'اعمال سیاست', 'Apply policy')),
                   ),
                 ),
               ],
@@ -1420,13 +1420,13 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
     final rawPrice = _singleDocPriceController.text.replaceAll(',', '').trim();
     final price = double.tryParse(rawPrice);
     if (price == null || price <= 0) {
-      _showSnack('مبلغ معتبر وارد کنید');
+      _showSnack(adminTx(context, 'مبلغ معتبر وارد کنید', 'Enter a valid amount'));
       return;
     }
     List<int> targetIds = <int>[];
     try {
       if (_applyToAllBusinesses) {
-        _showSnack('در حال آماده‌سازی لیست کسب‌وکارها...');
+        _showSnack(adminTx(context, 'در حال آماده‌سازی لیست کسب‌وکارها...', 'Preparing the business list...'));
         targetIds = await _fetchAllBusinessIds();
       } else {
         targetIds = _parseBusinessIds(_targetBusinessIdsController.text);
@@ -1434,14 +1434,14 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
     } catch (e) {
       if (mounted) {
         _showSnack(
-          'خطا در دریافت لیست کسب‌وکارها: ${ErrorExtractor.forContext(e, context)}',
+          adminTx(context, 'خطا در دریافت لیست کسب‌وکارها: ${ErrorExtractor.forContext(e, context)}', 'Could not load businesses: ${ErrorExtractor.forContext(e, context)}'),
         );
       }
       return;
     }
 
     if (targetIds.isEmpty) {
-      _showSnack('هیچ کسب‌وکاری برای اعمال سیاست مشخص نشد');
+      _showSnack(adminTx(context, 'هیچ کسب‌وکاری برای اعمال سیاست مشخص نشد', 'No business was selected'));
       return;
     }
 
@@ -1456,7 +1456,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
     }
 
     final payload = <String, dynamic>{
-      'title': 'هزینه ثبت تکی اسناد',
+      'title': adminTx(context, 'هزینه ثبت تکی اسناد', 'Per-document registration fee'),
       'policy_type': 'per_document',
       'priority': 120,
       'is_active': true,
@@ -1466,7 +1466,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
     setState(() {
       _applyingBulkPolicy = true;
       _bulkProgress = 0;
-      _bulkStatus = 'در حال اعمال برای ${targetIds.length} کسب‌وکار';
+      _bulkStatus = adminTx(context, 'در حال اعمال برای ${targetIds.length} کسب‌وکار', 'Applying to ${targetIds.length} businesses');
     });
 
     int success = 0;
@@ -1483,7 +1483,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
       if (!mounted) return;
       setState(() {
         _bulkProgress = (i + 1) / targetIds.length;
-        _bulkStatus = 'اعمال ${i + 1} از ${targetIds.length}';
+        _bulkStatus = adminTx(context, 'اعمال ${i + 1} از ${targetIds.length}', 'Applying ${i + 1} of ${targetIds.length}');
       });
     }
 
@@ -1491,9 +1491,9 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
     setState(() {
       _applyingBulkPolicy = false;
       _bulkProgress = 0;
-      _bulkStatus = 'موفق: $success | ناموفق: $failed';
+      _bulkStatus = adminTx(context, 'موفق: $success | ناموفق: $failed', 'Ok: $success | Failed: $failed');
     });
-    _showSnack('اعمال سیاست انجام شد (موفق: $success | ناموفق: $failed)');
+    _showSnack(adminTx(context, 'اعمال سیاست انجام شد (موفق: $success | ناموفق: $failed)', 'Policy applied (ok: $success | failed: $failed)'));
   }
 
   Future<List<int>> _fetchAllBusinessIds() async {
@@ -1549,13 +1549,13 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'پلن‌های اشتراک نامحدود اسناد',
+                  adminTx(context, 'پلن‌های اشتراک نامحدود اسناد', 'Unlimited document plans'),
                   style: theme.textTheme.titleMedium,
                 ),
                 TextButton.icon(
                   onPressed: () => _showPlanDialog(),
                   icon: const Icon(Icons.add),
-                  label: const Text('پلن جدید'),
+                  label: Text(adminTx(context, 'پلن جدید', 'New plan')),
                 ),
               ],
             ),
@@ -1563,7 +1563,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
             if (_loadingPlans)
               const Center(child: CircularProgressIndicator())
             else if (_plans.isEmpty)
-              const Text('پلنی ثبت نشده است')
+              Text(adminTx(context, 'پلنی ثبت نشده است', 'No plans yet'))
             else
               Column(
                 children: _plans
@@ -1572,7 +1572,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                         contentPadding: EdgeInsets.zero,
                         title: Text(plan['name'] as String? ?? '-'),
                         subtitle: Text(
-                          'مدت: ${plan['period_months']} ماه | قیمت: ${plan['price']} ${plan['currency_code'] ?? _walletCurrencyCode ?? ''}',
+                          adminTx(context, 'مدت: ${plan['period_months']} ماه | قیمت: ${plan['price']} ${plan['currency_code'] ?? _walletCurrencyCode ?? ''}', 'Term: ${plan['period_months']} mo | Price: ${plan['price']} ${plan['currency_code'] ?? _walletCurrencyCode ?? ''}'),
                         ),
                         trailing: Wrap(
                           spacing: 8,
@@ -1580,7 +1580,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                             IconButton(
                               icon: const Icon(Icons.edit),
                               onPressed: () => _showPlanDialog(initial: plan),
-                              tooltip: 'ویرایش',
+                              tooltip: adminTx(context, 'ویرایش', 'Edit'),
                             ),
                             IconButton(
                               icon: const Icon(Icons.delete_forever),
@@ -1588,16 +1588,16 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                                 final confirmed = await showDialog<bool>(
                                   context: context,
                                   builder: (context) => AlertDialog(
-                                    title: const Text('حذف پلن'),
-                                    content: const Text('آیا از حذف پلن اطمینان دارید؟'),
+                                    title: Text(adminTx(context, 'حذف پلن', 'Delete plan')),
+                                    content: Text(adminTx(context, 'آیا از حذف پلن اطمینان دارید؟', 'Delete this plan?')),
                                     actions: [
                                       TextButton(
                                         onPressed: () => Navigator.pop(context, false),
-                                        child: const Text('انصراف'),
+                                        child: Text(adminTx(context, 'انصراف', 'Cancel')),
                                       ),
                                       FilledButton(
                                         onPressed: () => Navigator.pop(context, true),
-                                        child: const Text('حذف'),
+                                        child: Text(adminTx(context, 'حذف', 'Delete')),
                                       ),
                                     ],
                                   ),
@@ -1608,7 +1608,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                                   _loadInitial();
                                 }
                               },
-                              tooltip: 'حذف',
+                              tooltip: adminTx(context, 'حذف', 'Delete'),
                             ),
                           ],
                         ),
@@ -1630,7 +1630,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'سیاست‌های فعال برای کسب‌وکار',
+              adminTx(context, 'سیاست‌های فعال برای کسب‌وکار', 'Active policies for a business'),
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 12),
@@ -1640,7 +1640,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                   child: TextField(
                     controller: _businessIdController,
                     decoration: InputDecoration(
-                      labelText: 'شناسه کسب‌وکار',
+                      labelText: adminTx(context, 'شناسه کسب‌وکار', 'Business id'),
                       border: const OutlineInputBorder(),
                       suffixIcon: IconButton(
                         icon: const Icon(Icons.clear),
@@ -1660,7 +1660,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                 FilledButton.icon(
                   onPressed: _loadPolicies,
                   icon: const Icon(Icons.search),
-                  label: const Text('بارگذاری'),
+                  label: Text(adminTx(context, 'بارگذاری', 'Load')),
                 ),
               ],
             ),
@@ -1668,9 +1668,9 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
             if (_loadingPolicies)
               const Center(child: CircularProgressIndicator())
             else if (_selectedBusinessId == null)
-              const Text('برای مشاهده سیاست‌ها، شناسه کسب‌وکار را وارد کنید')
+              Text(adminTx(context, 'برای مشاهده سیاست‌ها، شناسه کسب‌وکار را وارد کنید', 'Enter a business id to see its policies'))
             else if (_policies.isEmpty)
-              const Text('هیچ سیاستی برای این کسب‌وکار تعریف نشده است')
+              Text(adminTx(context, 'هیچ سیاستی برای این کسب‌وکار تعریف نشده است', 'This business has no policies'))
             else
               Column(
                 children: _policies
@@ -1679,7 +1679,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                         margin: const EdgeInsets.symmetric(vertical: 6),
                         child: ListTile(
                           title: Text(policy['title'] as String? ?? '-'),
-                          subtitle: Text('نوع: ${policy['policy_type']} | اولویت: ${policy['priority']}'),
+                          subtitle: Text(adminTx(context, 'نوع: ${policy['policy_type']} | اولویت: ${policy['priority']}', 'Type: ${policy['policy_type']} | Priority: ${policy['priority']}')),
                           leading: Icon(
                             policy['is_active'] == true ? Icons.verified : Icons.pause_circle_outline,
                             color: policy['is_active'] == true ? theme.colorScheme.primary : theme.colorScheme.outline,
@@ -1697,7 +1697,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                                   final pretty = _service.prettyJson(policy['config'] as Map<String, dynamic>? ?? {});
                                   Clipboard.setData(ClipboardData(text: pretty));
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('پیکربندی در کلیپ‌بورد کپی شد')),
+                                    SnackBar(content: Text(adminTx(context, 'پیکربندی در کلیپ‌بورد کپی شد', 'Configuration copied'))),
                                   );
                                 },
                               ),
@@ -1707,11 +1707,11 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                                   final confirmed = await showDialog<bool>(
                                     context: context,
                                     builder: (context) => AlertDialog(
-                                      title: const Text('حذف سیاست'),
-                                      content: Text('آیا از حذف "${policy['title']}" اطمینان دارید؟'),
+                                      title: Text(adminTx(context, 'حذف سیاست', 'Delete policy')),
+                                      content: Text(adminTx(context, 'آیا از حذف "${policy['title']}" اطمینان دارید؟', 'Delete "${policy['title']}"?')),
                                       actions: [
-                                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('انصراف')),
-                                        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('حذف')),
+                                        TextButton(onPressed: () => Navigator.pop(context, false), child: Text(adminTx(context, 'انصراف', 'Cancel'))),
+                                        FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(adminTx(context, 'حذف', 'Delete'))),
                                       ],
                                     ),
                                   );

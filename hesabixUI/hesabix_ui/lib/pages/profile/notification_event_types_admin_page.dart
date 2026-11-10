@@ -4,6 +4,8 @@ import '../../services/admin_notification_event_types_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
+import '../admin/admin_compact_scaffold.dart';
+import '../../theme/tokens/extensions.dart';
 
 class NotificationEventTypesAdminPage extends StatefulWidget {
   const NotificationEventTypesAdminPage({super.key});
@@ -23,18 +25,45 @@ class _NotificationEventTypesAdminPageState
   List<Map<String, dynamic>> _items = [];
   String? _categoryFilter;
 
-  static const _categories = <String, String>{
-    'sales': 'فروش',
-    'purchases': 'خرید',
-    'financial': 'مالی',
-    'crm': 'CRM',
-    'documents': 'اسناد',
-    'people': 'اشخاص',
-    'warehouse': 'انبار',
-    'distribution': 'پخش',
-    'repair_shop': 'تعمیرگاه',
-    'warranty': 'گارانتی',
-  };
+  String _categoryLabel(String key) {
+    switch (key) {
+      case 'sales':
+        return adminTx(context, 'فروش', 'Sales');
+      case 'purchases':
+        return adminTx(context, 'خرید', 'Purchases');
+      case 'financial':
+        return adminTx(context, 'مالی', 'Finance');
+      case 'crm':
+        return 'CRM';
+      case 'documents':
+        return adminTx(context, 'اسناد', 'Documents');
+      case 'people':
+        return adminTx(context, 'اشخاص', 'People');
+      case 'warehouse':
+        return adminTx(context, 'انبار', 'Warehouse');
+      case 'distribution':
+        return adminTx(context, 'پخش', 'Distribution');
+      case 'repair_shop':
+        return adminTx(context, 'تعمیرگاه', 'Repair shop');
+      case 'warranty':
+        return adminTx(context, 'گارانتی', 'Warranty');
+      default:
+        return key;
+    }
+  }
+
+  static const _categoryKeys = [
+    'sales',
+    'purchases',
+    'financial',
+    'crm',
+    'documents',
+    'people',
+    'warehouse',
+    'distribution',
+    'repair_shop',
+    'warranty',
+  ];
 
   @override
   void initState() {
@@ -87,37 +116,40 @@ class _NotificationEventTypesAdminPageState
     final saved = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('قالب پیش‌فرض — ${item['name'] ?? code}'),
+        title: Text('${adminTx(context, 'قالب پیش‌فرض', 'Default template')} — ${item['name'] ?? code}'),
         content: SizedBox(
           width: 560,
           child: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('کد رویداد: $code', style: Theme.of(ctx).textTheme.bodySmall),
-                const SizedBox(height: 12),
+                Text('${adminTx(context, 'کد رویداد', 'Event code')}: $code', style: Theme.of(ctx).textTheme.bodySmall),
+                const SizedBox(height: 8),
                 TextField(
                   controller: smsCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'قالب پیش‌فرض پیامک',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    labelText: adminTx(context, 'قالب پیش‌فرض پیامک', 'Default SMS template'),
+                    border: const OutlineInputBorder(),
                   ),
                   maxLines: 4,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 TextField(
                   controller: emailSubjectCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'موضوع پیش‌فرض ایمیل',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    labelText: adminTx(context, 'موضوع پیش‌فرض ایمیل', 'Default email subject'),
+                    border: const OutlineInputBorder(),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 TextField(
                   controller: emailBodyCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'متن پیش‌فرض ایمیل',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    labelText: adminTx(context, 'متن پیش‌فرض ایمیل', 'Default email body'),
+                    border: const OutlineInputBorder(),
                   ),
                   maxLines: 8,
                 ),
@@ -126,10 +158,10 @@ class _NotificationEventTypesAdminPageState
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(adminTx(context, 'انصراف', 'Cancel'))),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('ذخیره'),
+            child: Text(adminTx(context, 'ذخیره', 'Save')),
           ),
         ],
       ),
@@ -153,7 +185,7 @@ class _NotificationEventTypesAdminPageState
       emailBodyCtrl.dispose();
       emailSubjectCtrl.dispose();
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'قالب‌های پیش‌فرض ذخیره شد');
+      SnackBarHelper.show(context, message: adminTx(context, 'قالب‌های پیش‌فرض ذخیره شد', 'Default templates saved'));
       await _load();
     } catch (e) {
       smsCtrl.dispose();
@@ -166,32 +198,25 @@ class _NotificationEventTypesAdminPageState
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Scaffold(
+    return AdminCompactScaffold(
+      title: adminTx(context, 'قالب‌های پیش‌فرض', 'Default templates'),
+      subtitle: adminTx(
+        context,
+        'اگر کسب‌وکار قالب خودش را نداشته باشد، پیامک و ایمیل از این متن‌ها می‌روند',
+        'SMS and email use these texts when a business has no template of its own',
+      ),
       body: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: context.settingsHub.pagePadding,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              'قالب‌های پیش‌فرض نوتیفیکیشن کسب‌وکار',
-              style: theme.textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'اگر کسب‌وکار قالب اختصاصی نداشته باشد، از این متن‌ها برای ارسال SMS/Email استفاده می‌شود.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _searchCtrl,
                     decoration: InputDecoration(
-                      hintText: 'جستجو در نام یا کد رویداد…',
+                      hintText: adminTx(context, 'جستجو در نام یا کد رویداد', 'Search by event name or code'),
                       prefixIcon: const Icon(Icons.search),
                       border: const OutlineInputBorder(),
                       suffixIcon: IconButton(
@@ -208,11 +233,11 @@ class _NotificationEventTypesAdminPageState
                 const SizedBox(width: 12),
                 DropdownButton<String?>(
                   value: _categoryFilter,
-                  hint: const Text('دسته'),
+                  hint: Text(adminTx(context, 'دسته', 'Category')),
                   items: [
-                    const DropdownMenuItem(value: null, child: Text('همه دسته‌ها')),
-                    ..._categories.entries.map(
-                      (e) => DropdownMenuItem(value: e.key, child: Text(e.value)),
+                    DropdownMenuItem(value: null, child: Text(adminTx(context, 'همه دسته‌ها', 'All categories'))),
+                    ..._categoryKeys.map(
+                      (key) => DropdownMenuItem(value: key, child: Text(_categoryLabel(key))),
                     ),
                   ],
                   onChanged: (v) {
@@ -231,7 +256,7 @@ class _NotificationEventTypesAdminPageState
                   : _error != null
                       ? Center(child: Text(_error!))
                       : _items.isEmpty
-                          ? const Center(child: Text('رویدادی یافت نشد'))
+                          ? Center(child: Text(adminTx(context, 'رویدادی یافت نشد', 'No events found')))
                           : ListView.separated(
                               itemCount: _items.length,
                               separatorBuilder: (_, __) => const Divider(height: 1),
@@ -242,21 +267,21 @@ class _NotificationEventTypesAdminPageState
                                 return ListTile(
                                   title: Text(item['name'] as String? ?? ''),
                                   subtitle: Text(
-                                    '${item['code']} — ${_categories[item['category']] ?? item['category'] ?? ''}',
+                                    '${item['code']} — ${_categoryLabel('${item['category'] ?? ''}')}',
                                   ),
                                   trailing: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       if (hasSms)
                                         Tooltip(
-                                          message: 'پیامک',
+                                          message: adminTx(context, 'پیامک', 'SMS'),
                                           child: Icon(Icons.sms, size: 18, color: SemanticColorResolver.positive(context)),
                                         ),
                                       if (hasEmail)
                                         Padding(
                                           padding: EdgeInsets.only(left: 6),
                                           child: Tooltip(
-                                            message: 'ایمیل',
+                                            message: adminTx(context, 'ایمیل', 'Email'),
                                             child: Icon(Icons.email, size: 18, color: SemanticColorResolver.info(context)),
                                           ),
                                         ),

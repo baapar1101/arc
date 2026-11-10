@@ -21,7 +21,7 @@ router = APIRouter(prefix="/admin/ai/skills", tags=["admin-ai-skills"])
 
 
 def _require_superadmin(ctx: AuthContext) -> None:
-    if not ctx.has_any_permission("system_settings", "superadmin"):
+    if not ctx.has_app_permission("system_settings"):
         raise ApiError("FORBIDDEN", "فقط مدیر سیستم", http_status=403)
 
 

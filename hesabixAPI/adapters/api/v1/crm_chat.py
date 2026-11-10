@@ -159,7 +159,7 @@ async def list_chat_conversations(
 	_: None = Depends(require_crm_web_chat_dep("view")),
 ) -> Dict[str, Any]:
 	items, has_more = chat_svc.list_conversations_agent(
-		db, business_id, status=status, limit=limit, offset=offset, search=search
+		db, business_id, status=status, limit=limit, offset=offset, search=search, ctx=ctx
 	)
 	return success_response(
 		data={"items": [_fmt(request, x) for x in items], "has_more": has_more},
@@ -180,6 +180,7 @@ async def delete_chat_conversations_bulk(
 		None,
 		description="اگر ارسال شود فقط مکالمات با این وضعیت (open|pending|resolved) حذف می‌شوند؛ در غیر این صورت همه",
 	),
+	confirm_all: bool = Query(False, description="حذف همه مکالمات فقط با true"),
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(require_crm_web_chat_dep("edit_conversations")),
@@ -187,7 +188,9 @@ async def delete_chat_conversations_bulk(
 	if status is not None and status not in ("open", "pending", "resolved"):
 		raise HTTPException(status_code=422, detail="INVALID_STATUS")
 	try:
-		data = await chat_svc.delete_conversations_bulk_agent(db, business_id, status=status)
+		data = await chat_svc.delete_conversations_bulk_agent(
+			db, business_id, status=status, confirm_all=confirm_all
+		)
 	except ApiError as exc:
 		raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 	return success_response(data=_fmt(request, data), request=request, message="CRM_CHAT_CONVERSATIONS_BULK_DELETED")
@@ -385,6 +388,10 @@ async def patch_chat_conversation(
 		assigned_to_user_id=body.assigned_to_user_id,
 		lead_id=body.lead_id,
 		person_id=body.person_id,
+		clear_lead=body.clear_lead,
+		clear_person=body.clear_person,
+		clear_assignee=body.clear_assignee,
 		acting_user_id=ctx.get_user_id(),
+		ctx=ctx,
 	)
 	return success_response(data=_fmt(request, data), request=request, message="CRM_CHAT_CONVERSATION_UPDATED")

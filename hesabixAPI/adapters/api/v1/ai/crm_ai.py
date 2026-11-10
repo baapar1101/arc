@@ -17,6 +17,7 @@ from adapters.db.models.crm import Lead, Deal, CrmActivity
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_access, require_business_permission_dep
 from app.core.responses import success_response, ApiError
+from app.services.crm_enterprise_service import assert_can_view_record, restrict_activity_query
 from app.services.ai.ai_service import AIService
 from app.services.ai.prompt_service import get_prompt_by_key
 from app.services.ai.ai_crm_parse import parse_probability_percent
@@ -200,6 +201,7 @@ async def summarize_lead(
     ).first()
     if not lead:
         raise ApiError("NOT_FOUND", "سرنخ یافت نشد.", http_status=404)
+    assert_can_view_record(db, business_id, ctx, "lead", lead)
 
     ai_service = AIService(db, ctx, business_id=business_id)
     availability = ai_service.check_availability(estimated_tokens=800)
@@ -214,7 +216,10 @@ async def summarize_lead(
     lead_text = wrap_untrusted_block(
         "crm", _lead_context(lead), title=f"lead-{lead.id}"
     )
-    act_q = db.query(CrmActivity).filter(CrmActivity.business_id == business_id)
+    act_q = restrict_activity_query(
+        db.query(CrmActivity).filter(CrmActivity.business_id == business_id),
+        db, business_id, ctx, CrmActivity,
+    )
     if lead.person_id:
         act_q = act_q.filter(
             or_(
@@ -289,6 +294,7 @@ async def summarize_deal(
     ).first()
     if not deal:
         raise ApiError("NOT_FOUND", "فرصت فروش یافت نشد.", http_status=404)
+    assert_can_view_record(db, business_id, ctx, "deal", deal)
 
     ai_service = AIService(db, ctx, business_id=business_id)
     availability = ai_service.check_availability(estimated_tokens=800)
@@ -303,13 +309,10 @@ async def summarize_deal(
     deal_text = wrap_untrusted_block(
         "crm", _deal_context(deal), title=f"deal-{deal.id}"
     )
-    activities = (
-        db.query(CrmActivity)
-        .filter(CrmActivity.deal_id == deal_id, CrmActivity.business_id == business_id)
-        .order_by(CrmActivity.activity_date.desc())
-        .limit(10)
-        .all()
-    )
+    activities = restrict_activity_query(
+        db.query(CrmActivity).filter(CrmActivity.deal_id == deal_id, CrmActivity.business_id == business_id),
+        db, business_id, ctx, CrmActivity,
+    ).order_by(CrmActivity.activity_date.desc()).limit(10).all()
     activities_text = wrap_untrusted_block(
         "crm", _activities_context(activities), title=f"deal-{deal.id}-activities"
     )
@@ -383,6 +386,9 @@ async def suggest_activity_text(
         deal = db.query(Deal).filter(
             and_(Deal.id == deal_id, Deal.business_id == business_id)
         ).first()
+        if deal is None:
+            raise ApiError("NOT_FOUND", "فرصت فروش یافت نشد.", http_status=404)
+        assert_can_view_record(db, business_id, ctx, "deal", deal)
 
     ai_service = AIService(db, ctx, business_id=business_id)
     availability = ai_service.check_availability(estimated_tokens=600)
@@ -460,6 +466,7 @@ async def suggest_deal_probability(
     ).first()
     if not deal:
         raise ApiError("NOT_FOUND", "فرصت فروش یافت نشد.", http_status=404)
+    assert_can_view_record(db, business_id, ctx, "deal", deal)
 
     ai_service = AIService(db, ctx, business_id=business_id)
     availability = ai_service.check_availability(estimated_tokens=400)

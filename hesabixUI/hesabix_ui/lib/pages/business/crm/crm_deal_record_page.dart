@@ -13,9 +13,11 @@ import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/crm/crm_ai_assistant_widget.dart';
 import 'package:hesabix_ui/widgets/crm/crm_close_deal_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_deal_form_dialog.dart';
+import 'package:hesabix_ui/widgets/crm/crm_next_action_banner.dart';
 import 'package:hesabix_ui/widgets/crm/crm_delete_confirm_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_follow_up_field.dart';
 import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
+import 'package:hesabix_ui/widgets/crm/crm_sequence_enroll_button.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:hesabix_ui/core/hesabix_back.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -194,6 +196,7 @@ class _CrmDealRecordPageState extends State<CrmDealRecordPage> {
         businessId: widget.businessId,
         dealId: widget.dealId,
         nextFollowUpAt: at,
+        clearNextFollowUp: at == null,
       );
       if (!mounted) return;
       setState(() => _deal = {...?_deal, ...updated, 'next_follow_up_at': at?.toIso8601String()});
@@ -245,6 +248,68 @@ class _CrmDealRecordPageState extends State<CrmDealRecordPage> {
       );
       if (!mounted) return;
       SnackBarHelper.show(context, message: 'پیش‌فاکتور صادر شد');
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
+    }
+  }
+
+  Future<void> _setForecast(String? category) async {
+    try {
+      await _crm.setDealForecast(businessId: widget.businessId, dealId: widget.dealId, forecastCategory: category);
+      if (!mounted) return;
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
+    }
+  }
+
+  bool _organizationIncludesPerson(Map<String, dynamic> org, int personId) {
+    if ((org['billing_person_id'] as num?)?.toInt() == personId) return true;
+    final ids = org['contact_ids'];
+    if (ids is List) {
+      for (final item in ids) {
+        if (item is num && item.toInt() == personId) return true;
+      }
+    }
+    return false;
+  }
+
+  Future<void> _attachOrganization() async {
+    try {
+      final orgs = await _crm.listOrganizations(businessId: widget.businessId);
+      if (!mounted) return;
+      final personId = (_deal?['person_id'] as num?)?.toInt();
+      final compatible = personId == null
+          ? <Map<String, dynamic>>[]
+          : orgs.where((org) => _organizationIncludesPerson(org, personId)).toList();
+      final selected = await showDialog<int?>(
+        context: context,
+        builder: (ctx) => SimpleDialog(
+          title: const Text('سازمان'),
+          children: [
+            SimpleDialogOption(onPressed: () => Navigator.pop(ctx, 0), child: const Text('بدون سازمان')),
+            if (compatible.isEmpty)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(24, 8, 24, 12),
+                child: Text('هیچ سازمانی این شخص را به‌عنوان صورتحساب یا مخاطب ندارد.'),
+              ),
+            for (final org in compatible)
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(ctx, org['id'] as int?),
+                child: Text(org['name']?.toString() ?? ''),
+              ),
+          ],
+        ),
+      );
+      if (selected == null || !mounted) return;
+      await _crm.setDealOrganization(
+        businessId: widget.businessId,
+        dealId: widget.dealId,
+        organizationId: selected == 0 ? null : selected,
+      );
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -372,6 +437,62 @@ class _CrmDealRecordPageState extends State<CrmDealRecordPage> {
                     children: [
                       _buildHeader(),
                       const SizedBox(height: 12),
+                      if (_deal?['next_action'] is Map) ...[
+                        CrmNextActionBanner(
+                          action: Map<String, dynamic>.from(_deal!['next_action'] as Map),
+                          businessId: widget.businessId,
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      CrmSectionCard(
+                        title: 'دسته پیش‌بینی',
+                        subtitle: 'برد قطعی بسته است؛ باخت کنار گذاشته می‌شود. روی فرصت باز فقط خط لوله، محتمل و قطعی قابل جایگزینی‌اند.',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(_forecastLabel(_deal?['forecast_category']?.toString())),
+                            if (_canWrite && !_isClosed) ...[
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                children: [
+                                  for (final item in const [('pipeline', 'خط لوله'), ('best_case', 'محتمل'), ('commit', 'قطعی')])
+                                    ActionChip(
+                                      label: Text(item.$2),
+                                      onPressed: () => _setForecast(item.$1),
+                                    ),
+                                  ActionChip(label: const Text('خودکار'), onPressed: () => _setForecast(null)),
+                                ],
+                              ),
+                            ],
+                            if (_canWrite) ...[
+                              const SizedBox(height: 8),
+                              TextButton(
+                                onPressed: _attachOrganization,
+                                child: Text(
+                                  _deal?['organization_id'] == null
+                                      ? 'اتصال به سازمان'
+                                      : (_deal?['organization_name']?.toString().trim().isNotEmpty == true
+                                          ? _deal!['organization_name'].toString()
+                                          : 'سازمان'),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (_deal?['predictive'] is Map) ...[
+                        _PredictiveNote(predictive: Map<String, dynamic>.from(_deal!['predictive'] as Map)),
+                        const SizedBox(height: 12),
+                      ],
+                      if (_deal?['documents'] is List && (_deal!['documents'] as List).isNotEmpty) ...[
+                        CrmLinkedDocumentsCard(
+                          businessId: widget.businessId,
+                          documents: _deal!['documents'] as List,
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       if (_canWrite && !_isClosed) ...[
                         _buildQuickActions(),
                         const SizedBox(height: 12),
@@ -506,9 +627,23 @@ class _CrmDealRecordPageState extends State<CrmDealRecordPage> {
           ),
           const SizedBox(width: 8),
           OutlinedButton.icon(
+            onPressed: () => _quickLogActivity('meeting'),
+            icon: const Icon(Icons.event_outlined, size: 18),
+            label: const Text('جلسه'),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton.icon(
             onPressed: _issueProforma,
             icon: const Icon(Icons.request_quote_outlined, size: 18),
             label: const Text('پیش‌فاکتور'),
+          ),
+          const SizedBox(width: 8),
+          CrmSequenceEnrollButton(
+            businessId: widget.businessId,
+            entityId: widget.dealId,
+            entityType: 'deal',
+            crmService: _crm,
+            enabled: _canWrite,
           ),
           const SizedBox(width: 8),
           FilledButton.icon(
@@ -642,6 +777,43 @@ class _CrmDealRecordPageState extends State<CrmDealRecordPage> {
                     );
                   }).toList(),
                 ),
+    );
+  }
+}
+
+String _forecastLabel(String? code) {
+  switch (code) {
+    case 'commit':
+      return 'قطعی';
+    case 'best_case':
+      return 'محتمل';
+    case 'closed':
+      return 'بسته‌شده (برد)';
+    case 'omitted':
+      return 'کنار گذاشته‌شده';
+    default:
+      return 'خط لوله';
+  }
+}
+
+class _PredictiveNote extends StatelessWidget {
+  final Map<String, dynamic> predictive;
+
+  const _PredictiveNote({required this.predictive});
+
+  @override
+  Widget build(BuildContext context) {
+    final available = predictive['available'] == true;
+    final score = predictive['score'];
+    final closed = predictive['closed_deals'];
+    final requiredCount = predictive['required'];
+    final text = available
+        ? 'احتمال برد بر اساس سابقه همین کسب‌وکار: $score از ۱۰۰'
+        : 'امتیاز پیش‌بین بعد از $requiredCount فرصت بسته‌شده فعال می‌شود. اکنون $closed فرصت بسته شده است.';
+    return CrmSectionCard(
+      title: 'امتیاز پیش‌بین',
+      subtitle: available ? 'نرخ برد تاریخی، نه مدل جعبه سیاه' : 'حجم فرصت بسته‌شده هنوز کافی نیست',
+      child: Text(text),
     );
   }
 }

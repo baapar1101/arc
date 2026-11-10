@@ -24,6 +24,7 @@ router = APIRouter(prefix="/admin/scripts", tags=["مدیریت سیستم"])
 class ScriptRunCreatePayload(BaseModel):
 	params: Dict[str, Any] | None = None
 	dry_run: bool = True
+	confirmation: str | None = None
 
 
 def _require_system_admin(ctx: AuthContext) -> None:
@@ -57,12 +58,29 @@ def create_script_run_endpoint(
 	ctx: AuthContext = Depends(get_current_user),
 ):
 	_require_system_admin(ctx)
+	if not payload.dry_run and (payload.confirmation or "").strip() not in ("RUN", "اجرا"):
+		raise ApiError(
+			"CONFIRMATION_REQUIRED",
+			"برای اجرای واقعی عبارت RUN یا اجرا را وارد کنید.",
+			http_status=400,
+		)
 	created = create_script_run(
 		db=db,
 		user_id=ctx.get_user_id(),
 		script_key=script_key,
 		params=payload.params or {},
 		dry_run=payload.dry_run,
+	)
+	from app.services.admin_audit_service import client_ip_from_request, record_admin_action
+	record_admin_action(
+		db,
+		actor_user_id=ctx.get_user_id(),
+		action="admin_script.run",
+		summary=f"اجرای اسکریپت {script_key}" + (" (آزمایشی)" if payload.dry_run else ""),
+		target_type="admin_script",
+		target_id=script_key,
+		metadata={"dry_run": payload.dry_run},
+		client_ip=client_ip_from_request(request),
 	)
 	return success_response(created, request, message="SCRIPT_RUN_CREATED")
 

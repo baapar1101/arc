@@ -36,7 +36,7 @@ async def get_ai_config(
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """دریافت تنظیمات AI (فقط مدیر سیستم)"""
-    if not ctx.has_any_permission("system_settings", "superadmin"):
+    if not ctx.has_app_permission("system_settings"):
         raise ApiError("FORBIDDEN", "فقط مدیر سیستم می‌تواند تنظیمات AI را مشاهده کند", http_status=403)
     
     repo = AIConfigRepository(db)
@@ -75,34 +75,28 @@ async def update_ai_config(
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """به‌روزرسانی تنظیمات AI (فقط مدیر سیستم)"""
-    if not ctx.has_any_permission("system_settings", "superadmin"):
+    if not ctx.has_app_permission("system_settings"):
         raise ApiError("FORBIDDEN", "فقط مدیر سیستم می‌تواند تنظیمات AI را تغییر دهد", http_status=403)
     
     repo = AIConfigRepository(db)
     config = repo.get_active_config()
     
-    from app.services.ai.encryption import encrypt_api_key
-    
     if config:
         config.provider = config_data.provider
         config.model_name = config_data.model_name
         config.api_base_url = config_data.api_base_url
-        if config_data.api_key:
-            # رمزگذاری API key
-            config.api_key = encrypt_api_key(config_data.api_key)
+        # کلید فقط در اعتبارنامه‌های ارائه‌دهنده ذخیره می‌شود.
         config.max_tokens = config_data.max_tokens
         config.temperature = config_data.temperature
         config.is_active = config_data.is_active
         if config_data.function_calling_enabled is not None:
             config.function_calling_enabled = config_data.function_calling_enabled
     else:
-        from app.services.ai.encryption import encrypt_api_key
-        encrypted_key = encrypt_api_key(config_data.api_key) if config_data.api_key else None
         config = AIConfig(
             provider=config_data.provider,
             model_name=config_data.model_name,
             api_base_url=config_data.api_base_url,
-            api_key=encrypted_key,
+            api_key=None,
             max_tokens=config_data.max_tokens,
             temperature=config_data.temperature,
             is_active=config_data.is_active,
@@ -115,11 +109,6 @@ async def update_ai_config(
     db.commit()
     db.refresh(config)
 
-    from app.services.ai.ai_provider_service import upsert_credential_from_legacy_config
-
-    upsert_credential_from_legacy_config(db, config)
-    db.commit()
-    
     return success_response({
         "id": config.id,
         "provider": config.provider,
@@ -140,7 +129,7 @@ async def test_ai_connection(
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """تست اتصال به AI Provider (فقط مدیر سیستم)"""
-    if not ctx.has_any_permission("system_settings", "superadmin"):
+    if not ctx.has_app_permission("system_settings"):
         raise ApiError("FORBIDDEN", "فقط مدیر سیستم می‌تواند اتصال را تست کند", http_status=403)
     
     repo = AIConfigRepository(db)
@@ -149,20 +138,24 @@ async def test_ai_connection(
     if not config or not config.is_active:
         raise ApiError("CONFIG_NOT_FOUND", "تنظیمات AI فعالی وجود ندارد", http_status=400)
     
-    # رمزگشایی API Key
-    from app.services.ai.encryption import decrypt_api_key
-    api_key = decrypt_api_key(config.api_key) if config.api_key else None
-    
-    if not api_key:
-        raise ApiError("API_KEY_NOT_SET", "API Key تنظیم نشده است", http_status=400)
-    
-    # تست اتصال
+    from app.services.ai.ai_provider_service import resolve_provider_connection
+    from app.services.ai.ai_provider import create_provider
     try:
-        from app.services.ai.ai_provider import create_provider
+        _provider_type, api_key, api_base, _fce = resolve_provider_connection(
+            db,
+            config.provider,
+            legacy_config=config,
+        )
+    except ApiError:
+        raise
+    if not api_key:
+        raise ApiError("API_KEY_NOT_SET", "API Key در اعتبارنامه‌ها تنظیم نشده است", http_status=400)
+
+    try:
         provider = create_provider(
             provider_type=config.provider,
             api_key=api_key,
-            api_base_url=config.api_base_url
+            api_base_url=api_base or config.api_base_url,
         )
         
         # ارسال یک درخواست تست
@@ -190,7 +183,7 @@ async def get_ai_ops_metrics(
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """CHAT-14: reasoning_language_mismatch و tool_error بدون خواندن جلسه."""
-    if not ctx.has_any_permission("system_settings", "superadmin"):
+    if not ctx.has_app_permission("system_settings"):
         raise ApiError("FORBIDDEN", "فقط مدیر سیستم می‌تواند متریک AI را ببیند", http_status=403)
     from app.services.ai.ai_ops_metrics import metric_snapshot
 

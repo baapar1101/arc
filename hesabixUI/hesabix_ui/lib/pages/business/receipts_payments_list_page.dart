@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -197,8 +198,37 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
     // Register this page instance for external refresh access
     ReceiptsPaymentsListPage._pageStates[widget.businessId] = this;
     _service = ReceiptPaymentListService(widget.apiClient);
+    final documentId = int.tryParse(GoRouterState.of(context).uri.queryParameters['documentId'] ?? '');
     _loadProjects();
     _loadFiscalYears();
+    if (documentId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openDocumentById(documentId);
+      });
+    }
+  }
+
+  Future<void> _openDocumentById(int id) async {
+    try {
+      final fullDoc = await _service.getById(id);
+      if (!mounted) return;
+      if (fullDoc == null) {
+        SnackBarHelper.show(context, message: 'سند یافت نشد');
+        return;
+      }
+      await showDialog(
+        context: context,
+        builder: (_) => ReceiptPaymentViewDialog(
+          document: fullDoc,
+          calendarController: widget.calendarController,
+          businessId: widget.businessId,
+          apiClient: widget.apiClient,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: 'خطا در بارگذاری جزئیات: ${ErrorExtractor.forContext(e, context)}');
+    }
   }
 
   Future<void> _loadFiscalYears() async {

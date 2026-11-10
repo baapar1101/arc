@@ -14,7 +14,9 @@ import 'package:hesabix_ui/widgets/crm/crm_ai_assistant_widget.dart';
 import 'package:hesabix_ui/widgets/crm/crm_delete_confirm_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_follow_up_field.dart';
 import 'package:hesabix_ui/widgets/crm/crm_lead_form_dialog.dart';
+import 'package:hesabix_ui/widgets/crm/crm_next_action_banner.dart';
 import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
+import 'package:hesabix_ui/widgets/crm/crm_sequence_enroll_button.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:hesabix_ui/core/hesabix_back.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -155,6 +157,18 @@ class _CrmLeadRecordPageState extends State<CrmLeadRecordPage> {
     }
   }
 
+  Future<void> _claimLead() async {
+    try {
+      await _crm.claimLead(businessId: widget.businessId, leadId: widget.leadId);
+      if (!mounted) return;
+      SnackBarHelper.showSuccess(context, message: 'سرنخ به شما اختصاص یافت');
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
+
   Future<void> _loadTimeline() async {
     setState(() => _timelineLoading = true);
     try {
@@ -205,6 +219,7 @@ class _CrmLeadRecordPageState extends State<CrmLeadRecordPage> {
         businessId: widget.businessId,
         leadId: widget.leadId,
         nextFollowUpAt: at,
+        clearNextFollowUp: at == null,
       );
       if (!mounted) return;
       setState(() => _lead = {...?_lead, ...updated, 'next_follow_up_at': at?.toIso8601String()});
@@ -411,6 +426,13 @@ class _CrmLeadRecordPageState extends State<CrmLeadRecordPage> {
                     children: [
                       _buildHeader(),
                       const SizedBox(height: 12),
+                      if (_lead?['next_action'] is Map) ...[
+                        CrmNextActionBanner(
+                          action: Map<String, dynamic>.from(_lead!['next_action'] as Map),
+                          businessId: widget.businessId,
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       if (_canWrite && !_isConverted) ...[
                         _buildQuickActions(),
                         const SizedBox(height: 12),
@@ -418,6 +440,8 @@ class _CrmLeadRecordPageState extends State<CrmLeadRecordPage> {
                       _buildStageCard(),
                       const SizedBox(height: 12),
                       _buildDetailsCard(),
+                      const SizedBox(height: 12),
+                      _buildOrganizationCard(),
                       const SizedBox(height: 12),
                       if (_canWrite) ...[
                         CrmSectionCard(
@@ -441,6 +465,73 @@ class _CrmLeadRecordPageState extends State<CrmLeadRecordPage> {
                     ],
                   ),
                 ),
+    );
+  }
+
+  bool _organizationIncludesPerson(Map<String, dynamic> org, int personId) {
+    if ((org['billing_person_id'] as num?)?.toInt() == personId) return true;
+    final ids = org['contact_ids'];
+    if (ids is List) {
+      for (final item in ids) {
+        if (item is num && item.toInt() == personId) return true;
+      }
+    }
+    return false;
+  }
+
+  Future<void> _attachOrganization() async {
+    try {
+      final orgs = await _crm.listOrganizations(businessId: widget.businessId);
+      if (!mounted) return;
+      final personId = (_lead?['person_id'] as num?)?.toInt();
+      final compatible = personId == null ? orgs : orgs.where((org) => _organizationIncludesPerson(org, personId)).toList();
+      final selected = await showDialog<int?>(
+        context: context,
+        builder: (ctx) => SimpleDialog(
+          title: const Text('سازمان'),
+          children: [
+            SimpleDialogOption(onPressed: () => Navigator.pop(ctx, 0), child: const Text('بدون سازمان')),
+            if (compatible.isEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
+                child: Text(personId == null ? 'هنوز سازمانی ثبت نشده است.' : 'هیچ سازمانی این شخص را به‌عنوان صورتحساب یا مخاطب ندارد.'),
+              ),
+            for (final org in compatible)
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(ctx, org['id'] as int?),
+                child: Text(org['name']?.toString() ?? ''),
+              ),
+          ],
+        ),
+      );
+      if (selected == null || !mounted) return;
+      await _crm.setLeadOrganization(
+        businessId: widget.businessId,
+        leadId: widget.leadId,
+        organizationId: selected == 0 ? null : selected,
+      );
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
+    }
+  }
+
+  Widget _buildOrganizationCard() {
+    final name = _lead?['organization_name']?.toString().trim() ?? '';
+    return CrmSectionCard(
+      title: 'سازمان',
+      subtitle: 'سرنخ بدون مشتری به هر سازمان وصل می‌شود. بعد از تبدیل، مشتری جدید مخاطب همان سازمان می‌شود.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(name.isEmpty ? 'بدون سازمان' : name),
+          if (_canWrite) ...[
+            const SizedBox(height: 8),
+            TextButton(onPressed: _attachOrganization, child: Text(name.isEmpty ? 'اتصال به سازمان' : 'تغییر سازمان')),
+          ],
+        ],
+      ),
     );
   }
 
@@ -503,6 +594,12 @@ class _CrmLeadRecordPageState extends State<CrmLeadRecordPage> {
                               label: Text(_lead?['person_name']?.toString() ?? 'تبدیل‌شده'),
                               visualDensity: VisualDensity.compact,
                               backgroundColor: cs.tertiaryContainer,
+                            ),
+                          if (_canWrite && _lead?['queue_id'] != null && _lead?['assigned_to_user_id'] == null)
+                            ActionChip(
+                              avatar: const Icon(Icons.pan_tool_alt_outlined, size: 16),
+                              label: const Text('برداشتن از صف'),
+                              onPressed: _claimLead,
                             ),
                         ],
                       ),
@@ -582,6 +679,14 @@ class _CrmLeadRecordPageState extends State<CrmLeadRecordPage> {
             onPressed: () => _quickLogActivity('meeting'),
             icon: const Icon(Icons.event_outlined, size: 18),
             label: const Text('جلسه'),
+          ),
+          const SizedBox(width: 8),
+          CrmSequenceEnrollButton(
+            businessId: widget.businessId,
+            entityId: widget.leadId,
+            entityType: 'lead',
+            crmService: _crm,
+            enabled: _canWrite,
           ),
           const SizedBox(width: 8),
           if (!_isConverted)

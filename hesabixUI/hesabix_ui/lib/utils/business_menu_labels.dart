@@ -131,6 +131,8 @@ String businessMenuItemLabel(AppLocalizations t, String key) {
       return t.crmMenuProcessDefinitions;
     case 'crm/sequences':
       return t.crmMenuSequences;
+    case 'crm/enterprise':
+      return t.crmMenuEnterprise;
     case 'warranty':
       return t.warranty;
     case 'repair-shop':
@@ -139,12 +141,22 @@ String businessMenuItemLabel(AppLocalizations t, String key) {
       return t.customerClubMenu;
     case 'payroll':
       return t.payrollMenu;
+    case 'procurement':
+      return t.localeName.startsWith('fa') ? 'خرید و تدارکات' : 'Procurement';
     case 'advanced-production':
       return t.advancedProductionMenu;
     case 'group:office-automation':
       return t.oaMenu;
     case 'office-automation':
       return t.oaCartable;
+    case 'office-automation/desk':
+      return t.oaMyDesk;
+    case 'office-automation/processes':
+      return t.oaProcesses;
+    case 'office-automation/documents':
+      return t.oaDocuments;
+    case 'office-automation/enterprise':
+      return t.oaEnterprise;
     case 'office-automation/org':
       return t.oaOrg;
     case 'office-automation/external-orgs':

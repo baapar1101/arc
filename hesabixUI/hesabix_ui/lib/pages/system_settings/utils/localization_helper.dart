@@ -41,9 +41,9 @@ class LocalizationHelper {
       case 'settingsSupportOperators':
         return t.settingsSupportOperators;
       case 'settingsSupportPlans':
-        return 'پلن‌های پشتیبانی';
+        return t.settingsSupportPlans;
       case 'settingsSupportBillingStats':
-        return 'آمار پشتیبانی غیر رایگان';
+        return t.settingsSupportBillingStats;
       case 'settingsPaymentGateways':
         return t.settingsPaymentGateways;
       case 'settingsPayPageDomain':
@@ -58,6 +58,8 @@ class LocalizationHelper {
         return t.settingsNotifications;
       case 'settingsNotificationTemplates':
         return t.settingsNotificationTemplates;
+      case 'settingsNotificationEventDefaults':
+        return t.settingsNotificationEventDefaults;
       case 'settingsNotificationModeration':
         return t.settingsNotificationModeration;
       case 'settingsNotificationSmsPricing':
@@ -78,10 +80,14 @@ class LocalizationHelper {
         return t.settingsAISkills;
       case 'settingsAIMarketplace':
         return t.settingsAIMarketplace;
+      case 'settingsAIEval':
+        return t.settingsAIEval;
       case 'settingsZohalServices':
         return t.settingsZohalServices;
       case 'settingsZohalSettings':
         return t.settingsZohalSettings;
+      case 'settingsZohalStatistics':
+        return t.settingsZohalStatistics;
       case 'settingsTaxProductCodes':
         return t.settingsTaxProductCodes;
       case 'settingsTaxProviders':
@@ -92,13 +98,66 @@ class LocalizationHelper {
         return t.settingsSystemMonitoring;
       case 'settingsServiceLogs':
         return t.settingsServiceLogs;
+      case 'settingsBusinessActivityLogs':
+        return t.settingsBusinessActivityLogs;
       case 'settingsDatabaseBackup':
         return t.settingsDatabaseBackup;
+      case 'settingsLegacyDatabaseImport':
+        return t.settingsLegacyDatabaseImport;
       case 'settingsSystemScripts':
         return t.settingsSystemScripts;
       default:
-        return key;
+        return _extra(t, key) ?? key;
     }
+  }
+
+  static String? _extra(AppLocalizations t, String key) {
+    const fa = {
+      'systemAdminOpsHomeTitle': 'خانه عملیاتی',
+      'systemAdminOpsHomeDescription': 'صف اعلان، ورود ناموفق، ذخیره‌سازی و زمان‌بندی',
+      'systemAdminAuditTitle': 'لاگ کارهای مدیر',
+      'systemAdminAuditDescription': 'چه کسی پیکربندی، بکاپ، هدیه یا صف را عوض کرده',
+      'systemAdminSchedulesTitle': 'کارهای زمان‌بندی‌شده',
+      'systemAdminSchedulesDescription': 'کرون ورک‌فلو و ارزیابی AI',
+      'systemAdminWalletsTitle': 'فهرست کیف‌پول',
+      'systemAdminWalletsDescription': 'مانده کسب‌وکارها و استرداد مدیریتی',
+      'systemAdminHscriptTitle': 'اجرای HScript',
+      'systemAdminHscriptDescription': 'ممیزی اجرای گزارش سفارشی در همه کسب‌وکارها',
+      'systemAdminLicensesTitle': 'انقضای لایسنس',
+      'systemAdminLicensesDescription': 'تا ۳۰ روز آینده، تازه‌منقضی، یا هنوز فعال ولی سررسیدشده',
+      'systemAdminOutboxTitle': 'صف اعلان',
+      'systemAdminOutboxDescription': 'رها کردن صف ناموفق؛ فقط مدیر کل',
+      'systemAdminAiHubTitle': 'هوش مصنوعی',
+      'systemAdminAiHubDescription': 'تنظیمات، کلید، مدل، پلن و ارزیابی در یک بخش',
+      'systemAdminNotificationChannelsTitle': 'کانال‌های اعلان سیستم',
+      'systemAdminNotificationChannelsDescription': 'توکن ربات، وب‌هوک و پیامک سراسری',
+      'settingsCategoryOperationsHome': 'عملیات',
+      'settingsCategoryOperationsHomeDescription': 'وضعیت لحظه‌ای، لاگ مدیر و زمان‌بندی',
+    };
+    const en = {
+      'systemAdminOpsHomeTitle': 'Operations home',
+      'systemAdminOpsHomeDescription': 'Notification queue, failed logins, storage, and schedules',
+      'systemAdminAuditTitle': 'Admin audit log',
+      'systemAdminAuditDescription': 'Who changed configuration, backups, gifts, or the queue',
+      'systemAdminSchedulesTitle': 'Scheduled jobs',
+      'systemAdminSchedulesDescription': 'Workflow cron and AI evaluation',
+      'systemAdminWalletsTitle': 'Wallet directory',
+      'systemAdminWalletsDescription': 'Business balances and admin refunds',
+      'systemAdminHscriptTitle': 'HScript runs',
+      'systemAdminHscriptDescription': 'Custom report runs across businesses',
+      'systemAdminLicensesTitle': 'License expiry',
+      'systemAdminLicensesDescription': 'Next 30 days, recently expired, or overdue but still active',
+      'systemAdminOutboxTitle': 'Notification queue',
+      'systemAdminOutboxDescription': 'Abandon failed rows; super admin only',
+      'systemAdminAiHubTitle': 'Artificial intelligence',
+      'systemAdminAiHubDescription': 'Settings, keys, models, plans, and evaluation',
+      'systemAdminNotificationChannelsTitle': 'System notification channels',
+      'systemAdminNotificationChannelsDescription': 'Bot tokens, webhooks, and system SMS',
+      'settingsCategoryOperationsHome': 'Operations',
+      'settingsCategoryOperationsHomeDescription': 'Live status, admin audit, and schedules',
+    };
+    final table = t.localeName.startsWith('fa') ? fa : en;
+    return table[key];
   }
 
   /// Get localized description for a settings item
@@ -137,9 +196,9 @@ class LocalizationHelper {
       case 'settingsSupportOperatorsDescription':
         return t.settingsSupportOperatorsDescription;
       case 'settingsSupportPlansDescription':
-        return 'تعریف قیمت و مدت اشتراک‌های پشتیبانی کاربر';
+        return t.settingsSupportPlansDescription;
       case 'settingsSupportBillingStatsDescription':
-        return 'گزارش درآمد، اشتراک فعال و صورت‌حساب‌های پشتیبانی';
+        return t.settingsSupportBillingStatsDescription;
       case 'settingsPaymentGatewaysDescription':
         return t.settingsPaymentGatewaysDescription;
       case 'settingsPayPageDomainDescription':
@@ -154,6 +213,8 @@ class LocalizationHelper {
         return t.settingsNotificationsDescription;
       case 'settingsNotificationTemplatesDescription':
         return t.settingsNotificationTemplatesDescription;
+      case 'settingsNotificationEventDefaultsDescription':
+        return t.settingsNotificationEventDefaultsDescription;
       case 'settingsNotificationModerationDescription':
         return t.settingsNotificationModerationDescription;
       case 'settingsNotificationSmsPricingDescription':
@@ -174,10 +235,14 @@ class LocalizationHelper {
         return t.settingsAISkillsDescription;
       case 'settingsAIMarketplaceDescription':
         return t.settingsAIMarketplaceDescription;
+      case 'settingsAIEvalDescription':
+        return t.settingsAIEvalDescription;
       case 'settingsZohalServicesDescription':
         return t.settingsZohalServicesDescription;
       case 'settingsZohalSettingsDescription':
         return t.settingsZohalSettingsDescription;
+      case 'settingsZohalStatisticsDescription':
+        return t.settingsZohalStatisticsDescription;
       case 'settingsTaxProductCodesDescription':
         return t.settingsTaxProductCodesDescription;
       case 'settingsTaxProvidersDescription':
@@ -188,12 +253,16 @@ class LocalizationHelper {
         return t.settingsSystemMonitoringDescription;
       case 'settingsServiceLogsDescription':
         return t.settingsServiceLogsDescription;
+      case 'settingsBusinessActivityLogsDescription':
+        return t.settingsBusinessActivityLogsDescription;
       case 'settingsDatabaseBackupDescription':
         return t.settingsDatabaseBackupDescription;
+      case 'settingsLegacyDatabaseImportDescription':
+        return t.settingsLegacyDatabaseImportDescription;
       case 'settingsSystemScriptsDescription':
         return t.settingsSystemScriptsDescription;
       default:
-        return key;
+        return _extra(t, key) ?? key;
     }
   }
 
@@ -216,8 +285,10 @@ class LocalizationHelper {
         return t.settingsCategoryExternalServices;
       case 'settingsCategoryMonitoringLogs':
         return t.settingsCategoryMonitoringLogs;
+      case 'settingsCategoryMaintenance':
+        return t.settingsCategoryMaintenance;
       default:
-        return key;
+        return _extra(t, key) ?? key;
     }
   }
 
@@ -241,8 +312,11 @@ class LocalizationHelper {
         return t.settingsCategoryExternalServicesDescription;
       case 'settingsCategoryMonitoringLogsDescription':
         return t.settingsCategoryMonitoringLogsDescription;
+      case 'settingsCategoryMaintenanceDescription':
+        return t.settingsCategoryMaintenanceDescription;
       default:
-        return key;
+        final extra = _extra(t, key);
+        return extra ?? key;
     }
   }
 

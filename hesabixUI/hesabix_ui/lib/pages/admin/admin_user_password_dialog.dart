@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:hesabix_ui/config/app_config.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'admin_compact_scaffold.dart';
 
 /// دیالوگ سه‌حالته: توکن بازیابی، رمز انتخابی مدیر، رمز تصادفی.
 Future<void> showAdminUserPasswordDialog(
@@ -72,7 +73,7 @@ class _AdminUserPasswordDialogState extends State<_AdminUserPasswordDialog>
     final name = (map['full_name'] as String?) ??
         '${map['first_name'] ?? ''} ${map['last_name'] ?? ''}'.trim();
     if (name.isNotEmpty) return name;
-    return 'کاربر';
+    return adminTx(context, 'کاربر', 'User');
   }
 
   void _msg(String m, {bool err = false}) {
@@ -104,17 +105,20 @@ class _AdminUserPasswordDialogState extends State<_AdminUserPasswordDialog>
           if (!context.mounted) return;
           await _showResultDialog(
             context,
-            title: 'لینک بازیابی کلمه عبور',
+            title: adminTx(context, 'لینک بازیابی رمز', 'Password reset link'),
             body: displayUrl,
-            hint:
-                'این لینک را کپی و برای کاربر ارسال کنید. با باز کردن آن، صفحه ورود و تعیین رمز جدید نمایش داده می‌شود.',
+            hint: adminTx(
+              context,
+              'این لینک را کپی کنید و برای کاربر بفرستید. با باز کردن آن، صفحهٔ تعیین رمز جدید باز می‌شود.',
+              'Copy this link and send it to the user. Opening it shows the page for choosing a new password.',
+            ),
           );
         } else {
           if (!mounted) return;
           _msg(
             _sendNotification
-                ? 'توکن در سرور ثبت شد. اگر اعلان فعال است برای کاربر ارسال می‌شود (در این پاسخ لینک قابل ساختن نبود — APP_PUBLIC_URL یا Origin).'
-                : 'توکن بازیابی در سرور ثبت شد. برای نمایش لینک، آدرس پایهٔ برنامه (APP_PUBLIC_URL) را پیکربندی کنید.',
+                ? adminTx(context, 'توکن ثبت شد و در صورت فعال بودن اعلان برای کاربر ارسال می‌شود. لینک در پاسخ ساخته نشد.', 'The token was saved. If notifications are on, it is sent to the user. A link could not be built from this response.')
+                : adminTx(context, 'توکن بازیابی ثبت شد. برای نمایش لینک، آدرس عمومی برنامه را پیکربندی کنید.', 'The reset token was saved. Configure the public app address to show a link.'),
           );
         }
         if (!mounted) return;
@@ -124,7 +128,7 @@ class _AdminUserPasswordDialogState extends State<_AdminUserPasswordDialog>
         return;
       }
     } catch (e) {
-      _msg('خطا: ${_err(e)}', err: true);
+      _msg('${adminTx(context, 'خطا', 'Error')}: ${_err(e)}', err: true);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -148,7 +152,7 @@ class _AdminUserPasswordDialogState extends State<_AdminUserPasswordDialog>
         if (!mounted) return;
         widget.onSuccess?.call();
         if (!mounted) return;
-        _msg('رمز عبور توسط شما ثبت شد.');
+        _msg(adminTx(context, 'رمز عبور ثبت شد.', 'Password saved.'));
         _pass1.clear();
         _pass2.clear();
         if (!context.mounted) return;
@@ -156,7 +160,7 @@ class _AdminUserPasswordDialogState extends State<_AdminUserPasswordDialog>
         return;
       }
     } catch (e) {
-      _msg('خطا: ${_err(e)}', err: true);
+      _msg('${adminTx(context, 'خطا', 'Error')}: ${_err(e)}', err: true);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -168,12 +172,15 @@ class _AdminUserPasswordDialogState extends State<_AdminUserPasswordDialog>
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('تولید رمز تصادفی'),
-        content: const Text(
-            'یک رمز قوی تولید و روی حساب کاربر ثبت می‌شود. رمز فقط در مرحلهٔ بعد نمایش داده می‌شود. ادامه می‌دهید؟'),
+        title: Text(adminTx(context, 'تولید رمز تصادفی', 'Generate a random password')),
+        content: Text(adminTx(
+          context,
+          'یک رمز قوی ساخته و روی حساب کاربر ثبت می‌شود. رمز فقط یک‌بار نمایش داده می‌شود.',
+          'A strong password is created and saved on the account. It is shown only once.',
+        )),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('انصراف')),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('تأیید')),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(adminTx(context, 'انصراف', 'Cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(adminTx(context, 'تأیید', 'Confirm'))),
         ],
       ),
     );
@@ -192,12 +199,12 @@ class _AdminUserPasswordDialogState extends State<_AdminUserPasswordDialog>
           if (!context.mounted) return;
           await _showResultDialog(
             context,
-            title: 'رمز یک‌بار مصرف',
+            title: adminTx(context, 'رمز یک‌بار مصرف', 'One-time password'),
             body: plain,
           );
         } else {
           if (!mounted) return;
-          _msg('رمز تولید شد (پاسخ بدون نمایش رمز).', err: false);
+          _msg(adminTx(context, 'رمز تولید شد، ولی در پاسخ نمایش داده نشد.', 'A password was generated, but it was not included in the response.'));
         }
         if (!mounted) return;
         widget.onSuccess?.call();
@@ -206,7 +213,7 @@ class _AdminUserPasswordDialogState extends State<_AdminUserPasswordDialog>
         return;
       }
     } catch (e) {
-      _msg('خطا: ${_err(e)}', err: true);
+      _msg('${adminTx(context, 'خطا', 'Error')}: ${_err(e)}', err: true);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -216,7 +223,7 @@ class _AdminUserPasswordDialogState extends State<_AdminUserPasswordDialog>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return AlertDialog(
-      title: Text('مدیریت رمز: $_displayName'),
+      title: Text('${adminTx(context, 'مدیریت رمز', 'Password')}: $_displayName'),
       content: SizedBox(
         width: 400,
         child: Form(
@@ -227,10 +234,10 @@ class _AdminUserPasswordDialogState extends State<_AdminUserPasswordDialog>
               TabBar(
                 controller: _tabController,
                 labelStyle: const TextStyle(fontSize: 12),
-                tabs: const [
-                  Tab(text: 'بازیابی (توکن)'),
-                  Tab(text: 'انتخابی'),
-                  Tab(text: 'تصادفی'),
+                tabs: [
+                  Tab(text: adminTx(context, 'بازیابی', 'Reset link')),
+                  Tab(text: adminTx(context, 'انتخابی', 'Chosen')),
+                  Tab(text: adminTx(context, 'تصادفی', 'Random')),
                 ],
               ),
               const SizedBox(height: 12),
@@ -262,7 +269,7 @@ class _AdminUserPasswordDialogState extends State<_AdminUserPasswordDialog>
       actions: [
         TextButton(
           onPressed: _loading ? null : () => Navigator.of(context).pop(),
-          child: const Text('بستن'),
+          child: Text(adminTx(context, 'بستن', 'Close')),
         ),
       ],
     );
@@ -285,25 +292,27 @@ class _TokenTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       children: [
-        const Text(
-          'توکن در سرور ثبت می‌شود. لینک کامل (برای کپی) در پاسخ نمایش داده می‌شود؛ در صورت فعال بودن اعلان، مثل فراموشی رمز، پیام نیز ارسال می‌گردد.',
-          style: TextStyle(fontSize: 12),
+        Text(
+          adminTx(
+            context,
+            'توکن در سرور ثبت می‌شود. لینک برای کپی در پاسخ می‌آید و اگر اعلان روشن باشد برای کاربر هم فرستاده می‌شود.',
+            'The token is saved on the server. The copyable link is shown in the response, and a notification is sent if that option is on.',
+          ),
+          style: const TextStyle(fontSize: 12),
         ),
         SwitchListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
           value: sendNotification,
           onChanged: loading ? null : onChanged,
-          title: const Text('ارسال اعلان به کاربر', style: TextStyle(fontSize: 13)),
+          title: Text(adminTx(context, 'ارسال اعلان به کاربر', 'Notify the user'), style: const TextStyle(fontSize: 13)),
         ),
         const SizedBox(height: 8),
         FilledButton(
           onPressed: loading ? null : onSubmit,
           child: loading
-              ? const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('ایجاد توکن بازنشانی'),
+              ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))
+              : Text(adminTx(context, 'ایجاد توکن بازنشانی', 'Create reset token')),
         ),
       ],
     );
@@ -329,13 +338,14 @@ class _DirectTab extends StatelessWidget {
         TextFormField(
           controller: pass1,
           obscureText: true,
-          decoration: const InputDecoration(
-            labelText: 'رمز جدید',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            isDense: true,
+            labelText: adminTx(context, 'رمز جدید', 'New password'),
+            border: const OutlineInputBorder(),
           ),
           validator: (v) {
             if (v == null || v.length < 8) {
-              return 'حداقل ۸ نویسه';
+              return adminTx(context, 'حداقل ۸ نویسه', 'At least 8 characters');
             }
             return null;
           },
@@ -344,13 +354,14 @@ class _DirectTab extends StatelessWidget {
         TextFormField(
           controller: pass2,
           obscureText: true,
-          decoration: const InputDecoration(
-            labelText: 'تکرار رمز',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            isDense: true,
+            labelText: adminTx(context, 'تکرار رمز', 'Repeat password'),
+            border: const OutlineInputBorder(),
           ),
           validator: (v) {
             if (v != pass1.text) {
-              return 'تکرار رمز مطابقت ندارد';
+              return adminTx(context, 'تکرار رمز مطابقت ندارد', 'The passwords do not match');
             }
             return null;
           },
@@ -364,7 +375,7 @@ class _DirectTab extends StatelessWidget {
                   height: 22,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('ثبت رمز'),
+              : Text(adminTx(context, 'ثبت رمز', 'Save password')),
         ),
       ],
     );
@@ -386,7 +397,11 @@ class _RandomTab extends StatelessWidget {
     return ListView(
       children: [
         Text(
-          'یک رمز امن تولید و بلافاصله روی حساب ثبت می‌شود. فقط در گام بعد یک‌بار نمایش داده می‌شود؛ آن را برای کاربر ارسال کنید.',
+          adminTx(
+            context,
+            'یک رمز امن ساخته و همان لحظه روی حساب ثبت می‌شود. فقط یک‌بار نشان داده می‌شود؛ آن را برای کاربر بفرستید.',
+            'A secure password is created and saved immediately. It is shown only once; send it to the user.',
+          ),
           style: theme.textTheme.bodySmall,
         ),
         const SizedBox(height: 12),
@@ -398,7 +413,7 @@ class _RandomTab extends StatelessWidget {
                   height: 22,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('تولید و ثبت رمز تصادفی'),
+              : Text(adminTx(context, 'تولید و ثبت رمز تصادفی', 'Generate and save a random password')),
         ),
       ],
     );
@@ -442,12 +457,12 @@ Future<void> _showResultDialog(
             Clipboard.setData(ClipboardData(text: body));
             Navigator.pop(c);
             messenger?.showSnackBar(
-              const SnackBar(content: Text('لینک در حافظه کپی شد')),
+              SnackBar(content: Text(adminTx(context, 'در حافظه کپی شد', 'Copied'))),
             );
           },
-          child: const Text('کپی لینک'),
+          child: Text(adminTx(context, 'کپی', 'Copy')),
         ),
-        TextButton(onPressed: () => Navigator.pop(c), child: const Text('بستن')),
+        TextButton(onPressed: () => Navigator.pop(c), child: Text(adminTx(context, 'بستن', 'Close'))),
       ],
     ),
   );

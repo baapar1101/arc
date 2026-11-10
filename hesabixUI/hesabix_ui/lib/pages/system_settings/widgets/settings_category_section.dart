@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+
+import '../../../theme/tokens/extensions.dart';
+import '../../business/settings/business_settings_layout.dart';
 import '../models/settings_category.dart';
 import '../models/settings_item.dart';
 import '../utils/localization_helper.dart';
 import 'settings_card.dart';
 
-/// ویجت بخش دسته‌بندی تنظیمات
+/// بخش جمع‌شوندهٔ یک دسته در هاب مدیر سیستم.
 class SettingsCategorySection extends StatefulWidget {
   final SettingsCategory category;
   final bool isExpanded;
@@ -23,8 +27,7 @@ class SettingsCategorySection extends StatefulWidget {
   });
 
   @override
-  State<SettingsCategorySection> createState() =>
-      _SettingsCategorySectionState();
+  State<SettingsCategorySection> createState() => _SettingsCategorySectionState();
 }
 
 class _SettingsCategorySectionState extends State<SettingsCategorySection>
@@ -45,7 +48,6 @@ class _SettingsCategorySectionState extends State<SettingsCategorySection>
       parent: _animationController,
       curve: Curves.easeInOut,
     );
-
     if (_isExpanded) {
       _animationController.value = 1.0;
     }
@@ -82,49 +84,24 @@ class _SettingsCategorySectionState extends State<SettingsCategorySection>
     });
   }
 
-  static const double _kTwoColumnMinWidth = 720;
+  bool get _isDangerCategory => widget.category.id == 'maintenance';
 
-  Widget _buildItemsGrid(
-    BuildContext context,
-    List<SettingsItem> items,
-    double maxWidth,
-  ) {
-    final bool twoColumns = maxWidth >= _kTwoColumnMinWidth;
-
-    Widget cardWrap(SettingsItem item) {
+  Widget _buildItemsGrid(BuildContext context, List<SettingsItem> items) {
+    final cards = items.map((item) {
+      final isDanger = _isDangerCategory || item.tags.contains('danger');
       return SettingsCard(
         item: item,
         isHighlighted: widget.showSearchResults &&
             widget.searchQuery != null &&
             widget.searchQuery!.isNotEmpty,
+        isDanger: isDanger,
+        onTap: item.route.isEmpty ? null : () => context.push(item.route),
       );
-    }
+    }).toList();
 
-    if (!twoColumns) {
-      return Column(
-        children: [
-          for (final item in items)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: cardWrap(item),
-            ),
-        ],
-      );
-    }
-
-    const double gap = 8;
-    final double halfWidth = (maxWidth - gap) / 2;
-    return Wrap(
-      spacing: gap,
-      runSpacing: 6,
-      children: items
-          .map(
-            (item) => SizedBox(
-              width: halfWidth,
-              child: cardWrap(item),
-            ),
-          )
-          .toList(),
+    return BusinessSettingsLayout.buildResponsiveGrid(
+      context: context,
+      children: cards,
     );
   }
 
@@ -132,15 +109,12 @@ class _SettingsCategorySectionState extends State<SettingsCategorySection>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final hub = context.settingsHub;
     final t = AppLocalizations.of(context);
     final items = widget.category.items;
-
-    final bool screenWideDesktop = MediaQuery.sizeOf(context).width >= 900;
-    final hzHeader = screenWideDesktop ? 10.0 : 16.0;
-    final vtHeader = screenWideDesktop ? 10.0 : 12.0;
-    final hzBody = screenWideDesktop ? 10.0 : 16.0;
-    final vtBody = screenWideDesktop ? 6.0 : 8.0;
-    final sectionBottom = screenWideDesktop ? 8.0 : 12.0;
+    final categoryColor = _isDangerCategory ? colorScheme.error : widget.category.color;
+    final width = MediaQuery.sizeOf(context).width;
+    final radius = BorderRadius.circular(hub.categoryRadius);
 
     if (widget.showSearchResults &&
         widget.searchQuery != null &&
@@ -155,12 +129,16 @@ class _SettingsCategorySectionState extends State<SettingsCategorySection>
     );
 
     return Container(
-      margin: EdgeInsets.only(bottom: sectionBottom),
+      margin: EdgeInsets.only(bottom: hub.categorySectionBottomFor(width)),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
+        color: _isDangerCategory
+            ? colorScheme.errorContainer.withValues(alpha: 0.15)
+            : colorScheme.surface,
+        borderRadius: radius,
         border: Border.all(
-          color: colorScheme.outline.withValues(alpha: 0.08),
+          color: _isDangerCategory
+              ? colorScheme.error.withValues(alpha: 0.35)
+              : colorScheme.outline.withValues(alpha: 0.08),
           width: 1,
         ),
       ),
@@ -171,67 +149,76 @@ class _SettingsCategorySectionState extends State<SettingsCategorySection>
             color: Colors.transparent,
             child: InkWell(
               onTap: _toggleExpansion,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(12),
-              ),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(hub.categoryRadius)),
               child: Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: hzHeader,
-                  vertical: vtHeader,
-                ),
+                padding: hub.categoryHeaderPaddingFor(width),
                 decoration: BoxDecoration(
-                  color: widget.category.color.withValues(alpha: 0.05),
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(12),
+                  color: categoryColor.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(hub.categoryRadius),
                   ),
                 ),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(
                       widget.category.icon,
-                      color: widget.category.color,
-                      size: 20,
+                      color: categoryColor,
+                      size: hub.categoryIconSize,
                     ),
-                    SizedBox(width: screenWideDesktop ? 10 : 12),
+                    SizedBox(width: hub.categoryIconGap),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            LocalizationHelper.getCategoryTitle(
-                              t,
-                              widget.category.title,
+                            LocalizationHelper.getCategoryTitle(t, widget.category.title),
+                            style: hub.categoryTitleStyle(
+                              theme.textTheme,
+                              color: _isDangerCategory ? colorScheme.error : colorScheme.onSurface,
                             ),
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.onSurface,
-                              fontSize: 15,
-                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                           if (categorySubtitle.isNotEmpty) ...[
-                            const SizedBox(height: 4),
+                            SizedBox(height: hub.categoryTitleGap),
                             Text(
                               categorySubtitle,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onSurface
-                                    .withValues(alpha: 0.65),
-                                height: 1.3,
+                              style: hub.categorySubtitleStyle(
+                                theme.textTheme,
+                                color: colorScheme.onSurface.withValues(alpha: 0.65),
                               ),
-                              maxLines: 2,
+                              maxLines: hub.categorySubtitleMaxLines,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ],
                       ),
                     ),
+                    if (items.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: categoryColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          '${items.length}',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: categoryColor,
+                            fontWeight: FontWeight.w700,
+                            fontSize: hub.categorySubtitleFontSize,
+                            height: hub.labelHeight,
+                          ),
+                        ),
+                      ),
+                    SizedBox(width: hub.categoryIconGap),
                     AnimatedRotation(
                       turns: _isExpanded ? 0.5 : 0,
                       duration: const Duration(milliseconds: 300),
                       child: Icon(
                         Icons.expand_more,
                         color: colorScheme.onSurface.withValues(alpha: 0.6),
-                        size: 20,
+                        size: hub.categoryIconSize,
                       ),
                     ),
                   ],
@@ -242,33 +229,21 @@ class _SettingsCategorySectionState extends State<SettingsCategorySection>
           SizeTransition(
             sizeFactor: _expandAnimation,
             child: ClipRect(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: hzBody,
-                      vertical: vtBody,
-                    ),
-                    child: items.isEmpty
-                        ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Text(
-                                AppLocalizations.of(context).noSettingsInCategory,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color:
-                                      colorScheme.onSurface.withValues(alpha: 0.5),
-                                ),
-                              ),
+              child: Padding(
+                padding: hub.categoryBodyPaddingFor(width),
+                child: items.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: hub.emptyStatePadding,
+                          child: Text(
+                            t.noSettingsInCategory,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurface.withValues(alpha: 0.5),
                             ),
-                          )
-                        : _buildItemsGrid(
-                            context,
-                            items,
-                            constraints.maxWidth,
                           ),
-                  );
-                },
+                        ),
+                      )
+                    : _buildItemsGrid(context, items),
               ),
             ),
           ),

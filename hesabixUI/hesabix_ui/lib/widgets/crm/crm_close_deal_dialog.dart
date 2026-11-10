@@ -70,13 +70,25 @@ class _CrmCloseDealDialogState extends State<_CrmCloseDealDialog> {
   @override
   void initState() {
     super.initState();
-    final win = _winStages;
-    final lost = _lostStages;
-    if (win.isNotEmpty) {
-      _stageId = win.first['id'] as int?;
-    } else if (lost.isNotEmpty) {
+    final target = widget.currentStageId;
+    Map<String, dynamic>? dropped;
+    for (final stage in widget.stages) {
+      if ((stage['id'] as num?)?.toInt() == target) {
+        dropped = stage;
+        break;
+      }
+    }
+    if (dropped != null && dropped['is_lost'] == true) {
       _isWon = false;
-      _stageId = lost.first['id'] as int?;
+      _stageId = target;
+    } else if (dropped != null && dropped['is_win'] == true) {
+      _isWon = true;
+      _stageId = target;
+    } else if (_winStages.isNotEmpty) {
+      _stageId = (_winStages.first['id'] as num?)?.toInt();
+    } else if (_lostStages.isNotEmpty) {
+      _isWon = false;
+      _stageId = (_lostStages.first['id'] as num?)?.toInt();
     }
     _loadReasons();
   }
@@ -108,6 +120,10 @@ class _CrmCloseDealDialogState extends State<_CrmCloseDealDialog> {
   Future<void> _submit() async {
     if (_stageId == null) {
       SnackBarHelper.show(context, message: 'مرحله بستن تعریف نشده است', isError: true);
+      return;
+    }
+    if (_reasonCode == null || _reasonCode!.trim().isEmpty) {
+      SnackBarHelper.show(context, message: _isWon ? 'دلیل برد را انتخاب کنید' : 'دلیل باخت را انتخاب کنید', isError: true);
       return;
     }
     setState(() => _saving = true);

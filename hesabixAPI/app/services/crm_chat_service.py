@@ -24,6 +24,12 @@ from adapters.db.models.messenger_operator_session import MessengerOperatorSessi
 from adapters.db.models.file_storage import FileStorage
 from adapters.db.models.user import User
 from app.core.responses import ApiError
+from app.services.crm_guards import (
+	assert_bulk_delete_confirmed,
+	normalize_allowed_origins,
+	origins_unrestricted,
+	require_allowed_origins,
+)
 from app.services.crm_chat_realtime import crm_chat_realtime_manager
 from app.services.file_storage_service import FileStorageService
 from app.services.workflow.workflow_trigger_enrichment import build_crm_chat_visitor_message_trigger_enrichment
@@ -68,10 +74,8 @@ def _normalize_host_from_origin(origin: Optional[str]) -> Optional[str]:
 
 
 def origin_allowed(widget: CrmChatWidget, origin_header: Optional[str]) -> bool:
-	raw = widget.allowed_origins
-	if not raw or not isinstance(raw, list):
-		return True
-	hosts = [str(x).strip().lower() for x in raw if str(x).strip()]
+	"""ویجت بدون مبدأ (داده قدیمی) همچنان باز است. مبدأ ثبت‌شده فقط همان میزبان را می‌پذیرد."""
+	hosts = normalize_allowed_origins(widget.allowed_origins)
 	if not hosts:
 		return True
 	oh = _normalize_host_from_origin(origin_header)
@@ -123,6 +127,7 @@ def widget_to_dict(w: CrmChatWidget) -> Dict[str, Any]:
 		"name": w.name,
 		"public_key": w.public_key,
 		"allowed_origins": w.allowed_origins or [],
+		"origins_unrestricted": origins_unrestricted(w.allowed_origins),
 		"settings": w.settings or {},
 		"is_active": bool(w.is_active),
 		"created_at": w.created_at,
@@ -396,12 +401,13 @@ def create_widget(
 	settings: Optional[dict],
 	is_active: bool,
 ) -> CrmChatWidget:
+	origins = require_allowed_origins(allowed_origins)
 	pk = secrets.token_urlsafe(24).replace("-", "")[:48]
 	w = CrmChatWidget(
 		business_id=business_id,
 		name=name.strip(),
 		public_key=pk,
-		allowed_origins=allowed_origins,
+		allowed_origins=origins,
 		settings=settings,
 		is_active=is_active,
 	)
@@ -427,7 +433,7 @@ def update_widget(
 	if name is not None:
 		w.name = name.strip()
 	if allowed_origins is not None:
-		w.allowed_origins = allowed_origins
+		w.allowed_origins = require_allowed_origins(allowed_origins)
 	if settings is not None:
 		w.settings = settings
 	if is_active is not None:
@@ -561,21 +567,22 @@ async def update_visitor_current_page_url(
 	if len(raw) > _MAX_PAGE_URL_LEN:
 		raw = raw[:_MAX_PAGE_URL_LEN]
 	if c.page_url == raw:
-		return _conversation_dict(db, c)
+		return visitor_safe_event({"conversation": _conversation_dict(db, c)})["conversation"]
 	c.page_url = raw
 	c.updated_at = datetime.utcnow()
 	db.commit()
 	db.refresh(c)
 
+	full = _conversation_dict(db, c)
 	ev = {
 		"type": "crm_chat.event",
 		"event": "conversation.updated",
-		"conversation": _conversation_dict(db, c),
+		"conversation": full,
 	}
-	await crm_chat_realtime_manager.broadcast_conversation(c.id, ev)
+	await crm_chat_realtime_manager.broadcast_conversation(c.id, visitor_safe_event(ev))
 	await crm_chat_realtime_manager.broadcast_business(c.business_id, ev)
 
-	return _conversation_dict(db, c)
+	return visitor_safe_event({"conversation": full})["conversation"]
 
 
 def _assert_widget_origin(db: Session, c: CrmChatConversation, origin_header: Optional[str]) -> None:
@@ -612,6 +619,12 @@ async def post_visitor_message(
 	db.add(msg)
 	c.last_message_at = datetime.utcnow()
 	c.updated_at = datetime.utcnow()
+	try:
+		from app.services.crm_automation_service import stop_sequences_for_customer_reply
+
+		stop_sequences_for_customer_reply(db, c.business_id, lead_id=c.lead_id, person_id=c.person_id)
+	except Exception:
+		logger.exception("sequence stop on visitor reply failed conversation_id=%s", c.id)
 	db.commit()
 	db.refresh(msg)
 
@@ -746,6 +759,12 @@ async def post_visitor_file(
 	db.add(msg)
 	c.last_message_at = datetime.utcnow()
 	c.updated_at = datetime.utcnow()
+	try:
+		from app.services.crm_automation_service import stop_sequences_for_customer_reply
+
+		stop_sequences_for_customer_reply(db, c.business_id, lead_id=c.lead_id, person_id=c.person_id)
+	except Exception:
+		logger.exception("sequence stop on visitor file failed conversation_id=%s", c.id)
 	db.commit()
 	db.refresh(msg)
 
@@ -917,6 +936,62 @@ def list_messages_agent(
 	return ([_message_to_dict_enriched(db, m) for m in rows], has_more_older)
 
 
+def visitor_safe_event(payload: Dict[str, Any]) -> Dict[str, Any]:
+	"""اتاق مکالمه را بازدیدکننده هم می‌شنود؛ شناسه داخلی شخص و سرنخ آنجا نمی‌رود."""
+	conversation = payload.get("conversation")
+	if not isinstance(conversation, dict):
+		return payload
+	safe = dict(conversation)
+	for key in ("lead_id", "lead_name", "person_id", "person_name", "assigned_to_user_id"):
+		safe[key] = None
+	visitor = f"{safe.get('visitor_first_name') or ''} {safe.get('visitor_last_name') or ''}".strip()
+	safe["display_name"] = visitor
+	return {**payload, "conversation": safe}
+
+
+def conversation_event_for_agent(db: Session, business_id: int, user_id: Optional[int], payload: Dict[str, Any]) -> Dict[str, Any]:
+	"""رویداد کسب‌وکار برای هر سوکت جدا redact می‌شود تا سرنخ پنهان به عامل دیگر نرسد."""
+	conversation = payload.get("conversation")
+	if not isinstance(conversation, dict) or not conversation.get("lead_id"):
+		return payload
+	if user_id is None:
+		return visitor_safe_event(payload)
+	from app.services.crm_enterprise_service import acl_actor
+
+	redacted = _redact_hidden_lead_links(db, business_id, acl_actor(db, int(user_id)), [dict(conversation)])[0]
+	return {**payload, "conversation": redacted}
+
+
+def _redact_hidden_lead_links(db: Session, business_id: int, ctx: Any, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+	"""وقتی مجوز رکورد روشن است، شناسه و نام سرنخ پنهان از پاسخ گفتگو حذف می‌شود."""
+	if ctx is None or not items:
+		return items
+	from adapters.db.models.crm import Lead
+	from app.services.crm_enterprise_service import record_acl_enforced, restrict_visibility_query
+
+	if not record_acl_enforced(db, business_id, ctx):
+		return items
+	lead_ids = [int(item["lead_id"]) for item in items if item.get("lead_id")]
+	visible: set[int] = set()
+	if lead_ids:
+		query = restrict_visibility_query(
+			db.query(Lead.id).filter(Lead.business_id == business_id, Lead.id.in_(lead_ids)),
+			db, business_id, ctx, Lead, "lead",
+		)
+		visible = {int(row[0]) for row in query.all()}
+	redacted: List[Dict[str, Any]] = []
+	for item in items:
+		lead_id = item.get("lead_id")
+		if lead_id and int(lead_id) not in visible:
+			item = dict(item)
+			item["lead_id"] = None
+			item["lead_name"] = None
+			visitor = f"{item.get('visitor_first_name') or ''} {item.get('visitor_last_name') or ''}".strip()
+			item["display_name"] = item.get("person_name") or visitor
+		redacted.append(item)
+	return redacted
+
+
 def list_conversations_agent(
 	db: Session,
 	business_id: int,
@@ -925,6 +1000,7 @@ def list_conversations_agent(
 	limit: int = 50,
 	offset: int = 0,
 	search: Optional[str] = None,
+	ctx: Any = None,
 ) -> tuple[List[Dict[str, Any]], bool]:
 	sort_ts = func.coalesce(CrmChatConversation.last_message_at, CrmChatConversation.created_at)
 	lim = min(max(limit, 1), 200)
@@ -950,17 +1026,15 @@ def list_conversations_agent(
 	has_more = len(rows) > lim
 	rows = rows[:lim]
 	pnames, lnames = _party_names_for_conversations(db, rows)
-	return (
-		[
-			conversation_to_dict(
-				c,
-				person_name=pnames.get(int(c.person_id)) if c.person_id else None,
-				lead_name=lnames.get(int(c.lead_id)) if c.lead_id else None,
-			)
-			for c in rows
-		],
-		has_more,
-	)
+	items = [
+		conversation_to_dict(
+			c,
+			person_name=pnames.get(int(c.person_id)) if c.person_id else None,
+			lead_name=lnames.get(int(c.lead_id)) if c.lead_id else None,
+		)
+		for c in rows
+	]
+	return _redact_hidden_lead_links(db, business_id, ctx, items), has_more
 
 
 async def delete_message_agent(
@@ -1098,8 +1172,10 @@ async def delete_conversations_bulk_agent(
 	business_id: int,
 	*,
 	status: Optional[str] = None,
+	confirm_all: bool = False,
 ) -> Dict[str, Any]:
-	"""حذف دسته‌جمعی مکالمه‌ها؛ در صورت ارسال status فقط همان وضعیت. پیام‌ها و نشست‌ها قبل از مکالمه به‌ترتیب امن پاک می‌شوند."""
+	"""حذف دسته‌جمعی مکالمه‌ها. بدون status فقط با confirm_all. پیام‌ها قبل از مکالمه پاک می‌شوند."""
+	assert_bulk_delete_confirmed(status=status, confirm_all=confirm_all)
 	if status is not None and status not in ("open", "pending", "resolved"):
 		raise ApiError(
 			"CRM_CHAT_CONVERSATION_STATUS_INVALID",
@@ -1148,9 +1224,44 @@ async def patch_conversation_agent(
 	assigned_to_user_id: Optional[int] = None,
 	lead_id: Optional[int] = None,
 	person_id: Optional[int] = None,
+	clear_lead: bool = False,
+	clear_person: bool = False,
+	clear_assignee: bool = False,
 	acting_user_id: Optional[int] = None,
+	ctx: Any = None,
 ) -> Dict[str, Any]:
 	c = _get_conversation_business(db, business_id, conversation_id)
+	if clear_lead and lead_id is not None:
+		raise ApiError("CRM_CHAT_LINK_CONFLICT", "هم‌زمان نمی‌توان سرنخ را وصل و قطع کرد.", http_status=422)
+	if clear_person and person_id is not None:
+		raise ApiError("CRM_CHAT_LINK_CONFLICT", "هم‌زمان نمی‌توان شخص را وصل و قطع کرد.", http_status=422)
+	if clear_assignee and assigned_to_user_id is not None:
+		raise ApiError("CRM_CHAT_LINK_CONFLICT", "هم‌زمان نمی‌توان مسئول را تعیین و حذف کرد.", http_status=422)
+	if lead_id is not None and ctx is not None:
+		from adapters.db.models.crm import Lead
+		from app.services.crm_enterprise_service import assert_can_view_record
+
+		linked = db.query(Lead).filter(Lead.id == int(lead_id), Lead.business_id == business_id).first()
+		if linked is None:
+			raise ApiError("NOT_FOUND", "سرنخ یافت نشد.", http_status=404)
+		assert_can_view_record(db, business_id, ctx, "lead", linked, write=True)
+	elif lead_id is not None:
+		from adapters.db.models.crm import Lead
+
+		linked = db.query(Lead.id).filter(Lead.id == int(lead_id), Lead.business_id == business_id).first()
+		if linked is None:
+			raise ApiError("NOT_FOUND", "سرنخ یافت نشد.", http_status=404)
+	if person_id is not None:
+		from adapters.db.models.person import Person
+
+		linked_person = db.query(Person.id).filter(Person.id == int(person_id), Person.business_id == business_id).first()
+		if linked_person is None:
+			raise ApiError("NOT_FOUND", "شخص یافت نشد.", http_status=404)
+	if assigned_to_user_id is not None:
+		from app.services.crm_calendar_note_service import user_has_business_join
+
+		if not user_has_business_join(db, int(assigned_to_user_id), business_id):
+			raise ApiError("CRM_CHAT_ASSIGNEE_INVALID", "کاربر مسئول عضو این کسب‌وکار نیست.", http_status=400)
 	old_assignee = c.assigned_to_user_id
 	old_status = c.status
 
@@ -1160,10 +1271,16 @@ async def patch_conversation_agent(
 		c.status = status
 	if assigned_to_user_id is not None:
 		c.assigned_to_user_id = assigned_to_user_id
+	elif clear_assignee:
+		c.assigned_to_user_id = None
 	if lead_id is not None:
 		c.lead_id = lead_id
+	elif clear_lead:
+		c.lead_id = None
 	if person_id is not None:
 		c.person_id = person_id
+	elif clear_person:
+		c.person_id = None
 	c.updated_at = datetime.utcnow()
 	db.commit()
 	db.refresh(c)
@@ -1204,15 +1321,16 @@ async def patch_conversation_agent(
 				acting_user_id,
 			)
 
+	full = _conversation_dict(db, c)
 	ev = {
 		"type": "crm_chat.event",
 		"event": "conversation.updated",
-		"conversation": _conversation_dict(db, c),
+		"conversation": full,
 	}
-	await crm_chat_realtime_manager.broadcast_conversation(c.id, ev)
+	await crm_chat_realtime_manager.broadcast_conversation(c.id, visitor_safe_event(ev))
 	await crm_chat_realtime_manager.broadcast_business(c.business_id, ev)
 
-	return _conversation_dict(db, c)
+	return _redact_hidden_lead_links(db, business_id, ctx, [full])[0]
 
 
 async def broadcast_typing(

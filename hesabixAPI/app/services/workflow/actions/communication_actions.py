@@ -762,6 +762,11 @@ class CreateNotificationAction(ActionHandler):
                     "type": "string",
                     "description": "دسته‌بندی",
                     "required": False
+                },
+                "deep_link": {
+                    "type": "string",
+                    "description": "مسیر داخل برنامه؛ می‌تواند ارجاع $node.field داشته باشد",
+                    "required": False
                 }
             }
         }
@@ -795,17 +800,22 @@ class CreateNotificationAction(ActionHandler):
         channels = config.get("channels", ["inapp"])
         priority = config.get("priority", "normal")
         category = config.get("category")
+        deep_link = WorkflowEngine._resolve_value_static(config.get("deep_link"), context, node_results)
+        notification_context = {
+            "subject": str(title),
+            "message": str(message),
+            "priority": priority,
+            "category": category,
+        }
+        if deep_link:
+            notification_context["deep_link"] = str(deep_link)
+            notification_context["action_url"] = str(deep_link)
         
         # ایجاد notification
         notification_service.send(
             user_id=user_id,
             event_key=str(event_key),
-            context={
-                "subject": str(title),
-                "message": str(message),
-                "priority": priority,
-                "category": category
-            },
+            context=notification_context,
             preferred_channels=channels
         )
         

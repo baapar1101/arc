@@ -156,15 +156,21 @@ import 'pages/business/repair_shop/repair_settings_page.dart';
 import 'pages/business/customer_club/customer_club_main_page.dart';
 import 'pages/business/customer_club/customer_club_settings_page.dart';
 import 'pages/business/payroll/payroll_main_page.dart';
+import 'pages/business/procurement/procurement_page.dart';
 import 'pages/business/advanced_production/advanced_production_page.dart';
 import 'pages/business/office_automation/oa_archive_page.dart';
 import 'pages/business/office_automation/oa_cartable_page.dart';
 import 'pages/business/office_automation/oa_external_orgs_page.dart';
 import 'pages/business/office_automation/oa_letter_page.dart';
 import 'pages/business/office_automation/oa_org_page.dart';
+import 'pages/business/office_automation/oa_my_desk_page.dart';
+import 'pages/business/office_automation/oa_documents_page.dart';
+import 'pages/business/office_automation/oa_enterprise_page.dart';
+import 'pages/business/office_automation/oa_processes_page.dart';
 import 'pages/business/office_automation/oa_reports_page.dart';
 import 'pages/business/office_automation/oa_settings_page.dart';
 import 'pages/public/public_oa_track_page.dart';
+import 'pages/public/public_procurement_page.dart';
 import 'pages/business/fixed_assets/fixed_assets_main_page.dart';
 import 'pages/business/fixed_assets/fixed_assets_reports_page.dart';
 import 'pages/business/fixed_assets/fixed_assets_settings_page.dart';
@@ -178,6 +184,7 @@ import 'pages/business/telephony/telephony_softphone_page.dart';
 import 'pages/business/distribution/distribution_main_page.dart';
 import 'widgets/marketplace/distribution_plugin_gate.dart';
 import 'widgets/marketplace/payroll_plugin_gate.dart';
+import 'widgets/marketplace/procurement_plugin_gate.dart';
 import 'widgets/marketplace/advanced_production_plugin_gate.dart';
 import 'widgets/marketplace/office_automation_plugin_gate.dart';
 import 'widgets/marketplace/fixed_assets_plugin_gate.dart';
@@ -289,6 +296,8 @@ import 'pages/public/public_invoice_share_link_page.dart';
 import 'pages/public/public_pay_page.dart';
 import 'pages/public/public_storage_file_share_page.dart';
 import 'pages/admin/ai_settings_page.dart';
+import 'pages/admin/ai_admin_hub_page.dart';
+import 'pages/admin/admin_operations_pages.dart';
 import 'pages/admin/ai_plans_admin_page.dart';
 import 'pages/admin/ai_models_admin_page.dart';
 import 'pages/admin/ai_voice_models_admin_page.dart';
@@ -322,6 +331,7 @@ import 'pages/business/crm/crm_reports_page.dart';
 import 'pages/business/crm/crm_tasks_page.dart';
 import 'pages/business/crm/crm_customer_360_page.dart';
 import 'pages/business/crm/crm_sequences_page.dart';
+import 'pages/business/crm/crm_enterprise_page.dart';
 import 'pages/business/crm/crm_notes_calendar_page.dart';
 import 'pages/business/crm/crm_web_chat_page.dart';
 import 'pages/business/crm/business_crm_settings_page.dart';
@@ -1190,6 +1200,14 @@ class _MyAppState extends State<MyApp> {
           },
         ),
         GoRoute(
+          path: '/public/procurement/:token',
+          name: 'public_procurement',
+          builder: (context, state) {
+            final token = state.pathParameters['token'] ?? '';
+            return PublicProcurementPage(token: token);
+          },
+        ),
+        GoRoute(
           path: '/login',
           name: 'login',
           builder: (context, state) {
@@ -1716,6 +1734,157 @@ class _MyAppState extends State<MyApp> {
                   },
                 ),
                 GoRoute(
+                  path: 'operations',
+                  name: 'system_settings_operations',
+                  builder: (context, state) {
+                    if (_authStore == null ||
+                        !(_authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings'))) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const AdminOperationsHomePage();
+                  },
+                ),
+                GoRoute(
+                  path: 'audit-log',
+                  name: 'system_settings_audit_log',
+                  builder: (context, state) {
+                    if (_authStore == null ||
+                        !(_authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings'))) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const AdminAuditLogPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'schedules',
+                  name: 'system_settings_schedules',
+                  builder: (context, state) {
+                    if (_authStore == null ||
+                        !(_authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings'))) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const AdminSchedulesPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'wallets',
+                  name: 'system_settings_wallets',
+                  builder: (context, state) {
+                    if (_authStore == null ||
+                        !(_authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings'))) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const AdminWalletsPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'hscript-runs',
+                  name: 'system_settings_hscript_runs',
+                  builder: (context, state) {
+                    if (_authStore == null ||
+                        !(_authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings'))) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const AdminHscriptRunsPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'license-expiry',
+                  name: 'system_settings_license_expiry',
+                  builder: (context, state) {
+                    if (_authStore == null ||
+                        !(_authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings'))) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const AdminLicenseExpiryPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'notification-outbox',
+                  name: 'system_settings_notification_outbox',
+                  builder: (context, state) {
+                    if (_authStore == null || !_authStore!.isSuperAdmin) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const NotificationOutboxAdminPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'ai',
+                  name: 'system_settings_ai_hub',
+                  builder: (context, state) {
+                    if (_authStore == null ||
+                        !(_authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings'))) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const AIAdminHubPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'reports-storage',
+                  name: 'system_settings_reports_storage',
+                  builder: (context, state) {
+                    if (_authStore == null ||
+                        !(_authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings'))) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final en = Localizations.localeOf(context).languageCode == 'en';
+                    return AdminSystemReportPage(
+                      title: en ? 'Storage usage' : 'مصرف ذخیره‌سازی',
+                      subtitle: en ? 'File volume by business' : 'حجم فایل به تفکیک کسب‌وکار',
+                      load: (ops) => ops.storageReport(),
+                    );
+                  },
+                ),
+                GoRoute(
+                  path: 'reports-inactive-businesses',
+                  name: 'system_settings_reports_inactive_businesses',
+                  builder: (context, state) {
+                    if (_authStore == null ||
+                        !(_authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings'))) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final en = Localizations.localeOf(context).languageCode == 'en';
+                    return AdminSystemReportPage(
+                      title: en ? 'Quiet businesses' : 'کسب‌وکارهای کم‌فعال',
+                      subtitle: en ? 'No update in the last 90 days' : 'بدون به‌روزرسانی در ۹۰ روز اخیر',
+                      load: (ops) => ops.inactiveBusinesses(),
+                    );
+                  },
+                ),
+                GoRoute(
+                  path: 'reports-failed-logins',
+                  name: 'system_settings_reports_failed_logins',
+                  builder: (context, state) {
+                    if (_authStore == null ||
+                        !(_authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings'))) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final en = Localizations.localeOf(context).languageCode == 'en';
+                    return AdminSystemReportPage(
+                      title: en ? 'Failed sign-ins' : 'شکست ورود',
+                      subtitle: en ? 'Failed authentication events' : 'رویدادهای ناموفق احراز هویت',
+                      load: (ops) => ops.failedLogins(),
+                    );
+                  },
+                ),
+                GoRoute(
+                  path: 'reports-support-revenue',
+                  name: 'system_settings_reports_support_revenue',
+                  builder: (context, state) {
+                    if (_authStore == null ||
+                        !(_authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings'))) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final en = Localizations.localeOf(context).languageCode == 'en';
+                    return AdminSystemReportPage(
+                      title: en ? 'Support revenue' : 'درآمد پشتیبانی',
+                      subtitle: en ? 'Subscriptions and invoices, last 30 days' : 'آمار اشتراک و صورت‌حساب ۳۰ روز اخیر',
+                      load: (ops) => ops.supportStats(),
+                    );
+                  },
+                ),
+                GoRoute(
                   path: 'storage',
                   name: 'system_settings_storage',
                   builder: (context, state) {
@@ -1938,7 +2107,7 @@ class _MyAppState extends State<MyApp> {
                     if (!allowed) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
-                    return const AISettingsPage();
+                    return const AIAdminHubPage();
                   },
                 ),
                 GoRoute(
@@ -1954,7 +2123,7 @@ class _MyAppState extends State<MyApp> {
                     if (!allowed) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
-                    return const AIProviderCredentialsAdminPage();
+                    return const AIAdminHubPage(initialIndex: 1);
                   },
                 ),
                 GoRoute(
@@ -1970,7 +2139,7 @@ class _MyAppState extends State<MyApp> {
                     if (!allowed) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
-                    return const AIModelsAdminPage();
+                    return const AIAdminHubPage(initialIndex: 2);
                   },
                 ),
                 GoRoute(
@@ -1986,7 +2155,7 @@ class _MyAppState extends State<MyApp> {
                     if (!allowed) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
-                    return const AIVoiceModelsAdminPage();
+                    return const AIAdminHubPage(initialIndex: 3);
                   },
                 ),
                 GoRoute(
@@ -2002,7 +2171,7 @@ class _MyAppState extends State<MyApp> {
                     if (!allowed) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
-                    return const AIPlansAdminPage();
+                    return const AIAdminHubPage(initialIndex: 4);
                   },
                 ),
                 GoRoute(
@@ -2018,7 +2187,7 @@ class _MyAppState extends State<MyApp> {
                     if (!allowed) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
-                    return const AIPromptsAdminPage();
+                    return const AIAdminHubPage(initialIndex: 5);
                   },
                 ),
                 GoRoute(
@@ -2034,7 +2203,7 @@ class _MyAppState extends State<MyApp> {
                     if (!allowed) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
-                    return const AISkillsAdminPage();
+                    return const AIAdminHubPage(initialIndex: 6);
                   },
                 ),
                 GoRoute(
@@ -2050,7 +2219,7 @@ class _MyAppState extends State<MyApp> {
                     if (!allowed) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
-                    return const AIMarketplaceSettingsPage();
+                    return const AIAdminHubPage(initialIndex: 7);
                   },
                 ),
                 GoRoute(
@@ -2066,7 +2235,7 @@ class _MyAppState extends State<MyApp> {
                     if (!allowed) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
-                    return const AIEvalAdminPage();
+                    return const AIAdminHubPage(initialIndex: 8);
                   },
                 ),
                 GoRoute(
@@ -2098,7 +2267,9 @@ class _MyAppState extends State<MyApp> {
                     if (!allowed) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
-                    return const NotificationsSettingsPage();
+                    return const NotificationsSettingsPage(
+                      scope: NotificationsSettingsScope.systemChannels,
+                    );
                   },
                 ),
                 GoRoute(
@@ -2410,10 +2581,7 @@ class _MyAppState extends State<MyApp> {
                     if (_authStore == null) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
-                    final allowed =
-                        _authStore!.isSuperAdmin ||
-                        _authStore!.hasAppPermission('system_settings');
-                    if (!allowed) {
+                    if (!_authStore!.isSuperAdmin) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const DatabaseBackupPage();
@@ -3008,6 +3176,24 @@ class _MyAppState extends State<MyApp> {
                             },
                           ),
                           GoRoute(
+                            path: 'procurement',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                ProcurementPluginGate(
+                                  businessId: businessId,
+                                  child: ProcurementPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
                             path: 'office-automation',
                             pageBuilder: (context, state) {
                               final businessId = int.parse(
@@ -3097,6 +3283,80 @@ class _MyAppState extends State<MyApp> {
                                   child: OaArchivePage(
                                     businessId: businessId,
                                     authStore: _authStore!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'office-automation/enterprise',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                OfficeAutomationPluginGate(
+                                  businessId: businessId,
+                                  child: OaEnterprisePage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'office-automation/documents',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                OfficeAutomationPluginGate(
+                                  businessId: businessId,
+                                  child: OaDocumentsPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'office-automation/processes',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                OfficeAutomationPluginGate(
+                                  businessId: businessId,
+                                  child: OaProcessesPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    calendarController: _calendarController!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'office-automation/desk',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                OfficeAutomationPluginGate(
+                                  businessId: businessId,
+                                  child: OaMyDeskPage(
+                                    businessId: businessId,
+                                    authStore: _authStore!,
+                                    calendarController: _calendarController!,
                                   ),
                                 ),
                               );
@@ -3709,6 +3969,21 @@ class _MyAppState extends State<MyApp> {
                                   businessId: businessId,
                                   authStore: _authStore!,
                                   initialPersonId: personId,
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'crm/enterprise',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              return MaterialPage(
+                                key: state.pageKey,
+                                child: CrmEnterprisePage(
+                                  businessId: businessId,
+                                  authStore: _authStore!,
                                 ),
                               );
                             },

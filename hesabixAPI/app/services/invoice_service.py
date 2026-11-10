@@ -8485,6 +8485,50 @@ def _apply_invoice_payments_only_update(
     return result
 
 
+def _restore_procurement_receipt_stock_flags(
+    created_invoice_lines: List[tuple[InvoiceItemLine, Dict[str, Any]]],
+    preserved: List[Dict[str, Any]],
+) -> None:
+    """کالایی که با رسید سفارش موجودی گرفته، بعد از ویرایش فاکتور دوباره وارد کاردکس نمی‌شود."""
+    flagged_products = {int(row["product_id"]) for row in preserved if not row.get("skip")}
+    skipped_products = {int(row["product_id"]) for row in preserved if row.get("skip")}
+    order_line_by_product: Dict[int, Any] = {}
+    for row in preserved:
+        if row.get("order_line_id") is not None:
+            order_line_by_product.setdefault(int(row["product_id"]), row["order_line_id"])
+    for item_line, payload in created_invoice_lines:
+        payload_info = extra_info_dict(payload.get("extra_info") if isinstance(payload, dict) else None)
+        info = dict(item_line.extra_info or {})
+        stocked = bool(info.get("procurement_stocked_on_receipt") or payload_info.get("procurement_stocked_on_receipt"))
+        if int(item_line.product_id) in flagged_products:
+            stocked = True
+        skip = (not stocked) and bool(
+            info.get("procurement_skip_inventory")
+            or payload_info.get("procurement_skip_inventory")
+            or int(item_line.product_id) in skipped_products
+        )
+        if skip:
+            info["procurement_skip_inventory"] = True
+            info["inventory_posted"] = False
+        elif stocked:
+            info["procurement_stocked_on_receipt"] = True
+            info["inventory_posted"] = False
+        else:
+            continue
+        if info.get("procurement_order_line_id") is None:
+            remembered = payload_info.get("procurement_order_line_id") or order_line_by_product.get(int(item_line.product_id))
+            if remembered is not None:
+                info["procurement_order_line_id"] = remembered
+        item_line.extra_info = info
+        try:
+            from sqlalchemy import inspect as sa_inspect
+
+            sa_inspect(item_line)
+        except Exception:
+            continue
+        flag_modified(item_line, "extra_info")
+
+
 def update_invoice(
     db: Session,
     document_id: int,
@@ -8729,6 +8773,17 @@ def update_invoice(
     from app.services.fixed_asset_service import assert_invoice_capital_assets_rebuildable
 
     assert_invoice_capital_assets_rebuildable(db, int(document.business_id), int(document.id))
+    _procurement_receipt_stock = []
+    for old_line in db.query(InvoiceItemLine).filter(InvoiceItemLine.document_id == document.id).all():
+        old_info = dict(old_line.extra_info or {})
+        if old_info.get("procurement_stocked_on_receipt") or old_info.get("procurement_skip_inventory"):
+            _procurement_receipt_stock.append(
+                {
+                    "product_id": int(old_line.product_id),
+                    "order_line_id": old_info.get("procurement_order_line_id"),
+                    "skip": bool(old_info.get("procurement_skip_inventory")) and not old_info.get("procurement_stocked_on_receipt"),
+                }
+            )
     db.query(DocumentLine).filter(DocumentLine.document_id == document.id).delete(synchronize_session=False)
     db.query(InvoiceItemLine).filter(InvoiceItemLine.document_id == document.id).delete(synchronize_session=False)
 
@@ -8955,6 +9010,8 @@ def update_invoice(
         )
         db.add(item_line)
         created_invoice_lines.append((item_line, line))
+    db.flush()
+    _restore_procurement_receipt_stock_flags(created_invoice_lines, _procurement_receipt_stock)
     db.flush()
     _persist_invoice_variant_allocations(db, int(document.business_id), created_invoice_lines)
 

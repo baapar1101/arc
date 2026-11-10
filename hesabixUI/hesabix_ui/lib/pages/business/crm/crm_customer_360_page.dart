@@ -5,6 +5,7 @@ import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/services/crm_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/widgets/crm/crm_next_action_banner.dart';
 import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
@@ -197,6 +198,7 @@ class _CrmCustomer360PageState extends State<CrmCustomer360Page> {
 
     final person = data['person'] is Map ? Map<String, dynamic>.from(data['person'] as Map) : <String, dynamic>{};
     final summary = data['summary'] is Map ? Map<String, dynamic>.from(data['summary'] as Map) : <String, dynamic>{};
+    final financial = data['financial'] is Map ? Map<String, dynamic>.from(data['financial'] as Map) : <String, dynamic>{};
     final socialContacts = _list(data['social_contacts']);
     final openDeals = _list(data['open_deals']);
     final closedDeals = _list(data['closed_deals']);
@@ -211,6 +213,17 @@ class _CrmCustomer360PageState extends State<CrmCustomer360Page> {
         padding: const EdgeInsets.all(16),
         children: [
           _buildPersonHeader(person, socialContacts),
+          const SizedBox(height: 16),
+          if (data['next_action'] is Map) ...[
+            CrmNextActionBanner(
+              action: Map<String, dynamic>.from(data['next_action'] as Map),
+              businessId: widget.businessId,
+            ),
+            const SizedBox(height: 16),
+          ],
+          _buildFinancial(financial),
+          const SizedBox(height: 16),
+          _buildCommercial(financial),
           const SizedBox(height: 16),
           _buildSummary(summary),
           if (tags.isNotEmpty) ...[
@@ -248,6 +261,7 @@ class _CrmCustomer360PageState extends State<CrmCustomer360Page> {
               child: Column(
                 children: tasksOpen.map((t) {
                   final m = Map<String, dynamic>.from(t as Map);
+                  final taskId = (m['id'] as num?)?.toInt();
                   return ListTile(
                     dense: true,
                     contentPadding: EdgeInsets.zero,
@@ -257,6 +271,10 @@ class _CrmCustomer360PageState extends State<CrmCustomer360Page> {
                       if (m['assigned_to_name'] != null) m['assigned_to_name'].toString(),
                       if (m['due_at'] != null) 'سررسید: ${_formatDate(m['due_at'], withTime: true)}',
                     ].join(' · ')),
+                    trailing: const Icon(Icons.chevron_left, size: 18),
+                    onTap: taskId == null
+                        ? null
+                        : () => context.go('/business/${widget.businessId}/crm/activities?activityId=$taskId'),
                   );
                 }).toList(),
               ),
@@ -391,6 +409,163 @@ class _CrmCustomer360PageState extends State<CrmCustomer360Page> {
     );
   }
 
+  Widget _buildFinancial(Map<String, dynamic> financial) {
+    final status = financial['status']?.toString() ?? 'بدون تراکنش';
+    final exact = financial['open_invoices_exact'] != false;
+    final openCount = financial['open_invoices_count'] ?? 0;
+    final invoices = financial['open_invoices'] is List ? financial['open_invoices'] as List : const [];
+    final cs = Theme.of(context).colorScheme;
+    return CrmSectionCard(
+      title: 'وضعیت مالی',
+      subtitle: exact ? 'مانده از دفتر حسابداری' : 'مانده از دفتر؛ فاکتورهای باز از ۱۰۰ فاکتور فروش اخیر',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _moneyChip('مانده', '${_money(financial['balance'])} · $status', cs),
+              _moneyChip('بدهکار', _money(financial['total_debit']), cs),
+              _moneyChip('بستانکار', _money(financial['total_credit']), cs),
+              _moneyChip('فاکتور باز', '$openCount', cs),
+            ],
+          ),
+          if (invoices.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ...invoices.map((raw) {
+              final row = raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: Text(row['code']?.toString() ?? 'فاکتور'),
+                subtitle: Text(row['document_date']?.toString() ?? ''),
+                trailing: Text('${_money(row['remaining'])} مانده'),
+              );
+            }),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _moneyChip(String label, String value, ColorScheme cs) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 140),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: 4),
+          Text(value, style: Theme.of(context).textTheme.titleSmall),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCommercial(Map<String, dynamic> financial) {
+    final raw = financial['commercial'];
+    if (raw is! Map) return const SizedBox.shrink();
+    final commercial = Map<String, dynamic>.from(raw);
+    if (commercial['error'] != null) {
+      return const CrmSectionCard(
+        title: 'عمق فروش',
+        child: Text('خلاصه فروش از فاکتورها خوانده نشد.'),
+      );
+    }
+    final mixed = commercial['mixed_currency'] == true;
+    final truncated = commercial['documents_truncated'] == true;
+    final currencies = commercial['currencies'] is List ? commercial['currencies'] as List : const [];
+    final repeats = commercial['repeat_products'] is List ? commercial['repeat_products'] as List : const [];
+    final receipts = commercial['receipts'] is List ? commercial['receipts'] as List : const [];
+    final openDocs = commercial['open_documents'] is List ? commercial['open_documents'] as List : const [];
+    final margin = commercial['margin_amount'];
+    final marginLabel = margin == null
+        ? 'بهای ثبت‌شده‌ای نیست'
+        : commercial['margin_complete'] == true
+            ? _money(margin)
+            : '${_money(margin)} · ناقص';
+    return CrmSectionCard(
+      title: 'عمق فروش',
+      subtitle: truncated
+          ? 'از ۳۰۰ فاکتور اخیر؛ ارزهای مختلف جمع نشده‌اند'
+          : 'فروش و برگشت از فاکتور. مانده همان مانده دفتر است',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (mixed)
+            ...currencies.map((item) {
+              final row = item is Map ? Map<String, dynamic>.from(item) : <String, dynamic>{};
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text('${row['currency_title'] ?? row['currency_code'] ?? 'ارز ${row['currency_id']}'} : فروش ${_money(row['sales_total'])}، برگشت ${_money(row['returns_total'])}، خالص ${_money(row['net_sales'])}، حاشیه ${row['margin_amount'] == null ? 'ندارد' : _money(row['margin_amount'])}'),
+              );
+            })
+          else
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                _moneyChip('فروش قطعی', _money(commercial['sales_total']), Theme.of(context).colorScheme),
+                _moneyChip('برگشت', _money(commercial['returns_total']), Theme.of(context).colorScheme),
+                _moneyChip('خالص', _money(commercial['net_sales']), Theme.of(context).colorScheme),
+                _moneyChip('حاشیه', marginLabel, Theme.of(context).colorScheme),
+              ],
+            ),
+          if (openDocs.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text('اسناد باز', style: Theme.of(context).textTheme.titleSmall),
+            ...openDocs.map((item) => _documentTile(item, openInvoice: true)),
+          ],
+          if (receipts.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text('دریافت‌های متصل', style: Theme.of(context).textTheme.titleSmall),
+            ...receipts.map((item) => _documentTile(item, openInvoice: false)),
+          ],
+          if (repeats.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text('خرید تکراری', style: Theme.of(context).textTheme.titleSmall),
+            ...repeats.map((item) {
+              final row = item is Map ? Map<String, dynamic>.from(item) : <String, dynamic>{};
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: Text(row['product_name']?.toString() ?? 'کالا ${row['product_id']}'),
+                subtitle: Text('${row['invoice_count']} فاکتور · آخرین ${row['last_document_date'] ?? ''}'),
+              );
+            }),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _documentTile(Object? item, {required bool openInvoice}) {
+    final row = item is Map ? Map<String, dynamic>.from(item) : <String, dynamic>{};
+    final id = (row['id'] as num?)?.toInt();
+    final amount = openInvoice ? row['remaining'] : row['amount'];
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+      title: Text(row['code']?.toString() ?? (openInvoice ? 'فاکتور' : 'دریافت')),
+      subtitle: Text(row['document_date']?.toString() ?? ''),
+      trailing: Text(amount == null ? '' : _money(amount)),
+      onTap: id == null
+          ? null
+          : () => context.push(
+                openInvoice
+                    ? '/business/${widget.businessId}/invoice/$id/edit'
+                    : '/business/${widget.businessId}/receipts-payments?documentId=$id',
+              ),
+    );
+  }
+
   Widget _buildSummary(Map<String, dynamic> summary) {
     final items = <(String, String, IconData)>[
       ('فرصت‌های باز', '${summary['open_deals_count'] ?? 0}', Icons.trending_up),
@@ -451,6 +626,31 @@ class _CrmCustomer360PageState extends State<CrmCustomer360Page> {
     );
   }
 
+  void _openTimeline(Map<String, dynamic> e) {
+    final id = (e['ref_id'] as num?)?.toInt();
+    if (id == null) return;
+    final type = e['type']?.toString() ?? '';
+    final businessId = widget.businessId;
+    switch (type) {
+      case 'deal':
+        context.go('/business/$businessId/crm/deals/$id');
+      case 'lead':
+        context.go('/business/$businessId/crm/leads/$id');
+      case 'activity':
+      case 'task':
+        context.go('/business/$businessId/crm/activities?activityId=$id');
+      case 'note':
+        context.go('/business/$businessId/crm/notes-calendar?noteId=$id');
+      case 'document':
+        final docType = e['document_type']?.toString() ?? '';
+        if (docType.startsWith('invoice')) {
+          context.go('/business/$businessId/invoice/$id/edit');
+        }
+      default:
+        return;
+    }
+  }
+
   Widget _timelineTile(Map<String, dynamic> e) {
     final type = e['type']?.toString() ?? '';
     IconData icon;
@@ -476,12 +676,28 @@ class _CrmCustomer360PageState extends State<CrmCustomer360Page> {
       default:
         icon = Icons.history;
     }
+    final docType = e['document_type']?.toString() ?? '';
+    final opens = switch (type) {
+      'deal' || 'lead' || 'activity' || 'task' || 'note' => (e['ref_id'] as num?) != null,
+      'document' => docType.startsWith('invoice') && (e['ref_id'] as num?) != null,
+      _ => false,
+    };
+    final contextLabel = e['context']?.toString() ?? '';
     return ListTile(
       dense: true,
       contentPadding: EdgeInsets.zero,
       leading: Icon(icon, size: 20),
       title: Text(e['title']?.toString() ?? '-', overflow: TextOverflow.ellipsis),
-      subtitle: Text(_formatDate(e['date'], withTime: true)),
+      subtitle: Text(
+        [
+          if (contextLabel.isNotEmpty) contextLabel,
+          _formatDate(e['date'], withTime: true),
+        ].join(' · '),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailing: opens ? const Icon(Icons.chevron_left, size: 18) : null,
+      onTap: opens ? () => _openTimeline(e) : null,
     );
   }
 

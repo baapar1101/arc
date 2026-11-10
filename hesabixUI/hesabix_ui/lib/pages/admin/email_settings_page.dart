@@ -6,6 +6,8 @@ import 'package:hesabix_ui/services/email_service.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 import '../../utils/error_extractor.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
+import 'admin_compact_scaffold.dart';
+import '../../theme/tokens/extensions.dart';
 
 class EmailSettingsPage extends StatefulWidget {
   const EmailSettingsPage({super.key});
@@ -177,24 +179,24 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
     // ساخت متن کامل برای کپی
     String fullErrorText = errorMessage;
     if (errorDetails != null) {
-      fullErrorText += '\n\n=== جزئیات فنی ===\n';
+      fullErrorText += '\n\n=== ${adminTx(context, 'جزئیات فنی', 'Technical details')} ===\n';
       if (errorDetails['error_type'] != null) {
-        fullErrorText += 'نوع خطا: ${errorDetails['error_type']}\n';
+        fullErrorText += '${adminTx(context, 'نوع خطا', 'Error type')}: ${errorDetails['error_type']}\n';
       }
       if (errorDetails['host'] != null) {
-        fullErrorText += 'میزبان: ${errorDetails['host']}\n';
+        fullErrorText += '${adminTx(context, 'میزبان', 'Host')}: ${errorDetails['host']}\n';
       }
       if (errorDetails['port'] != null) {
-        fullErrorText += 'پورت: ${errorDetails['port']}\n';
+        fullErrorText += '${adminTx(context, 'پورت', 'Port')}: ${errorDetails['port']}\n';
       }
       if (errorDetails['use_ssl'] != null) {
-        fullErrorText += 'استفاده از SSL: ${errorDetails['use_ssl']}\n';
+        fullErrorText += 'SSL: ${errorDetails['use_ssl']}\n';
       }
       if (errorDetails['use_tls'] != null) {
-        fullErrorText += 'استفاده از TLS: ${errorDetails['use_tls']}\n';
+        fullErrorText += 'TLS: ${errorDetails['use_tls']}\n';
       }
       if (errorDetails['raw_error'] != null) {
-        fullErrorText += '\nخطای خام:\n${errorDetails['raw_error']}\n';
+        fullErrorText += '\n${adminTx(context, 'خطای خام', 'Raw error')}:\n${errorDetails['raw_error']}\n';
       }
     }
     
@@ -222,11 +224,11 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'جزئیات خطا:',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
+              Text(
+                adminTx(context, 'جزئیات خطا', 'Error details'),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
                 ),
               ),
               const SizedBox(height: 8),
@@ -250,11 +252,11 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
               ),
               if (errorDetails != null) ...[
                 const SizedBox(height: 16),
-                const Text(
-                  'اطلاعات فنی:',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                Text(
+                  adminTx(context, 'اطلاعات فنی', 'Technical details'),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -271,11 +273,11 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (errorDetails['error_type'] != null)
-                        _buildDetailRow('نوع خطا', errorDetails['error_type'].toString()),
+                        _buildDetailRow(adminTx(context, 'نوع خطا', 'Error type'), errorDetails['error_type'].toString()),
                       if (errorDetails['host'] != null)
-                        _buildDetailRow('میزبان', errorDetails['host'].toString()),
+                        _buildDetailRow(adminTx(context, 'میزبان', 'Host'), errorDetails['host'].toString()),
                       if (errorDetails['port'] != null)
-                        _buildDetailRow('پورت', errorDetails['port'].toString()),
+                        _buildDetailRow(adminTx(context, 'پورت', 'Port'), errorDetails['port'].toString()),
                       if (errorDetails['use_ssl'] != null)
                         _buildDetailRow('SSL', errorDetails['use_ssl'].toString()),
                       if (errorDetails['use_tls'] != null)
@@ -286,9 +288,9 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
                 if (errorDetails['raw_error'] != null) ...[
                   const SizedBox(height: 12),
                   ExpansionTile(
-                    title: const Text(
-                      'خطای خام (برای پشتیبانی)',
-                      style: TextStyle(fontSize: 13),
+                    title: Text(
+                      adminTx(context, 'خطای خام', 'Raw error'),
+                      style: const TextStyle(fontSize: 13),
                     ),
                     children: [
                       Container(
@@ -311,34 +313,34 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
                 ],
               ],
               const SizedBox(height: 16),
-              const Text(
-                'راهکارهای پیشنهادی:',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+              Text(
+                adminTx(context, 'پیشنهادها', 'Suggestions'),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
                 ),
               ),
               const SizedBox(height: 8),
-              _buildSuggestionItem('بررسی صحت آدرس میزبان SMTP'),
-              _buildSuggestionItem('بررسی صحت شماره پورت (معمولاً 25, 587, 465)'),
-              _buildSuggestionItem('بررسی صحت نام کاربری و رمز عبور'),
-              _buildSuggestionItem('بررسی تنظیمات TLS/SSL'),
-              _buildSuggestionItem('بررسی فایروال و تنظیمات شبکه'),
+              _buildSuggestionItem(adminTx(context, 'آدرس میزبان SMTP را بررسی کنید', 'Check the SMTP host')),
+              _buildSuggestionItem(adminTx(context, 'پورت را بررسی کنید (معمولاً ۲۵، ۵۸۷ یا ۴۶۵)', 'Check the port (usually 25, 587, or 465)')),
+              _buildSuggestionItem(adminTx(context, 'نام کاربری و رمز را بررسی کنید', 'Check the username and password')),
+              _buildSuggestionItem(adminTx(context, 'تنظیم TLS/SSL را بررسی کنید', 'Check TLS/SSL')),
+              _buildSuggestionItem(adminTx(context, 'فایروال و شبکه را بررسی کنید', 'Check the firewall and network')),
             ],
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('بستن'),
+            child: Text(adminTx(context, 'بستن', 'Close')),
           ),
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
               Clipboard.setData(ClipboardData(text: fullErrorText));
-              _showSuccessSnackBar('جزئیات خطا در کلیپ‌بورد کپی شد');
+              _showSuccessSnackBar(adminTx(context, 'جزئیات کپی شد', 'Details copied'));
             },
-            child: const Text('کپی خطا'),
+            child: Text(adminTx(context, 'کپی خطا', 'Copy error')),
           ),
         ],
       ),
@@ -493,18 +495,20 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
     final colorScheme = theme.colorScheme;
     final t = AppLocalizations.of(context);
 
-    return Scaffold(
-      backgroundColor: colorScheme.surface,
-      appBar: AppBar(
-        title: Text(t.emailSettings),
-        backgroundColor: colorScheme.surface,
-        foregroundColor: colorScheme.onSurface,
-        elevation: 0,
-      ),
+    return AdminCompactScaffold(
+      title: t.emailSettings,
+      subtitle: adminTx(context, 'پیکربندی ارسال ایمیل سیستم', 'System email delivery'),
+      actions: [
+        IconButton(
+          tooltip: adminTx(context, 'بازخوانی', 'Refresh'),
+          onPressed: _loadConfigs,
+          icon: const Icon(Icons.refresh, size: 20),
+        ),
+      ],
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+              padding: context.settingsHub.pagePadding,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -526,9 +530,7 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
           children: [
             Text(
               t.emailConfigurations,
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: context.settingsHub.cardTitleStyle(theme.textTheme, color: colorScheme.onSurface),
             ),
             const SizedBox(height: 16),
             if (_configs.isEmpty)
@@ -632,9 +634,7 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
             children: [
               Text(
                 _isEditing ? t.editEmailConfiguration : t.addEmailConfiguration,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: context.settingsHub.cardTitleStyle(theme.textTheme, color: colorScheme.onSurface),
               ),
               const SizedBox(height: 16),
               Row(

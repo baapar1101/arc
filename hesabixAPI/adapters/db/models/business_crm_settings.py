@@ -28,4 +28,5 @@ class BusinessCrmSettings(Base):
 	follow_up_notify_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
 	stale_deal_days: Mapped[int] = mapped_column(Integer, nullable=False, default=14, server_default="14")
 	score_rules: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+	record_acl_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
 	updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

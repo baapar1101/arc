@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/services/crm_service.dart';
+import 'package:hesabix_ui/widgets/crm/crm_global_search_dialog.dart';
+import 'package:hesabix_ui/widgets/crm/crm_next_action_banner.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_dialog.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
@@ -30,6 +33,8 @@ class _CrmDashboardPageState extends State<CrmDashboardPage> {
   Map<String, dynamic>? _summary;
   List<dynamic> _followUpLeads = [];
   List<dynamic> _followUpDeals = [];
+  Map<String, dynamic> _queue = {};
+  Map<String, dynamic> _stale = {};
   bool _loading = true;
   String? _error;
 
@@ -49,6 +54,8 @@ class _CrmDashboardPageState extends State<CrmDashboardPage> {
       final results = await Future.wait([
         _crmService.getSummary(businessId: widget.businessId),
         _crmService.getFollowUpsToday(businessId: widget.businessId, daysAhead: 7),
+        _crmService.getMyWorkQueue(businessId: widget.businessId),
+        _crmService.listStaleDeals(businessId: widget.businessId),
       ]);
       if (!mounted) return;
       final summaryData = Map<String, dynamic>.from(results[0] as Map);
@@ -57,6 +64,8 @@ class _CrmDashboardPageState extends State<CrmDashboardPage> {
         _summary = Map<String, dynamic>.from(summaryData);
         _followUpLeads = followData['leads'] is List ? List<dynamic>.from(followData['leads'] as List) : [];
         _followUpDeals = followData['deals'] is List ? List<dynamic>.from(followData['deals'] as List) : [];
+        _queue = Map<String, dynamic>.from(results[2] as Map);
+        _stale = Map<String, dynamic>.from(results[3] as Map);
         _loading = false;
       });
     } catch (e) {
@@ -74,11 +83,23 @@ class _CrmDashboardPageState extends State<CrmDashboardPage> {
       return AccessDeniedPage(message: 'شما دسترسی لازم برای مشاهده CRM را ندارید');
     }
 
-    return Scaffold(
+    return CallbackShortcuts(
+      bindings: <ShortcutActivator, VoidCallback>{
+        const SingleActivator(LogicalKeyboardKey.keyK, control: true): _openSearch,
+        const SingleActivator(LogicalKeyboardKey.keyK, meta: true): _openSearch,
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
       appBar: AppBar(
         title: const Text('داشبورد CRM'),
         leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
+          IconButton(
+            tooltip: 'جست‌وجوی CRM (Ctrl+K)',
+            icon: const Icon(Icons.manage_search),
+            onPressed: _openSearch,
+          ),
           IconButton(
             tooltip: 'چت با دستیار هوشمند',
             icon: const Icon(Icons.smart_toy_outlined),
@@ -220,6 +241,10 @@ class _CrmDashboardPageState extends State<CrmDashboardPage> {
                             SizedBox(height: gap),
                             p2,
                             SizedBox(height: maxW < 400 ? 14 : 20),
+                            _WorkQueueCard(businessId: widget.businessId, queue: _queue),
+                            SizedBox(height: gap),
+                            _StaleDealsCard(businessId: widget.businessId, stale: _stale),
+                            SizedBox(height: gap),
                             _FollowUpsCard(
                               businessId: widget.businessId,
                               leads: _followUpLeads,
@@ -232,7 +257,13 @@ class _CrmDashboardPageState extends State<CrmDashboardPage> {
                     ),
                   ),
                 ),
+        ),
+      ),
     );
+  }
+
+  void _openSearch() {
+    CrmGlobalSearchDialog.show(context, businessId: widget.businessId, crmService: _crmService);
   }
 }
 
@@ -409,5 +440,90 @@ class _SummaryCard extends StatelessWidget {
       ),
     );
     return card;
+  }
+}
+
+class _WorkQueueCard extends StatelessWidget {
+  const _WorkQueueCard({required this.businessId, required this.queue});
+
+  final int businessId;
+  final Map<String, dynamic> queue;
+
+  @override
+  Widget build(BuildContext context) {
+    final actions = queue['suggested_actions'] is List ? queue['suggested_actions'] as List : const [];
+    final overdue = queue['overdue_tasks_count'] ?? 0;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('صف کار من', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text('$overdue وظیفه عقب‌افتاده'),
+            const SizedBox(height: 8),
+            if (actions.isEmpty)
+              const Text('اقدام سررسیدشده‌ای در صف شما نیست.')
+            else
+              for (final raw in actions.take(5))
+                if (raw is Map)
+                  Builder(
+                    builder: (context) {
+                      final path = crmNextActionPath(businessId, Map<String, dynamic>.from(raw));
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: Text(raw['title']?.toString() ?? ''),
+                        subtitle: Text(raw['reason']?.toString() ?? ''),
+                        onTap: path == null ? null : () => context.go(path),
+                      );
+                    },
+                  ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StaleDealsCard extends StatelessWidget {
+  const _StaleDealsCard({required this.businessId, required this.stale});
+
+  final int businessId;
+  final Map<String, dynamic> stale;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = stale['items'] is List ? stale['items'] as List : const [];
+    final days = stale['stale_deal_days'] ?? 14;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('فرصت‌های راکد', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text('بیش از $days روز در مرحله فعلی'),
+            const SizedBox(height: 8),
+            if (items.isEmpty)
+              const Text('فرصت بازی از این حد گذشته نیست.')
+            else
+              for (final raw in items.take(8))
+                if (raw is Map)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: Text(raw['title']?.toString() ?? ''),
+                    subtitle: Text(
+                      [raw['person_name'], raw['stage_name']].where((part) => part != null && part.toString().isNotEmpty).join(' · '),
+                    ),
+                    onTap: () => context.go('/business/$businessId/crm/deals/${raw['id']}'),
+                  ),
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.responses import success_response, format_datetime_fields
+from app.core.responses import ApiError, success_response, format_datetime_fields
 from app.core.permissions import require_superadmin
 from app.services.business_service import get_all_businesses_admin
 from app.services.wallet_service import get_wallet_overview, add_gift_balance_admin
@@ -238,6 +238,9 @@ def add_gift_balance_business_admin(
     )
     
     amount = payload.get("amount")
+    confirmation = str(payload.get("confirmation") or "").strip()
+    if confirmation not in ("هدیه", "GIFT"):
+        raise ApiError("CONFIRMATION_REQUIRED", "برای شارژ هدیه عبارت 'هدیه' یا 'GIFT' را وارد کنید.", http_status=400)
     if amount is None:
         logger.error("add_gift_balance_endpoint_missing_amount", payload=payload)
         from app.core.responses import ApiError
@@ -287,6 +290,17 @@ def add_gift_balance_business_admin(
         # Commit تغییرات
         try:
             db.commit()
+            from app.services.admin_audit_service import client_ip_from_request, record_admin_action
+            record_admin_action(
+                db,
+                actor_user_id=user_id,
+                action="wallet.gift",
+                summary=f"شارژ هدیه {amount} برای کسب‌وکار {business_id}",
+                target_type="business",
+                target_id=str(business_id),
+                metadata={"amount": float(amount), "transaction_id": data.get("transaction_id")},
+                client_ip=client_ip_from_request(request),
+            )
             logger.info(
                 "add_gift_balance_endpoint_commit_success",
                 business_id=business_id,

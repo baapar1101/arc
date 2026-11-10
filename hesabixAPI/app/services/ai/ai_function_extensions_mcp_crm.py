@@ -1,8 +1,11 @@
 """MCP-facing CRM lifecycle tools built on CRM domain models and services."""
 from __future__ import annotations
 
+import logging
 from datetime import datetime, date
 from typing import Any, Dict, TYPE_CHECKING
+
+logger = logging.getLogger(__name__)
 
 from app.services.ai.function_registry import AIRole, AIFunction
 
@@ -78,6 +81,8 @@ def _crm_deal_result(db, business_id: int, deal: Any) -> Dict[str, Any]:
         "lost_reason_code": deal.lost_reason_code,
         "competitor_name": deal.competitor_name,
         "stage_entered_at": deal.stage_entered_at.isoformat() if deal.stage_entered_at else None,
+        "organization_id": deal.organization_id,
+        "organization_name": deal.organization.name if deal.organization else None,
         "tags": tags,
         "created_at": deal.created_at.isoformat() if deal.created_at else None,
         "updated_at": deal.updated_at.isoformat() if deal.updated_at else None,
@@ -99,6 +104,8 @@ def _crm_activity_result(activity: Any) -> Dict[str, Any]:
         "description": activity.description,
         "activity_date": activity.activity_date.isoformat() if activity.activity_date else None,
         "deal_id": activity.deal_id,
+        "deal_title": activity.deal.title if activity.deal else None,
+        "deal_code": activity.deal.code if activity.deal else None,
         "is_task": bool(activity.is_task),
         "due_at": activity.due_at.isoformat() if activity.due_at else None,
         "status": activity.status,
@@ -131,6 +138,8 @@ def _crm_lead_result(db: Any, business_id: int, lead: Any) -> Dict[str, Any]:
         "assigned_to_user_id": lead.assigned_to_user_id,
         "next_follow_up_at": lead.next_follow_up_at.isoformat() if lead.next_follow_up_at else None,
         "person_id": lead.person_id,
+        "organization_id": lead.organization_id,
+        "organization_name": lead.organization.name if lead.organization else None,
         "converted_at": lead.converted_at.isoformat() if lead.converted_at else None,
         "tags": crm_tag_service.get_lead_tags(db, business_id, int(lead.id)),
         "created_at": lead.created_at.isoformat() if lead.created_at else None,
@@ -152,6 +161,8 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
         lead = db.query(Lead).filter(Lead.id == lead_id, Lead.business_id == business_id).first()
         if not lead:
             raise ValueError("سرنخ در کسب‌وکار متصل پیدا نشد")
+        from app.services.crm_enterprise_service import guard_record
+        guard_record(db, business_id, ctx, "lead", lead, write=True)
         _ensure_business_member(db, business_id, body.assigned_to_user_id)
         if body.code is not None and str(body.code).strip():
             code = str(body.code).strip()
@@ -181,19 +192,29 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
                 pass
         if body.code is not None and str(body.code).strip():
             lead.code = str(body.code).strip()
+        if body.clear_next_follow_up and body.next_follow_up_at is not None:
+            raise ValueError("هم‌زمان نمی‌توان پیگیری را تنظیم و پاک کرد")
         for field in ("source_code", "name", "company_name", "mobile", "email", "description", "next_follow_up_at", "extra_info"):
             value = getattr(body, field, None)
-            if value is not None:
-                setattr(lead, field, value)
-        if body.assigned_to_user_id is not None:
+            if value is None:
+                continue
+            if field in {"source_code", "company_name", "mobile", "email", "description"}:
+                value = str(value).strip() or None
+            setattr(lead, field, value)
+        if body.clear_next_follow_up:
+            lead.next_follow_up_at = None
+        if body.clear_assigned_to and body.assigned_to_user_id is not None:
+            raise ValueError("هم‌زمان نمی‌توان مسئول را تنظیم و پاک کرد")
+        if body.clear_assigned_to or body.assigned_to_user_id is not None:
             old_assignee = lead.assigned_to_user_id
-            lead.assigned_to_user_id = body.assigned_to_user_id
-            if old_assignee != body.assigned_to_user_id:
+            new_assignee = None if body.clear_assigned_to else body.assigned_to_user_id
+            lead.assigned_to_user_id = new_assignee
+            if old_assignee != new_assignee:
                 try:
                     from app.services.workflow.workflow_trigger_service import trigger_lead_assigned
-                    trigger_lead_assigned(db, business_id, lead_id=lead_id, old_assigned_to_user_id=old_assignee, new_assigned_to_user_id=body.assigned_to_user_id, user_id=ctx.get_user_id())
+                    trigger_lead_assigned(db, business_id, lead_id=lead_id, old_assigned_to_user_id=old_assignee, new_assigned_to_user_id=new_assignee, user_id=ctx.get_user_id())
                 except Exception:
-                    pass
+                    logger.exception("mcp trigger_lead_assigned failed lead_id=%s", lead_id)
         if merged_custom_fields is not None:
             lead.extra_info = merged_custom_fields
         db.commit()
@@ -210,7 +231,9 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
         "email": {"type": ["string", "null"], "maxLength": 255},
         "description": {"type": ["string", "null"]},
         "assigned_to_user_id": {"type": ["integer", "null"], "minimum": 1},
+        "clear_assigned_to": {"type": "boolean", "description": "برداشتن مسئول. همراه assigned_to_user_id نفرستید."},
         "next_follow_up_at": {"anyOf": [_DATETIME, {"type": "null"}]},
+        "clear_next_follow_up": {"type": "boolean", "description": "پاک کردن پیگیری. همراه next_follow_up_at نفرستید."},
         "extra_info": {"type": ["object", "null"]},
         "custom_fields": {"type": ["object", "null"]},
         "tag_ids": {"type": ["array", "null"], "items": {"type": "integer", "minimum": 1}},
@@ -230,6 +253,8 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
         lead = db.query(Lead).filter(Lead.id == lead_id, Lead.business_id == business_id).first()
         if not lead:
             raise ValueError("سرنخ در کسب‌وکار متصل پیدا نشد")
+        from app.services.crm_enterprise_service import guard_record
+        guard_record(db, business_id, context["user_context"], "lead", lead, write=True)
         db.delete(lead)
         db.commit()
         return {"lead_id": lead_id, "deleted": True}
@@ -259,6 +284,8 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
         lead = db.query(Lead).filter(Lead.id == lead_id, Lead.business_id == business_id).with_for_update().first()
         if not lead:
             raise ValueError("سرنخ در کسب‌وکار متصل پیدا نشد")
+        from app.services.crm_enterprise_service import guard_record
+        guard_record(db, business_id, ctx, "lead", lead, write=True)
         if lead.person_id is not None:
             raise ValueError("این سرنخ قبلاً به مشتری تبدیل شده است")
         deal_option = body.create_deal
@@ -304,6 +331,11 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
             )
             db.add(deal)
             db.flush()
+            db.refresh(deal)
+        from app.services.crm_enterprise_service import link_converted_person_to_lead_organization
+
+        link_converted_person_to_lead_organization(db, business_id, lead, int(person["id"]), deal if deal_option else None)
+        if deal_option:
             db.refresh(deal)
             deal_result = _crm_deal_result(db, business_id, deal)
         db.commit()
@@ -448,6 +480,8 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
         deal = db.query(Deal).filter(Deal.id == deal_id, Deal.business_id == business_id).first()
         if not deal:
             raise ValueError("فرصت فروش در کسب‌وکار متصل پیدا نشد")
+        from app.services.crm_enterprise_service import guard_record
+        guard_record(db, business_id, ctx, "deal", deal, write=True)
         _ensure_business_member(db, business_id, body.assigned_to_user_id)
         if body.document_id is not None:
             from adapters.db.models.document import Document
@@ -495,12 +529,30 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
                     trigger_deal_stage_changed(db, business_id, deal_id=deal_id, old_stage_id=old_stage_id, new_stage_id=body.stage_id, user_id=ctx.get_user_id())
                 except Exception:
                     pass
+        if body.person_id is not None and int(body.person_id) != int(deal.person_id):
+            from app.core.responses import ApiError
+            from app.services.crm_enterprise_service import change_deal_person
+
+            old_person_id = deal.person_id
+            try:
+                change_deal_person(db, business_id, deal, int(body.person_id))
+            except ApiError as exc:
+                raise ValueError(exc.message) from exc
+            _log_crm_change(db, business_id, "deal", deal_id, "person_id", str(old_person_id), str(body.person_id), ctx.get_user_id())
+        if body.clear_next_follow_up and body.next_follow_up_at is not None:
+            raise ValueError("هم‌زمان نمی‌توان پیگیری را تنظیم و پاک کرد")
+        if body.clear_expected_close_date and body.expected_close_date is not None:
+            raise ValueError("هم‌زمان نمی‌توان تاریخ پیش‌بینی را تنظیم و پاک کرد")
         if body.code is not None and str(body.code).strip():
             deal.code = str(body.code).strip()
         for field in ("title", "amount", "currency_id", "probability_percent", "expected_close_date", "next_follow_up_at", "document_id", "description", "extra_info", "won_reason_code", "lost_reason_code", "competitor_name"):
             value = getattr(body, field, None)
             if value is not None:
                 setattr(deal, field, value)
+        if body.clear_next_follow_up:
+            deal.next_follow_up_at = None
+        if body.clear_expected_close_date:
+            deal.expected_close_date = None
         if body.amount is not None:
             _log_crm_change(db, business_id, "deal", deal_id, "amount", old_amount, str(body.amount), ctx.get_user_id())
         if body.assigned_to_user_id is not None:
@@ -515,6 +567,11 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
             deal.extra_info = merged_custom_fields
         if body.closed_at is not None:
             deal.closed_at = body.closed_at
+            try:
+                from app.services.crm_automation_service import cancel_sequence_enrollments
+                cancel_sequence_enrollments(db, business_id, entity_type="deal", entity_id=deal_id, reason="deal_closed", when="close")
+            except Exception:
+                logger.exception("sequence stop on mcp deal close failed deal_id=%s", deal_id)
             try:
                 from app.services.workflow.workflow_trigger_service import trigger_deal_closed
                 stage = db.query(CrmProcessStage).filter(CrmProcessStage.id == deal.stage_id).first()
@@ -537,11 +594,48 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
     })
     # Keep schema aligned with the public DealUpdate Pydantic contract.
     deal_update_props["amount"] = {"type": ["number", "null"], "minimum": 0}
+    deal_update_props["person_id"] = {"type": ["integer", "null"], "minimum": 1}
+    deal_update_props["clear_next_follow_up"] = {"type": "boolean", "description": "پاک کردن پیگیری. همراه next_follow_up_at نفرستید."}
+    deal_update_props["clear_expected_close_date"] = {"type": "boolean", "description": "پاک کردن تاریخ پیش‌بینی بسته شدن. همراه expected_close_date نفرستید."}
     registry.register(AIFunction(
-        name="update_deal", description="ویرایش فرصت یا انتقال مرحلهٔ CRM؛ برای مرحلهٔ برد/باخت دلیل معتبر لازم است. نیازمند تأیید است.",
+        name="update_deal", description="ویرایش فرصت یا انتقال مرحلهٔ CRM؛ برای مرحلهٔ برد/باخت دلیل معتبر لازم است. عوض کردن شخص، اگر سازمان وصل باشد، فقط به صورتحساب یا مخاطب همان سازمان مجاز است. نیازمند تأیید است.",
         parameters_schema=_schema({"deal_id": {"type": "integer", "minimum": 1}, **deal_update_props}, ["deal_id"]),
         handler=update_deal, allowed_roles=_ROLES, required_permissions=["crm.write"], category="crm",
         requires_approval=True, risk_level="high", is_readonly=False,
+    ))
+
+    def set_crm_organization(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from app.core.responses import ApiError
+        from app.services.crm_enterprise_service import attach_organization_to_deal, attach_organization_to_lead
+
+        db = context["db"]
+        business_id = int(context["business_id"])
+        ctx = context["user_context"]
+        entity_type = str(args["entity_type"])
+        entity_id = int(args["entity_id"])
+        organization_id = args.get("organization_id")
+        organization_id = int(organization_id) if organization_id is not None else None
+        try:
+            if entity_type == "lead":
+                lead = attach_organization_to_lead(db, business_id, entity_id, organization_id, ctx)
+                return _crm_lead_result(db, business_id, lead)
+            if entity_type == "deal":
+                deal = attach_organization_to_deal(db, business_id, entity_id, organization_id, ctx)
+                return _crm_deal_result(db, business_id, deal)
+        except ApiError as exc:
+            raise ValueError(exc.message) from exc
+        raise ValueError("entity_type باید lead یا deal باشد")
+
+    registry.register(AIFunction(
+        name="set_crm_organization",
+        description="وصل یا قطع سازمان روی سرنخ یا فرصت. organization_id خالی اتصال را برمی‌دارد. سرنخ بدون مشتری به هر سازمان همین کسب‌وکار وصل می‌شود؛ اگر شخص دارد، یا فرصت، شخص باید صورتحساب یا مخاطب همان سازمان باشد. نیازمند تأیید است.",
+        parameters_schema=_schema({
+            "entity_type": {"type": "string", "enum": ["lead", "deal"]},
+            "entity_id": {"type": "integer", "minimum": 1},
+            "organization_id": {"type": ["integer", "null"], "minimum": 1},
+        }, ["entity_type", "entity_id", "organization_id"]),
+        handler=set_crm_organization, allowed_roles=_ROLES, required_permissions=["crm.write"], category="crm",
+        requires_approval=True, risk_level="medium", is_readonly=False,
     ))
 
     def delete_deal(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
@@ -552,6 +646,8 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
         deal = db.query(Deal).filter(Deal.id == deal_id, Deal.business_id == business_id).first()
         if not deal:
             raise ValueError("فرصت فروش در کسب‌وکار متصل پیدا نشد")
+        from app.services.crm_enterprise_service import guard_record
+        guard_record(db, business_id, context["user_context"], "deal", deal, write=True)
         db.delete(deal)
         db.commit()
         return {"deal_id": deal_id, "deleted": True}
@@ -571,6 +667,12 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
         db = context["db"]
         business_id = int(context["business_id"])
         deal_id = int(args["deal_id"])
+        from adapters.db.models.crm import Deal
+        from app.services.crm_enterprise_service import guard_record
+        deal = db.query(Deal).filter(Deal.id == deal_id, Deal.business_id == business_id).first()
+        if deal is None:
+            raise ValueError("فرصت فروش در کسب‌وکار متصل پیدا نشد")
+        guard_record(db, business_id, context["user_context"], "deal", deal, write=True)
         body = CrmDealLinesReplaceRequest(lines=args.get("lines", []))
         result = crm_deal_line_service.replace_lines(
             db, business_id, deal_id,
@@ -600,24 +702,23 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
     def convert_deal_to_invoice(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
         from decimal import Decimal
         from sqlalchemy.orm import selectinload
-        from adapters.db.models.crm import CrmProcessStage, Deal
+        from adapters.db.models.crm import Deal
         from adapters.db.models.business import Business
         from adapters.api.v1.schema_models.crm import CrmDealConvertToInvoiceRequest
         from app.core.business_calendar import business_today
-        from app.services.invoice_service import create_invoice
-
         db = context["db"]
         business_id = int(context["business_id"])
         deal_id = int(args["deal_id"])
-        ctx = context["user_context"]
         body = CrmDealConvertToInvoiceRequest(**{
             key: value for key, value in args.items() if key not in {"deal_id", "business_id"}
         })
         deal = db.query(Deal).options(
             selectinload(Deal.lines), selectinload(Deal.stage),
-        ).filter(Deal.id == deal_id, Deal.business_id == business_id).with_for_update().first()
+        ).filter(Deal.id == deal_id, Deal.business_id == business_id).first()
         if not deal:
             raise ValueError("فرصت فروش در کسب‌وکار متصل پیدا نشد")
+        from app.services.crm_enterprise_service import guard_record
+        guard_record(db, business_id, context["user_context"], "deal", deal)
         if deal.document_id:
             raise ValueError("برای این فرصت فروش قبلاً فاکتور صادر شده است")
 
@@ -644,57 +745,208 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
         if not lines:
             raise ValueError("برای صدور فاکتور حداقل یک خط دارای کالا لازم است")
 
-        invoice_data = {
-            "invoice_type": "invoice_sales", "currency_id": int(currency_id),
-            "document_date": business_today(business_id).isoformat(), "is_proforma": bool(body.is_proforma),
-            "lines": lines, "extra_info": {"person_id": int(deal.person_id)},
-            "description": f"صادر شده از فرصت فروش {deal.code or deal.id}",
+        return {
+            "posted": False,
+            "reason": "assistant_cannot_post_accounting_document",
+            "message": "دستیار سند حسابداری صادر نمی‌کند. پیش‌فاکتور یا فاکتور را از صفحه فرصت فروش ثبت کنید.",
+            "preview": {
+                "deal_id": deal_id,
+                "person_id": int(deal.person_id),
+                "currency_id": int(currency_id),
+                "document_date": business_today(business_id).isoformat(),
+                "is_proforma": bool(body.is_proforma),
+                "line_count": len(lines),
+            },
         }
-        result = create_invoice(db, business_id, ctx.get_user_id(), invoice_data)
-        document_id = result.get("id") if isinstance(result, dict) else None
-        if not document_id:
-            raise ValueError("فاکتور ساخته شد اما شناسهٔ سند در پاسخ سرویس موجود نیست")
-        deal.document_id = int(document_id)
-        if body.close_as_won:
-            from app.services import crm_close_reason_service
-            from app.services.workflow.workflow_trigger_service import trigger_deal_closed, trigger_deal_stage_changed
-            now = datetime.utcnow()
-            won_code = body.won_reason_code or deal.won_reason_code
-            if won_code and crm_close_reason_service.is_valid_reason_code(db, business_id, "won", won_code):
-                deal.won_reason_code = won_code
-            old_stage_id = deal.stage_id
-            win_stage = db.query(CrmProcessStage).filter(
-                CrmProcessStage.process_definition_id == deal.process_definition_id,
-                CrmProcessStage.is_win.is_(True),
-            ).order_by(CrmProcessStage.order_index.desc()).first()
-            if win_stage:
-                deal.stage_id = win_stage.id
-                deal.stage_entered_at = now
-            deal.closed_at = now
-            if win_stage and old_stage_id != win_stage.id:
-                try:
-                    trigger_deal_stage_changed(db, business_id, deal_id=deal_id, old_stage_id=old_stage_id, new_stage_id=win_stage.id, user_id=ctx.get_user_id())
-                except Exception:
-                    pass
-            try:
-                trigger_deal_closed(db, business_id, deal_id=deal_id, amount=float(deal.amount), is_win=True, document_id=deal.document_id, user_id=ctx.get_user_id(), is_lost=False)
-            except Exception:
-                pass
-        db.commit()
-        db.refresh(deal)
-        return {"deal": _crm_deal_result(db, business_id, deal), "invoice": result}
 
     registry.register(AIFunction(
         name="convert_deal_to_invoice",
-        description="از خطوط کالادار فرصت فروش پیش‌فاکتور یا فاکتور می‌سازد و آن را به فرصت پیوند می‌دهد. فرصتِ دارای فاکتور دوباره تبدیل نمی‌شود؛ بستن به‌عنوان برد اختیاری است. نیازمند تأیید صریح است.",
+        description="پیش‌نمایش تبدیل فرصت به فاکتور را برمی‌گرداند و هیچ سند حسابداری صادر نمی‌کند. ثبت فاکتور فقط از صفحه فرصت فروش انجام می‌شود.",
         parameters_schema=_schema({
             "deal_id": {"type": "integer", "minimum": 1},
             "is_proforma": {"type": "boolean"}, "close_as_won": {"type": "boolean"},
             "won_reason_code": {"type": ["string", "null"], "maxLength": 50},
             "warehouse_id": {"type": ["integer", "null"], "minimum": 1},
         }, ["deal_id"]),
-        handler=convert_deal_to_invoice, allowed_roles=_ROLES, required_permissions=["crm.write"], category="crm",
-        requires_approval=True, risk_level="high", is_readonly=False,
+        handler=convert_deal_to_invoice, allowed_roles=_ROLES, required_permissions=["crm.view"], category="crm",
+        requires_approval=False, risk_level="safe", is_readonly=True,
+    ))
+
+    def get_crm_person_financial_summary(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from app.services.crm_intelligence_service import person_financial_answer
+
+        return person_financial_answer(
+            context["db"], int(context["business_id"]), int(args["person_id"]), context.get("user_context")
+        )
+
+    registry.register(AIFunction(
+        name="get_crm_person_financial_summary",
+        description="خلاصه فقط‌خواندنی مانده، فروش، برگشت، حاشیه، اسناد باز و اقدام بعدی یک شخص. سند حسابداری نمی‌سازد و فیلدهای خارج از فهرست مجاز را برنمی‌گرداند.",
+        parameters_schema=_schema({"person_id": {"type": "integer", "minimum": 1}}, ["person_id"]),
+        handler=get_crm_person_financial_summary, allowed_roles=_ROLES, required_permissions=["crm.view"], category="crm",
+        requires_approval=False, risk_level="safe", is_readonly=True,
+    ))
+
+    def get_crm_manager_rollup(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from app.services.crm_enterprise_service import manager_rollup
+        from app.core.responses import ApiError
+
+        try:
+            return manager_rollup(context["db"], int(context["business_id"]), int(args["manager_user_id"]), context["user_context"])
+        except ApiError as exc:
+            raise ValueError(exc.message) from exc
+
+    registry.register(AIFunction(
+        name="get_crm_manager_rollup",
+        description="جمع فرصت‌های باز مدیر و زیرمجموعه را به تفکیک ارز برمی‌گرداند. ارزها با هم جمع نمی‌شوند و سند حسابداری ساخته نمی‌شود.",
+        parameters_schema=_schema({"manager_user_id": {"type": "integer", "minimum": 1}}, ["manager_user_id"]),
+        handler=get_crm_manager_rollup, allowed_roles=_ROLES, required_permissions=["crm.view"], category="crm",
+        requires_approval=False, risk_level="safe", is_readonly=True,
+    ))
+
+    def list_crm_quotas(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from app.services.crm_enterprise_service import list_quotas
+
+        return {"items": list_quotas(context["db"], int(context["business_id"]))}
+
+    registry.register(AIFunction(
+        name="list_crm_quotas",
+        description="سهمیه‌های فروش و درصد تحقق از فرصت‌های برده‌شده همان ارز را فقط‌خواندنی برمی‌گرداند.",
+        parameters_schema=_schema({}, []),
+        handler=list_crm_quotas, allowed_roles=_ROLES, required_permissions=["crm.view"], category="crm",
+        requires_approval=False, risk_level="safe", is_readonly=True,
+    ))
+
+    def get_crm_next_action(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from adapters.db.models.crm import Deal, Lead
+        from adapters.db.models.person import Person
+        from app.services.crm_next_action_service import next_action_for_deal, next_action_for_lead, next_action_for_person
+
+        db, business_id = context["db"], int(context["business_id"])
+        entity_type = args.get("entity_type")
+        entity_id = int(args["entity_id"])
+        from app.services.crm_enterprise_service import guard_record
+        if entity_type == "lead":
+            row = db.query(Lead).filter(Lead.id == entity_id, Lead.business_id == business_id).first()
+            if row is not None:
+                guard_record(db, business_id, context["user_context"], "lead", row)
+            action = next_action_for_lead(db, business_id, row) if row else None
+        elif entity_type == "deal":
+            row = db.query(Deal).filter(Deal.id == entity_id, Deal.business_id == business_id).first()
+            if row is not None:
+                guard_record(db, business_id, context["user_context"], "deal", row)
+            action = next_action_for_deal(db, business_id, row) if row else None
+        elif entity_type == "person":
+            row = db.query(Person.id).filter(Person.id == entity_id, Person.business_id == business_id).first()
+            action = next_action_for_person(db, business_id, entity_id, ctx=context.get("user_context")) if row else None
+        else:
+            raise ValueError("entity_type باید lead، deal یا person باشد")
+        if row is None:
+            raise ValueError("رکورد در کسب‌وکار متصل پیدا نشد")
+        if not action:
+            return {"next_action": None}
+        return {"next_action": {"code": action.get("code"), "title": action.get("title"), "reason": action.get("reason")}}
+
+    registry.register(AIFunction(
+        name="get_crm_next_action",
+        description="اقدام بعدی قاعده‌مند یک سرنخ، فرصت یا شخص را همراه با دلیل برمی‌گرداند. فقط خواندنی است.",
+        parameters_schema=_schema({
+            "entity_type": {"type": "string", "enum": ["lead", "deal", "person"]},
+            "entity_id": {"type": "integer", "minimum": 1},
+        }, ["entity_type", "entity_id"]),
+        handler=get_crm_next_action, allowed_roles=_ROLES, required_permissions=["crm.view"], category="crm",
+        requires_approval=False, risk_level="safe", is_readonly=True,
+    ))
+
+    def preview_crm_task_from_text(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from datetime import datetime
+        from app.services.crm_assistant import parse_task_sentence
+
+        draft = parse_task_sentence(str(args.get("text") or ""), datetime.utcnow())
+        draft["created"] = False
+        return draft
+
+    registry.register(AIFunction(
+        name="preview_crm_task_from_text",
+        description="جمله فارسی را به پیش‌نویس وظیفه تبدیل می‌کند و هیچ رکوردی نمی‌سازد. برای ثبت، پس از تأیید کاربر از create_crm_task_from_text استفاده کن.",
+        parameters_schema=_schema({"text": {"type": "string", "minLength": 1, "maxLength": 1000}}, ["text"]),
+        handler=preview_crm_task_from_text, allowed_roles=_ROLES, required_permissions=["crm.view"], category="crm",
+        requires_approval=False, risk_level="safe", is_readonly=True,
+    ))
+
+    def create_crm_task_from_text(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from datetime import datetime
+        from adapters.db.models.crm import CrmActivity, Deal, Lead
+        from adapters.db.models.person import Person
+        from app.services.crm_assistant import parse_task_sentence
+        from app.services.document_numbering_service import generate_document_code
+
+        draft = parse_task_sentence(str(args.get("text") or ""), datetime.utcnow())
+        if args.get("confirmed") is not True:
+            return {"created": False, "draft": draft, "reason": "confirmation_required"}
+        if not draft.get("due_at"):
+            raise ValueError("جمله باید موعد داشته باشد، مثل امروز، فردا یا ۳ روز")
+        db, business_id = context["db"], int(context["business_id"])
+        ctx = context["user_context"]
+        person_id = args.get("person_id")
+        lead_id = args.get("lead_id")
+        deal_id = args.get("deal_id")
+        if not any((person_id, lead_id, deal_id)):
+            raise ValueError("یکی از person_id، lead_id یا deal_id لازم است")
+        if lead_id:
+            lead = db.query(Lead).filter(Lead.id == int(lead_id), Lead.business_id == business_id).first()
+            if lead is None:
+                raise ValueError("سرنخ در کسب‌وکار متصل پیدا نشد")
+            from app.services.crm_enterprise_service import guard_record
+            guard_record(db, business_id, ctx, "lead", lead, write=True)
+            person_id = person_id or lead.person_id
+        if person_id and not db.query(Person.id).filter(Person.id == int(person_id), Person.business_id == business_id).first():
+            raise ValueError("شخص در کسب‌وکار متصل پیدا نشد")
+        if deal_id:
+            linked_deal = db.query(Deal).filter(Deal.id == int(deal_id), Deal.business_id == business_id).first()
+            if linked_deal is None:
+                raise ValueError("فرصت در کسب‌وکار متصل پیدا نشد")
+            from app.services.crm_enterprise_service import guard_record
+            guard_record(db, business_id, ctx, "deal", linked_deal, write=True)
+        now = datetime.utcnow()
+        activity = CrmActivity(
+            business_id=business_id,
+            person_id=int(person_id) if person_id else None,
+            lead_id=int(lead_id) if lead_id else None,
+            deal_id=int(deal_id) if deal_id else None,
+            code=generate_document_code(db, business_id, "crm_activity", now.date()),
+            activity_type="task",
+            subject=draft["subject"],
+            description=str(args.get("text") or "")[:4000],
+            activity_date=now,
+            is_task=True,
+            due_at=datetime.fromisoformat(str(draft["due_at"])),
+            status="open",
+            priority="normal",
+            created_by_user_id=ctx.get_user_id(),
+        )
+        db.add(activity)
+        db.commit()
+        db.refresh(activity)
+        try:
+            from app.services.workflow.workflow_trigger_service import trigger_crm_activity_created
+            trigger_crm_activity_created(db, business_id, activity.id, user_id=ctx.get_user_id())
+        except Exception:
+            logger.exception("crm.activity.created trigger failed activity_id=%s", activity.id)
+        return {"created": True, "activity_id": activity.id, "subject": activity.subject, "due_at": draft["due_at"], "posted_document": False}
+
+    registry.register(AIFunction(
+        name="create_crm_task_from_text",
+        description="وظیفه CRM را از جمله فارسی می‌سازد، فقط وقتی confirmed=true باشد و کاربر ابزار را تأیید کرده باشد. سند حسابداری نمی‌سازد.",
+        parameters_schema=_schema({
+            "text": {"type": "string", "minLength": 1, "maxLength": 1000},
+            "confirmed": {"type": "boolean"},
+            "person_id": {"type": ["integer", "null"], "minimum": 1},
+            "lead_id": {"type": ["integer", "null"], "minimum": 1},
+            "deal_id": {"type": ["integer", "null"], "minimum": 1},
+        }, ["text", "confirmed"]),
+        handler=create_crm_task_from_text, allowed_roles=_ROLES, required_permissions=["crm.write"], category="crm",
+        requires_approval=True, risk_level="medium", is_readonly=False,
     ))
 
     # ACTIVITY CREATE
@@ -714,11 +966,17 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
             lead = db.query(Lead).filter(Lead.id == body.lead_id, Lead.business_id == business_id).first()
             if not lead:
                 raise ValueError("سرنخ در کسب‌وکار متصل پیدا نشد")
+            from app.services.crm_enterprise_service import guard_record
+            guard_record(db, business_id, ctx, "lead", lead, write=True)
         person_id = body.person_id or (lead.person_id if lead else None)
         if person_id and not db.query(Person.id).filter(Person.id == person_id, Person.business_id == business_id).first():
             raise ValueError("شخص در کسب‌وکار متصل پیدا نشد")
-        if body.deal_id and not db.query(Deal.id).filter(Deal.id == body.deal_id, Deal.business_id == business_id).first():
-            raise ValueError("فرصت در کسب‌وکار متصل پیدا نشد")
+        if body.deal_id:
+            linked_deal = db.query(Deal).filter(Deal.id == body.deal_id, Deal.business_id == business_id).first()
+            if linked_deal is None:
+                raise ValueError("فرصت در کسب‌وکار متصل پیدا نشد")
+            from app.services.crm_enterprise_service import guard_record
+            guard_record(db, business_id, ctx, "deal", linked_deal, write=True)
         _ensure_business_member(db, business_id, body.assigned_to_user_id)
         code = str(body.code or "").strip() or generate_document_code(db, business_id, "crm_activity", body.activity_date.date())
         if db.query(CrmActivity.id).filter(CrmActivity.business_id == business_id, CrmActivity.code == code).first():
@@ -776,26 +1034,35 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
     # ACTIVITY UPDATE
     def update_activity(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
         from adapters.db.models.crm import CrmActivity, Deal
-        from adapters.db.models.person import Person
         from adapters.api.v1.schema_models.crm import CrmActivityUpdate
         from app.services import crm_custom_field_service
 
         db = context["db"]
         business_id = int(context["business_id"])
+        ctx = context["user_context"]
         activity_id = int(args["activity_id"])
         body = CrmActivityUpdate(**{k: v for k, v in args.items() if k not in {"activity_id", "business_id"}})
         activity = db.query(CrmActivity).filter(CrmActivity.id == activity_id, CrmActivity.business_id == business_id).first()
         if not activity:
             raise ValueError("فعالیت در کسب‌وکار متصل پیدا نشد")
+        from app.services.crm_enterprise_service import guard_activity, guard_record
+        guard_activity(db, business_id, ctx, activity, write=True)
+        if body.deal_id is not None and body.deal_id != activity.deal_id:
+            linked_deal = db.query(Deal).filter(Deal.id == body.deal_id, Deal.business_id == business_id).first()
+            if linked_deal is None:
+                raise ValueError("فرصت در کسب‌وکار متصل پیدا نشد")
+            guard_record(db, business_id, ctx, "deal", linked_deal, write=True)
         if body.code is not None and str(body.code).strip():
             code = str(body.code).strip()
             if db.query(CrmActivity.id).filter(CrmActivity.business_id == business_id, CrmActivity.code == code, CrmActivity.id != activity_id).first():
                 raise ValueError("کد فعالیت CRM تکراری است")
             activity.code = code
-        if body.deal_id and not db.query(Deal.id).filter(Deal.id == body.deal_id, Deal.business_id == business_id).first():
-            raise ValueError("فرصت در کسب‌وکار متصل پیدا نشد")
         _ensure_business_member(db, business_id, body.assigned_to_user_id)
+        if body.clear_deal:
+            activity.deal_id = None
         for field in ("activity_type", "subject", "description", "activity_date", "deal_id", "extra_info", "is_task", "due_at", "assigned_to_user_id", "outcome", "priority"):
+            if field == "deal_id" and body.clear_deal:
+                continue
             value = getattr(body, field, None)
             if value is not None:
                 setattr(activity, field, value)
@@ -811,8 +1078,9 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
         return _crm_activity_result(activity)
 
     activity_update_props = {k: v for k, v in activity_create_props.items() if k not in {"person_id", "lead_id"}}
+    activity_update_props["clear_deal"] = {"type": "boolean"}
     registry.register(AIFunction(
-        name="update_crm_activity", description="ویرایش فعالیت یا وظیفهٔ CRM. برای تغییر وضعیت فقط open، done یا cancelled را بفرست. نیازمند تأیید است.",
+        name="update_crm_activity", description="ویرایش فعالیت یا وظیفهٔ CRM. برای تغییر وضعیت فقط open، done یا cancelled را بفرست. برای برداشتن فرصت، clear_deal را true بفرست. نیازمند تأیید است.",
         parameters_schema=_schema({"activity_id": {"type": "integer", "minimum": 1}, **activity_update_props}, ["activity_id"]),
         handler=update_activity, allowed_roles=_ROLES, required_permissions=["crm.write"], category="crm",
         requires_approval=True, risk_level="medium", is_readonly=False,
@@ -826,6 +1094,8 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
         activity = db.query(CrmActivity).filter(CrmActivity.id == activity_id, CrmActivity.business_id == business_id).first()
         if not activity:
             raise ValueError("فعالیت در کسب‌وکار متصل پیدا نشد")
+        from app.services.crm_enterprise_service import guard_activity
+        guard_activity(db, business_id, context["user_context"], activity, write=True)
         db.delete(activity)
         db.commit()
         return {"activity_id": activity_id, "deleted": True}
@@ -845,6 +1115,9 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
             "name": sequence.name,
             "description": sequence.description,
             "is_active": bool(sequence.is_active),
+            "sms_daily_cap": sequence.sms_daily_cap,
+            "stop_on_reply": bool(sequence.stop_on_reply),
+            "stop_on_close": bool(sequence.stop_on_close),
             "created_at": sequence.created_at.isoformat() if sequence.created_at else None,
             "updated_at": sequence.updated_at.isoformat() if sequence.updated_at else None,
             "created_by_user_id": sequence.created_by_user_id,
@@ -864,6 +1137,8 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
         "text": {"type": "string", "maxLength": 2000},
         "title": {"type": "string", "maxLength": 255},
         "stage_id": {"type": "integer", "minimum": 1},
+        "won_reason_code": {"type": "string", "maxLength": 50},
+        "lost_reason_code": {"type": "string", "maxLength": 50},
     }
     step_schema = {"type": "object", "properties": {
         "step_order": {"type": "integer", "minimum": 0},
@@ -890,7 +1165,7 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
             "send_sms": {"message", "text"},
             "notify_assignee": {"title", "message"},
             "update_lead_stage": {"stage_id"},
-            "update_deal_stage": {"stage_id"},
+            "update_deal_stage": {"stage_id", "won_reason_code", "lost_reason_code"},
         }
         for step in steps:
             config = step.action_config or {}
@@ -958,7 +1233,9 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
         steps = _parse_sequence_steps(args.get("steps") or [], db, business_id)
         sequence = CrmSequence(
             business_id=business_id, name=body.name, description=body.description,
-            is_active=body.is_active, created_by_user_id=context["user_context"].get_user_id(),
+            is_active=body.is_active, sms_daily_cap=body.sms_daily_cap or None,
+            stop_on_reply=body.stop_on_reply, stop_on_close=body.stop_on_close,
+            created_by_user_id=context["user_context"].get_user_id(),
         )
         db.add(sequence)
         db.flush()
@@ -976,6 +1253,9 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
         "name": {"type": "string", "minLength": 1, "maxLength": 255},
         "description": {"type": ["string", "null"]},
         "is_active": {"type": "boolean"},
+        "sms_daily_cap": {"type": ["integer", "null"], "minimum": 0, "maximum": 10000},
+        "stop_on_reply": {"type": "boolean"},
+        "stop_on_close": {"type": "boolean"},
         "steps": {"type": "array", "maxItems": 50, "items": step_schema},
     }
     registry.register(AIFunction(
@@ -1006,6 +1286,14 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
             sequence.description = body.description
         if body.is_active is not None:
             sequence.is_active = body.is_active
+        if body.clear_sms_daily_cap:
+            sequence.sms_daily_cap = None
+        elif body.sms_daily_cap is not None:
+            sequence.sms_daily_cap = body.sms_daily_cap or None
+        if body.stop_on_reply is not None:
+            sequence.stop_on_reply = body.stop_on_reply
+        if body.stop_on_close is not None:
+            sequence.stop_on_close = body.stop_on_close
         if steps is not None:
             db.query(CrmSequenceStep).filter(CrmSequenceStep.sequence_id == sequence_id).delete(synchronize_session=False)
             for step in steps:
@@ -1046,8 +1334,16 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
     def enroll_crm_sequence(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
         from app.services.crm_automation_service import enroll_in_sequence
         db, business_id = context["db"], int(context["business_id"])
+        from adapters.db.models.crm import Deal, Lead
+        from app.services.crm_enterprise_service import guard_record
+        entity_type = args["entity_type"]
+        model = Lead if entity_type == "lead" else Deal
+        target = db.query(model).filter(model.id == int(args["entity_id"]), model.business_id == business_id).first()
+        if target is None:
+            raise ValueError("رکورد در کسب‌وکار متصل پیدا نشد")
+        guard_record(db, business_id, context["user_context"], entity_type, target, write=True)
         enrollment = enroll_in_sequence(
-            db, business_id, int(args["sequence_id"]), args["entity_type"], int(args["entity_id"]),
+            db, business_id, int(args["sequence_id"]), entity_type, int(args["entity_id"]),
         )
         db.commit()
         db.refresh(enrollment)
@@ -1076,6 +1372,7 @@ def register_mcp_crm_functions(registry: "AIFunctionRegistry") -> None:
             "follow_up_notify_enabled": bool(settings.follow_up_notify_enabled),
             "stale_deal_days": settings.stale_deal_days,
             "score_rules": settings.score_rules,
+            "record_acl_enabled": bool(getattr(settings, "record_acl_enabled", False)),
         }
 
     def get_crm_automation_settings(args: Dict[str, Any], context: Dict[str, Any]) -> Any:

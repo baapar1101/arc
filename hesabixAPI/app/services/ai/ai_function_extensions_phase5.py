@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import base64
+import logging
 from datetime import date, datetime
 from typing import Any, Dict, List, TYPE_CHECKING
 
@@ -22,6 +23,7 @@ _EXPORT_TYPES = [
 ]
 
 _MAX_EXPORT_ROWS = 10_000
+logger = logging.getLogger(__name__)
 
 
 def register_phase5_business_functions(registry: "AIFunctionRegistry") -> None:
@@ -427,6 +429,20 @@ def register_phase5_business_functions(registry: "AIFunctionRegistry") -> None:
         if not stage:
             raise ValueError("مرحله CRM یافت نشد")
 
+        from app.core.responses import ApiError
+        from app.services.crm_duplicate_service import assert_lead_identity_available
+
+        try:
+            assert_lead_identity_available(
+                db,
+                business_id,
+                args.get("mobile"),
+                args.get("email"),
+                allow_similar=bool(args.get("allow_similar")),
+            )
+        except ApiError as exc:
+            raise ValueError(exc.message) from exc
+
         code_val = args.get("code")
         if code_val and str(code_val).strip():
             code_val = str(code_val).strip()
@@ -463,7 +479,7 @@ def register_phase5_business_functions(registry: "AIFunctionRegistry") -> None:
                 user_id=user_id,
             )
         except Exception:
-            pass
+            logger.exception("crm.lead.created trigger failed lead_id=%s", lead.id)
         return {
             "id": lead.id,
             "code": lead.code,
@@ -493,6 +509,10 @@ def register_phase5_business_functions(registry: "AIFunctionRegistry") -> None:
                     "company_name": {"type": "string", "description": "نام شرکت (اختیاری)"},
                     "mobile": {"type": "string", "description": "موبایل (اختیاری)"},
                     "email": {"type": "string", "format": "email", "description": "ایمیل (اختیاری)"},
+                    "allow_similar": {
+                        "type": "boolean",
+                        "description": "فقط پس از اطلاع کاربر از شباهت با سرنخ یا شخص موجود true شود",
+                    },
                     "description": {"type": "string", "description": "توضیحات (اختیاری)"},
                     "assigned_to_user_id": {
                         "type": "integer",

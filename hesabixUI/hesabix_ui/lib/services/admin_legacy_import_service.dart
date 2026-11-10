@@ -72,6 +72,7 @@ class LegacyImportRunParams {
     this.importOpeningBalance = true,
     this.importChecks = true,
     this.rewriteConfirmation,
+    this.runConfirmation,
   });
 
   final String importMode;
@@ -88,6 +89,7 @@ class LegacyImportRunParams {
   final bool importOpeningBalance;
   final bool importChecks;
   final String? rewriteConfirmation;
+  final String? runConfirmation;
 
   Map<String, String> toQuery() {
     final q = <String, String>{
@@ -111,6 +113,9 @@ class LegacyImportRunParams {
     }
     if (rewriteConfirmation != null && rewriteConfirmation!.isNotEmpty) {
       q['rewrite_confirmation'] = rewriteConfirmation!;
+    }
+    if (runConfirmation != null && runConfirmation!.isNotEmpty) {
+      q['run_confirmation'] = runConfirmation!;
     }
     return q;
   }

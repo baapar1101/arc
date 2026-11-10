@@ -8,6 +8,8 @@ import 'package:hesabix_ui/services/admin_system_settings_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'admin_compact_scaffold.dart';
+import 'package:hesabix_ui/theme/tokens/extensions.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 class DatabaseBackupPage extends StatefulWidget {
@@ -32,6 +34,7 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
   // Restore
   List<int>? _restoreFileBytes;
   String? _restoreFilename;
+  String? _restorePhraseError;
   String? _restoreJobId;
   Map<String, dynamic>? _restoreJobStatus;
   Timer? _restoreJobTimer;
@@ -99,7 +102,7 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
         BytesExportService.showFeedback(
           context,
           result,
-          successOverride: 'بکاپ با موفقیت دانلود شد',
+          successOverride: adminTx(context, 'بکاپ با موفقیت دانلود شد', 'Backup downloaded'),
         );
       }
     } catch (e) {
@@ -123,7 +126,7 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
   Future<void> _sendToEmail() async {
     final email = _emailController.text.trim();
     if (email.isEmpty) {
-      SnackBarHelper.showError(context, message: 'آدرس ایمیل را وارد کنید');
+      SnackBarHelper.showError(context, message: adminTx(context, 'آدرس ایمیل را وارد کنید', 'Enter an email address'));
       return;
     }
     setState(() {
@@ -135,7 +138,7 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
       if (mounted) {
         SnackBarHelper.showSuccess(
           context,
-          message: 'بکاپ به ایمیل $email ارسال شد',
+          message: adminTx(context, 'بکاپ به ایمیل $email ارسال شد', 'Backup sent to $email'),
         );
       }
     } catch (e) {
@@ -143,7 +146,7 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
         final t = AppLocalizations.of(context);
         SnackBarHelper.showError(
           context,
-          message: 'خطا در ارسال: ${ErrorExtractor.extractErrorMessage(e, t)}',
+          message: '${adminTx(context, 'خطا در ارسال', 'Send failed')}: ${ErrorExtractor.extractErrorMessage(e, t)}',
         );
       }
     } finally {
@@ -177,12 +180,12 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
           });
         } else {
           if (mounted) {
-            SnackBarHelper.showError(context, message: 'فرمت فایل باید .sql یا .sql.gz باشد');
+            SnackBarHelper.showError(context, message: adminTx(context, 'فرمت فایل باید .sql یا .sql.gz باشد', 'File must be .sql or .sql.gz'));
           }
         }
       } else {
         if (mounted) {
-          SnackBarHelper.showError(context, message: 'خواندن فایل ناموفق بود');
+          SnackBarHelper.showError(context, message: adminTx(context, 'خواندن فایل ناموفق بود', 'Could not read the file'));
         }
       }
     }
@@ -198,10 +201,10 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
         _restoreJobTimer?.cancel();
         _restoreJobTimer = null;
         if (state == 'succeeded') {
-          SnackBarHelper.showSuccess(context, message: 'ریستور با موفقیت انجام شد');
+          SnackBarHelper.showSuccess(context, message: adminTx(context, 'ریستور با موفقیت انجام شد', 'Restore completed'));
         } else {
-          final err = status['error'] as String? ?? 'خطای نامشخص';
-          SnackBarHelper.showError(context, message: 'ریستور ناموفق: $err');
+          final err = status['error'] as String? ?? adminTx(context, 'خطای نامشخص', 'Unknown error');
+          SnackBarHelper.showError(context, message: '${adminTx(context, 'ریستور ناموفق', 'Restore failed')}: $err');
         }
       }
     }).catchError((_) {
@@ -214,16 +217,14 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
     final filename = _restoreFilename;
     final confirmation = _restoreConfirmationController.text.trim();
     if (bytes == null || bytes.isEmpty || filename == null || filename.isEmpty) {
-      SnackBarHelper.showError(context, message: 'ابتدا فایل بکاپ را انتخاب کنید');
+      SnackBarHelper.showError(context, message: adminTx(context, 'ابتدا فایل بکاپ را انتخاب کنید', 'Choose a backup file first'));
       return;
     }
     if (confirmation != 'بازیابی' && confirmation != 'RESTORE') {
-      SnackBarHelper.showError(
-        context,
-        message: 'برای تأیید عبارت "بازیابی" یا "RESTORE" را وارد کنید',
-      );
+      setState(() => _restorePhraseError = adminTx(context, 'برای تأیید عبارت «بازیابی» یا RESTORE را وارد کنید', 'Type بازیابی or RESTORE to confirm'));
       return;
     }
+    setState(() => _restorePhraseError = null);
 
     setState(() {
       _isLoading = true;
@@ -238,18 +239,18 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
       if (mounted) {
         setState(() {
           _restoreJobId = jobId;
-          _restoreJobStatus = {'state': 'queued', 'message': 'در صف...'};
+          _restoreJobStatus = {'state': 'queued', 'message': adminTx(context, 'در صف…', 'Queued…')};
           _restoreJobTimer = Timer.periodic(const Duration(seconds: 2), (_) => _pollRestoreJob());
         });
         _pollRestoreJob();
-        SnackBarHelper.showSuccess(context, message: 'ریستور در پس‌زمینه شروع شد');
+        SnackBarHelper.showSuccess(context, message: adminTx(context, 'ریستور در پس‌زمینه شروع شد', 'Restore started in the background'));
       }
     } catch (e) {
       if (mounted) {
         final t = AppLocalizations.of(context);
         SnackBarHelper.showError(
           context,
-          message: 'خطا در شروع ریستور: ${ErrorExtractor.extractErrorMessage(e, t)}',
+          message: '${adminTx(context, 'خطا در شروع ریستور', 'Could not start restore')}: ${ErrorExtractor.extractErrorMessage(e, t)}',
         );
       }
     } finally {
@@ -265,7 +266,7 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
   Future<void> _sendToFtp() async {
     final configId = _selectedFtpConfigId;
     if (configId == null || configId.isEmpty) {
-      SnackBarHelper.showError(context, message: 'یک سرور FTP انتخاب کنید');
+      SnackBarHelper.showError(context, message: adminTx(context, 'یک سرور FTP انتخاب کنید', 'Choose an FTP server'));
       return;
     }
     setState(() {
@@ -280,7 +281,7 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
       if (mounted) {
         SnackBarHelper.showSuccess(
           context,
-          message: 'بکاپ با موفقیت به FTP آپلود شد',
+          message: adminTx(context, 'بکاپ با موفقیت به FTP آپلود شد', 'Backup uploaded to FTP'),
         );
       }
     } catch (e) {
@@ -288,7 +289,7 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
         final t = AppLocalizations.of(context);
         SnackBarHelper.showError(
           context,
-          message: 'خطا در آپلود FTP: ${ErrorExtractor.extractErrorMessage(e, t)}',
+          message: '${adminTx(context, 'خطا در آپلود FTP', 'FTP upload failed')}: ${ErrorExtractor.extractErrorMessage(e, t)}',
         );
       }
     } finally {
@@ -304,91 +305,58 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final hub = context.settingsHub;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('بکاپ دیتابیس'),
-        backgroundColor: theme.colorScheme.surface,
-        foregroundColor: theme.colorScheme.onSurface,
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              theme.colorScheme.primary.withValues(alpha: 0.1),
-              theme.colorScheme.surface,
-            ],
-          ),
-        ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildInfoCard(theme),
-              const SizedBox(height: 24),
-              _buildOptionsCard(theme),
-              const SizedBox(height: 24),
-              _buildDownloadSection(theme),
-              const SizedBox(height: 16),
-              _buildEmailSection(theme),
-              const SizedBox(height: 16),
-              _buildFtpSection(theme),
-              const SizedBox(height: 16),
-              _buildRestoreSection(theme),
-            ],
-          ),
+    return AdminCompactScaffold(
+      title: adminTx(context, 'بکاپ دیتابیس', 'Database backup'),
+      body: SingleChildScrollView(
+        padding: hub.pagePadding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildInfoCard(theme),
+            const SizedBox(height: 10),
+            _buildOptionsCard(theme),
+            const SizedBox(height: 10),
+            _buildDownloadSection(theme),
+            const SizedBox(height: 8),
+            _buildEmailSection(theme),
+            const SizedBox(height: 8),
+            _buildFtpSection(theme),
+            const SizedBox(height: 8),
+            _buildRestoreSection(theme),
+          ],
         ),
       ),
     );
   }
 
   Widget _buildInfoCard(ThemeData theme) {
+    final hub = context.settingsHub;
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              theme.colorScheme.primary.withValues(alpha: 0.1),
-              theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(16),
-        ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.storage, color: Colors.white, size: 24),
-            ),
-            const SizedBox(width: 16),
+            Icon(Icons.storage, color: theme.colorScheme.primary, size: 20),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'بکاپ کامل دیتابیس',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onSurface,
-                    ),
+                    adminTx(context, 'بکاپ کامل دیتابیس', 'Full database backup'),
+                    style: hub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.onSurface),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
-                    'از کل دیتابیس PostgreSQL نسخه پشتیبان تهیه کنید و آن را دانلود کنید، '
-                    'به ایمیل بفرستید یا روی سرور FTP آپلود کنید.',
-                    style: theme.textTheme.bodyMedium?.copyWith(
+                    adminTx(
+                      context,
+                      'از کل دیتابیس PostgreSQL نسخه پشتیبان بگیرید و آن را دانلود کنید، ایمیل کنید یا روی FTP بگذارید.',
+                      'Back up the PostgreSQL database, then download it, email it, or upload it to FTP.',
+                    ),
+                    style: hub.cardSubtitleStyle(
+                      theme.textTheme,
                       color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                     ),
                   ),
@@ -415,10 +383,8 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
                 Icon(Icons.settings_outlined, color: theme.colorScheme.primary),
                 const SizedBox(width: 12),
                 Text(
-                  'تنظیمات',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  adminTx(context, 'تنظیمات', 'Options'),
+                  style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.onSurface),
                 ),
               ],
             ),
@@ -426,8 +392,8 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
             SwitchListTile(
               value: _compress,
               onChanged: (v) => setState(() => _compress = v),
-              title: const Text('فشرده‌سازی (gzip)'),
-              subtitle: const Text('کاهش حجم فایل بکاپ'),
+              title: Text(adminTx(context, 'فشرده‌سازی (gzip)', 'Compress (gzip)')),
+              subtitle: Text(adminTx(context, 'کاهش حجم فایل بکاپ', 'Smaller backup file')),
             ),
           ],
         ),
@@ -449,17 +415,15 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
                 Icon(Icons.download, color: theme.colorScheme.primary),
                 const SizedBox(width: 12),
                 Text(
-                  'دانلود مستقیم',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  adminTx(context, 'دانلود مستقیم', 'Direct download'),
+                  style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.onSurface),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            const Text(
-              'فایل بکاپ مستقیماً در دستگاه شما ذخیره می‌شود.',
-              style: TextStyle(color: Colors.grey),
+            Text(
+              adminTx(context, 'فایل بکاپ مستقیماً در دستگاه شما ذخیره می‌شود.', 'The backup file is saved on this device.'),
+              style: context.settingsHub.cardSubtitleStyle(theme.textTheme, color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 16),
             SizedBox(
@@ -476,7 +440,9 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
                         ),
                       )
                     : const Icon(Icons.download),
-                label: Text(_loadingAction == 'download' ? 'در حال ایجاد...' : 'دانلود بکاپ'),
+                label: Text(_loadingAction == 'download'
+                    ? adminTx(context, 'در حال ایجاد…', 'Creating…')
+                    : adminTx(context, 'دانلود بکاپ', 'Download backup')),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
@@ -505,23 +471,25 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
                 Icon(Icons.email_outlined, color: theme.colorScheme.primary),
                 const SizedBox(width: 12),
                 Text(
-                  'ارسال به ایمیل',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  adminTx(context, 'ارسال به ایمیل', 'Email the backup'),
+                  style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.onSurface),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            const Text(
-              'بکاپ به آدرس ایمیل شما ارسال می‌شود. توجه: محدودیت حجم ایمیل معمولاً ۲۵–۵۰ مگابایت است.',
-              style: TextStyle(color: Colors.grey),
+            Text(
+              adminTx(
+                context,
+                'بکاپ به آدرس ایمیل شما ارسال می‌شود. محدودیت حجم ایمیل معمولاً ۲۵ تا ۵۰ مگابایت است.',
+                'The backup is emailed to you. Mailboxes usually accept 25–50 MB.',
+              ),
+              style: context.settingsHub.cardSubtitleStyle(theme.textTheme, color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: _emailController,
               decoration: InputDecoration(
-                labelText: 'آدرس ایمیل',
+                labelText: adminTx(context, 'آدرس ایمیل', 'Email address'),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -544,7 +512,9 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
                         ),
                       )
                     : const Icon(Icons.send),
-                label: Text(_loadingAction == 'email' ? 'در حال ارسال...' : 'ارسال به ایمیل'),
+                label: Text(_loadingAction == 'email'
+                    ? adminTx(context, 'در حال ارسال…', 'Sending…')
+                    : adminTx(context, 'ارسال به ایمیل', 'Send by email')),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
@@ -573,17 +543,19 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
                 Icon(Icons.cloud_upload_outlined, color: theme.colorScheme.primary),
                 const SizedBox(width: 12),
                 Text(
-                  'آپلود به FTP',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  adminTx(context, 'آپلود به FTP', 'Upload to FTP'),
+                  style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.onSurface),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            const Text(
-              'بکاپ روی سرور FTP آپلود می‌شود. ابتدا در بخش ذخیره‌سازی یک پیکربندی FTP ایجاد کنید.',
-              style: TextStyle(color: Colors.grey),
+            Text(
+              adminTx(
+                context,
+                'بکاپ روی سرور FTP آپلود می‌شود. ابتدا در مدیریت ذخیره‌سازی یک پیکربندی FTP بسازید.',
+                'The backup is uploaded to FTP. Create an FTP configuration in storage management first.',
+              ),
+              style: context.settingsHub.cardSubtitleStyle(theme.textTheme, color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 16),
             if (_loadingFtpConfigs)
@@ -599,9 +571,13 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
                   children: [
                     Icon(Icons.info_outline, color: theme.colorScheme.primary),
                     const SizedBox(width: 12),
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'هیچ پیکربندی FTP یافت نشد. از بخش مدیریت ذخیره‌سازی یک پیکربندی FTP ایجاد کنید.',
+                        adminTx(
+                          context,
+                          'پیکربندی FTP پیدا نشد. از مدیریت ذخیره‌سازی یک پیکربندی FTP بسازید.',
+                          'No FTP configuration. Create one in storage management.',
+                        ),
                       ),
                     ),
                   ],
@@ -611,7 +587,7 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
               DropdownButtonFormField<String>(
                 value: _selectedFtpConfigId,
                 decoration: InputDecoration(
-                  labelText: 'سرور FTP',
+                  labelText: adminTx(context, 'سرور FTP', 'FTP server'),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -639,7 +615,9 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
                           ),
                         )
                       : const Icon(Icons.cloud_upload),
-                  label: Text(_loadingAction == 'ftp' ? 'در حال آپلود...' : 'آپلود به FTP'),
+                  label: Text(_loadingAction == 'ftp'
+                      ? adminTx(context, 'در حال آپلود…', 'Uploading…')
+                      : adminTx(context, 'آپلود به FTP', 'Upload to FTP')),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
@@ -672,11 +650,8 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
                 Icon(Icons.restore, color: theme.colorScheme.error),
                 const SizedBox(width: 12),
                 Text(
-                  'ریستور دیتابیس',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.error,
-                  ),
+                  adminTx(context, 'بازیابی دیتابیس', 'Restore database'),
+                  style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.error),
                 ),
               ],
             ),
@@ -687,16 +662,20 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
                 color: theme.colorScheme.errorContainer.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Text(
-                '⚠️ هشدار: ریستور کل داده‌های فعلی را حذف کرده و با محتوای فایل بکاپ جایگزین می‌کند. این عمل غیرقابل بازگشت است.',
-                style: TextStyle(fontSize: 13, color: Colors.black87),
+              child: Text(
+                adminTx(
+                  context,
+                  'بازیابی داده‌های فعلی را حذف می‌کند و محتوای فایل بکاپ را جایگزین آن‌ها می‌کند. این کار برگشت‌پذیر نیست.',
+                  'Restore deletes current data and replaces it with the backup. This cannot be undone.',
+                ),
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onErrorContainer),
               ),
             ),
             const SizedBox(height: 16),
             OutlinedButton.icon(
               onPressed: _isLoading ? null : _pickRestoreFile,
               icon: const Icon(Icons.upload_file),
-              label: Text(_restoreFilename ?? 'انتخاب فایل بکاپ (.sql یا .sql.gz)'),
+              label: Text(_restoreFilename ?? adminTx(context, 'انتخاب فایل بکاپ (.sql یا .sql.gz)', 'Choose a backup file (.sql or .sql.gz)')),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 48),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -706,8 +685,9 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
             TextField(
               controller: _restoreConfirmationController,
               decoration: InputDecoration(
-                labelText: 'برای تأیید عبارت "بازیابی" را وارد کنید',
-                hintText: 'بازیابی',
+                labelText: adminTx(context, 'برای تأیید «بازیابی» یا RESTORE را بنویسید', 'Type بازیابی or RESTORE to confirm'),
+                hintText: adminTx(context, 'بازیابی', 'RESTORE'),
+                errorText: _restorePhraseError,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 prefixIcon: const Icon(Icons.warning_amber),
               ),
@@ -737,7 +717,9 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
                         ),
                       )
                     : const Icon(Icons.restore),
-                label: Text(_loadingAction == 'restore' ? 'در حال ارسال...' : 'شروع ریستور'),
+                label: Text(_loadingAction == 'restore'
+                    ? adminTx(context, 'در حال ارسال…', 'Submitting…')
+                    : adminTx(context, 'شروع بازیابی', 'Start restore')),
               ),
             ),
           ],
@@ -785,10 +767,10 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
               const SizedBox(width: 8),
               Text(
                 state == 'succeeded'
-                    ? 'ریستور موفق'
+                    ? adminTx(context, 'بازیابی موفق', 'Restore succeeded')
                     : state == 'failed'
-                        ? 'ریستور ناموفق'
-                        : 'در حال ریستور...',
+                        ? adminTx(context, 'بازیابی ناموفق', 'Restore failed')
+                        : adminTx(context, 'در حال بازیابی…', 'Restoring…'),
                 style: theme.textTheme.titleSmall?.copyWith(color: color, fontWeight: FontWeight.bold),
               ),
             ],

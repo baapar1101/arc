@@ -54,6 +54,8 @@ from adapters.api.v1.support.statuses import router as support_statuses_router
 from adapters.api.v1.admin.file_storage import router as admin_file_storage_router
 from adapters.api.v1.admin.email_config import router as admin_email_config_router
 from adapters.api.v1.admin.system_settings import router as admin_system_settings_router
+from adapters.api.v1.admin.audit_logs import router as admin_audit_logs_router
+from adapters.api.v1.admin.operations import router as admin_operations_router
 from adapters.api.v1.admin.tax_providers import router as admin_tax_providers_router
 from adapters.api.v1.admin.legacy_import import router as admin_legacy_import_router
 from adapters.api.v1.admin.firewall import router as admin_firewall_router
@@ -98,6 +100,8 @@ from adapters.api.v1.warranty import router as warranty_router
 from adapters.api.v1.customer_club import router as customer_club_router
 from adapters.api.v1.payroll import router as payroll_router
 from adapters.api.v1.office_automation import router as office_automation_router
+from adapters.api.v1.procurement import public_router as procurement_public_router
+from adapters.api.v1.procurement import router as procurement_router
 from adapters.api.v1.fixed_assets import router as fixed_assets_router
 from adapters.api.v1.advanced_production import router as advanced_production_router
 from adapters.api.v1.barcode_labels import router as barcode_labels_router
@@ -1056,7 +1060,9 @@ def create_app() -> FastAPI:
     from adapters.api.v1.projects import router as projects_router
     application.include_router(projects_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.crm import router as crm_router
+    from adapters.api.v1.crm_enterprise import router as crm_enterprise_router
     application.include_router(crm_router, prefix=settings.api_v1_prefix)
+    application.include_router(crm_enterprise_router, prefix=settings.api_v1_prefix)
     application.include_router(bank_accounts_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.checks import router as checks_router
     application.include_router(checks_router, prefix=settings.api_v1_prefix)
@@ -1104,6 +1110,8 @@ def create_app() -> FastAPI:
     application.include_router(customer_club_router, prefix=settings.api_v1_prefix)
     application.include_router(payroll_router, prefix=settings.api_v1_prefix)
     application.include_router(office_automation_router, prefix=settings.api_v1_prefix)
+    application.include_router(procurement_router, prefix=settings.api_v1_prefix)
+    application.include_router(procurement_public_router, prefix=settings.api_v1_prefix)
     application.include_router(fixed_assets_router, prefix=settings.api_v1_prefix)
     application.include_router(advanced_production_router, prefix=settings.api_v1_prefix)
     application.include_router(barcode_labels_router, prefix=settings.api_v1_prefix)
@@ -1175,6 +1183,8 @@ def create_app() -> FastAPI:
     application.include_router(admin_file_storage_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_email_config_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_system_settings_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_audit_logs_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_operations_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_tax_providers_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_legacy_import_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_firewall_router, prefix=settings.api_v1_prefix)

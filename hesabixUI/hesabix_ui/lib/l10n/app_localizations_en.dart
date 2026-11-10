@@ -2225,7 +2225,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get systemSettingsDescription =>
-      'Manage system configuration and administration';
+      'Frequent tasks are at the top. Open a category or search for the rest.';
 
   @override
   String get storageManagement => 'Storage Management';
@@ -2977,6 +2977,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get crmMenuSequences => 'Automation sequences';
+
+  @override
+  String get crmMenuEnterprise => 'Sales organization';
 
   @override
   String get storageSpace => 'Storage Space';
@@ -11151,45 +11154,46 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noSettingsInCategory => 'No settings found in this category';
 
   @override
-  String get settingsCategoryCoreConfiguration => 'Core & Configuration';
+  String get settingsCategoryCoreConfiguration => 'Infrastructure';
 
   @override
   String get settingsCategoryCoreConfigurationDescription =>
-      'Basic system settings and configuration';
+      'Core configuration, cache, and firewall';
 
   @override
-  String get settingsCategoryStorageFiles => 'Storage & Files';
+  String get settingsCategoryStorageFiles => 'Files & plugins';
 
   @override
   String get settingsCategoryStorageFilesDescription =>
-      'File storage and storage plan management';
+      'Storage, plans, marketplace, and share links';
 
   @override
-  String get settingsCategoryFinancialPayment => 'Financial & Payment';
+  String get settingsCategoryFinancialPayment => 'Finance & payments';
 
   @override
   String get settingsCategoryFinancialPaymentDescription =>
-      'Wallet and payment gateway settings';
+      'Wallet, currencies, gateways, and pay page';
 
   @override
-  String get settingsCategoryUsersBusinesses => 'Users & Businesses';
+  String get settingsCategoryUsersBusinesses => 'Users & support';
 
   @override
   String get settingsCategoryUsersBusinessesDescription =>
-      'User and business management';
+      'Users, businesses, support, and reports';
 
   @override
   String get settingsCategoryCommunications => 'Communications';
 
   @override
   String get settingsCategoryCommunicationsDescription =>
-      'Email, notifications and announcements';
+      'Email, notifications, and message templates';
 
   @override
-  String get settingsCategoryAI => 'Artificial Intelligence';
+  String get settingsCategoryAI => 'Artificial intelligence';
 
   @override
-  String get settingsCategoryAIDescription => 'AI settings, plans and prompts';
+  String get settingsCategoryAIDescription =>
+      'Models, plans, prompts, and evaluation';
 
   @override
   String get aiStatusSending => 'Sending…';
@@ -12379,14 +12383,76 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsCategoryExternalServicesDescription =>
-      'External service integrations';
+      'Zohal, tax, and other integrations';
 
   @override
   String get settingsCategoryMonitoringLogs => 'Monitoring & Logs';
 
   @override
   String get settingsCategoryMonitoringLogsDescription =>
-      'System monitoring and logging';
+      'Health, service logs, and business activity';
+
+  @override
+  String get settingsCategoryMaintenance => 'Sensitive maintenance';
+
+  @override
+  String get settingsCategoryMaintenanceDescription =>
+      'Backup, import, and scripts — open only when needed';
+
+  @override
+  String get systemAdminQuickAccessTitle => 'Quick access';
+
+  @override
+  String get systemAdminQuickAccessDescription =>
+      'Tasks system administrators use most often';
+
+  @override
+  String get systemAdminSuperAdminRole => 'Super admin';
+
+  @override
+  String get systemAdminLimitedRole => 'Limited access';
+
+  @override
+  String get settingsSupportPlans => 'Support plans';
+
+  @override
+  String get settingsSupportPlansDescription =>
+      'Price and duration of user support subscriptions';
+
+  @override
+  String get settingsSupportBillingStats => 'Paid support stats';
+
+  @override
+  String get settingsSupportBillingStatsDescription =>
+      'Revenue, active subscriptions, and support invoices';
+
+  @override
+  String get settingsNotificationEventDefaults => 'Default business templates';
+
+  @override
+  String get settingsNotificationEventDefaultsDescription =>
+      'Default SMS and email text when a business has no template';
+
+  @override
+  String get settingsLegacyDatabaseImport => 'Legacy database import';
+
+  @override
+  String get settingsLegacyDatabaseImportDescription =>
+      'Move data from an old Hesabix MySQL dump';
+
+  @override
+  String get settingsAIEval => 'AI quality evaluation';
+
+  @override
+  String get settingsAIEvalDescription =>
+      'Regression scenarios and scheduled response checks';
+
+  @override
+  String get settingsZohalStatistics => 'Zohal statistics';
+
+  @override
+  String get settingsZohalStatisticsDescription =>
+      'Usage and inquiry statistics for Zohal';
 
   @override
   String get settingsShareLinks => 'Share Links';
@@ -13634,7 +13700,337 @@ class AppLocalizationsEn extends AppLocalizations {
   String get oaFollowUp => 'Follow-up';
 
   @override
+  String get oaOverdue => 'Overdue';
+
+  @override
+  String get oaSaveFilter => 'Save filter';
+
+  @override
+  String get oaSavedFilters => 'Saved filters';
+
+  @override
+  String get oaFilterName => 'Filter name';
+
+  @override
+  String get oaNoSavedFilters => 'No saved filters';
+
+  @override
+  String get oaBoardView => 'Work board';
+
+  @override
+  String get oaListView => 'List';
+
+  @override
+  String get oaColumnPending => 'Waiting';
+
+  @override
+  String get oaColumnSeen => 'Seen';
+
+  @override
+  String get oaColumnDone => 'Done';
+
+  @override
+  String get oaColumnReturned => 'Returned';
+
+  @override
+  String get oaDropHere => 'Drop to save on the server';
+
+  @override
+  String get oaOpenLetter => 'Open letter';
+
+  @override
+  String get oaDropAttachment => 'Drop a file here to attach it';
+
+  @override
+  String get oaMyDesk => 'My desk';
+
+  @override
+  String get oaDueSoon => 'Due soon';
+
+  @override
+  String get oaFollowUpsDue => 'Follow-ups';
+
+  @override
+  String get oaProcesses => 'Processes';
+
+  @override
+  String get oaProcessTasks => 'Process tasks';
+
+  @override
+  String get oaStartProcess => 'Start';
+
+  @override
+  String get oaCompleteTask => 'Complete task';
+
+  @override
+  String get oaPublishProcess => 'Publish process';
+
+  @override
+  String get oaProcessName => 'Process name';
+
+  @override
+  String get oaFormLabel => 'Form label';
+
+  @override
+  String get oaAssignee => 'Assignee position';
+
+  @override
+  String get oaProcessDesigner => 'Process designer';
+
+  @override
+  String get oaProcessDrafts => 'Drafts';
+
+  @override
+  String get oaProcessCode => 'Code';
+
+  @override
+  String get oaProcessCodeName => 'Enter a latin code and a name';
+
+  @override
+  String get oaNewProcess => 'New process';
+
+  @override
+  String get oaProcessInspector => 'Step';
+
+  @override
+  String get oaSelectNode => 'Select a step';
+
+  @override
+  String get oaConnectNodes => 'Connect';
+
+  @override
+  String get oaPickTarget => 'Choose the next step';
+
+  @override
+  String get oaDeleteNode => 'Remove step';
+
+  @override
+  String get oaGatewayField => 'Decision field';
+
+  @override
+  String get oaEdgeWhen => 'When value';
+
+  @override
+  String get oaEdgeDefault => 'Default';
+
+  @override
+  String get oaTimerHours => 'Wait hours';
+
+  @override
+  String get oaSlaHours => 'SLA hours';
+
+  @override
+  String get oaEscalateTo => 'Escalate to';
+
+  @override
+  String get oaSubprocessVersion => 'Published subprocess';
+
+  @override
+  String get oaNodeStart => 'Start';
+
+  @override
+  String get oaNodeTask => 'Task';
+
+  @override
+  String get oaNodeExclusive => 'Decision';
+
+  @override
+  String get oaNodeSplit => 'Split';
+
+  @override
+  String get oaNodeJoin => 'Join';
+
+  @override
+  String get oaNodeTimer => 'Timer';
+
+  @override
+  String get oaNodeSubprocess => 'Subprocess';
+
+  @override
+  String get oaNodeEnd => 'End';
+
+  @override
+  String get oaDocuments => 'Documents';
+
+  @override
+  String get oaDocumentSearch => 'Search documents';
+
+  @override
+  String get oaRegisterDocument => 'Register document';
+
+  @override
+  String get oaDocumentTitle => 'Document title';
+
+  @override
+  String get oaConfidentiality => 'Confidentiality';
+
+  @override
+  String get oaAddVersion => 'Add version';
+
+  @override
+  String get oaAcceptSuggestion => 'Accept';
+
+  @override
+  String get oaRejectSuggestion => 'Reject';
+
+  @override
+  String get oaNoDocuments => 'No documents you can see';
+
+  @override
+  String get oaDocumentVersions => 'Versions';
+
+  @override
+  String get oaPendingConfirmations => 'Pending sensitive actions';
+
+  @override
+  String get oaNoPendingConfirmations => 'No action is waiting for you';
+
+  @override
+  String get oaApproveAction => 'Approve';
+
+  @override
+  String get oaRejectAction => 'Reject';
+
+  @override
+  String get oaEnterprise => 'Branches and retention';
+
+  @override
+  String get oaBranches => 'Branches';
+
+  @override
+  String get oaBranchCode => 'Branch code';
+
+  @override
+  String get oaBranchName => 'Branch name';
+
+  @override
+  String get oaCreateBranch => 'Create branch';
+
+  @override
+  String get oaNoBranches => 'No branches yet';
+
+  @override
+  String get oaRetentionDue => 'Retention review';
+
+  @override
+  String get oaNoRetentionDue => 'No letter is due for review';
+
+  @override
+  String get oaHoldLetter => 'Keep';
+
+  @override
+  String get oaRetentionDocuments => 'Documents due for retention';
+
+  @override
+  String get oaHoldDocument => 'Keep document';
+
+  @override
+  String get oaHoldDocumentKeepsFile => 'Keeping a document does not delete the document or its file.';
+
+  @override
+  String get oaRetentionPolicy => 'Retention policy';
+
+  @override
+  String get oaRetainDays => 'Retention days';
+
+  @override
+  String get oaNoRetentionPolicies => 'No retention policy yet';
+
+  @override
+  String get oaRetentionKeepsLetters => 'This policy does not delete letters.';
+
+  @override
+  String get oaSignatureProviders => 'Signature providers';
+
+  @override
+  String get oaNoSignatureProviders => 'No signature provider yet';
+
+  @override
+  String get oaProviderLive => 'The result comes from the provider URL';
+
+  @override
+  String get oaProviderManual => 'The result is recorded with an external reference';
+
+  @override
+  String get oaRequestProviderSignature => 'Request provider signature';
+
+  @override
+  String get oaNoProviderRequests => 'No provider request yet';
+
+  @override
+  String get oaRecordProviderResult => 'Record provider result';
+
+  @override
+  String get oaProviderExternalRef => 'External reference';
+
+  @override
+  String get oaProviderCompleted => 'Completed';
+
+  @override
+  String get oaProviderRejected => 'Rejected';
+
+  @override
+  String get oaExchangeLetter => 'Exchange letter';
+
+  @override
+  String get oaTargetBusinessId => 'Target business id';
+
+  @override
+  String get oaTargetPositionId => 'Target secretariat position id';
+
+  @override
+  String get oaExchangeNormalOnly => 'Only a registered normal letter can be exchanged.';
+
+  @override
+  String get oaProviderSignatureNote => 'A provider signature record does not replace the image signature and is not a qualified electronic signature by itself.';
+
+  @override
+  String get oaCreateProvider => 'Add signature provider';
+
+  @override
+  String get oaProviderCode => 'Provider code';
+
+  @override
+  String get oaProviderName => 'Provider name';
+
+  @override
+  String get oaProviderEndpoint => 'Provider URL';
+
+  @override
+  String get oaProviderToken => 'Access token';
+
+  @override
+  String get oaCommercialLinks => 'Accounting and CRM';
+
+  @override
+  String get oaNoCommercialLinks => 'No accounting document or deal is linked';
+
+  @override
+  String get oaAddCommercialLink => 'Link existing record';
+
+  @override
+  String get oaLinkDocument => 'Accounting document';
+
+  @override
+  String get oaLinkDeal => 'Deal';
+
+  @override
+  String get oaCommercialTargetId => 'Record id';
+
+  @override
   String get oaArchive => 'Archive';
+
+  @override
+  String get oaUnarchive => 'Reopen from archive';
+
+  @override
+  String get oaRejectSign => 'Reject signature';
+
+  @override
+  String get oaRejectSignNote => 'Rejecting this step marks the image signature as rejected. It does not create a secure electronic signature.';
+
+  @override
+  String get oaCancelReferral => 'Cancel referral';
 
   @override
   String get oaRegistry => 'Registry';
@@ -14089,6 +14485,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get oaNewSecretariat => 'New secretariat';
 
   @override
+  String get oaSecretariatBranch => 'Secretariat branch';
+
+  @override
+  String get oaNoBranch => 'No branch';
+
+  @override
   String get oaSecretariat => 'Secretariat';
 
   @override
@@ -14150,6 +14552,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get oaPublicTrackResult => 'Letter status';
 
   @override
+  String get oaPublicTrackRestricted => 'This letter has no public details. Sign in to Hesabix to view it.';
+
+  @override
   String get oaTrackingToken => 'Tracking token';
 
   @override
@@ -14206,6 +14611,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get oaSign => 'Sign';
+
+  @override
+  String get oaImageSignatureNote => 'This records a stored signature image. It is not a secure electronic signature.';
+
+  @override
+  String get oaClassifiedStaysInside => 'Classified letters are not emailed, exported, or sent to the assistant.';
 
   @override
   String get oaDispatch => 'Dispatch';
@@ -16825,7 +17236,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get crmNotesBody => 'Content';
 
   @override
-  String get crmNotesLeadOptional => 'Lead (optional)';
+  String get crmNotesLeadOptional => 'Customer, lead, or deal';
 
   @override
   String get crmNotesClearLead => 'Clear lead';
@@ -17128,7 +17539,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get crmSectionDescription => 'Description';
 
   @override
-  String get crmSectionActivityLink => 'Customer or lead';
+  String get crmSectionActivityLink => 'Customer, lead, or deal';
 
   @override
   String get crmSectionActivityScheduling => 'Schedule';
@@ -17150,6 +17561,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get crmActivityClearLead => 'Clear lead';
+
+  @override
+  String get crmActivityPickDeal => 'Search & select deal';
+
+  @override
+  String get crmActivityClearDeal => 'Clear deal';
+
+  @override
+  String get crmActivityDealSearchHint => 'Title, code, or customer…';
+
+  @override
+  String get crmActivityDealSearchEmpty => 'No deal matches this search.';
 
   @override
   String get crmActivityTypeCall => 'Call';
@@ -19642,10 +20065,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get crmWebChatAssignTo => 'Assign to';
 
   @override
-  String get crmWebChatOptionalLeadId => 'Lead id (optional)';
+  String get crmWebChatOptionalLeadId => 'Search and select a lead (optional)';
 
   @override
-  String get crmWebChatOptionalPersonId => 'Person id (optional)';
+  String get crmWebChatOptionalPersonId => 'Search and select a person (optional)';
+
+  @override
+  String get crmWebChatClearLead => 'Clear lead';
 
   @override
   String get crmWebChatUnassigned => '—';

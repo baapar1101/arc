@@ -181,3 +181,12 @@ class TriggerRegistry:
         self.register("office_automation.letter_dispatched", OaLetterDispatchedTrigger())
         self.register("office_automation.letter_signed", OaLetterSignedTrigger())
 
+        from app.services.workflow.triggers.procurement_triggers import ProcurementEventTrigger
+
+        self.register("procurement.requisition.created", ProcurementEventTrigger("ایجاد درخواست خرید", "پس از ثبت درخواست خرید"))
+        self.register("procurement.requisition.approved", ProcurementEventTrigger("تأیید درخواست خرید", "پس از تأیید نهایی درخواست خرید"))
+        self.register("procurement.order.approved", ProcurementEventTrigger("تأیید سفارش خرید", "پس از تأیید سفارش و ثبت تعهد بودجه"))
+        self.register("procurement.order.sent", ProcurementEventTrigger("ارسال سفارش خرید", "پس از ارسال سفارش برای تأمین‌کننده"))
+        self.register("procurement.receipt.posted", ProcurementEventTrigger("رسید سفارش خرید", "پس از ثبت رسید کالا یا خدمت"))
+        self.register("procurement.contract.expiring", ProcurementEventTrigger("نزدیک شدن انقضای قرارداد", "وقتی قرارداد فعال در افق ۳۰ روز به پایان برسد"))
+

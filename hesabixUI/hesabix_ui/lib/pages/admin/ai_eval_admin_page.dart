@@ -4,10 +4,13 @@ import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart' show SnackBarHelper;
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
+import 'admin_compact_scaffold.dart';
+import '../../theme/tokens/extensions.dart';
 
 /// ارزیابی کیفیت پاسخ AI (regression سناریوها).
 class AIEvalAdminPage extends StatefulWidget {
-  const AIEvalAdminPage({super.key});
+  final bool embedded;
+  const AIEvalAdminPage({super.key, this.embedded = false});
 
   @override
   State<AIEvalAdminPage> createState() => _AIEvalAdminPageState();
@@ -78,7 +81,7 @@ class _AIEvalAdminPageState extends State<AIEvalAdminPage> {
         'min_pass_rate': minPass,
       });
       await _load();
-      if (mounted) SnackBarHelper.show(context, message: 'زمان‌بندی ذخیره شد');
+      if (mounted) SnackBarHelper.show(context, message: adminTx(context, 'زمان‌بندی ذخیره شد', 'Schedule saved'));
     } catch (e) {
       if (mounted) {
         SnackBarHelper.show(
@@ -96,7 +99,7 @@ class _AIEvalAdminPageState extends State<AIEvalAdminPage> {
     try {
       await _ai.seedDefaultEvalCases();
       await _load();
-      if (mounted) SnackBarHelper.show(context, message: 'سناریوهای پیش‌فرض اضافه شدند');
+      if (mounted) SnackBarHelper.show(context, message: adminTx(context, 'سناریوهای پیش‌فرض اضافه شدند', 'Default scenarios added'));
     } catch (e) {
       if (mounted) {
         SnackBarHelper.show(
@@ -121,7 +124,7 @@ class _AIEvalAdminPageState extends State<AIEvalAdminPage> {
       final run = result['run'] as Map<String, dynamic>?;
       SnackBarHelper.show(
         context,
-        message: 'نتیجه: ${run?['passed_cases']}/${run?['total_cases']} موفق',
+        message: '${adminTx(context, 'نتیجه', 'Result')}: ${run?['passed_cases']}/${run?['total_cases']} ${adminTx(context, 'موفق', 'passed')}',
       );
     } catch (e) {
       if (mounted) {
@@ -139,19 +142,16 @@ class _AIEvalAdminPageState extends State<AIEvalAdminPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('ارزیابی کیفیت AI'),
+      appBar: aiHubAppBar(
+        embedded: widget.embedded,
+        title: Text(adminTx(context, 'ارزیابی کیفیت', 'Quality evaluation')),
         actions: [
-          TextButton(onPressed: _seed, child: const Text('سناریوهای پیش‌فرض')),
+          TextButton(onPressed: _seed, child: Text(adminTx(context, 'سناریوهای پیش‌فرض', 'Default cases'))),
           FilledButton(
             onPressed: _running ? null : _run,
             child: _running
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('اجرای دستی'),
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                : Text(adminTx(context, 'اجرای دستی', 'Run now')),
           ),
           const SizedBox(width: 8),
         ],
@@ -159,33 +159,38 @@ class _AIEvalAdminPageState extends State<AIEvalAdminPage> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.all(16),
+              padding: context.settingsHub.pagePadding,
               children: [
                 Card(
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
-                          'زمان‌بندی خودکار',
-                          style: Theme.of(context).textTheme.titleMedium,
+                          adminTx(context, 'زمان‌بندی خودکار', 'Automatic schedule'),
+                          style: context.settingsHub.cardTitleStyle(
+                            Theme.of(context).textTheme,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
                         ),
                         SwitchListTile(
+                          dense: true,
                           contentPadding: EdgeInsets.zero,
-                          title: const Text('فعال'),
+                          title: Text(adminTx(context, 'فعال', 'Enabled')),
                           subtitle: Text(
                             _schedule?['last_run_at'] != null
-                                ? 'آخرین اجرا: ${_schedule!['last_run_at']} — نرخ: ${_schedule!['last_pass_rate']}%'
-                                : 'پیش‌فرض: هر روز ۳:۰۰ (Asia/Tehran)',
+                                ? '${adminTx(context, 'آخرین اجرا', 'Last run')}: ${_schedule!['last_run_at']} — ${adminTx(context, 'نرخ', 'Rate')}: ${_schedule!['last_pass_rate']}%'
+                                : adminTx(context, 'پیش‌فرض: هر روز ۳:۰۰ به وقت تهران', 'Default: every day at 03:00 Asia/Tehran'),
                           ),
                           value: _scheduleEnabled,
                           onChanged: (v) => setState(() => _scheduleEnabled = v),
                         ),
                         TextField(
                           controller: _cronCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'عبارت cron',
+                          decoration: InputDecoration(
+                            isDense: true,
+                            labelText: adminTx(context, 'عبارت cron', 'Cron expression'),
                             hintText: '0 3 * * *',
                           ),
                         ),
@@ -193,32 +198,35 @@ class _AIEvalAdminPageState extends State<AIEvalAdminPage> {
                         TextField(
                           controller: _minPassCtrl,
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'حداقل نرخ قبولی (%)',
+                          decoration: InputDecoration(
+                            isDense: true,
+                            labelText: adminTx(context, 'حداقل نرخ قبولی (٪)', 'Minimum pass rate (%)'),
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 8),
                         FilledButton(
                           onPressed: _savingSchedule ? null : _saveSchedule,
                           child: _savingSchedule
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Text('ذخیره زمان‌بندی'),
+                              ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                              : Text(adminTx(context, 'ذخیره زمان‌بندی', 'Save schedule')),
                         ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                Text('سناریوها (${_cases.length})',
-                    style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 12),
+                Text(
+                  '${adminTx(context, 'سناریوها', 'Cases')} (${_cases.length})',
+                  style: context.settingsHub.cardTitleStyle(
+                    Theme.of(context).textTheme,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
                 const SizedBox(height: 8),
                 ..._cases.map(
                   (c) => Card(
                     child: ListTile(
+                      dense: true,
                       title: Text(c['name'] as String? ?? ''),
                       subtitle: Text(
                         (c['user_message'] as String? ?? '').length > 120
@@ -233,7 +241,13 @@ class _AIEvalAdminPageState extends State<AIEvalAdminPage> {
                 ),
                 const SizedBox(height: 24),
                 if (_lastResult != null) ...[
-                  Text('آخرین اجرا', style: Theme.of(context).textTheme.titleMedium),
+                  Text(
+                    adminTx(context, 'آخرین اجرا', 'Latest run'),
+                    style: context.settingsHub.cardTitleStyle(
+                      Theme.of(context).textTheme,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   ...((_lastResult!['results'] as List?) ?? []).map((r) {
                     final m = Map<String, dynamic>.from(r as Map);
@@ -249,11 +263,17 @@ class _AIEvalAdminPageState extends State<AIEvalAdminPage> {
                   }),
                 ],
                 const SizedBox(height: 16),
-                Text('اجراهای اخیر', style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  adminTx(context, 'اجراهای اخیر', 'Recent runs'),
+                  style: context.settingsHub.cardTitleStyle(
+                    Theme.of(context).textTheme,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
                 ..._runs.take(10).map(
                       (r) => ListTile(
                         dense: true,
-                        title: Text('اجرا #${r['id']} — ${r['status']}'),
+                        title: Text('${adminTx(context, 'اجرا', 'Run')} #${r['id']} — ${r['status']}'),
                         trailing: Text('${r['passed_cases']}/${r['total_cases']}'),
                       ),
                     ),

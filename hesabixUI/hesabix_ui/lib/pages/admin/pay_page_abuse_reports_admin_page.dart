@@ -4,6 +4,7 @@ import '../../core/api_client.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/pay_page_abuse_reports_service.dart';
 import '../../utils/error_extractor.dart';
+import 'admin_compact_scaffold.dart';
 
 class PayPageAbuseReportsAdminPage extends StatefulWidget {
   const PayPageAbuseReportsAdminPage({super.key});
@@ -128,8 +129,16 @@ class _PayPageAbuseReportsAdminPageState
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    return Scaffold(
-      appBar: AppBar(title: Text(t.settingsPayPageAbuseReports)),
+    return AdminCompactScaffold(
+      title: t.settingsPayPageAbuseReports,
+      subtitle: adminTx(context, 'گزارش‌های سوءاستفاده از صفحهٔ پرداخت', 'Payment page abuse reports'),
+      actions: [
+        IconButton(
+          tooltip: adminTx(context, 'بازخوانی', 'Refresh'),
+          onPressed: _load,
+          icon: const Icon(Icons.refresh, size: 20),
+        ),
+      ],
       body: Column(
         children: [
           Padding(
@@ -140,6 +149,7 @@ class _PayPageAbuseReportsAdminPageState
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 FilterChip(
+                  visualDensity: VisualDensity.compact,
                   label: Text(t.all),
                   selected: _status == null,
                   onSelected: (_) {
@@ -148,6 +158,7 @@ class _PayPageAbuseReportsAdminPageState
                   },
                 ),
                 FilterChip(
+                  visualDensity: VisualDensity.compact,
                   label: Text(t.payPageAbuseStatusNew),
                   selected: _status == 'new',
                   onSelected: (_) {
@@ -156,6 +167,7 @@ class _PayPageAbuseReportsAdminPageState
                   },
                 ),
                 FilterChip(
+                  visualDensity: VisualDensity.compact,
                   label: Text(t.payPageAbuseStatusReviewed),
                   selected: _status == 'reviewed',
                   onSelected: (_) {
@@ -164,6 +176,7 @@ class _PayPageAbuseReportsAdminPageState
                   },
                 ),
                 FilterChip(
+                  visualDensity: VisualDensity.compact,
                   label: Text(t.payPageAbuseStatusDismissed),
                   selected: _status == 'dismissed',
                   onSelected: (_) {

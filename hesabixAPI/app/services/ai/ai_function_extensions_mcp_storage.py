@@ -78,8 +78,28 @@ def _file_dict(row) -> dict:
     }
 
 
+def _oa_file_admin(context, business_id: int) -> bool:
+    ctx = context.get("user_context")
+    if ctx is None:
+        return False
+    try:
+        return bool(ctx.has_business_permission("office_automation", "admin") or ctx.is_business_owner(business_id))
+    except Exception:
+        return False
+
+
+def _hide_oa_file(context, file_id: str) -> None:
+    from app.services.oa_document_service import require_oa_file_visible
+
+    bid = mcp_bid(context)
+    require_oa_file_visible(
+        mcp_db(context), bid, mcp_uid(context), str(file_id), is_admin=_oa_file_admin(context, bid),
+    )
+
+
 def list_storage_files_handler(args, context):
     from adapters.db.models.file_storage import FileStorage
+    from app.services.oa_document_service import restrict_file_query
 
     db = mcp_db(context)
     bid = mcp_bid(context)
@@ -90,7 +110,13 @@ def list_storage_files_handler(args, context):
         filters.append(FileStorage.module_context == args["module_context"])
     if args.get("context_id"):
         filters.append(FileStorage.context_id == args["context_id"])
-    q = db.query(FileStorage).filter(and_(*filters))
+    q = restrict_file_query(
+        db.query(FileStorage).filter(and_(*filters)),
+        db,
+        bid,
+        mcp_uid(context),
+        _oa_file_admin(context, bid),
+    )
     total = q.count()
     rows = q.order_by(FileStorage.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
     return {
@@ -105,10 +131,12 @@ def list_storage_files_handler(args, context):
 
 
 def get_storage_file_handler(args, context):
+    _hide_oa_file(context, str(args["file_id"]))
     return _file_dict(_file_row(mcp_db(context), mcp_bid(context), str(args["file_id"])))
 
 
 def rename_storage_file_handler(args, context):
+    _hide_oa_file(context, str(args["file_id"]))
     row = _file_row(mcp_db(context), mcp_bid(context), str(args["file_id"]))
     row.original_name = str(args["new_name"]).strip()
     mcp_commit(context)
@@ -116,6 +144,7 @@ def rename_storage_file_handler(args, context):
 
 
 def delete_storage_file_handler(args, context):
+    _hide_oa_file(context, str(args["file_id"]))
     row = _file_row(mcp_db(context), mcp_bid(context), str(args["file_id"]))
     row.deleted_at = datetime.now(timezone.utc)
     mcp_commit(context)
@@ -134,6 +163,7 @@ def create_storage_file_share_handler(args, context):
             mcp_uid(context),
             password=None,
             expires_in_days=args.get("expires_in_days", 30),
+            is_admin=_oa_file_admin(context, mcp_bid(context)),
         )
     )
     if isinstance(data, dict):
@@ -146,6 +176,7 @@ def create_storage_file_share_handler(args, context):
 def list_storage_file_shares_handler(args, context):
     from app.services.file_storage_share_service import list_shares_for_file
 
+    _hide_oa_file(context, str(args["file_id"]))
     return {"items": mcp_jsonable(mcp_run(list_shares_for_file, mcp_db(context), mcp_bid(context), str(args["file_id"])))}
 
 
@@ -162,6 +193,8 @@ def list_storage_shares_handler(args, context):
             page=page,
             limit=limit,
             only_active=bool(args.get("only_active")),
+            user_id=mcp_uid(context),
+            is_admin=_oa_file_admin(context, mcp_bid(context)),
         )
     )
 

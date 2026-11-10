@@ -39,19 +39,25 @@ from app.services.office_automation_service import (
 	_allocate_oa_code,
 	_audit,
 	_can_view_letter,
+	_is_classified,
+	_visible_letter_clause,
 	_create_referral,
 	_ensure_plugin,
 	_get_letter,
 	_get_position,
 	_letter_dict,
+	_require_letter_view,
 	_normalize_i18n,
 	_now,
 	_occupancy_filter,
 	_parse_date,
 	_require_letter_open,
 	_user_display_name,
+	business_display_name,
 	get_letter,
 	get_or_create_settings,
+	letter_notification,
+	refuse_external_letter,
 	resolve_acting_position,
 	resolve_i18n,
 )
@@ -104,7 +110,7 @@ def snapshot_letter_version(db: Session, letter: OaLetter, user_id: int) -> Opti
 
 
 def list_letter_versions(db: Session, business_id: int, letter_id: int, user_id: int, position_id: Optional[int], lang: str = "fa", is_admin: bool = False) -> List[dict]:
-	get_letter(db, business_id, letter_id, user_id, position_id, lang=lang, is_admin=is_admin)
+	opened = get_letter(db, business_id, letter_id, user_id, position_id, lang=lang, is_admin=is_admin)
 	rows = (
 		db.query(OaLetterVersion)
 		.filter(OaLetterVersion.letter_id == letter_id, OaLetterVersion.business_id == business_id)
@@ -117,6 +123,7 @@ def list_letter_versions(db: Session, business_id: int, letter_id: int, user_id:
 			"version_no": r.version_no,
 			"subject": r.subject,
 			"body": r.body,
+			"confidentiality": opened.get("confidentiality"),
 			"body_format": r.body_format,
 			"created_by_user_id": r.created_by_user_id,
 			"created_at": r.created_at,
@@ -158,6 +165,7 @@ def _secretariat_dict(row: OaSecretariat, lang: str) -> dict:
 		"name_i18n": row.name_i18n,
 		"title": resolve_i18n(row.name_i18n, lang),
 		"org_unit_id": row.org_unit_id,
+		"branch_id": row.branch_id,
 		"incoming_prefix": row.incoming_prefix,
 		"outgoing_prefix": row.outgoing_prefix,
 		"internal_prefix": row.internal_prefix,
@@ -197,10 +205,14 @@ def create_secretariat(db: Session, business_id: int, payload: dict, user_id: in
 		is_active=bool(payload.get("is_active", True)),
 		ece_enabled=bool(payload.get("ece_enabled")),
 		ece_email=(str(payload.get("ece_email") or "").strip() or None),
+		branch_id=int(payload["branch_id"]) if payload.get("branch_id") else None,
 		sort_order=int(payload.get("sort_order") or 0),
 		created_at=_now(),
 		updated_at=_now(),
 	)
+	if row.branch_id:
+		from app.services.oa_enterprise_service import require_branch
+		require_branch(db, business_id, row.branch_id)
 	if row.is_default:
 		db.query(OaSecretariat).filter(OaSecretariat.business_id == business_id).update({"is_default": False})
 	db.add(row)
@@ -234,6 +246,11 @@ def update_secretariat(db: Session, business_id: int, secretariat_id: int, paylo
 		row.ece_email = str(payload.get("ece_email") or "").strip() or None
 	if "sort_order" in payload:
 		row.sort_order = int(payload.get("sort_order") or 0)
+	if "branch_id" in payload:
+		row.branch_id = int(payload["branch_id"]) if payload.get("branch_id") else None
+		if row.branch_id:
+			from app.services.oa_enterprise_service import require_branch
+			require_branch(db, business_id, row.branch_id)
 	if payload.get("is_default"):
 		db.query(OaSecretariat).filter(OaSecretariat.business_id == business_id).update({"is_default": False})
 		row.is_default = True
@@ -274,7 +291,7 @@ def resolve_letter_secretariat(
 			.order_by(OaSecretariat.is_default.desc(), OaSecretariat.id)
 			.first()
 		)
-		if row and not row.is_confidential and confidential:
+		if row and not row.is_confidential:
 			raise ApiError(
 				"OA_CONFIDENTIAL_SECRETARIAT_REQUIRED",
 				"Classified letters must be registered in a confidential secretariat.",
@@ -282,28 +299,35 @@ def resolve_letter_secretariat(
 			)
 		if confidential:
 			return confidential
+		raise ApiError(
+			"OA_CONFIDENTIAL_SECRETARIAT_REQUIRED",
+			"Classified letters require an active confidential secretariat.",
+			http_status=400,
+		)
 	if row:
 		return row
 	return ensure_default_secretariat(db, business_id)
 
 
 def fire_oa_workflow(db: Session, business_id: int, trigger_type: str, letter: OaLetter, user_id: int, extra: Optional[dict] = None) -> None:
+	payload = {
+		"letter_id": letter.id,
+		"subject": letter.subject,
+		"number": letter.secretariat_number,
+		"letter_kind": letter.letter_kind,
+		"status": letter.status,
+		"confidentiality": letter.confidentiality,
+		"urgency": letter.urgency,
+		"person_id": letter.person_id,
+		"secretariat_id": letter.secretariat_id,
+	}
+	if extra:
+		payload.update(extra)
+	if (letter.confidentiality or "") in _CLASSIFIED:
+		payload["subject"] = None
 	try:
 		from app.services.workflow.workflow_trigger_service import trigger_workflows
 
-		payload = {
-			"letter_id": letter.id,
-			"subject": letter.subject,
-			"number": letter.secretariat_number,
-			"letter_kind": letter.letter_kind,
-			"status": letter.status,
-			"confidentiality": letter.confidentiality,
-			"urgency": letter.urgency,
-			"person_id": letter.person_id,
-			"secretariat_id": letter.secretariat_id,
-		}
-		if extra:
-			payload.update(extra)
 		trigger_workflows(db, business_id, trigger_type, payload, user_id)
 	except Exception:
 		logger.debug("OA workflow trigger %s skipped", trigger_type, exc_info=True)
@@ -532,9 +556,11 @@ def start_sign_path(
 	user_id: int,
 	position_id: int,
 	lang: str = "fa",
+	is_admin: bool = False,
 ) -> dict:
 	position, _kind = resolve_acting_position(db, business_id, user_id, position_id, required_scope="full")
 	letter = _get_letter(db, business_id, letter_id)
+	_require_letter_view(db, letter, user_id, is_admin)
 	_require_letter_open(letter, allow_draft=True)
 	db.query(OaLetterSignStep).filter(OaLetterSignStep.letter_id == letter.id).delete()
 	steps_payload = list(payload.get("steps") or [])
@@ -568,7 +594,7 @@ def start_sign_path(
 	letter.updated_at = _now()
 	_audit(db, business_id=business_id, user_id=user_id, action="letter.sign_path", letter_id=letter.id, position_id=position.id)
 	db.commit()
-	return get_letter(db, business_id, letter.id, user_id, position_id, lang=lang, is_admin=True)
+	return get_letter(db, business_id, letter.id, user_id, position_id, lang=lang, is_admin=is_admin)
 
 
 def sign_letter_step(
@@ -637,7 +663,7 @@ def sign_letter_step(
 		position_ids=[letter.origin_position_id] + ([nxt.position_id] if nxt else []),
 	)
 	fire_oa_workflow(db, business_id, "office_automation.letter_signed", letter, user_id)
-	return get_letter(db, business_id, letter.id, user_id, position_id, lang=lang, is_admin=True)
+	return get_letter(db, business_id, letter.id, user_id, position_id, lang=lang, is_admin=False)
 
 
 def reject_sign_step(
@@ -670,7 +696,7 @@ def reject_sign_step(
 	letter.updated_at = _now()
 	_audit(db, business_id=business_id, user_id=user_id, action="letter.sign_reject", letter_id=letter.id, position_id=position.id)
 	db.commit()
-	return get_letter(db, business_id, letter.id, user_id, position_id, lang=lang, is_admin=True)
+	return get_letter(db, business_id, letter.id, user_id, position_id, lang=lang, is_admin=False)
 
 
 def required_signs_complete(db: Session, letter: OaLetter) -> bool:
@@ -695,9 +721,11 @@ def dispatch_letter(
 	position_id: int,
 	lang: str = "fa",
 	calendar_type: CalendarType = "jalali",
+	is_admin: bool = False,
 ) -> dict:
 	position, _kind = resolve_acting_position(db, business_id, user_id, position_id, required_scope="refer")
 	letter = _get_letter(db, business_id, letter_id)
+	_require_letter_view(db, letter, user_id, is_admin)
 	_require_letter_open(letter)
 	to_pid = int(payload.get("to_position_id") or 0)
 	to_position = _get_position(db, business_id, to_pid)
@@ -731,7 +759,6 @@ def dispatch_letter(
 	db.commit()
 	try:
 		from app.services.notification_service import NotificationService
-		from adapters.db.models.business import Business
 
 		svc = NotificationService(db)
 		now = _now()
@@ -742,22 +769,18 @@ def dispatch_letter(
 			.filter(_occupancy_filter(now))
 			.all()
 		}
+		notice, channels = letter_notification(letter, business_display_name(db, business_id))
 		for uid in uids:
 			svc.send(
 				user_id=int(uid),
 				event_key="office_automation.letter_dispatched",
-				context={
-					"subject": letter.subject,
-					"number": letter.secretariat_number or "",
-					"letter_id": letter.id,
-					"business_name": db.query(Business.name).filter(Business.id == business_id).scalar() or "",
-				},
-				preferred_channels=["inapp", "sms", "email"],
+				context=notice,
+				preferred_channels=channels,
 			)
 	except Exception:
 		logger.debug("OA dispatch notify skipped", exc_info=True)
 	fire_oa_workflow(db, business_id, "office_automation.letter_dispatched", letter, user_id, extra={"to_position_id": to_position.id})
-	return get_letter(db, business_id, letter.id, user_id, position_id, lang=lang, is_admin=True)
+	return get_letter(db, business_id, letter.id, user_id, position_id, lang=lang, is_admin=is_admin)
 
 
 def acknowledge_dispatch(
@@ -778,7 +801,7 @@ def acknowledge_dispatch(
 	row.acknowledged_at = _now()
 	row.acknowledged_by_user_id = user_id
 	db.commit()
-	return get_letter(db, business_id, row.letter_id, user_id, position_id, lang=lang, is_admin=True)
+	return get_letter(db, business_id, row.letter_id, user_id, position_id, lang=lang, is_admin=False)
 
 
 def cancel_referral(db: Session, business_id: int, referral_id: int, payload: dict, user_id: int, position_id: int, lang: str = "fa") -> dict:
@@ -796,12 +819,13 @@ def cancel_referral(db: Session, business_id: int, referral_id: int, payload: di
 	row.updated_at = _now()
 	_audit(db, business_id=business_id, user_id=user_id, action="referral.cancel", letter_id=row.letter_id, position_id=position.id)
 	db.commit()
-	return get_letter(db, business_id, row.letter_id, user_id, position_id, lang=lang, is_admin=True)
+	return get_letter(db, business_id, row.letter_id, user_id, position_id, lang=lang, is_admin=False)
 
 
-def unarchive_letter(db: Session, business_id: int, letter_id: int, user_id: int, position_id: int, lang: str = "fa") -> dict:
+def unarchive_letter(db: Session, business_id: int, letter_id: int, user_id: int, position_id: int, lang: str = "fa", is_admin: bool = False) -> dict:
 	position, _kind = resolve_acting_position(db, business_id, user_id, position_id, required_scope="full")
 	letter = _get_letter(db, business_id, letter_id)
+	_require_letter_view(db, letter, user_id, is_admin)
 	if letter.status != "archived":
 		raise ApiError("OA_LETTER_NOT_ARCHIVED", "Only archived letters can be reopened.", http_status=400)
 	pending = db.query(OaReferral.id).filter(OaReferral.letter_id == letter.id, OaReferral.status.in_(("pending", "seen"))).first()
@@ -810,7 +834,7 @@ def unarchive_letter(db: Session, business_id: int, letter_id: int, user_id: int
 	letter.updated_at = _now()
 	_audit(db, business_id=business_id, user_id=user_id, action="letter.unarchive", letter_id=letter.id, position_id=position.id)
 	db.commit()
-	return get_letter(db, business_id, letter.id, user_id, position_id, lang=lang, is_admin=True)
+	return get_letter(db, business_id, letter.id, user_id, position_id, lang=lang, is_admin=is_admin)
 
 
 def _read_file_bytes(file_row: Optional[FileStorage]) -> bytes:
@@ -832,8 +856,9 @@ def export_ece(
 	lang: str = "fa",
 	calendar_type: CalendarType = "jalali",
 ) -> dict:
-	data = get_letter(db, business_id, letter_id, user_id, position_id, lang=lang, is_admin=True)
+	data = get_letter(db, business_id, letter_id, user_id, position_id, lang=lang, is_admin=False)
 	letter = _get_letter(db, business_id, letter_id)
+	refuse_external_letter(letter)
 	if not letter.secretariat_number:
 		raise ApiError("OA_LETTER_NOT_REGISTERED", "Register the letter before ECE export.", http_status=400)
 	settings = get_or_create_settings(db, business_id)
@@ -988,14 +1013,32 @@ def import_ece(
 	)
 	db.add(msg)
 	db.commit()
-	return get_letter(db, business_id, letter.id, user_id, position.id, lang=lang, is_admin=True)
+	return get_letter(db, business_id, letter.id, user_id, position.id, lang=lang, is_admin=False)
 
 
-def list_ece_messages(db: Session, business_id: int, *, direction: Optional[str] = None) -> List[dict]:
+def list_ece_messages(
+	db: Session,
+	business_id: int,
+	*,
+	direction: Optional[str] = None,
+	user_id: Optional[int] = None,
+	is_admin: bool = False,
+) -> List[dict]:
 	_ensure_plugin(db, business_id)
+	if not is_admin and user_id is None:
+		return []
 	q = db.query(OaEceMessage).filter(OaEceMessage.business_id == business_id)
 	if direction in _ECE_DIRECTIONS:
 		q = q.filter(OaEceMessage.direction == direction)
+	if not is_admin:
+		q = q.filter(
+			OaEceMessage.letter_id.in_(
+				db.query(OaLetter.id).filter(
+					OaLetter.business_id == business_id,
+					_visible_letter_clause(db, business_id, int(user_id), False),
+				)
+			)
+		)
 	rows = q.order_by(OaEceMessage.id.desc()).limit(100).all()
 	return [
 		{
@@ -1037,10 +1080,14 @@ def apply_cartable_rules(db: Session, business_id: int, letter: OaLetter, referr
 		if actions.get("mark_seen"):
 			referral.status = "seen"
 			referral.seen_at = _now()
-		if actions.get("auto_archive_folder_id"):
-			letter.archive_folder_id = int(actions["auto_archive_folder_id"])
-			letter.status = "archived"
-		to_pid = actions.get("auto_refer_to")
+		# ارجاع و بایگانی خودکار مخاطب نامه را زیاد می‌کند. نامه طبقه‌بندی‌شده فقط با ارجاع صریح جابه‌جا می‌شود.
+		if not _is_classified(letter.confidentiality):
+			if actions.get("auto_archive_folder_id"):
+				letter.archive_folder_id = int(actions["auto_archive_folder_id"])
+				letter.status = "archived"
+			to_pid = actions.get("auto_refer_to")
+		else:
+			to_pid = None
 		if to_pid:
 			try:
 				_create_referral(
@@ -1175,7 +1222,7 @@ def save_archive_folder(db: Session, business_id: int, payload: dict, user_id: i
 	}
 
 
-def archive_to_folder(db: Session, business_id: int, letter_id: int, payload: dict, user_id: int, position_id: int, lang: str = "fa") -> dict:
+def archive_to_folder(db: Session, business_id: int, letter_id: int, payload: dict, user_id: int, position_id: int, lang: str = "fa", is_admin: bool = False) -> dict:
 	from app.services.office_automation_service import archive_letter
 
 	folder_id = payload.get("folder_id") or payload.get("archive_folder_id")
@@ -1184,7 +1231,7 @@ def archive_to_folder(db: Session, business_id: int, letter_id: int, payload: di
 		folder = db.query(OaArchiveFolder).filter(OaArchiveFolder.id == int(folder_id), OaArchiveFolder.business_id == business_id).first()
 		if not folder:
 			raise ApiError("OA_ARCHIVE_FOLDER_NOT_FOUND", "Archive folder was not found.", http_status=404)
-	data = archive_letter(db, business_id, letter_id, user_id, position_id, lang=lang)
+	data = archive_letter(db, business_id, letter_id, user_id, position_id, lang=lang, is_admin=is_admin)
 	if folder:
 		letter = _get_letter(db, business_id, letter_id)
 		letter.archive_folder_id = folder.id
@@ -1193,10 +1240,19 @@ def archive_to_folder(db: Session, business_id: int, letter_id: int, payload: di
 	return data
 
 
-def delay_report(db: Session, business_id: int, lang: str = "fa") -> dict:
+def delay_report(
+	db: Session,
+	business_id: int,
+	lang: str = "fa",
+	*,
+	user_id: Optional[int] = None,
+	is_admin: bool = False,
+) -> dict:
 	_ensure_plugin(db, business_id)
+	if not is_admin and user_id is None:
+		return {"items": [], "total": 0}
 	today = date.today()
-	rows = (
+	query = (
 		db.query(OaReferral, OaLetter, OaPosition)
 		.join(OaLetter, OaLetter.id == OaReferral.letter_id)
 		.join(OaPosition, OaPosition.id == OaReferral.to_position_id)
@@ -1206,10 +1262,10 @@ def delay_report(db: Session, business_id: int, lang: str = "fa") -> dict:
 			OaReferral.due_at.isnot(None),
 			OaReferral.due_at < today,
 		)
-		.order_by(OaReferral.due_at)
-		.limit(200)
-		.all()
 	)
+	if not is_admin:
+		query = query.filter(_visible_letter_clause(db, business_id, user_id, False))
+	rows = query.order_by(OaReferral.due_at).limit(200).all()
 	items = []
 	for ref, letter, pos in rows:
 		items.append(
@@ -1228,26 +1284,40 @@ def delay_report(db: Session, business_id: int, lang: str = "fa") -> dict:
 	return {"items": items, "total": len(items)}
 
 
-def volume_report(db: Session, business_id: int) -> dict:
+def _report_visible(db: Session, letter: OaLetter, user_id: Optional[int], is_admin: bool) -> bool:
+	if is_admin:
+		return True
+	if user_id is None:
+		return False
+	return _can_view_letter(db, letter, user_id, False)
+
+
+def volume_report(db: Session, business_id: int, *, user_id: Optional[int] = None, is_admin: bool = False) -> dict:
 	_ensure_plugin(db, business_id)
-	by_kind = db.query(OaLetter.letter_kind, func.count(OaLetter.id)).filter(OaLetter.business_id == business_id).group_by(OaLetter.letter_kind).all()
-	by_status = db.query(OaLetter.status, func.count(OaLetter.id)).filter(OaLetter.business_id == business_id).group_by(OaLetter.status).all()
-	return {
-		"by_kind": {k: int(c) for k, c in by_kind},
-		"by_status": {k: int(c) for k, c in by_status},
-	}
+	rows = db.query(OaLetter).filter(OaLetter.business_id == business_id).all()
+	by_kind: Dict[str, int] = {}
+	by_status: Dict[str, int] = {}
+	for letter in rows:
+		if not _report_visible(db, letter, user_id, is_admin):
+			continue
+		by_kind[letter.letter_kind] = by_kind.get(letter.letter_kind, 0) + 1
+		by_status[letter.status] = by_status.get(letter.status, 0) + 1
+	return {"by_kind": by_kind, "by_status": by_status}
 
 
-def performance_report(db: Session, business_id: int, lang: str = "fa") -> dict:
+def performance_report(db: Session, business_id: int, lang: str = "fa", *, user_id: Optional[int] = None, is_admin: bool = False) -> dict:
 	_ensure_plugin(db, business_id)
 	rows = (
-		db.query(OaReferral, OaPosition)
+		db.query(OaReferral, OaPosition, OaLetter)
 		.join(OaPosition, OaPosition.id == OaReferral.to_position_id)
+		.join(OaLetter, OaLetter.id == OaReferral.letter_id)
 		.filter(OaReferral.business_id == business_id, OaReferral.completed_at.isnot(None))
 		.all()
 	)
 	agg: Dict[int, Dict[str, Any]] = {}
-	for ref, pos in rows:
+	for ref, pos, letter in rows:
+		if not _report_visible(db, letter, user_id, is_admin):
+			continue
 		bucket = agg.setdefault(pos.id, {"title": resolve_i18n(pos.name_i18n, lang), "days": [], "count": 0})
 		bucket["count"] += 1
 		if ref.completed_at and ref.created_at:
@@ -1268,19 +1338,31 @@ def public_track(db: Session, token: str) -> dict:
 	letter = db.query(OaLetter).filter(OaLetter.tracking_token == token).first()
 	if not letter:
 		raise ApiError("OA_TRACK_NOT_FOUND", "Letter tracking token was not found.", http_status=404)
+	if (letter.confidentiality or "") in _CLASSIFIED:
+		return {
+			"restricted": True,
+			"number": None,
+			"letter_date": None,
+			"status": None,
+			"letter_kind": None,
+			"subject": None,
+			"registered_at": None,
+			"last_action_at": None,
+			"confidentiality": None,
+		}
 	last = (
 		db.query(OaReferral)
 		.filter(OaReferral.letter_id == letter.id)
 		.order_by(OaReferral.updated_at.desc())
 		.first()
 	)
-	hide_subject = letter.confidentiality in {"highly_confidential", "secret"}
 	return {
+		"restricted": False,
 		"number": letter.secretariat_number,
 		"letter_date": letter.letter_date,
 		"status": letter.status,
 		"letter_kind": letter.letter_kind,
-		"subject": None if hide_subject else letter.subject,
+		"subject": letter.subject,
 		"registered_at": letter.registered_at,
 		"last_action_at": last.updated_at if last else letter.updated_at,
 		"confidentiality": letter.confidentiality,
@@ -1337,7 +1419,7 @@ def import_email_as_letter(
 	)
 	db.add(msg)
 	db.commit()
-	return get_letter(db, business_id, created["id"], user_id, position.id, lang=lang, is_admin=True)
+	return get_letter(db, business_id, created["id"], user_id, position.id, lang=lang, is_admin=False)
 
 
 def send_letter_email(
@@ -1348,9 +1430,11 @@ def send_letter_email(
 	user_id: int,
 	position_id: int,
 	lang: str = "fa",
+	is_admin: bool = False,
 ) -> dict:
-	letter_data = get_letter(db, business_id, letter_id, user_id, position_id, lang=lang, is_admin=True)
+	letter_data = get_letter(db, business_id, letter_id, user_id, position_id, lang=lang, is_admin=is_admin)
 	letter = _get_letter(db, business_id, letter_id)
+	refuse_external_letter(letter)
 	to_email = str(payload.get("to_email") or "").strip()
 	if not to_email:
 		raise ApiError("VALIDATION_ERROR", "Destination email is required.", http_status=400)
@@ -1422,24 +1506,34 @@ def ocr_letter_attachments(
 	position_id: int,
 	lang: str = "fa",
 ) -> dict:
-	get_letter(db, business_id, letter_id, user_id, position_id, lang=lang, is_admin=True)
+	get_letter(db, business_id, letter_id, user_id, position_id, lang=lang, is_admin=False)
 	letter = _get_letter(db, business_id, letter_id)
-	atts = (
-		db.query(OaLetterAttachment, FileStorage)
-		.outerjoin(FileStorage, FileStorage.id == OaLetterAttachment.file_storage_id)
-		.filter(OaLetterAttachment.letter_id == letter.id)
-		.all()
-	)
-	collected = []
-	for att, frow in atts:
-		text = extract_attachment_text(frow) if frow else ""
-		att.ocr_text = text or att.ocr_text
-		if text:
-			collected.append(text)
-	letter.ocr_text = "\n".join(collected)[:20000] if collected else letter.ocr_text
-	refresh_letter_search_text(db, letter)
+	from adapters.db.models.oa_document import OaOcrJob
+
+	atts = db.query(OaLetterAttachment).filter(OaLetterAttachment.letter_id == letter.id).all()
+	queued = 0
+	for att in atts:
+		pending = (
+			db.query(OaOcrJob.id)
+			.filter(OaOcrJob.letter_attachment_id == att.id, OaOcrJob.status == "queued")
+			.first()
+		)
+		if pending:
+			continue
+		db.add(
+			OaOcrJob(
+				business_id=business_id,
+				document_version_id=None,
+				letter_attachment_id=att.id,
+				status="queued",
+				created_at=_now(),
+			)
+		)
+		queued += 1
 	db.commit()
-	return get_letter(db, business_id, letter.id, user_id, position_id, lang=lang, is_admin=True)
+	data = get_letter(db, business_id, letter.id, user_id, position_id, lang=lang, is_admin=False)
+	data["ocr_queued"] = queued
+	return data
 
 
 def summarize_letter(
@@ -1450,8 +1544,9 @@ def summarize_letter(
 	position_id: int,
 	lang: str = "fa",
 ) -> dict:
-	data = get_letter(db, business_id, letter_id, user_id, position_id, lang=lang, is_admin=True)
+	data = get_letter(db, business_id, letter_id, user_id, position_id, lang=lang, is_admin=False)
 	letter = _get_letter(db, business_id, letter_id)
+	refuse_external_letter(letter)
 	source = " ".join(p for p in (letter.subject, letter.body, letter.ocr_text) if p)
 	if not source.strip():
 		raise ApiError("OA_EMPTY_LETTER", "Letter has no text to summarize.", http_status=400)
@@ -1526,25 +1621,19 @@ def _notify_letter_event(
 	sent = 0
 	try:
 		from app.services.notification_service import NotificationService
-		from adapters.db.models.business import Business
 
 		svc = NotificationService(db)
 		uids = set(int(u) for u in (user_ids or []) if u)
 		for pid in position_ids or []:
 			uids |= _holder_user_ids(db, business_id, pid)
-		bname = db.query(Business.name).filter(Business.id == business_id).scalar() or ""
+		notice, channels = letter_notification(letter, business_display_name(db, business_id))
 		for uid in uids:
 			try:
 				svc.send(
 					user_id=int(uid),
 					event_key=event_key,
-					context={
-						"subject": letter.subject,
-						"number": letter.secretariat_number or "",
-						"letter_id": letter.id,
-						"business_name": bname,
-					},
-					preferred_channels=["inapp", "sms", "email"],
+					context=notice,
+					preferred_channels=channels,
 				)
 				sent += 1
 			except Exception:

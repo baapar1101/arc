@@ -24,6 +24,8 @@ async def export_business_files_as_zip(
 	module_context: Optional[str] = None,
 	from_date: Optional[datetime] = None,
 	to_date: Optional[datetime] = None,
+	user_id: Optional[int] = None,
+	is_admin: bool = False,
 ) -> bytes:
 	"""ایجاد فایل ZIP از تمام فایل‌های کسب‌وکار"""
 	# دریافت فایل‌های کسب‌وکار
@@ -44,7 +46,9 @@ async def export_business_files_as_zip(
 	
 	if to_date:
 		query = query.filter(FileStorage.created_at <= to_date)
-	
+	from app.services.oa_document_service import restrict_file_query
+
+	query = restrict_file_query(query, db, business_id, user_id, is_admin)
 	files = query.order_by(FileStorage.created_at).all()
 	
 	if not files:
@@ -90,6 +94,8 @@ def get_export_info(
 	module_context: Optional[str] = None,
 	from_date: Optional[datetime] = None,
 	to_date: Optional[datetime] = None,
+	user_id: Optional[int] = None,
+	is_admin: bool = False,
 ) -> Dict[str, Any]:
 	"""دریافت اطلاعات فایل‌های قابل دانلود (بدون دانلود)"""
 	query = db.query(FileStorage).filter(
@@ -109,7 +115,9 @@ def get_export_info(
 	
 	if to_date:
 		query = query.filter(FileStorage.created_at <= to_date)
-	
+	from app.services.oa_document_service import restrict_file_query
+
+	query = restrict_file_query(query, db, business_id, user_id, is_admin)
 	files = query.all()
 	
 	total_size = sum(f.file_size for f in files)

@@ -44,6 +44,8 @@ def get_crm_activity_handler(args, context):
     )
     if not activity:
         raise ValueError("فعالیت CRM در کسب‌وکار متصل یافت نشد")
+    from app.services.crm_enterprise_service import guard_activity
+    guard_activity(db, bid, context["user_context"], activity)
     person = getattr(activity, "person", None)
     person_name = None
     if person is not None:

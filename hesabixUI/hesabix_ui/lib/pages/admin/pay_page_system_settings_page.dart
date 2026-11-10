@@ -5,6 +5,8 @@ import '../../l10n/app_localizations.dart';
 import '../../services/system_settings_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'admin_compact_scaffold.dart';
+import '../../theme/tokens/extensions.dart';
 
 class PayPageSystemSettingsPage extends StatefulWidget {
   const PayPageSystemSettingsPage({super.key});
@@ -86,18 +88,18 @@ class _PayPageSystemSettingsPageState extends State<PayPageSystemSettingsPage> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(t.settingsPayPageDomain),
-        actions: [
-          TextButton(
-            onPressed: _saving ? null : _save,
-            child: _saving
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                : Text(t.save, style: const TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
+    return AdminCompactScaffold(
+      title: t.settingsPayPageDomain,
+      subtitle: adminTx(context, 'دامنهٔ عمومی صفحهٔ پرداخت', 'Public domain of the payment page'),
+      actions: [
+        IconButton(
+          tooltip: t.save,
+          onPressed: _saving ? null : _save,
+          icon: _saving
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.save_outlined, size: 20),
+        ),
+      ],
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -112,7 +114,7 @@ class _PayPageSystemSettingsPageState extends State<PayPageSystemSettingsPage> {
                   ),
                 )
               : ListView(
-                  padding: const EdgeInsets.all(16),
+                  padding: context.settingsHub.pagePadding,
                   children: [
                     Form(
                       key: _formKey,
@@ -121,7 +123,7 @@ class _PayPageSystemSettingsPageState extends State<PayPageSystemSettingsPage> {
                         children: [
                           Text(
                             t.payPageDomainUrlLabel,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.onSurface),
                           ),
                           const SizedBox(height: 8),
                           Text(t.payPageDomainUrlHint, style: theme.textTheme.bodySmall),

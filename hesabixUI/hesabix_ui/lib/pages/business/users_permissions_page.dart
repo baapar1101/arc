@@ -1054,6 +1054,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
     'customer_club': 'customer_club',
     'distribution': 'distribution',
     'payroll': 'payroll',
+    'procurement': 'procurement',
     'advanced_production': 'advanced_production',
     'office_automation': 'office_automation',
     'fixed_assets': 'fixed_assets',
@@ -1373,6 +1374,13 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'operate': t.payrollPermissionOperate,
         'post': t.payrollPermissionPost,
         'approve': t.payrollPermissionApprove,
+      },
+      'procurement': {
+        'view': t.localeName.startsWith('fa') ? 'مشاهده تدارکات' : 'View procurement',
+        'operate': t.localeName.startsWith('fa') ? 'ثبت عملیات خرید' : 'Operate procurement',
+        'approve': t.localeName.startsWith('fa') ? 'تأیید خرید' : 'Approve procurement',
+        'manage': t.localeName.startsWith('fa') ? 'تنظیم تدارکات' : 'Manage procurement',
+        'admin': t.localeName.startsWith('fa') ? 'مدیریت کامل تدارکات' : 'Administer procurement',
       },
       'advanced_production': {
         'view': '${t.view} ${t.advancedProductionMenu}',
@@ -2004,6 +2012,11 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'sections': ['payroll'],
       },
       {
+        'title': t.localeName.startsWith('fa') ? 'خرید و تدارکات' : 'Procurement',
+        'icon': Icons.shopping_cart_outlined,
+        'sections': ['procurement'],
+      },
+      {
         'title': t.advancedProductionMenu,
         'icon': Icons.precision_manufacturing_outlined,
         'sections': ['advanced_production'],
@@ -2191,6 +2204,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.distributionMenu;
       case 'payroll':
         return t.payrollMenu;
+      case 'procurement':
+        return t.localeName.startsWith('fa') ? 'خرید و تدارکات' : 'Procurement';
       case 'advanced_production':
         return t.advancedProductionMenu;
       case 'office_automation':

@@ -4,9 +4,12 @@ import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/models/ai_models.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../theme/tokens/extensions.dart';
+import 'admin_compact_scaffold.dart';
 
 class AISettingsPage extends StatefulWidget {
-  const AISettingsPage({super.key});
+  final bool embedded;
+  const AISettingsPage({super.key, this.embedded = false});
 
   @override
   State<AISettingsPage> createState() => _AISettingsPageState();
@@ -23,7 +26,6 @@ class _AISettingsPageState extends State<AISettingsPage> {
   final _providerController = TextEditingController();
   final _modelController = TextEditingController();
   final _apiBaseUrlController = TextEditingController();
-  final _apiKeyController = TextEditingController();
   final _maxTokensController = TextEditingController(text: '2000');
   final _temperatureController = TextEditingController(text: '0.7');
   bool _isActive = false;
@@ -73,8 +75,6 @@ class _AISettingsPageState extends State<AISettingsPage> {
         'api_base_url': _apiBaseUrlController.text.trim().isEmpty
             ? null
             : _apiBaseUrlController.text.trim(),
-        if (_apiKeyController.text.trim().isNotEmpty)
-          'api_key': _apiKeyController.text.trim(),
         'max_tokens': int.parse(_maxTokensController.text),
         'temperature': double.parse(_temperatureController.text),
         'is_active': _isActive,
@@ -84,7 +84,7 @@ class _AISettingsPageState extends State<AISettingsPage> {
       await _aiService.updateAIConfig(data);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تنظیمات با موفقیت ذخیره شد')),
+          SnackBar(content: Text(adminTx(context, 'تنظیمات ذخیره شد', 'Settings saved'))),
         );
         _load();
       }
@@ -104,13 +104,15 @@ class _AISettingsPageState extends State<AISettingsPage> {
       if (mounted) {
         showDialog(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('تست اتصال'),
-            content: Text(result['message'] ?? 'اتصال با موفقیت برقرار شد'),
+          builder: (dialogContext) => AlertDialog(
+            title: Text(adminTx(context, 'تست اتصال', 'Connection test')),
+            content: Text(
+              '${result['message'] ?? adminTx(context, 'اتصال برقرار شد', 'Connected')}',
+            ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('بستن'),
+                onPressed: () => Navigator.pop(dialogContext),
+                child: Text(adminTx(context, 'بستن', 'Close')),
               ),
             ],
           ),
@@ -120,7 +122,7 @@ class _AISettingsPageState extends State<AISettingsPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('خطا در تست اتصال: ${ErrorExtractor.forContext(e, context)}'),
+            content: Text('${adminTx(context, 'خطا در تست اتصال', 'Connection test failed')}: ${ErrorExtractor.forContext(e, context)}'),
           ),
         );
       }
@@ -134,25 +136,45 @@ class _AISettingsPageState extends State<AISettingsPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final hub = context.settingsHub;
+    final scheme = theme.colorScheme;
+    final appBar = aiHubAppBar(
+      embedded: widget.embedded,
+      title: Text(adminTx(context, 'تنظیمات AI', 'AI settings')),
+      actions: [
+        if (_testing)
+          const Padding(
+            padding: EdgeInsets.all(12),
+            child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+          )
+        else
+          IconButton(
+            icon: const Icon(Icons.wifi_tethering_outlined, size: 20),
+            onPressed: _testConnection,
+            tooltip: adminTx(context, 'تست اتصال با اعتبارنامه', 'Test connection with credentials'),
+          ),
+      ],
+    );
 
     if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return Scaffold(appBar: appBar, body: const Center(child: CircularProgressIndicator()));
     }
 
     if (_error != null && _config == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('تنظیمات AI')),
+        appBar: appBar,
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text('خطا: $_error'),
-              const SizedBox(height: 16),
-              ElevatedButton(
+              Text(
+                '${adminTx(context, 'خطا', 'Error')}: $_error',
+                style: hub.cardSubtitleStyle(theme.textTheme, color: scheme.error),
+              ),
+              const SizedBox(height: 12),
+              FilledButton(
                 onPressed: _load,
-                child: const Text('تلاش مجدد'),
+                child: Text(adminTx(context, 'تلاش مجدد', 'Retry')),
               ),
             ],
           ),
@@ -161,28 +183,9 @@ class _AISettingsPageState extends State<AISettingsPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('تنظیمات AI'),
-        actions: [
-          if (_testing)
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            )
-          else
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _testConnection,
-              tooltip: 'تست اتصال',
-            ),
-        ],
-      ),
+      appBar: appBar,
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: hub.pagePadding,
         child: Form(
           key: _formKey,
           child: Column(
@@ -190,138 +193,135 @@ class _AISettingsPageState extends State<AISettingsPage> {
             children: [
               Card(
                 child: Padding(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        'تنظیمات Provider',
-                        style: theme.textTheme.titleLarge,
+                        adminTx(context, 'ارائه‌دهنده', 'Provider'),
+                        style: hub.cardTitleStyle(theme.textTheme, color: scheme.onSurface),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
-                        value: _providerController.text.isEmpty
-                            ? null
-                            : _providerController.text,
-                        decoration: const InputDecoration(
-                          labelText: 'Provider',
-                          prefixIcon: Icon(Icons.cloud_outlined),
+                        value: _providerController.text.isEmpty ? null : _providerController.text,
+                        decoration: InputDecoration(
+                          isDense: true,
+                          labelText: adminTx(context, 'ارائه‌دهنده', 'Provider'),
                         ),
                         items: const [
                           DropdownMenuItem(value: 'openai', child: Text('OpenAI')),
                           DropdownMenuItem(value: 'anthropic', child: Text('Anthropic')),
                           DropdownMenuItem(value: 'local', child: Text('Local (Ollama)')),
                         ],
-                        onChanged: (v) {
-                          setState(() => _providerController.text = v ?? '');
-                        },
-                        validator: (v) => v == null ? 'Provider الزامی است' : null,
+                        onChanged: (v) => setState(() => _providerController.text = v ?? ''),
+                        validator: (v) => v == null ? adminTx(context, 'ارائه‌دهنده الزامی است', 'Provider is required') : null,
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 8),
                       TextFormField(
                         controller: _modelController,
-                        decoration: const InputDecoration(
-                          labelText: 'نام مدل',
-                          prefixIcon: Icon(Icons.smart_toy_outlined),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          labelText: adminTx(context, 'نام مدل', 'Model name'),
                         ),
-                        validator: (v) => v?.isEmpty ?? true ? 'نام مدل الزامی است' : null,
+                        validator: (v) => (v?.isEmpty ?? true) ? adminTx(context, 'نام مدل الزامی است', 'Model name is required') : null,
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 8),
                       TextFormField(
                         controller: _apiBaseUrlController,
-                        decoration: const InputDecoration(
-                          labelText: 'آدرس API (اختیاری)',
-                          prefixIcon: Icon(Icons.link_outlined),
-                          helperText: 'برای Local Provider الزامی است',
+                        decoration: InputDecoration(
+                          isDense: true,
+                          labelText: adminTx(context, 'آدرس API (اختیاری)', 'API address (optional)'),
+                          helperText: adminTx(context, 'برای ارائه‌دهندهٔ محلی الزامی است', 'Required for a local provider'),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _apiKeyController,
-                        decoration: const InputDecoration(
-                          labelText: 'API Key',
-                          prefixIcon: Icon(Icons.key_outlined),
-                          helperText: 'برای تغییر API Key، مقدار جدید را وارد کنید',
+                      const SizedBox(height: 8),
+                      Text(
+                        adminTx(
+                          context,
+                          'کلید API فقط در زبانهٔ اعتبارنامه‌ها ذخیره می‌شود.',
+                          'API keys are stored only on the credentials tab.',
                         ),
-                        obscureText: true,
+                        style: hub.cardSubtitleStyle(theme.textTheme, color: scheme.onSurfaceVariant),
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 8),
               Card(
                 child: Padding(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        'تنظیمات پیش‌فرض',
-                        style: theme.textTheme.titleLarge,
+                        adminTx(context, 'پیش‌فرض‌ها', 'Defaults'),
+                        style: hub.cardTitleStyle(theme.textTheme, color: scheme.onSurface),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 8),
                       TextFormField(
                         controller: _maxTokensController,
-                        decoration: const InputDecoration(
-                          labelText: 'حداکثر توکن',
-                          prefixIcon: Icon(Icons.numbers_outlined),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          labelText: adminTx(context, 'حداکثر توکن', 'Max tokens'),
                         ),
                         keyboardType: TextInputType.number,
                         validator: (v) {
-                          if (v?.isEmpty ?? true) return 'الزامی است';
+                          if (v?.isEmpty ?? true) return adminTx(context, 'الزامی است', 'Required');
                           final val = int.tryParse(v!);
-                          if (val == null || val <= 0) return 'باید عدد مثبت باشد';
+                          if (val == null || val <= 0) return adminTx(context, 'باید عدد مثبت باشد', 'Must be a positive number');
                           return null;
                         },
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 8),
                       TextFormField(
                         controller: _temperatureController,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
+                          isDense: true,
                           labelText: 'Temperature',
-                          prefixIcon: Icon(Icons.thermostat_outlined),
-                          helperText: 'مقدار بین 0 تا 2',
+                          helperText: adminTx(context, 'بین ۰ و ۲', 'Between 0 and 2'),
                         ),
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         validator: (v) {
-                          if (v?.isEmpty ?? true) return 'الزامی است';
+                          if (v?.isEmpty ?? true) return adminTx(context, 'الزامی است', 'Required');
                           final val = double.tryParse(v!);
                           if (val == null || val < 0 || val > 2) {
-                            return 'باید بین 0 تا 2 باشد';
+                            return adminTx(context, 'باید بین ۰ و ۲ باشد', 'Must be between 0 and 2');
                           }
                           return null;
                         },
                       ),
-                      const SizedBox(height: 16),
                       SwitchListTile(
-                        title: const Text('فعال'),
-                        subtitle: const Text('AI در دسترس کاربران باشد'),
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(adminTx(context, 'فعال', 'Active')),
+                        subtitle: Text(adminTx(context, 'هوش مصنوعی برای کاربران در دسترس باشد', 'Make AI available to users')),
                         value: _isActive,
                         onChanged: (v) => setState(() => _isActive = v),
                       ),
                       SwitchListTile(
-                        title: const Text('فراخوانی توابع (ابزارها)'),
-                        subtitle: const Text(
-                          'برای OpenAI رسمی یا vLLM با tool parser بگذارید روشن. '
-                          'برای gatewayهایی مثل برخی deploymentهای Arvan که خطای tool choice می‌دهند، خاموش کنید.',
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(adminTx(context, 'فراخوانی ابزارها', 'Tool calling')),
+                        subtitle: Text(
+                          adminTx(
+                            context,
+                            'برای OpenAI یا vLLM با tool parser روشن بماند. اگر درگاه خطای tool choice می‌دهد، خاموش کنید.',
+                            'Leave on for OpenAI or vLLM with a tool parser. Turn off if the gateway rejects tool choice.',
+                          ),
                         ),
                         value: _functionCallingEnabled,
-                        onChanged: (v) =>
-                            setState(() => _functionCallingEnabled = v),
+                        onChanged: (v) => setState(() => _functionCallingEnabled = v),
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
+              const SizedBox(height: 8),
+              FilledButton.icon(
                 onPressed: _save,
-                icon: const Icon(Icons.save_outlined),
-                label: const Text('ذخیره تنظیمات'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.all(16),
-                ),
+                icon: const Icon(Icons.save_outlined, size: 18),
+                label: Text(adminTx(context, 'ذخیره تنظیمات', 'Save settings')),
               ),
             ],
           ),
@@ -335,7 +335,6 @@ class _AISettingsPageState extends State<AISettingsPage> {
     _providerController.dispose();
     _modelController.dispose();
     _apiBaseUrlController.dispose();
-    _apiKeyController.dispose();
     _maxTokensController.dispose();
     _temperatureController.dispose();
     super.dispose();

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
@@ -9,6 +10,9 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/crm_service.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/crm/crm_delete_confirm_dialog.dart';
+import 'package:hesabix_ui/widgets/crm/crm_global_search_dialog.dart';
+import 'package:hesabix_ui/widgets/crm/crm_kanban_draggable.dart';
+import 'package:hesabix_ui/widgets/crm/crm_saved_view_bar.dart';
 import 'package:hesabix_ui/widgets/crm/crm_lead_form_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_lead_quick_create_dialog.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -52,6 +56,9 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
   int _total = 0;
   int _page = 1;
   bool _kanbanView = false;
+  bool _filtersInSheet = false;
+  List<Map<String, dynamic>> _savedViews = [];
+  int? _activeViewId;
 
   @override
   void initState() {
@@ -90,6 +97,7 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
     });
     _loadLeadSources();
     _loadFilterUsers();
+    _loadSavedViews();
     _load();
   }
 
@@ -194,6 +202,142 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
     }
   }
 
+  Future<void> _loadSavedViews() async {
+    try {
+      final views = await _crmService.listSavedViews(businessId: widget.businessId, entityType: 'lead');
+      if (!mounted) return;
+      setState(() => _savedViews = views);
+    } catch (_) {}
+  }
+
+  Map<String, dynamic> _currentLeadFilters() {
+    return {
+      if (_filterProcessDefinitionId != null) 'process_definition_id': _filterProcessDefinitionId,
+      if (_filterStageId != null) 'stage_id': _filterStageId,
+      if (_filterAssignedToUserId != null) 'assigned_to_user_id': _filterAssignedToUserId,
+      if (_searchQuery.isNotEmpty) 'search': _searchQuery,
+      'kanban': _kanbanView,
+    };
+  }
+
+  void _syncStagesForProcess() {
+    _stages = [];
+    if (_filterProcessDefinitionId == null) return;
+    final proc = _processDefs.cast<Map<String, dynamic>?>().firstWhere(
+          (e) => e?['id'] == _filterProcessDefinitionId,
+          orElse: () => <String, dynamic>{},
+        );
+    final stagesRaw = proc?['stages'];
+    _stages = stagesRaw is List ? stagesRaw.cast<Map<String, dynamic>>() : <Map<String, dynamic>>[];
+  }
+
+  void _applySavedView(Map<String, dynamic> view) {
+    final filters = view['filters'] is Map ? Map<String, dynamic>.from(view['filters'] as Map) : <String, dynamic>{};
+    setState(() {
+      _activeViewId = (view['id'] as num?)?.toInt();
+      _filterProcessDefinitionId = (filters['process_definition_id'] as num?)?.toInt();
+      _filterStageId = (filters['stage_id'] as num?)?.toInt();
+      _filterAssignedToUserId = (filters['assigned_to_user_id'] as num?)?.toInt();
+      _kanbanView = filters['kanban'] == true;
+      _searchQuery = filters['search']?.toString() ?? '';
+      _searchController.text = _searchQuery;
+      _syncStagesForProcess();
+    });
+    _load(resetPage: true);
+  }
+
+  Future<void> _saveCurrentView() async {
+    final nameController = TextEditingController();
+    var shared = false;
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('ذخیره نما'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                autofocus: true,
+                decoration: const InputDecoration(labelText: 'نام نما'),
+              ),
+              const SizedBox(height: 8),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('مشترک با تیم'),
+                value: shared,
+                onChanged: (v) => setLocal(() => shared = v),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('انصراف')),
+            FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('ذخیره')),
+          ],
+        ),
+      ),
+    );
+    final name = nameController.text.trim();
+    nameController.dispose();
+    if (saved != true || name.isEmpty || !mounted) return;
+    try {
+      await _crmService.createSavedView(
+        businessId: widget.businessId,
+        entityType: 'lead',
+        name: name,
+        filters: _currentLeadFilters(),
+        isShared: shared,
+      );
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: 'نما ذخیره شد');
+      await _loadSavedViews();
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: ErrorExtractor.forContext(e, context), isError: true);
+    }
+  }
+
+  Future<void> _deleteSavedView(int id) async {
+    try {
+      await _crmService.deleteSavedView(businessId: widget.businessId, viewId: id);
+      if (!mounted) return;
+      setState(() {
+        if (_activeViewId == id) _activeViewId = null;
+      });
+      await _loadSavedViews();
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: ErrorExtractor.forContext(e, context), isError: true);
+    }
+  }
+
+  void _openGlobalSearch() {
+    CrmGlobalSearchDialog.show(context, businessId: widget.businessId, crmService: _crmService);
+  }
+
+  void _shortcutNew() {
+    if (widget.authStore.hasBusinessPermission('crm', 'write') && _processDefs.isNotEmpty) {
+      _onAdd();
+    }
+  }
+
+  void _closeFilterSheetIfOpen() {
+    if (_filtersInSheet) Navigator.of(context).pop();
+  }
+
+  Widget _withWorkspaceShortcuts(Widget child) {
+    return CallbackShortcuts(
+      bindings: <ShortcutActivator, VoidCallback>{
+        const SingleActivator(LogicalKeyboardKey.keyK, control: true): _openGlobalSearch,
+        const SingleActivator(LogicalKeyboardKey.keyK, meta: true): _openGlobalSearch,
+        const SingleActivator(LogicalKeyboardKey.keyN, control: true): _shortcutNew,
+        const SingleActivator(LogicalKeyboardKey.keyN, meta: true): _shortcutNew,
+      },
+      child: Focus(autofocus: true, child: child),
+    );
+  }
+
   static String _csvEscape(String? s) {
     if (s == null) return '';
     final t = s.replaceAll('"', '""');
@@ -261,7 +405,7 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
       return AccessDeniedPage(message: 'شما دسترسی لازم برای مشاهده CRM را ندارید');
     }
 
-    return Scaffold(
+    return _withWorkspaceShortcuts(Scaffold(
       appBar: AppBar(
         title: const Text('سرنخ‌ها'),
         leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
@@ -280,6 +424,11 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
             },
           ),
           const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.manage_search),
+            tooltip: 'جست‌وجوی CRM (Ctrl+K)',
+            onPressed: _openGlobalSearch,
+          ),
           IconButton(
             icon: const Icon(Icons.download),
             onPressed: _exportCsv,
@@ -346,8 +495,19 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
                   ],
                 ),
                 const SizedBox(height: 12),
+                CrmSavedViewBar(
+                  views: _savedViews,
+                  activeId: _activeViewId,
+                  canSave: widget.authStore.hasBusinessPermission('crm', 'write'),
+                  onSave: _saveCurrentView,
+                  onApply: _applySavedView,
+                  onDelete: _deleteSavedView,
+                ),
+                const SizedBox(height: 8),
                 if (_processDefs.isNotEmpty)
-                  Row(
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final fields = Row(
                 children: [
                   Expanded(
                     child: DropdownButtonFormField<int?>(
@@ -371,6 +531,7 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
                           }
                         });
                         _load(resetPage: true);
+                        _closeFilterSheetIfOpen();
                       },
                     ),
                   ),
@@ -390,6 +551,7 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
                         onChanged: (v) {
                           setState(() => _filterStageId = v);
                           _load(resetPage: true);
+                          _closeFilterSheetIfOpen();
                         },
                       ),
                     ),
@@ -409,12 +571,38 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
                         onChanged: (v) {
                           setState(() => _filterAssignedToUserId = v);
                           _load(resetPage: true);
+                          _closeFilterSheetIfOpen();
                         },
                       ),
                     ),
                   ],
                 ],
-                ),
+                );
+                      if (constraints.maxWidth >= 720) return fields;
+                      return Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            setState(() => _filtersInSheet = true);
+                            await showModalBottomSheet<void>(
+                              context: context,
+                              showDragHandle: true,
+                              isScrollControlled: true,
+                              builder: (ctx) => SafeArea(
+                                child: SingleChildScrollView(
+                                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                                  child: fields,
+                                ),
+                              ),
+                            );
+                            if (mounted) setState(() => _filtersInSheet = false);
+                          },
+                          icon: const Icon(Icons.tune),
+                          label: const Text('فیلتر فانل'),
+                        ),
+                      );
+                    },
+                  ),
               ],
             ),
           ),
@@ -563,7 +751,7 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
               tooltip: 'سرنخ جدید',
             )
           : null,
-    );
+    ));
   }
 
   Widget _buildLeadsKanbanView() {
@@ -682,25 +870,7 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
                                     ),
                                   );
                                   if (!canWrite || isConverted || id == null) return card;
-                                  return LongPressDraggable<Map<String, dynamic>>(
-                                    data: l,
-                                    feedback: Material(
-                                      elevation: 6,
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: SizedBox(
-                                        width: 240,
-                                        child: Card(
-                                          child: ListTile(
-                                            dense: true,
-                                            title: Text(name, maxLines: 1),
-                                            subtitle: const Text('رها کنید روی مرحله مقصد'),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    childWhenDragging: Opacity(opacity: 0.35, child: card),
-                                    child: card,
-                                  );
+                                  return CrmKanbanDraggable(data: l, feedbackTitle: name, child: card);
                                 }),
                                 if (canWrite)
                                   TextButton.icon(

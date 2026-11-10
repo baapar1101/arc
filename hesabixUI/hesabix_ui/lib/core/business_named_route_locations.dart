@@ -60,6 +60,7 @@ abstract final class BusinessNamedRoutes {
     'business_crm_tasks': 'crm/tasks',
     'business_crm_customer_360': 'crm/customer-360',
     'business_crm_sequences': 'crm/sequences',
+    'business_crm_enterprise': 'crm/enterprise',
     'business_crm_notes_calendar': 'crm/notes-calendar',
     'business_crm_web_chat': 'crm/web-chat',
     'business_invoice': 'invoice',

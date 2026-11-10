@@ -1,16 +1,16 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/utils/date_formatters.dart' as date_formatters;
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table.dart';
-
-import 'admin_user_password_dialog.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
+
+import 'admin_compact_scaffold.dart';
+import 'admin_user_password_dialog.dart';
+import '../../theme/tokens/extensions.dart';
 
 class UserManagementPage extends StatefulWidget {
   const UserManagementPage({super.key});
@@ -85,56 +85,50 @@ class _UserManagementPageState extends State<UserManagementPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'مدیریت کاربران سیستم',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/user/profile/system-settings'),
-        ),
-        actions: [
-          Tooltip(
-            message:
-                'تعداد کاربران «فعّال» سیستمی که ضربان اپ را در ۵ دقیقهٔ اخیر ثبت کرده‌اند (برآورد تقریبی آنلاین بودن؛ نه تعداد قطعی سوکت‌ها).',
-            child: Padding(
-              padding: const EdgeInsetsDirectional.only(start: 4, end: 8),
-              child: Chip(
-                avatar: Icon(Icons.sensors_rounded, size: 18, color: theme.colorScheme.primary),
-                label: Text(
-                  _recentApproxCount == null
-                      ? 'فعالیت اخیر: …'
-                      : 'فعالیت اخیر (~۵ دق): ${_recentApproxCount!} نفر',
-                  style: const TextStyle(fontSize: 13),
-                ),
+    return AdminCompactScaffold(
+      title: adminTx(context, 'کاربران', 'Users'),
+      subtitle: adminTx(context, 'نمایش، فیلتر و کنترل کاربران سیستم', 'View, filter, and manage system users'),
+      actions: [
+        Tooltip(
+          message: adminTx(
+            context,
+            'کاربرانی که در ۵ دقیقهٔ اخیر در اپ فعال بوده‌اند. این عدد برآورد است.',
+            'Users active in the app during the last 5 minutes. This is an estimate.',
+          ),
+          child: Padding(
+            padding: const EdgeInsetsDirectional.only(end: 4),
+            child: Chip(
+              visualDensity: VisualDensity.compact,
+              avatar: Icon(Icons.sensors_rounded, size: 16, color: theme.colorScheme.primary),
+              label: Text(
+                _recentApproxCount == null
+                    ? adminTx(context, 'فعالیت اخیر: …', 'Recent activity: …')
+                    : adminTx(context, '۵ دقیقه: ${_recentApproxCount!}', '5 min: ${_recentApproxCount!}'),
+                style: const TextStyle(fontSize: 11),
               ),
             ),
           ),
-          IconButton(
-            tooltip: 'به‌روزرسانی شمارندهٔ فعالیت اخیر',
-            icon: const Icon(Icons.sync),
-            onPressed: _fetchRecentApproxCount,
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: DataTableWidget<Map<String, dynamic>>(
+        ),
+        IconButton(
+          tooltip: adminTx(context, 'بازخوانی فعالیت اخیر', 'Refresh recent activity'),
+          icon: const Icon(Icons.sync, size: 20),
+          onPressed: _fetchRecentApproxCount,
+        ),
+      ],
+      body: DataTableWidget<Map<String, dynamic>>(
           key: _usersTableKey,
           config: _buildTableConfig(theme),
           fromJson: (json) => Map<String, dynamic>.from(json),
           calendarController: _calendarController,
         ),
-      ),
     );
   }
 
   DataTableConfig<Map<String, dynamic>> _buildTableConfig(ThemeData theme) {
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/api/v1/users/search',
-      title: 'مدیریت کاربران',
-      subtitle: BrandConfig.rebrand('نمایش، فیلتر و کنترل کاربران سیستم حسابیکس'),
+      showTableIcon: false,
+      emptyStateMessage: adminTx(context, 'کاربری یافت نشد', 'No users found'),
       tableId: 'admin_users',
       showSearch: true,
       showFilters: true,
@@ -154,7 +148,6 @@ class _UserManagementPageState extends State<UserManagementPage> {
       pageSizeOptions: const [10, 20, 50, 100],
       searchFields: const ['first_name', 'last_name', 'email', 'mobile'],
       filterFields: const ['status', 'role'],
-      emptyStateMessage: 'کاربری یافت نشد',
       onRowTap: (item) => _openUserDetailsDialog(item as Map<String, dynamic>),
       onRowSelectionChanged: (indexes) {
         setState(() => _selectedRowIndexes = {...indexes});
@@ -164,18 +157,18 @@ class _UserManagementPageState extends State<UserManagementPage> {
       },
       customHeaderActions: [
         Tooltip(
-          message: 'فعال‌سازی کاربران انتخاب‌شده',
+          message: adminTx(context, 'فعال‌سازی کاربران انتخاب‌شده', 'Activate selected users'),
           child: FilledButton.icon(
             onPressed: _selectedCount > 0
                 ? () => _handleBulkAction(_BulkUserAction.activate)
                 : null,
-            icon: const Icon(Icons.verified_user_outlined),
-            label: Text('فعال‌سازی ($_selectedCount)'),
+            icon: const Icon(Icons.verified_user_outlined, size: 18),
+            label: Text('${adminTx(context, 'فعال‌سازی', 'Activate')} ($_selectedCount)'),
           ),
         ),
         const SizedBox(width: 8),
         Tooltip(
-          message: 'تعلیق یا غیرفعال‌سازی کاربران انتخاب‌شده',
+          message: adminTx(context, 'تعلیق کاربران انتخاب‌شده', 'Suspend selected users'),
           child: FilledButton.icon(
             onPressed: _selectedCount > 0
                 ? () => _handleBulkAction(_BulkUserAction.deactivate)
@@ -184,19 +177,19 @@ class _UserManagementPageState extends State<UserManagementPage> {
               backgroundColor: theme.colorScheme.errorContainer,
               foregroundColor: theme.colorScheme.onErrorContainer,
             ),
-            icon: const Icon(Icons.pause_circle_outline),
-            label: Text('تعلیق ($_selectedCount)'),
+            icon: const Icon(Icons.pause_circle_outline, size: 18),
+            label: Text('${adminTx(context, 'تعلیق', 'Suspend')} ($_selectedCount)'),
           ),
         ),
         const SizedBox(width: 8),
         Tooltip(
-          message: 'بازنشانی رمز عبور کاربران انتخاب‌شده',
+          message: adminTx(context, 'بازنشانی رمز کاربران انتخاب‌شده', 'Reset passwords for selected users'),
           child: OutlinedButton.icon(
             onPressed: _selectedCount > 0
                 ? () => _handleBulkAction(_BulkUserAction.resetPassword)
                 : null,
-            icon: const Icon(Icons.key_outlined),
-            label: const Text('بازنشانی رمز'),
+            icon: const Icon(Icons.key_outlined, size: 18),
+            label: Text(adminTx(context, 'بازنشانی رمز', 'Reset password')),
           ),
         ),
       ],
@@ -211,7 +204,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         ),
         TextColumn(
           'full_name',
-          'نام کاربر',
+          adminTx(context, 'نام کاربر', 'Name'),
           width: ColumnWidth.medium,
           sortable: true,
           searchable: true,
@@ -219,12 +212,12 @@ class _UserManagementPageState extends State<UserManagementPage> {
             final map = item as Map<String, dynamic>;
             final fullName = (map['full_name'] as String?) ??
                 '${map['first_name'] ?? ''} ${map['last_name'] ?? ''}'.trim();
-            return fullName.isNotEmpty ? fullName : 'نام ثبت نشده';
+            return fullName.isNotEmpty ? fullName : adminTx(context, 'نام ثبت نشده', 'No name');
           },
         ),
         TextColumn(
           'email',
-          'ایمیل',
+          adminTx(context, 'ایمیل', 'Email'),
           width: ColumnWidth.medium,
           sortable: true,
           searchable: true,
@@ -235,7 +228,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         ),
         TextColumn(
           'mobile',
-          'موبایل',
+          adminTx(context, 'موبایل', 'Mobile'),
           width: ColumnWidth.medium,
           sortable: true,
           searchable: true,
@@ -246,14 +239,14 @@ class _UserManagementPageState extends State<UserManagementPage> {
         ),
         CustomColumn(
           'status',
-          'وضعیت',
+          adminTx(context, 'وضعیت', 'Status'),
           width: ColumnWidth.small,
           filterType: ColumnFilterType.multiSelect,
-          filterOptions: const [
-            FilterOption(value: 'active', label: 'فعال'),
-            FilterOption(value: 'inactive', label: 'غیرفعال'),
-            FilterOption(value: 'pending', label: 'در انتظار'),
-            FilterOption(value: 'suspended', label: 'معلق'),
+          filterOptions: [
+            FilterOption(value: 'active', label: adminTx(context, 'فعال', 'Active')),
+            FilterOption(value: 'inactive', label: adminTx(context, 'غیرفعال', 'Inactive')),
+            FilterOption(value: 'pending', label: adminTx(context, 'در انتظار', 'Pending')),
+            FilterOption(value: 'suspended', label: adminTx(context, 'معلق', 'Suspended')),
           ],
           builder: (item, index) {
             final map = item as Map<String, dynamic>;
@@ -263,18 +256,18 @@ class _UserManagementPageState extends State<UserManagementPage> {
             );
           },
           formatter: (item) =>
-              _statusLabel((item as Map<String, dynamic>)['status']),
+              _userStatusLabel(context, (item as Map<String, dynamic>)['status']),
         ),
         CustomColumn(
           'role',
-          'نقش',
+          adminTx(context, 'نقش', 'Role'),
           width: ColumnWidth.small,
           filterType: ColumnFilterType.multiSelect,
-          filterOptions: const [
-            FilterOption(value: 'admin', label: 'مدیر سیستم'),
-            FilterOption(value: 'operator', label: 'اپراتور'),
-            FilterOption(value: 'supervisor', label: 'ناظر'),
-            FilterOption(value: 'user', label: 'کاربر'),
+          filterOptions: [
+            FilterOption(value: 'admin', label: adminTx(context, 'مدیر سیستم', 'System admin')),
+            FilterOption(value: 'operator', label: adminTx(context, 'اپراتور', 'Operator')),
+            FilterOption(value: 'supervisor', label: adminTx(context, 'ناظر', 'Supervisor')),
+            FilterOption(value: 'user', label: adminTx(context, 'کاربر', 'User')),
           ],
           builder: (item, index) {
             final map = item as Map<String, dynamic>;
@@ -284,11 +277,11 @@ class _UserManagementPageState extends State<UserManagementPage> {
             );
           },
           formatter: (item) =>
-              _roleLabel((item as Map<String, dynamic>)['role']),
+              _userRoleLabel(context, (item as Map<String, dynamic>)['role']),
         ),
         CustomColumn(
           'businesses_count',
-          'کسب‌وکارها',
+          adminTx(context, 'کسب‌وکارها', 'Businesses'),
           width: ColumnWidth.small,
           builder: (item, index) {
             final count = (item as Map<String, dynamic>)['businesses_count'] ?? 0;
@@ -313,7 +306,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         ),
         DateColumn(
           'last_login_at',
-          'آخرین ورود',
+          adminTx(context, 'آخرین ورود', 'Last login'),
           width: ColumnWidth.medium,
           sortable: true,
           showTime: false,
@@ -324,7 +317,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         ),
         DateColumn(
           'created_at',
-          'تاریخ ثبت‌نام',
+          adminTx(context, 'تاریخ ثبت‌نام', 'Signed up'),
           width: ColumnWidth.medium,
           sortable: true,
           showTime: false,
@@ -334,22 +327,22 @@ class _UserManagementPageState extends State<UserManagementPage> {
         ),
         ActionColumn(
           'actions',
-          'عملیات',
+          adminTx(context, 'عملیات', 'Actions'),
           actions: [
             DataTableAction(
               icon: Icons.info_outline,
-              label: 'جزئیات',
+              label: adminTx(context, 'جزئیات', 'Details'),
               onTap: (item) =>
                   _openUserDetailsDialog(item as Map<String, dynamic>),
             ),
             DataTableAction(
               icon: Icons.key,
-              label: 'مدیریت رمز',
+              label: adminTx(context, 'مدیریت رمز', 'Password'),
               onTap: (item) => _openUserPasswordManager(item as Map<String, dynamic>),
             ),
             DataTableAction(
               icon: Icons.pause_circle_outline,
-              label: 'تعلیق',
+              label: adminTx(context, 'تعلیق', 'Suspend'),
               isDestructive: true,
               onTap: (item) => _suspendUser(item as Map<String, dynamic>),
             ),
@@ -387,7 +380,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('شناسهٔ معتبری در انتخاب فعلی یافت نشد. صفحه را تازه‌سازی کنید.'),
+            content: Text(adminTx(context, 'شناسهٔ معتبری در انتخاب نیست. صفحه را تازه کنید.', 'The selection has no valid id. Refresh the page.')),
             backgroundColor: SemanticColorResolver.warning(context),
           ),
         );
@@ -405,22 +398,28 @@ class _UserManagementPageState extends State<UserManagementPage> {
         builder: (c) => StatefulBuilder(
           builder: (ctx, setSt) {
             return AlertDialog(
-              title: Text('بازنشانی رمز برای ${ids.length} کاربر'),
+              title: Text(adminTx(context, 'بازنشانی رمز برای ${ids.length} کاربر', 'Reset password for ${ids.length} users')),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text('برای هر کاربر که ایمیل یا موبایل داشته باشد، توکن بازنشانی ساخته می‌شود.'),
+                  Text(adminTx(
+                    context,
+                    'برای هر کاربر که ایمیل یا موبایل داشته باشد، توکن بازنشانی ساخته می‌شود.',
+                    'A reset token is created for each user who has an email or mobile number.',
+                  )),
                   SwitchListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
                     value: sendNotif,
                     onChanged: (v) => setSt(() => sendNotif = v),
-                    title: const Text('ارسال اعلان (auth.password_reset)'),
+                    title: Text(adminTx(context, 'ارسال اعلان بازنشانی', 'Send the reset notification')),
                   ),
                 ],
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('انصراف')),
-                FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('ادامه')),
+                TextButton(onPressed: () => Navigator.pop(c, false), child: Text(adminTx(context, 'انصراف', 'Cancel'))),
+                FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(adminTx(context, 'ادامه', 'Continue'))),
               ],
             );
           },
@@ -439,7 +438,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
           final data = res.data?['data'] as Map<String, dynamic>?;
           final created = data?['tokens_created'] ?? 0;
           messenger.showSnackBar(
-            SnackBar(content: Text('توکن ساخته‌شده: $created از ${ids.length}')),
+            SnackBar(content: Text('${adminTx(context, 'توکن ساخته‌شده', 'Tokens created')}: $created / ${ids.length}')),
           );
           setState(() => _selectedRowIndexes = const {});
           _refreshTable();
@@ -449,7 +448,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         final err = Theme.of(context).colorScheme.error;
         messenger.showSnackBar(
           SnackBar(
-            content: Text('خطا: ${ErrorExtractor.forContext(e, context)}'),
+            content: Text('${adminTx(context, 'خطا', 'Error')}: ${ErrorExtractor.forContext(e, context)}'),
             backgroundColor: err,
           ),
         );
@@ -458,18 +457,18 @@ class _UserManagementPageState extends State<UserManagementPage> {
     }
 
     final title = action == _BulkUserAction.activate
-        ? 'فعال‌سازی ${ids.length} کاربر؟'
-        : 'تعلیق ${ids.length} کاربر؟';
+        ? adminTx(context, 'فعال‌سازی ${ids.length} کاربر؟', 'Activate ${ids.length} users?')
+        : adminTx(context, 'تعلیق ${ids.length} کاربر؟', 'Suspend ${ids.length} users?');
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
         title: Text(title),
-        content: const Text('این عملیات روی همهٔ شناسه‌های انتخاب‌شده (در همین صفحه) اعمال می‌شود.'),
+        content: Text(adminTx(context, 'این کار روی همهٔ کاربران انتخاب‌شده در همین صفحه اعمال می‌شود.', 'This applies to every user selected on this page.')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('انصراف')),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(adminTx(context, 'انصراف', 'Cancel'))),
           FilledButton(
             onPressed: () => Navigator.pop(c, true),
-            child: const Text('تأیید'),
+            child: Text(adminTx(context, 'تأیید', 'Confirm')),
           ),
         ],
       ),
@@ -488,7 +487,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         final data = res.data?['data'] as Map<String, dynamic>?;
         final updated = data?['updated_count'] ?? 0;
         messenger.showSnackBar(
-          SnackBar(content: Text('به‌روزشده: $updated')),
+          SnackBar(content: Text('${adminTx(context, 'به‌روزشده', 'Updated')}: $updated')),
         );
         setState(() => _selectedRowIndexes = const {});
         _refreshTable();
@@ -498,7 +497,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
       final err = Theme.of(context).colorScheme.error;
       messenger.showSnackBar(
         SnackBar(
-          content: Text('خطا: ${ErrorExtractor.forContext(e, context)}'),
+          content: Text('${adminTx(context, 'خطا', 'Error')}: ${ErrorExtractor.forContext(e, context)}'),
           backgroundColor: err,
         ),
       );
@@ -541,20 +540,24 @@ class _UserManagementPageState extends State<UserManagementPage> {
     
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('تعلیق کاربر'),
-        content: Text('آیا مطمئن هستید که می‌خواهید ${user['full_name'] ?? 'کاربر'} را تعلیق کنید؟'),
+      builder: (dialogContext) => AlertDialog(
+        title: Text(adminTx(context, 'تعلیق کاربر', 'Suspend user')),
+        content: Text(adminTx(
+          context,
+          '${user['full_name'] ?? adminTx(context, 'این کاربر', 'This user')} تعلیق شود؟',
+          'Suspend ${user['full_name'] ?? 'this user'}?',
+        )),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text('انصراف'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(adminTx(context, 'انصراف', 'Cancel')),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
             style: FilledButton.styleFrom(
-              backgroundColor: SemanticColorResolver.negative(context),
+              backgroundColor: SemanticColorResolver.negative(dialogContext),
             ),
-            child: const Text('تعلیق'),
+            child: Text(adminTx(context, 'تعلیق', 'Suspend')),
           ),
         ],
       ),
@@ -568,7 +571,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
       if (response.statusCode == 200) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('کاربر با موفقیت تعلیق شد')),
+            SnackBar(content: Text(adminTx(context, 'کاربر تعلیق شد', 'User suspended'))),
           );
         }
       }
@@ -577,7 +580,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'خطا در تعلیق کاربر: ${ErrorExtractor.forContext(e, context)}',
+              '${adminTx(context, 'خطا در تعلیق کاربر', 'Could not suspend the user')}: ${ErrorExtractor.forContext(e, context)}',
             ),
             backgroundColor: SemanticColorResolver.negative(context),
           ),
@@ -611,35 +614,35 @@ class _UserManagementPageState extends State<UserManagementPage> {
         ? date_formatters.DateFormatters.formatServerDateTime(value)
         : date_formatters.DateFormatters.formatServerDate(value);
   }
+}
 
-  static String _statusLabel(dynamic status) {
-    switch (status) {
-      case 'active':
-        return 'فعال';
-      case 'inactive':
-        return 'غیرفعال';
-      case 'pending':
-        return 'در انتظار';
-      case 'suspended':
-        return 'معلق';
-      default:
-        return 'نامشخص';
-    }
+String _userStatusLabel(BuildContext context, dynamic status) {
+  switch (status) {
+    case 'active':
+      return adminTx(context, 'فعال', 'Active');
+    case 'inactive':
+      return adminTx(context, 'غیرفعال', 'Inactive');
+    case 'pending':
+      return adminTx(context, 'در انتظار', 'Pending');
+    case 'suspended':
+      return adminTx(context, 'معلق', 'Suspended');
+    default:
+      return adminTx(context, 'نامشخص', 'Unknown');
   }
+}
 
-  static String _roleLabel(dynamic role) {
-    switch (role) {
-      case 'admin':
-        return 'مدیر سیستم';
-      case 'operator':
-        return 'اپراتور';
-      case 'supervisor':
-        return 'ناظر';
-      case 'user':
-        return 'کاربر';
-      default:
-        return 'نامشخص';
-    }
+String _userRoleLabel(BuildContext context, dynamic role) {
+  switch (role) {
+    case 'admin':
+      return adminTx(context, 'مدیر سیستم', 'System admin');
+    case 'operator':
+      return adminTx(context, 'اپراتور', 'Operator');
+    case 'supervisor':
+      return adminTx(context, 'ناظر', 'Supervisor');
+    case 'user':
+      return adminTx(context, 'کاربر', 'User');
+    default:
+      return adminTx(context, 'نامشخص', 'Unknown');
   }
 }
 
@@ -652,7 +655,7 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = _UserManagementPageState._statusLabel(value);
+    final label = _userStatusLabel(context, value);
     final Color background;
     final Color foreground;
     switch (value) {
@@ -702,7 +705,7 @@ class _RoleChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = _UserManagementPageState._roleLabel(value);
+    final label = _userRoleLabel(context, value);
     final Color background;
     final Color foreground;
     switch (value) {
@@ -765,34 +768,26 @@ class _UserDetailsDialog extends StatelessWidget {
         child: Column(
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               width: double.infinity,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(12),
-                  topRight: Radius.circular(12),
-                ),
-              ),
+              color: theme.colorScheme.surfaceContainerHighest,
               child: Row(
                 children: [
-                  Icon(Icons.person_outline, color: theme.colorScheme.onPrimary),
-                  const SizedBox(width: 12),
+                  Icon(Icons.person_outline, size: 18, color: theme.colorScheme.onSurface),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          displayName.isNotEmpty ? displayName : 'کاربر بدون نام',
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            color: theme.colorScheme.onPrimary,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          displayName.isNotEmpty ? displayName : adminTx(context, 'کاربر بدون نام', 'Unnamed user'),
+                          style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.onSurface),
                         ),
                         Text(
                           user['email']?.toString() ?? '-',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onPrimary.withValues(alpha: 0.7),
+                          style: context.settingsHub.cardSubtitleStyle(
+                            theme.textTheme,
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -800,7 +795,7 @@ class _UserDetailsDialog extends StatelessWidget {
                   ),
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: Icon(Icons.close, color: theme.colorScheme.onPrimary),
+                    icon: Icon(Icons.close, size: 20, color: theme.colorScheme.onSurface),
                   ),
                 ],
               ),
@@ -810,11 +805,13 @@ class _UserDetailsDialog extends StatelessWidget {
                 length: 3,
                 child: Column(
                   children: [
-                    const TabBar(
+                    TabBar(
+                      labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      unselectedLabelStyle: const TextStyle(fontSize: 12),
                       tabs: [
-                        Tab(text: 'اطلاعات کاربر'),
-                        Tab(text: 'کسب‌وکارها'),
-                        Tab(text: 'نشست‌ها و فعالیت'),
+                        Tab(text: adminTx(context, 'اطلاعات کاربر', 'Profile')),
+                        Tab(text: adminTx(context, 'کسب‌وکارها', 'Businesses')),
+                        Tab(text: adminTx(context, 'نشست‌ها و فعالیت', 'Sessions')),
                       ],
                     ),
                     Expanded(
@@ -850,32 +847,32 @@ class _OverviewTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SectionTitle(title: 'اطلاعات هویتی', theme: theme),
+          _SectionTitle(title: adminTx(context, 'اطلاعات هویتی', 'Identity'), theme: theme),
           _InfoCard(
             children: [
-              _InfoRow(label: 'نام کامل', value: user['full_name'] ?? '-'),
-              _InfoRow(label: 'ایمیل', value: user['email'] ?? '-'),
-              _InfoRow(label: 'موبایل', value: user['mobile'] ?? '-'),
+              _InfoRow(label: adminTx(context, 'نام کامل', 'Full name'), value: user['full_name'] ?? '-'),
+              _InfoRow(label: adminTx(context, 'ایمیل', 'Email'), value: user['email'] ?? '-'),
+              _InfoRow(label: adminTx(context, 'موبایل', 'Mobile'), value: user['mobile'] ?? '-'),
             ],
           ),
-          const SizedBox(height: 16),
-          _SectionTitle(title: 'اطلاعات دسترسی', theme: theme),
+          const SizedBox(height: 12),
+          _SectionTitle(title: adminTx(context, 'دسترسی', 'Access'), theme: theme),
           _InfoCard(
             children: [
               _InfoRow(
-                label: 'نقش جاری',
-                value: _UserManagementPageState._roleLabel(user['role']),
+                label: adminTx(context, 'نقش جاری', 'Current role'),
+                value: _userRoleLabel(context, user['role']),
               ),
               _InfoRow(
-                label: 'وضعیت',
-                value: _UserManagementPageState._statusLabel(user['status']),
+                label: adminTx(context, 'وضعیت', 'Status'),
+                value: _userStatusLabel(context, user['status']),
               ),
               _InfoRow(
-                label: 'تاریخ ایجاد',
+                label: adminTx(context, 'تاریخ ایجاد', 'Created'),
                 value: _UserManagementPageState._formatDate(user['created_at']),
               ),
               _InfoRow(
-                label: 'آخرین ورود',
+                label: adminTx(context, 'آخرین ورود', 'Last login'),
                 value: _UserManagementPageState._formatDate(
                   user['last_login_at'],
                   showTime: true,
@@ -908,7 +905,7 @@ class _BusinessesTab extends StatelessWidget {
                 size: 64, color: theme.colorScheme.outline),
             const SizedBox(height: 12),
             Text(
-              'کسب‌وکاری برای این کاربر ثبت نشده است.',
+              adminTx(context, 'کسب‌وکاری برای این کاربر ثبت نشده است.', 'This user has no businesses.'),
               style: theme.textTheme.bodyMedium,
             ),
           ],
@@ -933,7 +930,7 @@ class _BusinessesTab extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        business['name']?.toString() ?? 'بدون نام',
+                        business['name']?.toString() ?? adminTx(context, 'بدون نام', 'Unnamed'),
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -951,25 +948,25 @@ class _BusinessesTab extends StatelessWidget {
                   children: [
                     _BusinessMetaChip(
                       icon: Icons.numbers,
-                      label: 'شناسه: ${business['id'] ?? '-'}',
+                      label: '${adminTx(context, 'شناسه', 'Id')}: ${business['id'] ?? '-'}',
                     ),
                     if (business['status'] != null)
                       _BusinessMetaChip(
                         icon: Icons.verified_user_outlined,
                         label:
-                            'وضعیت: ${_UserManagementPageState._statusLabel(business['status'])}',
+                            '${adminTx(context, 'وضعیت', 'Status')}: ${_userStatusLabel(context, business['status'])}',
                       ),
                     if (business['field'] != null)
                       _BusinessMetaChip(
                         icon: Icons.work_outline,
-                        label: 'حوزه: ${business['field']}',
+                        label: '${adminTx(context, 'حوزه', 'Field')}: ${business['field']}',
                       ),
                   ],
                 ),
                 if (business['created_at'] != null) ...[
                   const SizedBox(height: 8),
                   Text(
-                    'تاریخ عضویت: ${_UserManagementPageState._formatDate(business['created_at'])}',
+                    '${adminTx(context, 'عضویت', 'Joined')}: ${_UserManagementPageState._formatDate(business['created_at'])}',
                     style: theme.textTheme.bodySmall,
                   ),
                 ],
@@ -998,20 +995,20 @@ class _ActivityTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SectionTitle(title: 'نشست‌های فعال', theme: theme),
+          _SectionTitle(title: adminTx(context, 'نشست‌های فعال', 'Active sessions'), theme: theme),
           if (sessions.isEmpty)
             _EmptyInlineState(
               icon: Icons.laptop_chromebook_outlined,
-              message: 'نشستی ثبت نشده است.',
+              message: adminTx(context, 'نشستی ثبت نشده است.', 'No sessions recorded.'),
             )
           else
             ...sessions.map((session) => _SessionTile(session: session)),
           const SizedBox(height: 24),
-          _SectionTitle(title: 'آخرین فعالیت‌ها', theme: theme),
+          _SectionTitle(title: adminTx(context, 'آخرین فعالیت‌ها', 'Recent activity'), theme: theme),
           if (audits.isEmpty)
             _EmptyInlineState(
               icon: Icons.timeline_outlined,
-              message: 'رخدادی برای نمایش وجود ندارد.',
+              message: adminTx(context, 'رخدادی برای نمایش وجود ندارد.', 'No events to show.'),
             )
           else
             ...audits.map((log) => _AuditTile(log: log)),
@@ -1033,10 +1030,7 @@ class _SectionTitle extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: Text(
         title,
-        style: theme.textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.bold,
-          color: theme.colorScheme.primary,
-        ),
+        style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.primary),
       ),
     );
   }
@@ -1152,16 +1146,16 @@ class _SessionTile extends StatelessWidget {
     final map = session as Map<String, dynamic>? ?? const {};
     return ListTile(
       leading: const Icon(Icons.devices_other),
-      title: Text(map['device']?.toString() ?? 'دستگاه نامشخص'),
+      title: Text(map['device']?.toString() ?? adminTx(context, 'دستگاه نامشخص', 'Unknown device')),
       subtitle: Text(
-        'IP: ${map['ip'] ?? '-'} • آخرین فعالیت: ${_UserManagementPageState._formatDate(map['last_active_at'], showTime: true)}',
+        'IP: ${map['ip'] ?? '-'} · ${adminTx(context, 'آخرین فعالیت', 'Last activity')}: ${_UserManagementPageState._formatDate(map['last_active_at'], showTime: true)}',
       ),
       trailing: IconButton(
-        icon: const Icon(Icons.logout),
-        tooltip: 'خروج از نشست',
+        icon: const Icon(Icons.logout, size: 18),
+        tooltip: adminTx(context, 'خروج از نشست', 'Sign out session'),
         onPressed: () {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('درخواست خروج از نشست ثبت شد')),
+            SnackBar(content: Text(adminTx(context, 'درخواست خروج از نشست ثبت شد', 'Session sign-out was requested'))),
           );
         },
       ),
@@ -1179,7 +1173,7 @@ class _AuditTile extends StatelessWidget {
     final map = log as Map<String, dynamic>? ?? const {};
     return ListTile(
       leading: const Icon(Icons.timeline),
-      title: Text(map['action']?.toString() ?? 'اقدام نامشخص'),
+      title: Text(map['action']?.toString() ?? adminTx(context, 'اقدام نامشخص', 'Unknown action')),
       subtitle: Text(map['description']?.toString() ?? '-'),
       trailing: Text(
         _UserManagementPageState._formatDate(map['created_at'], showTime: true),

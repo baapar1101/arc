@@ -139,16 +139,20 @@ def list_ai_usage_logs_handler(args, context):
 
 
 def get_storage_export_info_handler(args, context):
+    from app.services.ai.ai_function_extensions_mcp_storage import _oa_file_admin
     from app.services.storage_export_service import get_export_info
 
+    bid = mcp_bid(context)
     return mcp_jsonable(
         mcp_run(
             get_export_info,
             mcp_db(context),
-            mcp_bid(context),
+            bid,
             module_context=args.get("module_context"),
             from_date=_parse_dt(args.get("from_date")),
             to_date=_parse_dt(args.get("to_date")),
+            user_id=mcp_uid(context),
+            is_admin=_oa_file_admin(context, bid),
         )
     )
 

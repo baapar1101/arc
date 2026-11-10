@@ -1105,6 +1105,15 @@ def get_invoice_endpoint(
         raise ApiError("FORBIDDEN", f"Missing invoice type permission for {doc.document_type}", http_status=403)
     # پاک‌سازی لینک‌های مرده در invoice_document_to_dict انجام می‌شود
     result = invoice_document_to_dict(db, doc)
+    if ctx.has_business_permission("crm", "view"):
+        try:
+            from app.services.crm_deal_document_service import deals_for_document
+
+            result["crm_deals"] = deals_for_document(db, business_id, int(doc.id), ctx)
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).warning("crm deal back-reference failed invoice_id=%s", invoice_id, exc_info=True)
     return success_response(data={"item": result}, request=request, message="INVOICE")
 
 

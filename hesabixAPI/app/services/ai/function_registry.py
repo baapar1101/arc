@@ -185,6 +185,9 @@ class AIFunctionRegistry:
         )
 
         register_mcp_office_automation_functions(self)
+        from app.services.ai.ai_function_extensions_mcp_procurement import register_mcp_procurement_functions
+
+        register_mcp_procurement_functions(self)
         from app.services.ai.ai_function_extensions_mcp_products_batch import register_mcp_products_batch_functions
 
         register_mcp_products_batch_functions(self)
@@ -1585,7 +1588,10 @@ class AIFunctionRegistry:
             return d
 
         def search_leads_wrapper(db, business_id, user_id, **kwargs):
+            from app.services.crm_enterprise_service import acl_actor, restrict_visibility_query
+
             q = db.query(Lead).filter(Lead.business_id == business_id)
+            q = restrict_visibility_query(q, db, business_id, acl_actor(db, int(user_id)), Lead, "lead")
             if kwargs.get("process_definition_id"):
                 q = q.filter(Lead.process_definition_id == kwargs["process_definition_id"])
             if kwargs.get("stage_id"):
@@ -1610,15 +1616,21 @@ class AIFunctionRegistry:
             return {"items": [_lead_to_dict_simple(lead) for lead in items], "total": total}
 
         def get_lead_details_wrapper(db, business_id, user_id, lead_id, **kwargs):
+            from app.services.crm_enterprise_service import acl_actor, guard_record
+
             lead = db.query(Lead).filter(
                 and_(Lead.id == lead_id, Lead.business_id == business_id)
             ).first()
             if not lead:
                 raise ValueError(f"Lead {lead_id} not found")
+            guard_record(db, business_id, acl_actor(db, int(user_id)), "lead", lead)
             return _lead_to_dict_simple(lead)
 
         def search_deals_wrapper(db, business_id, user_id, **kwargs):
+            from app.services.crm_enterprise_service import acl_actor, restrict_visibility_query
+
             q = db.query(Deal).filter(Deal.business_id == business_id)
+            q = restrict_visibility_query(q, db, business_id, acl_actor(db, int(user_id)), Deal, "deal")
             if kwargs.get("process_definition_id"):
                 q = q.filter(Deal.process_definition_id == kwargs["process_definition_id"])
             if kwargs.get("stage_id"):
@@ -1640,15 +1652,21 @@ class AIFunctionRegistry:
             return {"items": [_deal_to_dict_simple(dl) for dl in items], "total": total}
 
         def get_deal_details_wrapper(db, business_id, user_id, deal_id, **kwargs):
+            from app.services.crm_enterprise_service import acl_actor, guard_record
+
             deal = db.query(Deal).filter(
                 and_(Deal.id == deal_id, Deal.business_id == business_id)
             ).first()
             if not deal:
                 raise ValueError(f"Deal {deal_id} not found")
+            guard_record(db, business_id, acl_actor(db, int(user_id)), "deal", deal)
             return _deal_to_dict_simple(deal)
 
         def search_activities_wrapper(db, business_id, user_id, **kwargs):
+            from app.services.crm_enterprise_service import acl_actor, restrict_activity_query
+
             q = db.query(CrmActivity).filter(CrmActivity.business_id == business_id)
+            q = restrict_activity_query(q, db, business_id, acl_actor(db, int(user_id)), CrmActivity)
             if kwargs.get("person_id"):
                 q = q.filter(CrmActivity.person_id == kwargs["person_id"])
             if kwargs.get("deal_id"):
@@ -1662,19 +1680,18 @@ class AIFunctionRegistry:
             return {"items": [_activity_to_dict_simple(a) for a in items], "total": total}
 
         def get_crm_summary_wrapper(db, business_id, user_id, **kwargs):
-            total_leads = db.query(Lead).filter(Lead.business_id == business_id).count()
-            converted_leads = db.query(Lead).filter(
-                Lead.business_id == business_id, Lead.person_id.isnot(None)
-            ).count()
-            total_deals = db.query(Deal).filter(Deal.business_id == business_id).count()
+            from app.services.crm_enterprise_service import acl_actor, restrict_visibility_query
+
+            actor = acl_actor(db, int(user_id))
+            leads = restrict_visibility_query(db.query(Lead).filter(Lead.business_id == business_id), db, business_id, actor, Lead, "lead")
+            deals = restrict_visibility_query(db.query(Deal).filter(Deal.business_id == business_id), db, business_id, actor, Deal, "deal")
+            total_leads = leads.count()
+            converted_leads = leads.filter(Lead.person_id.isnot(None)).count()
+            total_deals = deals.count()
             deals_amount = (
-                db.query(sql_func.coalesce(sql_func.sum(Deal.amount), 0))
-                .filter(Deal.business_id == business_id)
-                .scalar() or 0
+                deals.with_entities(sql_func.coalesce(sql_func.sum(Deal.amount), 0)).scalar() or 0
             )
-            closed_deals = db.query(Deal).filter(
-                Deal.business_id == business_id, Deal.closed_at.isnot(None)
-            ).count()
+            closed_deals = deals.filter(Deal.closed_at.isnot(None)).count()
             conversion_rate = (converted_leads / total_leads * 100) if total_leads else 0
             return {
                 "total_leads": total_leads,
@@ -1703,6 +1720,15 @@ class AIFunctionRegistry:
             )
             if process_def_id:
                 q = q.filter(CrmProcessDefinition.id == process_def_id)
+            from sqlalchemy.orm import aliased
+            from app.services.crm_enterprise_service import acl_actor, restrict_visibility_query
+
+            deal_alias = aliased(Deal)
+            visible_deals = restrict_visibility_query(
+                db.query(deal_alias.id).filter(deal_alias.business_id == business_id),
+                db, business_id, acl_actor(db, int(user_id)), deal_alias, "deal",
+            )
+            q = q.filter(or_(Deal.id.is_(None), Deal.id.in_(visible_deals)))
             q = q.group_by(CrmProcessStage.id, CrmProcessStage.name, CrmProcessStage.order_index)
             q = q.order_by(CrmProcessStage.order_index)
             rows = q.all()
@@ -1728,6 +1754,15 @@ class AIFunctionRegistry:
             )
             if process_def_id:
                 q = q.filter(CrmProcessDefinition.id == process_def_id)
+            from sqlalchemy.orm import aliased
+            from app.services.crm_enterprise_service import acl_actor, restrict_visibility_query
+
+            lead_alias = aliased(Lead)
+            visible_leads = restrict_visibility_query(
+                db.query(lead_alias.id).filter(lead_alias.business_id == business_id),
+                db, business_id, acl_actor(db, int(user_id)), lead_alias, "lead",
+            )
+            q = q.filter(or_(Lead.id.is_(None), Lead.id.in_(visible_leads)))
             q = q.group_by(CrmProcessStage.id, CrmProcessStage.name, CrmProcessStage.order_index)
             q = q.order_by(CrmProcessStage.order_index)
             rows = q.all()

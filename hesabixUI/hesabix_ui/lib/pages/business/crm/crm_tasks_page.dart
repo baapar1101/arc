@@ -34,6 +34,7 @@ class _CrmTasksPageState extends State<CrmTasksPage> with SingleTickerProviderSt
   List<Map<String, dynamic>> _followUpLeads = [];
   List<Map<String, dynamic>> _followUpDeals = [];
   List<Map<String, dynamic>> _slaBreachedLeads = [];
+  List<Map<String, dynamic>> _suggestions = [];
 
   @override
   void initState() {
@@ -83,6 +84,7 @@ class _CrmTasksPageState extends State<CrmTasksPage> with SingleTickerProviderSt
         _followUpLeads = leads;
         _followUpDeals = deals;
         _slaBreachedLeads = sla;
+        _suggestions = _asMapList(data['suggested_actions']);
         _loading = false;
       });
     } catch (e) {
@@ -227,12 +229,41 @@ class _CrmTasksPageState extends State<CrmTasksPage> with SingleTickerProviderSt
                     ],
                   ),
                 )
-              : TabBarView(
-                  controller: _tabController,
+              : Column(
                   children: [
-                    _buildTasksTab(canWrite),
-                    _buildFollowUpsTab(),
-                    _buildSlaTab(),
+                    if (_suggestions.isNotEmpty)
+                      SizedBox(
+                        height: 88,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                          itemCount: _suggestions.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 8),
+                          itemBuilder: (context, index) {
+                            final item = _suggestions[index];
+                            final dealId = (item['deal_id'] as num?)?.toInt();
+                            final leadId = (item['lead_id'] as num?)?.toInt();
+                            final personId = (item['person_id'] as num?)?.toInt();
+                            final canOpen = dealId != null || leadId != null || personId != null;
+                            return ActionChip(
+                              label: Text('${item['title'] ?? ''} · ${item['reason'] ?? ''}'),
+                              onPressed: canOpen
+                                  ? () => _navigateForEntity(dealId: dealId, leadId: leadId, personId: personId)
+                                  : null,
+                            );
+                          },
+                        ),
+                      ),
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildTasksTab(canWrite),
+                          _buildFollowUpsTab(),
+                          _buildSlaTab(),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
     );

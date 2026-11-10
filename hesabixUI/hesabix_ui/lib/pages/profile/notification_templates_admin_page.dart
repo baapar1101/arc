@@ -10,6 +10,7 @@ import '../../models/notification_template_model.dart';
 import '../../models/event_key_info.dart';
 import '../../utils/error_extractor.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
+import '../admin/admin_compact_scaffold.dart';
 
 class NotificationTemplatesAdminPage extends StatefulWidget {
   const NotificationTemplatesAdminPage({super.key});
@@ -24,13 +25,13 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SingleChildScrollView(
-        child: DataTableWidget<NotificationTemplate>(
-          key: _tableKey,
-          config: _buildDataTableConfig(),
-          fromJson: NotificationTemplate.fromJson,
-        ),
+    return AdminCompactScaffold(
+      title: adminTx(context, 'قالب‌های اعلان', 'Notification templates'),
+      subtitle: adminTx(context, 'قالب رویدادها برای کانال‌های ارسال', 'Event templates for delivery channels'),
+      body: DataTableWidget<NotificationTemplate>(
+        key: _tableKey,
+        config: _buildDataTableConfig(),
+        fromJson: NotificationTemplate.fromJson,
       ),
     );
   }
@@ -38,10 +39,8 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
   DataTableConfig<NotificationTemplate> _buildDataTableConfig() {
     return DataTableConfig<NotificationTemplate>(
       endpoint: '/api/v1/admin/notification-templates/list',
-      title: 'مدیریت قالب‌های ناتیفیکیشن',
-      subtitle: 'ایجاد و مدیریت قالب‌های ناتیفیکیشن برای رویدادهای مختلف',
       showBackButton: false,
-      showTableIcon: true,
+      showTableIcon: false,
       showSearch: true,
       showFilters: true,
       showPagination: true,
@@ -56,7 +55,7 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
       columns: [
         NumberColumn(
           'id',
-          'شناسه',
+          adminTx(context, 'شناسه', 'ID'),
           width: ColumnWidth.small,
           textAlign: TextAlign.center,
           formatter: (item) {
@@ -66,7 +65,7 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
         ),
         TextColumn(
           'event_key',
-          'کلید رویداد',
+          adminTx(context, 'کلید رویداد', 'Event key'),
           width: ColumnWidth.medium,
           filterType: ColumnFilterType.text,
           formatter: (item) {
@@ -76,14 +75,14 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
         ),
         TextColumn(
           'channel',
-          'کانال',
+          adminTx(context, 'کانال', 'Channel'),
           width: ColumnWidth.small,
           filterType: ColumnFilterType.multiSelect,
-          filterOptions: const [
-            FilterOption(value: 'telegram', label: 'تلگرام', icon: Icons.send),
-            FilterOption(value: 'email', label: 'ایمیل', icon: Icons.email),
-            FilterOption(value: 'sms', label: 'پیامک', icon: Icons.sms),
-            FilterOption(value: 'inapp', label: 'درون برنامه', icon: Icons.notifications),
+          filterOptions: [
+            FilterOption(value: 'telegram', label: adminTx(context, 'تلگرام', 'Telegram'), icon: Icons.send),
+            FilterOption(value: 'email', label: adminTx(context, 'ایمیل', 'Email'), icon: Icons.email),
+            FilterOption(value: 'sms', label: adminTx(context, 'پیامک', 'SMS'), icon: Icons.sms),
+            FilterOption(value: 'inapp', label: adminTx(context, 'درون‌برنامه', 'In-app'), icon: Icons.notifications),
           ],
           formatter: (item) {
             final template = item as NotificationTemplate;
@@ -92,26 +91,26 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
         ),
         TextColumn(
           'locale',
-          'زبان',
+          adminTx(context, 'زبان', 'Language'),
           width: ColumnWidth.small,
           filterType: ColumnFilterType.multiSelect,
-          filterOptions: const [
-            FilterOption(value: 'fa', label: 'فارسی'),
-            FilterOption(value: 'en', label: 'انگلیسی'),
-            FilterOption(value: 'ar', label: 'عربی'),
-            FilterOption(value: 'tr', label: 'ترکی'),
+          filterOptions: [
+            FilterOption(value: 'fa', label: adminTx(context, 'فارسی', 'Persian')),
+            FilterOption(value: 'en', label: adminTx(context, 'انگلیسی', 'English')),
+            FilterOption(value: 'ar', label: adminTx(context, 'عربی', 'Arabic')),
+            FilterOption(value: 'tr', label: adminTx(context, 'ترکی', 'Turkish')),
           ],
           formatter: (item) => item.locale ?? '-',
         ),
         TextColumn(
           'subject',
-          'موضوع',
+          adminTx(context, 'موضوع', 'Subject'),
           width: ColumnWidth.medium,
           formatter: (item) => item.subject ?? '-',
         ),
         CustomColumn(
           'body',
-          'محتوا',
+          adminTx(context, 'محتوا', 'Body'),
           width: ColumnWidth.large,
           formatter: (item) {
             final body = item.body;
@@ -123,7 +122,7 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
             return InkWell(
               onTap: () => _showBodyDialog(item),
               child: Tooltip(
-                message: 'کلیک برای مشاهده کامل',
+                message: adminTx(context, 'برای دیدن متن کامل بزنید', 'Tap to read the full text'),
                 child: Text(
                   preview,
                   style: TextStyle(
@@ -137,9 +136,9 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
         ),
         CustomColumn(
           'is_active',
-          'وضعیت',
+          adminTx(context, 'وضعیت', 'Status'),
           width: ColumnWidth.small,
-          formatter: (item) => item.isActive ? 'فعال' : 'غیرفعال',
+          formatter: (item) => item.isActive ? adminTx(context, 'فعال', 'Active') : adminTx(context, 'غیرفعال', 'Inactive'),
           builder: (item, index) {
             return Row(
               mainAxisSize: MainAxisSize.min,
@@ -151,7 +150,7 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
                 ),
                 SizedBox(width: 4),
                 Text(
-                  item.isActive ? 'فعال' : 'غیرفعال',
+                  item.isActive ? adminTx(context, 'فعال', 'Active') : adminTx(context, 'غیرفعال', 'Inactive'),
                   style: TextStyle(
                     color: item.isActive ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
                     fontWeight: FontWeight.w500,
@@ -189,17 +188,17 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
         ),
         ActionColumn(
           'actions',
-          'عملیات',
+          adminTx(context, 'عملیات', 'Actions'),
           width: ColumnWidth.small,
           actions: [
             DataTableAction(
               icon: Icons.edit,
-              label: 'ویرایش',
+              label: adminTx(context, 'ویرایش', 'Edit'),
               onTap: (item) => _openEditDialog(item: item as NotificationTemplate),
             ),
             DataTableAction(
               icon: Icons.delete_outline,
-              label: 'حذف',
+              label: adminTx(context, 'حذف', 'Delete'),
               onTap: (item) => _deleteTemplate(item as NotificationTemplate),
               isDestructive: true,
             ),
@@ -254,11 +253,11 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
     bool isActive = item?.isActive ?? true;
     
     // گزینه‌های کانال
-    const channelOptions = [
-      {'value': 'telegram', 'label': 'تلگرام', 'icon': Icons.send},
-      {'value': 'email', 'label': 'ایمیل', 'icon': Icons.email},
-      {'value': 'sms', 'label': 'پیامک', 'icon': Icons.sms},
-      {'value': 'inapp', 'label': 'درون برنامه', 'icon': Icons.notifications},
+    final channelOptions = [
+      {'value': 'telegram', 'label': adminTx(context, 'تلگرام', 'Telegram'), 'icon': Icons.send},
+      {'value': 'email', 'label': adminTx(context, 'ایمیل', 'Email'), 'icon': Icons.email},
+      {'value': 'sms', 'label': adminTx(context, 'پیامک', 'SMS'), 'icon': Icons.sms},
+      {'value': 'inapp', 'label': adminTx(context, 'درون‌برنامه', 'In-app'), 'icon': Icons.notifications},
     ];
     
     // تابع برای دریافت کلید رویداد نهایی
@@ -293,7 +292,7 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
                         ),
                         const SizedBox(width: 12),
                         Text(
-                          item == null ? 'ایجاد قالب جدید' : 'ویرایش قالب',
+                          item == null ? adminTx(context, 'قالب جدید', 'New template') : adminTx(context, 'ویرایش قالب', 'Edit template'),
                           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),
@@ -318,8 +317,8 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
                                 value: eventKeyMode == EventKeyInputMode.selection
                                     ? selectedEventKey
                                     : 'custom',
-                                decoration: const InputDecoration(
-                                  labelText: 'کلید رویداد *',
+                                decoration: InputDecoration(
+                                  labelText: adminTx(context, 'کلید رویداد *', 'Event key *'),
                                   prefixIcon: Icon(Icons.key),
                                   border: OutlineInputBorder(),
                                 ),
@@ -403,28 +402,28 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
                                 const SizedBox(height: 16),
                                 TextFormField(
                                   controller: customEventKeyCtrl,
-                                  decoration: const InputDecoration(
-                                    labelText: 'کلید رویداد سفارشی *',
+                                  decoration: InputDecoration(
+                                    labelText: adminTx(context, 'کلید رویداد سفارشی *', 'Custom event key *'),
                                     hintText: 'مثال: invoice.payment_received',
                                     prefixIcon: Icon(Icons.edit),
                                     border: OutlineInputBorder(),
-                                    helperText: 'کلید رویداد را به فرمت category.event_name وارد کنید',
+                                    helperText: adminTx(context, 'فرمت category.event_name', 'Format: category.event_name'),
                                   ),
                                   textDirection: TextDirection.ltr,
                                   textAlign: TextAlign.left,
                                   validator: (v) {
                                     if (v == null || v.trim().isEmpty) {
-                                      return 'الزامی';
+                                      return adminTx(context, 'الزامی', 'Required');
                                     }
                                     final trimmed = v.trim();
                                     if (trimmed.length > 100) {
-                                      return 'حداکثر 100 کاراکتر مجاز است';
+                                      return adminTx(context, 'حداکثر ۱۰۰ نویسه', 'At most 100 characters');
                                     }
                                     if (!trimmed.contains('.')) {
-                                      return 'فرمت نامعتبر. باید به صورت category.event_name باشد';
+                                      return adminTx(context, 'باید به شکل category.event_name باشد', 'Must look like category.event_name');
                                     }
                                     if (!RegExp(r'^[a-z0-9_]+\.[a-z0-9_]+$').hasMatch(trimmed)) {
-                                      return 'فقط حروف کوچک، اعداد و زیرخط مجاز است';
+                                      return adminTx(context, 'فقط حروف کوچک، عدد و زیرخط', 'Only lowercase letters, numbers, and underscore');
                                     }
                                     return null;
                                   },
@@ -591,9 +590,9 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
                                   Expanded(
                                     child: DropdownButtonFormField<String>(
                                       value: selectedChannel,
-                                      decoration: const InputDecoration(
-                                        labelText: 'کانال *',
-                                        hintText: 'انتخاب کانال',
+                                      decoration: InputDecoration(
+                                        labelText: adminTx(context, 'کانال *', 'Channel *'),
+                                        hintText: adminTx(context, 'انتخاب کانال', 'Choose a channel'),
                                         prefixIcon: Icon(Icons.send),
                                         border: OutlineInputBorder(),
                                       ),
@@ -618,7 +617,7 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
                                         });
                                       },
                                       validator: (v) {
-                                        if (v == null || v.isEmpty) return 'الزامی';
+                                        if (v == null || v.isEmpty) return adminTx(context, 'الزامی', 'Required');
                                         return null;
                                       },
                                     ),
@@ -631,8 +630,8 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
                                   Expanded(
                                     child: TextFormField(
                                       controller: localeCtrl,
-                                      decoration: const InputDecoration(
-                                        labelText: 'زبان (اختیاری)',
+                                      decoration: InputDecoration(
+                                        labelText: adminTx(context, 'زبان (اختیاری)', 'Language (optional)'),
                                         hintText: 'fa|en|ar|tr',
                                         prefixIcon: Icon(Icons.language),
                                         border: OutlineInputBorder(),
@@ -643,8 +642,8 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
                                   Expanded(
                                     child: TextFormField(
                                       controller: subjectCtrl,
-                                      decoration: const InputDecoration(
-                                        labelText: 'موضوع (اختیاری)',
+                                      decoration: InputDecoration(
+                                        labelText: adminTx(context, 'موضوع (اختیاری)', 'Subject (optional)'),
                                         hintText: 'موضوع ناتیفیکیشن',
                                         prefixIcon: Icon(Icons.subject),
                                         border: OutlineInputBorder(),
@@ -656,23 +655,23 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
                               const SizedBox(height: 16),
                               TextFormField(
                                 controller: bodyCtrl,
-                                decoration: const InputDecoration(
-                                  labelText: 'محتوا *',
-                                  hintText: 'محتوا با استفاده از Jinja2 template',
+                                decoration: InputDecoration(
+                                  labelText: adminTx(context, 'محتوا *', 'Body *'),
+                                  hintText: adminTx(context, 'متن با الگوی Jinja2', 'Text using a Jinja2 template'),
                                   prefixIcon: Icon(Icons.text_fields),
                                   border: OutlineInputBorder(),
                                   alignLabelWithHint: true,
                                 ),
                                 minLines: 6,
                                 maxLines: 12,
-                                validator: (v) => (v == null || v.isEmpty) ? 'الزامی' : null,
+                                validator: (v) => (v == null || v.isEmpty) ? adminTx(context, 'الزامی', 'Required') : null,
                               ),
                               const SizedBox(height: 16),
                               Card(
                                 color: Theme.of(context).colorScheme.surfaceVariant,
                                 child: SwitchListTile(
-                                  title: const Text('فعال'),
-                                  subtitle: const Text('این قالب در سیستم فعال است'),
+                                  title: Text(adminTx(context, 'فعال', 'Active')),
+                                  subtitle: Text(adminTx(context, 'این قالب برای ارسال استفاده می‌شود', 'This template is used for sending')),
                                   value: isActive,
                                   onChanged: (v) {
                                     setState(() {
@@ -687,8 +686,8 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
                               ),
                               const SizedBox(height: 16),
                               ExpansionTile(
-                                title: const Text('پارامترهای پیش‌نمایش'),
-                                subtitle: const Text('برای تست قالب با پارامترهای نمونه'),
+                                title: Text(adminTx(context, 'پارامترهای پیش‌نمایش', 'Preview parameters')),
+                                subtitle: Text(adminTx(context, 'برای آزمودن قالب با مقدارهای نمونه', 'Try the template with sample values')),
                                 leading: const Icon(Icons.settings_input_component, size: 20),
                                 initiallyExpanded: false,
                                 children: [
@@ -776,7 +775,7 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
                       children: [
                         TextButton(
                           onPressed: () => Navigator.of(context).pop(false),
-                          child: const Text('انصراف'),
+                          child: Text(adminTx(context, 'انصراف', 'Cancel')),
                         ),
                         const SizedBox(width: 8),
                         FilledButton.icon(
@@ -831,7 +830,7 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
                             }
                           },
                           icon: const Icon(Icons.save, size: 18),
-                          label: const Text('ذخیره'),
+                          label: Text(adminTx(context, 'ذخیره', 'Save')),
                         ),
                       ],
                     ),
@@ -848,19 +847,23 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
   Future<void> _deleteTemplate(NotificationTemplate item) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        icon: Icon(Icons.warning_amber_rounded, color: SemanticColorResolver.warning(context), size: 48),
-        title: Text('تایید حذف'),
-        content: Text('آیا از حذف قالب "${item.eventKey}" (${item.channel}) اطمینان دارید؟\n\nاین عمل قابل بازگشت نیست.'),
+      builder: (dialogContext) => AlertDialog(
+        icon: Icon(Icons.warning_amber_rounded, color: SemanticColorResolver.warning(dialogContext), size: 40),
+        title: Text(adminTx(context, 'حذف قالب', 'Delete template')),
+        content: Text(adminTx(
+          context,
+          'قالب «${item.eventKey}» (${item.channel}) حذف شود؟ این کار برگشت‌پذیر نیست.',
+          'Delete the “${item.eventKey}” (${item.channel}) template? This cannot be undone.',
+        )),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text('انصراف'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(adminTx(context, 'انصراف', 'Cancel')),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: SemanticColorResolver.negative(context)),
-            child: const Text('حذف'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: SemanticColorResolver.negative(dialogContext)),
+            child: Text(adminTx(context, 'حذف', 'Delete')),
           ),
         ],
       ),
@@ -871,7 +874,7 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
     try {
       await _svc.delete(item.id);
       if (mounted) {
-        SnackBarHelper.showSuccess(context, message: 'قالب با موفقیت حذف شد');
+        SnackBarHelper.showSuccess(context, message: adminTx(context, 'قالب حذف شد', 'Template deleted'));
         // Refresh table by calling refresh method
         final state = _tableKey.currentState;
         if (state != null) {

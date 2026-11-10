@@ -4,6 +4,7 @@ import 'package:hesabix_ui/services/admin_users_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
+import 'admin_compact_scaffold.dart';
 
 class SupportOperatorsPage extends StatefulWidget {
   const SupportOperatorsPage({super.key});
@@ -102,17 +103,16 @@ class _SupportOperatorsPageState extends State<SupportOperatorsPage> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(t.supportOperatorsPageTitle),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadOperators,
-            tooltip: t.refresh,
-          ),
-        ],
-      ),
+    return AdminCompactScaffold(
+      title: t.supportOperatorsPageTitle,
+      subtitle: adminTx(context, 'اپراتورهای پاسخ‌گوی پشتیبانی', 'Operators who answer support'),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh, size: 20),
+          onPressed: _loadOperators,
+          tooltip: t.refresh,
+        ),
+      ],
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _operators.isEmpty

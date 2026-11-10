@@ -4,6 +4,7 @@ import '../../l10n/app_localizations.dart';
 import '../../services/tax_provider_admin_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'admin_compact_scaffold.dart';
 
 class MotamedAsaProviderAdminPage extends StatefulWidget {
   const MotamedAsaProviderAdminPage({super.key});
@@ -144,8 +145,9 @@ class _MotamedAsaProviderAdminPageState extends State<MotamedAsaProviderAdminPag
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final cs = Theme.of(context).colorScheme;
-    return Scaffold(
-      appBar: AppBar(title: Text(t.motamedAsaAdminTitle)),
+    return AdminCompactScaffold(
+      title: t.motamedAsaAdminTitle,
+      subtitle: adminTx(context, 'اتصال معتمد آسا', 'Motamed Asa connection'),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _loadError != null

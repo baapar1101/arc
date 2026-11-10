@@ -1,11 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../core/api_client.dart';
 import '../../services/system_services_service.dart';
+import 'admin_compact_scaffold.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/loading_indicator.dart';
@@ -437,26 +437,21 @@ class _ServiceLogsPageState extends State<ServiceLogsPage> with WidgetsBindingOb
     final dropdownValue =
         _availableServices.contains(_selectedService) ? _selectedService : _availableServices.first;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(t.settingsServiceLogs),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/user/profile/system-settings'),
+    return AdminCompactScaffold(
+      title: t.settingsServiceLogs,
+      subtitle: adminTx(context, 'خروجی زنده‌ی سرویس‌های سیستم', 'Live output of system services'),
+      actions: [
+        IconButton(
+          icon: Icon(_autoRefresh ? Icons.pause : Icons.play_arrow, size: 20),
+          onPressed: _toggleAutoRefresh,
+          tooltip: _autoRefresh ? t.serviceLogsPauseAutoRefreshTooltip : t.serviceLogsResumeAutoRefreshTooltip,
         ),
-        actions: [
-          IconButton(
-            icon: Icon(_autoRefresh ? Icons.pause : Icons.play_arrow),
-            onPressed: _toggleAutoRefresh,
-            tooltip: _autoRefresh ? t.serviceLogsPauseAutoRefreshTooltip : t.serviceLogsResumeAutoRefreshTooltip,
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => _loadData(),
-            tooltip: t.serviceLogsRefreshTooltip,
-          ),
-        ],
-      ),
+        IconButton(
+          icon: const Icon(Icons.refresh, size: 20),
+          onPressed: () => _loadData(),
+          tooltip: t.serviceLogsRefreshTooltip,
+        ),
+      ],
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

@@ -4,6 +4,8 @@ import 'package:hesabix_ui/services/admin_users_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
+import 'admin_compact_scaffold.dart';
+import '../../theme/tokens/extensions.dart';
 
 class UserAppPermissionsPage extends StatefulWidget {
   final int userId;
@@ -25,19 +27,32 @@ class _UserAppPermissionsPageState extends State<UserAppPermissionsPage> {
   bool _isSaving = false;
   Map<String, bool> _permissions = {};
 
-  final Map<String, String> _permissionLabels = {
-    'support_operator': 'اپراتور پشتیبانی',
-    'system_settings': 'تنظیمات سیستم',
-    'user_management': 'مدیریت کاربران',
-    'business_management': 'مدیریت کسب‌وکارها',
-  };
+  static const _permissionKeys = [
+    'support_operator',
+    'system_settings',
+    'user_management',
+    'business_management',
+  ];
 
-  final Map<String, String> _permissionDescriptions = {
-    'support_operator': 'دسترسی به پنل پشتیبانی و مدیریت تیکت‌ها',
-    'system_settings': 'دسترسی به تنظیمات سیستم',
-    'user_management': 'مدیریت کاربران در سطح اپلیکیشن',
-    'business_management': 'مدیریت کسب‌وکارها',
-  };
+  String _permissionLabel(String key) {
+    return switch (key) {
+      'support_operator' => adminTx(context, 'اپراتور پشتیبانی', 'Support operator'),
+      'system_settings' => adminTx(context, 'تنظیمات سیستم', 'System settings'),
+      'user_management' => adminTx(context, 'مدیریت کاربران', 'User management'),
+      'business_management' => adminTx(context, 'مدیریت کسب‌وکارها', 'Business management'),
+      _ => key,
+    };
+  }
+
+  String _permissionDescription(String key) {
+    return switch (key) {
+      'support_operator' => adminTx(context, 'پنل پشتیبانی و تیکت‌ها', 'Support desk and tickets'),
+      'system_settings' => adminTx(context, 'تنظیمات سراسری سیستم', 'Application-wide settings'),
+      'user_management' => adminTx(context, 'کاربران در سطح اپلیکیشن', 'Application users'),
+      'business_management' => adminTx(context, 'کسب‌وکارهای سیستم', 'System businesses'),
+      _ => '',
+    };
+  }
 
   @override
   void initState() {
@@ -54,7 +69,7 @@ class _UserAppPermissionsPageState extends State<UserAppPermissionsPage> {
       
       // Initialize all permissions
       final permissions = <String, bool>{};
-      for (var key in _permissionLabels.keys) {
+      for (var key in _permissionKeys) {
         permissions[key] = appPerms[key] == true;
       }
       
@@ -136,7 +151,7 @@ class _UserAppPermissionsPageState extends State<UserAppPermissionsPage> {
       if (ok != true || !mounted) return;
     }
     setState(() {
-      for (final k in _permissionLabels.keys) {
+      for (final k in _permissionKeys) {
         _permissions[k] = enable;
       }
     });
@@ -146,34 +161,23 @@ class _UserAppPermissionsPageState extends State<UserAppPermissionsPage> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('مدیریت دسترسی‌ها'),
-        actions: [
-          if (!_isLoading)
-            TextButton.icon(
-              onPressed: _isSaving ? null : _savePermissions,
-              icon: _isSaving
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Icon(Icons.save, color: Colors.white),
-              label: Text(
-                _isSaving ? t.saving : t.save,
-                style: const TextStyle(color: Colors.white),
-              ),
-            ),
-        ],
-      ),
+    return AdminCompactScaffold(
+      title: adminTx(context, 'دسترسی‌های برنامه', 'App permissions'),
+      subtitle: widget.userEmail,
+      actions: [
+        if (!_isLoading)
+          IconButton(
+            tooltip: _isSaving ? t.saving : t.save,
+            onPressed: _isSaving ? null : _savePermissions,
+            icon: _isSaving
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.save_outlined, size: 20),
+          ),
+      ],
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: context.settingsHub.pagePadding,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -184,7 +188,7 @@ class _UserAppPermissionsPageState extends State<UserAppPermissionsPage> {
                         child: Text(widget.userEmail[0].toUpperCase()),
                       ),
                       title: Text(widget.userEmail),
-                      subtitle: const Text('مدیریت دسترسی‌های سطح اپلیکیشن'),
+                      subtitle: Text(adminTx(context, 'دسترسی‌های سطح اپلیکیشن', 'Application permissions'), style: context.settingsHub.cardSubtitleStyle(Theme.of(context).textTheme, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                     ),
                   ),
                   
@@ -194,13 +198,10 @@ class _UserAppPermissionsPageState extends State<UserAppPermissionsPage> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: Text(
-                          'دسترسی‌های سطح اپلیکیشن',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          adminTx(context, 'دسترسی‌ها', 'Permissions'),
+                          style: context.settingsHub.cardTitleStyle(Theme.of(context).textTheme, color: Theme.of(context).colorScheme.onSurface),
                         ),
                       ),
                       TextButton(
@@ -218,23 +219,25 @@ class _UserAppPermissionsPageState extends State<UserAppPermissionsPage> {
                   ),
                   const SizedBox(height: 16),
                   
-                  ..._permissionLabels.entries.map((entry) {
+                  ..._permissionKeys.map((key) {
                     return Card(
                       margin: const EdgeInsets.only(bottom: 8),
+                      elevation: 0,
                       child: SwitchListTile(
-                        title: Text(entry.value),
-                        subtitle: Text(_permissionDescriptions[entry.key] ?? ''),
-                        value: _permissions[entry.key] ?? false,
+                        title: Text(_permissionLabel(key), style: const TextStyle(fontSize: 13)),
+                        subtitle: Text(_permissionDescription(key), style: const TextStyle(fontSize: 11)),
+                        value: _permissions[key] ?? false,
                         onChanged: _isSaving
                             ? null
                             : (value) {
                                 setState(() {
-                                  _permissions[entry.key] = value;
+                                  _permissions[key] = value;
                                 });
                               },
                         secondary: Icon(
-                          _getIconForPermission(entry.key),
-                          color: Theme.of(context).primaryColor,
+                          _getIconForPermission(key),
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 18,
                         ),
                       ),
                     );

@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../services/tax_product_code_service.dart';
+import 'admin_compact_scaffold.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/data_table/data_table_config.dart';
@@ -64,16 +65,16 @@ class _TaxProductCodesPageState extends State<TaxProductCodesPage> {
         _jobId = jobId;
         _jobStatus = {
           'state': 'queued',
-          'message': 'در انتظار شروع کار پس‌زمینه',
+          'message': adminTx(context, 'در انتظار شروع کار پس‌زمینه', 'Waiting for the background job'),
         };
       });
-      SnackBarHelper.show(context, message: 'ایمپورت آغاز شد. وضعیت در نوار بالا نمایش داده می‌شود.');
+      SnackBarHelper.show(context, message: adminTx(context, 'ایمپورت آغاز شد. وضعیت در نوار بالا دیده می‌شود.', 'Import started. Status is shown in the banner.'));
       _startJobPolling();
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(
         context,
-        message: 'خطا در ارسال فایل: ${ErrorExtractor.forContext(e, context)}',
+        message: '${adminTx(context, 'ارسال فایل ناموفق بود', 'Could not upload the file')}: ${ErrorExtractor.forContext(e, context)}',
       );
       }
     } finally {
@@ -106,12 +107,12 @@ class _TaxProductCodesPageState extends State<TaxProductCodesPage> {
         _jobTimer?.cancel();
         _jobTimer = null;
         if (state == 'succeeded') {
-          SnackBarHelper.show(context, message: 'ایمپورت با موفقیت پایان یافت.');
+          SnackBarHelper.show(context, message: adminTx(context, 'ایمپورت تمام شد', 'Import finished'));
           setState(() {
             _tableRefreshToken++;
           });
         } else {
-          final err = status['error'] ?? status['message'] ?? 'ایمپورت ناموفق بود';
+          final err = status['error'] ?? status['message'] ?? adminTx(context, 'ایمپورت ناموفق بود', 'Import failed');
           SnackBarHelper.showError(context, message: err.toString());
         }
       }
@@ -122,7 +123,7 @@ class _TaxProductCodesPageState extends State<TaxProductCodesPage> {
         SnackBarHelper.showError(
         context,
         message:
-            'خطا در دریافت وضعیت کار: ${ErrorExtractor.forContext(e, context)}',
+            '${adminTx(context, 'وضعیت کار خوانده نشد', 'Could not read the job status')}: ${ErrorExtractor.forContext(e, context)}',
       );
       }
     }
@@ -132,23 +133,18 @@ class _TaxProductCodesPageState extends State<TaxProductCodesPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final t = AppLocalizations.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('کدهای مالیاتی کالا'),
-        actions: [
-          TextButton.icon(
-            onPressed: _importing ? null : _pickAndImportFile,
-            icon: _importing
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.upload_file_outlined),
-            label: const Text('ایمپورت XML/ZIP'),
-          ),
-        ],
-      ),
+    return AdminCompactScaffold(
+      title: adminTx(context, 'کدهای مالیاتی کالا', 'Tax product codes'),
+      subtitle: adminTx(context, 'فهرست کدهای سازمان امور مالیاتی', 'Tax authority product codes'),
+      actions: [
+        IconButton(
+          tooltip: adminTx(context, 'ورود XML یا ZIP', 'Import XML or ZIP'),
+          onPressed: _importing ? null : _pickAndImportFile,
+          icon: _importing
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.upload_file_outlined, size: 20),
+        ),
+      ],
       body: Column(
         children: [
           if (_importing) _buildUploadProgressBanner(theme),
@@ -202,7 +198,7 @@ class _TaxProductCodesPageState extends State<TaxProductCodesPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('وضعیت ایمپورت: $state', style: theme.textTheme.titleSmall?.copyWith(color: color)),
+                Text('${adminTx(context, 'وضعیت ایمپورت', 'Import status')}: ${_jobStateLabel(state)}', style: theme.textTheme.titleSmall?.copyWith(color: color, fontSize: 13)),
                 if (progress != null) LinearProgressIndicator(value: progress.clamp(0, 100) / 100),
                 if (message.isNotEmpty)
                   Padding(
@@ -215,16 +211,16 @@ class _TaxProductCodesPageState extends State<TaxProductCodesPage> {
           if (state == 'failed' && (_jobStatus?['error'] ?? '').toString().isNotEmpty)
             IconButton(
               icon: const Icon(Icons.info_outline),
-              tooltip: 'جزئیات خطا',
+              tooltip: adminTx(context, 'جزئیات خطا', 'Error details'),
               onPressed: () {
-                final err = _jobStatus?['error'] ?? 'نامشخص';
+                final err = _jobStatus?['error'] ?? adminTx(context, 'نامشخص', 'Unknown');
                 showDialog(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    title: const Text('جزئیات خطا'),
+                    title: Text(adminTx(ctx, 'جزئیات خطا', 'Error details'), style: const TextStyle(fontSize: 16)),
                     content: Text(err.toString()),
                     actions: [
-                      TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('بستن')),
+                      TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(adminTx(ctx, 'بستن', 'Close'))),
                     ],
                   ),
                 );
@@ -260,19 +256,19 @@ class _TaxProductCodesPageState extends State<TaxProductCodesPage> {
         ),
         TextColumn(
           'taxable_status',
-          'وضعیت مالیاتی',
+          adminTx(context, 'وضعیت مالیاتی', 'Tax status'),
           width: ColumnWidth.medium,
           formatter: (item) => item['taxable_status']?.toString(),
         ),
         TextColumn(
           'run_date',
-          'تاریخ اجرا',
+          adminTx(context, 'تاریخ اجرا', 'Effective date'),
           width: ColumnWidth.small,
           formatter: (item) => item['run_date']?.toString(),
         ),
         TextColumn(
           'last_edit_date',
-          'آخرین ویرایش',
+          adminTx(context, 'آخرین ویرایش', 'Last edit'),
           width: ColumnWidth.small,
           formatter: (item) => item['last_edit_date']?.toString(),
         ),
@@ -319,7 +315,7 @@ class _TaxProductCodesPageState extends State<TaxProductCodesPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'در حال بارگذاری فایل...',
+                  adminTx(context, 'در حال بارگذاری فایل', 'Uploading file'),
                   style: theme.textTheme.titleSmall,
                 ),
                 const SizedBox(height: 4),
@@ -334,6 +330,16 @@ class _TaxProductCodesPageState extends State<TaxProductCodesPage> {
         ],
       ),
     );
+  }
+
+  String _jobStateLabel(String state) {
+    return switch (state) {
+      'succeeded' => adminTx(context, 'موفق', 'Succeeded'),
+      'failed' => adminTx(context, 'ناموفق', 'Failed'),
+      'running' => adminTx(context, 'در حال اجرا', 'Running'),
+      'queued' => adminTx(context, 'در صف', 'Queued'),
+      _ => state,
+    };
   }
 
   String _formatVatValue(Map<String, dynamic> item, AppLocalizations t) {

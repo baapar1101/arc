@@ -507,7 +507,7 @@ def lookup_number(
 	db: Session = Depends(get_db),
 	_ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	return _resp(svc.match_caller(db, business_id, number), request)
+	return _resp(svc.scrub_match_for_viewer(db, business_id, _ctx, svc.match_caller(db, business_id, number)), request)
 
 
 # ─── Connector endpoints ────────────────────────────────────────────────────

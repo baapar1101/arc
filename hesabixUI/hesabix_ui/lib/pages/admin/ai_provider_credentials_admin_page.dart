@@ -3,9 +3,12 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'admin_compact_scaffold.dart';
+import '../../theme/tokens/extensions.dart';
 
 class AIProviderCredentialsAdminPage extends StatefulWidget {
-  const AIProviderCredentialsAdminPage({super.key});
+  final bool embedded;
+  const AIProviderCredentialsAdminPage({super.key, this.embedded = false});
 
   @override
   State<AIProviderCredentialsAdminPage> createState() =>
@@ -75,7 +78,7 @@ class _AIProviderCredentialsAdminPageState
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text('اعتبارنامه $label'),
+          title: Text(adminTx(context, 'اعتبارنامه $label', '$label credential')),
           content: SizedBox(
             width: 480,
             child: Column(
@@ -83,36 +86,43 @@ class _AIProviderCredentialsAdminPageState
               children: [
                 TextField(
                   controller: baseUrlCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'API Base URL',
-                    helperText: 'اختیاری — برای gateway سفارشی',
+                  decoration: InputDecoration(
+                    isDense: true,
+                    labelText: adminTx(context, 'آدرس پایه API', 'API base URL'),
+                    helperText: adminTx(context, 'اختیاری؛ برای درگاه سفارشی', 'Optional, for a custom gateway'),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 TextField(
                   controller: apiKeyCtrl,
                   decoration: InputDecoration(
-                    labelText: 'API Key',
+                    isDense: true,
+                    labelText: adminTx(context, 'کلید API', 'API key'),
                     helperText: existing?['api_key'] != null
-                        ? 'خالی بگذارید تا کلید فعلی حفظ شود'
+                        ? adminTx(context, 'خالی بگذارید تا کلید فعلی بماند', 'Leave empty to keep the current key')
                         : null,
                   ),
                   obscureText: true,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 TextField(
                   controller: testModelCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'مدل تست (اختیاری)',
+                  decoration: InputDecoration(
+                    isDense: true,
+                    labelText: adminTx(context, 'مدل تست (اختیاری)', 'Test model (optional)'),
                   ),
                 ),
                 SwitchListTile(
-                  title: const Text('فعال'),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(adminTx(context, 'فعال', 'Active')),
                   value: isActive,
                   onChanged: (v) => setDialogState(() => isActive = v),
                 ),
                 SwitchListTile(
-                  title: const Text('پشتیبانی از ابزارها'),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(adminTx(context, 'پشتیبانی از ابزارها', 'Tool support')),
                   value: fce,
                   onChanged: (v) => setDialogState(() => fce = v),
                 ),
@@ -122,37 +132,30 @@ class _AIProviderCredentialsAdminPageState
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('لغو'),
+              child: Text(adminTx(context, 'لغو', 'Cancel')),
             ),
             OutlinedButton(
               onPressed: () async {
                 try {
                   await _aiService.testAIProviderConnection(
                     provider,
-                    model: testModelCtrl.text.trim().isEmpty
-                        ? null
-                        : testModelCtrl.text.trim(),
+                    model: testModelCtrl.text.trim().isEmpty ? null : testModelCtrl.text.trim(),
                   );
                   if (!context.mounted) return;
-                  SnackBarHelper.show(context, message: 'اتصال موفق بود');
+                  SnackBarHelper.show(context, message: adminTx(context, 'اتصال برقرار شد', 'Connected'));
                 } catch (e) {
                   if (!context.mounted) return;
-                  SnackBarHelper.showError(
-                    context,
-                    message: ErrorExtractor.forContext(e, context),
-                  );
+                  SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
                 }
               },
-              child: const Text('تست اتصال'),
+              child: Text(adminTx(context, 'تست اتصال', 'Test connection')),
             ),
             FilledButton(
               onPressed: () async {
                 try {
                   final payload = <String, dynamic>{
                     'display_name': label,
-                    'api_base_url': baseUrlCtrl.text.trim().isEmpty
-                        ? null
-                        : baseUrlCtrl.text.trim(),
+                    'api_base_url': baseUrlCtrl.text.trim().isEmpty ? null : baseUrlCtrl.text.trim(),
                     'is_active': isActive,
                     'function_calling_enabled': fce,
                   };
@@ -165,13 +168,10 @@ class _AIProviderCredentialsAdminPageState
                   _load();
                 } catch (e) {
                   if (!context.mounted) return;
-                  SnackBarHelper.showError(
-                    context,
-                    message: ErrorExtractor.forContext(e, context),
-                  );
+                  SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
                 }
               },
-              child: const Text('ذخیره'),
+              child: Text(adminTx(context, 'ذخیره', 'Save')),
             ),
           ],
         ),
@@ -187,7 +187,7 @@ class _AIProviderCredentialsAdminPageState
     try {
       await _aiService.syncAIProviderCredentialsFromConfig();
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'همگام‌سازی از تنظیمات AI انجام شد');
+      SnackBarHelper.show(context, message: adminTx(context, 'از تنظیمات AI همگام شد', 'Synced from AI settings'));
       _load();
     } catch (e) {
       if (!mounted) return;
@@ -201,15 +201,20 @@ class _AIProviderCredentialsAdminPageState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('اعتبارنامه Providerها'),
+      appBar: aiHubAppBar(
+        embedded: widget.embedded,
+        title: Text(adminTx(context, 'اعتبارنامه ارائه‌دهنده‌ها', 'Provider credentials')),
         actions: [
           IconButton(
-            tooltip: 'همگام‌سازی از تنظیمات AI',
-            icon: const Icon(Icons.sync),
+            tooltip: adminTx(context, 'اگر اعتبارنامه کلید نداشته باشد، از تنظیمات قدیمی پر می‌شود', 'Fills a credential only when it has no key yet'),
+            icon: const Icon(Icons.sync, size: 20),
             onPressed: _syncFromConfig,
           ),
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
+          IconButton(
+            tooltip: adminTx(context, 'بازخوانی', 'Refresh'),
+            icon: const Icon(Icons.refresh, size: 20),
+            onPressed: _load,
+          ),
         ],
       ),
       body: _loading
@@ -217,39 +222,55 @@ class _AIProviderCredentialsAdminPageState
           : _error != null
               ? Center(child: Text(_error!))
               : ListView(
-                  padding: const EdgeInsets.all(16),
+                  padding: context.settingsHub.pagePadding,
                   children: [
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Text(
-                          'برای هر provider می‌توانید API Key جداگانه تنظیم کنید. '
-                          'هنگام انتخاب مدل توسط کاربر، سیستم credential همان provider را استفاده می‌کند.',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
+                    Text(
+                      adminTx(
+                        context,
+                        'کلید هر ارائه‌دهنده جدا ذخیره می‌شود. هنگام انتخاب مدل، اعتبارنامهٔ همان ارائه‌دهنده استفاده می‌شود.',
+                        'Each provider keeps its own key. Choosing a model uses that provider’s credential.',
+                      ),
+                      style: context.settingsHub.cardSubtitleStyle(
+                        Theme.of(context).textTheme,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     ..._providers.map((entry) {
                       final provider = entry.$1;
                       final label = entry.$2;
                       final cred = _credFor(provider);
                       final configured = cred != null && cred['api_key'] != null;
+                      final active = cred?['is_active'] == true;
                       return Card(
+                        margin: const EdgeInsets.only(bottom: 6),
                         child: ListTile(
+                          dense: true,
                           leading: Icon(
                             configured ? Icons.vpn_key : Icons.vpn_key_off,
+                            size: 18,
                             color: configured
                                 ? Theme.of(context).colorScheme.primary
                                 : Theme.of(context).colorScheme.outline,
                           ),
-                          title: Text(label),
+                          title: Text(
+                            label,
+                            style: context.settingsHub.cardTitleStyle(
+                              Theme.of(context).textTheme,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ),
                           subtitle: Text(
                             configured
-                                ? 'پیکربندی شده · ${cred['is_active'] == true ? 'فعال' : 'غیرفعال'}'
-                                : 'تنظیم نشده',
+                                ? '${adminTx(context, 'پیکربندی شده', 'Configured')} · ${active ? adminTx(context, 'فعال', 'Active') : adminTx(context, 'غیرفعال', 'Inactive')}'
+                                : adminTx(context, 'تنظیم نشده', 'Not configured'),
                           ),
-                          trailing: const Icon(Icons.chevron_left),
+                          trailing: Icon(
+                            Directionality.of(context) == TextDirection.rtl
+                                ? Icons.chevron_left
+                                : Icons.chevron_right,
+                            size: 18,
+                          ),
                           onTap: () => _editCredential(provider, label),
                         ),
                       );

@@ -86,6 +86,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   final TextEditingController _loyaltyPointsController = TextEditingController();
   final TextEditingController _clubVoucherCodeController = TextEditingController();
   bool _isProforma = false; // وضعیت پیش‌فاکتور (قابل تغییر)
+  List<Map<String, dynamic>> _crmDeals = [];
   /// none | draft | posted
   String _invoiceWarehouseReleaseMode = 'draft';
 
@@ -467,6 +468,10 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
         _selectedTagIds = [];
       }
       _invoiceTitle = item['description']?.toString();
+      final crmDeals = item['crm_deals'];
+      _crmDeals = crmDeals is List
+          ? crmDeals.whereType<Map>().map((row) => Map<String, dynamic>.from(row)).toList()
+          : <Map<String, dynamic>>[];
 
       // extra_info
       _originalExtraInfo = Map<String, dynamic>.from(item['extra_info'] ?? const {});
@@ -879,6 +884,44 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     );
   }
 
+  Widget _buildCrmDealLinks() {
+    if (_crmDeals.isEmpty) return const SizedBox.shrink();
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: cs.secondaryContainer,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('فرصت فروش', style: Theme.of(context).textTheme.labelLarge),
+              for (final deal in _crmDeals)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  leading: const Icon(Icons.trending_up),
+                  title: Text(
+                    [
+                      deal['code']?.toString() ?? '',
+                      deal['title']?.toString() ?? '',
+                    ].where((part) => part.isNotEmpty).join(' — '),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: const Icon(Icons.chevron_left),
+                  onTap: (deal['id'] as num?) == null
+                      ? null
+                      : () => context.go('/business/${widget.businessId}/crm/deals/${(deal['id'] as num).toInt()}'),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildTaxConstraintBanner() {
     final reason = _taxTypeChangeBlockReason?.trim();
     final inWorkspaceHint = _isInTaxWorkspace &&
@@ -945,7 +988,13 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1600),
           child: InvoiceInfoForm(
-            header: _buildTaxConstraintBanner(),
+            header: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildTaxConstraintBanner(),
+                if (_crmDeals.isNotEmpty) _buildCrmDealLinks(),
+              ],
+            ),
             businessId: widget.businessId,
             authStore: widget.authStore,
             calendarController: widget.calendarController,

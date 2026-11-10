@@ -10,8 +10,10 @@ import 'package:hesabix_ui/services/business_user_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/crm/crm_delete_confirm_dialog.dart';
+import 'package:hesabix_ui/widgets/crm/crm_deal_picker_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_lead_picker_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_responsive_dialog.dart';
+import 'package:hesabix_ui/widgets/crm/crm_custom_field_form.dart';
 import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
@@ -49,6 +51,7 @@ class _CrmActivitiesPageState extends State<CrmActivitiesPage> {
   bool _openTasksOnly = false;
   bool _loading = true;
   String? _error;
+  int? _pendingActivityId;
 
   List<Map<String, dynamic>> get _visibleItems {
     if (!_openTasksOnly) return _items;
@@ -65,7 +68,9 @@ class _CrmActivitiesPageState extends State<CrmActivitiesPage> {
   @override
   void initState() {
     super.initState();
-    final openAdd = GoRouterState.of(context).uri.queryParameters['openAdd'] == '1';
+    final query = GoRouterState.of(context).uri.queryParameters;
+    final openAdd = query['openAdd'] == '1';
+    _pendingActivityId = int.tryParse(query['activityId'] ?? '');
     _loadFilterPersons().then((_) {
       if (mounted && openAdd) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -73,7 +78,7 @@ class _CrmActivitiesPageState extends State<CrmActivitiesPage> {
         });
       }
     });
-    _load();
+    _load().then((_) => _openPendingActivity());
   }
 
   Future<void> _loadFilterPersons() async {
@@ -309,7 +314,16 @@ class _CrmActivitiesPageState extends State<CrmActivitiesPage> {
                                 final overdue = isOpenTask && dueDt != null && dueDt.isBefore(DateTime.now());
                                 final priority = item['priority']?.toString();
                                 final canWrite = widget.authStore.hasBusinessPermission('crm', 'write');
+                                final personName = item['person_name']?.toString() ?? '';
+                                final leadName = item['lead_name']?.toString() ?? '';
+                                final dealLabel = [
+                                  item['deal_code']?.toString() ?? '',
+                                  item['deal_title']?.toString() ?? '',
+                                ].where((part) => part.isNotEmpty).join(' — ');
                                 final subtitleParts = <String>[
+                                  if (personName.isNotEmpty) personName,
+                                  if (leadName.isNotEmpty) leadName,
+                                  if (dealLabel.isNotEmpty) dealLabel,
                                   if (code.isNotEmpty) code,
                                   if (desc.isNotEmpty) desc,
                                   if (dateStr.isNotEmpty) dateStr,
@@ -383,6 +397,20 @@ class _CrmActivitiesPageState extends State<CrmActivitiesPage> {
       return DateFormat('y/MM/dd HH:mm').format(dt);
     } catch (_) {
       return iso;
+    }
+  }
+
+  Future<void> _openPendingActivity() async {
+    final id = _pendingActivityId;
+    _pendingActivityId = null;
+    if (id == null || !mounted) return;
+    try {
+      final item = await _crmService.getActivity(businessId: widget.businessId, activityId: id);
+      if (!mounted) return;
+      _onEdit(item);
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: ErrorExtractor.forContext(e, context), isError: true);
     }
   }
 
@@ -469,6 +497,8 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
   late TextEditingController _codeController;
   int? _leadId;
   String _leadLabel = '';
+  int? _dealPersonId;
+  String _dealLabel = '';
   bool _codeAuto = true;
   String _activityType = 'call';
   DateTime _activityDate = DateTime.now();
@@ -483,6 +513,7 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
   String _status = 'open';
   int? _assignedToUserId;
   List<Map<String, dynamic>> _businessUsers = [];
+  Map<String, dynamic> _customFieldValues = {};
 
   @override
   void initState() {
@@ -499,6 +530,7 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
     _codeController = TextEditingController(text: i['code']?.toString() ?? '');
     _codeAuto = i['id'] == null;
     _descController = TextEditingController(text: i['description']?.toString() ?? '');
+    _customFieldValues = crmCustomValuesFromRecord(i);
     _leadId = (i['lead_id'] as num?)?.toInt();
     final lc = i['lead_code']?.toString();
     final ln = i['lead_name']?.toString();
@@ -514,6 +546,11 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
     final pName = i['person_name']?.toString();
     if (pid != null) _selectedPerson = _minimalPersonForActivityDisplay(widget.businessId, pid, pName);
     _dealId = (i['deal_id'] as num?)?.toInt();
+    _dealPersonId = (i['deal_person_id'] as num?)?.toInt();
+    final dealCode = i['deal_code']?.toString() ?? '';
+    final dealTitle = i['deal_title']?.toString() ?? '';
+    _dealLabel = [dealCode, dealTitle].where((part) => part.isNotEmpty).join(' — ');
+    if (_dealId != null && _dealLabel.isEmpty) _dealLabel = 'فرصت';
     final date = i['activity_date'];
     _activityDate = date != null ? DateTime.tryParse(date.toString()) ?? DateTime.now() : DateTime.now();
   }
@@ -554,6 +591,30 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
     setState(() {
       _leadId = null;
       _leadLabel = '';
+    });
+  }
+
+  Future<void> _pickDeal() async {
+    final m = await showCrmDealPickerDialog(
+      context,
+      businessId: widget.businessId,
+      personId: _selectedPerson?.id ?? _personId,
+    );
+    if (m == null || !mounted) return;
+    setState(() {
+      _dealId = (m['id'] as num?)?.toInt();
+      _dealPersonId = (m['person_id'] as num?)?.toInt();
+      final title = (m['title'] ?? '').toString();
+      final code = (m['code'] ?? '').toString();
+      _dealLabel = [code, title].where((part) => part.isNotEmpty).join(' — ');
+    });
+  }
+
+  void _clearDeal() {
+    setState(() {
+      _dealId = null;
+      _dealPersonId = null;
+      _dealLabel = '';
     });
   }
 
@@ -636,6 +697,11 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
                     setState(() {
                       _selectedPerson = p;
                       _personId = p?.id;
+                      if (_dealId != null && _dealPersonId != null && p?.id != _dealPersonId) {
+                        _dealId = null;
+                        _dealPersonId = null;
+                        _dealLabel = '';
+                      }
                     });
                   },
                 ),
@@ -664,6 +730,28 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
                     contentPadding: EdgeInsets.zero,
                     title: Text(t.crmActivityPickLead, style: Theme.of(context).textTheme.labelMedium),
                     subtitle: Text(_leadLabel),
+                  ),
+                const SizedBox(height: 12),
+                if (_dealId != null)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+                    ),
+                    title: Text(t.crmActivityPickDeal, style: Theme.of(context).textTheme.labelMedium),
+                    subtitle: Text(_dealLabel, maxLines: 2, overflow: TextOverflow.ellipsis),
+                    trailing: IconButton(
+                      tooltip: t.crmActivityClearDeal,
+                      icon: const Icon(Icons.clear),
+                      onPressed: _clearDeal,
+                    ),
+                  )
+                else
+                  OutlinedButton.icon(
+                    onPressed: _pickDeal,
+                    icon: const Icon(Icons.handshake_outlined),
+                    label: Text(t.crmActivityPickDeal),
                   ),
               ],
             ),
@@ -718,6 +806,14 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 16),
+          CrmCustomFieldInputs(
+            businessId: widget.businessId,
+            crmService: widget.crmService,
+            entityType: 'activity',
+            initialValues: _customFieldValues,
+            onChanged: (values) => _customFieldValues = values,
           ),
           const SizedBox(height: 16),
           CrmSectionCard(
@@ -885,7 +981,7 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
     final personId = _selectedPerson?.id ?? _personId;
     final leadId = _leadId;
     if (!isEdit && personId == null && leadId == null) {
-      SnackBarHelper.show(context, message: 'یکی از مشتری یا شناسه سرنخ لازم است', isError: true);
+      SnackBarHelper.show(context, message: 'یکی از مشتری یا سرنخ را انتخاب کنید', isError: true);
       return;
     }
     setState(() => _saving = true);
@@ -901,11 +997,13 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
           description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
           activityDate: _activityDate,
           dealId: _dealId,
+          clearDeal: _dealId == null && (widget.initial?['deal_id'] != null),
           isTask: _isTask,
           dueAt: _isTask ? _dueAt : null,
           status: _isTask ? _status : null,
           priority: _isTask ? _priority : null,
           assignedToUserId: _isTask ? _assignedToUserId : null,
+          customFields: _customFieldValues,
         );
       } else {
         await widget.crmService.createActivity(
@@ -923,6 +1021,7 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
           status: _isTask ? _status : null,
           priority: _isTask ? _priority : null,
           assignedToUserId: _isTask ? _assignedToUserId : null,
+          customFields: _customFieldValues,
         );
       }
       if (!mounted) return;

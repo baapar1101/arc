@@ -219,6 +219,13 @@ class Lead(Base):
     assigned_to = relationship("User", foreign_keys=[assigned_to_user_id])
     person = relationship("Person", foreign_keys=[person_id])
     created_by = relationship("User", foreign_keys=[created_by_user_id])
+    organization_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("crm_organizations.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    queue_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("crm_lead_queues.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    organization = relationship("CrmOrganization", foreign_keys=[organization_id])
     activities: Mapped[list["CrmActivity"]] = relationship(
         "CrmActivity",
         back_populates="lead",
@@ -299,6 +306,10 @@ class Deal(Base):
     lost_reason_code: Mapped[str | None] = mapped_column(String(50), nullable=True, comment="کد دلیل باخت")
     competitor_name: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="نام رقیب در صورت باخت")
     stage_entered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, comment="زمان ورود به مرحله فعلی")
+    organization_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("crm_organizations.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    forecast_category: Mapped[str | None] = mapped_column(String(20), nullable=True)
     extra_info: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
@@ -322,6 +333,7 @@ class Deal(Base):
     document = relationship("Document", foreign_keys=[document_id])
     assigned_to = relationship("User", foreign_keys=[assigned_to_user_id])
     created_by = relationship("User", foreign_keys=[created_by_user_id])
+    organization = relationship("CrmOrganization", foreign_keys=[organization_id])
     activities: Mapped[list["CrmActivity"]] = relationship(
         "CrmActivity",
         back_populates="deal",
@@ -551,6 +563,18 @@ class CrmNote(Base):
         nullable=True,
         index=True,
     )
+    person_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("persons.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    deal_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("crm_deals.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     created_by_user_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("users.id", ondelete="RESTRICT"),
@@ -576,6 +600,8 @@ class CrmNote(Base):
     business = relationship("Business")
     note_type = relationship("CrmNoteType", foreign_keys=[note_type_id])
     lead = relationship("Lead", foreign_keys=[lead_id])
+    person = relationship("Person", foreign_keys=[person_id])
+    deal = relationship("Deal", foreign_keys=[deal_id])
     created_by = relationship("User", foreign_keys=[created_by_user_id])
     acl_users: Mapped[list["CrmNoteAclUser"]] = relationship(
         "CrmNoteAclUser",
@@ -835,6 +861,9 @@ class CrmSequence(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    sms_daily_cap: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="سقف پیامک همین توالی در هر روز")
+    stop_on_reply: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    stop_on_close: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
@@ -927,4 +956,198 @@ class CrmReminderDedup(Base):
     reminder_key: Mapped[str] = mapped_column(String(80), nullable=False)
     sent_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
+
+class CrmDealDocument(Base):
+    """پیوند چندسند حسابداری به یک فرصت فروش."""
+
+    __tablename__ = "crm_deal_documents"
+    __table_args__ = (
+        UniqueConstraint("deal_id", "document_id", name="uq_crm_deal_documents_deal_document"),
+        Index("idx_crm_deal_documents_business_deal", "business_id", "deal_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    deal_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("crm_deals.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    document_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    role: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        comment="proforma | invoice | receipt",
+    )
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class CrmSavedView(Base):
+    """نمای فیلتر ذخیره‌شده برای فهرست سرنخ یا فرصت."""
+
+    __tablename__ = "crm_saved_views"
+    __table_args__ = (
+        UniqueConstraint(
+            "business_id",
+            "owner_user_id",
+            "entity_type",
+            "name",
+            name="uq_crm_saved_views_owner_name",
+        ),
+        Index("idx_crm_saved_views_business_entity", "business_id", "entity_type"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    owner_user_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    entity_type: Mapped[str] = mapped_column(String(20), nullable=False, comment="lead | deal")
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    filters: Mapped[dict] = mapped_column(JSON, nullable=False)
+    is_shared: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class CrmPersonStats(Base):
+    """عکس شبانه عمق فروش یک شخص. مانده حسابداری اینجا ذخیره نمی‌شود."""
+
+    __tablename__ = "crm_person_stats"
+    __table_args__ = (
+        UniqueConstraint("business_id", "person_id", name="uq_crm_person_stats_person"),
+        Index("idx_crm_person_stats_computed", "computed_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False
+    )
+    person_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("persons.id", ondelete="CASCADE"), nullable=False
+    )
+    sales_total: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default="0")
+    returns_total: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default="0")
+    net_sales: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
+    margin_amount: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
+    margin_complete: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    mixed_currency: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    open_document_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    open_remaining: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
+    documents_truncated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    currencies: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    repeat_products: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    receipt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    computed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class CrmOrganization(Base):
+    """سازمان فروش. طرف‌حساب صورتحساب همیشه یک شخص حسابداری است."""
+
+    __tablename__ = "crm_organizations"
+    __table_args__ = (UniqueConstraint("business_id", "name", name="uq_crm_organizations_business_name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    billing_person_id: Mapped[int] = mapped_column(Integer, ForeignKey("persons.id", ondelete="RESTRICT"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    contacts: Mapped[list["CrmOrganizationContact"]] = relationship(
+        "CrmOrganizationContact", back_populates="organization", cascade="all, delete-orphan"
+    )
+
+
+class CrmOrganizationContact(Base):
+    __tablename__ = "crm_organization_contacts"
+    __table_args__ = (UniqueConstraint("organization_id", "person_id", name="uq_crm_org_contact"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    organization_id: Mapped[int] = mapped_column(Integer, ForeignKey("crm_organizations.id", ondelete="CASCADE"), nullable=False)
+    person_id: Mapped[int] = mapped_column(Integer, ForeignKey("persons.id", ondelete="CASCADE"), nullable=False)
+    organization = relationship("CrmOrganization", back_populates="contacts")
+
+
+class CrmQuota(Base):
+    __tablename__ = "crm_quotas"
+    __table_args__ = (
+        UniqueConstraint("business_id", "user_id", "period_start", "currency_id", name="uq_crm_quotas_period"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    period_start: Mapped[date] = mapped_column(Date, nullable=False)
+    period_end: Mapped[date] = mapped_column(Date, nullable=False)
+    amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
+    currency_id: Mapped[int] = mapped_column(Integer, ForeignKey("currencies.id", ondelete="RESTRICT"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class CrmManagerLink(Base):
+    __tablename__ = "crm_manager_links"
+    __table_args__ = (UniqueConstraint("business_id", "member_user_id", name="uq_crm_manager_member"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False)
+    manager_user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    member_user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+
+class CrmLeadQueue(Base):
+    __tablename__ = "crm_lead_queues"
+    __table_args__ = (UniqueConstraint("business_id", "name", name="uq_crm_lead_queues_name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    members: Mapped[list["CrmLeadQueueMember"]] = relationship(
+        "CrmLeadQueueMember", back_populates="queue", cascade="all, delete-orphan"
+    )
+
+
+class CrmLeadQueueMember(Base):
+    __tablename__ = "crm_lead_queue_members"
+    __table_args__ = (UniqueConstraint("queue_id", "user_id", name="uq_crm_queue_member"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    queue_id: Mapped[int] = mapped_column(Integer, ForeignKey("crm_lead_queues.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    queue = relationship("CrmLeadQueue", back_populates="members")
+
+
+class CrmRecordAcl(Base):
+    __tablename__ = "crm_record_acl"
+    __table_args__ = (
+        UniqueConstraint("business_id", "entity_type", "entity_id", "user_id", name="uq_crm_record_acl"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    entity_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    access: Mapped[str] = mapped_column(String(10), nullable=False, default="view", server_default="view")
 

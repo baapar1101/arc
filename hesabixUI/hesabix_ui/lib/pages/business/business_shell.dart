@@ -225,10 +225,20 @@ class _BusinessShellState extends State<BusinessShell> {
         return t.businessPanelTabRouteRepairShopSettings;
       case 'payroll':
         return t.payrollMenu;
+      case 'procurement':
+        return t.localeName.startsWith('fa') ? 'خرید و تدارکات' : 'Procurement';
       case 'advanced-production':
         return t.advancedProductionMenu;
       case 'office-automation':
         return t.oaCartable;
+      case 'office-automation/desk':
+        return t.oaMyDesk;
+      case 'office-automation/processes':
+        return t.oaProcesses;
+      case 'office-automation/documents':
+        return t.oaDocuments;
+      case 'office-automation/enterprise':
+        return t.oaEnterprise;
       case 'office-automation/org':
         return t.oaOrg;
       case 'office-automation/external-orgs':
@@ -1385,6 +1395,8 @@ class _BusinessShellState extends State<BusinessShell> {
 
   bool _isPayrollPluginActive() => _isPluginCodeLicensed('payroll');
 
+  bool _isProcurementPluginActive() => _isPluginCodeLicensed('procurement');
+
   bool _isAdvancedProductionPluginActive() =>
       _isPluginCodeLicensed('advanced_production');
 
@@ -2142,6 +2154,15 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: true,
           ),
           _MenuItem(
+            key: 'crm/enterprise',
+            label: t.crmMenuEnterprise,
+            icon: Icons.groups_outlined,
+            selectedIcon: Icons.groups,
+            path: _bu('crm/enterprise'),
+            type: _MenuItemType.simple,
+            hasAddButton: false,
+          ),
+          _MenuItem(
             key: 'crm/sequences',
             label: t.crmMenuSequences,
             icon: Icons.timeline_outlined,
@@ -2198,6 +2219,14 @@ class _BusinessShellState extends State<BusinessShell> {
         hasAddButton: false,
       ),
       _MenuItem(
+        key: 'procurement',
+        label: t.localeName.startsWith('fa') ? 'خرید و تدارکات' : 'Procurement',
+        icon: Icons.shopping_cart_outlined,
+        selectedIcon: Icons.shopping_cart,
+        path: _bu('procurement'),
+        type: _MenuItemType.simple,
+      ),
+      _MenuItem(
         key: 'group:office-automation',
         label: t.oaMenu,
         icon: Icons.mark_email_unread_outlined,
@@ -2205,6 +2234,38 @@ class _BusinessShellState extends State<BusinessShell> {
         path: null,
         type: _MenuItemType.expandable,
         children: [
+          _MenuItem(
+            key: 'office-automation/enterprise',
+            label: t.oaEnterprise,
+            icon: Icons.apartment_outlined,
+            selectedIcon: Icons.apartment,
+            path: _bu('office-automation/enterprise'),
+            type: _MenuItemType.simple,
+          ),
+          _MenuItem(
+            key: 'office-automation/documents',
+            label: t.oaDocuments,
+            icon: Icons.folder_copy_outlined,
+            selectedIcon: Icons.folder_copy,
+            path: _bu('office-automation/documents'),
+            type: _MenuItemType.simple,
+          ),
+          _MenuItem(
+            key: 'office-automation/processes',
+            label: t.oaProcesses,
+            icon: Icons.account_tree_outlined,
+            selectedIcon: Icons.account_tree,
+            path: _bu('office-automation/processes'),
+            type: _MenuItemType.simple,
+          ),
+          _MenuItem(
+            key: 'office-automation/desk',
+            label: t.oaMyDesk,
+            icon: Icons.space_dashboard_outlined,
+            selectedIcon: Icons.space_dashboard,
+            path: _bu('office-automation/desk'),
+            type: _MenuItemType.simple,
+          ),
           _MenuItem(
             key: 'office-automation',
             label: t.oaCartable,
@@ -3908,6 +3969,12 @@ class _BusinessShellState extends State<BusinessShell> {
       }
     }
 
+    if (section == 'procurement') {
+      if (!_showPluginGatedMenu(_isProcurementPluginActive())) {
+        return false;
+      }
+    }
+
     if (section == 'advanced_production') {
       if (!_showPluginGatedMenu(_isAdvancedProductionPluginActive())) {
         return false;
@@ -4111,6 +4178,8 @@ class _BusinessShellState extends State<BusinessShell> {
           return 'customer_club';
         case 'payroll':
           return 'payroll';
+        case 'procurement':
+          return 'procurement';
         case 'advanced-production':
           return 'advanced_production';
         case 'fixed-assets':
@@ -4130,6 +4199,7 @@ class _BusinessShellState extends State<BusinessShell> {
       if (path.contains('/report-templates')) return 'report_templates';
       if (path.contains('/hscript')) return 'reports';
       if (path.contains('/payroll')) return 'payroll';
+      if (path.contains('/procurement')) return 'procurement';
       if (path.contains('/advanced-production')) return 'advanced_production';
       if (path.contains('/office-automation')) return 'office_automation';
       if (path.contains('/fixed-assets')) return 'fixed_assets';
@@ -4161,7 +4231,8 @@ class _BusinessShellState extends State<BusinessShell> {
         label == t.crmMenuWebChat ||
         label == t.crmMenuTasks ||
         label == t.crmMenuCustomer360 ||
-        label == t.crmMenuSequences) {
+        label == t.crmMenuSequences ||
+        label == t.crmMenuEnterprise) {
       return 'crm';
     }
     if (label == t.products ||

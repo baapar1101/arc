@@ -859,7 +859,30 @@ def route_to_dict(r: DistributionRoute, territory_name: Optional[str] = None) ->
 	}
 
 
-def visit_to_dict(v: DistributionFieldVisit, person_name: Optional[str] = None) -> Dict[str, Any]:
+def _visible_deal_id(db: Session, business_id: int, user_id: int, deal_id: Optional[int]) -> Optional[int]:
+	"""شناسه فرصت را فقط وقتی برگردان که بیننده همان رکورد را ببیند."""
+	if not deal_id:
+		return None
+	from adapters.db.models.crm import Deal
+	from app.services.crm_enterprise_service import acl_actor, assert_can_view_record
+
+	deal = db.query(Deal).filter(Deal.id == int(deal_id), Deal.business_id == business_id).first()
+	if deal is None:
+		return None
+	try:
+		assert_can_view_record(db, business_id, acl_actor(db, int(user_id)), "deal", deal, write=False)
+	except ApiError:
+		return None
+	return int(deal.id)
+
+
+def visit_to_dict(
+	v: DistributionFieldVisit,
+	person_name: Optional[str] = None,
+	*,
+	db: Optional[Session] = None,
+	viewer_user_id: Optional[int] = None,
+) -> Dict[str, Any]:
 	def _num(val: Any) -> Any:
 		if val is None:
 			return None
@@ -881,7 +904,11 @@ def visit_to_dict(v: DistributionFieldVisit, person_name: Optional[str] = None) 
 		"outcome": v.outcome,
 		"no_order_reason": v.no_order_reason,
 		"document_id": v.document_id,
-		"deal_id": v.deal_id,
+		"deal_id": (
+			_visible_deal_id(db, int(v.business_id), int(viewer_user_id), v.deal_id)
+			if db is not None and viewer_user_id is not None
+			else v.deal_id
+		),
 		"crm_activity_id": v.crm_activity_id,
 		"notes": v.notes,
 		"extra_info": v.extra_info,
@@ -1794,7 +1821,7 @@ def start_visit(
 	db.commit()
 	db.refresh(v)
 	pname = (person.alias_name or "").strip()
-	return visit_to_dict(v, pname)
+	return visit_to_dict(v, pname, db=db, viewer_user_id=user_id)
 
 
 def heartbeat_visit(
@@ -1936,6 +1963,9 @@ def complete_visit(
 		deal = db.query(Deal).filter(Deal.id == deal_id, Deal.business_id == business_id).first()
 		if not deal:
 			raise ApiError("VALIDATION_ERROR", "deal_id not found in this business", http_status=400)
+		from app.services.crm_enterprise_service import acl_actor, assert_can_view_record
+
+		assert_can_view_record(db, business_id, acl_actor(db, int(user_id)), "deal", deal, write=True)
 		v.deal_id = deal_id
 	if payload.get("notes"):
 		v.notes = str(payload["notes"])
@@ -2101,7 +2131,7 @@ def complete_visit(
 
 	person = db.query(Person).filter(Person.id == v.person_id).first()
 	pname = (person.alias_name or "").strip() if person else None
-	return visit_to_dict(v, pname)
+	return visit_to_dict(v, pname, db=db, viewer_user_id=user_id)
 
 
 def _create_visit_crm_activity(db: Session, business_id: int, visit: DistributionFieldVisit, user_id: int, summary: str) -> Optional[int]:
@@ -2161,7 +2191,7 @@ def cancel_visit(
 	db.refresh(v)
 	person = db.query(Person).filter(Person.id == v.person_id).first()
 	pname = (person.alias_name or "").strip() if person else None
-	return visit_to_dict(v, pname)
+	return visit_to_dict(v, pname, db=db, viewer_user_id=user_id)
 
 
 def list_visits(
@@ -2187,7 +2217,8 @@ def list_visits(
 	if pids:
 		for p in db.query(Person).filter(Person.id.in_(pids)).all():
 			pmap[p.id] = (p.alias_name or "").strip()
-	return [visit_to_dict(r, pmap.get(r.person_id)) for r in rows], total
+	viewer_id = int(ctx.get_user_id())
+	return [visit_to_dict(r, pmap.get(r.person_id), db=db, viewer_user_id=viewer_id) for r in rows], total
 
 
 def create_return_request(

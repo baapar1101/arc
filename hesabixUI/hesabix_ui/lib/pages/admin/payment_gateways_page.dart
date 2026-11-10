@@ -7,6 +7,8 @@ import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import 'package:uuid/uuid.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
+import 'admin_compact_scaffold.dart';
+import '../../theme/tokens/extensions.dart';
 
 class PaymentGatewaysPage extends StatefulWidget {
   const PaymentGatewaysPage({super.key});
@@ -234,7 +236,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
               child: Icon(Icons.payment_outlined, color: Theme.of(context).colorScheme.primary),
             ),
             SizedBox(width: 12),
-            Text('ایجاد درگاه پرداخت'),
+            Text(adminTx(context, 'ایجاد درگاه پرداخت', 'New payment gateway')),
           ],
         ),
         content: SizedBox(
@@ -258,14 +260,14 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                             children: [
                               Icon(Icons.apps, size: 20, color: Theme.of(context).colorScheme.primary),
                               const SizedBox(width: 8),
-                              Text('انتخاب درگاه پرداخت', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                              Text(adminTx(context, 'انتخاب درگاه', 'Choose a gateway'), style: context.settingsHub.cardTitleStyle(Theme.of(context).textTheme, color: Theme.of(context).colorScheme.onSurface)),
                             ],
                           ),
                           const SizedBox(height: 12),
                           DropdownButtonFormField<String>(
                             initialValue: _provider,
                             decoration: InputDecoration(
-                              labelText: 'درگاه پرداخت',
+                              labelText: adminTx(context, 'درگاه پرداخت', 'Payment gateway'),
                               prefixIcon: const Icon(Icons.account_balance),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                               filled: true,
@@ -277,7 +279,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                                   children: [
                                     Icon(Icons.payment, size: 20, color: SemanticColorResolver.info(context)),
                                     SizedBox(width: 8),
-                                    Text('زرین‌پال (ZarinPal)'),
+                                    Text(adminTx(context, 'زرین‌پال', 'Zarinpal')),
                                   ],
                                 ),
                               ),
@@ -287,7 +289,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                                   children: [
                                     Icon(Icons.payment, size: 20, color: SemanticColorResolver.positive(context)),
                                     SizedBox(width: 8),
-                                    Text('پارسیان (Parsian)'),
+                                    Text(adminTx(context, 'پارسیان', 'Parsian')),
                                   ],
                                 ),
                               ),
@@ -297,7 +299,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                                   children: [
                                     Icon(Icons.payment, size: 20, color: SemanticColorResolver.warning(context)),
                                     const SizedBox(width: 8),
-                                    const Text('بیت‌پی (BitPay)'),
+                                    Text(adminTx(context, 'بیت‌پی', 'BitPay')),
                                   ],
                                 ),
                               ),
@@ -330,14 +332,14 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                             children: [
                               Icon(Icons.settings, size: 20, color: Theme.of(context).colorScheme.primary),
                               const SizedBox(width: 8),
-                              Text('تنظیمات عمومی', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                              Text(adminTx(context, 'تنظیمات عمومی', 'General'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                             ],
                           ),
                           const SizedBox(height: 12),
                           TextFormField(
                             decoration: InputDecoration(
-                              labelText: 'نام نمایشی',
-                              hintText: 'مثال: درگاه پرداخت اصلی',
+                              labelText: adminTx(context, 'نام نمایشی', 'Display name'),
+                              hintText: adminTx(context, 'مثال: درگاه پرداخت اصلی', 'Example: main payment gateway'),
                               prefixIcon: const Icon(Icons.label),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                               filled: true,
@@ -352,7 +354,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                                 children: [
                                   SwitchListTile(
                                     title: Text(AppLocalizations.of(context).active),
-                                    subtitle: const Text('فعال/غیرفعال بودن درگاه'),
+                                    subtitle: Text(adminTx(context, 'درگاه برای پرداخت در دسترس باشد', 'The gateway is available for payments')),
                                     secondary: const Icon(Icons.check_circle_outline),
                                     value: _isActive,
                                     onChanged: (v) {
@@ -366,8 +368,8 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                                     },
                                   ),
                                   SwitchListTile(
-                                    title: const Text('حالت تست (Sandbox)'),
-                                    subtitle: const Text('برای تست درگاه فعال شود'),
+                                    title: Text(adminTx(context, 'حالت تست', 'Sandbox')),
+                                    subtitle: Text(adminTx(context, 'پرداخت واقعی انجام نمی‌شود', 'No real payment is taken')),
                                     secondary: const Icon(Icons.science_outlined),
                                     value: _isSandbox,
                                     onChanged: (v) {
@@ -406,7 +408,11 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                                 Icon(Icons.vpn_key, size: 20, color: Theme.of(context).colorScheme.primary),
                                 const SizedBox(width: 8),
                                 Text(
-                                  _provider == 'zarinpal' ? 'تنظیمات زرین‌پال' : _provider == 'parsian' ? 'تنظیمات پارسیان' : 'تنظیمات بیت‌پی',
+                                  _provider == 'zarinpal'
+                                      ? adminTx(context, 'تنظیمات زرین‌پال', 'Zarinpal settings')
+                                      : _provider == 'parsian'
+                                          ? adminTx(context, 'تنظیمات پارسیان', 'Parsian settings')
+                                          : adminTx(context, 'تنظیمات بیت‌پی', 'BitPay settings'),
                                   style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                                 ),
                               ],
@@ -417,11 +423,11 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                                 controller: _merchantIdCtrl,
                                 decoration: InputDecoration(
                                   labelText: 'Merchant ID',
-                                  hintText: 'کد پذیرنده از پنل زرین‌پال',
+                                  hintText: adminTx(context, 'کد پذیرنده از پنل زرین‌پال', 'Merchant code from the Zarinpal panel'),
                                   prefixIcon: const Icon(Icons.badge),
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                   filled: true,
-                                  helperText: _isSandbox ? 'در حالت تست، یک UUID معتبر استفاده کنید' : 'کد پذیرنده 36 کاراکتری از پنل زرین‌پال',
+                                  helperText: _isSandbox ? adminTx(context, 'در حالت تست یک UUID معتبر بگذارید', 'Use a valid UUID in sandbox') : adminTx(context, 'کد ۳۶ نویسه‌ای پذیرنده از پنل زرین‌پال', 'The 36-character merchant code from the Zarinpal panel'),
                                   helperMaxLines: 2,
                                 ),
                                 validator: (v) {
@@ -432,7 +438,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                                   if (_isSandbox) {
                                     final isUuid = RegExp(r'^[0-9a-fA-F\-]{32,36}$').hasMatch(v.trim());
                                     if (!isUuid) {
-                                      return 'در حالت تست باید یک UUID معتبر وارد کنید';
+                                      return adminTx(context, 'در حالت تست باید یک UUID معتبر وارد کنید', 'Sandbox mode requires a valid UUID');
                                     }
                                   }
                                   return null;
@@ -442,12 +448,12 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                               TextFormField(
                                 controller: _terminalIdCtrl,
                                 decoration: InputDecoration(
-                                  labelText: 'شناسه پذیرنده (PIN)',
-                                  hintText: 'رمز پذیرنده دریافتی از پارسیان',
+                                  labelText: adminTx(context, 'شناسه پذیرنده', 'Merchant PIN'),
+                                  hintText: adminTx(context, 'رمز پذیرنده از پارسیان', 'Merchant password from Parsian'),
                                   prefixIcon: const Icon(Icons.vpn_key),
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                   filled: true,
-                                  helperText: 'همان LoginAccount وب‌سرویس پارسیان — PIN را از شرکت پارسیان دریافت کرده‌اید',
+                                  helperText: adminTx(context, 'همان LoginAccount وب‌سرویس پارسیان است', 'This is the Parsian web service LoginAccount'),
                                   helperMaxLines: 3,
                                 ),
                                 validator: (v) => (v == null || v.trim().isEmpty) ? AppLocalizations.of(context).requiredField : null,
@@ -458,11 +464,11 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                                 controller: _merchantIdCtrl,
                                 decoration: InputDecoration(
                                   labelText: 'Merchant ID',
-                                  hintText: 'کد پذیرنده از پنل بیت‌پی',
+                                  hintText: adminTx(context, 'کد پذیرنده از پنل بیت‌پی', 'Merchant code from the BitPay panel'),
                                   prefixIcon: const Icon(Icons.badge),
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                   filled: true,
-                                  helperText: 'کد پذیرنده (Merchant ID) از پنل بیت‌پی',
+                                  helperText: adminTx(context, 'شناسه پذیرنده از پنل بیت‌پی', 'Merchant ID from the BitPay panel'),
                                 ),
                                 validator: (v) => (v == null || v.isEmpty) ? AppLocalizations.of(context).requiredField : null,
                               ),
@@ -471,11 +477,11 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                                 controller: _apiCtrl,
                                 decoration: InputDecoration(
                                   labelText: 'API Key',
-                                  hintText: 'کلید API از پنل بیت‌پی (52 کاراکتر)',
+                                  hintText: adminTx(context, 'کلید API از پنل بیت‌پی، ۵۲ نویسه', 'API key from the BitPay panel, 52 characters'),
                                   prefixIcon: const Icon(Icons.key),
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                   filled: true,
-                                  helperText: 'API key 52 کاراکتری - برای تست: adxcv-zzadq-polkjsad-opp13opoz-1sdf455aadzmck1244567',
+                                  helperText: adminTx(context, 'کلید ۵۲ نویسه‌ای. برای تست می‌توانید کلید نمونهٔ پنل را بگذارید.', '52-character key. For testing you can use the sample key from the panel.'),
                                   helperMaxLines: 2,
                                 ),
                                 validator: (v) {
@@ -483,7 +489,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                                     return AppLocalizations.of(context).requiredField;
                                   }
                                   if (v.trim().length != 52) {
-                                    return 'API key باید دقیقاً 52 کاراکتر باشد';
+                                    return adminTx(context, 'کلید API باید دقیقاً ۵۲ نویسه باشد', 'The API key must be exactly 52 characters');
                                   }
                                   return null;
                                 },
@@ -507,14 +513,14 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                               children: [
                                 Icon(Icons.link, size: 20, color: Theme.of(context).colorScheme.primary),
                                 const SizedBox(width: 8),
-                                Text('آدرس‌های بازگشت', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                                Text(adminTx(context, 'آدرس‌های بازگشت', 'Return addresses'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                               ],
                             ),
                             const SizedBox(height: 12),
                             CheckboxListTile(
                               contentPadding: EdgeInsets.zero,
-                              title: const Text('استفاده از آدرس callback پیشنهادی'),
-                              subtitle: const Text('آدرس به‌صورت خودکار از تنظیمات سیستم پر می‌شود'),
+                              title: Text(adminTx(context, 'آدرس بازگشت پیشنهادی', 'Suggested callback address')),
+                              subtitle: Text(adminTx(context, 'از تنظیمات سیستم پر می‌شود', 'Filled from system settings')),
                               secondary: const Icon(Icons.auto_awesome),
                               value: _useSuggestedCallback,
                               onChanged: (v) {
@@ -529,7 +535,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                               controller: _callbackUrlCtrl,
                               decoration: InputDecoration(
                                 labelText: 'Callback URL',
-                                hintText: 'آدرس بازگشت پس از پرداخت',
+                                hintText: adminTx(context, 'آدرس بازگشت پس از پرداخت', 'Return address after payment'),
                                 prefixIcon: Icon(Icons.call_received),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                 filled: true,
@@ -550,7 +556,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                                   SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      'پارامتر tx_id به‌صورت خودکار به callback اضافه می‌شود. در صورت تنظیم آدرس‌های redirect، کاربر پس از پرداخت هدایت می‌شود.',
+                                      adminTx(context, 'tx_id خودکار به callback اضافه می‌شود. اگر آدرس بازگشت تنظیم شده باشد، کاربر بعد از پرداخت به آنجا می‌رود.', 'tx_id is added to the callback. If a return address is set, the user is sent there after payment.'),
                                       style: TextStyle(fontSize: 12, color: SemanticColorResolver.info(context)),
                                     ),
                                   ),
@@ -561,8 +567,8 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                             TextFormField(
                               controller: _successRedirectCtrl,
                               decoration: InputDecoration(
-                                labelText: 'آدرس پس از پرداخت موفق (اختیاری)',
-                                hintText: 'مثال: https://app.com/success',
+                                labelText: adminTx(context, 'آدرس پس از پرداخت موفق', 'Address after a successful payment'),
+                                hintText: adminTx(context, 'مثال: https://app.com/success', 'Example: https://app.com/success'),
                                 prefixIcon: Icon(Icons.check_circle, color: SemanticColorResolver.positive(context)),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                 filled: true,
@@ -572,8 +578,8 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                             TextFormField(
                               controller: _failureRedirectCtrl,
                               decoration: InputDecoration(
-                                labelText: 'آدرس پس از پرداخت ناموفق (اختیاری)',
-                                hintText: 'مثال: https://app.com/failed',
+                                labelText: adminTx(context, 'آدرس پس از پرداخت ناموفق', 'Address after a failed payment'),
+                                hintText: adminTx(context, 'مثال: https://app.com/failed', 'Example: https://app.com/failed'),
                                 prefixIcon: Icon(Icons.error, color: SemanticColorResolver.negative(context)),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                 filled: true,
@@ -680,7 +686,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
               child: Icon(Icons.edit_outlined, color: Theme.of(context).colorScheme.primary),
             ),
             SizedBox(width: 12),
-            Text('ویرایش درگاه پرداخت'),
+            Text(adminTx(context, 'ویرایش درگاه پرداخت', 'Edit payment gateway')),
           ],
         ),
         content: SizedBox(
@@ -704,14 +710,14 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                             children: [
                               Icon(Icons.apps, size: 20, color: Theme.of(context).colorScheme.primary),
                               const SizedBox(width: 8),
-                              Text('درگاه پرداخت', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                              Text(adminTx(context, 'درگاه پرداخت', 'Payment gateway'), style: context.settingsHub.cardTitleStyle(Theme.of(context).textTheme, color: Theme.of(context).colorScheme.onSurface)),
                             ],
                           ),
                           const SizedBox(height: 12),
                           DropdownButtonFormField<String>(
                             initialValue: _provider,
                             decoration: InputDecoration(
-                              labelText: 'نوع درگاه',
+                              labelText: adminTx(context, 'نوع درگاه', 'Gateway type'),
                               prefixIcon: const Icon(Icons.account_balance),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                               filled: true,
@@ -723,7 +729,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                                   children: [
                                     Icon(Icons.payment, size: 20, color: SemanticColorResolver.info(context)),
                                     SizedBox(width: 8),
-                                    Text('زرین‌پال (ZarinPal)'),
+                                    Text(adminTx(context, 'زرین‌پال', 'Zarinpal')),
                                   ],
                                 ),
                               ),
@@ -733,7 +739,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                                   children: [
                                     Icon(Icons.payment, size: 20, color: SemanticColorResolver.positive(context)),
                                     SizedBox(width: 8),
-                                    Text('پارسیان (Parsian)'),
+                                    Text(adminTx(context, 'پارسیان', 'Parsian')),
                                   ],
                                 ),
                               ),
@@ -743,7 +749,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                                   children: [
                                     Icon(Icons.payment, size: 20, color: SemanticColorResolver.warning(context)),
                                     const SizedBox(width: 8),
-                                    const Text('بیت‌پی (BitPay)'),
+                                    Text(adminTx(context, 'بیت‌پی', 'BitPay')),
                                   ],
                                 ),
                               ),
@@ -780,15 +786,15 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                             children: [
                               Icon(Icons.settings, size: 20, color: Theme.of(context).colorScheme.primary),
                               const SizedBox(width: 8),
-                              Text('تنظیمات عمومی', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                              Text(adminTx(context, 'تنظیمات عمومی', 'General'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                             ],
                           ),
                           const SizedBox(height: 12),
                           TextFormField(
                             initialValue: _displayName,
                             decoration: InputDecoration(
-                              labelText: 'نام نمایشی',
-                              hintText: 'مثال: درگاه پرداخت اصلی',
+                              labelText: adminTx(context, 'نام نمایشی', 'Display name'),
+                              hintText: adminTx(context, 'مثال: درگاه پرداخت اصلی', 'Example: main payment gateway'),
                               prefixIcon: const Icon(Icons.label),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                               filled: true,
@@ -803,7 +809,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                                 children: [
                                   SwitchListTile(
                                     title: Text(AppLocalizations.of(context).active),
-                                    subtitle: const Text('فعال/غیرفعال بودن درگاه'),
+                                    subtitle: Text(adminTx(context, 'درگاه برای پرداخت در دسترس باشد', 'The gateway is available for payments')),
                                     secondary: const Icon(Icons.check_circle_outline),
                                     value: _isActive,
                                     onChanged: (v) {
@@ -817,8 +823,8 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                                     },
                                   ),
                                   SwitchListTile(
-                                    title: const Text('حالت تست (Sandbox)'),
-                                    subtitle: const Text('برای تست درگاه فعال شود'),
+                                    title: Text(adminTx(context, 'حالت تست', 'Sandbox')),
+                                    subtitle: Text(adminTx(context, 'پرداخت واقعی انجام نمی‌شود', 'No real payment is taken')),
                                     secondary: const Icon(Icons.science_outlined),
                                     value: _isSandbox,
                                     onChanged: (v) {
@@ -854,7 +860,11 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                               Icon(Icons.vpn_key, size: 20, color: Theme.of(context).colorScheme.primary),
                               const SizedBox(width: 8),
                               Text(
-                                _provider == 'zarinpal' ? 'تنظیمات زرین‌پال' : _provider == 'parsian' ? 'تنظیمات پارسیان' : 'تنظیمات بیت‌پی',
+                                _provider == 'zarinpal'
+                                    ? adminTx(context, 'تنظیمات زرین‌پال', 'Zarinpal settings')
+                                    : _provider == 'parsian'
+                                        ? adminTx(context, 'تنظیمات پارسیان', 'Parsian settings')
+                                        : adminTx(context, 'تنظیمات بیت‌پی', 'BitPay settings'),
                                 style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                               ),
                             ],
@@ -865,11 +875,11 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                               controller: _merchantIdCtrl,
                               decoration: InputDecoration(
                                 labelText: 'Merchant ID',
-                                hintText: 'کد پذیرنده از پنل زرین‌پال',
+                                hintText: adminTx(context, 'کد پذیرنده از پنل زرین‌پال', 'Merchant code from the Zarinpal panel'),
                                 prefixIcon: const Icon(Icons.badge),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                 filled: true,
-                                helperText: _isSandbox ? 'در حالت تست، یک UUID معتبر استفاده کنید' : 'کد پذیرنده 36 کاراکتری از پنل زرین‌پال',
+                                helperText: _isSandbox ? adminTx(context, 'در حالت تست یک UUID معتبر بگذارید', 'Use a valid UUID in sandbox') : adminTx(context, 'کد ۳۶ نویسه‌ای پذیرنده از پنل زرین‌پال', 'The 36-character merchant code from the Zarinpal panel'),
                                 helperMaxLines: 2,
                               ),
                               validator: (v) {
@@ -880,7 +890,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                                 if (_isSandbox) {
                                   final isUuid = RegExp(r'^[0-9a-fA-F\-]{32,36}$').hasMatch(v.trim());
                                   if (!isUuid) {
-                                    return 'در حالت تست باید یک UUID معتبر وارد کنید';
+                                    return adminTx(context, 'در حالت تست باید یک UUID معتبر وارد کنید', 'Sandbox mode requires a valid UUID');
                                   }
                                 }
                                 return null;
@@ -890,12 +900,12 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                             TextFormField(
                               controller: _terminalIdCtrl,
                               decoration: InputDecoration(
-                                labelText: 'شناسه پذیرنده (PIN)',
-                                hintText: 'رمز پذیرنده دریافتی از پارسیان',
+                                labelText: adminTx(context, 'شناسه پذیرنده', 'Merchant PIN'),
+                                hintText: adminTx(context, 'رمز پذیرنده از پارسیان', 'Merchant password from Parsian'),
                                 prefixIcon: const Icon(Icons.vpn_key),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                 filled: true,
-                                helperText: 'همان LoginAccount وب‌سرویس پارسیان — PIN را از شرکت پارسیان دریافت کرده‌اید',
+                                helperText: adminTx(context, 'همان LoginAccount وب‌سرویس پارسیان است', 'This is the Parsian web service LoginAccount'),
                                 helperMaxLines: 3,
                               ),
                               validator: (v) => (v == null || v.trim().isEmpty) ? AppLocalizations.of(context).requiredField : null,
@@ -906,11 +916,11 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                               controller: _merchantIdCtrl,
                               decoration: InputDecoration(
                                 labelText: 'Merchant ID',
-                                hintText: 'کد پذیرنده از پنل بیت‌پی',
+                                hintText: adminTx(context, 'کد پذیرنده از پنل بیت‌پی', 'Merchant code from the BitPay panel'),
                                 prefixIcon: const Icon(Icons.badge),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                 filled: true,
-                                helperText: 'کد پذیرنده (Merchant ID) از پنل بیت‌پی',
+                                helperText: adminTx(context, 'شناسه پذیرنده از پنل بیت‌پی', 'Merchant ID from the BitPay panel'),
                               ),
                               validator: (v) => (v == null || v.isEmpty) ? AppLocalizations.of(context).requiredField : null,
                             ),
@@ -919,11 +929,11 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                               controller: _apiCtrl,
                               decoration: InputDecoration(
                                 labelText: 'API Key',
-                                hintText: 'کلید API از پنل بیت‌پی (52 کاراکتر)',
+                                hintText: adminTx(context, 'کلید API از پنل بیت‌پی، ۵۲ نویسه', 'API key from the BitPay panel, 52 characters'),
                                 prefixIcon: const Icon(Icons.key),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                 filled: true,
-                                helperText: 'API key 52 کاراکتری از پنل بیت‌پی',
+                                helperText: adminTx(context, 'کلید ۵۲ نویسه‌ای از پنل بیت‌پی', '52-character key from the BitPay panel'),
                                 helperMaxLines: 2,
                               ),
                               validator: (v) {
@@ -931,7 +941,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                                   return AppLocalizations.of(context).requiredField;
                                 }
                                 if (v.trim().length != 52) {
-                                  return 'API key باید دقیقاً 52 کاراکتر باشد';
+                                  return adminTx(context, 'کلید API باید دقیقاً ۵۲ نویسه باشد', 'The API key must be exactly 52 characters');
                                 }
                                 return null;
                               },
@@ -955,14 +965,14 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                             children: [
                               Icon(Icons.link, size: 20, color: Theme.of(context).colorScheme.primary),
                               const SizedBox(width: 8),
-                              Text('آدرس‌های بازگشت', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                              Text(adminTx(context, 'آدرس‌های بازگشت', 'Return addresses'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                             ],
                           ),
                           const SizedBox(height: 12),
                           CheckboxListTile(
                             contentPadding: EdgeInsets.zero,
-                            title: const Text('استفاده از آدرس callback پیشنهادی'),
-                            subtitle: const Text('آدرس به‌صورت خودکار از تنظیمات سیستم پر می‌شود'),
+                            title: Text(adminTx(context, 'آدرس بازگشت پیشنهادی', 'Suggested callback address')),
+                            subtitle: Text(adminTx(context, 'از تنظیمات سیستم پر می‌شود', 'Filled from system settings')),
                             secondary: const Icon(Icons.auto_awesome),
                             value: _useSuggestedCallback,
                             onChanged: (v) {
@@ -977,7 +987,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                             controller: _callbackUrlCtrl,
                             decoration: InputDecoration(
                               labelText: 'Callback URL',
-                              hintText: 'آدرس بازگشت پس از پرداخت',
+                              hintText: adminTx(context, 'آدرس بازگشت پس از پرداخت', 'Return address after payment'),
                               prefixIcon: Icon(Icons.call_received),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                               filled: true,
@@ -998,7 +1008,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                                 SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    'پارامتر tx_id به‌صورت خودکار به callback اضافه می‌شود. در صورت تنظیم آدرس‌های redirect، کاربر پس از پرداخت هدایت می‌شود.',
+                                    adminTx(context, 'tx_id خودکار به callback اضافه می‌شود. اگر آدرس بازگشت تنظیم شده باشد، کاربر بعد از پرداخت به آنجا می‌رود.', 'tx_id is added to the callback. If a return address is set, the user is sent there after payment.'),
                                     style: TextStyle(fontSize: 12, color: SemanticColorResolver.info(context)),
                                   ),
                                 ),
@@ -1009,8 +1019,8 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                           TextFormField(
                             controller: _successRedirectCtrl,
                             decoration: InputDecoration(
-                              labelText: 'آدرس پس از پرداخت موفق (اختیاری)',
-                              hintText: 'مثال: https://app.com/success',
+                              labelText: adminTx(context, 'آدرس پس از پرداخت موفق', 'Address after a successful payment'),
+                              hintText: adminTx(context, 'مثال: https://app.com/success', 'Example: https://app.com/success'),
                               prefixIcon: Icon(Icons.check_circle, color: SemanticColorResolver.positive(context)),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                               filled: true,
@@ -1020,8 +1030,8 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                           TextFormField(
                             controller: _failureRedirectCtrl,
                             decoration: InputDecoration(
-                              labelText: 'آدرس پس از پرداخت ناموفق (اختیاری)',
-                              hintText: 'مثال: https://app.com/failed',
+                              labelText: adminTx(context, 'آدرس پس از پرداخت ناموفق', 'Address after a failed payment'),
+                              hintText: adminTx(context, 'مثال: https://app.com/failed', 'Example: https://app.com/failed'),
                               prefixIcon: Icon(Icons.error, color: SemanticColorResolver.negative(context)),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                               filled: true,
@@ -1061,13 +1071,17 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('درگاه‌های پرداخت'),
-        actions: [
-          IconButton(onPressed: _openCreateDialog, tooltip: t.add, icon: const Icon(Icons.add)),
-        ],
-      ),
+    final hub = context.settingsHub;
+    return AdminCompactScaffold(
+      title: adminTx(context, 'درگاه‌های پرداخت', 'Payment gateways'),
+      actions: [
+        IconButton(
+          onPressed: _load,
+          tooltip: adminTx(context, 'بازخوانی', 'Refresh'),
+          icon: const Icon(Icons.refresh, size: 20),
+        ),
+        IconButton(onPressed: _openCreateDialog, tooltip: t.add, icon: const Icon(Icons.add, size: 20)),
+      ],
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -1076,15 +1090,15 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                   onRefresh: _load,
                   child: _items.isEmpty
                       ? ListView(
-                          padding: const EdgeInsets.all(24),
+                          padding: hub.pagePadding,
                           children: [
                             Center(child: Text(t.noDataFound)),
                           ],
                         )
                       : ListView.separated(
-                          padding: const EdgeInsets.all(16),
+                          padding: hub.pagePadding,
                           itemCount: _items.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 12),
+                          separatorBuilder: (_, __) => const SizedBox(height: 8),
                           itemBuilder: (ctx, i) {
                             final it = _items[i];
                             final provider = it['provider']?.toString() ?? '';
@@ -1097,13 +1111,13 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                             
                             if (provider == 'zarinpal') {
                               providerColor = SemanticColorResolver.info(context)!;
-                              providerLabel = 'زرین‌پال';
+                              providerLabel = adminTx(context, 'زرین‌پال', 'Zarinpal');
                             } else if (provider == 'parsian') {
                               providerColor = SemanticColorResolver.positive(context)!;
-                              providerLabel = 'پارسیان';
+                              providerLabel = adminTx(context, 'پارسیان', 'Parsian');
                             } else if (provider == 'bitpay') {
                               providerColor = SemanticColorResolver.warning(context)!;
-                              providerLabel = 'بیت‌پی';
+                              providerLabel = adminTx(context, 'بیت‌پی', 'BitPay');
                             }
                             
                             return Card(
@@ -1131,7 +1145,10 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                                             children: [
                                               Text(
                                                 '${it['display_name']}',
-                                                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                                                style: hub.cardTitleStyle(
+                                                  Theme.of(context).textTheme,
+                                                  color: Theme.of(context).colorScheme.onSurface,
+                                                ),
                                               ),
                                               const SizedBox(height: 4),
                                               Text(
@@ -1163,7 +1180,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                                                   ),
                                                   SizedBox(width: 4),
                                                   Text(
-                                                    isActive ? t.active : 'غیرفعال',
+                                                    isActive ? t.active : adminTx(context, 'غیرفعال', 'Inactive'),
                                                     style: TextStyle(
                                                       fontSize: 12,
                                                       color: isActive ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
@@ -1186,7 +1203,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                                                     Icon(Icons.science, size: 16, color: Colors.amber[700]),
                                                     SizedBox(width: 4),
                                                     Text(
-                                                      'تست',
+                                                      adminTx(context, 'تست', 'Test'),
                                                       style: TextStyle(fontSize: 12, color: Colors.amber[700]),
                                                     ),
                                                   ],

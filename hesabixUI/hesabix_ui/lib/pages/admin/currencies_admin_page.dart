@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/admin_currencies_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'admin_compact_scaffold.dart';
+import '../../theme/tokens/extensions.dart';
 
 /// مدیریت ارزهای سیستم: اعشار، گرد کردن، افزودن و حذف (با شرایط).
 class CurrenciesAdminPage extends StatefulWidget {
@@ -62,32 +63,32 @@ class _CurrenciesAdminPageState extends State<CurrenciesAdminPage> {
         return StatefulBuilder(
           builder: (context, setLocal) {
             return AlertDialog(
-              title: Text(isNew ? 'ارز جدید' : 'ویرایش ارز'),
+              title: Text(isNew ? adminTx(context, 'ارز جدید', 'New currency') : adminTx(context, 'ویرایش ارز', 'Edit currency')),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     TextField(
                       controller: nameCtrl,
-                      decoration: const InputDecoration(labelText: 'نام انگلیسی (یکتا)'),
+                      decoration: InputDecoration(isDense: true, labelText: adminTx(context, 'نام انگلیسی (یکتا)', 'Unique English name')),
                       enabled: isNew,
                     ),
                     TextField(
                       controller: titleCtrl,
-                      decoration: const InputDecoration(labelText: 'عنوان فارسی'),
+                      decoration: InputDecoration(isDense: true, labelText: adminTx(context, 'عنوان', 'Title')),
                     ),
                     TextField(
                       controller: symbolCtrl,
-                      decoration: const InputDecoration(labelText: 'نماد'),
+                      decoration: InputDecoration(isDense: true, labelText: adminTx(context, 'نماد', 'Symbol')),
                     ),
                     TextField(
                       controller: codeCtrl,
-                      decoration: const InputDecoration(labelText: 'کد (مثل IRR، USD)'),
+                      decoration: InputDecoration(isDense: true, labelText: adminTx(context, 'کد، مثل IRR یا USD', 'Code, for example IRR or USD')),
                       enabled: isNew,
                     ),
                     Row(
                       children: [
-                        Text('تعداد اعشار: $dp'),
+                        Text(adminTx(context, 'تعداد اعشار: $dp', 'Decimal places: $dp')),
                         Expanded(
                           child: Slider(
                             value: dp.toDouble(),
@@ -101,7 +102,9 @@ class _CurrenciesAdminPageState extends State<CurrenciesAdminPage> {
                       ],
                     ),
                     SwitchListTile(
-                      title: const Text('گرد کردن مبالغ در محاسبات'),
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(adminTx(context, 'گرد کردن مبالغ در محاسبات', 'Round amounts in calculations')),
                       value: round,
                       onChanged: (v) => setLocal(() => round = v),
                     ),
@@ -170,7 +173,7 @@ class _CurrenciesAdminPageState extends State<CurrenciesAdminPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('حذف ارز'),
+        title: Text(adminTx(context, 'حذف ارز', 'Delete currency')),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -179,16 +182,16 @@ class _CurrenciesAdminPageState extends State<CurrenciesAdminPage> {
               Text('${row['code']} — ${row['title']}'),
               if (!canDelete) ...[
                 const SizedBox(height: 12),
-                const Text(
-                  'به‌دلیل موارد زیر حذف ممکن نیست:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                Text(
+                  adminTx(context, 'به‌دلیل موارد زیر حذف ممکن نیست:', 'This currency cannot be deleted because:'),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 ...blockers.map((b) => Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text('• $b'),
                     )),
               ] else
-                const Text('آیا از حذف این ارز اطمینان دارید؟'),
+                Text(adminTx(context, 'این ارز حذف شود؟', 'Delete this currency?')),
             ],
           ),
         ),
@@ -224,19 +227,16 @@ class _CurrenciesAdminPageState extends State<CurrenciesAdminPage> {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(t.settingsCurrenciesAdmin),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/user/profile/system-settings'),
+    return AdminCompactScaffold(
+      title: t.settingsCurrenciesAdmin,
+      subtitle: t.settingsCurrenciesAdminDescription,
+      actions: [
+        IconButton(
+          tooltip: adminTx(context, 'ارز جدید', 'New currency'),
+          onPressed: () => _openEdit(),
+          icon: const Icon(Icons.add, size: 20),
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openEdit(),
-        icon: const Icon(Icons.add),
-        label: const Text('ارز جدید'),
-      ),
+      ],
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -244,25 +244,18 @@ class _CurrenciesAdminPageState extends State<CurrenciesAdminPage> {
               : RefreshIndicator(
                   onRefresh: _load,
                   child: ListView(
-                    padding: const EdgeInsets.all(16),
+                    padding: context.settingsHub.pagePadding,
                     children: [
-                      Text(
-                        t.settingsCurrenciesAdminDescription,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: DataTable(
-                          columns: const [
-                            DataColumn(label: Text('کد')),
-                            DataColumn(label: Text('عنوان')),
-                            DataColumn(label: Text('نماد')),
-                            DataColumn(label: Text('اعشار')),
-                            DataColumn(label: Text('گرد')),
-                            DataColumn(label: Text('عملیات')),
+                          columns: [
+                            DataColumn(label: Text(adminTx(context, 'کد', 'Code'))),
+                            DataColumn(label: Text(adminTx(context, 'عنوان', 'Title'))),
+                            DataColumn(label: Text(adminTx(context, 'نماد', 'Symbol'))),
+                            DataColumn(label: Text(adminTx(context, 'اعشار', 'Decimals'))),
+                            DataColumn(label: Text(adminTx(context, 'گرد', 'Round'))),
+                            DataColumn(label: Text(adminTx(context, 'عملیات', 'Actions'))),
                           ],
                           rows: _rows.map((r) {
                             return DataRow(
@@ -271,7 +264,7 @@ class _CurrenciesAdminPageState extends State<CurrenciesAdminPage> {
                                 DataCell(Text('${r['title']}')),
                                 DataCell(Text('${r['symbol']}')),
                                 DataCell(Text('${r['decimal_places'] ?? 2}')),
-                                DataCell(Text((r['round_monetary_amounts'] != false) ? 'بله' : 'خیر')),
+                                DataCell(Text((r['round_monetary_amounts'] != false) ? adminTx(context, 'بله', 'Yes') : adminTx(context, 'خیر', 'No'))),
                                 DataCell(
                                   Row(
                                     mainAxisSize: MainAxisSize.min,

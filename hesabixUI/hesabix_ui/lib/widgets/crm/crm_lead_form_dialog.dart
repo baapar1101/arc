@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -5,9 +6,11 @@ import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/services/business_user_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/crm_service.dart';
+import 'package:hesabix_ui/services/errors/api_error.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/crm/crm_ai_assistant_widget.dart';
 import 'package:hesabix_ui/widgets/crm/crm_responsive_dialog.dart';
+import 'package:hesabix_ui/widgets/crm/crm_custom_field_form.dart';
 import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
 import 'package:hesabix_ui/widgets/crm/crm_tag_selector.dart';
 import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
@@ -288,6 +291,7 @@ class _CrmLeadFormDialogState extends State<CrmLeadFormDialog> {
   bool _historyLoading = false;
   bool _saving = false;
   List<int> _selectedTagIds = [];
+  Map<String, dynamic> _customFieldValues = {};
 
   @override
   void initState() {
@@ -306,6 +310,7 @@ class _CrmLeadFormDialogState extends State<CrmLeadFormDialog> {
     _mobileController = TextEditingController(text: i?['mobile']?.toString() ?? '');
     _emailController = TextEditingController(text: i?['email']?.toString() ?? '');
     _descController = TextEditingController(text: i?['description']?.toString() ?? '');
+    _customFieldValues = crmCustomValuesFromRecord(i);
     final nextAt = i?['next_follow_up_at']?.toString();
     if (nextAt != null && nextAt.isNotEmpty) {
       _nextFollowUpAt = DateTime.tryParse(nextAt);
@@ -539,6 +544,14 @@ class _CrmLeadFormDialogState extends State<CrmLeadFormDialog> {
                 ),
               ),
               const SizedBox(height: 16),
+              CrmCustomFieldInputs(
+                businessId: widget.businessId,
+                crmService: widget.crmService,
+                entityType: 'lead',
+                initialValues: _customFieldValues,
+                onChanged: (values) => _customFieldValues = values,
+              ),
+              const SizedBox(height: 16),
               CrmSectionCard(
                 title: t.crmSectionAssignmentFollowup,
                 child: Column(
@@ -679,7 +692,14 @@ class _CrmLeadFormDialogState extends State<CrmLeadFormDialog> {
     }
   }
 
-  Future<void> _save() async {
+  bool _isDuplicateLead(Object error) {
+    if (error is DioException && error.error is ApiErrorDetails) {
+      return (error.error as ApiErrorDetails).code == 'CRM_LEAD_DUPLICATE';
+    }
+    return error.toString().contains('CRM_LEAD_DUPLICATE');
+  }
+
+  Future<void> _save({bool allowSimilar = false}) async {
     if (_nameController.text.trim().isEmpty) {
       SnackBarHelper.show(context, message: 'نام الزامی است', isError: true);
       return;
@@ -699,14 +719,20 @@ class _CrmLeadFormDialogState extends State<CrmLeadFormDialog> {
           stageId: _selectedStageId,
           code: _codeController.text.trim().isEmpty ? null : _codeController.text.trim(),
           name: _nameController.text.trim(),
-          sourceCode: _selectedSourceCode,
-          companyName: _companyController.text.trim().isEmpty ? null : _companyController.text.trim(),
-          mobile: _mobileController.text.trim().isEmpty ? null : _mobileController.text.trim(),
-          email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
-          description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
+          sourceCode: widget.leadSources.isNotEmpty && (_selectedSourceCode == null || _selectedSourceCode!.trim().isEmpty)
+              ? ''
+              : _selectedSourceCode,
+          companyName: _companyController.text.trim(),
+          mobile: _mobileController.text.trim(),
+          email: _emailController.text.trim(),
+          description: _descController.text.trim(),
           assignedToUserId: _selectedAssignedToUserId,
+          clearAssignedTo: _businessUsers.isNotEmpty && _selectedAssignedToUserId == null,
           nextFollowUpAt: _nextFollowUpAt,
+          clearNextFollowUp: _nextFollowUpAt == null,
           tagIds: _selectedTagIds,
+          customFields: _customFieldValues,
+          allowSimilar: allowSimilar,
         );
       } else {
         await widget.crmService.createLead(
@@ -723,6 +749,8 @@ class _CrmLeadFormDialogState extends State<CrmLeadFormDialog> {
           assignedToUserId: _selectedAssignedToUserId,
           nextFollowUpAt: _nextFollowUpAt,
           tagIds: _selectedTagIds,
+          customFields: _customFieldValues,
+          allowSimilar: allowSimilar,
         );
       }
       if (!mounted) return;
@@ -731,6 +759,23 @@ class _CrmLeadFormDialogState extends State<CrmLeadFormDialog> {
       SnackBarHelper.show(context, message: 'ذخیره شد');
     } catch (e) {
       if (!mounted) return;
+      if (!allowSimilar && _isDuplicateLead(e)) {
+        final proceed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('شباهت با رکورد موجود'),
+            content: const Text('سرنخ یا شخصی با همین موبایل یا ایمیل وجود دارد. ذخیره با آگاهی از این شباهت انجام شود؟'),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('انصراف')),
+              FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('ادامه')),
+            ],
+          ),
+        );
+        if (proceed == true) {
+          await _save(allowSimilar: true);
+        }
+        return;
+      }
       SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
     } finally {
       if (mounted) setState(() => _saving = false);

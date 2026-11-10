@@ -23,6 +23,9 @@ import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/pages/business/crm/crm_operator_voice.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/hesabix_back.dart';
+import 'package:hesabix_ui/models/person_model.dart';
+import 'package:hesabix_ui/widgets/crm/crm_lead_picker_dialog.dart';
+import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
@@ -522,7 +525,13 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
       },
     );
     if (idx >= 0) {
-      _conversations[idx] = c;
+      final previous = Map<String, dynamic>.from(_conversations[idx] as Map);
+      final next = Map<String, dynamic>.from(c);
+      if (!next.containsKey('lead_id') && previous['lead_id'] != null) {
+        next['lead_id'] = previous['lead_id'];
+        next['lead_name'] = previous['lead_name'];
+      }
+      _conversations[idx] = next;
     }
   }
 
@@ -1402,7 +1411,16 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     }
   }
 
-  Future<void> _patchConv(Map<String, dynamic> c, {String? status, int? assignedTo, int? leadId, int? personId}) async {
+  Future<void> _patchConv(
+    Map<String, dynamic> c, {
+    String? status,
+    int? assignedTo,
+    int? leadId,
+    int? personId,
+    bool clearLead = false,
+    bool clearPerson = false,
+    bool clearAssignee = false,
+  }) async {
     if (!widget.authStore.canEditCrmWebChatConversations()) {
       final t = AppLocalizations.of(context);
       SnackBarHelper.show(context, message: t.crmWebChatNoCrmWritePermission, isError: true);
@@ -1418,6 +1436,9 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
         assignedToUserId: assignedTo,
         leadId: leadId,
         personId: personId,
+        clearLead: clearLead,
+        clearPerson: clearPerson,
+        clearAssignee: clearAssignee,
       );
       await _loadConversationsList();
       await _loadAll(silent: true);
@@ -1447,8 +1468,19 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     if (!const {'open', 'pending', 'resolved'}.contains(st0)) st0 = 'open';
     String st = st0;
     int? assign = (c['assigned_to_user_id'] as num?)?.toInt();
-    final leadCtrl = TextEditingController(text: c['lead_id'] != null ? '${c['lead_id']}' : '');
-    final personCtrl = TextEditingController(text: c['person_id'] != null ? '${c['person_id']}' : '');
+    int? leadId = (c['lead_id'] as num?)?.toInt();
+    var leadLabel = (c['lead_name']?.toString().trim().isNotEmpty == true) ? c['lead_name'].toString() : '';
+    int? personId = (c['person_id'] as num?)?.toInt();
+    Person? selectedPerson = personId == null
+        ? null
+        : Person(
+            id: personId,
+            businessId: widget.businessId,
+            aliasName: (c['person_name']?.toString().trim().isNotEmpty == true) ? c['person_name'].toString() : 'شخص',
+            personTypes: const [PersonType.customer],
+            createdAt: DateTime(2020, 1, 1),
+            updatedAt: DateTime(2020, 1, 1),
+          );
 
     final ok = await showModalBottomSheet<Object?>(
       context: context,
@@ -1502,39 +1534,54 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                     },
                   ),
                   const SizedBox(height: 12),
-                  TextField(
-                    controller: leadCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: loc.crmWebChatOptionalLeadId,
-                      border: const OutlineInputBorder(),
-                    ),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final picked = await showCrmLeadPickerDialog(context, businessId: widget.businessId);
+                      if (picked == null) return;
+                      setModal(() {
+                        leadId = (picked['id'] as num?)?.toInt();
+                        final name = picked['name']?.toString() ?? '';
+                        final code = picked['code']?.toString() ?? '';
+                        leadLabel = [code, name].where((part) => part.isNotEmpty).join(' — ');
+                      });
+                    },
+                    icon: const Icon(Icons.person_search_outlined),
+                    label: Text(leadLabel.isEmpty ? loc.crmWebChatOptionalLeadId : leadLabel),
                   ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: personCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: loc.crmWebChatOptionalPersonId,
-                      border: const OutlineInputBorder(),
+                  if (leadId != null)
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: TextButton.icon(
+                        onPressed: () => setModal(() {
+                          leadId = null;
+                          leadLabel = '';
+                        }),
+                        icon: const Icon(Icons.link_off_outlined, size: 18),
+                        label: Text(loc.crmWebChatClearLead),
+                      ),
                     ),
+                  const SizedBox(height: 12),
+                  PersonComboboxWidget(
+                    businessId: widget.businessId,
+                    selectedPerson: selectedPerson,
+                    isRequired: false,
+                    label: loc.crmWebChatOptionalPersonId,
+                    hintText: loc.crmWebChatOptionalPersonId,
+                    onChanged: (person) {
+                      setModal(() {
+                        selectedPerson = person;
+                        personId = person?.id;
+                      });
+                    },
                   ),
                   const SizedBox(height: 16),
                   FilledButton(
                     onPressed: () {
-                      int? parseId(String x) {
-                        final s = x.trim();
-                        if (s.isEmpty) return null;
-                        return int.tryParse(s);
-                      }
-
-                      final lid = parseId(leadCtrl.text);
-                      final pid = parseId(personCtrl.text);
                       Navigator.pop(ctx, {
                         'status': st,
                         'assign': assign,
-                        'lead': lid,
-                        'person': pid,
+                        'lead': leadId,
+                        'person': personId,
                       });
                     },
                     child: Text(loc.save),
@@ -1548,16 +1595,20 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     );
     if (ok is Map) {
       final d = Map<String, dynamic>.from(ok);
+      final previousLead = (c['lead_id'] as num?)?.toInt();
+      final previousPerson = (c['person_id'] as num?)?.toInt();
+      final previousAssignee = (c['assigned_to_user_id'] as num?)?.toInt();
       await _patchConv(
         c,
         status: d['status'] as String?,
         assignedTo: d['assign'] as int?,
         leadId: d['lead'] as int?,
         personId: d['person'] as int?,
+        clearLead: previousLead != null && d['lead'] == null,
+        clearPerson: previousPerson != null && d['person'] == null,
+        clearAssignee: previousAssignee != null && d['assign'] == null,
       );
     }
-    leadCtrl.dispose();
-    personCtrl.dispose();
   }
 
   @override

@@ -43,7 +43,8 @@ _PROMPT_CATALOG = {
     "receivables_review": ("مرور مطالبات", "financial", "مانده حساب مشتریان و دریافت‌های ثبت‌شده را بر اساس ابزارهای مجاز بررسی کن."),
     "payables_review": ("مرور بدهی‌ها", "financial", "مانده حساب تأمین‌کنندگان و پرداخت‌های ثبت‌شده را بر اساس ابزارهای مجاز بررسی کن."),
     "payroll_review": ("مرور حقوق و دستمزد", "payroll", "وضعیت دوره‌ها و اجراهای حقوق، جمع ناخالص/کسورات/خالص و وضعیت تأیید یا ثبت را فقط از ابزارهای مجاز همین کسب‌وکار بررسی کن. داده بانکی، شناسه مالیاتی یا جزئیات فردی را فقط وقتی درخواست شده و برای پاسخ لازم است نمایش بده؛ هیچ اجرا را تأیید، قطعی یا پرداخت نکن مگر کاربر همان عملیات را صریحاً درخواست کند."),
-    "office_automation_review": ("مرور کارتابل اتوماسیون اداری", "office_automation", "کارتابل سمت فعال، پیش‌نویس، ارجاع، پاراف، پیوست و دبیرخانه را فقط با ابزارهای مجاز همین کسب‌وکار بررسی کن. نامه را فقط وقتی درخواست شده ثبت، ارجاع، پاراف یا بایگانی کن؛ سمت فعال را از list_my_oa_positions بگیر و as_position_id را در هر عملیات بنویس."),
+    "office_automation_review": ("مرور کارتابل اتوماسیون اداری", "office_automation", "کارتابل سمت فعال، پیش‌نویس، ارجاع، پاراف، پیوست و دبیرخانه را فقط با ابزارهای مجاز همین کسب‌وکار بررسی کن. نامه را فقط وقتی درخواست شده ثبت، ارجاع، پاراف یا بایگانی کن؛ سمت فعال را از list_my_oa_positions بگیر و as_position_id را در هر عملیات بنویس. پیشنهاد ارجاع را بدون refer_oa_letter برنگردان به اجرا. پیش‌نویس فرآیند از متن منتشر نمی‌شود. هر عمل نوشتنی تا تأیید میز کار اجرا نمی‌شود."),
+    "procurement_review": ("مرور تدارکات", "procurement", "درخواست، استعلام، سفارش، رسید، تطبیق فاکتور، بودجه و امتیاز تأمین‌کننده را فقط از ابزارهای مجاز همین کسب‌وکار بخوان. سفارش، رسید، فاکتور و انتخاب برنده را فقط با درخواست صریح و تأیید کاربر انجام بده. کمترین قیمت را بدون دلیل جایزه نکن."),
     "crm_review": ("مرور CRM", "crm", "سرنخ‌ها، فرصت‌ها، فعالیت‌ها، توالی‌های پیگیری و قیف فروش را مرور کن؛ ثبت‌نام یا تغییر توالی را فقط در صورت درخواست روشن انجام بده."),
     "repair_review": ("مرور تعمیرگاه", "repair", "سفارش‌های تعمیر و وضعیت، تعمیرکار، قطعات و هزینه را از ابزارهای مجاز کسب‌وکار بررسی کن. پیش از تغییر وضعیت، اعلان به مشتری، مصرف قطعه، اتمام/تحویل یا صدور فاکتور، اثر عملیات و سفارش دقیق را بیان کن و تأیید صریح بگیر."),
     "warranty_review": ("مرور گارانتی", "warranty", "کدها و وضعیت گارانتی را فقط از ابزارهای مجاز همین کسب‌وکار بررسی کن. اطلاعات تماس مشتری و کد لینک رهگیری را در پاسخ عادی نمایش نده. پیش از تولید کد، تغییر تنظیمات یا حذف، دامنه اثر را شرح بده و تأیید صریح بگیر؛ فعال‌سازی عمومی گارانتی را از طرف مشتری انجام نده."),
@@ -65,7 +66,7 @@ def _prompt_category_available(category: str, visible: set[str]) -> bool:
 
 def _prompt_content(name: str, title: str, goal: str, user_request: str, catalog: list[dict[str, Any]]) -> str:
     categories = sorted({item["category"] for item in catalog})
-    tools = [item for item in catalog if item["category"] in {"general", "query", "business", "reports", "financial", "payroll", "office_automation", "repair", "production", "advanced_production", "warranty", "distribution", "invoices", "warehouse", "crm", "products", "persons"}]
+    tools = [item for item in catalog if item["category"] in {"general", "query", "business", "reports", "financial", "payroll", "office_automation", "procurement", "repair", "production", "advanced_production", "warranty", "distribution", "invoices", "warehouse", "crm", "products", "persons"}]
     tool_names = ", ".join(item["name"] for item in tools[:100]) or "هیچ ابزار دامنه‌ای در این اتصال مجاز نیست"
     text = (
         f"{title}. {goal}\n"
@@ -77,7 +78,8 @@ def _prompt_content(name: str, title: str, goal: str, user_request: str, catalog
         "برای پاسخ تحلیلی، داده را از ابزارهای خواندنی بگیر، بازه و واحد را روشن کن، محاسبه را از دادهٔ واقعی جدا کن و اگر ابزار یا داده کافی نیست صریح بگو. "
         "شناسه‌ها را با جستجو به دست بیاور و حدس نزن. هیچ تغییری در داده‌ها ایجاد نکن مگر کاربر در همین گفتگو صریحاً همان تغییر را درخواست کرده باشد. "
         "پیش از هر فراخوانی نوشتنی، اقدام دقیق و آرگومان‌های مهم را به کاربر نشان بده و تا تأیید صریح و اختصاصی همان عملیات صبر کن؛ مجوز write اتصال تأیید آن تراکنش نیست. "
-        "کلاینت MCP باید تأیید انسانی را پیش از ارسال فراخوانی اجرا کند؛ سرور این تأیید موردی را مستقلاً راستی‌آزمایی نمی‌کند. "
+        "هر عمل نوشتنی اتوماسیون اداری تا وقتی همان کاربر آن را در میز کار تأیید نکرده اجرا نمی‌شود. شناسه تأیید را فقط پس از تأیید میز کار بفرست. پرچم داخل آرگومان مجوز نیست. "
+        "برای نوشتنی‌های خارج از اتوماسیون اداری، سرور تأیید موردی را مستقلاً راستی‌آزمایی نمی‌کند. "
         "هرگز محدودیت مجوز، تأیید یا tenant را دور نزن."
     )
     if user_request.strip():
@@ -490,6 +492,7 @@ async def handle_mcp_request(
         if name != AGENT_TOOL_NAME and not _mcp_readonly(name, registry) and WRITE_SCOPE not in getattr(ctx, "mcp_scopes", set()):
             return _jsonrpc_error(req_id, -32003, "This MCP connection is read-only; create a separately authorized write connection.")
         safe_arguments = prepare_mcp_tool_arguments(arguments, business_id=eff_business)
+        confirmation_id = safe_arguments.pop("confirmation_id", None)
         if name != AGENT_TOOL_NAME:
             tool_schema = (available[name].get("function") or {}).get("parameters") or {"type": "object"}
             schema_error = _validate_tool_arguments(safe_arguments, tool_schema)
@@ -536,6 +539,27 @@ async def handle_mcp_request(
                 return _jsonrpc_result(req_id, {"content": [{"type": "text", "text": str(rendered)}], "isError": False, **({"resultType": "complete"} if modern else {})})
 
             from app.services.ai.ai_db_helpers import run_ai_registry_function
+            from app.services.oa_mcp_confirmation import gate_sensitive_oa_call
+
+            held = gate_sensitive_oa_call(
+                db,
+                registry,
+                name,
+                safe_arguments,
+                user_id=ctx.get_user_id(),
+                business_id=eff_business,
+                connection_id=getattr(ctx, "mcp_connection_id", None),
+                confirmation_id=confirmation_id,
+            )
+            if held is not None:
+                return _jsonrpc_result(
+                    req_id,
+                    {
+                        "content": [{"type": "text", "text": json.dumps(held, ensure_ascii=False, default=str)}],
+                        "isError": True,
+                        **({"resultType": "complete"} if modern else {}),
+                    },
+                )
 
             result = run_ai_registry_function(name, safe_arguments, context)
             text = result if isinstance(result, str) else json.dumps(result, ensure_ascii=False, default=str)

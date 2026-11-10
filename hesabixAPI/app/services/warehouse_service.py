@@ -182,6 +182,7 @@ _SOURCE_TYPE_LABELS_FA = {
 	"invoice": "فاکتور",
 	"opening_balance": "تراز افتتاحیه",
 	"api": "API",
+	"purchase_order": "سفارش خرید",
 	"goods_expense_income": "کالای هزینه/درآمد شده",
 }
 

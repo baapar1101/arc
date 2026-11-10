@@ -72,6 +72,9 @@ CONV_PATCH = mcp_schema(
         "assigned_to_user_id": {"type": ["integer", "null"], "minimum": 1},
         "lead_id": {"type": ["integer", "null"], "minimum": 1},
         "person_id": {"type": ["integer", "null"], "minimum": 1},
+        "clear_lead": {"type": "boolean", "description": "قطع اتصال سرنخ. همراه lead_id نفرستید."},
+        "clear_person": {"type": "boolean", "description": "قطع اتصال شخص. همراه person_id نفرستید."},
+        "clear_assignee": {"type": "boolean", "description": "حذف مسئول. همراه assigned_to_user_id نفرستید."},
     },
     ["conversation_id"],
 )
@@ -82,7 +85,10 @@ READ_SCHEMA = mcp_schema(
     },
     ["conversation_id"],
 )
-BULK_DEL = mcp_schema({"status": {"type": "string", "enum": ["open", "pending", "resolved"]}})
+BULK_DEL = mcp_schema({
+    "status": {"type": "string", "enum": ["open", "pending", "resolved"]},
+    "confirm_all": {"type": "boolean", "description": "برای حذف همه مکالمات باید true باشد"},
+})
 
 
 def get_crm_web_chat_settings_handler(args, context):
@@ -153,6 +159,7 @@ def list_crm_chat_conversations_handler(args, context):
         limit=int(args.get("limit") or 50),
         offset=int(args.get("offset") or 0),
         search=args.get("search"),
+        ctx=context.get("user_context"),
     )
     return mcp_jsonable({"items": items, "has_more": has_more})
 
@@ -221,7 +228,11 @@ def update_crm_chat_conversation_handler(args, context):
                 assigned_to_user_id=args.get("assigned_to_user_id"),
                 lead_id=args.get("lead_id"),
                 person_id=args.get("person_id"),
+                clear_lead=bool(args.get("clear_lead")),
+                clear_person=bool(args.get("clear_person")),
+                clear_assignee=bool(args.get("clear_assignee")),
                 acting_user_id=mcp_uid(context),
+                ctx=context.get("user_context"),
             )
         )
     )
@@ -257,7 +268,12 @@ def delete_crm_chat_conversations_bulk_handler(args, context):
     from app.services import crm_chat_service as chat_svc
 
     return mcp_jsonable(
-        mcp_await(chat_svc.delete_conversations_bulk_agent(mcp_db(context), mcp_bid(context), status=args.get("status")))
+        mcp_await(chat_svc.delete_conversations_bulk_agent(
+            mcp_db(context),
+            mcp_bid(context),
+            status=args.get("status"),
+            confirm_all=bool(args.get("confirm_all")),
+        ))
     )
 
 
@@ -367,7 +383,7 @@ def register_mcp_crm_chat_functions(registry) -> None:
     ))
     registry.register(AIFunction(
         name="update_crm_chat_conversation",
-        description="تغییر وضعیت، مسئول، سرنخ یا شخص مکالمه چت وب. نیازمند تأیید.",
+        description="تغییر وضعیت، مسئول، سرنخ یا شخص مکالمه چت وب. قطع اتصال فقط با clear_lead، clear_person یا clear_assignee. نیازمند تأیید.",
         parameters_schema=CONV_PATCH,
         handler=update_crm_chat_conversation_handler,
         allowed_roles=roles,
@@ -403,7 +419,7 @@ def register_mcp_crm_chat_functions(registry) -> None:
     ))
     registry.register(AIFunction(
         name="delete_crm_chat_conversations_bulk",
-        description="حذف دسته‌ای مکالمات چت وب، اختیاری فقط یک وضعیت. نیازمند تأیید.",
+        description="حذف دسته‌ای مکالمات چت وب. بدون status باید confirm_all برابر true باشد. نیازمند تأیید.",
         parameters_schema=BULK_DEL,
         handler=delete_crm_chat_conversations_bulk_handler,
         allowed_roles=roles,

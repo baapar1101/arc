@@ -11,10 +11,33 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from adapters.db.models.file_storage import FileStorage
+from adapters.db.models.oa_enterprise import (
+	OaBranch,
+	OaLetterCommercialLink,
+	OaLetterExchange,
+	OaQualifiedSignRequest,
+	OaRetentionPolicy,
+	OaSignatureProvider,
+)
+from adapters.db.models.oa_mcp_confirmation import OaMcpConfirmation
+from adapters.db.models.oa_document import (
+	OaDocument,
+	OaDocumentVersion,
+	OaExtractionSuggestion,
+	OaOcrJob,
+)
+from adapters.db.models.oa_process import (
+	OaProcessDefinition,
+	OaProcessInstance,
+	OaProcessTask,
+	OaProcessToken,
+	OaProcessVersion,
+)
 from adapters.db.models.office_automation import (
 	OaArchiveFolder,
 	OaAuditLog,
 	OaCartableRule,
+	OaCartableSavedFilter,
 	OaDelegation,
 	OaDispatch,
 	OaEceMessage,
@@ -102,6 +125,39 @@ def test_plugin_code_constant():
 
 OA_TOOLS = (
 	"get_oa_dashboard",
+	"get_oa_personal_desk",
+	"save_oa_process_draft",
+	"publish_oa_process",
+	"publish_oa_linear_process",
+	"list_oa_process_definitions",
+	"list_oa_process_versions",
+	"start_oa_process",
+	"list_oa_process_tasks",
+	"complete_oa_process_task",
+	"list_oa_mcp_confirmations",
+	"suggest_oa_referral",
+	"draft_oa_process_from_text",
+	"list_oa_branches",
+	"create_oa_branch",
+	"list_oa_retention_policies",
+	"save_oa_retention_policy",
+	"list_oa_retention_reviews",
+	"hold_oa_letter_retention",
+	"hold_oa_document_retention",
+	"list_oa_signature_providers",
+	"create_oa_signature_provider",
+	"list_oa_letter_qualified_requests",
+	"request_oa_qualified_signature",
+	"record_oa_qualified_sign_result",
+	"exchange_oa_letter",
+	"list_oa_letter_commercial_links",
+	"link_oa_letter_commercial",
+	"register_oa_document",
+	"add_oa_document_version",
+	"search_oa_documents",
+	"get_oa_document",
+	"accept_oa_document_suggestion",
+	"reject_oa_document_suggestion",
 	"get_oa_settings",
 	"update_oa_settings",
 	"list_oa_org_units",
@@ -118,6 +174,10 @@ OA_TOOLS = (
 	"create_oa_delegation",
 	"end_oa_delegation",
 	"list_oa_cartable",
+	"list_oa_cartable_filters",
+	"list_oa_cartable_board",
+	"save_oa_cartable_filter",
+	"delete_oa_cartable_filter",
 	"get_oa_letter",
 	"get_oa_letter_print",
 	"create_oa_letter_draft",
@@ -133,6 +193,7 @@ OA_TOOLS = (
 	"archive_oa_letter",
 	"set_oa_follow_up",
 	"link_oa_letters",
+	"reply_oa_letter",
 	"search_oa_letters",
 	"list_oa_letter_formats",
 	"create_oa_letter_format",
@@ -211,7 +272,24 @@ def _session():
 			OaDispatch.__table__,
 			OaEceMessage.__table__,
 			OaCartableRule.__table__,
+			OaCartableSavedFilter.__table__,
 			OaMailboxMessage.__table__,
+			OaProcessDefinition.__table__,
+			OaProcessVersion.__table__,
+			OaProcessInstance.__table__,
+			OaProcessToken.__table__,
+			OaProcessTask.__table__,
+			OaDocument.__table__,
+			OaDocumentVersion.__table__,
+			OaOcrJob.__table__,
+			OaExtractionSuggestion.__table__,
+			OaMcpConfirmation.__table__,
+			OaBranch.__table__,
+			OaRetentionPolicy.__table__,
+			OaSignatureProvider.__table__,
+			OaQualifiedSignRequest.__table__,
+			OaLetterExchange.__table__,
+			OaLetterCommercialLink.__table__,
 		],
 	)
 	return sessionmaker(bind=engine)()
@@ -409,6 +487,16 @@ def test_position_occupancy_numbering_paraph_and_referral(_plugin):
 	)
 	assert linked["related_letter_id"] == registered["id"]
 	assert linked["link_kind"] == "related"
+
+	reply = svc.reply_to_letter(db, bid, second_reg["id"], {"body": "پاسخ کوتاه"}, owner.id, mgr["id"])
+	assert reply["status"] == "draft"
+	assert reply["subject"].startswith("پاسخ:")
+	assert any(item["link_kind"] == "reply" for item in reply["links"])
+	source = svc.get_letter(db, bid, second_reg["id"], owner.id, mgr["id"])
+	assert any(item["related_letter_id"] == reply["id"] and item["link_kind"] == "reply" for item in source["links"])
+	assert any(item["kind"] == "referral" for item in source["timeline"])
+	assert any(item["action"] == "letter.view" for item in source["timeline"])
+	assert any(item["action"] == "letter.reply" and item["summary"] == "پاسخ" for item in source["timeline"])
 
 	settings = svc.update_settings(db, bid, {"internal_prefix": "INTX", "numbering_calendar": "jalali"}, owner.id)
 	assert settings["internal_prefix"] == "INTX"
@@ -616,6 +704,11 @@ def test_commercial_upgrade_secretariats_sign_ece_track_archive(_plugin):
 		owner.id,
 	)
 
+	conf_sec = ext.create_secretariat(
+		db, bid,
+		{"code": "secret", "name_i18n": {"fa": "دبیرخانه محرمانه", "en": "Confidential secretariat"}, "is_confidential": True, "incoming_prefix": "SEC"},
+		owner.id,
+	)
 	incoming = svc.create_letter_draft(
 		db, bid,
 		{
@@ -633,11 +726,15 @@ def test_commercial_upgrade_secretariats_sign_ece_track_archive(_plugin):
 	assert incoming["confidentiality"] == "secret"
 	incoming_reg = svc.register_letter(db, bid, incoming["id"], {"letter_kind": "incoming"}, owner.id, mgr["id"])
 	assert incoming_reg["tracking_token"]
-	assert incoming_reg["secretariat_id"] == main["id"]
+	assert incoming_reg["secretariat_id"] == conf_sec["id"]
+	assert incoming_reg["secretariat_number"].startswith("SEC-")
 	assert incoming_reg["receipt_number"] == "EXT-99"
 	track = ext.public_track(db, incoming_reg["tracking_token"])
-	assert track["number"] == incoming_reg["secretariat_number"]
+	assert track["restricted"] is True
+	assert track["number"] is None
+	assert track["status"] is None
 	assert track["subject"] is None
+	assert track["confidentiality"] is None
 
 	hits = svc.search_letters(db, bid, owner.id, q="تمام‌متن", is_admin=True)
 	assert any(item["id"] == incoming_reg["id"] for item in hits)
@@ -672,6 +769,10 @@ def test_commercial_upgrade_secretariats_sign_ece_track_archive(_plugin):
 	assert out_reg["secretariat_id"] == branch["id"]
 	assert out_reg["secretariat_number"].startswith("BR-")
 	assert out_reg["tracking_token"]
+	open_track = ext.public_track(db, out_reg["tracking_token"])
+	assert open_track["restricted"] is False
+	assert open_track["number"] == out_reg["secretariat_number"]
+	assert open_track["subject"] == "صادره نیازمند امضا"
 
 	versions = ext.list_letter_versions(db, bid, outgoing["id"], owner.id, mgr["id"], is_admin=True)
 	assert versions
@@ -711,19 +812,14 @@ def test_commercial_upgrade_secretariats_sign_ece_track_archive(_plugin):
 	)
 	assert any(r["status"] == "seen" for r in ruled["referrals"])
 
-	delay = ext.delay_report(db, bid)
-	volume = ext.volume_report(db, bid)
-	perf = ext.performance_report(db, bid)
+	delay = ext.delay_report(db, bid, user_id=owner.id, is_admin=True)
+	volume = ext.volume_report(db, bid, user_id=owner.id, is_admin=True)
+	perf = ext.performance_report(db, bid, user_id=owner.id, is_admin=True)
 	assert "items" in delay and "by_kind" in volume and "items" in perf
 
 	summary = ext.summarize_letter(db, bid, out_reg["id"], owner.id, mgr["id"])
 	assert summary["ai_summary"]
 
-	conf_sec = ext.create_secretariat(
-		db, bid,
-		{"code": "secret", "name_i18n": {"fa": "دبیرخانه محرمانه", "en": "Confidential secretariat"}, "is_confidential": True, "incoming_prefix": "SEC"},
-		owner.id,
-	)
 	secret_draft = svc.create_letter_draft(
 		db, bid,
 		{"subject": "نامه سری برای دبیرخانه محرمانه", "letter_kind": "incoming", "confidentiality": "secret"},
@@ -766,4 +862,204 @@ def test_commercial_upgrade_secretariats_sign_ece_track_archive(_plugin):
 	db.commit()
 	again = ext.notify_due_followups(db, bid)
 	assert again["due_letters"] == 0
+	db.close()
+
+
+@patch("app.services.office_automation_service.check_office_automation_plugin_active", return_value=True)
+def test_classified_letter_requires_confidential_secretariat_and_clearance(_plugin):
+	db = _session()
+	owner = _user(db, "oa-secret-owner@example.com", "oa6")
+	stranger = _user(db, "oa-secret-stranger@example.com", "oa7")
+	bid = 1
+	unit = svc.create_org_unit(db, bid, {"code": "hq", "name_i18n": {"fa": "ستاد", "en": "HQ"}}, owner.id)
+	clerk = svc.create_position(
+		db, bid,
+		{"code": "sec", "org_unit_id": unit["id"], "name_i18n": {"fa": "دبیر", "en": "Clerk"}, "is_secretariat": True},
+		owner.id,
+	)
+	other = svc.create_position(
+		db, bid,
+		{"code": "other", "org_unit_id": unit["id"], "name_i18n": {"fa": "بیگانه", "en": "Outsider"}},
+		owner.id,
+	)
+	svc.assign_position_holder(db, bid, {"position_id": clerk["id"], "user_id": owner.id, "is_primary": True}, owner.id)
+	svc.assign_position_holder(db, bid, {"position_id": other["id"], "user_id": stranger.id, "is_primary": True}, owner.id)
+
+	blocked = svc.create_letter_draft(
+		db, bid,
+		{"subject": "سری بدون دبیرخانه", "letter_kind": "incoming", "confidentiality": "secret"},
+		owner.id, clerk["id"],
+	)
+	with pytest.raises(ApiError) as missing:
+		svc.register_letter(db, bid, blocked["id"], {"letter_kind": "incoming"}, owner.id, clerk["id"])
+	assert missing.value.code == "OA_CONFIDENTIAL_SECRETARIAT_REQUIRED"
+
+	conf = ext.create_secretariat(
+		db, bid,
+		{"code": "secret", "name_i18n": {"fa": "محرمانه", "en": "Confidential"}, "is_confidential": True, "incoming_prefix": "SEC"},
+		owner.id,
+	)
+	draft = svc.create_letter_draft(
+		db, bid,
+		{"subject": "نامه سری قابل جستجو", "body": "متن سری", "letter_kind": "incoming", "confidentiality": "secret"},
+		owner.id, clerk["id"],
+	)
+	registered = svc.register_letter(db, bid, draft["id"], {"letter_kind": "incoming"}, owner.id, clerk["id"])
+	assert registered["secretariat_id"] == conf["id"]
+
+	registry = svc.list_cartable(db, bid, owner.id, clerk["id"], folder="registry")
+	assert all(item["id"] != registered["id"] for item in registry["items"])
+	hidden = svc.search_letters(db, bid, stranger.id, q="قابل جستجو", is_admin=False)
+	assert hidden == []
+	with pytest.raises(ApiError) as forbidden:
+		svc.get_letter(db, bid, registered["id"], stranger.id, other["id"], is_admin=False)
+	assert forbidden.value.code == "OA_LETTER_FORBIDDEN"
+
+	visible = svc.search_letters(db, bid, owner.id, q="قابل جستجو", is_admin=False)
+	assert any(item["id"] == registered["id"] for item in visible)
+	opened = svc.get_letter(db, bid, registered["id"], owner.id, clerk["id"], is_admin=False)
+	assert any(event["action"] == "letter.view" for event in opened["timeline"])
+	with pytest.raises(ApiError) as reply_denied:
+		svc.reply_to_letter(db, bid, registered["id"], {}, stranger.id, other["id"])
+	assert reply_denied.value.code == "OA_LETTER_FORBIDDEN"
+	secret_reply = svc.reply_to_letter(db, bid, registered["id"], {}, owner.id, clerk["id"])
+	assert secret_reply["status"] == "draft"
+	assert secret_reply["confidentiality"] == "secret"
+
+	shared = svc.refer_letter(
+		db, bid, registered["id"],
+		{"recipients": [{"to_position_id": other["id"], "kind": "action"}]},
+		owner.id, clerk["id"],
+	)
+	assert any(item["to_position_id"] == other["id"] for item in shared["referrals"])
+	seen = svc.get_letter(db, bid, registered["id"], stranger.id, other["id"], is_admin=False)
+	assert seen["subject"] == "نامه سری قابل جستجو"
+
+	due = svc.create_letter_draft(db, bid, {"subject": "ارجاع معوق", "letter_kind": "internal"}, owner.id, clerk["id"])
+	due_reg = svc.register_letter(
+		db, bid, due["id"],
+		{"recipients": [{"to_position_id": other["id"], "kind": "action", "due_at": "2020-01-01"}]},
+		owner.id, clerk["id"], calendar_type="gregorian",
+	)
+	box = svc.list_cartable(db, bid, stranger.id, other["id"], folder="overdue")
+	assert any(item["id"] == due_reg["id"] for item in box["items"])
+	fresh = svc.create_letter_draft(db, bid, {"subject": "ارجاع آینده", "letter_kind": "internal"}, owner.id, clerk["id"])
+	fresh_reg = svc.register_letter(
+		db, bid, fresh["id"],
+		{"recipients": [{"to_position_id": other["id"], "kind": "action", "due_at": "2099-01-01"}]},
+		owner.id, clerk["id"], calendar_type="gregorian",
+	)
+	box = svc.list_cartable(db, bid, stranger.id, other["id"], folder="overdue")
+	assert any(item["id"] == due_reg["id"] for item in box["items"])
+	assert all(item["id"] != fresh_reg["id"] for item in box["items"])
+	dash = svc.get_dashboard(db, bid, stranger.id, other["id"])
+	assert dash["counts"]["overdue"] >= 1
+	db.close()
+
+
+@patch("app.services.office_automation_service.check_office_automation_plugin_active", return_value=True)
+def test_saved_cartable_filter_stays_private(_plugin):
+	db = _session()
+	owner = _user(db, "oa-filter-owner@example.com", "oa8")
+	other = _user(db, "oa-filter-other@example.com", "oa9")
+	saved = svc.save_saved_filter(db, 1, owner.id, {"name": "معوق قرارداد", "folder": "overdue", "q": "قرارداد"})
+	assert saved["folder"] == "overdue"
+	assert saved["q"] == "قرارداد"
+	updated = svc.save_saved_filter(db, 1, owner.id, {"name": "معوق قرارداد", "folder": "inbox"})
+	assert updated["id"] == saved["id"]
+	assert updated["folder"] == "inbox"
+	assert updated["q"] is None
+	assert svc.list_saved_filters(db, 1, other.id) == []
+	assert [item["id"] for item in svc.list_saved_filters(db, 1, owner.id)] == [saved["id"]]
+	with pytest.raises(ApiError) as invalid:
+		svc.save_saved_filter(db, 1, owner.id, {"name": "بد", "folder": "kanban"})
+	assert invalid.value.code == "OA_FOLDER_INVALID"
+	removed = svc.delete_saved_filter(db, 1, owner.id, saved["id"])
+	assert removed["deleted"] is True
+	with pytest.raises(ApiError) as missing:
+		svc.delete_saved_filter(db, 1, other.id, saved["id"])
+	assert missing.value.code == "OA_FILTER_NOT_FOUND"
+	db.close()
+
+
+@patch("app.services.office_automation_service.check_office_automation_plugin_active", return_value=True)
+def test_cartable_board_moves_only_by_referral_action(_plugin):
+	db = _session()
+	owner = _user(db, "oa-board-owner@example.com", "oa10")
+	clerk = _user(db, "oa-board-clerk@example.com", "oa11")
+	bid = 1
+	unit = svc.create_org_unit(db, bid, {"code": "ops", "name_i18n": {"fa": "عملیات", "en": "Ops"}}, owner.id)
+	src = svc.create_position(
+		db, bid, {"code": "src", "org_unit_id": unit["id"], "name_i18n": {"fa": "مبدأ", "en": "Source"}, "is_secretariat": True}, owner.id,
+	)
+	dst = svc.create_position(
+		db, bid, {"code": "dst", "org_unit_id": unit["id"], "name_i18n": {"fa": "مقصد", "en": "Target"}}, owner.id,
+	)
+	svc.assign_position_holder(db, bid, {"position_id": src["id"], "user_id": owner.id, "is_primary": True}, owner.id)
+	svc.assign_position_holder(db, bid, {"position_id": dst["id"], "user_id": clerk.id, "is_primary": True}, owner.id)
+	draft = svc.create_letter_draft(db, bid, {"subject": "کار برد", "body": "متن محرمانه برد", "letter_kind": "internal"}, owner.id, src["id"])
+	registered = svc.register_letter(
+		db, bid, draft["id"],
+		{"recipients": [{"to_position_id": dst["id"], "kind": "action"}]},
+		owner.id, src["id"],
+	)
+	board = svc.list_cartable_board(db, bid, clerk.id, dst["id"], q="کار برد")
+	pending = board["columns"]["pending"]["items"]
+	assert any(item["id"] == registered["id"] for item in pending)
+	assert all("body" not in item for item in pending)
+	referral_id = next(item["referral_id"] for item in pending if item["id"] == registered["id"])
+	with pytest.raises(ApiError) as forbidden:
+		svc.complete_referral(db, bid, referral_id, {}, owner.id, src["id"])
+	assert forbidden.value.code == "OA_REFERRAL_FORBIDDEN"
+	still = svc.list_cartable_board(db, bid, clerk.id, dst["id"])
+	assert any(item["referral_id"] == referral_id for item in still["columns"]["pending"]["items"])
+	svc.complete_referral(db, bid, referral_id, {"note": "انجام شد"}, clerk.id, dst["id"])
+	moved = svc.list_cartable_board(db, bid, clerk.id, dst["id"])
+	assert all(item["referral_id"] != referral_id for item in moved["columns"]["pending"]["items"])
+	assert any(item["referral_id"] == referral_id for item in moved["columns"]["done"]["items"])
+	assert moved["columns"]["done"]["total"] >= 1
+	db.close()
+
+
+@patch("app.services.office_automation_service.check_office_automation_plugin_active", return_value=True)
+def test_personal_desk_is_limited_to_the_acting_position(_plugin):
+	db = _session()
+	owner = _user(db, "oa-desk-owner@example.com", "oa12")
+	clerk = _user(db, "oa-desk-clerk@example.com", "oa13")
+	bid = 1
+	unit = svc.create_org_unit(db, bid, {"code": "desk", "name_i18n": {"fa": "میز", "en": "Desk"}}, owner.id)
+	src = svc.create_position(
+		db, bid, {"code": "from", "org_unit_id": unit["id"], "name_i18n": {"fa": "فرستنده", "en": "From"}, "is_secretariat": True}, owner.id,
+	)
+	dst = svc.create_position(
+		db, bid, {"code": "to", "org_unit_id": unit["id"], "name_i18n": {"fa": "گیرنده", "en": "To"}}, owner.id,
+	)
+	svc.assign_position_holder(db, bid, {"position_id": src["id"], "user_id": owner.id, "is_primary": True}, owner.id)
+	svc.assign_position_holder(db, bid, {"position_id": dst["id"], "user_id": clerk.id, "is_primary": True}, owner.id)
+	late = svc.create_letter_draft(db, bid, {"subject": "کار معوق میز", "body": "نباید در میز بیاید", "letter_kind": "internal"}, owner.id, src["id"])
+	late_reg = svc.register_letter(
+		db, bid, late["id"],
+		{"recipients": [{"to_position_id": dst["id"], "kind": "action", "due_at": "2020-01-01"}]},
+		owner.id, src["id"], calendar_type="gregorian",
+	)
+	soon = svc.create_letter_draft(db, bid, {"subject": "کار نزدیک", "letter_kind": "internal"}, owner.id, src["id"])
+	svc.register_letter(
+		db, bid, soon["id"],
+		{"recipients": [{"to_position_id": dst["id"], "kind": "action", "due_at": "2099-01-01"}]},
+		owner.id, src["id"], calendar_type="gregorian",
+	)
+	tracked = svc.create_letter_draft(db, bid, {"subject": "پیگیری فرستنده", "letter_kind": "internal"}, owner.id, src["id"])
+	tracked_reg = svc.register_letter(db, bid, tracked["id"], {}, owner.id, src["id"])
+	row = db.query(OaLetter).filter(OaLetter.id == tracked_reg["id"]).one()
+	row.follow_up_at = date.today()
+	db.commit()
+
+	mine = svc.get_personal_desk(db, bid, clerk.id, dst["id"], horizon_days=7)
+	assert any(item["letter_id"] == late_reg["id"] for item in mine["overdue"])
+	assert all(item["letter_id"] != late_reg["id"] for item in mine["due_soon"])
+	assert all("body" not in item for item in mine["overdue"])
+	assert mine["counts"]["overdue"] >= 1
+	sender = svc.get_personal_desk(db, bid, owner.id, src["id"])
+	assert all(item["letter_id"] != late_reg["id"] for item in sender["overdue"])
+	assert any(item["letter_id"] == tracked_reg["id"] for item in sender["follow_ups"])
 	db.close()

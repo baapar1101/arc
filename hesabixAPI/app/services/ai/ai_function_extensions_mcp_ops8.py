@@ -1,7 +1,13 @@
 """MCP leftovers: office automation extras, telephony extras, business soft-delete/restore."""
 from __future__ import annotations
 
-from app.services.ai.ai_mcp_tool_util import mcp_bid, mcp_db, mcp_jsonable, mcp_run, mcp_schema, mcp_uid
+from app.services.ai.ai_mcp_tool_util import mcp_bid, mcp_can, mcp_db, mcp_jsonable, mcp_run, mcp_schema, mcp_uid
+
+
+def _oa_model(value):
+	from app.services.office_automation_service import withhold_classified_text
+
+	return withhold_classified_text(mcp_jsonable(value))
 
 EMPTY = mcp_schema({})
 PAYLOAD = mcp_schema({"payload": {"type": "object"}}, ["payload"])
@@ -66,59 +72,59 @@ def _ext():
 
 
 def update_oa_secretariat_handler(args, context):
-    return mcp_jsonable(
+    return _oa_model(
         mcp_run(_ext().update_secretariat, mcp_db(context), mcp_bid(context), int(args["secretariat_id"]), args["payload"], mcp_uid(context), lang=_lang(context))
     )
 
 
 def update_oa_external_org_handler(args, context):
-    return mcp_jsonable(
+    return _oa_model(
         mcp_run(_ext().update_external_org, mcp_db(context), mcp_bid(context), int(args["org_id"]), args["payload"], mcp_uid(context), lang=_lang(context))
     )
 
 
 def list_oa_signatures_handler(args, context):
-    return mcp_jsonable({"items": mcp_run(_ext().list_signatures, mcp_db(context), mcp_bid(context), mcp_uid(context))})
+    return _oa_model({"items": mcp_run(_ext().list_signatures, mcp_db(context), mcp_bid(context), mcp_uid(context))})
 
 
 def upsert_oa_signature_handler(args, context):
-    return mcp_jsonable(mcp_run(_ext().upsert_signature, mcp_db(context), mcp_bid(context), mcp_uid(context), args["payload"]))
+    return _oa_model(mcp_run(_ext().upsert_signature, mcp_db(context), mcp_bid(context), mcp_uid(context), args["payload"]))
 
 
 def list_oa_sign_paths_handler(args, context):
-    return mcp_jsonable({"items": mcp_run(_ext().list_sign_path_templates, mcp_db(context), mcp_bid(context), lang=_lang(context))})
+    return _oa_model({"items": mcp_run(_ext().list_sign_path_templates, mcp_db(context), mcp_bid(context), lang=_lang(context))})
 
 
 def save_oa_sign_path_handler(args, context):
-    return mcp_jsonable(mcp_run(_ext().save_sign_path_template, mcp_db(context), mcp_bid(context), args["payload"], mcp_uid(context), lang=_lang(context)))
+    return _oa_model(mcp_run(_ext().save_sign_path_template, mcp_db(context), mcp_bid(context), args["payload"], mcp_uid(context), lang=_lang(context)))
 
 
 def reject_oa_letter_sign_handler(args, context):
-    return mcp_jsonable(
+    return _oa_model(
         mcp_run(_ext().reject_sign_step, mcp_db(context), mcp_bid(context), int(args["letter_id"]), {"note": args.get("note")}, mcp_uid(context), _pid(args), lang=_lang(context))
     )
 
 
 def acknowledge_oa_dispatch_handler(args, context):
-    return mcp_jsonable(
+    return _oa_model(
         mcp_run(_ext().acknowledge_dispatch, mcp_db(context), mcp_bid(context), int(args["dispatch_id"]), mcp_uid(context), _pid(args), lang=_lang(context))
     )
 
 
 def cancel_oa_referral_handler(args, context):
-    return mcp_jsonable(
+    return _oa_model(
         mcp_run(_ext().cancel_referral, mcp_db(context), mcp_bid(context), int(args["referral_id"]), {"note": args.get("note")}, mcp_uid(context), _pid(args), lang=_lang(context))
     )
 
 
 def unarchive_oa_letter_handler(args, context):
-    return mcp_jsonable(
-        mcp_run(_ext().unarchive_letter, mcp_db(context), mcp_bid(context), int(args["letter_id"]), mcp_uid(context), _pid(args), lang=_lang(context))
+    return _oa_model(
+        mcp_run(_ext().unarchive_letter, mcp_db(context), mcp_bid(context), int(args["letter_id"]), mcp_uid(context), _pid(args), lang=_lang(context), is_admin=mcp_can(context, "office_automation", "admin"))
     )
 
 
 def list_oa_letter_versions_handler(args, context):
-    return mcp_jsonable(
+    return _oa_model(
         {
             "items": mcp_run(
                 _ext().list_letter_versions,
@@ -135,54 +141,67 @@ def list_oa_letter_versions_handler(args, context):
 
 
 def list_oa_ece_messages_handler(args, context):
-    rows = mcp_run(_ext().list_ece_messages, mcp_db(context), mcp_bid(context), direction=args.get("direction"))
+    rows = mcp_run(
+        _ext().list_ece_messages,
+        mcp_db(context),
+        mcp_bid(context),
+        direction=args.get("direction"),
+        user_id=mcp_uid(context),
+        is_admin=mcp_can(context, "office_automation", "admin"),
+    )
     items = []
     for row in rows or []:
         item = dict(row)
         item.pop("xml_content", None)
         items.append(item)
-    return mcp_jsonable({"items": items})
+    return _oa_model({"items": items})
 
 
 def list_oa_cartable_rules_handler(args, context):
-    return mcp_jsonable({"items": mcp_run(_ext().list_cartable_rules, mcp_db(context), mcp_bid(context))})
+    return _oa_model({"items": mcp_run(_ext().list_cartable_rules, mcp_db(context), mcp_bid(context))})
 
 
 def save_oa_cartable_rule_handler(args, context):
-    return mcp_jsonable(mcp_run(_ext().save_cartable_rule, mcp_db(context), mcp_bid(context), args["payload"], mcp_uid(context)))
+    return _oa_model(mcp_run(_ext().save_cartable_rule, mcp_db(context), mcp_bid(context), args["payload"], mcp_uid(context)))
 
 
 def delete_oa_cartable_rule_handler(args, context):
-    return mcp_jsonable(mcp_run(_ext().delete_cartable_rule, mcp_db(context), mcp_bid(context), int(args["rule_id"]), mcp_uid(context)))
+    return _oa_model(mcp_run(_ext().delete_cartable_rule, mcp_db(context), mcp_bid(context), int(args["rule_id"]), mcp_uid(context)))
 
 
 def save_oa_archive_folder_handler(args, context):
-    return mcp_jsonable(mcp_run(_ext().save_archive_folder, mcp_db(context), mcp_bid(context), args["payload"], mcp_uid(context), lang=_lang(context)))
+    return _oa_model(mcp_run(_ext().save_archive_folder, mcp_db(context), mcp_bid(context), args["payload"], mcp_uid(context), lang=_lang(context)))
 
 
 def archive_oa_letter_to_folder_handler(args, context):
     payload = {"folder_id": args.get("folder_id")}
-    return mcp_jsonable(
+    return _oa_model(
         mcp_run(_ext().archive_to_folder, mcp_db(context), mcp_bid(context), int(args["letter_id"]), payload, mcp_uid(context), _pid(args), lang=_lang(context))
     )
 
 
 def get_oa_volume_report_handler(args, context):
-    return mcp_jsonable(mcp_run(_ext().volume_report, mcp_db(context), mcp_bid(context)))
+    return _oa_model(mcp_run(
+        _ext().volume_report, mcp_db(context), mcp_bid(context),
+        user_id=mcp_uid(context), is_admin=mcp_can(context, "office_automation", "admin"),
+    ))
 
 
 def get_oa_performance_report_handler(args, context):
-    return mcp_jsonable(mcp_run(_ext().performance_report, mcp_db(context), mcp_bid(context), lang=_lang(context)))
+    return _oa_model(mcp_run(
+        _ext().performance_report, mcp_db(context), mcp_bid(context), lang=_lang(context),
+        user_id=mcp_uid(context), is_admin=mcp_can(context, "office_automation", "admin"),
+    ))
 
 
 def notify_oa_due_followups_handler(args, context):
-    return mcp_jsonable(mcp_run(_ext().notify_due_followups, mcp_db(context), mcp_bid(context)))
+    return _oa_model(mcp_run(_ext().notify_due_followups, mcp_db(context), mcp_bid(context)))
 
 
 def soft_delete_connected_business_handler(args, context):
     from app.services.business_service import delete_business_soft
 
-    return mcp_jsonable(
+    return _oa_model(
         mcp_run(
             delete_business_soft,
             mcp_db(context),
@@ -198,7 +217,7 @@ def soft_delete_connected_business_handler(args, context):
 def restore_connected_business_handler(args, context):
     from app.services.business_service import restore_business
 
-    return mcp_jsonable(mcp_run(restore_business, mcp_db(context), mcp_bid(context), mcp_uid(context)))
+    return _oa_model(mcp_run(restore_business, mcp_db(context), mcp_bid(context), mcp_uid(context)))
 
 
 def _tel_plugin(db, bid):
@@ -219,7 +238,7 @@ def get_telephony_my_context_handler(args, context):
         data.pop("connector_token", None)
         data.pop("sip_password", None)
         data.pop("secret", None)
-    return mcp_jsonable(data)
+    return _oa_model(data)
 
 
 def list_telephony_assignable_users_handler(args, context):
@@ -227,7 +246,7 @@ def list_telephony_assignable_users_handler(args, context):
 
     db, bid = mcp_db(context), mcp_bid(context)
     _tel_plugin(db, bid)
-    return mcp_jsonable({"items": mcp_run(list_assignable_users, db, bid)})
+    return _oa_model({"items": mcp_run(list_assignable_users, db, bid)})
 
 
 def list_telephony_team_supervisors_handler(args, context):
@@ -235,7 +254,7 @@ def list_telephony_team_supervisors_handler(args, context):
 
     db, bid = mcp_db(context), mcp_bid(context)
     _tel_plugin(db, bid)
-    return mcp_jsonable({"items": mcp_run(list_team_supervisors, db, bid)})
+    return _oa_model({"items": mcp_run(list_team_supervisors, db, bid)})
 
 
 def sync_telephony_extensions_handler(args, context):
@@ -243,7 +262,7 @@ def sync_telephony_extensions_handler(args, context):
 
     db, bid = mcp_db(context), mcp_bid(context)
     _tel_plugin(db, bid)
-    return mcp_jsonable(mcp_run(svc.sync_extensions, db, bid, int(args["pbx_id"]), args.get("items") or []))
+    return _oa_model(mcp_run(svc.sync_extensions, db, bid, int(args["pbx_id"]), args.get("items") or []))
 
 
 def get_telephony_screen_pop_handler(args, context):
@@ -251,7 +270,7 @@ def get_telephony_screen_pop_handler(args, context):
 
     db, bid = mcp_db(context), mcp_bid(context)
     _tel_plugin(db, bid)
-    return mcp_jsonable(mcp_run(svc.screen_pop_context, db, bid, int(args["call_id"]), auth_ctx=context.get("user_context")))
+    return _oa_model(mcp_run(svc.screen_pop_context, db, bid, int(args["call_id"]), auth_ctx=context.get("user_context")))
 
 
 def get_telephony_operators_report_handler(args, context):
@@ -259,7 +278,7 @@ def get_telephony_operators_report_handler(args, context):
 
     db, bid = mcp_db(context), mcp_bid(context)
     _tel_plugin(db, bid)
-    return mcp_jsonable(mcp_run(operators_report, db, bid, date_from=args.get("date_from"), date_to=args.get("date_to"), auth_ctx=context.get("user_context")))
+    return _oa_model(mcp_run(operators_report, db, bid, date_from=args.get("date_from"), date_to=args.get("date_to"), auth_ctx=context.get("user_context")))
 
 
 def get_telephony_person_report_handler(args, context):
@@ -267,7 +286,7 @@ def get_telephony_person_report_handler(args, context):
 
     db, bid = mcp_db(context), mcp_bid(context)
     _tel_plugin(db, bid)
-    return mcp_jsonable(mcp_run(by_person_report, db, bid, date_from=args.get("date_from"), date_to=args.get("date_to"), auth_ctx=context.get("user_context")))
+    return _oa_model(mcp_run(by_person_report, db, bid, date_from=args.get("date_from"), date_to=args.get("date_to"), auth_ctx=context.get("user_context")))
 
 
 def get_telephony_extension_report_handler(args, context):
@@ -275,7 +294,7 @@ def get_telephony_extension_report_handler(args, context):
 
     db, bid = mcp_db(context), mcp_bid(context)
     _tel_plugin(db, bid)
-    return mcp_jsonable(mcp_run(by_extension_report, db, bid, date_from=args.get("date_from"), date_to=args.get("date_to"), auth_ctx=context.get("user_context")))
+    return _oa_model(mcp_run(by_extension_report, db, bid, date_from=args.get("date_from"), date_to=args.get("date_to"), auth_ctx=context.get("user_context")))
 
 
 def get_telephony_live_snapshot_handler(args, context):
@@ -283,7 +302,7 @@ def get_telephony_live_snapshot_handler(args, context):
 
     db, bid = mcp_db(context), mcp_bid(context)
     _tel_plugin(db, bid)
-    return mcp_jsonable(mcp_run(live_snapshot, db, bid, auth_ctx=context.get("user_context")))
+    return _oa_model(mcp_run(live_snapshot, db, bid, auth_ctx=context.get("user_context")))
 
 
 def control_telephony_call_handler(args, context):
@@ -291,7 +310,7 @@ def control_telephony_call_handler(args, context):
 
     db, bid = mcp_db(context), mcp_bid(context)
     _tel_plugin(db, bid)
-    return mcp_jsonable(
+    return _oa_model(
         mcp_run(
             enqueue_control_command,
             db,
@@ -310,7 +329,7 @@ def get_telephony_ops_metrics_handler(args, context):
 
     db, bid = mcp_db(context), mcp_bid(context)
     _tel_plugin(db, bid)
-    return mcp_jsonable(mcp_run(metrics_summary, db, bid))
+    return _oa_model(mcp_run(metrics_summary, db, bid))
 
 
 def list_telephony_dead_letters_handler(args, context):
@@ -318,7 +337,7 @@ def list_telephony_dead_letters_handler(args, context):
 
     db, bid = mcp_db(context), mcp_bid(context)
     _tel_plugin(db, bid)
-    return mcp_jsonable({"items": mcp_run(list_dead_letters, db, bid)})
+    return _oa_model({"items": mcp_run(list_dead_letters, db, bid)})
 
 
 def resolve_telephony_dead_letter_handler(args, context):
@@ -326,7 +345,7 @@ def resolve_telephony_dead_letter_handler(args, context):
 
     db, bid = mcp_db(context), mcp_bid(context)
     _tel_plugin(db, bid)
-    return mcp_jsonable(mcp_run(resolve_dead_letter, db, bid, int(args["dlq_id"])))
+    return _oa_model(mcp_run(resolve_dead_letter, db, bid, int(args["dlq_id"])))
 
 
 def get_telephony_softphone_health_handler(args, context):
@@ -339,7 +358,7 @@ def get_telephony_softphone_health_handler(args, context):
         data = dict(data)
         for key in ("sip_password", "password", "secret", "token"):
             data.pop(key, None)
-    return mcp_jsonable(data)
+    return _oa_model(data)
 
 
 def register_mcp_ops8_functions(registry) -> None:

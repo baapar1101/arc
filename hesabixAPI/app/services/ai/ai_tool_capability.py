@@ -71,6 +71,7 @@ TOOL_CAPABILITIES: frozenset[str] = frozenset({
     "misc.general",
     "office_automation.correspondence",
     "payroll.payroll",
+    "procurement.purchase",
     "repair.service",
 })
 

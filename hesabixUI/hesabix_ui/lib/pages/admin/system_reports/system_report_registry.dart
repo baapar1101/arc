@@ -48,5 +48,47 @@ class SystemReportRegistry {
       icon: Icons.timeline_outlined,
       iconColor: const Color(0xFF6A1B9A),
     ),
+    SystemReportDefinition(
+      id: 'storage_usage',
+      subPath: 'reports-storage',
+      titleBuilder: (AppLocalizations t) =>
+          t.localeName.startsWith('fa') ? 'مصرف ذخیره‌سازی' : 'Storage usage',
+      descriptionBuilder: (AppLocalizations t) =>
+          t.localeName.startsWith('fa') ? 'حجم فایل به تفکیک کسب‌وکار' : 'File volume by business',
+      icon: Icons.cloud_outlined,
+      iconColor: const Color(0xFF0277BD),
+    ),
+    SystemReportDefinition(
+      id: 'inactive_businesses',
+      subPath: 'reports-inactive-businesses',
+      titleBuilder: (AppLocalizations t) =>
+          t.localeName.startsWith('fa') ? 'کسب‌وکارهای کم‌فعال' : 'Inactive businesses',
+      descriptionBuilder: (AppLocalizations t) => t.localeName.startsWith('fa')
+          ? 'کسب‌وکارهایی که ۹۰ روز به‌روز نشده‌اند'
+          : 'Businesses with no update for 90 days',
+      icon: Icons.business_outlined,
+      iconColor: const Color(0xFF6D4C41),
+    ),
+    SystemReportDefinition(
+      id: 'failed_logins',
+      subPath: 'reports-failed-logins',
+      titleBuilder: (AppLocalizations t) =>
+          t.localeName.startsWith('fa') ? 'شکست ورود' : 'Failed logins',
+      descriptionBuilder: (AppLocalizations t) =>
+          t.localeName.startsWith('fa') ? 'ورود و کپچای ناموفق' : 'Failed sign-in and captcha events',
+      icon: Icons.lock_outline,
+      iconColor: const Color(0xFFC62828),
+    ),
+    SystemReportDefinition(
+      id: 'support_revenue',
+      subPath: 'reports-support-revenue',
+      titleBuilder: (AppLocalizations t) =>
+          t.localeName.startsWith('fa') ? 'درآمد پشتیبانی' : 'Support revenue',
+      descriptionBuilder: (AppLocalizations t) => t.localeName.startsWith('fa')
+          ? 'اشتراک و صورت‌حساب پشتیبانی'
+          : 'Support subscriptions and invoices',
+      icon: Icons.payments_outlined,
+      iconColor: const Color(0xFF2E7D32),
+    ),
   ];
 }

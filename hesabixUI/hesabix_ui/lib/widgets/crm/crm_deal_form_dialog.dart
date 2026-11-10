@@ -12,6 +12,7 @@ import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/widgets/crm/crm_ai_assistant_widget.dart';
 import 'package:hesabix_ui/widgets/crm/crm_responsive_dialog.dart';
+import 'package:hesabix_ui/widgets/crm/crm_custom_field_form.dart';
 import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
 import 'package:hesabix_ui/widgets/crm/crm_tag_selector.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
@@ -81,6 +82,7 @@ class _CrmDealFormDialogState extends State<CrmDealFormDialog> {
   List<dynamic> _changeHistory = [];
   bool _historyLoading = false;
   List<int> _selectedTagIds = [];
+  Map<String, dynamic> _customFieldValues = {};
   List<CrmDealLineDraft> _lines = [];
   bool _loadingLines = false;
   String? _wonReasonCode;
@@ -97,6 +99,7 @@ class _CrmDealFormDialogState extends State<CrmDealFormDialog> {
           .whereType<int>()
           .toList();
     }
+    _customFieldValues = crmCustomValuesFromRecord(i);
     _wonReasonCode = i?['won_reason_code']?.toString();
     _lostReasonCode = i?['lost_reason_code']?.toString();
     _competitorName = i?['competitor_name']?.toString();
@@ -600,6 +603,14 @@ class _CrmDealFormDialogState extends State<CrmDealFormDialog> {
                       label: Text(_expectedCloseDate != null ? 'تغییر' : 'انتخاب'),
                     ),
                   ),
+                if (cal == null && _expectedCloseDate != null)
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: TextButton(
+                      onPressed: () => setState(() => _expectedCloseDate = null),
+                      child: const Text('پاک کردن تاریخ پیش‌بینی'),
+                    ),
+                  ),
                 const SizedBox(height: 12),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
@@ -664,6 +675,14 @@ class _CrmDealFormDialogState extends State<CrmDealFormDialog> {
               initialTagIds: _selectedTagIds,
               onChanged: (ids) => _selectedTagIds = ids,
             ),
+          ),
+          const SizedBox(height: 16),
+          CrmCustomFieldInputs(
+            businessId: widget.businessId,
+            crmService: widget.crmService,
+            entityType: 'deal',
+            initialValues: _customFieldValues,
+            onChanged: (values) => _customFieldValues = values,
           ),
           if (isEdit) ...[
             const SizedBox(height: 16),
@@ -938,6 +957,7 @@ class _CrmDealFormDialogState extends State<CrmDealFormDialog> {
         await widget.crmService.updateDeal(
           businessId: widget.businessId,
           dealId: id,
+          personId: _selectedPersonId,
           stageId: _selectedStageId,
           code: _codeController.text.trim().isEmpty ? null : _codeController.text.trim(),
           title: _titleController.text.trim(),
@@ -945,12 +965,15 @@ class _CrmDealFormDialogState extends State<CrmDealFormDialog> {
           currencyId: _selectedCurrencyId,
           probabilityPercent: _probabilityPercent,
           expectedCloseDate: _expectedCloseDate,
+          clearExpectedCloseDate: _expectedCloseDate == null,
           nextFollowUpAt: _nextFollowUpAt,
-          description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
+          clearNextFollowUp: _nextFollowUpAt == null,
+          description: _descController.text.trim(),
           wonReasonCode: _wonReasonCode,
           lostReasonCode: _lostReasonCode,
           competitorName: _competitorName,
           tagIds: _selectedTagIds,
+          customFields: _customFieldValues,
         );
         try {
           await widget.crmService.replaceDealLines(
@@ -958,7 +981,9 @@ class _CrmDealFormDialogState extends State<CrmDealFormDialog> {
             dealId: id,
             lines: _lines.map((l) => l.toJson()).toList(),
           );
-        } catch (_) {}
+        } catch (e) {
+          rethrow;
+        }
       } else {
         await widget.crmService.createDeal(
           businessId: widget.businessId,
@@ -974,6 +999,7 @@ class _CrmDealFormDialogState extends State<CrmDealFormDialog> {
           nextFollowUpAt: _nextFollowUpAt,
           description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
           tagIds: _selectedTagIds,
+          customFields: _customFieldValues,
         );
       }
       if (!mounted) return;

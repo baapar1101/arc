@@ -51,6 +51,19 @@ import io
 router = APIRouter(prefix="/business/{business_id}/storage", tags=["business-storage"])
 
 
+def _oa_file_admin(ctx: AuthContext, business_id: int) -> bool:
+	try:
+		return bool(ctx.has_business_permission("office_automation", "admin") or ctx.is_business_owner(business_id))
+	except Exception:
+		return False
+
+
+def _hide_oa_file(db: Session, business_id: int, ctx: AuthContext, file_id: str) -> None:
+	from app.services.oa_document_service import require_oa_file_visible
+
+	require_oa_file_visible(db, business_id, ctx.get_user_id(), str(file_id), is_admin=_oa_file_admin(ctx, business_id))
+
+
 @router.get(
 	"/files/{file_id}/usage",
 	summary="لیست وابستگی‌های فایل",
@@ -74,6 +87,7 @@ async def get_file_usage_endpoint(
 
 	if not file_storage:
 		raise ApiError("FILE_NOT_FOUND", "فایل یافت نشد", http_status=404)
+	_hide_oa_file(db, business_id, ctx, file_id)
 
 	dependency_service = FileDependencyService(db)
 	dependencies = dependency_service.get_dependencies(file_storage)
@@ -429,7 +443,8 @@ async def export_zip_endpoint(
 	
 	# ایجاد ZIP
 	zip_data = await export_business_files_as_zip(
-		db, business_id, module_context=module_context, from_date=from_dt, to_date=to_dt
+		db, business_id, module_context=module_context, from_date=from_dt, to_date=to_dt,
+		user_id=ctx.get_user_id(), is_admin=_oa_file_admin(ctx, business_id),
 	)
 	
 	# بازگرداندن فایل
@@ -474,7 +489,10 @@ def get_export_info_endpoint(
 		except Exception:
 			pass
 	
-	data = get_export_info(db, business_id, module_context=module_context, from_date=from_dt, to_date=to_dt)
+	data = get_export_info(
+		db, business_id, module_context=module_context, from_date=from_dt, to_date=to_dt,
+		user_id=ctx.get_user_id(), is_admin=_oa_file_admin(ctx, business_id),
+	)
 	return success_response(data, request)
 
 
@@ -518,7 +536,15 @@ def list_files_endpoint(
 		offset = (page - 1) * limit
 		
 		# دریافت فایل‌ها
-		files_query = db.query(FileStorage).filter(and_(*filters))
+		from app.services.oa_document_service import restrict_file_query
+
+		files_query = restrict_file_query(
+			db.query(FileStorage).filter(and_(*filters)),
+			db,
+			business_id,
+			ctx.get_user_id(),
+			_oa_file_admin(ctx, business_id),
+		)
 		total_count = files_query.count()
 		
 		files = files_query.order_by(FileStorage.created_at.desc()).offset(offset).limit(limit).all()
@@ -578,6 +604,10 @@ async def download_file_endpoint(
 	# بررسی دسترسی به کسب‌وکار
 	if not ctx.can_access_business(business_id):
 		raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+	from app.services.oa_document_service import require_business_file
+
+	require_business_file(db, business_id, file_id)
+	_hide_oa_file(db, business_id, ctx, file_id)
 	
 	storage = FileStorageService(db)
 	try:
@@ -679,6 +709,10 @@ async def download_file_thumbnail_endpoint(
 	# بررسی دسترسی به کسب‌وکار
 	if not ctx.can_access_business(business_id):
 		raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+	from app.services.oa_document_service import require_business_file
+
+	require_business_file(db, business_id, file_id)
+	_hide_oa_file(db, business_id, ctx, file_id)
 
 	storage = FileStorageService(db)
 	try:
@@ -726,6 +760,7 @@ async def rename_file_endpoint(
 	
 	if not file_storage:
 		raise ApiError("FILE_NOT_FOUND", "فایل یافت نشد", http_status=404)
+	_hide_oa_file(db, business_id, ctx, file_id)
 	
 	# بررسی اعتبار نام جدید
 	if not new_name or not new_name.strip():
@@ -772,6 +807,7 @@ async def delete_file_endpoint(
 	
 	if not file_storage:
 		raise ApiError("FILE_NOT_FOUND", "فایل یافت نشد", http_status=404)
+	_hide_oa_file(db, business_id, ctx, file_id)
 	
 	dependency_service = FileDependencyService(db)
 	dependencies = dependency_service.get_dependencies(file_storage)
@@ -830,6 +866,7 @@ def create_file_share_endpoint(
 			user_id=user_id,
 			password=password,
 			expires_in_days=expires_in_days,
+			is_admin=_oa_file_admin(ctx, business_id),
 		)
 	except ApiError:
 		raise
@@ -850,6 +887,7 @@ def list_file_shares_endpoint(
 ) -> dict:
 	if not ctx.can_access_business(business_id):
 		raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+	_hide_oa_file(db, business_id, ctx, file_id)
 	try:
 		items = list_shares_for_file(db, business_id, file_id)
 	except ApiError:
@@ -873,7 +911,10 @@ def list_business_shares_endpoint(
 ) -> dict:
 	if not ctx.can_access_business(business_id):
 		raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
-	data = list_shares_for_business(db, business_id, page=page, limit=limit, only_active=only_active)
+	data = list_shares_for_business(
+		db, business_id, page=page, limit=limit, only_active=only_active,
+		user_id=ctx.get_user_id(), is_admin=_oa_file_admin(ctx, business_id),
+	)
 	return success_response(data, request)
 
 

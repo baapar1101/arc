@@ -114,7 +114,7 @@ def get_metrics(
 	
 	try:
 		ctx: AuthContext = get_current_user(request, db)
-		if not ctx.has_any_permission("system_settings", "superadmin"):
+		if not ctx.has_app_permission("system_settings"):
 			raise ApiError("FORBIDDEN", "Missing permission", http_status=403)
 	except Exception:
 		# اگر احراز هویت نشد، metrics را نشان نمی‌دهیم

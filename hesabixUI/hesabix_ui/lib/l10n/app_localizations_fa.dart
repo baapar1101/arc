@@ -2212,7 +2212,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get systemSettingsWelcome => 'تنظیمات سیستم';
 
   @override
-  String get systemSettingsDescription => 'مدیریت پیکربندی و مدیریت سیستم';
+  String get systemSettingsDescription =>
+      'کارهای پرتکرار بالا هستند؛ بقیه را از دسته‌ها یا جستجو باز کنید.';
 
   @override
   String get storageManagement => 'مدیریت ذخیره‌سازی';
@@ -2960,6 +2961,9 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get crmMenuSequences => 'توالی‌های خودکار';
+
+  @override
+  String get crmMenuEnterprise => 'سازمان فروش';
 
   @override
   String get storageSpace => 'فضای ذخیره‌سازی';
@@ -11080,45 +11084,45 @@ class AppLocalizationsFa extends AppLocalizations {
   String get noSettingsInCategory => 'هیچ تنظیماتی در این دسته یافت نشد';
 
   @override
-  String get settingsCategoryCoreConfiguration => 'پایه و پیکربندی';
+  String get settingsCategoryCoreConfiguration => 'زیرساخت';
 
   @override
   String get settingsCategoryCoreConfigurationDescription =>
-      'تنظیمات پایه و پیکربندی سیستم';
+      'پیکربندی اصلی، کش و فایروال';
 
   @override
-  String get settingsCategoryStorageFiles => 'ذخیره‌سازی و فایل‌ها';
+  String get settingsCategoryStorageFiles => 'فایل‌ها و افزونه‌ها';
 
   @override
   String get settingsCategoryStorageFilesDescription =>
-      'مدیریت ذخیره‌سازی و پلن‌های ذخیره‌سازی';
+      'ذخیره‌سازی، پلن‌ها، بازارچه و لینک اشتراک';
 
   @override
   String get settingsCategoryFinancialPayment => 'مالی و پرداخت';
 
   @override
   String get settingsCategoryFinancialPaymentDescription =>
-      'تنظیمات کیف‌پول و درگاه‌های پرداخت';
+      'کیف‌پول، ارز، درگاه و صفحه پرداخت';
 
   @override
-  String get settingsCategoryUsersBusinesses => 'کاربران و کسب و کارها';
+  String get settingsCategoryUsersBusinesses => 'کاربران و پشتیبانی';
 
   @override
   String get settingsCategoryUsersBusinessesDescription =>
-      'مدیریت کاربران و کسب و کارها';
+      'کاربران، کسب‌وکارها، پشتیبانی و گزارش‌ها';
 
   @override
   String get settingsCategoryCommunications => 'ارتباطات';
 
   @override
   String get settingsCategoryCommunicationsDescription =>
-      'ایمیل، اعلان‌ها و اعلان‌های سیستمی';
+      'ایمیل، اعلان و قالب پیام';
 
   @override
   String get settingsCategoryAI => 'هوش مصنوعی';
 
   @override
-  String get settingsCategoryAIDescription => 'تنظیمات، پلن‌ها و Prompt های AI';
+  String get settingsCategoryAIDescription => 'مدل، پلن، پرامپت و ارزیابی';
 
   @override
   String get aiStatusSending => 'در حال ارسال…';
@@ -12307,14 +12311,76 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get settingsCategoryExternalServicesDescription =>
-      'ادغام‌های سرویس‌های خارجی';
+      'زحل، مالیات و سرویس‌های بیرونی';
 
   @override
   String get settingsCategoryMonitoringLogs => 'مانیتورینگ و لاگ‌ها';
 
   @override
   String get settingsCategoryMonitoringLogsDescription =>
-      'مانیتورینگ سیستم و ثبت لاگ';
+      'سلامت سیستم، لاگ سرویس و فعالیت کسب‌وکار';
+
+  @override
+  String get settingsCategoryMaintenance => 'نگهداری حساس';
+
+  @override
+  String get settingsCategoryMaintenanceDescription =>
+      'پشتیبان، ایمپورت و اسکریپت — فقط وقتی لازم است';
+
+  @override
+  String get systemAdminQuickAccessTitle => 'دسترسی سریع';
+
+  @override
+  String get systemAdminQuickAccessDescription =>
+      'کارهایی که مدیر سیستم بیشتر با آن‌ها سروکار دارد';
+
+  @override
+  String get systemAdminSuperAdminRole => 'مدیر کل';
+
+  @override
+  String get systemAdminLimitedRole => 'دسترسی محدود';
+
+  @override
+  String get settingsSupportPlans => 'پلن‌های پشتیبانی';
+
+  @override
+  String get settingsSupportPlansDescription =>
+      'قیمت و مدت اشتراک پشتیبانی کاربران';
+
+  @override
+  String get settingsSupportBillingStats => 'آمار پشتیبانی غیررایگان';
+
+  @override
+  String get settingsSupportBillingStatsDescription =>
+      'درآمد، اشتراک فعال و صورت‌حساب پشتیبانی';
+
+  @override
+  String get settingsNotificationEventDefaults => 'قالب‌های پیش‌فرض کسب‌وکار';
+
+  @override
+  String get settingsNotificationEventDefaultsDescription =>
+      'متن پیش‌فرض پیامک و ایمیل وقتی کسب‌وکار قالب ندارد';
+
+  @override
+  String get settingsLegacyDatabaseImport => 'ایمپورت دیتابیس قدیمی';
+
+  @override
+  String get settingsLegacyDatabaseImportDescription =>
+      'انتقال داده از دامپ MySQL نسخه قدیمی';
+
+  @override
+  String get settingsAIEval => 'ارزیابی کیفیت AI';
+
+  @override
+  String get settingsAIEvalDescription =>
+      'سناریوهای رگرسیون و زمان‌بندی ارزیابی پاسخ‌ها';
+
+  @override
+  String get settingsZohalStatistics => 'آمار زحل';
+
+  @override
+  String get settingsZohalStatisticsDescription =>
+      'مصرف و آمار استعلام‌های زحل';
 
   @override
   String get settingsShareLinks => 'لینک‌های اشتراک';
@@ -13552,7 +13618,337 @@ class AppLocalizationsFa extends AppLocalizations {
   String get oaFollowUp => 'پیگیری';
 
   @override
+  String get oaOverdue => 'معوق';
+
+  @override
+  String get oaSaveFilter => 'ذخیره فیلتر';
+
+  @override
+  String get oaSavedFilters => 'فیلترهای ذخیره‌شده';
+
+  @override
+  String get oaFilterName => 'نام فیلتر';
+
+  @override
+  String get oaNoSavedFilters => 'فیلتر ذخیره‌شده‌ای نیست';
+
+  @override
+  String get oaBoardView => 'برد کار';
+
+  @override
+  String get oaListView => 'فهرست';
+
+  @override
+  String get oaColumnPending => 'منتظر اقدام';
+
+  @override
+  String get oaColumnSeen => 'دیده‌شده';
+
+  @override
+  String get oaColumnDone => 'اقدام‌شده';
+
+  @override
+  String get oaColumnReturned => 'عودت‌شده';
+
+  @override
+  String get oaDropHere => 'رها کنید تا روی سرور ثبت شود';
+
+  @override
+  String get oaOpenLetter => 'باز کردن نامه';
+
+  @override
+  String get oaDropAttachment => 'فایل را اینجا رها کنید تا پیوست شود';
+
+  @override
+  String get oaMyDesk => 'میز کار من';
+
+  @override
+  String get oaDueSoon => 'سررسید نزدیک';
+
+  @override
+  String get oaFollowUpsDue => 'پیگیری‌های نزدیک';
+
+  @override
+  String get oaProcesses => 'فرآیندها';
+
+  @override
+  String get oaProcessTasks => 'وظایف فرآیند';
+
+  @override
+  String get oaStartProcess => 'شروع';
+
+  @override
+  String get oaCompleteTask => 'تکمیل وظیفه';
+
+  @override
+  String get oaPublishProcess => 'انتشار فرآیند';
+
+  @override
+  String get oaProcessName => 'نام فرآیند';
+
+  @override
+  String get oaFormLabel => 'برچسب فرم';
+
+  @override
+  String get oaAssignee => 'سمت مسئول';
+
+  @override
+  String get oaProcessDesigner => 'طراح فرآیند';
+
+  @override
+  String get oaProcessDrafts => 'پیش‌نویس‌ها';
+
+  @override
+  String get oaProcessCode => 'کد';
+
+  @override
+  String get oaProcessCodeName => 'کد لاتین و نام را وارد کنید';
+
+  @override
+  String get oaNewProcess => 'فرآیند تازه';
+
+  @override
+  String get oaProcessInspector => 'گام';
+
+  @override
+  String get oaSelectNode => 'یک گام را انتخاب کنید';
+
+  @override
+  String get oaConnectNodes => 'اتصال';
+
+  @override
+  String get oaPickTarget => 'گام بعد را انتخاب کنید';
+
+  @override
+  String get oaDeleteNode => 'حذف گام';
+
+  @override
+  String get oaGatewayField => 'فیلد تصمیم';
+
+  @override
+  String get oaEdgeWhen => 'مقدار شرط';
+
+  @override
+  String get oaEdgeDefault => 'پیش‌فرض';
+
+  @override
+  String get oaTimerHours => 'ساعت انتظار';
+
+  @override
+  String get oaSlaHours => 'مهلت ساعت';
+
+  @override
+  String get oaEscalateTo => 'ارجاع پس از مهلت';
+
+  @override
+  String get oaSubprocessVersion => 'نسخه منتشرشده زیر فرآیند';
+
+  @override
+  String get oaNodeStart => 'شروع';
+
+  @override
+  String get oaNodeTask => 'وظیفه';
+
+  @override
+  String get oaNodeExclusive => 'تصمیم';
+
+  @override
+  String get oaNodeSplit => 'انشعاب';
+
+  @override
+  String get oaNodeJoin => 'پیوند';
+
+  @override
+  String get oaNodeTimer => 'تایمر';
+
+  @override
+  String get oaNodeSubprocess => 'زیرفرآیند';
+
+  @override
+  String get oaNodeEnd => 'پایان';
+
+  @override
+  String get oaDocuments => 'اسناد';
+
+  @override
+  String get oaDocumentSearch => 'جست‌وجوی سند';
+
+  @override
+  String get oaRegisterDocument => 'ثبت سند';
+
+  @override
+  String get oaDocumentTitle => 'عنوان سند';
+
+  @override
+  String get oaConfidentiality => 'محرمانگی';
+
+  @override
+  String get oaAddVersion => 'نسخه جدید';
+
+  @override
+  String get oaAcceptSuggestion => 'تأیید';
+
+  @override
+  String get oaRejectSuggestion => 'رد';
+
+  @override
+  String get oaNoDocuments => 'سندی برای نمایش نیست';
+
+  @override
+  String get oaDocumentVersions => 'نسخه‌ها';
+
+  @override
+  String get oaPendingConfirmations => 'عمل‌های حساس در انتظار تأیید';
+
+  @override
+  String get oaNoPendingConfirmations => 'عملی در انتظار تأیید شما نیست';
+
+  @override
+  String get oaApproveAction => 'تأیید';
+
+  @override
+  String get oaRejectAction => 'رد';
+
+  @override
+  String get oaEnterprise => 'شعبه و نگهداری';
+
+  @override
+  String get oaBranches => 'شعبه‌ها';
+
+  @override
+  String get oaBranchCode => 'کد شعبه';
+
+  @override
+  String get oaBranchName => 'نام شعبه';
+
+  @override
+  String get oaCreateBranch => 'ساخت شعبه';
+
+  @override
+  String get oaNoBranches => 'شعبه‌ای ثبت نشده است';
+
+  @override
+  String get oaRetentionDue => 'بازبینی نگهداری';
+
+  @override
+  String get oaNoRetentionDue => 'نامه‌ای برای بازبینی نگهداری نرسیده است';
+
+  @override
+  String get oaHoldLetter => 'نگه‌داشت';
+
+  @override
+  String get oaRetentionDocuments => 'اسناد سررسید نگهداری';
+
+  @override
+  String get oaHoldDocument => 'نگه‌داشت سند';
+
+  @override
+  String get oaHoldDocumentKeepsFile => 'نگه‌داشت سند، سند و فایل را حذف نمی‌کند.';
+
+  @override
+  String get oaRetentionPolicy => 'سیاست نگهداری';
+
+  @override
+  String get oaRetainDays => 'مدت نگهداری (روز)';
+
+  @override
+  String get oaNoRetentionPolicies => 'سیاستی ثبت نشده است';
+
+  @override
+  String get oaRetentionKeepsLetters => 'این سیاست نامه را حذف نمی‌کند.';
+
+  @override
+  String get oaSignatureProviders => 'ارائه‌دهندگان امضا';
+
+  @override
+  String get oaNoSignatureProviders => 'ارائه‌دهنده‌ای ثبت نشده است';
+
+  @override
+  String get oaProviderLive => 'نتیجه از نشانی سرویس می‌آید';
+
+  @override
+  String get oaProviderManual => 'نتیجه با مرجع خارجی ثبت می‌شود';
+
+  @override
+  String get oaRequestProviderSignature => 'درخواست امضای ارائه‌دهنده';
+
+  @override
+  String get oaNoProviderRequests => 'درخواستی برای ارائه‌دهنده ثبت نشده است';
+
+  @override
+  String get oaRecordProviderResult => 'ثبت نتیجه ارائه‌دهنده';
+
+  @override
+  String get oaProviderExternalRef => 'مرجع خارجی';
+
+  @override
+  String get oaProviderCompleted => 'تکمیل‌شده';
+
+  @override
+  String get oaProviderRejected => 'ردشده';
+
+  @override
+  String get oaExchangeLetter => 'تبادل نامه';
+
+  @override
+  String get oaTargetBusinessId => 'شناسه کسب‌وکار مقصد';
+
+  @override
+  String get oaTargetPositionId => 'شناسه سمت دبیرخانه مقصد';
+
+  @override
+  String get oaExchangeNormalOnly => 'فقط نامه عادی ثبت‌شده تبادل می‌شود.';
+
+  @override
+  String get oaProviderSignatureNote => 'ثبت نتیجه ارائه‌دهنده جای تصویر امضا را نمی‌گیرد و به‌تنهایی امضای الکترونیکی مطمئن نیست.';
+
+  @override
+  String get oaCreateProvider => 'افزودن ارائه‌دهنده امضا';
+
+  @override
+  String get oaProviderCode => 'کد ارائه‌دهنده';
+
+  @override
+  String get oaProviderName => 'نام ارائه‌دهنده';
+
+  @override
+  String get oaProviderEndpoint => 'نشانی سرویس';
+
+  @override
+  String get oaProviderToken => 'توکن دسترسی';
+
+  @override
+  String get oaCommercialLinks => 'حسابداری و CRM';
+
+  @override
+  String get oaNoCommercialLinks => 'سند حسابداری یا فرصتی پیوند نشده است';
+
+  @override
+  String get oaAddCommercialLink => 'پیوند رکورد موجود';
+
+  @override
+  String get oaLinkDocument => 'سند حسابداری';
+
+  @override
+  String get oaLinkDeal => 'فرصت فروش';
+
+  @override
+  String get oaCommercialTargetId => 'شناسه رکورد';
+
+  @override
   String get oaArchive => 'بایگانی';
+
+  @override
+  String get oaUnarchive => 'خروج از بایگانی';
+
+  @override
+  String get oaRejectSign => 'رد امضا';
+
+  @override
+  String get oaRejectSignNote => 'رد این گام وضعیت تصویر امضا را ردشده می‌کند و امضای الکترونیکی مطمئن نمی‌سازد.';
+
+  @override
+  String get oaCancelReferral => 'لغو ارجاع';
 
   @override
   String get oaRegistry => 'دبیرخانه';
@@ -14006,6 +14402,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get oaNewSecretariat => 'دبیرخانه جدید';
 
   @override
+  String get oaSecretariatBranch => 'شعبه دبیرخانه';
+
+  @override
+  String get oaNoBranch => 'بدون شعبه';
+
+  @override
   String get oaSecretariat => 'دبیرخانه';
 
   @override
@@ -14067,6 +14469,9 @@ class AppLocalizationsFa extends AppLocalizations {
   String get oaPublicTrackResult => 'وضعیت نامه';
 
   @override
+  String get oaPublicTrackRestricted => 'این نامه در رهگیری عمومی جزئیات ندارد. برای مشاهده باید وارد حسابیکس شوید.';
+
+  @override
   String get oaTrackingToken => 'رمز رهگیری';
 
   @override
@@ -14122,6 +14527,12 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get oaSign => 'امضا';
+
+  @override
+  String get oaImageSignatureNote => 'این ثبت، تصویر امضای ذخیره‌شده است و امضای الکترونیکی مطمئن نیست.';
+
+  @override
+  String get oaClassifiedStaysInside => 'نامه طبقه‌بندی‌شده ایمیل، صدور ECE و خلاصه هوشمند ندارد.';
 
   @override
   String get oaDispatch => 'ابلاغ';
@@ -16730,7 +17141,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmNotesBody => 'متن';
 
   @override
-  String get crmNotesLeadOptional => 'سرنخ (اختیاری)';
+  String get crmNotesLeadOptional => 'مشتری، سرنخ یا فرصت';
 
   @override
   String get crmNotesClearLead => 'حذف اتصال سرنخ';
@@ -17031,7 +17442,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmSectionDescription => 'توضیحات';
 
   @override
-  String get crmSectionActivityLink => 'مشتری یا سرنخ';
+  String get crmSectionActivityLink => 'مشتری، سرنخ یا فرصت';
 
   @override
   String get crmSectionActivityScheduling => 'زمان‌بندی';
@@ -17053,6 +17464,18 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get crmActivityClearLead => 'حذف اتصال سرنخ';
+
+  @override
+  String get crmActivityPickDeal => 'جستجو و انتخاب فرصت';
+
+  @override
+  String get crmActivityClearDeal => 'حذف اتصال فرصت';
+
+  @override
+  String get crmActivityDealSearchHint => 'عنوان، کد یا مشتری…';
+
+  @override
+  String get crmActivityDealSearchEmpty => 'فرصتی با این جستجو یافت نشد.';
 
   @override
   String get crmActivityTypeCall => 'تماس';
@@ -19526,10 +19949,13 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmWebChatAssignTo => 'تخصیص به';
 
   @override
-  String get crmWebChatOptionalLeadId => 'شناسه لید (اختیاری)';
+  String get crmWebChatOptionalLeadId => 'جستجو و انتخاب سرنخ (اختیاری)';
 
   @override
-  String get crmWebChatOptionalPersonId => 'شناسه شخص (اختیاری)';
+  String get crmWebChatOptionalPersonId => 'جستجو و انتخاب شخص (اختیاری)';
+
+  @override
+  String get crmWebChatClearLead => 'حذف اتصال سرنخ';
 
   @override
   String get crmWebChatUnassigned => '—';

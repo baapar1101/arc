@@ -48,7 +48,7 @@ def upsert_credential_from_legacy_config(db: Session, config: AIConfig) -> AIPro
     if cred:
         cred.display_name = provider_display_name(config.provider)
         cred.api_base_url = config.api_base_url
-        if config.api_key:
+        if config.api_key and not cred.api_key:
             cred.api_key = config.api_key
         cred.is_active = bool(config.is_active)
         cred.function_calling_enabled = bool(getattr(config, "function_calling_enabled", True))
@@ -150,7 +150,5 @@ def _sync_legacy_ai_config(db: Session, cred: AIProviderCredential) -> None:
     if not config or config.provider != cred.provider:
         return
     config.api_base_url = cred.api_base_url
-    if cred.api_key:
-        config.api_key = cred.api_key
     config.is_active = bool(cred.is_active)
     config.function_calling_enabled = bool(cred.function_calling_enabled)

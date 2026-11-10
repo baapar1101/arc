@@ -171,7 +171,7 @@ async def crm_chat_websocket(websocket: WebSocket):
 					raise WsAuthRejected(4403)
 			finally:
 				db.close()
-			await crm_chat_realtime_manager.add_to_business(business_id, websocket)
+			await crm_chat_realtime_manager.add_to_business(business_id, websocket, user_id=int(agent_user.id))
 			await websocket.send_json({"type": "auth_ok", "role": "agent", "business_id": business_id})
 			try:
 				while True:

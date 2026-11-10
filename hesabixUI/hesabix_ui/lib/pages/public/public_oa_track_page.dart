@@ -108,6 +108,9 @@ class _PublicOaTrackPageState extends State<PublicOaTrackPage> {
                       children: [
                         Text(t.oaPublicTrackResult, style: Theme.of(context).textTheme.titleLarge),
                         const SizedBox(height: 12),
+                        if (_data!['restricted'] == true)
+                          Text(t.oaPublicTrackRestricted)
+                        else ...[
                         _row(t.oaRegistry, '${_data!['number'] ?? '—'}'),
                         _row(t.oaLetterKind, oaKindLabel(t, '${_data!['letter_kind'] ?? ''}')),
                         _row(t.oaStatus, oaStatusLabel(t, '${_data!['status'] ?? ''}')),
@@ -121,6 +124,7 @@ class _PublicOaTrackPageState extends State<PublicOaTrackPage> {
                               ApiClient.getCalendarController()?.isJalali ?? true,
                             ),
                           ),
+                        ],
                       ],
                     ),
                   ),

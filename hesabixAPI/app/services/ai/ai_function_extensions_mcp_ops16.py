@@ -8,9 +8,18 @@ DEAL_ID = mcp_schema({"deal_id": {"type": "integer", "minimum": 1}}, ["deal_id"]
 
 
 def list_crm_deal_lines_handler(args, context):
+    from adapters.db.models.crm import Deal
     from app.services.crm_deal_line_service import list_lines
+    from app.services.crm_enterprise_service import guard_record
 
-    items = mcp_run(list_lines, mcp_db(context), mcp_bid(context), int(args["deal_id"]))
+    db = mcp_db(context)
+    business_id = mcp_bid(context)
+    deal_id = int(args["deal_id"])
+    deal = db.query(Deal).filter(Deal.id == deal_id, Deal.business_id == business_id).first()
+    if deal is None:
+        raise ValueError("فرصت فروش در کسب‌وکار متصل پیدا نشد")
+    guard_record(db, business_id, context["user_context"], "deal", deal)
+    items = mcp_run(list_lines, db, business_id, deal_id)
     return mcp_jsonable({"items": items[:100], "truncated": len(items) > 100})
 
 

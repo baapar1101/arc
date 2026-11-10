@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/api_client.dart';
 import '../../services/zohal_service.dart';
 import '../../services/currency_service.dart';
 import '../../utils/snackbar_helper.dart';
+import 'admin_compact_scaffold.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 
 class ZohalServicesAdminPage extends StatefulWidget {
@@ -76,12 +76,12 @@ class _ZohalServicesAdminPageState extends State<ZohalServicesAdminPage> {
     try {
       await _zohalService.toggleService(serviceId, !currentStatus);
       if (mounted) {
-        SnackBarHelper.show(context, message: 'وضعیت سرویس تغییر کرد');
+        SnackBarHelper.show(context, message: adminTx(context, 'وضعیت سرویس تغییر کرد', 'Service status updated'));
         _load();
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
+        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
       }
     }
   }
@@ -99,7 +99,7 @@ class _ZohalServicesAdminPageState extends State<ZohalServicesAdminPage> {
         builder: (context, setDialogState) {
           final theme = Theme.of(context);
           return AlertDialog(
-            title: Text('تغییر قیمت: ${service['service_name']}'),
+            title: Text(adminTx(context, 'قیمت ${service['service_name']}', 'Price for ${service['service_name']}'), style: const TextStyle(fontSize: 16)),
             content: Form(
               key: formKey,
               child: Column(
@@ -107,27 +107,29 @@ class _ZohalServicesAdminPageState extends State<ZohalServicesAdminPage> {
                 children: [
                   TextFormField(
                     controller: priceController,
-                    decoration: const InputDecoration(
-                      labelText: 'قیمت (تومان)',
-                      prefixIcon: Icon(Icons.attach_money),
+                    decoration: InputDecoration(
+                      labelText: adminTx(context, 'قیمت', 'Price'),
+                      prefixIcon: const Icon(Icons.attach_money),
+                      isDense: true,
                     ),
                     keyboardType: TextInputType.numberWithOptions(decimal: true),
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
                     ],
                     validator: (v) {
-                      if (v?.isEmpty ?? true) return 'قیمت الزامی است';
+                      if (v?.isEmpty ?? true) return adminTx(context, 'قیمت الزامی است', 'Price is required');
                       final val = double.tryParse(v!);
-                      if (val == null || val < 0) return 'قیمت نامعتبر است';
+                      if (val == null || val < 0) return adminTx(context, 'قیمت نامعتبر است', 'Invalid price');
                       return null;
                     },
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<int>(
                     value: selectedCurrencyId,
-                    decoration: const InputDecoration(
-                      labelText: 'ارز',
-                      prefixIcon: Icon(Icons.currency_exchange),
+                    decoration: InputDecoration(
+                      labelText: adminTx(context, 'ارز', 'Currency'),
+                      prefixIcon: const Icon(Icons.currency_exchange),
+                      isDense: true,
                     ),
                     items: _currencies
                         .map((c) => DropdownMenuItem<int>(
@@ -136,7 +138,7 @@ class _ZohalServicesAdminPageState extends State<ZohalServicesAdminPage> {
                             ))
                         .toList(),
                     onChanged: (v) => setDialogState(() => selectedCurrencyId = v),
-                    validator: (v) => v == null ? 'ارز الزامی است' : null,
+                    validator: (v) => v == null ? adminTx(context, 'ارز الزامی است', 'Currency is required') : null,
                   ),
                 ],
               ),
@@ -144,7 +146,7 @@ class _ZohalServicesAdminPageState extends State<ZohalServicesAdminPage> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('لغو'),
+                child: Text(adminTx(context, 'انصراف', 'Cancel')),
               ),
               FilledButton(
                 onPressed: () async {
@@ -157,16 +159,16 @@ class _ZohalServicesAdminPageState extends State<ZohalServicesAdminPage> {
                     );
                     if (mounted) {
                       Navigator.pop(context);
-                      SnackBarHelper.show(context, message: 'قیمت به‌روزرسانی شد');
+                      SnackBarHelper.show(context, message: adminTx(context, 'قیمت ذخیره شد', 'Price saved'));
                       _load();
                     }
                   } catch (e) {
                     if (mounted) {
-                      SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
+                      SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
                     }
                   }
                 },
-                child: const Text('ذخیره'),
+                child: Text(adminTx(context, 'ذخیره', 'Save')),
               ),
             ],
           );
@@ -175,27 +177,38 @@ class _ZohalServicesAdminPageState extends State<ZohalServicesAdminPage> {
     );
   }
 
+  String _categoryLabel(String cat) {
+    return switch (cat) {
+      'همه' => adminTx(context, 'همه', 'All'),
+      'بانکی' => adminTx(context, 'بانکی', 'Banking'),
+      'احراز هویت' => adminTx(context, 'احراز هویت', 'Identity'),
+      'احراز هویت ویدیویی' => adminTx(context, 'احراز هویت ویدیویی', 'Video identity'),
+      'خدماتی' => adminTx(context, 'خدماتی', 'Services'),
+      'شرکت' => adminTx(context, 'شرکت', 'Company'),
+      'استعلام اعتبارسنجی' => adminTx(context, 'استعلام اعتبارسنجی', 'Credit inquiry'),
+      _ => cat,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final t = AppLocalizations.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('مدیریت سرویس‌های زحل'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.bar_chart),
-            onPressed: () => context.go('/user/profile/system-settings/zohal-statistics'),
-            tooltip: 'آمار و گزارش‌ها',
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _load,
-            tooltip: 'بارگذاری مجدد',
-          ),
-        ],
-      ),
+    return AdminCompactScaffold(
+      title: adminTx(context, 'سرویس‌های زحل', 'Zohal services'),
+      subtitle: adminTx(context, 'کاتالوگ استعلام‌های زحل', 'Zohal inquiry catalog'),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.bar_chart, size: 20),
+          onPressed: () => context.go('/user/profile/system-settings/zohal-statistics'),
+          tooltip: adminTx(context, 'آمار', 'Statistics'),
+        ),
+        IconButton(
+          icon: const Icon(Icons.refresh, size: 20),
+          onPressed: _load,
+          tooltip: adminTx(context, 'بارگذاری مجدد', 'Reload'),
+        ),
+      ],
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -210,7 +223,7 @@ class _ZohalServicesAdminPageState extends State<ZohalServicesAdminPage> {
                       ElevatedButton.icon(
                         onPressed: _load,
                         icon: const Icon(Icons.refresh),
-                        label: const Text('تلاش مجدد'),
+                        label: Text(adminTx(context, 'تلاش مجدد', 'Retry')),
                       ),
                     ],
                   ),
@@ -231,15 +244,16 @@ class _ZohalServicesAdminPageState extends State<ZohalServicesAdminPage> {
                           Expanded(
                             child: DropdownButtonFormField<String>(
                               value: _selectedCategory,
-                              decoration: const InputDecoration(
-                                labelText: 'دسته‌بندی',
-                                border: OutlineInputBorder(),
-                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: InputDecoration(
+                                labelText: adminTx(context, 'دسته', 'Category'),
+                                border: const OutlineInputBorder(),
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                               ),
                               items: _categories
                                   .map((cat) => DropdownMenuItem<String>(
                                         value: cat == 'همه' ? null : cat,
-                                        child: Text(cat),
+                                        child: Text(_categoryLabel(cat)),
                                       ))
                                   .toList(),
                               onChanged: (v) {
@@ -252,15 +266,16 @@ class _ZohalServicesAdminPageState extends State<ZohalServicesAdminPage> {
                           Expanded(
                             child: DropdownButtonFormField<bool?>(
                               value: _onlyActive,
-                              decoration: const InputDecoration(
-                                labelText: 'وضعیت',
-                                border: OutlineInputBorder(),
-                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: InputDecoration(
+                                labelText: adminTx(context, 'وضعیت', 'Status'),
+                                border: const OutlineInputBorder(),
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                               ),
-                              items: const [
-                                DropdownMenuItem<bool?>(value: null, child: Text('همه')),
-                                DropdownMenuItem<bool?>(value: true, child: Text('فعال')),
-                                DropdownMenuItem<bool?>(value: false, child: Text('غیرفعال')),
+                              items: [
+                                DropdownMenuItem<bool?>(value: null, child: Text(adminTx(context, 'همه', 'All'))),
+                                DropdownMenuItem<bool?>(value: true, child: Text(adminTx(context, 'فعال', 'Active'))),
+                                DropdownMenuItem<bool?>(value: false, child: Text(adminTx(context, 'غیرفعال', 'Inactive'))),
                               ],
                               onChanged: (v) {
                                 setState(() => _onlyActive = v);
@@ -281,8 +296,8 @@ class _ZohalServicesAdminPageState extends State<ZohalServicesAdminPage> {
                                   Icon(Icons.inbox_outlined, size: 64, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
                                   const SizedBox(height: 16),
                                   Text(
-                                    'سرویسی یافت نشد',
-                                    style: theme.textTheme.titleMedium?.copyWith(
+                                    adminTx(context, 'سرویسی نیست', 'No services'),
+                                    style: theme.textTheme.bodyMedium?.copyWith(
                                       color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                                     ),
                                   ),
@@ -319,14 +334,7 @@ class _ZohalServicesAdminPageState extends State<ZohalServicesAdminPage> {
                                     subtitle: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text('دسته‌بندی: ${service['service_category'] ?? ''}'),
-                                        Text(
-                                          'قیمت: ${service['base_price'] ?? 0} ${service['currency_code'] ?? ''}',
-                                          style: theme.textTheme.bodyMedium?.copyWith(
-                                            fontWeight: FontWeight.bold,
-                                            color: theme.colorScheme.primary,
-                                          ),
-                                        ),
+                                        Text('${_categoryLabel('${service['service_category'] ?? ''}')} · ${service['base_price'] ?? 0} ${service['currency_code'] ?? ''}'),
                                       ],
                                     ),
                                     trailing: Row(
@@ -335,7 +343,7 @@ class _ZohalServicesAdminPageState extends State<ZohalServicesAdminPage> {
                                         IconButton(
                                           icon: const Icon(Icons.edit),
                                           onPressed: () => _showPriceDialog(service),
-                                          tooltip: 'تغییر قیمت',
+                                          tooltip: adminTx(context, 'قیمت', 'Price'),
                                         ),
                                         Switch(
                                           value: isActive,

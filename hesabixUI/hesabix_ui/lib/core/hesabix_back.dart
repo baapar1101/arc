@@ -402,6 +402,7 @@ const Set<String> _level1RelativePaths = {
   'crm/reports',
   'crm/process-definitions',
   'crm/sequences',
+  'crm/enterprise',
   'warranty',
   'repair-shop',
   'customer-club',

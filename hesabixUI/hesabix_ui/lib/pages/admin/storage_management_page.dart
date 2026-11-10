@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/widgets/admin/file_storage/storage_config_list_widget.dart';
 import 'package:hesabix_ui/widgets/admin/file_storage/storage_config_form_dialog.dart';
 import 'package:hesabix_ui/widgets/admin/file_storage/storage_share_link_settings_card.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
+import 'admin_compact_scaffold.dart';
 
 class AdminStorageManagementPage extends StatefulWidget {
   const AdminStorageManagementPage({super.key});
@@ -18,38 +18,19 @@ class _AdminStorageManagementPageState extends State<AdminStorageManagementPage>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final t = AppLocalizations.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          t.storageManagement,
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: theme.colorScheme.onPrimary,
-          ),
+    return AdminCompactScaffold(
+      title: t.storageManagement,
+      subtitle: adminTx(context, 'محل فایل‌ها و پیوندهای اشتراک', 'File locations and share links'),
+      actions: [
+        IconButton(
+          tooltip: t.addStorageConfig,
+          onPressed: () => _showCreateDialog(context),
+          icon: const Icon(Icons.add, size: 20),
         ),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/user/profile/system-settings'),
-        ),
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              theme.colorScheme.primary.withValues(alpha: 0.1),
-              theme.colorScheme.surface,
-            ],
-          ),
-        ),
-        child: Column(
+      ],
+      body: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Padding(
@@ -63,14 +44,6 @@ class _AdminStorageManagementPageState extends State<AdminStorageManagementPage>
               ),
             ),
           ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showCreateDialog(context),
-        icon: const Icon(Icons.add),
-        label: Text(t.addStorageConfig),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
       ),
     );
   }

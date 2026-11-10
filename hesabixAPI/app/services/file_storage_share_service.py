@@ -49,8 +49,13 @@ def create_share(
 	user_id: int,
 	password: Optional[str] = None,
 	expires_in_days: Optional[int] = 30,
+	is_admin: bool = False,
 ) -> dict[str, Any]:
 	_get_file_for_business(db, business_id, file_id)
+	from app.services.oa_document_service import refuse_external_oa_file, require_oa_file_visible
+
+	refuse_external_oa_file(db, file_id)
+	require_oa_file_visible(db, business_id, user_id, file_id, is_admin=is_admin)
 	if expires_in_days is not None and (expires_in_days < 1 or expires_in_days > 365):
 		raise ApiError("VALIDATION_ERROR", "انقضا باید بین ۱ تا ۳۶۵ روز باشد یا خالی (بدون انقضا)", http_status=422)
 
@@ -123,8 +128,14 @@ def list_shares_for_business(
 	page: int = 1,
 	limit: int = 50,
 	only_active: bool = False,
+	user_id: Optional[int] = None,
+	is_admin: bool = False,
 ) -> dict[str, Any]:
 	q = db.query(FileStorageShare).filter(FileStorageShare.business_id == business_id)
+	if user_id is not None and not is_admin:
+		from app.services.oa_document_service import hidden_oa_file_ids
+
+		q = q.filter(~FileStorageShare.file_storage_id.in_(hidden_oa_file_ids(db, business_id, int(user_id))))
 	if only_active:
 		q = q.filter(
 			and_(

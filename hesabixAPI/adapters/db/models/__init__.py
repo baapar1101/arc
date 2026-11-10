@@ -12,6 +12,7 @@ from .captcha import Captcha  # noqa: F401
 from .auth_security_event import AuthSecurityEvent  # noqa: F401
 from .sms_destination_send_log import SmsDestinationSendLog  # noqa: F401
 from .firewall_rule import FirewallRule, FirewallRequestLog, FirewallAuditLog  # noqa: F401
+from .admin_audit_log import AdminAuditLog  # noqa: F401
 from .firewall_rate_policy import FirewallRatePolicy  # noqa: F401
 from .password_reset import PasswordReset  # noqa: F401
 from .email_verification import EmailVerificationToken  # noqa: F401
@@ -262,6 +263,14 @@ from .crm import (  # noqa: F401
     CrmSequenceStep,
     CrmSequenceEnrollment,
     CrmReminderDedup,
+    CrmPersonStats,
+    CrmOrganization,
+    CrmOrganizationContact,
+    CrmQuota,
+    CrmManagerLink,
+    CrmLeadQueue,
+    CrmLeadQueueMember,
+    CrmRecordAcl,
 )
 from .customer_club import (  # noqa: F401
 	CustomerClubSettings,
@@ -308,6 +317,28 @@ from .distribution import (  # noqa: F401
 	DistributionDailyPlanLock,
 )
 from .digipay import DigipaySettings, DigipayPurchase, DigipaySettlement  # noqa: F401
+from .oa_enterprise import (  # noqa: F401
+	OaBranch,
+	OaLetterCommercialLink,
+	OaLetterExchange,
+	OaQualifiedSignRequest,
+	OaRetentionPolicy,
+	OaSignatureProvider,
+)
+from .oa_mcp_confirmation import OaMcpConfirmation  # noqa: F401
+from .oa_document import (  # noqa: F401
+	OaDocument,
+	OaDocumentVersion,
+	OaOcrJob,
+	OaExtractionSuggestion,
+)
+from .oa_process import (  # noqa: F401
+	OaProcessDefinition,
+	OaProcessVersion,
+	OaProcessInstance,
+	OaProcessToken,
+	OaProcessTask,
+)
 from .office_automation import (  # noqa: F401
 	OaSettings,
 	OaOrgUnit,
@@ -339,4 +370,36 @@ from .telephony import (  # noqa: F401
 	TelephonyNumberAlias,
 	TelephonyEventDeadLetter,
 	TelephonyMetricCounter,
+)
+from .procurement import (  # noqa: F401
+	ProcApproval,
+	ProcBudget,
+	ProcBudgetMovement,
+	ProcCommitment,
+	ProcContract,
+	ProcContractLine,
+	ProcCostCenter,
+	ProcDelegation,
+	ProcGuarantee,
+	ProcInvoiceLink,
+	ProcMatchLine,
+	ProcOrder,
+	ProcOrderLine,
+	ProcPortalInvoice,
+	ProcPrepayment,
+	ProcReceipt,
+	ProcReceiptLine,
+	ProcReorderSuggestion,
+	ProcRequisition,
+	ProcRequisitionLine,
+	ProcScore,
+	ProcSettings,
+	ProcShareLink,
+	ProcSourcingBid,
+	ProcSourcingBidLine,
+	ProcSourcingEvent,
+	ProcSourcingInvite,
+	ProcSourcingLine,
+	ProcSupplierDocument,
+	ProcSupplierProfile,
 )

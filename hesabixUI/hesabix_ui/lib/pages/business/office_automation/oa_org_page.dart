@@ -30,6 +30,7 @@ class _OaOrgPageState extends State<OaOrgPage> with SingleTickerProviderStateMix
   List<Map<String, dynamic>> _delegations = [];
   List<Map<String, dynamic>> _users = [];
   List<Map<String, dynamic>> _secretariats = [];
+  List<Map<String, dynamic>> _branches = [];
 
   @override
   void initState() {
@@ -54,6 +55,7 @@ class _OaOrgPageState extends State<OaOrgPage> with SingleTickerProviderStateMix
         _svc.listDelegations(businessId: widget.businessId),
         _svc.listBusinessUsers(businessId: widget.businessId),
         _svc.listSecretariats(businessId: widget.businessId, includeInactive: true),
+        _svc.listBranches(businessId: widget.businessId),
       ]);
       if (!mounted) return;
       setState(() {
@@ -63,6 +65,7 @@ class _OaOrgPageState extends State<OaOrgPage> with SingleTickerProviderStateMix
         _delegations = results[3];
         _users = results[4];
         _secretariats = results[5];
+        _branches = results[6];
         _loading = false;
       });
     } catch (e) {
@@ -806,7 +809,12 @@ class _OaOrgPageState extends State<OaOrgPage> with SingleTickerProviderStateMix
                 ),
                 _flatList(
                   _secretariats,
-                  title: (r) => '${r['title'] ?? r['code']} · ${r['incoming_prefix']}/${r['outgoing_prefix']}/${r['internal_prefix']}',
+                  title: (r) {
+                    final branch = _branchTitle(r['branch_id']);
+                    final prefixes = '${r['incoming_prefix']}/${r['outgoing_prefix']}/${r['internal_prefix']}';
+                    final name = '${r['title'] ?? r['code']} · $prefixes';
+                    return branch.isEmpty ? name : '$name · $branch';
+                  },
                   onAdd: () => _editSecretariat(),
                   trailing: (r) => IconButton(
                     icon: const Icon(Icons.edit_outlined),
@@ -816,6 +824,15 @@ class _OaOrgPageState extends State<OaOrgPage> with SingleTickerProviderStateMix
               ],
             ),
     );
+  }
+
+  String _branchTitle(dynamic id) {
+    final branchId = oaId(id);
+    if (branchId == null) return '';
+    for (final row in _branches) {
+      if (oaId(row['id']) == branchId) return '${row['title'] ?? row['code'] ?? ''}';
+    }
+    return '';
   }
 
   Future<void> _editSecretariat({Map<String, dynamic>? existing}) async {
@@ -830,6 +847,8 @@ class _OaOrgPageState extends State<OaOrgPage> with SingleTickerProviderStateMix
     var isDefault = existing?['is_default'] == true;
     var ece = existing?['ece_enabled'] == true;
     var confidential = existing?['is_confidential'] == true;
+    int? branchId = oaId(existing?['branch_id']);
+    if (!_branches.any((row) => oaId(row['id']) == branchId)) branchId = null;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -856,6 +875,18 @@ class _OaOrgPageState extends State<OaOrgPage> with SingleTickerProviderStateMix
                   SwitchListTile(title: Text(t.oaMakeDefault), value: isDefault, onChanged: (v) => setLocal(() => isDefault = v)),
                   SwitchListTile(title: Text(t.oaEceEnabled), value: ece, onChanged: (v) => setLocal(() => ece = v)),
                   SwitchListTile(title: Text(t.oaConfidentialSecretariat), value: confidential, onChanged: (v) => setLocal(() => confidential = v)),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<int?>(
+                    initialValue: branchId,
+                    decoration: InputDecoration(labelText: t.oaSecretariatBranch),
+                    items: [
+                      DropdownMenuItem<int?>(value: null, child: Text(t.oaNoBranch)),
+                      for (final branch in _branches)
+                        if (oaId(branch['id']) != null)
+                          DropdownMenuItem<int?>(value: oaId(branch['id']), child: Text('${branch['title'] ?? branch['code']}')),
+                    ],
+                    onChanged: (value) => setLocal(() => branchId = value),
+                  ),
                 ],
               ),
             ),
@@ -877,6 +908,7 @@ class _OaOrgPageState extends State<OaOrgPage> with SingleTickerProviderStateMix
       'is_default': isDefault,
       'ece_enabled': ece,
       'is_confidential': confidential,
+      'branch_id': branchId,
     };
     fa.dispose();
     en.dispose();

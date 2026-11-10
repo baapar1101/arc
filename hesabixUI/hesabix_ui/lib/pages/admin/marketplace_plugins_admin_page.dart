@@ -6,6 +6,7 @@ import 'package:hesabix_ui/services/currency_service.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'admin_compact_scaffold.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 import 'package:hesabix_ui/widgets/marketplace/plugin_marketplace_utils.dart';
 
@@ -68,8 +69,8 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
       SnackBarHelper.show(
         context,
         message:
-            'همگام‌سازی انجام شد. افزونه جدید: $createdP، به‌روزشده: $updatedP، '
-            'پلن جدید: $createdPlans، پلن فعال‌شده: $reactivated',
+            adminTx(context, 'همگام‌سازی انجام شد. افزونه جدید: $createdP، به‌روزشده: $updatedP، ', 'Sync finished. New plugins: $createdP, updated: $updatedP, ')
+            adminTx(context, 'پلن جدید: $createdPlans، پلن فعال‌شده: $reactivated', 'new plans: $createdPlans, reactivated: $reactivated'),
         backgroundColor: SemanticColorResolver.positive(context),
       );
       await _load();
@@ -77,7 +78,7 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
       if (!mounted) return;
       SnackBarHelper.show(
         context,
-        message: 'خطا در همگام‌سازی: ${ErrorExtractor.forContext(e, context)}',
+        message: adminTx(context, 'خطا در همگام‌سازی: ${ErrorExtractor.forContext(e, context)}', 'Sync failed: ${ErrorExtractor.forContext(e, context)}'),
         backgroundColor: SemanticColorResolver.negative(context),
       );
     } finally {
@@ -98,7 +99,7 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
         )
       else
         IconButton(
-          tooltip: 'به‌روزرسانی لیست افزونه‌های پیش‌فرض (نصب قدیمی / محیط جدید)',
+          tooltip: adminTx(context, 'به‌روزرسانی لیست افزونه‌های پیش‌فرض (نصب قدیمی / محیط جدید)', 'Refresh the default plugin list'),
           icon: const Icon(Icons.cloud_download_outlined),
           onPressed: _syncDefaultPluginsFromSeed,
         ),
@@ -166,7 +167,7 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              isEdit ? 'ویرایش افزونه' : 'ایجاد افزونه جدید',
+                              isEdit ? adminTx(context, 'ویرایش افزونه', 'Edit plugin') : adminTx(context, 'ایجاد افزونه جدید', 'New plugin'),
                               style: theme.textTheme.titleLarge?.copyWith(
                                 color: theme.colorScheme.onPrimary,
                                 fontWeight: FontWeight.bold,
@@ -190,30 +191,30 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                             TextFormField(
                               controller: codeController,
                               decoration: InputDecoration(
-                                labelText: 'کد افزونه *',
+                                labelText: adminTx(context, 'کد افزونه *', 'Plugin code *'),
                                 prefixIcon: const Icon(Icons.code_outlined),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                 filled: true,
                               ),
                               enabled: !isEdit,
-                              validator: (v) => v?.isEmpty ?? true ? 'کد الزامی است' : null,
+                              validator: (v) => v?.isEmpty ?? true ? adminTx(context, 'کد الزامی است', 'Code is required') : null,
                             ),
                             const SizedBox(height: 16),
                             TextFormField(
                               controller: nameController,
                               decoration: InputDecoration(
-                                labelText: 'نام افزونه *',
+                                labelText: adminTx(context, 'نام افزونه *', 'Plugin name *'),
                                 prefixIcon: const Icon(Icons.label_outlined),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                 filled: true,
                               ),
-                              validator: (v) => v?.isEmpty ?? true ? 'نام الزامی است' : null,
+                              validator: (v) => v?.isEmpty ?? true ? adminTx(context, 'نام الزامی است', 'Name is required') : null,
                             ),
                             const SizedBox(height: 16),
                             TextFormField(
                               controller: descriptionController,
                               decoration: InputDecoration(
-                                labelText: 'توضیحات',
+                                labelText: adminTx(context, 'توضیحات', 'Description'),
                                 prefixIcon: const Icon(Icons.description_outlined),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                 filled: true,
@@ -224,7 +225,7 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                             TextFormField(
                               controller: categoryController,
                               decoration: InputDecoration(
-                                labelText: 'دسته‌بندی',
+                                labelText: adminTx(context, 'دسته‌بندی', 'Category'),
                                 prefixIcon: const Icon(Icons.category_outlined),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                 filled: true,
@@ -234,7 +235,7 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                             TextFormField(
                               controller: iconUrlController,
                               decoration: InputDecoration(
-                                labelText: 'آدرس آیکون',
+                                labelText: adminTx(context, 'آدرس آیکون', 'Icon URL'),
                                 prefixIcon: const Icon(Icons.image_outlined),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                 filled: true,
@@ -244,37 +245,37 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                             TextFormField(
                               controller: trialDaysController,
                               decoration: InputDecoration(
-                                labelText: 'تعداد روزهای trial (مثلاً 7)',
+                                labelText: adminTx(context, 'تعداد روزهای trial (مثلاً 7)', 'Trial days (for example 7)'),
                                 prefixIcon: const Icon(Icons.free_breakfast_outlined),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                 filled: true,
-                                helperText: 'برای غیرفعال کردن trial، این فیلد را خالی بگذارید',
+                                helperText: adminTx(context, 'برای غیرفعال کردن trial، این فیلد را خالی بگذارید', 'Leave empty to disable the trial'),
                               ),
                               keyboardType: const TextInputType.numberWithOptions(decimal: false),
                               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                             ),
                             const SizedBox(height: 16),
                             CheckboxListTile(
-                              title: const Text('فعال در سیستم'),
-                              subtitle: const Text('اگر خاموش باشد افزونه برای هیچ کسب‌وکاری کار نمی‌کند'),
+                              title: Text(adminTx(context, 'فعال در سیستم', 'Enabled in the system')),
+                              subtitle: Text(adminTx(context, 'اگر خاموش باشد افزونه برای هیچ کسب‌وکاری کار نمی‌کند', 'When off, the plugin works for no business')),
                               value: isActive,
                               onChanged: (v) => setDialogState(() => isActive = v ?? true),
                             ),
                             CheckboxListTile(
-                              title: const Text('نمایش در بازار افزونه‌ها'),
-                              subtitle: const Text('در کاتالوگ قابل خرید کسب‌وکارها دیده شود'),
+                              title: Text(adminTx(context, 'نمایش در بازار افزونه‌ها', 'Show in the marketplace')),
+                              subtitle: Text(adminTx(context, 'در کاتالوگ قابل خرید کسب‌وکارها دیده شود', 'Visible in the catalog businesses can buy')),
                               value: listedInMarketplace,
                               onChanged: (v) => setDialogState(() => listedInMarketplace = v ?? true),
                             ),
                             CheckboxListTile(
-                              title: const Text('فعال برای همه کسب‌وکارها'),
-                              subtitle: const Text('بدون خرید، برای همه کسب‌وکارهای فعلی و بعدی فعال می‌ماند'),
+                              title: Text(adminTx(context, 'فعال برای همه کسب‌وکارها', 'Enabled for every business')),
+                              subtitle: Text(adminTx(context, 'بدون خرید، برای همه کسب‌وکارهای فعلی و بعدی فعال می‌ماند', 'Stays on for current and future businesses without a purchase')),
                               value: enabledForAllBusinesses,
                               onChanged: (v) => setDialogState(() => enabledForAllBusinesses = v ?? false),
                             ),
                             CheckboxListTile(
-                              title: const Text('مجاز به trial'),
-                              subtitle: const Text('اجازه استفاده از دوره تست رایگان'),
+                              title: Text(adminTx(context, 'مجاز به trial', 'Trial allowed')),
+                              subtitle: Text(adminTx(context, 'اجازه استفاده از دوره تست رایگان', 'Allow the free trial')),
                               value: trialAllowed,
                               onChanged: (v) => setDialogState(() => trialAllowed = v ?? false),
                             ),
@@ -297,7 +298,7 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                         children: [
                           TextButton(
                             onPressed: () => Navigator.pop(context),
-                            child: const Text('لغو'),
+                            child: Text(adminTx(context, 'لغو', 'Cancel')),
                           ),
                           const SizedBox(width: 12),
                           FilledButton(
@@ -339,19 +340,19 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                                 _load();
                                 SnackBarHelper.show(
                                   context,
-                                  message: isEdit ? 'افزونه با موفقیت به‌روزرسانی شد' : 'افزونه با موفقیت ایجاد شد',
+                                  message: isEdit ? adminTx(context, 'افزونه با موفقیت به‌روزرسانی شد', 'Plugin saved') : adminTx(context, 'افزونه با موفقیت ایجاد شد', 'Plugin created'),
                                   backgroundColor: SemanticColorResolver.positive(context),
                                 );
                               } catch (e) {
                                 if (!context.mounted) return;
                                 SnackBarHelper.show(
                                   context,
-                                  message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+                                  message: adminTx(context, 'خطا: ${ErrorExtractor.forContext(e, context)}', '${ErrorExtractor.forContext(e, context)}'),
                                   backgroundColor: SemanticColorResolver.negative(context),
                                 );
                               }
                             },
-                            child: Text(isEdit ? 'ذخیره' : 'ایجاد'),
+                            child: Text(isEdit ? adminTx(context, 'ذخیره', 'Save') : adminTx(context, 'ایجاد', 'Create')),
                           ),
                         ],
                       ),
@@ -417,7 +418,7 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              isEdit ? 'ویرایش پلن' : 'ایجاد پلن جدید',
+                              isEdit ? adminTx(context, 'ویرایش پلن', 'Edit plan') : adminTx(context, 'ایجاد پلن جدید', 'New plan'),
                               style: theme.textTheme.titleLarge?.copyWith(
                                 color: theme.colorScheme.onPrimary,
                                 fontWeight: FontWeight.bold,
@@ -440,15 +441,15 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                             DropdownButtonFormField<String>(
                               value: selectedPeriod,
                               decoration: InputDecoration(
-                                labelText: 'دوره *',
+                                labelText: adminTx(context, 'دوره *', 'Period *'),
                                 prefixIcon: const Icon(Icons.calendar_today_outlined),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                 filled: true,
                               ),
-                              items: const [
-                                DropdownMenuItem(value: 'monthly', child: Text('ماهانه')),
-                                DropdownMenuItem(value: 'yearly', child: Text('سالانه')),
-                                DropdownMenuItem(value: 'lifetime', child: Text('مادام‌العمر')),
+                              items: [
+                                DropdownMenuItem(value: 'monthly', child: Text(adminTx(context, 'ماهانه', 'Monthly'))),
+                                DropdownMenuItem(value: 'yearly', child: Text(adminTx(context, 'سالانه', 'Yearly'))),
+                                DropdownMenuItem(value: 'lifetime', child: Text(adminTx(context, 'مادام‌العمر', 'Lifetime'))),
                               ],
                               onChanged: (v) => setDialogState(() => selectedPeriod = v ?? 'monthly'),
                             ),
@@ -456,7 +457,7 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                             TextFormField(
                               controller: priceController,
                               decoration: InputDecoration(
-                                labelText: 'قیمت *',
+                                labelText: adminTx(context, 'قیمت *', 'Price *'),
                                 prefixIcon: const Icon(Icons.attach_money_outlined),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                 filled: true,
@@ -464,9 +465,9 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
                               inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
                               validator: (v) {
-                                if (v?.isEmpty ?? true) return 'قیمت الزامی است';
+                                if (v?.isEmpty ?? true) return adminTx(context, 'قیمت الزامی است', 'Price is required');
                                 final val = double.tryParse(v!);
-                                if (val == null || val < 0) return 'قیمت نامعتبر است';
+                                if (val == null || val < 0) return adminTx(context, 'قیمت نامعتبر است', 'Invalid price');
                                 return null;
                               },
                             ),
@@ -474,7 +475,7 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                             DropdownButtonFormField<int>(
                               value: selectedCurrencyId,
                               decoration: InputDecoration(
-                                labelText: 'ارز *',
+                                labelText: adminTx(context, 'ارز *', 'Currency *'),
                                 prefixIcon: const Icon(Icons.currency_exchange_outlined),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                 filled: true,
@@ -484,11 +485,11 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                                 child: Text('${c['title']} (${c['code']})'),
                               )).toList(),
                               onChanged: (v) => setDialogState(() => selectedCurrencyId = v),
-                              validator: (v) => v == null ? 'ارز الزامی است' : null,
+                              validator: (v) => v == null ? adminTx(context, 'ارز الزامی است', 'Currency is required') : null,
                             ),
                             const SizedBox(height: 16),
                             CheckboxListTile(
-                              title: const Text('فعال'),
+                              title: Text(adminTx(context, 'فعال', 'Active')),
                               value: isActive,
                               onChanged: (v) => setDialogState(() => isActive = v ?? true),
                             ),
@@ -510,14 +511,14 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                         children: [
                           TextButton(
                             onPressed: () => Navigator.pop(context),
-                            child: const Text('لغو'),
+                            child: Text(adminTx(context, 'لغو', 'Cancel')),
                           ),
                           const SizedBox(width: 12),
                           FilledButton(
                             onPressed: () async {
                               if (!(formKey.currentState?.validate() ?? false)) return;
                               if (selectedCurrencyId == null) {
-                                SnackBarHelper.show(context, message: 'لطفاً ارز را انتخاب کنید', backgroundColor: SemanticColorResolver.negative(context));
+                                SnackBarHelper.show(context, message: adminTx(context, 'لطفاً ارز را انتخاب کنید', 'Select a currency'), backgroundColor: SemanticColorResolver.negative(context));
                                 return;
                               }
                               
@@ -540,19 +541,19 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                                 _load();
                                 SnackBarHelper.show(
                                   context,
-                                  message: isEdit ? 'پلن با موفقیت به‌روزرسانی شد' : 'پلن با موفقیت ایجاد شد',
+                                  message: isEdit ? adminTx(context, 'پلن با موفقیت به‌روزرسانی شد', 'Plan saved') : adminTx(context, 'پلن با موفقیت ایجاد شد', 'Plan created'),
                                   backgroundColor: SemanticColorResolver.positive(context),
                                 );
                               } catch (e) {
                                 if (!context.mounted) return;
                                 SnackBarHelper.show(
                                   context,
-                                  message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+                                  message: adminTx(context, 'خطا: ${ErrorExtractor.forContext(e, context)}', '${ErrorExtractor.forContext(e, context)}'),
                                   backgroundColor: SemanticColorResolver.negative(context),
                                 );
                               }
                             },
-                            child: Text(isEdit ? 'ذخیره' : 'ایجاد'),
+                            child: Text(isEdit ? adminTx(context, 'ذخیره', 'Save') : adminTx(context, 'ایجاد', 'Create')),
                           ),
                         ],
                       ),
@@ -571,16 +572,16 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('تایید حذف'),
-        content: const Text('آیا از حذف این افزونه اطمینان دارید؟'),
+        title: Text(adminTx(context, 'تایید حذف', 'Confirm delete')),
+        content: Text(adminTx(context, 'آیا از حذف این افزونه اطمینان دارید؟', 'Delete this plugin?')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('لغو'),
+            child: Text(adminTx(context, 'لغو', 'Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('حذف'),
+            child: Text(adminTx(context, 'حذف', 'Delete')),
           ),
         ],
       ),
@@ -591,9 +592,9 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
     try {
       await _marketplaceService.deletePlugin(pluginId);
       _load();
-      SnackBarHelper.show(context, message: 'افزونه با موفقیت حذف شد', backgroundColor: SemanticColorResolver.positive(context));
+      SnackBarHelper.show(context, message: adminTx(context, 'افزونه با موفقیت حذف شد', 'Plugin deleted'), backgroundColor: SemanticColorResolver.positive(context));
     } catch (e) {
-      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', backgroundColor: SemanticColorResolver.negative(context));
+      SnackBarHelper.show(context, message: adminTx(context, 'خطا: ${ErrorExtractor.forContext(e, context)}', '${ErrorExtractor.forContext(e, context)}'), backgroundColor: SemanticColorResolver.negative(context));
     }
   }
 
@@ -601,16 +602,16 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('تایید حذف'),
-        content: const Text('آیا از حذف این پلن اطمینان دارید؟'),
+        title: Text(adminTx(context, 'تایید حذف', 'Confirm delete')),
+        content: Text(adminTx(context, 'آیا از حذف این پلن اطمینان دارید؟', 'Delete this plan?')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('لغو'),
+            child: Text(adminTx(context, 'لغو', 'Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('حذف'),
+            child: Text(adminTx(context, 'حذف', 'Delete')),
           ),
         ],
       ),
@@ -621,9 +622,9 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
     try {
       await _marketplaceService.deletePluginPlan(planId);
       _load();
-      SnackBarHelper.show(context, message: 'پلن با موفقیت حذف شد', backgroundColor: SemanticColorResolver.positive(context));
+      SnackBarHelper.show(context, message: adminTx(context, 'پلن حذف شد', 'Plan deleted'), backgroundColor: SemanticColorResolver.positive(context));
     } catch (e) {
-      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', backgroundColor: SemanticColorResolver.negative(context));
+      SnackBarHelper.show(context, message: adminTx(context, 'خطا: ${ErrorExtractor.forContext(e, context)}', '${ErrorExtractor.forContext(e, context)}'), backgroundColor: SemanticColorResolver.negative(context));
     }
   }
 
@@ -632,30 +633,28 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
     final theme = Theme.of(context);
 
     if (_loading) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('مدیریت افزونه‌های بازار'),
-          actions: _appBarSyncActions(),
-        ),
+      return AdminCompactScaffold(
+        title: adminTx(context, 'افزونه‌های بازار', 'Marketplace plugins'),
+        subtitle: adminTx(context, 'کاتالوگ و پلن افزونه‌ها', 'Plugin catalog and plans'),
+        actions: _appBarSyncActions(),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_error != null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text('مدیریت افزونه‌های بازار'),
-          actions: _appBarSyncActions(),
-        ),
+      return AdminCompactScaffold(
+        title: adminTx(context, 'افزونه‌های بازار', 'Marketplace plugins'),
+        subtitle: adminTx(context, 'کاتالوگ و پلن افزونه‌ها', 'Plugin catalog and plans'),
+        actions: _appBarSyncActions(),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text('خطا: $_error', style: TextStyle(color: SemanticColorResolver.negative(context))),
-              const SizedBox(height: 16),
-              ElevatedButton(
+              Text('${adminTx(context, 'خطا', 'Error')}: $_error', style: TextStyle(color: SemanticColorResolver.negative(context))),
+              const SizedBox(height: 12),
+              FilledButton(
                 onPressed: _load,
-                child: const Text('تلاش مجدد'),
+                child: Text(adminTx(context, 'تلاش مجدد', 'Retry')),
               ),
             ],
           ),
@@ -663,11 +662,10 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('مدیریت افزونه‌های بازار'),
-        actions: _appBarSyncActions(),
-      ),
+    return AdminCompactScaffold(
+      title: adminTx(context, 'افزونه‌های بازار', 'Marketplace plugins'),
+      subtitle: adminTx(context, 'کاتالوگ و پلن افزونه‌ها', 'Plugin catalog and plans'),
+      actions: _appBarSyncActions(),
       body: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: _plugins.length,
@@ -683,11 +681,11 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
               subtitle: Text(
                 [
                   plugin['code'] ?? '-',
-                  if (plugin['is_active'] != true) 'غیرفعال در سیستم',
+                  if (plugin['is_active'] != true) adminTx(context, 'غیرفعال در سیستم', 'Disabled'),
                   if (plugin.containsKey('listed_in_marketplace') &&
                       !marketplaceJsonBool(plugin['listed_in_marketplace']))
-                    'مخفی از بازار',
-                  if (marketplaceJsonBool(plugin['enabled_for_all_businesses'])) 'سراسری',
+                    adminTx(context, 'مخفی از بازار', 'Hidden from marketplace'),
+                  if (marketplaceJsonBool(plugin['enabled_for_all_businesses'])) adminTx(context, 'سراسری', 'Global'),
                 ].join(' • '),
               ),
               trailing: Row(
@@ -710,7 +708,7 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                     child: Text(plugin['description']),
                   ),
                 ListTile(
-                  title: const Text('پلن‌ها'),
+                  title: Text(adminTx(context, 'پلن‌ها', 'Plans')),
                   trailing: IconButton(
                     icon: const Icon(Icons.add),
                     onPressed: () => _showCreatePlanDialog(plugin['id']),
@@ -719,10 +717,10 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                 ...plans.map((plan) {
                   final period = plan['period'] ?? '-';
                   final periodLabel = period == 'monthly'
-                      ? 'ماهانه'
+                      ? adminTx(context, 'ماهانه', 'Monthly')
                       : period == 'yearly'
-                          ? 'سالانه'
-                          : 'مادام‌العمر';
+                          ? adminTx(context, 'سالانه', 'Yearly')
+                          : adminTx(context, 'مادام‌العمر', 'Lifetime');
                   final price = (plan['price'] ?? 0).toDouble();
                   // پیدا کردن ارز
                   String currencyInfo = '';
@@ -740,7 +738,7 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                   }
                   return ListTile(
                     title: Text('$periodLabel - ${formatWithThousands(price, decimalPlaces: 0)}$currencyInfo'),
-                    subtitle: Text('وضعیت: ${plan['is_active'] == true ? 'فعال' : 'غیرفعال'}'),
+                    subtitle: Text(adminTx(context, 'وضعیت: ${plan['is_active'] == true ? 'فعال' : 'غیرفعال'}', 'Status: ${plan['is_active'] == true ? 'Active' : 'Inactive'}')),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -764,7 +762,7 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showCreatePluginDialog,
         icon: const Icon(Icons.add),
-        label: const Text('افزونه جدید'),
+        label: Text(adminTx(context, 'افزونه جدید', 'New plugin')),
       ),
     );
   }

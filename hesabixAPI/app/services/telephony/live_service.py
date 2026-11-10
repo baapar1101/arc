@@ -20,21 +20,33 @@ from app.services.telephony.telephony_access import TelephonyScope, require_call
 from app.services.telephony.telephony_service import (
 	_load_party_names,
 	call_to_dict,
+	scrub_calls_for_viewer,
 	extension_to_dict,
 	list_pbx,
 )
 
 
-def _calls_with_party_names(db: Session, rows: List[TelephonyCall]) -> List[Dict[str, Any]]:
+def _calls_with_party_names(
+	db: Session,
+	rows: List[TelephonyCall],
+	*,
+	business_id: int,
+	auth_ctx: Any = None,
+) -> List[Dict[str, Any]]:
 	pnames, lnames = _load_party_names(db, rows)
-	return [
-		call_to_dict(
-			c,
-			person_name=pnames.get(int(c.person_id)) if c.person_id else None,
-			lead_name=lnames.get(int(c.lead_id)) if c.lead_id else None,
-		)
-		for c in rows
-	]
+	return scrub_calls_for_viewer(
+		db,
+		business_id,
+		auth_ctx,
+		[
+			call_to_dict(
+				c,
+				person_name=pnames.get(int(c.person_id)) if c.person_id else None,
+				lead_name=lnames.get(int(c.lead_id)) if c.lead_id else None,
+			)
+			for c in rows
+		],
+	)
 
 
 def _now() -> datetime:
@@ -114,7 +126,7 @@ def live_snapshot(db: Session, business_id: int, *, auth_ctx=None) -> Dict[str, 
 			"missed_today": missed_today,
 			"operators_online": online_ops,
 		},
-		"active_calls": _calls_with_party_names(db, active),
+		"active_calls": _calls_with_party_names(db, active, business_id=business_id, auth_ctx=auth_ctx),
 		"blf": blf,
 		"queues": [
 			{

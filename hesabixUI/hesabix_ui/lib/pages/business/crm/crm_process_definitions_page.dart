@@ -573,8 +573,10 @@ class _StagesManagementDialogState extends State<_StagesManagementDialog> {
           list = List<dynamic>.from(i);
         }
       }
+      final stages = list.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map)).toList();
+      stages.sort((a, b) => ((a['order_index'] as num?) ?? 0).compareTo((b['order_index'] as num?) ?? 0));
       setState(() {
-        _stages = list.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map)).toList();
+        _stages = stages;
       });
     } catch (_) {}
   }
@@ -622,6 +624,112 @@ class _StagesManagementDialogState extends State<_StagesManagementDialog> {
       );
       if (!mounted) return;
       SnackBarHelper.show(context, message: 'مرحله اضافه شد');
+      _loadStages();
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
+    }
+  }
+
+  Future<void> _moveStage(int index, int delta) async {
+    final target = index + delta;
+    if (target < 0 || target >= _stages.length) return;
+    final current = _stages[index];
+    final other = _stages[target];
+    final currentId = current['id'] as int?;
+    final otherId = other['id'] as int?;
+    if (currentId == null || otherId == null) return;
+    try {
+      await widget.crmService.updateStage(
+        businessId: widget.businessId,
+        definitionId: widget.definitionId,
+        stageId: currentId,
+        orderIndex: target,
+      );
+      await widget.crmService.updateStage(
+        businessId: widget.businessId,
+        definitionId: widget.definitionId,
+        stageId: otherId,
+        orderIndex: index,
+      );
+      if (!mounted) return;
+      _loadStages();
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
+    }
+  }
+
+  Future<void> _editStage(Map<String, dynamic> stage) async {
+    final id = stage['id'] as int?;
+    if (id == null) return;
+    final name = TextEditingController(text: stage['name']?.toString() ?? '');
+    final color = TextEditingController(text: stage['color']?.toString() ?? '');
+    var isWin = stage['is_win'] == true;
+    var isLost = stage['is_lost'] == true;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('ویرایش مرحله'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: name, decoration: const InputDecoration(labelText: 'نام')),
+              TextField(controller: color, decoration: const InputDecoration(labelText: 'رنگ، مثل #1D4ED8')),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('مرحله برد'),
+                value: isWin,
+                onChanged: (v) => setLocal(() {
+                  isWin = v;
+                  if (v) isLost = false;
+                }),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('مرحله باخت'),
+                value: isLost,
+                onChanged: (v) => setLocal(() {
+                  isLost = v;
+                  if (v) isWin = false;
+                }),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('ذخیره')),
+          ],
+        ),
+      ),
+    );
+    if (ok != true || !mounted) {
+      name.dispose();
+      color.dispose();
+      return;
+    }
+    final stageName = name.text.trim();
+    final stageColor = color.text.trim();
+    name.dispose();
+    color.dispose();
+    if (stageName.isEmpty) return;
+    if (stageColor.isNotEmpty && !RegExp(r'^#[0-9A-Fa-f]{6}$').hasMatch(stageColor)) {
+      SnackBarHelper.show(context, message: 'رنگ باید مثل #1D4ED8 باشد', isError: true);
+      return;
+    }
+    try {
+      await widget.crmService.updateStage(
+        businessId: widget.businessId,
+        definitionId: widget.definitionId,
+        stageId: id,
+        name: stageName,
+        color: stageColor,
+        isWin: isWin,
+        isLost: isLost,
+      );
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: 'مرحله ذخیره شد');
       _loadStages();
     } catch (e) {
       if (!mounted) return;
@@ -685,15 +793,49 @@ class _StagesManagementDialogState extends State<_StagesManagementDialog> {
                         final name = s['name']?.toString() ?? '';
                         final code = s['stage_code']?.toString() ?? '';
                         final id = s['id'] as int?;
+                        final isWin = s['is_win'] == true;
+                        final isLost = s['is_lost'] == true;
+                        final colorHex = s['color']?.toString() ?? '';
+                        final parsed = RegExp(r'^#[0-9A-Fa-f]{6}$').hasMatch(colorHex)
+                            ? Color(int.parse(colorHex.replaceFirst('#', '0xFF')))
+                            : null;
+                        final onColor = parsed == null ? null : (parsed.computeLuminance() > 0.5 ? Colors.black : Colors.white);
                         return ListTile(
-                          leading: CircleAvatar(child: Text('${index + 1}')),
+                          leading: CircleAvatar(
+                            backgroundColor: parsed ?? Theme.of(context).colorScheme.surfaceContainerHighest,
+                            child: Text('${index + 1}', style: TextStyle(color: onColor)),
+                          ),
                           title: Text(name),
-                          subtitle: Text(code),
+                          subtitle: Text([
+                            code,
+                            if (isWin) 'برد',
+                            if (isLost) 'باخت',
+                          ].join(' · ')),
                           trailing: widget.canWrite && id != null
-                              ? IconButton(
-                                  icon: const Icon(Icons.delete_outline),
-                                  onPressed: () => _onDeleteStage(s),
-                                  tooltip: 'حذف',
+                              ? Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.arrow_upward),
+                                      tooltip: 'بالاتر',
+                                      onPressed: index == 0 ? null : () => _moveStage(index, -1),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.arrow_downward),
+                                      tooltip: 'پایین‌تر',
+                                      onPressed: index == _stages.length - 1 ? null : () => _moveStage(index, 1),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.edit_outlined),
+                                      tooltip: 'ویرایش',
+                                      onPressed: () => _editStage(s),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_outline),
+                                      onPressed: () => _onDeleteStage(s),
+                                      tooltip: 'حذف',
+                                    ),
+                                  ],
                                 )
                               : null,
                         );

@@ -8,6 +8,8 @@ import '../../core/api_client.dart';
 import '../../services/admin_system_settings_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'admin_compact_scaffold.dart';
+import '../../theme/tokens/extensions.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class SystemConfigurationPage extends StatefulWidget {
@@ -80,6 +82,8 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
   int _loginBackoffSeconds = 90;
   bool _firewallAutoBanOnLoginFail = false;
   int _firewallAutoBanDurationSec = 3600;
+
+  int _configSection = 0;
 
   bool _authReportLoading = false;
   Map<String, dynamic>? _authReport;
@@ -280,47 +284,15 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
     final t = AppLocalizations.of(context);
 
     if (_isLoadingData) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text(
-            t.systemConfiguration,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: theme.colorScheme.onPrimary,
-            ),
-          ),
-          backgroundColor: theme.colorScheme.primary,
-          foregroundColor: theme.colorScheme.onPrimary,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.go('/user/profile/system-settings'),
-          ),
-        ),
-        body: const Center(
-          child: CircularProgressIndicator(),
-        ),
+      return AdminCompactScaffold(
+        title: t.systemConfiguration,
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_error != null && _appName.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text(
-            t.systemConfiguration,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: theme.colorScheme.onPrimary,
-            ),
-          ),
-          backgroundColor: theme.colorScheme.primary,
-          foregroundColor: theme.colorScheme.onPrimary,
-          elevation: 0,
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back),
-            onPressed: () => context.go('/user/profile/system-settings'),
-          ),
-        ),
+      return AdminCompactScaffold(
+        title: t.systemConfiguration,
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -330,8 +302,8 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                 style: TextStyle(color: SemanticColorResolver.negative(context)),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 16),
-              ElevatedButton(
+              const SizedBox(height: 12),
+              FilledButton(
                 onPressed: _loadConfiguration,
                 child: Text(t.retry),
               ),
@@ -341,69 +313,44 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          t.systemConfiguration,
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: theme.colorScheme.onPrimary,
-          ),
+    return AdminCompactScaffold(
+      title: t.systemConfiguration,
+      subtitle: adminTx(context, 'هر بخش جدا ذخیره می‌شود', 'Each section saves on its own'),
+      actions: [
+        IconButton(
+          tooltip: _isLoading ? t.saving : adminTx(context, 'ذخیره این بخش', 'Save this section'),
+          onPressed: _isLoading ? null : _saveConfiguration,
+          icon: _isLoading
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.save_outlined, size: 20),
         ),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/user/profile/system-settings'),
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: ElevatedButton.icon(
-              onPressed: _isLoading ? null : _saveConfiguration,
-              icon: _isLoading
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.save, size: 18),
-              label: Text(
-                _isLoading ? t.saving : t.save,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              theme.colorScheme.primary.withValues(alpha: 0.1),
-              theme.colorScheme.surface,
-            ],
-          ),
-        ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+      ],
+      body: SingleChildScrollView(
+          padding: context.settingsHub.pagePadding,
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Wrap(
+                  spacing: 6,
+                  children: [
+                    for (final entry in [
+                      (0, adminTx(context, 'عمومی', 'General')),
+                      (1, adminTx(context, 'ثبت‌نام', 'Registration')),
+                      (2, adminTx(context, 'پشتیبانی', 'Support')),
+                      (3, adminTx(context, 'امنیت', 'Security')),
+                    ])
+                      ChoiceChip(
+                        label: Text(entry.$2, style: const TextStyle(fontSize: 12)),
+                        selected: _configSection == entry.$1,
+                        visualDensity: VisualDensity.compact,
+                        onSelected: (_) => setState(() => _configSection = entry.$1),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (_configSection == 0) ...[
                 _buildSectionCard(
                   theme,
                   t.generalSettings,
@@ -450,7 +397,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                       onChanged: (value) => setState(() => _defaultThemeId = value!),
                     ),
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.only(bottom: 8),
                       child: Text(
                         t.defaultColorThemeHint,
                         style: theme.textTheme.bodySmall?.copyWith(
@@ -459,14 +406,14 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                       ),
                     ),
                     _buildTextField(
-                      label: 'منطقهٔ زمانی نمایش (IANA)',
+                      label: adminTx(context, 'منطقهٔ زمانی نمایش (IANA)', 'Display timezone (IANA)'),
                       value: _defaultDisplayTimezone,
                       onChanged: (value) => setState(() => _defaultDisplayTimezone = value),
                     ),
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.only(bottom: 8),
                       child: Text(
-                        'مثال: Asia/Tehran، UTC، Europe/Berlin. همهٔ تاریخ/زمان‌های ارسالی API بر اساس این منطقه نمایش داده می‌شوند.',
+                        adminTx(context, 'مثال: Asia/Tehran، UTC، Europe/Berlin. همهٔ تاریخ/زمان‌های ارسالی API بر اساس این منطقه نمایش داده می‌شوند.', 'Example: Asia/Tehran, UTC, Europe/Berlin. API dates are shown in this timezone.'),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -475,6 +422,8 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                   ],
                 ),
                 const SizedBox(height: 24),
+                ],
+                if (_configSection == 1) ...[
                 _buildSectionCard(
                   theme,
                   t.securitySettings,
@@ -500,7 +449,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                       unlimitedLabel: t.unlimited,
                     ),
                     _buildNumberField(
-                      label: 'مدت اعتبار اتصال ChatGPT و ابزارهای هوش مصنوعی (روز)',
+                      label: adminTx(context, 'مدت اعتبار اتصال ChatGPT و ابزارهای هوش مصنوعی (روز)', 'ChatGPT and AI tool session (days)'),
                       value: _mcpOauthSessionDays,
                       onChanged: (value) => setState(() => _mcpOauthSessionDays = value),
                       min: 1,
@@ -509,35 +458,35 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
-                        'پس از این مدت، کاربر باید اتصال حسابیکس را دوباره تایید کند. مقدار پیش‌فرض ۳۰ روز است.',
+                        adminTx(context, 'پس از این مدت، کاربر باید اتصال حسابیکس را دوباره تایید کند. مقدار پیش‌فرض ۳۰ روز است.', 'After this, the user must approve the connection again. Default is 30 days.'),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ),
                     _buildDropdownField(
-                      label: 'محدودیت ایجاد کسب و کار',
+                      label: adminTx(context, 'محدودیت ایجاد کسب و کار', 'Who can create a business'),
                       value: _businessCreationRequirement,
                       items: [
-                        const DropdownMenuItem(
+                        DropdownMenuItem(
                           value: 'none',
-                          child: Text('بدون محدودیت (همه کاربران)'),
+                          child: Text(adminTx(context, 'بدون محدودیت (همه کاربران)', 'No restriction')),
                         ),
-                        const DropdownMenuItem(
+                        DropdownMenuItem(
                           value: 'email_only',
-                          child: Text('فقط ایمیل تایید شده'),
+                          child: Text(adminTx(context, 'فقط ایمیل تایید شده', 'Verified email only')),
                         ),
-                        const DropdownMenuItem(
+                        DropdownMenuItem(
                           value: 'mobile_only',
-                          child: Text('فقط شماره موبایل تایید شده'),
+                          child: Text(adminTx(context, 'فقط شماره موبایل تایید شده', 'Verified mobile only')),
                         ),
-                        const DropdownMenuItem(
+                        DropdownMenuItem(
                           value: 'both',
-                          child: Text('هر دو (ایمیل و موبایل)'),
+                          child: Text(adminTx(context, 'هر دو (ایمیل و موبایل)', 'Both email and mobile')),
                         ),
-                        const DropdownMenuItem(
+                        DropdownMenuItem(
                           value: 'either',
-                          child: Text('هر کدام (ایمیل یا موبایل)'),
+                          child: Text(adminTx(context, 'هر کدام (ایمیل یا موبایل)', 'Either email or mobile')),
                         ),
                       ],
                       onChanged: (value) => setState(() => _businessCreationRequirement = value!),
@@ -545,7 +494,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
-                        'این تنظیم تعیین می‌کند که چه کاربرانی می‌توانند کسب و کار جدید ایجاد کنند.',
+                        adminTx(context, 'این تنظیم تعیین می‌کند که چه کاربرانی می‌توانند کسب و کار جدید ایجاد کنند.', 'This controls which users can create a new business.'),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -589,6 +538,8 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                   ],
                 ),
                 const SizedBox(height: 24),
+                ],
+                if (_configSection == 0) ...[
                 _buildSectionCard(
                   theme,
                   t.maintenanceSettings,
@@ -618,6 +569,8 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                   ],
                 ),
                 const SizedBox(height: 24),
+                ],
+                if (_configSection == 2) ...[
                 _buildSectionCard(
                   theme,
                   t.supportTicketsUserSectionTitle,
@@ -652,27 +605,36 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       value: _supportBillingMode,
-                      decoration: const InputDecoration(
-                        labelText: 'حالت صورتحساب پشتیبانی',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: adminTx(context, 'حالت صورتحساب پشتیبانی', 'Support billing mode'),
+                        border: const OutlineInputBorder(),
                       ),
-                      items: const [
-                        DropdownMenuItem(value: 'free', child: Text('رایگان برای همه')),
-                        DropdownMenuItem(value: 'paid', child: Text('پشتیبانی غیر رایگان')),
-                        DropdownMenuItem(value: 'hybrid', child: Text('ترکیبی (سهمیه + اشتراک)')),
+                      items: [
+                        DropdownMenuItem(
+                          value: 'free',
+                          child: Text(adminTx(context, 'رایگان برای همه', 'Free for everyone')),
+                        ),
+                        DropdownMenuItem(
+                          value: 'paid',
+                          child: Text(adminTx(context, 'پشتیبانی غیررایگان', 'Paid support')),
+                        ),
+                        DropdownMenuItem(
+                          value: 'hybrid',
+                          child: Text(adminTx(context, 'ترکیبی (سهمیه + اشتراک)', 'Hybrid (quota + subscription)')),
+                        ),
                       ],
                       onChanged: (v) => setState(() => _supportBillingMode = v ?? 'free'),
                     ),
                     if (_supportBillingMode == 'hybrid')
                       _buildNumberField(
-                        label: 'سهمیه رایگان ماهانه (تیکت)',
+                        label: adminTx(context, 'سهمیه رایگان ماهانه (تیکت)', 'Free monthly ticket quota'),
                         value: _supportFreeQuotaPerMonth,
                         onChanged: (value) => setState(() => _supportFreeQuotaPerMonth = value),
                         min: 0,
                         max: 1000,
                       ),
                     _buildNumberField(
-                      label: 'مهلت ارفاق بعد از انقضا (روز)',
+                      label: adminTx(context, 'مهلت ارفاق بعد از انقضا (روز)', 'Grace period after expiry (days)'),
                       value: _supportGracePeriodDays,
                       onChanged: (value) => setState(() => _supportGracePeriodDays = value),
                       min: 0,
@@ -680,29 +642,31 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                     ),
                     TextFormField(
                       controller: _supportInvoicePrefixCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'پیشوند کد صورت‌حساب',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: adminTx(context, 'پیشوند کد صورت‌حساب', 'Invoice code prefix'),
+                        border: const OutlineInputBorder(),
                       ),
                     ),
                     _buildSwitchField(
-                      label: 'مشاهده تیکت‌های قبلی بدون اشتراک',
+                      label: adminTx(context, 'مشاهده تیکت‌های قبلی بدون اشتراک', 'Read old tickets without a subscription'),
                       value: _supportAllowReadWithoutSub,
                       onChanged: (value) => setState(() => _supportAllowReadWithoutSub = value),
                     ),
                     _buildSwitchField(
-                      label: 'برای پاسخ هم اشتراک لازم باشد',
+                      label: adminTx(context, 'برای پاسخ هم اشتراک لازم باشد', 'Require a subscription to reply'),
                       value: _supportRequireSubToReply,
                       onChanged: (value) => setState(() => _supportRequireSubToReply = value),
                     ),
                     _buildSwitchField(
-                      label: 'اولویت‌دهی تیکت مشترکان در صف اپراتور',
+                      label: adminTx(context, 'اولویت‌دهی تیکت مشترکان در صف اپراتور', 'Prioritize subscriber tickets in the operator queue'),
                       value: _supportPaidPriorityBoost,
                       onChanged: (value) => setState(() => _supportPaidPriorityBoost = value),
                     ),
                   ],
                 ),
                 const SizedBox(height: 24),
+                ],
+                if (_configSection == 3) ...[
                 _buildSectionCard(
                   theme,
                   t.smsDestinationRateSettings,
@@ -737,58 +701,64 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                 const SizedBox(height: 24),
                 _buildSectionCard(
                   theme,
-                  'امنیت کپچا و محدودیت نرخ احراز هویت',
+                  adminTx(context, 'امنیت کپچا و محدودیت نرخ احراز هویت', 'Captcha and sign-in rate limits'),
                   Icons.shield_outlined,
                   [
                     _buildNumberField(
-                      label: 'حداکثر تلاش اشتباه برای هر کپچا',
+                      label: adminTx(context, 'حداکثر تلاش اشتباه برای هر کپچا', 'Wrong attempts per captcha'),
                       value: _captchaMaxAttempts,
                       onChanged: (v) => setState(() => _captchaMaxAttempts = v),
                       min: 1,
                       max: 30,
                     ),
                     _buildNumberField(
-                      label: 'طول کد کپچا (۴ تا ۸)',
+                      label: adminTx(context, 'طول کد کپچا (۴ تا ۸)', 'Captcha length (4–8)'),
                       value: _captchaLength,
                       onChanged: (v) => setState(() => _captchaLength = v),
                       min: 4,
                       max: 8,
                     ),
                     _buildNumberField(
-                      label: 'زمان انقضای کپچا (ثانیه، ۶۰–۶۰۰)',
+                      label: adminTx(context, 'زمان انقضای کپچا (ثانیه، ۶۰–۶۰۰)', 'Captcha expiry (seconds, 60–600)'),
                       value: _captchaTtlSeconds,
                       onChanged: (v) => setState(() => _captchaTtlSeconds = v),
                       min: 60,
                       max: 600,
                     ),
                     _buildDropdownField(
-                      label: 'نوع کاراکتر کپچا',
+                      label: adminTx(context, 'نوع کاراکتر کپچا', 'Captcha character set'),
                       value: _captchaMode,
-                      items: const [
-                        DropdownMenuItem(value: 'numeric', child: Text('فقط عدد')),
-                        DropdownMenuItem(value: 'alphanumeric', child: Text('حروف انگلیسی + عدد')),
+                      items: [
+                        DropdownMenuItem(
+                          value: 'numeric',
+                          child: Text(adminTx(context, 'فقط عدد', 'Digits only')),
+                        ),
+                        DropdownMenuItem(
+                          value: 'alphanumeric',
+                          child: Text(adminTx(context, 'حروف انگلیسی + عدد', 'Letters and digits')),
+                        ),
                       ],
                       onChanged: (v) => setState(() => _captchaMode = v ?? 'numeric'),
                     ),
                     _buildSwitchField(
-                      label: 'اتصال کپچا به IP مشتری',
+                      label: adminTx(context, 'اتصال کپچا به IP مشتری', 'Bind captcha to client IP'),
                       value: _captchaBindIp,
                       onChanged: (v) => setState(() => _captchaBindIp = v),
                     ),
                     _buildSwitchField(
-                      label: 'تصویر کپچای قوی‌تر (نویز بیشتر)',
+                      label: adminTx(context, 'تصویر کپچای قوی‌تر (نویز بیشتر)', 'Stronger captcha image'),
                       value: _captchaStrongImage,
                       onChanged: (v) => setState(() => _captchaStrongImage = v),
                     ),
                     _buildNumberField(
-                      label: 'سقف درخواست تولید کپچا به‌ازای هر IP (در پنجره)',
+                      label: adminTx(context, 'سقف درخواست تولید کپچا به‌ازای هر IP (در پنجره)', 'Captcha requests per IP in the window'),
                       value: _captchaRateMax,
                       onChanged: (v) => setState(() => _captchaRateMax = v),
                       min: 1,
                       max: 200,
                     ),
                     _buildNumberField(
-                      label: 'پنجره نرخ تولید کپچا (ثانیه)',
+                      label: adminTx(context, 'پنجره نرخ تولید کپچا (ثانیه)', 'Captcha rate window (seconds)'),
                       value: _captchaRateWindowSec,
                       onChanged: (v) => setState(() => _captchaRateWindowSec = v),
                       min: 10,
@@ -796,33 +766,33 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                     ),
                     const Divider(height: 32),
                     Text(
-                      'محدودیت درخواست ورود (رمز عبور) به‌ازای هر IP',
+                      adminTx(context, 'محدودیت درخواست ورود (رمز عبور) به‌ازای هر IP', 'Password sign-in limit per IP'),
                       style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 12),
                     _buildNumberField(
-                      label: 'کوتاه‌مدت: حداکثر درخواست',
+                      label: adminTx(context, 'کوتاه‌مدت: حداکثر درخواست', 'Short window: max requests'),
                       value: _loginRateMaxShort,
                       onChanged: (v) => setState(() => _loginRateMaxShort = v),
                       min: 1,
                       max: 100,
                     ),
                     _buildNumberField(
-                      label: 'کوتاه‌مدت: پنجره (ثانیه)',
+                      label: adminTx(context, 'کوتاه‌مدت: پنجره (ثانیه)', 'Short window (seconds)'),
                       value: _loginRateWindowShortSec,
                       onChanged: (v) => setState(() => _loginRateWindowShortSec = v),
                       min: 10,
                       max: 3600,
                     ),
                     _buildNumberField(
-                      label: 'بلندمدت: حداکثر درخواست',
+                      label: adminTx(context, 'بلندمدت: حداکثر درخواست', 'Long window: max requests'),
                       value: _loginRateMaxLong,
                       onChanged: (v) => setState(() => _loginRateMaxLong = v),
                       min: 1,
                       max: 500,
                     ),
                     _buildNumberField(
-                      label: 'بلندمدت: پنجره (ثانیه)',
+                      label: adminTx(context, 'بلندمدت: پنجره (ثانیه)', 'Long window (seconds)'),
                       value: _loginRateWindowLongSec,
                       onChanged: (v) => setState(() => _loginRateWindowLongSec = v),
                       min: 60,
@@ -830,17 +800,17 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                     ),
                     const Divider(height: 32),
                     Text(
-                      'Backoff پس از ورود ناموفق (بر اساس IP + شناسه)',
+                      adminTx(context, 'Backoff پس از ورود ناموفق (بر اساس IP + شناسه)', 'Backoff after failed sign-in (IP + identifier)'),
                       style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'با ۰ در «حداکثر خطا» این قابلیت غیرفعال می‌شود.',
+                      adminTx(context, 'با ۰ در «حداکثر خطا» این قابلیت غیرفعال می‌شود.', 'Set the failure limit to 0 to turn this off.'),
                       style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                     ),
                     const SizedBox(height: 8),
                     _buildNumberField(
-                      label: 'حداکثر خطای رمز در پنجره (۰ = غیرفعال)',
+                      label: adminTx(context, 'حداکثر خطای رمز در پنجره (۰ = غیرفعال)', 'Password failures in the window (0 = off)'),
                       value: _loginBackoffMaxFails,
                       onChanged: (v) => setState(() => _loginBackoffMaxFails = v),
                       min: 0,
@@ -848,34 +818,34 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                       allowUnlimited: false,
                     ),
                     _buildNumberField(
-                      label: 'پنجره شمارش خطا (دقیقه)',
+                      label: adminTx(context, 'پنجره شمارش خطا (دقیقه)', 'Failure counting window (minutes)'),
                       value: _loginBackoffWindowMinutes,
                       onChanged: (v) => setState(() => _loginBackoffWindowMinutes = v),
                       min: 1,
                       max: 1440,
                     ),
                     _buildNumberField(
-                      label: 'مدت مسدودسازی پس از رسیدن به سقف (ثانیه)',
+                      label: adminTx(context, 'مدت مسدودسازی پس از رسیدن به سقف (ثانیه)', 'Lockout after the limit (seconds)'),
                       value: _loginBackoffSeconds,
                       onChanged: (v) => setState(() => _loginBackoffSeconds = v),
                       min: 0,
                       max: 3600,
                       allowUnlimited: true,
-                      unlimitedLabel: 'بدون انتظار اجباری',
+                      unlimitedLabel: adminTx(context, 'بدون انتظار اجباری', 'No forced wait'),
                     ),
                     const SizedBox(height: 12),
                     _buildSwitchField(
-                      label: 'فایروال: بن خودکار IP پس از رسیدن به همان سقف خطای بالا',
+                      label: adminTx(context, 'فایروال: بن خودکار IP پس از رسیدن به همان سقف خطای بالا', 'Firewall: auto-ban IP after that failure limit'),
                       value: _firewallAutoBanOnLoginFail,
                       onChanged: (v) => setState(() => _firewallAutoBanOnLoginFail = v),
                     ),
                     Text(
-                      'نیازمند فعال بودن backoff (حداکثر خطا > 0). مدت بن جدا از انتظار backoff است.',
+                      adminTx(context, 'نیازمند فعال بودن backoff (حداکثر خطا > 0). مدت بن جدا از انتظار backoff است.', 'Requires backoff (failure limit > 0). Ban length is separate from the backoff wait.'),
                       style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                     ),
                     const SizedBox(height: 8),
                     _buildNumberField(
-                      label: 'مدت بن خودکار در فایروال (ثانیه، ۶۰ تا ۸۶۴۰۰)',
+                      label: adminTx(context, 'مدت بن خودکار در فایروال (ثانیه، ۶۰ تا ۸۶۴۰۰)', 'Auto-ban duration (seconds, 60–86400)'),
                       value: _firewallAutoBanDurationSec,
                       onChanged: (v) => setState(() => _firewallAutoBanDurationSec = v),
                       min: 60,
@@ -883,61 +853,61 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                     ),
                     const Divider(height: 32),
                     Text(
-                      'سایر محدودیت‌ها (به‌ازای هر IP)',
+                      adminTx(context, 'سایر محدودیت‌ها (به‌ازای هر IP)', 'Other limits per IP'),
                       style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 12),
                     _buildNumberField(
-                      label: 'ثبت‌نام: حداکثر درخواست / پنجره (ثانیه در فیلد بعد)',
+                      label: adminTx(context, 'ثبت‌نام: حداکثر درخواست / پنجره (ثانیه در فیلد بعد)', 'Sign-up: max requests (window is the next field)'),
                       value: _registerRateMax,
                       onChanged: (v) => setState(() => _registerRateMax = v),
                       min: 1,
                       max: 100,
                     ),
                     _buildNumberField(
-                      label: 'ثبت‌نام: پنجره (ثانیه)',
+                      label: adminTx(context, 'ثبت‌نام: پنجره (ثانیه)', 'Sign-up window (seconds)'),
                       value: _registerRateWindowSec,
                       onChanged: (v) => setState(() => _registerRateWindowSec = v),
                       min: 60,
                       max: 86400,
                     ),
                     _buildNumberField(
-                      label: 'فراموشی رمز: حداکثر درخواست',
+                      label: adminTx(context, 'فراموشی رمز: حداکثر درخواست', 'Forgot password: max requests'),
                       value: _forgotPasswordRateMax,
                       onChanged: (v) => setState(() => _forgotPasswordRateMax = v),
                       min: 1,
                       max: 100,
                     ),
                     _buildNumberField(
-                      label: 'فراموشی رمز: پنجره (ثانیه)',
+                      label: adminTx(context, 'فراموشی رمز: پنجره (ثانیه)', 'Forgot password window (seconds)'),
                       value: _forgotPasswordRateWindowSec,
                       onChanged: (v) => setState(() => _forgotPasswordRateWindowSec = v),
                       min: 60,
                       max: 86400,
                     ),
                     _buildNumberField(
-                      label: 'بازنشانی رمز با توکن: حداکثر درخواست',
+                      label: adminTx(context, 'بازنشانی رمز با توکن: حداکثر درخواست', 'Token reset: max requests'),
                       value: _resetPasswordRateMax,
                       onChanged: (v) => setState(() => _resetPasswordRateMax = v),
                       min: 1,
                       max: 200,
                     ),
                     _buildNumberField(
-                      label: 'بازنشانی رمز با توکن: پنجره (ثانیه)',
+                      label: adminTx(context, 'بازنشانی رمز با توکن: پنجره (ثانیه)', 'Token reset window (seconds)'),
                       value: _resetPasswordRateWindowSec,
                       onChanged: (v) => setState(() => _resetPasswordRateWindowSec = v),
                       min: 60,
                       max: 86400,
                     ),
                     _buildNumberField(
-                      label: 'ارسال OTP بازیابی رمز: حداکثر درخواست',
+                      label: adminTx(context, 'ارسال OTP بازیابی رمز: حداکثر درخواست', 'Password OTP: max requests'),
                       value: _passwordResetOtpRateMax,
                       onChanged: (v) => setState(() => _passwordResetOtpRateMax = v),
                       min: 1,
                       max: 100,
                     ),
                     _buildNumberField(
-                      label: 'ارسال OTP بازیابی رمز: پنجره (ثانیه)',
+                      label: adminTx(context, 'ارسال OTP بازیابی رمز: پنجره (ثانیه)', 'Password OTP window (seconds)'),
                       value: _passwordResetOtpRateWindowSec,
                       onChanged: (v) => setState(() => _passwordResetOtpRateWindowSec = v),
                       min: 60,
@@ -948,7 +918,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                 const SizedBox(height: 24),
                 _buildSectionCard(
                   theme,
-                  'گزارش امنیت احراز هویت (۲۴ ساعت اخیر)',
+                  adminTx(context, 'گزارش امنیت احراز هویت (۲۴ ساعت اخیر)', 'Sign-in security report (last 24 hours)'),
                   Icons.analytics_outlined,
                   [
                     Row(
@@ -962,23 +932,31 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 )
                               : const Icon(Icons.refresh, size: 20),
-                          label: const Text('بروزرسانی گزارش'),
+                          label: Text(adminTx(context, 'بروزرسانی گزارش', 'Refresh report')),
                         ),
                       ],
                     ),
                     const SizedBox(height: 16),
                     if (_authReport == null && !_authReportLoading)
                       Text(
-                        'داده‌ای برای نمایش نیست.',
+                        adminTx(context, 'داده‌ای برای نمایش نیست.', 'Nothing to show yet.'),
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       )
                     else if (_authReport != null) ...[
-                      Text('مجموع رویدادها: ${_authReport!['total'] ?? 0}'),
+                      Text(adminTx(
+                        context,
+                        'مجموع رویدادها: ${_authReport!['total'] ?? 0}',
+                        'Total events: ${_authReport!['total'] ?? 0}',
+                      )),
                       const SizedBox(height: 8),
-                      if ((_authReport!['by_type'] as Map?)?.isNotEmpty ?? false) ...[
-                        Text('به تفکیک نوع', style: theme.textTheme.labelLarge),
+                      if (_authReport!['by_type'] is Map &&
+                          (_authReport!['by_type'] as Map).isNotEmpty) ...[
+                        Text(
+                          adminTx(context, 'به تفکیک نوع', 'By type'),
+                          style: theme.textTheme.labelLarge,
+                        ),
                         const SizedBox(height: 4),
                         ...((_authReport!['by_type'] as Map).entries.map(
                           (e) => Padding(
@@ -988,98 +966,86 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                         )),
                         const SizedBox(height: 12),
                       ],
-                      Text('آخرین رویدادها', style: theme.textTheme.labelLarge),
+                      Text(
+                        adminTx(context, 'آخرین رویدادها', 'Latest events'),
+                        style: theme.textTheme.labelLarge,
+                      ),
                       const SizedBox(height: 4),
                       ConstrainedBox(
                         constraints: const BoxConstraints(maxHeight: 240),
                         child: ListView(
                           shrinkWrap: true,
                           children: [
-                            for (final item in (_authReport!['recent'] as List? ?? const []))
-                              ListTile(
-                                dense: true,
-                                contentPadding: EdgeInsets.zero,
-                                title: Text(
-                                  '${item['event_type'] ?? ''}  ${item['client_ip'] != null ? '— ${item['client_ip']}' : ''}',
-                                  style: theme.textTheme.bodySmall,
+                            for (final raw in (_authReport!['recent'] as List? ?? const []))
+                              if (raw is Map)
+                                ListTile(
+                                  dense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Text(
+                                    '${raw['event_type'] ?? ''}  ${raw['client_ip'] != null ? '— ${raw['client_ip']}' : ''}',
+                                    style: theme.textTheme.bodySmall,
+                                  ),
+                                  subtitle: Text(
+                                    raw['created_at']?.toString() ?? '',
+                                    style: theme.textTheme.labelSmall,
+                                  ),
                                 ),
-                                subtitle: Text(
-                                  item['created_at']?.toString() ?? '',
-                                  style: theme.textTheme.labelSmall,
-                                ),
-                              ),
                           ],
                         ),
                       ),
                     ],
                   ],
                 ),
-                const SizedBox(height: 32),
-                // دکمه ذخیره بزرگ و واضح در پایین صفحه
+                ],
+                const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton.icon(
+                  child: FilledButton.icon(
                     onPressed: _isLoading ? null : _saveConfiguration,
                     icon: _isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.save),
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.save, size: 18),
                     label: Text(
-                      _isLoading ? t.saving : t.save,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 2,
+                      _isLoading ? t.saving : adminTx(context, 'ذخیره این بخش', 'Save this section'),
                     ),
                   ),
                 ),
-                const SizedBox(height: 24), // فاصله اضافی برای اطمینان از نمایش کامل
               ],
             ),
           ),
         ),
-      ),
     );
   }
 
   Widget _buildSectionCard(ThemeData theme, String title, IconData icon, List<Widget> children) {
+    final hub = context.settingsHub;
     return Card(
-      elevation: 2,
+      elevation: 0,
+      margin: EdgeInsets.only(bottom: hub.categorySectionBottom),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(hub.categoryRadius),
+        side: BorderSide(color: theme.colorScheme.outline.withValues(alpha: 0.1)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: hub.categoryBodyPadding,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(icon, color: theme.colorScheme.primary),
-                const SizedBox(width: 12),
-                Text(
-                  title,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.onSurface,
+                Icon(icon, color: theme.colorScheme.primary, size: hub.categoryIconSize),
+                SizedBox(width: hub.categoryIconGap),
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: hub.categoryTitleStyle(theme.textTheme, color: theme.colorScheme.onSurface),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: hub.listTitleGap),
             ...children,
           ],
         ),
@@ -1093,7 +1059,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
     required ValueChanged<String> onChanged,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 8),
       child: TextFormField(
         key: ValueKey('$label-$value'),
         initialValue: value,
@@ -1113,7 +1079,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
     required ValueChanged<String?> onChanged,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 8),
       child: DropdownButtonFormField<String>(
         value: value,
         decoration: InputDecoration(
@@ -1132,7 +1098,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
     required ValueChanged<bool> onChanged,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -1165,7 +1131,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
     final suffixText = value == 0 && allowUnlimited ? ' ($finalUnlimitedLabel)' : '';
     
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
           Expanded(
@@ -1219,21 +1185,25 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
     setState(() => _isLoading = true);
 
     try {
-      await _service.updateSystemConfiguration({
+      final all = <String, dynamic>{
         'app_name': _appName.trim(),
         'app_version': _appVersion.trim(),
         'default_language': _defaultLanguage,
         'default_theme': _defaultTheme,
         'default_theme_id': _defaultThemeId,
         'default_timezone': _defaultDisplayTimezone.trim(),
+        'enable_maintenance_mode': _enableMaintenanceMode,
+        'max_file_size': _maxFileSize,
+        'max_users': _maxUsers,
         'enable_registration': _enableRegistration,
         'enable_email_verification': _enableEmailVerification,
-        'enable_maintenance_mode': _enableMaintenanceMode,
+        'session_timeout': _sessionTimeout,
+        'mcp_oauth_session_days': _mcpOauthSessionDays,
+        'business_creation_verification_requirement': _businessCreationRequirement,
+        'legacy_api_import_enabled': _legacyApiImportEnabled,
+        'legacy_api_import_disabled_message': _legacyApiImportDisabledMessageCtrl.text.trim(),
         'support_tickets_enabled': _supportTicketsEnabled,
         'support_tickets_disabled_message': _supportTicketsDisabledMessageCtrl.text.trim(),
-        'legacy_api_import_enabled': _legacyApiImportEnabled,
-        'legacy_api_import_disabled_message':
-            _legacyApiImportDisabledMessageCtrl.text.trim(),
         'support_billing_mode': _supportBillingMode,
         'support_free_quota_per_month': _supportFreeQuotaPerMonth,
         'support_grace_period_days': _supportGracePeriodDays,
@@ -1241,11 +1211,6 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
         'support_require_subscription_to_reply': _supportRequireSubToReply,
         'support_invoice_prefix': _supportInvoicePrefixCtrl.text.trim(),
         'support_paid_priority_boost': _supportPaidPriorityBoost,
-        'session_timeout': _sessionTimeout,
-        'mcp_oauth_session_days': _mcpOauthSessionDays,
-        'max_file_size': _maxFileSize,
-        'max_users': _maxUsers,
-        'business_creation_verification_requirement': _businessCreationRequirement,
         'sms_destination_rate_enabled': _smsDestinationRateEnabled,
         'sms_destination_rate_max_sends': _smsDestinationRateMaxSends,
         'sms_destination_rate_window_minutes': _smsDestinationRateWindowMinutes,
@@ -1274,6 +1239,73 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
         'login_backoff_seconds': _loginBackoffSeconds,
         'firewall_auto_ban_on_login_fail': _firewallAutoBanOnLoginFail,
         'firewall_auto_ban_duration_sec': _firewallAutoBanDurationSec,
+      };
+      const sections = <List<String>>[
+        [
+          'app_name',
+          'app_version',
+          'default_language',
+          'default_theme',
+          'default_theme_id',
+          'default_timezone',
+          'enable_maintenance_mode',
+          'max_file_size',
+          'max_users',
+        ],
+        [
+          'enable_registration',
+          'enable_email_verification',
+          'session_timeout',
+          'mcp_oauth_session_days',
+          'business_creation_verification_requirement',
+          'legacy_api_import_enabled',
+          'legacy_api_import_disabled_message',
+        ],
+        [
+          'support_tickets_enabled',
+          'support_tickets_disabled_message',
+          'support_billing_mode',
+          'support_free_quota_per_month',
+          'support_grace_period_days',
+          'support_allow_read_without_subscription',
+          'support_require_subscription_to_reply',
+          'support_invoice_prefix',
+          'support_paid_priority_boost',
+        ],
+        [
+          'sms_destination_rate_enabled',
+          'sms_destination_rate_max_sends',
+          'sms_destination_rate_window_minutes',
+          'captcha_max_attempts',
+          'captcha_length',
+          'captcha_ttl_seconds',
+          'captcha_mode',
+          'captcha_bind_ip',
+          'captcha_strong_image',
+          'captcha_rate_max',
+          'captcha_rate_window_sec',
+          'login_rate_max_short',
+          'login_rate_window_short_sec',
+          'login_rate_max_long',
+          'login_rate_window_long_sec',
+          'register_rate_max',
+          'register_rate_window_sec',
+          'forgot_password_rate_max',
+          'forgot_password_rate_window_sec',
+          'reset_password_rate_max',
+          'reset_password_rate_window_sec',
+          'password_reset_otp_rate_max',
+          'password_reset_otp_rate_window_sec',
+          'login_backoff_max_fails',
+          'login_backoff_window_minutes',
+          'login_backoff_seconds',
+          'firewall_auto_ban_on_login_fail',
+          'firewall_auto_ban_duration_sec',
+        ],
+      ];
+      final keys = sections[_configSection];
+      await _service.updateSystemConfiguration({
+        for (final key in keys) key: all[key],
       });
 
       if (mounted) {

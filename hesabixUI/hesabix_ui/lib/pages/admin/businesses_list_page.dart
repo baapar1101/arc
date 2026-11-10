@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/utils/date_formatters.dart' as date_formatters;
@@ -12,6 +11,8 @@ import '../../core/api_client.dart';
 import '../../services/document_monetization_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'admin_compact_scaffold.dart';
+import '../../theme/tokens/extensions.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class BusinessesListPage extends StatefulWidget {
@@ -43,60 +44,51 @@ class _BusinessesListPageState extends State<BusinessesListPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'مدیریت کسب و کارها',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/user/profile/system-settings'),
-        ),
-      ),
+    return AdminCompactScaffold(
+      title: adminTx(context, 'کسب‌وکارها', 'Businesses'),
+      subtitle: adminTx(context, 'فهرست و مدیریت کسب‌وکارهای سیستم', 'List and manage system businesses'),
       body: DataTableWidget<Map<String, dynamic>>(
         config: DataTableConfig<Map<String, dynamic>>(
           endpoint: '/api/v1/admin/businesses/list',
-          title: 'مدیریت کسب و کارها',
-          subtitle: 'مشاهده و مدیریت لیست همه کسب و کارهای سیستم',
+          showTableIcon: false,
           columns: [
             TextColumn(
               'id',
-              'شناسه',
+              adminTx(context, 'شناسه', 'ID'),
               width: ColumnWidth.small,
               sortable: true,
             ),
             TextColumn(
               'name',
-              'نام کسب و کار',
+              adminTx(context, 'نام کسب‌وکار', 'Business name'),
               width: ColumnWidth.large,
               sortable: true,
               searchable: true,
             ),
             TextColumn(
               'business_type',
-              'نوع کسب و کار',
+              adminTx(context, 'نوع کسب‌وکار', 'Business type'),
               width: ColumnWidth.medium,
               sortable: true,
             ),
             TextColumn(
               'business_field',
-              'زمینه فعالیت',
+              adminTx(context, 'زمینه فعالیت', 'Field'),
               width: ColumnWidth.medium,
               sortable: true,
             ),
             CustomColumn(
               'owner',
-              'مالک',
+              adminTx(context, 'مالک', 'Owner'),
               width: ColumnWidth.large,
               builder: (item, index) {
                 final owner = item['owner'] as Map<String, dynamic>?;
                 if (owner == null) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8.0),
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
                     child: Text(
-                      'نامشخص',
-                      style: TextStyle(color: Colors.grey),
+                      adminTx(context, 'نامشخص', 'Unknown'),
+                      style: const TextStyle(color: Colors.grey),
                     ),
                   );
                 }
@@ -163,28 +155,28 @@ class _BusinessesListPageState extends State<BusinessesListPage> {
             ),
             TextColumn(
               'phone',
-              'تلفن',
+              adminTx(context, 'تلفن', 'Phone'),
               width: ColumnWidth.medium,
               searchable: true,
               formatter: (item) => item['phone'] as String? ?? '-',
             ),
             TextColumn(
               'mobile',
-              'موبایل',
+              adminTx(context, 'موبایل', 'Mobile'),
               width: ColumnWidth.medium,
               searchable: true,
               formatter: (item) => item['mobile'] as String? ?? '-',
             ),
             TextColumn(
               'national_id',
-              'شناسه ملی',
+              adminTx(context, 'شناسه ملی', 'National ID'),
               width: ColumnWidth.medium,
               searchable: true,
               formatter: (item) => item['national_id'] as String? ?? '-',
             ),
             TextColumn(
               'province',
-              'استان',
+              adminTx(context, 'استان', 'Province'),
               width: ColumnWidth.medium,
               sortable: true,
               formatter: (item) {
@@ -197,7 +189,7 @@ class _BusinessesListPageState extends State<BusinessesListPage> {
             ),
             CustomColumn(
               'status',
-              'وضعیت',
+              adminTx(context, 'وضعیت', 'Status'),
               width: ColumnWidth.medium,
               builder: (item, index) {
                 final isDeleted = item['is_deleted'] as bool? ?? false;
@@ -213,7 +205,7 @@ class _BusinessesListPageState extends State<BusinessesListPage> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        'در حال حذف',
+                        adminTx(context, 'در حال حذف', 'Deleting'),
                         style: TextStyle(
                           color: SemanticColorResolver.warning(context),
                           fontSize: 12,
@@ -233,7 +225,7 @@ class _BusinessesListPageState extends State<BusinessesListPage> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      'فعال',
+                      adminTx(context, 'فعال', 'Active'),
                       style: TextStyle(
                         color: SemanticColorResolver.positive(context),
                         fontSize: 12,
@@ -246,7 +238,7 @@ class _BusinessesListPageState extends State<BusinessesListPage> {
             ),
             DateColumn(
               'created_at',
-              'تاریخ ایجاد',
+              adminTx(context, 'تاریخ ایجاد', 'Created'),
               width: ColumnWidth.medium,
               sortable: true,
               showTime: false,
@@ -264,7 +256,7 @@ class _BusinessesListPageState extends State<BusinessesListPage> {
           enableGlobalSearch: true,
           showRefreshButton: true,
           showBackButton: false,
-          emptyStateMessage: 'کسب و کاری یافت نشد',
+          emptyStateMessage: adminTx(context, 'کسب‌وکاری یافت نشد', 'No businesses found'),
           tableId: 'admin_businesses',
           onRowTap: (item) {
             // جلوگیری از ورود به کسب و کار حذف شده
@@ -272,7 +264,13 @@ class _BusinessesListPageState extends State<BusinessesListPage> {
             if (isDeleted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('این کسب و کار حذف شده است و نمی‌توان به آن دسترسی داشت. می‌توانید آن را بازیابی کنید.'),
+                  content: Text(
+                    adminTx(
+                      context,
+                      'این کسب‌وکار حذف شده است. از جزئیات می‌توانید آن را بازیابی کنید.',
+                      'This business is deleted. Open its details to restore it.',
+                    ),
+                  ),
                   backgroundColor: SemanticColorResolver.warning(context),
                 ),
               );
@@ -311,7 +309,7 @@ class _BusinessDetailsDialogState extends State<_BusinessDetailsDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final businessName = widget.business['name'] as String? ?? 'نامشخص';
+    final businessName = widget.business['name'] as String? ?? adminTx(context, 'نامشخص', 'Unknown');
     final isDeleted = widget.business['is_deleted'] as bool? ?? false;
     final isDeletionPending = widget.business['is_deletion_pending'] as bool? ?? false;
     final businessId = widget.business['id'] as int?;
@@ -324,21 +322,12 @@ class _BusinessDetailsDialogState extends State<_BusinessDetailsDialog> {
           children: [
             // Header
             Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(8),
-                  topRight: Radius.circular(8),
-                ),
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              color: theme.colorScheme.surfaceContainerHighest,
               child: Row(
                 children: [
-                  Icon(
-                    Icons.business,
-                    color: theme.colorScheme.onPrimary,
-                  ),
-                  SizedBox(width: 12),
+                  Icon(Icons.business, size: 18, color: theme.colorScheme.onSurface),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -346,10 +335,7 @@ class _BusinessDetailsDialogState extends State<_BusinessDetailsDialog> {
                       children: [
                         Text(
                           businessName,
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            color: theme.colorScheme.onPrimary,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.onSurface),
                         ),
                         if (isDeleted || isDeletionPending)
                           Padding(
@@ -361,7 +347,7 @@ class _BusinessDetailsDialogState extends State<_BusinessDetailsDialog> {
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
-                                'در حال حذف',
+                                adminTx(context, 'در حال حذف', 'Deleting'),
                                 style: TextStyle(
                                   color: SemanticColorResolver.warning(context),
                                   fontSize: 11,
@@ -387,7 +373,7 @@ class _BusinessDetailsDialogState extends State<_BusinessDetailsDialog> {
                               ),
                             )
                           : Icon(Icons.restore, size: 18),
-                      label: Text(_isRestoring ? 'در حال بازیابی...' : 'بازیابی'),
+                      label: Text(_isRestoring ? adminTx(context, 'در حال بازیابی…', 'Restoring…') : adminTx(context, 'بازیابی', 'Restore')),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: SemanticColorResolver.positive(context),
                         foregroundColor: Colors.white,
@@ -396,10 +382,7 @@ class _BusinessDetailsDialogState extends State<_BusinessDetailsDialog> {
                     ),
                   ],
                   IconButton(
-                    icon: Icon(
-                      Icons.close,
-                      color: theme.colorScheme.onPrimary,
-                    ),
+                    icon: Icon(Icons.close, color: theme.colorScheme.onSurface),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
@@ -411,11 +394,13 @@ class _BusinessDetailsDialogState extends State<_BusinessDetailsDialog> {
                 length: 3,
                 child: Column(
                   children: [
-                    const TabBar(
+                    TabBar(
+                      labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      unselectedLabelStyle: const TextStyle(fontSize: 12),
                       tabs: [
-                        Tab(text: 'اطلاعات کسب و کار'),
-                        Tab(text: 'کیف پول'),
-                        Tab(text: 'سیاست‌ها و پکیج‌ها'),
+                        Tab(text: adminTx(context, 'اطلاعات کسب‌وکار', 'Business')),
+                        Tab(text: adminTx(context, 'کیف پول', 'Wallet')),
+                        Tab(text: adminTx(context, 'سیاست‌ها و پکیج‌ها', 'Policies')),
                       ],
                     ),
                     Expanded(
@@ -443,20 +428,24 @@ class _BusinessDetailsDialogState extends State<_BusinessDetailsDialog> {
 
     final confirmed = await showDialog<bool>(
       context: pageContext,
-      builder: (context) => AlertDialog(
-        title: Text('بازیابی کسب و کار'),
+      builder: (dialogContext) => AlertDialog(
+        title: Text(adminTx(pageContext, 'بازیابی کسب‌وکار', 'Restore business')),
         content: Text(
-          'آیا مطمئن هستید که می‌خواهید کسب و کار "${widget.business['name']}" را بازیابی کنید؟',
+          adminTx(
+            pageContext,
+            'کسب‌وکار «${widget.business['name']}» بازیابی شود؟',
+            'Restore “${widget.business['name']}”?',
+          ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text('انصراف'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(adminTx(pageContext, 'انصراف', 'Cancel')),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: SemanticColorResolver.positive(context)),
-            child: const Text('بازیابی'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: SemanticColorResolver.positive(dialogContext)),
+            child: Text(adminTx(pageContext, 'بازیابی', 'Restore')),
           ),
         ],
       ),
@@ -474,7 +463,7 @@ class _BusinessDetailsDialogState extends State<_BusinessDetailsDialog> {
       if (!pageContext.mounted) return;
       ScaffoldMessenger.of(pageContext).showSnackBar(
         SnackBar(
-          content: Text('کسب و کار با موفقیت بازیابی شد'),
+          content: Text(adminTx(pageContext, 'کسب‌وکار بازیابی شد', 'Business restored')),
           backgroundColor: SemanticColorResolver.positive(context),
         ),
       );
@@ -484,7 +473,7 @@ class _BusinessDetailsDialogState extends State<_BusinessDetailsDialog> {
       ScaffoldMessenger.of(pageContext).showSnackBar(
         SnackBar(
           content: Text(
-            'خطا در بازیابی کسب و کار: ${ErrorExtractor.forContext(e, pageContext)}',
+            '${adminTx(pageContext, 'خطا در بازیابی کسب‌وکار', 'Could not restore the business')}: ${ErrorExtractor.forContext(e, pageContext)}',
           ),
           backgroundColor: SemanticColorResolver.negative(context),
         ),
@@ -508,64 +497,64 @@ class _BusinessDetailsDialogState extends State<_BusinessDetailsDialog> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSectionTitle(theme, 'اطلاعات اصلی'),
+          _buildSectionTitle(theme, adminTx(context, 'اطلاعات اصلی', 'Basics')),
           _buildInfoCard(
             theme,
             [
-              _buildInfoRow(theme, 'شناسه', widget.business['id']?.toString() ?? '-'),
-              _buildInfoRow(theme, 'نام کسب و کار', widget.business['name'] ?? '-'),
-              _buildInfoRow(theme, 'نوع کسب و کار', widget.business['business_type'] ?? '-'),
-              _buildInfoRow(theme, 'زمینه فعالیت', widget.business['business_field'] ?? '-'),
+              _buildInfoRow(theme, adminTx(context, 'شناسه', 'ID'), widget.business['id']?.toString() ?? '-'),
+              _buildInfoRow(theme, adminTx(context, 'نام کسب‌وکار', 'Business name'), widget.business['name'] ?? '-'),
+              _buildInfoRow(theme, adminTx(context, 'نوع کسب‌وکار', 'Business type'), widget.business['business_type'] ?? '-'),
+              _buildInfoRow(theme, adminTx(context, 'زمینه فعالیت', 'Field'), widget.business['business_field'] ?? '-'),
             ],
           ),
           const SizedBox(height: 16),
           
           if (owner != null) ...[
-            _buildSectionTitle(theme, 'اطلاعات مالک'),
+            _buildSectionTitle(theme, adminTx(context, 'اطلاعات مالک', 'Owner')),
             _buildInfoCard(
               theme,
               [
-                _buildInfoRow(theme, 'نام کامل', owner['full_name'] ?? '-'),
-                _buildInfoRow(theme, 'ایمیل', owner['email'] ?? '-'),
-                _buildInfoRow(theme, 'موبایل', _cleanMobileNumber(owner['mobile'])),
+                _buildInfoRow(theme, adminTx(context, 'نام کامل', 'Full name'), owner['full_name'] ?? '-'),
+                _buildInfoRow(theme, adminTx(context, 'ایمیل', 'Email'), owner['email'] ?? '-'),
+                _buildInfoRow(theme, adminTx(context, 'موبایل', 'Mobile'), _cleanMobileNumber(owner['mobile'])),
               ],
             ),
             const SizedBox(height: 16),
           ],
           
-          _buildSectionTitle(theme, 'اطلاعات تماس'),
+          _buildSectionTitle(theme, adminTx(context, 'اطلاعات تماس', 'Contact')),
           _buildInfoCard(
             theme,
             [
-              _buildInfoRow(theme, 'تلفن', widget.business['phone'] ?? '-'),
-              _buildInfoRow(theme, 'موبایل', widget.business['mobile'] ?? '-'),
-              _buildInfoRow(theme, 'آدرس', widget.business['address'] ?? '-'),
+              _buildInfoRow(theme, adminTx(context, 'تلفن', 'Phone'), widget.business['phone'] ?? '-'),
+              _buildInfoRow(theme, adminTx(context, 'موبایل', 'Mobile'), widget.business['mobile'] ?? '-'),
+              _buildInfoRow(theme, adminTx(context, 'آدرس', 'Address'), widget.business['address'] ?? '-'),
               if (widget.business['province'] != null || widget.business['city'] != null)
                 _buildInfoRow(
                   theme,
-                  'موقعیت',
+                  adminTx(context, 'موقعیت', 'Location'),
                   '${widget.business['province'] ?? ''}${widget.business['province'] != null && widget.business['city'] != null ? '، ' : ''}${widget.business['city'] ?? ''}',
                 ),
-              _buildInfoRow(theme, 'کد پستی', widget.business['postal_code'] ?? '-'),
+              _buildInfoRow(theme, adminTx(context, 'کد پستی', 'Postal code'), widget.business['postal_code'] ?? '-'),
             ],
           ),
           const SizedBox(height: 16),
           
-          _buildSectionTitle(theme, 'اطلاعات ثبت'),
+          _buildSectionTitle(theme, adminTx(context, 'اطلاعات ثبت', 'Registration')),
           _buildInfoCard(
             theme,
             [
-              _buildInfoRow(theme, 'شناسه ملی', widget.business['national_id'] ?? '-'),
-              _buildInfoRow(theme, 'شماره ثبت', widget.business['registration_number'] ?? '-'),
-              _buildInfoRow(theme, 'شناسه اقتصادی', widget.business['economic_id'] ?? '-'),
+              _buildInfoRow(theme, adminTx(context, 'شناسه ملی', 'National ID'), widget.business['national_id'] ?? '-'),
+              _buildInfoRow(theme, adminTx(context, 'شماره ثبت', 'Registration number'), widget.business['registration_number'] ?? '-'),
+              _buildInfoRow(theme, adminTx(context, 'شناسه اقتصادی', 'Economic ID'), widget.business['economic_id'] ?? '-'),
               _buildInfoRow(
                 theme,
-                'تاریخ ایجاد',
+                adminTx(context, 'تاریخ ایجاد', 'Created'),
                 date_formatters.DateFormatters.formatServerDateTime(widget.business['created_at']),
               ),
               _buildInfoRow(
                 theme,
-                'آخرین بروزرسانی',
+                adminTx(context, 'آخرین بروزرسانی', 'Updated'),
                 date_formatters.DateFormatters.formatServerDateTime(widget.business['updated_at']),
               ),
             ],
@@ -573,20 +562,20 @@ class _BusinessDetailsDialogState extends State<_BusinessDetailsDialog> {
           const SizedBox(height: 16),
           
           if (defaultCurrency != null || currencies.isNotEmpty) ...[
-            _buildSectionTitle(theme, 'اطلاعات ارز'),
+            _buildSectionTitle(theme, adminTx(context, 'اطلاعات ارز', 'Currencies')),
             _buildInfoCard(
               theme,
               [
                 if (defaultCurrency != null)
                   _buildInfoRow(
                     theme,
-                    'ارز پیش‌فرض',
+                    adminTx(context, 'ارز پیش‌فرض', 'Default currency'),
                     '${defaultCurrency['title']} (${defaultCurrency['symbol']})',
                   ),
                 if (currencies.isNotEmpty)
                   _buildInfoRow(
                     theme,
-                    'ارزهای فعال',
+                    adminTx(context, 'ارزهای فعال', 'Active currencies'),
                     currencies
                         .map((c) => '${c['title']} (${c['symbol']})')
                         .join('، '),
@@ -605,10 +594,7 @@ class _BusinessDetailsDialogState extends State<_BusinessDetailsDialog> {
       padding: const EdgeInsets.only(bottom: 8),
       child: Text(
         title,
-        style: theme.textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.bold,
-          color: theme.colorScheme.primary,
-        ),
+        style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.primary),
       ),
     );
   }
@@ -684,6 +670,7 @@ class _WalletTabState extends State<_WalletTab> {
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _reasonController = TextEditingController();
+  final _giftConfirmController = TextEditingController();
 
   @override
   void initState() {
@@ -696,6 +683,7 @@ class _WalletTabState extends State<_WalletTab> {
     _amountController.dispose();
     _descriptionController.dispose();
     _reasonController.dispose();
+    _giftConfirmController.dispose();
     super.dispose();
   }
 
@@ -737,7 +725,7 @@ class _WalletTabState extends State<_WalletTab> {
       // استفاده از parseFormattedDouble برای تبدیل مقدار فرمت‌شده به عدد
       final amount = parseFormattedDouble(_amountController.text);
       if (amount == null || amount <= 0) {
-        throw Exception('مبلغ نامعتبر است');
+        throw Exception(adminTx(context, 'مبلغ نامعتبر است', 'Amount is invalid'));
       }
 
       await BusinessApiService.addGiftBalanceAdmin(
@@ -745,12 +733,14 @@ class _WalletTabState extends State<_WalletTab> {
         amount: amount,
         description: _descriptionController.text.isEmpty ? null : _descriptionController.text,
         reason: _reasonController.text.isEmpty ? null : _reasonController.text,
+        confirmation: _giftConfirmController.text.trim(),
       );
 
       // پاک کردن فرم
       _amountController.clear();
       _descriptionController.clear();
       _reasonController.clear();
+      _giftConfirmController.clear();
 
       // بارگذاری مجدد اطلاعات کیف‌پول
       await _loadWalletData();
@@ -758,7 +748,7 @@ class _WalletTabState extends State<_WalletTab> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('موجودی هدیه با موفقیت اضافه شد'),
+            content: Text(adminTx(context, 'موجودی هدیه اضافه شد', 'Gift balance added')),
             backgroundColor: SemanticColorResolver.positive(context),
           ),
         );
@@ -794,7 +784,7 @@ class _WalletTabState extends State<_WalletTab> {
             Icon(Icons.error_outline, size: 48, color: SemanticColorResolver.negative(context)),
             const SizedBox(height: 16),
             Text(
-              'خطا در دریافت اطلاعات کیف‌پول',
+              adminTx(context, 'خطا در دریافت اطلاعات کیف‌پول', 'Could not load the wallet'),
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
@@ -807,7 +797,7 @@ class _WalletTabState extends State<_WalletTab> {
             ElevatedButton.icon(
               onPressed: _loadWalletData,
               icon: const Icon(Icons.refresh),
-              label: const Text('تلاش مجدد'),
+              label: Text(adminTx(context, 'تلاش مجدد', 'Retry')),
             ),
           ],
         ),
@@ -821,13 +811,13 @@ class _WalletTabState extends State<_WalletTab> {
         children: [
           // نمایش اطلاعات کیف‌پول
           if (_walletData != null) ...[
-            _buildSectionTitle(theme, 'وضعیت کیف‌پول'),
+            _buildSectionTitle(theme, adminTx(context, 'وضعیت کیف‌پول', 'Wallet')),
             _buildWalletInfoCard(theme, _walletData!),
             const SizedBox(height: 24),
           ],
 
           // فرم افزودن موجودی هدیه
-          _buildSectionTitle(theme, 'افزودن موجودی هدیه'),
+          _buildSectionTitle(theme, adminTx(context, 'افزودن موجودی هدیه', 'Add gift balance')),
           _buildGiftForm(theme),
         ],
       ),
@@ -839,10 +829,7 @@ class _WalletTabState extends State<_WalletTab> {
       padding: const EdgeInsets.only(bottom: 12),
       child: Text(
         title,
-        style: theme.textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.bold,
-          color: theme.colorScheme.primary,
-        ),
+        style: context.settingsHub.cardTitleStyle(theme.textTheme, color: theme.colorScheme.primary),
       ),
     );
   }
@@ -862,7 +849,7 @@ class _WalletTabState extends State<_WalletTab> {
           children: [
             _buildInfoRow(
               theme,
-              'موجودی قابل استفاده',
+              adminTx(context, 'موجودی قابل استفاده', 'Available'),
               _formatCurrency(availableBalance, currencyCode),
               SemanticColorResolver.positive(context),
               FontWeight.bold,
@@ -870,19 +857,19 @@ class _WalletTabState extends State<_WalletTab> {
             const Divider(height: 24),
             _buildInfoRow(
               theme,
-              'موجودی در انتظار',
+              adminTx(context, 'موجودی در انتظار', 'Pending'),
               _formatCurrency(pendingBalance, currencyCode),
               SemanticColorResolver.warning(context),
             ),
             const Divider(height: 24),
             _buildInfoRow(
               theme,
-              'وضعیت',
-              status == 'active' ? 'فعال' : 'معلق',
+              adminTx(context, 'وضعیت', 'Status'),
+              status == 'active' ? adminTx(context, 'فعال', 'Active') : adminTx(context, 'معلق', 'Suspended'),
               status == 'active' ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
             ),
             const Divider(height: 24),
-            _buildInfoRow(theme, 'ارز پایه', currencyCode),
+            _buildInfoRow(theme, adminTx(context, 'ارز پایه', 'Currency'), currencyCode),
           ],
         ),
       ),
@@ -937,11 +924,11 @@ class _WalletTabState extends State<_WalletTab> {
             children: [
               TextFormField(
                 controller: _amountController,
-                decoration: const InputDecoration(
-                  labelText: 'مبلغ *',
-                  hintText: 'مبلغ هدیه را وارد کنید (مثلاً 1,000,000)',
-                  prefixIcon: Icon(Icons.attach_money),
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: adminTx(context, 'مبلغ *', 'Amount *'),
+                  hintText: adminTx(context, 'مثلاً 1,000,000', 'For example 1,000,000'),
+                  prefixIcon: const Icon(Icons.attach_money),
+                  border: const OutlineInputBorder(),
                 ),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [
@@ -951,12 +938,11 @@ class _WalletTabState extends State<_WalletTab> {
                 ],
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'مبلغ الزامی است';
+                    return adminTx(context, 'مبلغ الزامی است', 'Amount is required');
                   }
-                  // استفاده از parseFormattedDouble برای تبدیل مقدار فرمت‌شده به عدد
                   final amount = parseFormattedDouble(value);
                   if (amount == null || amount <= 0) {
-                    return 'مبلغ باید بزرگتر از صفر باشد';
+                    return adminTx(context, 'مبلغ باید بزرگ‌تر از صفر باشد', 'Amount must be greater than zero');
                   }
                   return null;
                 },
@@ -964,24 +950,41 @@ class _WalletTabState extends State<_WalletTab> {
               SizedBox(height: 16),
               TextFormField(
                 controller: _descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'توضیحات',
-                  hintText: 'توضیحات (اختیاری)',
-                  prefixIcon: Icon(Icons.description),
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: adminTx(context, 'توضیحات', 'Description'),
+                  hintText: adminTx(context, 'اختیاری', 'Optional'),
+                  prefixIcon: const Icon(Icons.description),
+                  border: const OutlineInputBorder(),
                 ),
                 maxLines: 2,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _reasonController,
-                decoration: const InputDecoration(
-                  labelText: 'دلیل',
-                  hintText: 'دلیل افزودن موجودی (اختیاری)',
-                  prefixIcon: Icon(Icons.info_outline),
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: adminTx(context, 'دلیل', 'Reason'),
+                  hintText: adminTx(context, 'اختیاری', 'Optional'),
+                  prefixIcon: const Icon(Icons.info_outline),
+                  border: const OutlineInputBorder(),
                 ),
                 maxLines: 2,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _giftConfirmController,
+                decoration: InputDecoration(
+                  labelText: adminTx(context, 'عبارت تأیید', 'Confirmation phrase'),
+                  hintText: adminTx(context, 'برای شارژ، هدیه یا GIFT را بنویسید', 'Type هدیه or GIFT'),
+                  prefixIcon: const Icon(Icons.verified_user_outlined),
+                  border: const OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  final text = (value ?? '').trim();
+                  if (text != 'هدیه' && text != 'GIFT') {
+                    return adminTx(context, 'عبارت تأیید باید هدیه یا GIFT باشد', 'Type هدیه or GIFT');
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 24),
               if (_errorMessage != null) ...[
@@ -1016,7 +1019,9 @@ class _WalletTabState extends State<_WalletTab> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.card_giftcard),
-                label: Text(_isLoading ? 'در حال افزودن...' : 'افزودن موجودی هدیه'),
+                label: Text(_isLoading
+                    ? adminTx(context, 'در حال افزودن…', 'Adding…')
+                    : adminTx(context, 'افزودن موجودی هدیه', 'Add gift balance')),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   backgroundColor: theme.colorScheme.primary,
@@ -1081,7 +1086,7 @@ class _BusinessPoliciesTabState extends State<_BusinessPoliciesTab> {
 
   Future<void> _assignPlan() async {
     if (_selectedPlanId == null) {
-      _showSnack('پلن را انتخاب کنید');
+      _showSnack(adminTx(context, 'پلن را انتخاب کنید', 'Choose a plan'));
       return;
     }
     setState(() => _assigningPlan = true);
@@ -1090,11 +1095,11 @@ class _BusinessPoliciesTabState extends State<_BusinessPoliciesTab> {
         widget.businessId,
         {'plan_id': _selectedPlanId, 'auto_renew': false},
       );
-      _showSnack('پلن با موفقیت اعمال شد');
+      _showSnack(adminTx(context, 'پلن اعمال شد', 'Plan applied'));
     } catch (e) {
       if (!mounted) return;
       _showSnack(
-        'خطا در اعمال پلن: ${ErrorExtractor.forContext(e, context)}',
+        '${adminTx(context, 'خطا در اعمال پلن', 'Could not apply the plan')}: ${ErrorExtractor.forContext(e, context)}',
       );
     } finally {
       if (mounted) {
@@ -1108,11 +1113,11 @@ class _BusinessPoliciesTabState extends State<_BusinessPoliciesTab> {
     try {
       await _service.deleteBusinessPolicyAdmin(widget.businessId, policyId);
       await _loadData();
-      _showSnack('سیاست حذف شد');
+      _showSnack(adminTx(context, 'سیاست حذف شد', 'Policy deleted'));
     } catch (e) {
       if (mounted) {
         _showSnack(
-          'خطا در حذف سیاست: ${ErrorExtractor.forContext(e, context)}',
+          '${adminTx(context, 'خطا در حذف سیاست', 'Could not delete the policy')}: ${ErrorExtractor.forContext(e, context)}',
         );
       }
     } finally {
@@ -1138,7 +1143,9 @@ class _BusinessPoliciesTabState extends State<_BusinessPoliciesTab> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setInnerState) => AlertDialog(
-            title: Text(initial == null ? 'سیاست جدید' : 'ویرایش سیاست'),
+            title: Text(initial == null
+                ? adminTx(pageContext, 'سیاست جدید', 'New policy')
+                : adminTx(pageContext, 'ویرایش سیاست', 'Edit policy')),
             content: SizedBox(
               width: 480,
               child: Form(
@@ -1149,51 +1156,52 @@ class _BusinessPoliciesTabState extends State<_BusinessPoliciesTab> {
                     children: [
                       TextFormField(
                         controller: titleCtrl,
-                        decoration: const InputDecoration(labelText: 'عنوان'),
-                        validator: (v) => v == null || v.isEmpty ? 'عنوان الزامی است' : null,
+                        decoration: InputDecoration(isDense: true, labelText: adminTx(pageContext, 'عنوان', 'Title')),
+                        validator: (v) => (v == null || v.isEmpty) ? adminTx(pageContext, 'عنوان الزامی است', 'Title is required') : null,
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
                         initialValue: policyType,
-                        decoration: const InputDecoration(labelText: 'نوع سیاست'),
-                        items: const [
-                          DropdownMenuItem(value: 'free', child: Text('رایگان')),
-                          DropdownMenuItem(value: 'subscription', child: Text('اشتراک')),
-                          DropdownMenuItem(value: 'per_document', child: Text('به‌ازای هر سند')),
-                          DropdownMenuItem(value: 'volume', child: Text('حجمی/تناوبی')),
-                          DropdownMenuItem(value: 'hybrid', child: Text('ترکیبی')),
+                        decoration: InputDecoration(isDense: true, labelText: adminTx(pageContext, 'نوع سیاست', 'Policy type')),
+                        items: [
+                          DropdownMenuItem(value: 'free', child: Text(adminTx(pageContext, 'رایگان', 'Free'))),
+                          DropdownMenuItem(value: 'subscription', child: Text(adminTx(pageContext, 'اشتراک', 'Subscription'))),
+                          DropdownMenuItem(value: 'per_document', child: Text(adminTx(pageContext, 'به‌ازای هر سند', 'Per document'))),
+                          DropdownMenuItem(value: 'volume', child: Text(adminTx(pageContext, 'حجمی', 'Volume'))),
+                          DropdownMenuItem(value: 'hybrid', child: Text(adminTx(pageContext, 'ترکیبی', 'Hybrid'))),
                         ],
                         onChanged: (v) => setInnerState(() => policyType = v ?? policyType),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                       TextFormField(
                         controller: priorityCtrl,
-                        decoration: const InputDecoration(labelText: 'اولویت'),
+                        decoration: InputDecoration(isDense: true, labelText: adminTx(pageContext, 'اولویت', 'Priority')),
                         keyboardType: TextInputType.number,
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        validator: (v) => v == null || v.isEmpty ? 'اولویت الزامی است' : null,
+                        validator: (v) => (v == null || v.isEmpty) ? adminTx(pageContext, 'اولویت الزامی است', 'Priority is required') : null,
                       ),
-                      const SizedBox(height: 12),
                       SwitchListTile(
-                        title: const Text('فعال'),
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(adminTx(pageContext, 'فعال', 'Active')),
                         value: isActive,
                         onChanged: (v) => setInnerState(() => isActive = v),
                       ),
-                      const SizedBox(height: 12),
                       TextFormField(
                         controller: configCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'پیکربندی (JSON)',
+                        decoration: InputDecoration(
+                          isDense: true,
+                          labelText: adminTx(pageContext, 'پیکربندی (JSON)', 'Configuration (JSON)'),
                           alignLabelWithHint: true,
                         ),
                         maxLines: 8,
                         validator: (v) {
-                          if (v == null || v.isEmpty) return 'پیکربندی الزامی است';
+                          if (v == null || v.isEmpty) return adminTx(pageContext, 'پیکربندی الزامی است', 'Configuration is required');
                           try {
                             jsonDecode(v);
                             return null;
                           } catch (_) {
-                            return 'فرمت JSON نامعتبر است';
+                            return adminTx(pageContext, 'فرمت JSON نامعتبر است', 'Invalid JSON');
                           }
                         },
                       ),
@@ -1205,7 +1213,7 @@ class _BusinessPoliciesTabState extends State<_BusinessPoliciesTab> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('انصراف'),
+                child: Text(adminTx(pageContext, 'انصراف', 'Cancel')),
               ),
               FilledButton(
                 onPressed: () async {
@@ -1231,12 +1239,12 @@ class _BusinessPoliciesTabState extends State<_BusinessPoliciesTab> {
                   } catch (e) {
                     if (pageContext.mounted) {
                       _showSnack(
-                        'خطا در ذخیره سیاست: ${ErrorExtractor.forContext(e, pageContext)}',
+                        '${adminTx(pageContext, 'خطا در ذخیره سیاست', 'Could not save the policy')}: ${ErrorExtractor.forContext(e, pageContext)}',
                       );
                     }
                   }
                 },
-                child: const Text('ذخیره'),
+                child: Text(adminTx(pageContext, 'ذخیره', 'Save')),
               ),
             ],
           ),
@@ -1262,7 +1270,7 @@ class _BusinessPoliciesTabState extends State<_BusinessPoliciesTab> {
             ElevatedButton.icon(
               onPressed: _loadData,
               icon: const Icon(Icons.refresh),
-              label: const Text('تلاش مجدد'),
+              label: Text(adminTx(context, 'تلاش مجدد', 'Retry')),
             ),
           ],
         ),
@@ -1272,92 +1280,122 @@ class _BusinessPoliciesTabState extends State<_BusinessPoliciesTab> {
     return RefreshIndicator(
       onRefresh: _loadData,
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: context.settingsHub.pagePadding,
         children: [
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('تعیین پکیج اشتراک برای کسب‌وکار', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(
+                        child: Text(
+                          adminTx(context, 'پکیج اشتراک کسب‌وکار', 'Business subscription package'),
+                          style: context.settingsHub.cardTitleStyle(
+                            Theme.of(context).textTheme,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
                       IconButton(
-                        icon: const Icon(Icons.refresh),
-                        tooltip: 'به‌روزرسانی پلن‌ها',
+                        icon: const Icon(Icons.refresh, size: 20),
+                        tooltip: adminTx(context, 'بازخوانی پلن‌ها', 'Refresh plans'),
                         onPressed: _loadData,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
                   DropdownButtonFormField<int>(
                     initialValue: _selectedPlanId,
                     items: _plans
                         .map(
                           (plan) => DropdownMenuItem<int>(
                             value: plan['id'] as int?,
-                            child: Text('${plan['name']} (${plan['period_months']} ماه)'),
+                            child: Text('${plan['name']} (${plan['period_months']} ${adminTx(context, 'ماه', 'mo')})'),
                           ),
                         )
                         .toList(),
                     onChanged: (v) => setState(() => _selectedPlanId = v),
-                    decoration: const InputDecoration(
-                      labelText: 'انتخاب پکیج',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      labelText: adminTx(context, 'انتخاب پکیج', 'Choose a package'),
+                      border: const OutlineInputBorder(),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   FilledButton.icon(
                     onPressed: _assigningPlan ? null : _assignPlan,
-                    icon: const Icon(Icons.check_circle_outline),
-                    label: Text(_assigningPlan ? 'در حال اعمال...' : 'اعمال پکیج'),
+                    icon: const Icon(Icons.check_circle_outline, size: 18),
+                    label: Text(_assigningPlan
+                        ? adminTx(context, 'در حال اعمال…', 'Applying…')
+                        : adminTx(context, 'اعمال پکیج', 'Apply package')),
                   ),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('سیاست‌های فعال', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(
+                        child: Text(
+                          adminTx(context, 'سیاست‌های فعال', 'Active policies'),
+                          style: context.settingsHub.cardTitleStyle(
+                            Theme.of(context).textTheme,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
                       FilledButton.icon(
                         onPressed: () => _openPolicyDialog(),
-                        icon: const Icon(Icons.add),
-                        label: const Text('سیاست جدید'),
+                        icon: const Icon(Icons.add, size: 18),
+                        label: Text(adminTx(context, 'سیاست جدید', 'New policy')),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   if (_policies.isEmpty)
-                    const Text('سیاستی ثبت نشده است', textAlign: TextAlign.center)
+                    Text(
+                      adminTx(context, 'سیاستی ثبت نشده است', 'No policies yet'),
+                      textAlign: TextAlign.center,
+                      style: context.settingsHub.cardSubtitleStyle(
+                        Theme.of(context).textTheme,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    )
                   else
                     ..._policies.map((policy) {
-                      final status = policy['is_active'] == true ? 'فعال' : 'غیرفعال';
+                      final status = policy['is_active'] == true
+                          ? adminTx(context, 'فعال', 'Active')
+                          : adminTx(context, 'غیرفعال', 'Inactive');
                       return Card(
-                        margin: const EdgeInsets.symmetric(vertical: 6),
+                        margin: const EdgeInsets.only(bottom: 6),
                         child: ListTile(
+                          dense: true,
                           title: Text(policy['title'] as String? ?? '-'),
-                          subtitle: Text('نوع: ${policy['policy_type']} | اولویت: ${policy['priority']} | وضعیت: $status'),
+                          subtitle: Text(
+                            '${adminTx(context, 'نوع', 'Type')}: ${policy['policy_type']} · ${adminTx(context, 'اولویت', 'Priority')}: ${policy['priority']} · ${adminTx(context, 'وضعیت', 'Status')}: $status',
+                          ),
                           trailing: Wrap(
-                            spacing: 8,
+                            spacing: 4,
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.edit),
-                                tooltip: 'ویرایش',
+                                icon: const Icon(Icons.edit, size: 18),
+                                tooltip: adminTx(context, 'ویرایش', 'Edit'),
                                 onPressed: () => _openPolicyDialog(initial: policy),
                               ),
                               IconButton(
-                                icon: const Icon(Icons.delete_outline),
-                                tooltip: _deleting ? 'در حال حذف...' : 'حذف',
+                                icon: const Icon(Icons.delete_outline, size: 18),
+                                tooltip: _deleting
+                                    ? adminTx(context, 'در حال حذف…', 'Deleting…')
+                                    : adminTx(context, 'حذف', 'Delete'),
                                 onPressed: _deleting ? null : () => _deletePolicy(policy['id'] as int),
                               ),
                             ],

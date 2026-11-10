@@ -2,9 +2,12 @@
 Actionهای مربوط به CRM (سرنخ، فرصت فروش، فعالیت)
 """
 
+import logging
 from typing import Any, Dict, Optional
 from datetime import datetime, date
 from decimal import Decimal
+
+logger = logging.getLogger(__name__)
 from app.services.workflow.action_registry import ActionHandler
 from app.services.workflow.logging_decorators import log_action_execution
 
@@ -62,6 +65,19 @@ class CreateLeadAction(ActionHandler):
         name = str(name).strip()[:255]
         if not name:
             return {"success": False, "error": "name is required"}
+        from adapters.db.models.crm import CrmProcessDefinition, CrmProcessStage
+
+        process = db.query(CrmProcessDefinition).filter(
+            CrmProcessDefinition.id == process_definition_id,
+            CrmProcessDefinition.business_id == business_id,
+            CrmProcessDefinition.process_type == "lead_funnel",
+        ).first()
+        stage = db.query(CrmProcessStage).filter(
+            CrmProcessStage.id == stage_id,
+            CrmProcessStage.process_definition_id == process_definition_id,
+        ).first() if process is not None else None
+        if process is None or stage is None:
+            return {"success": False, "error": "lead funnel or stage not found in this business"}
 
         code_val = generate_document_code(db, business_id, "crm_lead", date.today())
         created_by = user_id
@@ -101,7 +117,7 @@ class CreateLeadAction(ActionHandler):
                 user_id=int(created_by) if created_by else None,
             )
         except Exception:
-            pass
+            logger.exception("workflow trigger_lead_created failed lead_id=%s", lead.id)
         return {"success": True, "lead_id": lead.id, "code": lead.code}
 
 
@@ -162,6 +178,30 @@ class CreateDealAction(ActionHandler):
         amount = float(amount)
         if amount < 0:
             return {"success": False, "error": "amount must be >= 0"}
+        from adapters.db.models.person import Person
+        from adapters.db.models.crm import CrmProcessDefinition, CrmProcessStage
+        from app.core.responses import ApiError
+        from app.services.crm_guards import assert_currency_enabled_for_business
+
+        if db.query(Person.id).filter(Person.id == person_id, Person.business_id == business_id).first() is None:
+            return {"success": False, "error": "person not found in this business"}
+        process = db.query(CrmProcessDefinition).filter(
+            CrmProcessDefinition.id == process_definition_id,
+            CrmProcessDefinition.business_id == business_id,
+            CrmProcessDefinition.process_type == "sales_pipeline",
+        ).first()
+        stage = db.query(CrmProcessStage).filter(
+            CrmProcessStage.id == stage_id,
+            CrmProcessStage.process_definition_id == process_definition_id,
+        ).first() if process is not None else None
+        if process is None or stage is None:
+            return {"success": False, "error": "sales pipeline or stage not found in this business"}
+        currency_id = WorkflowEngine._resolve_value_static(config.get("currency_id"), context, node_results) or None
+        if currency_id is not None:
+            try:
+                assert_currency_enabled_for_business(db, int(business_id), int(currency_id))
+            except ApiError as exc:
+                return {"success": False, "error": exc.message}
 
         created_by = user_id
         if not created_by:
@@ -179,7 +219,7 @@ class CreateDealAction(ActionHandler):
             code=code_val,
             title=title,
             amount=amount,
-            currency_id=WorkflowEngine._resolve_value_static(config.get("currency_id"), context, node_results) or None,
+            currency_id=int(currency_id) if currency_id is not None else None,
             probability_percent=WorkflowEngine._resolve_value_static(config.get("probability_percent"), context, node_results) or None,
             description=WorkflowEngine._resolve_value_static(config.get("description"), context, node_results) or None,
             assigned_to_user_id=WorkflowEngine._resolve_value_static(config.get("assigned_to_user_id"), context, node_results) or None,
@@ -203,7 +243,7 @@ class CreateDealAction(ActionHandler):
                 user_id=int(created_by) if created_by else None,
             )
         except Exception:
-            pass
+            logger.exception("workflow trigger_deal_created failed deal_id=%s", deal.id)
         return {"success": True, "deal_id": deal.id, "code": deal.code}
 
 
@@ -271,6 +311,7 @@ class CreateCrmActivityAction(ActionHandler):
             try:
                 activity_date = datetime.fromisoformat(str(activity_date_str).replace("Z", "+00:00"))
             except Exception:
+                logger.exception("workflow activity_date invalid; using utcnow")
                 activity_date = datetime.utcnow()
         else:
             activity_date = datetime.utcnow()
@@ -288,6 +329,13 @@ class CreateCrmActivityAction(ActionHandler):
             person = db.query(Person).filter(Person.id == person_id_int, Person.business_id == business_id).first()
             if not person:
                 return {"success": False, "error": "person not found"}
+        deal_raw = WorkflowEngine._resolve_value_static(config.get("deal_id"), context, node_results)
+        deal_id_int = int(deal_raw) if deal_raw else None
+        if deal_id_int is not None:
+            from adapters.db.models.crm import Deal
+
+            if db.query(Deal.id).filter(Deal.id == deal_id_int, Deal.business_id == business_id).first() is None:
+                return {"success": False, "error": "deal not found in this business"}
         code_val = generate_document_code(db, business_id, "crm_activity", activity_date.date())
         act = CrmActivity(
             business_id=business_id,
@@ -298,7 +346,7 @@ class CreateCrmActivityAction(ActionHandler):
             subject=WorkflowEngine._resolve_value_static(config.get("subject"), context, node_results) or None,
             description=WorkflowEngine._resolve_value_static(config.get("description"), context, node_results) or None,
             activity_date=activity_date,
-            deal_id=WorkflowEngine._resolve_value_static(config.get("deal_id"), context, node_results) or None,
+            deal_id=deal_id_int,
             created_by_user_id=created_by,
         )
         db.add(act)
@@ -309,7 +357,7 @@ class CreateCrmActivityAction(ActionHandler):
 
             trigger_crm_activity_created(db, int(business_id), act.id, user_id=int(created_by) if created_by else None)
         except Exception:
-            pass
+            logger.exception("workflow trigger_crm_activity_created failed activity_id=%s", act.id)
         return {"success": True, "activity_id": act.id, "code": act.code}
 
 
@@ -392,7 +440,7 @@ class UpdateLeadAction(ActionHandler):
                         user_id=int(uid) if uid else None,
                     )
                 except Exception:
-                    pass
+                    logger.exception("workflow trigger_lead_stage_changed failed lead_id=%s", lead.id)
         aid = WorkflowEngine._resolve_value_static(config.get("assigned_to_user_id"), context, node_results)
         if aid is not None:
             new_assign = int(aid) if aid else None
@@ -411,13 +459,13 @@ class UpdateLeadAction(ActionHandler):
                         user_id=int(uid) if uid else None,
                     )
                 except Exception:
-                    pass
+                    logger.exception("workflow trigger_lead_assigned failed lead_id=%s", lead.id)
         nfu = WorkflowEngine._resolve_value_static(config.get("next_follow_up_at"), context, node_results)
         if nfu:
             try:
                 lead.next_follow_up_at = datetime.fromisoformat(str(nfu).replace("Z", "+00:00"))
             except Exception:
-                pass
+                return {"success": False, "error": "invalid next_follow_up_at (use ISO datetime)"}
         nm = WorkflowEngine._resolve_value_static(config.get("name"), context, node_results)
         if nm is not None:
             lead.name = str(nm).strip()[:255]
@@ -443,6 +491,8 @@ class UpdateDealAction(ActionHandler):
                 "amount": {"type": "number", "required": False},
                 "probability_percent": {"type": "integer", "required": False},
                 "document_id": {"type": "integer", "required": False},
+                "won_reason_code": {"type": "string", "required": False},
+                "lost_reason_code": {"type": "string", "required": False},
                 "title": {"type": "string", "required": False},
                 "closed_at": {
                     "type": "string",
@@ -500,6 +550,18 @@ class UpdateDealAction(ActionHandler):
             if not st:
                 return {"success": False, "error": "invalid stage_id"}
             if new_sid != old_stage_id:
+                if st.is_win or st.is_lost:
+                    from app.services import crm_close_reason_service
+
+                    reason_type = "won" if st.is_win else "lost"
+                    reason_key = "won_reason_code" if st.is_win else "lost_reason_code"
+                    reason_code = WorkflowEngine._resolve_value_static(config.get(reason_key), context, node_results)
+                    if not reason_code or not crm_close_reason_service.is_valid_reason_code(db, int(business_id), reason_type, str(reason_code)):
+                        return {"success": False, "error": "win/loss stage requires a valid reason code"}
+                    if st.is_win:
+                        deal.won_reason_code = str(reason_code)
+                    else:
+                        deal.lost_reason_code = str(reason_code)
                 deal.stage_id = new_sid
                 db.flush()
                 try:
@@ -514,7 +576,7 @@ class UpdateDealAction(ActionHandler):
                         user_id=int(uid) if uid else None,
                     )
                 except Exception:
-                    pass
+                    logger.exception("workflow trigger_deal_stage_changed failed deal_id=%s", deal.id)
         aid = WorkflowEngine._resolve_value_static(config.get("assigned_to_user_id"), context, node_results)
         if aid is not None:
             new_assign = int(aid) if aid else None
@@ -533,7 +595,7 @@ class UpdateDealAction(ActionHandler):
                         user_id=int(uid) if uid else None,
                     )
                 except Exception:
-                    pass
+                    logger.exception("workflow trigger_deal_assigned failed deal_id=%s", deal.id)
         amt = WorkflowEngine._resolve_value_static(config.get("amount"), context, node_results)
         if amt is not None:
             deal.amount = float(amt)
@@ -542,7 +604,16 @@ class UpdateDealAction(ActionHandler):
             deal.probability_percent = int(pr) if pr is not None else None
         doc = WorkflowEngine._resolve_value_static(config.get("document_id"), context, node_results)
         if doc is not None:
-            deal.document_id = int(doc) if doc else None
+            if not doc:
+                deal.document_id = None
+            else:
+                from app.core.responses import ApiError
+                from app.services.crm_deal_document_service import link_deal_document
+
+                try:
+                    link_deal_document(db, int(business_id), deal, int(doc), created_by_user_id=int(uid) if uid else None)
+                except ApiError as exc:
+                    return {"success": False, "error": exc.message}
         ttl = WorkflowEngine._resolve_value_static(config.get("title"), context, node_results)
         if ttl is not None:
             deal.title = str(ttl).strip()[:255]
@@ -553,6 +624,14 @@ class UpdateDealAction(ActionHandler):
                 deal.closed_at = datetime.fromisoformat(str(closed_raw).replace("Z", "+00:00"))
             except Exception:
                 return {"success": False, "error": "invalid closed_at (use ISO datetime)"}
+            try:
+                from app.services.crm_automation_service import cancel_sequence_enrollments
+
+                cancel_sequence_enrollments(
+                    db, int(deal.business_id), entity_type="deal", entity_id=int(deal.id), reason="deal_closed", when="close"
+                )
+            except Exception:
+                logger.exception("sequence stop on workflow deal close failed deal_id=%s", deal.id)
             db.flush()
             stg = (
                 db.query(CrmProcessStage)
@@ -578,7 +657,7 @@ class UpdateDealAction(ActionHandler):
                     is_lost=is_lost,
                 )
             except Exception:
-                pass
+                logger.exception("workflow trigger_deal_closed failed deal_id=%s", deal.id)
 
         db.flush()
         db.refresh(deal)
@@ -624,7 +703,19 @@ class CrmLinkDealDocumentAction(ActionHandler):
         deal = db.query(Deal).filter(Deal.id == int(deal_id), Deal.business_id == business_id).first()
         if not deal:
             return {"success": False, "error": "deal not found"}
-        deal.document_id = int(document_id)
+        from app.core.responses import ApiError
+        from app.services.crm_deal_document_service import link_deal_document
+
+        try:
+            link_deal_document(
+                db,
+                int(business_id),
+                deal,
+                int(document_id),
+                created_by_user_id=int(context.get("user_id")) if context.get("user_id") else None,
+            )
+        except ApiError as exc:
+            return {"success": False, "error": exc.message}
         db.flush()
         return {"success": True, "deal_id": deal.id, "document_id": int(document_id)}
 

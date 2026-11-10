@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/api_client.dart';
-import '../../services/admin_scripts_service.dart';
+import 'admin_compact_scaffold.dart';
+import '../../theme/tokens/extensions.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
@@ -58,7 +58,7 @@ class _SystemScriptsPageState extends State<SystemScriptsPage> {
       SnackBarHelper.showError(
         context,
         message:
-            'خطا در بارگذاری اسکریپت‌ها: ${ErrorExtractor.forContext(e, context)}',
+            '${adminTx(context, 'خطا در بارگذاری اسکریپت‌ها', 'Could not load scripts')}: ${ErrorExtractor.forContext(e, context)}',
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -67,6 +67,47 @@ class _SystemScriptsPageState extends State<SystemScriptsPage> {
 
   Future<void> _startRun(String scriptKey) async {
     if (_isSubmitting) return;
+    if (!_dryRun) {
+      final controller = TextEditingController();
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) {
+          var phraseError = '';
+          return StatefulBuilder(
+            builder: (context, setLocal) {
+              return AlertDialog(
+                title: Text(adminTx(context, 'تأیید اجرای واقعی', 'Confirm a real run')),
+                content: TextField(
+                  controller: controller,
+                  decoration: InputDecoration(
+                    labelText: adminTx(context, 'برای اجرا RUN را بنویسید', 'Type RUN to execute'),
+                    errorText: phraseError.isEmpty ? null : phraseError,
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                    child: Text(adminTx(context, 'انصراف', 'Cancel')),
+                  ),
+                  FilledButton(
+                    onPressed: () {
+                      if (controller.text.trim() != 'RUN') {
+                        setLocal(() => phraseError = adminTx(context, 'عبارت باید دقیقاً RUN باشد', 'The phrase must be exactly RUN'));
+                        return;
+                      }
+                      Navigator.pop(dialogContext, true);
+                    },
+                    child: Text(adminTx(context, 'اجرا', 'Run')),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+      controller.dispose();
+      if (confirmed != true) return;
+    }
     setState(() => _isSubmitting = true);
     try {
       final params = <String, dynamic>{};
@@ -84,15 +125,16 @@ class _SystemScriptsPageState extends State<SystemScriptsPage> {
         scriptKey: scriptKey,
         dryRun: _dryRun,
         params: params,
+        confirmation: _dryRun ? null : 'RUN',
       );
       if (!mounted) return;
-      SnackBarHelper.showSuccess(context, message: 'اجرای اسکریپت در صف قرار گرفت');
+      SnackBarHelper.showSuccess(context, message: adminTx(context, 'اجرای اسکریپت در صف قرار گرفت', 'Script run queued'));
       await _refreshRuns();
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.showError(
         context,
-        message: 'خطا در شروع اجرا: ${ErrorExtractor.forContext(e, context)}',
+        message: '${adminTx(context, 'خطا در شروع اجرا', 'Could not start the run')}: ${ErrorExtractor.forContext(e, context)}',
       );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -128,7 +170,7 @@ class _SystemScriptsPageState extends State<SystemScriptsPage> {
       SnackBarHelper.showError(
         context,
         message:
-            'خطا در دریافت جزئیات اجرا: ${ErrorExtractor.forContext(e, context)}',
+            '${adminTx(context, 'خطا در دریافت جزئیات اجرا', 'Could not load run details')}: ${ErrorExtractor.forContext(e, context)}',
       );
     }
   }
@@ -151,21 +193,17 @@ class _SystemScriptsPageState extends State<SystemScriptsPage> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('اسکریپت‌های سیستمی'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/user/profile/system-settings'),
+    final hub = context.settingsHub;
+    final textTheme = Theme.of(context).textTheme;
+    return AdminCompactScaffold(
+      title: adminTx(context, 'اسکریپت‌های سیستمی', 'System scripts'),
+      actions: [
+        IconButton(
+          onPressed: _refreshRuns,
+          icon: const Icon(Icons.refresh, size: 20),
+          tooltip: adminTx(context, 'بازخوانی', 'Refresh'),
         ),
-        actions: [
-          IconButton(
-            onPressed: _refreshRuns,
-            icon: const Icon(Icons.refresh),
-            tooltip: 'بازخوانی',
-          ),
-        ],
-      ),
+      ],
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Row(
@@ -173,15 +211,21 @@ class _SystemScriptsPageState extends State<SystemScriptsPage> {
                 Expanded(
                   flex: 3,
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: hub.pagePadding,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('اجرای اسکریپت', style: TextStyle(fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
+                        Text(
+                          adminTx(context, 'اجرای اسکریپت', 'Run a script'),
+                          style: hub.cardTitleStyle(textTheme, color: scheme.onSurface),
+                        ),
                         SwitchListTile(
+                          dense: true,
                           contentPadding: EdgeInsets.zero,
-                          title: const Text('Dry-run (بدون اعمال تغییر)'),
+                          title: Text(
+                            adminTx(context, 'اجرای آزمایشی (بدون اعمال تغییر)', 'Dry run (no changes)'),
+                            style: hub.cardSubtitleStyle(textTheme, color: scheme.onSurface),
+                          ),
                           value: _dryRun,
                           onChanged: (v) => setState(() => _dryRun = v),
                         ),
@@ -191,43 +235,57 @@ class _SystemScriptsPageState extends State<SystemScriptsPage> {
                               child: TextField(
                                 controller: _businessIdController,
                                 keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                  labelText: 'Business ID (اختیاری)',
-                                  border: OutlineInputBorder(),
+                                style: hub.cardSubtitleStyle(textTheme, color: scheme.onSurface),
+                                decoration: InputDecoration(
+                                  isDense: true,
+                                  labelText: adminTx(context, 'شناسه کسب‌وکار (اختیاری)', 'Business ID (optional)'),
+                                  border: const OutlineInputBorder(),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 8),
                             Expanded(
                               child: TextField(
                                 controller: _limitController,
                                 keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                  labelText: 'Limit (اختیاری)',
-                                  border: OutlineInputBorder(),
+                                style: hub.cardSubtitleStyle(textTheme, color: scheme.onSurface),
+                                decoration: InputDecoration(
+                                  isDense: true,
+                                  labelText: adminTx(context, 'سقف (اختیاری)', 'Limit (optional)'),
+                                  border: const OutlineInputBorder(),
                                 ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 8),
                         ..._scripts.map((s) {
                           final key = (s['key'] ?? '').toString();
                           return Card(
+                            margin: const EdgeInsets.only(bottom: 6),
                             child: ListTile(
-                              title: Text((s['title'] ?? key).toString()),
-                              subtitle: Text((s['description'] ?? '').toString()),
+                              dense: true,
+                              title: Text(
+                                (s['title'] ?? key).toString(),
+                                style: hub.cardTitleStyle(textTheme, color: scheme.onSurface),
+                              ),
+                              subtitle: Text(
+                                (s['description'] ?? '').toString(),
+                                style: hub.cardSubtitleStyle(textTheme, color: scheme.onSurfaceVariant),
+                              ),
                               trailing: FilledButton(
                                 onPressed: _isSubmitting ? null : () => _startRun(key),
-                                child: const Text('اجرا'),
+                                child: Text(adminTx(context, 'اجرا', 'Run')),
                               ),
                             ),
                           );
                         }),
-                        const SizedBox(height: 12),
                         const Divider(),
-                        const Text('تاریخچه اجراها', style: TextStyle(fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
+                        Text(
+                          adminTx(context, 'تاریخچه اجراها', 'Run history'),
+                          style: hub.cardTitleStyle(textTheme, color: scheme.onSurface),
+                        ),
+                        const SizedBox(height: 4),
                         Expanded(
                           child: ListView.builder(
                             itemCount: _runs.length,
@@ -236,15 +294,22 @@ class _SystemScriptsPageState extends State<SystemScriptsPage> {
                               final runId = item['id'] as int?;
                               final status = (item['status'] ?? '').toString();
                               return Card(
+                                margin: const EdgeInsets.only(bottom: 4),
                                 child: ListTile(
+                                  dense: true,
                                   onTap: runId != null ? () => _loadRunDetails(runId) : null,
                                   selected: runId != null && runId == _selectedRunId,
-                                  title: Text('#${item['id']} - ${item['script_key'] ?? ''}'),
+                                  title: Text(
+                                    '#${item['id']} · ${item['script_key'] ?? ''}',
+                                    style: hub.cardTitleStyle(textTheme, color: scheme.onSurface),
+                                  ),
                                   subtitle: Text(
-                                    'اسکن: ${item['scanned_count'] ?? 0} | آپدیت: ${item['updated_count'] ?? 0} | خطا: ${item['error_count'] ?? 0}',
+                                    '${adminTx(context, 'اسکن', 'Scanned')}: ${item['scanned_count'] ?? 0} · ${adminTx(context, 'به‌روزرسانی', 'Updated')}: ${item['updated_count'] ?? 0} · ${adminTx(context, 'خطا', 'Errors')}: ${item['error_count'] ?? 0}',
+                                    style: hub.cardSubtitleStyle(textTheme, color: scheme.onSurfaceVariant),
                                   ),
                                   trailing: Chip(
-                                    label: Text(status),
+                                    visualDensity: VisualDensity.compact,
+                                    label: Text(status, style: const TextStyle(fontSize: 11)),
                                     backgroundColor: _statusColor(status, scheme).withValues(alpha: 0.15),
                                     labelStyle: TextStyle(color: _statusColor(status, scheme)),
                                   ),
@@ -261,9 +326,14 @@ class _SystemScriptsPageState extends State<SystemScriptsPage> {
                 Expanded(
                   flex: 2,
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: hub.pagePadding,
                     child: _selectedRunDetails == null
-                        ? const Center(child: Text('یک اجرا را برای مشاهده جزئیات انتخاب کنید'))
+                        ? Center(
+                            child: Text(
+                              adminTx(context, 'یک اجرا را برای مشاهده جزئیات انتخاب کنید', 'Select a run to see details'),
+                              style: hub.cardSubtitleStyle(textTheme, color: scheme.onSurfaceVariant),
+                            ),
+                          )
                         : _buildDetailsPanel(),
                   ),
                 ),
@@ -279,21 +349,42 @@ class _SystemScriptsPageState extends State<SystemScriptsPage> {
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
 
+    final hub = context.settingsHub;
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('جزئیات اجرا #${run['id'] ?? ''}', style: TextStyle(fontWeight: FontWeight.bold)),
-        SizedBox(height: 8),
-        Text('وضعیت: ${run['status'] ?? '-'}'),
-        Text('dry_run: ${run['dry_run'] == true ? 'true' : 'false'}'),
-        Text('updated: ${run['updated_count'] ?? 0} / scanned: ${run['scanned_count'] ?? 0}'),
+        Text(
+          '${adminTx(context, 'جزئیات اجرا', 'Run')} #${run['id'] ?? ''}',
+          style: hub.cardTitleStyle(textTheme, color: scheme.onSurface),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          '${adminTx(context, 'وضعیت', 'Status')}: ${run['status'] ?? '-'}',
+          style: hub.cardSubtitleStyle(textTheme, color: scheme.onSurface),
+        ),
+        Text(
+          '${adminTx(context, 'آزمایشی', 'Dry run')}: ${run['dry_run'] == true ? adminTx(context, 'بله', 'Yes') : adminTx(context, 'خیر', 'No')}',
+          style: hub.cardSubtitleStyle(textTheme, color: scheme.onSurface),
+        ),
+        Text(
+          '${adminTx(context, 'به‌روزرسانی', 'Updated')}: ${run['updated_count'] ?? 0} / ${adminTx(context, 'اسکن', 'Scanned')}: ${run['scanned_count'] ?? 0}',
+          style: hub.cardSubtitleStyle(textTheme, color: scheme.onSurface),
+        ),
         if ((run['error_text'] ?? '').toString().isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 8),
-            child: Text('خطا: ${run['error_text']}', style: TextStyle(color: SemanticColorResolver.negative(context))),
+            child: Text(
+              '${adminTx(context, 'خطا', 'Error')}: ${run['error_text']}',
+              style: hub.cardSubtitleStyle(textTheme, color: SemanticColorResolver.negative(context)),
+            ),
           ),
-        const SizedBox(height: 12),
-        const Text('لاگ اجرا', style: TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Text(
+          adminTx(context, 'لاگ اجرا', 'Run log'),
+          style: hub.cardTitleStyle(textTheme, color: scheme.onSurface),
+        ),
         const SizedBox(height: 8),
         Expanded(
           child: ListView.builder(

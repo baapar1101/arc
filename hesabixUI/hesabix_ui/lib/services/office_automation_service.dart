@@ -43,6 +43,359 @@ class OfficeAutomationService {
     return _extractData(res.data);
   }
 
+  Future<Map<String, dynamic>> getPersonalDesk({
+    required int businessId,
+    required int positionId,
+    int horizonDays = 7,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/desk',
+      query: _posQuery(positionId, {'horizon_days': horizonDays}),
+      options: _opts(positionId),
+    );
+    return _extractData(res.data);
+  }
+
+  Future<Map<String, dynamic>> publishLinearProcess({
+    required int businessId,
+    required String name,
+    required int assigneePositionId,
+    String? code,
+    int? slaHours,
+    String? formLabel,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/processes/linear',
+      data: {
+        'name': name,
+        'assignee_position_id': assigneePositionId,
+        if (code != null && code.isNotEmpty) 'code': code,
+        if (slaHours != null && slaHours > 0) 'sla_hours': slaHours,
+        if (formLabel != null && formLabel.isNotEmpty) 'form_label': formLabel,
+      },
+    );
+    return _extractData(res.data);
+  }
+
+  Future<List<Map<String, dynamic>>> listProcessDefinitions({required int businessId}) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/processes',
+    );
+    return _asMapList(_extractData(res.data)['items']);
+  }
+
+  Future<Map<String, dynamic>> saveProcessDraft({
+    required int businessId,
+    required String code,
+    required String name,
+    required Map<String, dynamic> graph,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/processes',
+      data: {'code': code, 'name': name, 'graph': graph},
+    );
+    return _extractData(res.data);
+  }
+
+  Future<Map<String, dynamic>> publishProcess({
+    required int businessId,
+    required int definitionId,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/processes/$definitionId/publish',
+    );
+    return _extractData(res.data);
+  }
+
+  Future<List<Map<String, dynamic>>> listProcessVersions({required int businessId}) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/process-versions',
+    );
+    final data = _extractData(res.data);
+    final items = data['items'];
+    if (items is List) return items.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    return const [];
+  }
+
+  Future<Map<String, dynamic>> startProcess({
+    required int businessId,
+    required int versionId,
+    required int positionId,
+    Map<String, dynamic>? variables,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/process-versions/$versionId/start',
+      data: {'variables': variables ?? const {}},
+      query: _posQuery(positionId),
+      options: _opts(positionId),
+    );
+    return _extractData(res.data);
+  }
+
+  Future<List<Map<String, dynamic>>> listProcessTasks({
+    required int businessId,
+    required int positionId,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/process-tasks',
+      query: _posQuery(positionId),
+      options: _opts(positionId),
+    );
+    final data = _extractData(res.data);
+    final items = data['items'];
+    if (items is List) return items.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    return const [];
+  }
+
+  Future<Map<String, dynamic>> completeProcessTask({
+    required int businessId,
+    required int taskId,
+    required int positionId,
+    required Map<String, dynamic> form,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/process-tasks/$taskId/complete',
+      data: {'form': form},
+      query: _posQuery(positionId),
+      options: _opts(positionId),
+    );
+    return _extractData(res.data);
+  }
+
+  Future<Map<String, dynamic>> registerDocument({
+    required int businessId,
+    required int positionId,
+    required String title,
+    required String fileStorageId,
+    String confidentiality = 'normal',
+    int? letterId,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/documents',
+      data: {
+        'title': title,
+        'file_storage_id': fileStorageId,
+        'confidentiality': confidentiality,
+        if (letterId != null) 'letter_id': letterId,
+      },
+      query: _posQuery(positionId),
+      options: _opts(positionId),
+    );
+    return _extractData(res.data);
+  }
+
+  Future<Map<String, dynamic>> addDocumentVersion({
+    required int businessId,
+    required int documentId,
+    required int positionId,
+    required String fileStorageId,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/documents/$documentId/versions',
+      data: {'file_storage_id': fileStorageId},
+      query: _posQuery(positionId),
+      options: _opts(positionId),
+    );
+    return _extractData(res.data);
+  }
+
+  Future<Map<String, dynamic>> searchDocuments({
+    required int businessId,
+    required int positionId,
+    String? q,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/documents',
+      query: _posQuery(positionId, {if (q != null && q.isNotEmpty) 'q': q}),
+      options: _opts(positionId),
+    );
+    return _extractData(res.data);
+  }
+
+  Future<Map<String, dynamic>> getDocument({
+    required int businessId,
+    required int documentId,
+    required int positionId,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/documents/$documentId',
+      query: _posQuery(positionId),
+      options: _opts(positionId),
+    );
+    return _extractData(res.data);
+  }
+
+  Future<Map<String, dynamic>> decideDocumentSuggestion({
+    required int businessId,
+    required int suggestionId,
+    required int positionId,
+    required bool accept,
+  }) async {
+    final action = accept ? 'accept' : 'reject';
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/document-suggestions/$suggestionId/$action',
+      query: _posQuery(positionId),
+      options: _opts(positionId),
+    );
+    return _extractData(res.data);
+  }
+
+  Future<List<Map<String, dynamic>>> listBranches({required int businessId}) async {
+    final res = await _api.get<Map<String, dynamic>>('/api/v1/office-automation/business/$businessId/branches');
+    final data = _extractData(res.data);
+    return List<Map<String, dynamic>>.from(data['items'] as List? ?? const []);
+  }
+
+  Future<void> createSignatureProvider({
+    required int businessId,
+    required String code,
+    required String name,
+    String? endpointUrl,
+    String? accessToken,
+  }) async {
+    await _api.post<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/signature-providers',
+      data: {
+        'code': code,
+        'name': name,
+        if (endpointUrl != null && endpointUrl.isNotEmpty) 'endpoint_url': endpointUrl,
+        if (accessToken != null && accessToken.isNotEmpty) 'access_token': accessToken,
+      },
+    );
+  }
+
+  Future<void> createBranch({required int businessId, required String code, required String name}) async {
+    await _api.post<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/branches',
+      data: {'code': code, 'name': name},
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> listRetentionPolicies({required int businessId}) async {
+    final res = await _api.get<Map<String, dynamic>>('/api/v1/office-automation/business/$businessId/retention-policies');
+    final data = _extractData(res.data);
+    return List<Map<String, dynamic>>.from(data['items'] as List? ?? const []);
+  }
+
+  Future<void> saveRetentionPolicy({
+    required int businessId,
+    required String confidentiality,
+    required int retainDays,
+  }) async {
+    await _api.post<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/retention-policies',
+      data: {'confidentiality': confidentiality, 'retain_days': retainDays},
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> listSignatureProviders({required int businessId}) async {
+    final res = await _api.get<Map<String, dynamic>>('/api/v1/office-automation/business/$businessId/signature-providers');
+    final data = _extractData(res.data);
+    return List<Map<String, dynamic>>.from(data['items'] as List? ?? const []);
+  }
+
+  Future<List<Map<String, dynamic>>> listQualifiedRequests({
+    required int businessId,
+    required int letterId,
+    required int positionId,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/letters/$letterId/qualified-signatures',
+      query: _posQuery(positionId),
+      options: _opts(positionId),
+    );
+    final data = _extractData(res.data);
+    return List<Map<String, dynamic>>.from(data['items'] as List? ?? const []);
+  }
+
+  Future<void> requestQualifiedSignature({
+    required int businessId,
+    required int letterId,
+    required int positionId,
+    required int providerId,
+  }) async {
+    await _api.post<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/letters/$letterId/qualified-signature',
+      query: _posQuery(positionId),
+      options: _opts(positionId),
+      data: {'provider_id': providerId, 'as_position_id': positionId},
+    );
+  }
+
+  Future<void> recordQualifiedResult({
+    required int businessId,
+    required int requestId,
+    required String externalRef,
+    required String outcome,
+  }) async {
+    await _api.post<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/qualified-signatures/$requestId/result',
+      data: {'external_ref': externalRef, 'outcome': outcome},
+    );
+  }
+
+  Future<void> exchangeLetter({
+    required int businessId,
+    required int letterId,
+    required int positionId,
+    required int targetBusinessId,
+    required int targetPositionId,
+  }) async {
+    await _api.post<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/letters/$letterId/exchange',
+      query: _posQuery(positionId),
+      options: _opts(positionId),
+      data: {
+        'as_position_id': positionId,
+        'target_business_id': targetBusinessId,
+        'target_position_id': targetPositionId,
+      },
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> listRetentionReviews({required int businessId}) async {
+    final res = await _api.get<Map<String, dynamic>>('/api/v1/office-automation/business/$businessId/retention-reviews');
+    final data = _extractData(res.data);
+    return List<Map<String, dynamic>>.from(data['items'] as List? ?? const []);
+  }
+
+  Future<List<Map<String, dynamic>>> listRetentionDocuments({required int businessId}) async {
+    final res = await _api.get<Map<String, dynamic>>('/api/v1/office-automation/business/$businessId/retention-reviews');
+    final data = _extractData(res.data);
+    return List<Map<String, dynamic>>.from(data['documents'] as List? ?? const []);
+  }
+
+  Future<void> holdLetterRetention({required int businessId, required int letterId}) async {
+    await _api.post<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/letters/$letterId/retention-hold',
+    );
+  }
+
+  Future<void> holdDocumentRetention({required int businessId, required int documentId}) async {
+    await _api.post<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/documents/$documentId/retention-hold',
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> listMcpConfirmations({required int businessId}) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/mcp-confirmations',
+    );
+    final data = _extractData(res.data);
+    return List<Map<String, dynamic>>.from(data['items'] as List? ?? const []);
+  }
+
+  Future<void> decideMcpConfirmation({
+    required int businessId,
+    required int confirmationId,
+    required bool accept,
+  }) async {
+    final action = accept ? 'approve' : 'reject';
+    await _api.post<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/mcp-confirmations/$confirmationId/$action',
+    );
+  }
+
   Future<Map<String, dynamic>> getDashboard({
     required int businessId,
     int? positionId,
@@ -229,6 +582,62 @@ class OfficeAutomationService {
     return _extractData(res.data);
   }
 
+  Future<Map<String, dynamic>> listCartableBoard({
+    required int businessId,
+    required int positionId,
+    String? q,
+    int limit = 40,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/cartable/board',
+      query: _posQuery(positionId, {
+        if (q != null && q.isNotEmpty) 'q': q,
+        'limit': limit,
+      }),
+      options: _opts(positionId),
+    );
+    return _extractData(res.data);
+  }
+
+  Future<List<Map<String, dynamic>>> listSavedFilters({required int businessId}) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/cartable/filters',
+    );
+    final data = _extractData(res.data);
+    final items = data['items'];
+    if (items is List) {
+      return items.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    }
+    return const [];
+  }
+
+  Future<Map<String, dynamic>> saveSavedFilter({
+    required int businessId,
+    required String name,
+    required String folder,
+    String? q,
+    String? dateFrom,
+    String? dateTo,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/cartable/filters',
+      data: {
+        'name': name,
+        'folder': folder,
+        if (q != null && q.trim().isNotEmpty) 'q': q.trim(),
+        if (dateFrom != null && dateFrom.isNotEmpty) 'date_from': dateFrom,
+        if (dateTo != null && dateTo.isNotEmpty) 'date_to': dateTo,
+      },
+    );
+    return _extractData(res.data);
+  }
+
+  Future<void> deleteSavedFilter({required int businessId, required int filterId}) async {
+    await _api.delete<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/cartable/filters/$filterId',
+    );
+  }
+
   Future<Map<String, dynamic>> createDraft({
     required int businessId,
     required int positionId,
@@ -254,6 +663,35 @@ class OfficeAutomationService {
       options: _opts(positionId),
     );
     return _extractData(res.data);
+  }
+
+  Future<List<Map<String, dynamic>>> listCommercialLinks({
+    required int businessId,
+    required int letterId,
+    required int positionId,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/letters/$letterId/commercial-links',
+      query: _posQuery(positionId),
+      options: _opts(positionId),
+    );
+    final data = _extractData(res.data);
+    return List<Map<String, dynamic>>.from(data['items'] as List? ?? const []);
+  }
+
+  Future<void> linkCommercial({
+    required int businessId,
+    required int letterId,
+    required int positionId,
+    required String targetKind,
+    required int targetId,
+  }) async {
+    await _api.post<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/letters/$letterId/commercial-links',
+      data: {'target_kind': targetKind, 'target_id': targetId},
+      query: _posQuery(positionId),
+      options: _opts(positionId),
+    );
   }
 
   Future<Map<String, dynamic>> getLetterPrint({
@@ -427,6 +865,25 @@ class OfficeAutomationService {
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/office-automation/business/$businessId/letters/$letterId/follow-up',
       data: {'follow_up_at': followUpAt},
+      query: _posQuery(positionId),
+      options: _opts(positionId),
+    );
+    return _extractData(res.data);
+  }
+
+  Future<Map<String, dynamic>> replyToLetter({
+    required int businessId,
+    required int letterId,
+    required int positionId,
+    String? subject,
+    String? body,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/letters/$letterId/reply',
+      data: {
+        if (subject != null && subject.trim().isNotEmpty) 'subject': subject.trim(),
+        if (body != null) 'body': body,
+      },
       query: _posQuery(positionId),
       options: _opts(positionId),
     );
@@ -853,6 +1310,21 @@ class OfficeAutomationService {
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/office-automation/business/$businessId/letters/$letterId/archive-to-folder',
       data: {'folder_id': folderId},
+      query: _posQuery(positionId),
+      options: _opts(positionId),
+    );
+    return _extractData(res.data);
+  }
+
+  Future<Map<String, dynamic>> cancelReferral({
+    required int businessId,
+    required int referralId,
+    required int positionId,
+    String? note,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/office-automation/business/$businessId/referrals/$referralId/cancel',
+      data: {'note': note},
       query: _posQuery(positionId),
       options: _opts(positionId),
     );

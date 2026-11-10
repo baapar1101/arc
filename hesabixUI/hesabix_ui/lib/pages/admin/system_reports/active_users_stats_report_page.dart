@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+
+import '../admin_compact_scaffold.dart';
 
 /// گزارش خلاصهٔ کاربران و فعالیت اخیر (آنلاین تقریبی).
 class ActiveUsersStatsReportPage extends StatefulWidget {
@@ -83,21 +84,16 @@ class _ActiveUsersStatsReportPageState extends State<ActiveUsersStatsReportPage>
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(t.systemReportActiveUsersTitle),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/user/profile/system-settings/reports'),
+    return AdminCompactScaffold(
+      title: t.systemReportActiveUsersTitle,
+      backFallback: '/user/profile/system-settings/reports',
+      actions: [
+        IconButton(
+          tooltip: t.systemReportRefresh,
+          icon: const Icon(Icons.refresh, size: 20),
+          onPressed: _load,
         ),
-        actions: [
-          IconButton(
-            tooltip: t.systemReportRefresh,
-            icon: const Icon(Icons.refresh),
-            onPressed: _load,
-          ),
-        ],
-      ),
+      ],
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null

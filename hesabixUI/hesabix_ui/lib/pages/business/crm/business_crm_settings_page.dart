@@ -13,6 +13,7 @@ import 'package:hesabix_ui/services/crm_chat_service.dart';
 import 'package:hesabix_ui/services/crm_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/widgets/crm/crm_custom_field_form.dart';
 import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
 import 'package:hesabix_ui/widgets/crm/crm_web_chat_widget_form_dialog.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
@@ -383,9 +384,18 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
       }
 
       final raw = originsCtrl.text.trim();
-      List<String>? origins;
-      if (raw.isNotEmpty) {
-        origins = raw.split(RegExp(r'[،,]')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      if (raw.isEmpty) {
+        if (mounted) {
+          SnackBarHelper.show(context, message: 'حداقل یک مبدأ مجاز، مثل shop.example.com، لازم است', isError: true);
+        }
+        return;
+      }
+      final origins = raw.split(RegExp(r'[،,]')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      if (origins.isEmpty) {
+        if (mounted) {
+          SnackBarHelper.show(context, message: 'حداقل یک مبدأ مجاز، مثل shop.example.com، لازم است', isError: true);
+        }
+        return;
       }
 
       final t0 = AppLocalizations.of(context);
@@ -446,11 +456,18 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
       final allowVs = res['allow_visitor_voice'] == true;
       final isActive = res['is_active'] == true;
       final raw = originsCtrl.text.trim();
-      List<String>? origins;
-      if (raw.isNotEmpty) {
-        origins = raw.split(RegExp(r'[،,]')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
-      } else {
-        origins = const <String>[];
+      if (raw.isEmpty) {
+        if (mounted) {
+          SnackBarHelper.show(context, message: 'مبدأ مجاز را خالی نگذارید. ویجت بدون مبدأ از هر سایتی قابل جاسازی است.', isError: true);
+        }
+        return;
+      }
+      final origins = raw.split(RegExp(r'[،,]')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      if (origins.isEmpty) {
+        if (mounted) {
+          SnackBarHelper.show(context, message: 'مبدأ مجاز را خالی نگذارید. ویجت بدون مبدأ از هر سایتی قابل جاسازی است.', isError: true);
+        }
+        return;
       }
       await _svc.updateWidget(
         businessId: widget.businessId,
@@ -679,6 +696,12 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
+                CrmCustomFieldAdmin(
+                  businessId: widget.businessId,
+                  crmService: _crm,
+                  canWrite: canWrite,
+                ),
+                const SizedBox(height: 16),
                 CrmSectionCard(
                   title: 'دلایل برد',
                   child: _buildReasonList('won', _wonReasons, canWrite),
@@ -777,6 +800,12 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
                                           fontSize: 12,
                                         ),
                                       ),
+                                      if (w['origins_unrestricted'] == true ||
+                                          (w['allowed_origins'] is List && (w['allowed_origins'] as List).isEmpty))
+                                        Text(
+                                          'مبدأ محدود نشده است. ویرایش کنید و دامنه سایت را وارد کنید.',
+                                          style: TextStyle(color: cs.error, fontSize: 12),
+                                        ),
                                       const SizedBox(height: 4),
                                       Text(
                                         fileHint,

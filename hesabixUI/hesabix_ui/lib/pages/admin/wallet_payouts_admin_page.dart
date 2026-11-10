@@ -13,6 +13,7 @@ import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/jalali_date_picker.dart';
 import '../../core/date_utils.dart' show HesabixDateUtils;
 import '../../core/calendar_controller.dart';
+import 'admin_compact_scaffold.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class WalletPayoutsAdminPage extends StatefulWidget {
@@ -30,12 +31,12 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
   final GlobalKey<RefreshIndicatorState> _refreshKey = GlobalKey<RefreshIndicatorState>();
 
   static const List<Map<String, String>> _statusOptions = [
-    {'value': 'requested', 'label': 'در انتظار تایید', 'icon': 'pending'},
-    {'value': 'approved', 'label': 'تایید شده', 'icon': 'check_circle'},
-    {'value': 'processing', 'label': 'در حال پردازش', 'icon': 'sync'},
-    {'value': 'settled', 'label': 'تسویه شده', 'icon': 'done'},
-    {'value': 'canceled', 'label': 'لغو شده', 'icon': 'cancel'},
-    {'value': 'failed', 'label': 'ناموفق', 'icon': 'error'},
+    {'value': 'requested', 'label': adminTx(context, 'در انتظار تایید', 'Awaiting approval'), 'icon': 'pending'},
+    {'value': 'approved', 'label': adminTx(context, 'تایید شده', 'Approved'), 'icon': 'check_circle'},
+    {'value': 'processing', 'label': adminTx(context, 'در حال پردازش', 'Processing'), 'icon': 'sync'},
+    {'value': 'settled', 'label': adminTx(context, 'تسویه شده', 'Settled'), 'icon': 'done'},
+    {'value': 'canceled', 'label': adminTx(context, 'لغو شده', 'Cancelled'), 'icon': 'cancel'},
+    {'value': 'failed', 'label': adminTx(context, 'ناموفق', 'Failed'), 'icon': 'error'},
   ];
 
   @override
@@ -274,14 +275,14 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'خلاصه درخواست',
+                                    adminTx(context, 'خلاصه درخواست', 'Request summary'),
                                     style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                                   ),
                                   const SizedBox(height: 8),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text('کسب‌وکار:', style: theme.textTheme.bodySmall),
+                                      Text(adminTx(context, 'کسب‌وکار:', 'Business:'), style: theme.textTheme.bodySmall),
                                       Text(
                                         '${payout['business_name'] ?? '-'} (#${payout['business_id']})',
                                         style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
@@ -292,7 +293,7 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text('مبلغ ناخالص:', style: theme.textTheme.bodySmall),
+                                      Text(adminTx(context, 'مبلغ ناخالص:', 'Gross:'), style: theme.textTheme.bodySmall),
                                       Text(
                                         formatWithThousands(grossAmount),
                                         style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
@@ -344,7 +345,7 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
                                   controller: trackingCtrl,
                                   decoration: InputDecoration(
                                     labelText: t.bankTrackingCode,
-                                    hintText: 'مثال: 1234567890',
+                                    hintText: adminTx(context, 'مثال: 1234567890', 'Example: 1234567890'),
                                     prefixIcon: const Icon(Icons.numbers),
                                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                     filled: true,
@@ -363,7 +364,7 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
                                     labelText: t.feeAmount,
                                     helperText: t.walletPayoutsAdminFeeHint,
                                     prefixIcon: const Icon(Icons.percent),
-                                    suffixText: 'ریال',
+                                    suffixText: adminTx(context, 'ریال', 'IRR'),
                                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                     filled: true,
                                   ),
@@ -384,7 +385,7 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
                                     child: Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text('مبلغ خالص:', style: theme.textTheme.bodySmall),
+                                        Text(adminTx(context, 'مبلغ خالص:', 'Net:'), style: theme.textTheme.bodySmall),
                                         Text(
                                           formatWithThousands(netAmount!),
                                           style: theme.textTheme.bodyMedium?.copyWith(
@@ -543,20 +544,19 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
     final t = AppLocalizations.of(context);
     final isJalali = _calendarCtrl?.isJalali ?? false;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(t.walletPayoutsAdminTitle),
-        actions: [
-          IconButton(
-            tooltip: t.refresh,
-            onPressed: () {
-              _loadStats();
-              _refreshKey.currentState?.show();
-            },
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
-      ),
+    return AdminCompactScaffold(
+      title: t.walletPayoutsAdminTitle,
+      subtitle: adminTx(context, 'درخواست‌های برداشت کیف پول', 'Wallet withdrawal requests'),
+      actions: [
+        IconButton(
+          tooltip: t.refresh,
+          onPressed: () {
+            _loadStats();
+            _refreshKey.currentState?.show();
+          },
+          icon: const Icon(Icons.refresh, size: 20),
+        ),
+      ],
       body: RefreshIndicator(
         key: _refreshKey,
         onRefresh: () async {
@@ -580,7 +580,7 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'آمار کلی',
+                        adminTx(context, 'آمار کلی', 'Overview'),
                         style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 16),
@@ -593,22 +593,22 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
                         childAspectRatio: 1.5,
                         children: [
                           _buildStatsCard(
-                            title: 'کل درخواست‌ها',
+                            title: adminTx(context, 'کل درخواست‌ها', 'All requests'),
                             value: '${_stats!['total_count'] ?? 0}',
                             icon: Icons.receipt_long,
                             color: theme.colorScheme.primary,
                           ),
                           _buildStatsCard(
-                            title: 'در انتظار تسویه',
+                            title: adminTx(context, 'در انتظار تسویه', 'Awaiting settlement'),
                             value: formatWithThousands((_stats!['pending_total'] ?? 0) is num 
                                 ? (_stats!['pending_total'] as num).toDouble() 
                                 : double.tryParse('${_stats!['pending_total']}') ?? 0),
                             icon: Icons.pending_actions,
                             color: Colors.amber.shade700,
-                            subtitle: '${(_stats!['status_counts']?['requested'] ?? 0) + (_stats!['status_counts']?['approved'] ?? 0) + (_stats!['status_counts']?['processing'] ?? 0)} درخواست',
+                            subtitle: adminTx(context, '${(_stats!['status_counts']?['requested'] ?? 0) + (_stats!['status_counts']?['approved'] ?? 0) + (_stats!['status_counts']?['processing'] ?? 0)} درخواست', '${(_stats!['status_counts']?['requested'] ?? 0) + (_stats!['status_counts']?['approved'] ?? 0) + (_stats!['status_counts']?['processing'] ?? 0)} requests'),
                           ),
                           _buildStatsCard(
-                            title: 'تسویه شده (ماه جاری)',
+                            title: adminTx(context, 'تسویه شده (ماه جاری)', 'Settled (this month)'),
                             value: formatWithThousands((_stats!['monthly_settled'] ?? 0) is num 
                                 ? (_stats!['monthly_settled'] as num).toDouble() 
                                 : double.tryParse('${_stats!['monthly_settled']}') ?? 0),
@@ -616,7 +616,7 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
                             color: SemanticColorResolver.positive(context),
                           ),
                           _buildStatsCard(
-                            title: 'کارمزد (ماه جاری)',
+                            title: adminTx(context, 'کارمزد (ماه جاری)', 'Fees (this month)'),
                             value: formatWithThousands((_stats!['monthly_fees'] ?? 0) is num 
                                 ? (_stats!['monthly_fees'] as num).toDouble() 
                                 : double.tryParse('${_stats!['monthly_fees']}') ?? 0),
@@ -640,7 +640,7 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
                               SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  '${_stats!['old_pending_count']} درخواست قدیمی (> 7 روز) نیاز به بررسی دارد',
+                                  adminTx(context, '${_stats!['old_pending_count']} درخواست قدیمی (> 7 روز) نیاز به بررسی دارد', '${_stats!['old_pending_count']} requests older than 7 days need review'),
                                   style: theme.textTheme.bodyMedium?.copyWith(
                                     color: SemanticColorResolver.warning(context),
                                   ),
@@ -705,7 +705,7 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
                           return formatWithThousands(n);
                         },
                       ),
-                      NumberColumn('net_amount', 'مبلغ خالص', 
+                      NumberColumn('net_amount', adminTx(context, 'مبلغ خالص', 'Net amount'), 
                         formatter: (it) {
                           final net = it['net_amount'];
                           final n = (net is num) ? net.toDouble() : double.tryParse('$net') ?? 0;
@@ -749,13 +749,13 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
                           );
                         },
                       ),
-                      TextColumn('pending_days', 'روزهای انتظار',
+                      TextColumn('pending_days', adminTx(context, 'روزهای انتظار', 'Days waiting'),
                         formatter: (it) {
                           final days = _calculatePendingDays(it['created_at']?.toString());
                           if (days == 0) return '-';
                           final status = it['status']?.toString() ?? '';
                           if (status == 'settled') return '-';
-                          return '$days روز';
+                          return adminTx(context, '$days روز', '$days days');
                         },
                       ),
                       DateColumn('created_at', t.createdAt, 
@@ -981,27 +981,27 @@ class _PayoutDetailSheet extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'تاریخچه',
+                        adminTx(context, 'تاریخچه', 'History'),
                         style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       SizedBox(height: 12),
                       _TimelineItem(
                         icon: Icons.add_circle_outline,
-                        title: 'ایجاد درخواست',
+                        title: adminTx(context, 'ایجاد درخواست', 'Created'),
                         date: _formatDate(payout['created_at']?.toString(), isJalali),
                         color: SemanticColorResolver.info(context),
                       ),
                       if (status == 'approved' || status == 'processing' || status == 'settled')
                         _TimelineItem(
                           icon: Icons.verified,
-                          title: 'تایید شده',
+                          title: adminTx(context, 'تایید شده', 'Approved'),
                           date: _formatDate(payout['updated_at']?.toString(), isJalali),
                           color: SemanticColorResolver.positive(context),
                         ),
                       if (status == 'settled' && payout['settlement_date'] != null)
                         _TimelineItem(
                           icon: Icons.check_circle,
-                          title: 'تسویه شده',
+                          title: adminTx(context, 'تسویه شده', 'Settled'),
                           date: _formatDate(payout['settlement_date']?.toString(), isJalali),
                           color: SemanticColorResolver.positive(context),
                           isLast: true,
@@ -1052,7 +1052,7 @@ class _PayoutDetailSheet extends StatelessWidget {
                             icon: Icons.percent,
                           ),
                           _InfoTile(
-                            label: 'مبلغ خالص',
+                            label: adminTx(context, 'مبلغ خالص', 'Net amount'),
                             value: formatWithThousands(
                               (payout['net_amount'] ?? 0) is num ? payout['net_amount'] : double.tryParse('${payout['net_amount']}') ?? 0,
                             ),
@@ -1064,7 +1064,7 @@ class _PayoutDetailSheet extends StatelessWidget {
                             icon: Icons.numbers,
                             onTap: payout['bank_tracking_code'] != null ? () {
                               Clipboard.setData(ClipboardData(text: payout['bank_tracking_code'].toString()));
-                              SnackBarHelper.show(context, message: 'کد پیگیری کپی شد');
+                              SnackBarHelper.show(context, message: adminTx(context, 'کد پیگیری کپی شد', 'Tracking code copied'));
                             } : null,
                           ),
                           _InfoTile(
@@ -1303,23 +1303,23 @@ class _BankAccountCard extends StatelessWidget {
             const SizedBox(height: 12),
             _BankInfoRow(
               icon: Icons.person,
-              label: 'صاحب حساب',
+              label: adminTx(context, 'صاحب حساب', 'Account holder'),
               value: bankAccount['owner_name']?.toString() ?? '-',
             ),
             const SizedBox(height: 8),
             _BankInfoRow(
               icon: Icons.account_balance,
-              label: 'بانک',
+              label: adminTx(context, 'بانک', 'Bank'),
               value: bankAccount['bank_name']?.toString() ?? '-',
             ),
             const SizedBox(height: 8),
             _BankInfoRow(
               icon: Icons.credit_card,
-              label: 'شماره شبا',
+              label: adminTx(context, 'شماره شبا', 'IBAN'),
               value: bankAccount['iban']?.toString() ?? '-',
               onCopy: bankAccount['iban'] != null ? () {
                 Clipboard.setData(ClipboardData(text: bankAccount['iban'].toString()));
-                SnackBarHelper.show(context, message: 'شماره شبا کپی شد');
+                SnackBarHelper.show(context, message: adminTx(context, 'شماره شبا کپی شد', 'IBAN copied'));
               } : null,
             ),
           ],
@@ -1365,7 +1365,7 @@ class _BankInfoRow extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.copy, size: 16),
             onPressed: onCopy,
-            tooltip: 'کپی',
+            tooltip: adminTx(context, 'کپی', 'Copy'),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
           ),

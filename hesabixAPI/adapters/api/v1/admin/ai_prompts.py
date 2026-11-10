@@ -31,7 +31,7 @@ async def get_default_prompts(
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
-    if not ctx.has_any_permission("system_settings", "superadmin"):
+    if not ctx.has_app_permission("system_settings"):
         raise ApiError(
             "FORBIDDEN",
             "فقط مدیر سیستم می‌تواند prompt های پیش‌فرض را مشاهده کند",
@@ -49,7 +49,7 @@ async def get_default_prompt(
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
-    if not ctx.has_any_permission("system_settings", "superadmin"):
+    if not ctx.has_app_permission("system_settings"):
         raise ApiError("FORBIDDEN", "دسترسی مجاز نیست", http_status=403)
 
     prompts = list_effective_default_prompts(db)
@@ -67,7 +67,7 @@ async def update_default_prompt_endpoint(
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
-    if not ctx.has_any_permission("system_settings", "superadmin"):
+    if not ctx.has_app_permission("system_settings"):
         raise ApiError("FORBIDDEN", "فقط مدیر سیستم می‌تواند prompt پیش‌فرض را ویرایش کند", http_status=403)
 
     try:
@@ -98,7 +98,7 @@ async def reset_default_prompt_endpoint(
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
-    if not ctx.has_any_permission("system_settings", "superadmin"):
+    if not ctx.has_app_permission("system_settings"):
         raise ApiError("FORBIDDEN", "دسترسی مجاز نیست", http_status=403)
 
     try:
@@ -116,7 +116,7 @@ async def delete_default_prompt_endpoint(
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
-    if not ctx.has_any_permission("system_settings", "superadmin"):
+    if not ctx.has_app_permission("system_settings"):
         raise ApiError("FORBIDDEN", "دسترسی مجاز نیست", http_status=403)
 
     delete_default_prompt_by_key(db, prompt_key)

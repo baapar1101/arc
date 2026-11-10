@@ -6,6 +6,8 @@ import 'package:hesabix_ui/services/support_billing_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'admin_compact_scaffold.dart';
+import '../../theme/tokens/extensions.dart';
 
 class SupportPlansAdminPage extends StatefulWidget {
   const SupportPlansAdminPage({super.key});
@@ -79,7 +81,7 @@ class _SupportPlansAdminPageState extends State<SupportPlansAdminPage> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) => AlertDialog(
-          title: Text(isEdit ? 'ویرایش پلن پشتیبانی' : 'پلن پشتیبانی جدید'),
+          title: Text(isEdit ? adminTx(ctx, 'ویرایش پلن', 'Edit plan') : adminTx(ctx, 'پلن جدید', 'New plan'), style: const TextStyle(fontSize: 16)),
           content: SizedBox(
             width: 480,
             child: Form(
@@ -90,25 +92,25 @@ class _SupportPlansAdminPageState extends State<SupportPlansAdminPage> {
                   children: [
                     TextFormField(
                       controller: nameCtrl,
-                      decoration: const InputDecoration(labelText: 'نام'),
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'الزامی' : null,
+                      decoration: InputDecoration(labelText: adminTx(ctx, 'نام', 'Name'), isDense: true),
+                      validator: (v) => (v == null || v.trim().isEmpty) ? adminTx(ctx, 'الزامی', 'Required') : null,
                     ),
                     TextFormField(
                       controller: codeCtrl,
-                      decoration: const InputDecoration(labelText: 'کد'),
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'الزامی' : null,
+                      decoration: InputDecoration(labelText: adminTx(ctx, 'کد', 'Code'), isDense: true),
+                      validator: (v) => (v == null || v.trim().isEmpty) ? adminTx(ctx, 'الزامی', 'Required') : null,
                     ),
                     DropdownButtonFormField<int>(
                       value: periodMonths,
-                      decoration: const InputDecoration(labelText: 'مدت (ماه)'),
-                      items: const [1, 3, 6, 12]
-                          .map((m) => DropdownMenuItem(value: m, child: Text('$m ماهه')))
+                      decoration: InputDecoration(labelText: adminTx(ctx, 'مدت (ماه)', 'Term (months)'), isDense: true),
+                      items: [1, 3, 6, 12]
+                          .map((m) => DropdownMenuItem(value: m, child: Text('$m ${adminTx(ctx, 'ماه', 'mo')}')))
                           .toList(),
                       onChanged: (v) => setLocal(() => periodMonths = v ?? 1),
                     ),
                     DropdownButtonFormField<int>(
                       value: currencyId,
-                      decoration: const InputDecoration(labelText: 'ارز'),
+                      decoration: InputDecoration(labelText: adminTx(ctx, 'ارز', 'Currency'), isDense: true),
                       items: _currencies
                           .map(
                             (c) => DropdownMenuItem<int>(
@@ -121,23 +123,23 @@ class _SupportPlansAdminPageState extends State<SupportPlansAdminPage> {
                     ),
                     TextFormField(
                       controller: priceCtrl,
-                      decoration: const InputDecoration(labelText: 'قیمت (ریال)'),
+                      decoration: InputDecoration(labelText: adminTx(ctx, 'قیمت', 'Price'), isDense: true),
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       enabled: !isFree,
                     ),
                     TextFormField(
                       controller: sortCtrl,
-                      decoration: const InputDecoration(labelText: 'ترتیب نمایش'),
+                      decoration: InputDecoration(labelText: adminTx(ctx, 'ترتیب', 'Order'), isDense: true),
                       keyboardType: TextInputType.number,
                     ),
                     TextFormField(
                       controller: descCtrl,
-                      decoration: const InputDecoration(labelText: 'توضیحات'),
+                      decoration: InputDecoration(labelText: adminTx(ctx, 'توضیح', 'Description'), isDense: true),
                       maxLines: 2,
                     ),
                     SwitchListTile(
-                      title: const Text('رایگان'),
+                      title: Text(adminTx(ctx, 'رایگان', 'Free'), style: const TextStyle(fontSize: 13)),
                       value: isFree,
                       onChanged: (v) => setLocal(() {
                         isFree = v;
@@ -145,12 +147,12 @@ class _SupportPlansAdminPageState extends State<SupportPlansAdminPage> {
                       }),
                     ),
                     SwitchListTile(
-                      title: const Text('فعال'),
+                      title: Text(adminTx(ctx, 'فعال', 'Active'), style: const TextStyle(fontSize: 13)),
                       value: isActive,
                       onChanged: (v) => setLocal(() => isActive = v),
                     ),
                     SwitchListTile(
-                      title: const Text('پشتیبانی اولویت‌دار'),
+                      title: Text(adminTx(ctx, 'پشتیبانی اولویت‌دار', 'Priority support'), style: const TextStyle(fontSize: 13)),
                       value: priority,
                       onChanged: (v) => setLocal(() => priority = v),
                     ),
@@ -160,13 +162,13 @@ class _SupportPlansAdminPageState extends State<SupportPlansAdminPage> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(adminTx(ctx, 'انصراف', 'Cancel'))),
             FilledButton(
               onPressed: () {
                 if (formKey.currentState?.validate() != true) return;
                 Navigator.pop(ctx, true);
               },
-              child: const Text('ذخیره'),
+              child: Text(adminTx(ctx, 'ذخیره', 'Save')),
             ),
           ],
         ),
@@ -193,7 +195,7 @@ class _SupportPlansAdminPageState extends State<SupportPlansAdminPage> {
         await _service.createPlan(payload);
       }
       if (mounted) {
-        SnackBarHelper.showSuccess(context, message: 'ذخیره شد');
+        SnackBarHelper.showSuccess(context, message: adminTx(context, 'ذخیره شد', 'Saved'));
         await _load();
       }
     } catch (e) {
@@ -207,11 +209,11 @@ class _SupportPlansAdminPageState extends State<SupportPlansAdminPage> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('حذف/غیرفعال‌سازی'),
-        content: Text('پلن «${plan['name']}» حذف یا غیرفعال شود؟'),
+        title: Text(adminTx(ctx, 'حذف یا غیرفعال', 'Delete or disable'), style: const TextStyle(fontSize: 16)),
+        content: Text(adminTx(ctx, 'پلن «${plan['name']}» حذف یا غیرفعال شود؟', 'Delete or disable “${plan['name']}”?')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('تأیید')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(adminTx(ctx, 'انصراف', 'Cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(adminTx(ctx, 'تأیید', 'Confirm'))),
         ],
       ),
     );
@@ -219,7 +221,7 @@ class _SupportPlansAdminPageState extends State<SupportPlansAdminPage> {
     try {
       await _service.deletePlan(plan['id'] as int);
       if (mounted) {
-        SnackBarHelper.showSuccess(context, message: 'انجام شد');
+        SnackBarHelper.showSuccess(context, message: adminTx(context, 'انجام شد', 'Done'));
         await _load();
       }
     } catch (e) {
@@ -231,40 +233,53 @@ class _SupportPlansAdminPageState extends State<SupportPlansAdminPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('پلن‌های پشتیبانی'),
-        actions: [
-          IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
-          IconButton(onPressed: () => _showForm(), icon: const Icon(Icons.add)),
-        ],
-      ),
+    return AdminCompactScaffold(
+      title: adminTx(context, 'پلن‌های پشتیبانی', 'Support plans'),
+      subtitle: adminTx(context, 'بسته‌های پشتیبانی غیررایگان', 'Paid support packages'),
+      actions: [
+        IconButton(
+          tooltip: adminTx(context, 'بازخوانی', 'Refresh'),
+          onPressed: _load,
+          icon: const Icon(Icons.refresh, size: 20),
+        ),
+        IconButton(
+          tooltip: adminTx(context, 'پلن جدید', 'New plan'),
+          onPressed: () => _showForm(),
+          icon: const Icon(Icons.add, size: 20),
+        ),
+      ],
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? Center(child: Text(_error!))
               : ListView.separated(
-                  padding: const EdgeInsets.all(16),
+                  padding: context.settingsHub.pagePadding,
                   itemCount: _plans.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (context, i) {
                     final p = _plans[i];
                     return Card(
                       child: ListTile(
-                        title: Text('${p['name']} (${p['period_months']} ماهه)'),
+                        title: Text(
+                          '${p['name']} (${p['period_months']} ${adminTx(context, 'ماه', 'mo')})',
+                          style: context.settingsHub.cardTitleStyle(Theme.of(context).textTheme, color: Theme.of(context).colorScheme.onSurface),
+                        ),
                         subtitle: Text(
-                          'کد: ${p['code']} · قیمت: ${formatWithThousands(p['price'], decimalPlaces: 0)} ریال · '
-                          '${p['is_active'] == true ? 'فعال' : 'غیرفعال'}'
-                          '${p['is_free'] == true ? ' · رایگان' : ''}',
+                          '${p['code']} · ${formatWithThousands(p['price'], decimalPlaces: 0)} · '
+                          '${p['is_active'] == true ? adminTx(context, 'فعال', 'Active') : adminTx(context, 'غیرفعال', 'Inactive')}'
+                          '${p['is_free'] == true ? ' · ${adminTx(context, 'رایگان', 'Free')}' : ''}',
+                          style: context.settingsHub.cardSubtitleStyle(Theme.of(context).textTheme, color: Theme.of(context).colorScheme.onSurfaceVariant),
                         ),
                         trailing: Wrap(
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.edit),
+                              tooltip: adminTx(context, 'ویرایش', 'Edit'),
+                              icon: const Icon(Icons.edit, size: 18),
                               onPressed: () => _showForm(initial: p),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.delete_outline),
+                              tooltip: adminTx(context, 'حذف', 'Delete'),
+                              icon: const Icon(Icons.delete_outline, size: 18),
                               onPressed: () => _delete(p),
                             ),
                           ],
@@ -273,10 +288,6 @@ class _SupportPlansAdminPageState extends State<SupportPlansAdminPage> {
                     );
                   },
                 ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showForm(),
-        child: const Icon(Icons.add),
-      ),
     );
   }
 }
