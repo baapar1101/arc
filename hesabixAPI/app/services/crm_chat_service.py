@@ -110,6 +110,7 @@ def _visitor_message_workflow_payload(
 		"widget_id": c.widget_id,
 		"message_id": msg.id,
 		"body": text,
+		"message": text,
 		"sender_role": "visitor",
 	}
 	if file_storage_id:

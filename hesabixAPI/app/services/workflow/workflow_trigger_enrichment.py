@@ -179,6 +179,12 @@ def build_document_trigger_enrichment(
     return {k: v for k, v in out.items() if v is not None and v != ""}
 
 
+def crm_chat_visitor_name(first_name: Optional[str], last_name: Optional[str]) -> str:
+    """نام نمایشی بازدیدکننده برای قالب‌هایی که visitor_name می‌خواهند."""
+    parts = [(first_name or "").strip(), (last_name or "").strip()]
+    return " ".join(part for part in parts if part)
+
+
 def build_crm_chat_visitor_message_trigger_enrichment(
     db: Session,
     business_id: int,
@@ -191,6 +197,7 @@ def build_crm_chat_visitor_message_trigger_enrichment(
     return {
         "visitor_first_name": c.visitor_first_name,
         "visitor_last_name": c.visitor_last_name,
+        "visitor_name": crm_chat_visitor_name(c.visitor_first_name, c.visitor_last_name),
         "visitor_email": c.visitor_email or "",
         "visitor_phone": c.visitor_phone,
         "conversation_status": c.status,
