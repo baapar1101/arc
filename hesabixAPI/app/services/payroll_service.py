@@ -10,9 +10,10 @@ import json
 import re
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from sqlalchemy import and_, desc, func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from adapters.db.models.account import Account
@@ -35,6 +36,7 @@ from adapters.db.models.document import Document
 from app.core.calendar import CalendarConverter, CalendarType
 from app.core.payroll_plugin_dependency import check_payroll_plugin_active
 from app.core.responses import ApiError
+from app.core.transaction_lock import acquire_transaction_lock
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +48,8 @@ _STATUTORY_ITEM_CODES = frozenset({"insurance_employee", "insurance_employer", "
 _EMPLOYMENT_TYPES = frozenset({"full_time", "part_time", "contract", "daily", "seasonal"})
 _RUN_STATUSES = frozenset({"draft", "pending_approval", "approved", "finalized", "posted", "cancelled"})
 _CODE_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+_RUN_CODE_ALLOC_ATTEMPTS = 8
+_SETTINGS_INIT_ATTEMPTS = 3
 
 
 def _format_payroll_date_for_display(value: Any, calendar_type: CalendarType = "jalali") -> str:
@@ -124,6 +128,11 @@ def _validate_account(db: Session, business_id: int, account_id: Optional[int]) 
 	)
 	if not acc:
 		raise ApiError("ACCOUNT_NOT_FOUND", "حساب یافت نشد یا متعلق به این کسب‌وکار نیست.", http_status=404)
+
+
+def _is_payroll_unique_violation(exc: IntegrityError, constraint: str) -> bool:
+	text = f"{exc} {getattr(exc, 'orig', '')}".lower()
+	return constraint.lower() in text
 
 
 def _json_safe(value: Any) -> Any:
@@ -261,22 +270,46 @@ def _seed_defaults(db: Session, business_id: int) -> None:
 	db.flush()
 
 
+def _load_settings(db: Session, business_id: int) -> Optional[PayrollSettings]:
+	return db.query(PayrollSettings).filter(PayrollSettings.business_id == business_id).first()
+
+
 def _get_or_create_settings(db: Session, business_id: int) -> PayrollSettings:
-	row = db.query(PayrollSettings).filter(PayrollSettings.business_id == business_id).first()
+	row = _load_settings(db, business_id)
 	if row:
 		return row
 	business = db.query(Business).filter(Business.id == business_id).first()
 	if not business:
 		raise ApiError("BUSINESS_NOT_FOUND", "کسب‌وکار یافت نشد.", http_status=404)
-	row = PayrollSettings(
-		business_id=business_id,
-		enabled=True,
-		default_currency_id=business.default_currency_id,
+
+	for _ in range(_SETTINGS_INIT_ATTEMPTS):
+		acquire_transaction_lock(db, f"payroll:settings:{int(business_id)}")
+		row = _load_settings(db, business_id)
+		if row:
+			_seed_defaults(db, business_id)
+			return row
+		try:
+			with db.begin_nested():
+				row = PayrollSettings(
+					business_id=business_id,
+					enabled=True,
+					default_currency_id=business.default_currency_id,
+				)
+				db.add(row)
+				db.flush()
+				_seed_defaults(db, business_id)
+			return row
+		except IntegrityError:
+			row = _load_settings(db, business_id)
+			if row:
+				_seed_defaults(db, business_id)
+				return row
+
+	raise ApiError(
+		"PAYROLL_SETTINGS_INIT_FAILED",
+		"ایجاد تنظیمات حقوق ناموفق بود. دوباره تلاش کنید.",
+		http_status=500,
 	)
-	db.add(row)
-	db.flush()
-	_seed_defaults(db, business_id)
-	return row
 
 
 def get_settings(db: Session, business_id: int) -> Dict[str, Any]:
@@ -1052,6 +1085,23 @@ def _round_amount(amount: Decimal, round_to: int) -> Decimal:
 	return amount.quantize(step)
 
 
+def _next_sequential_run_code(existing_codes: List[str], prefix: str, year: int) -> str:
+	"""شماره بعدی را از بیشترین پسوند موجود می‌سازد، نه از تعداد ردیف‌ها.
+
+	حذف پیش‌نویس وسط دنباله نباید کد تکراری تولید کند (مثلاً 0002 و 0003 → 0004).
+	"""
+	head = f"{prefix}-{int(year)}-"
+	max_n = 0
+	for raw in existing_codes:
+		code = str(raw or "")
+		if not code.startswith(head):
+			continue
+		suffix = code[len(head) :]
+		if suffix.isdigit():
+			max_n = max(max_n, int(suffix))
+	return f"{head}{max_n + 1:04d}"
+
+
 def _generate_run_code(db: Session, business_id: int, settings: PayrollSettings) -> str:
 	import secrets
 
@@ -1068,11 +1118,50 @@ def _generate_run_code(db: Session, business_id: int, settings: PayrollSettings)
 			if not exists:
 				return code
 		raise ApiError("CODE_GENERATION_FAILED", "تولید کد یکتا ناموفق بود.", http_status=500)
+	acquire_transaction_lock(db, f"payroll:run-code:{int(business_id)}")
 	year = datetime.utcnow().year
-	count = (
-		db.query(func.count(PayrollRun.id)).filter(PayrollRun.business_id == business_id).scalar() or 0
+	existing = [
+		row[0]
+		for row in db.query(PayrollRun.code).filter(PayrollRun.business_id == business_id).all()
+	]
+	return _next_sequential_run_code(existing, prefix, year)
+
+
+def _flush_new_payroll_run(
+	db: Session,
+	business_id: int,
+	settings: PayrollSettings,
+	build_run: Callable[[str], PayrollRun],
+	*,
+	explicit_code: str = "",
+) -> PayrollRun:
+	code_hint = (explicit_code or "").strip()
+	for _ in range(_RUN_CODE_ALLOC_ATTEMPTS):
+		code = code_hint or _generate_run_code(db, business_id, settings)
+		run = build_run(code)
+		try:
+			with db.begin_nested():
+				db.add(run)
+				db.flush()
+			return run
+		except IntegrityError as exc:
+			if not _is_payroll_unique_violation(exc, "uq_payroll_runs_biz_code"):
+				raise
+			if code_hint:
+				raise ApiError(
+					"DUPLICATE_CODE",
+					f"کد سند حقوق تکراری است: {code_hint}",
+					http_status=409,
+				) from exc
+	raise ApiError("CODE_GENERATION_FAILED", "تولید کد یکتا ناموفق بود.", http_status=500)
+
+
+def _run_has_accounting_amounts(run: PayrollRun) -> bool:
+	zero = Decimal("0")
+	return any(
+		_decimal(getattr(run, field, 0)) != zero
+		for field in ("gross_total", "deduction_total", "employer_cost_total")
 	)
-	return f"{prefix}-{year}-{int(count) + 1:04d}"
 
 
 def _get_active_items_map(db: Session, business_id: int) -> Dict[int, PayrollItemDefinition]:
@@ -1454,20 +1543,23 @@ def create_run(
 	if not title:
 		title = f"حقوق {run_date.isoformat()}"
 
-	code = str(payload.get("code") or "").strip() or _generate_run_code(db, business_id, settings)
-
-	run = PayrollRun(
-		business_id=business_id,
-		period_id=int(period_id) if period_id is not None else None,
-		code=code,
-		title=title,
-		run_date=run_date,
-		description=payload.get("description"),
-		status="draft",
-		created_by_user_id=user_id,
+	explicit_code = str(payload.get("code") or "").strip()
+	run = _flush_new_payroll_run(
+		db,
+		business_id,
+		settings,
+		lambda code: PayrollRun(
+			business_id=business_id,
+			period_id=int(period_id) if period_id is not None else None,
+			code=code,
+			title=title,
+			run_date=run_date,
+			description=payload.get("description"),
+			status="draft",
+			created_by_user_id=user_id,
+		),
+		explicit_code=explicit_code,
 	)
-	db.add(run)
-	db.flush()
 
 	lines_payload = payload.get("lines")
 	if not lines_payload:
@@ -1565,6 +1657,12 @@ def finalize_run(
 	line_count = db.query(func.count(PayrollRunLine.id)).filter(PayrollRunLine.run_id == run.id).scalar() or 0
 	if line_count == 0:
 		raise ApiError("NO_LINES", "سند حقوق بدون ردیف پرسنل قابل قطعی‌سازی نیست.", http_status=400)
+	if not _run_has_accounting_amounts(run):
+		raise ApiError(
+			"NO_PAYROLL_AMOUNTS",
+			"سند حقوق بدون مبلغ قابل قطعی‌سازی نیست. ابتدا مبالغ را وارد کنید.",
+			http_status=400,
+		)
 
 	old = _run_to_dict(run)
 	if settings.require_approval:
@@ -1810,18 +1908,21 @@ def copy_run(
 	run_date_raw = payload.get("run_date")
 	run_date = date.fromisoformat(run_date_raw) if run_date_raw else date.today()
 
-	new_run = PayrollRun(
-		business_id=business_id,
-		period_id=int(target_period_id) if target_period_id is not None else None,
-		code=_generate_run_code(db, business_id, settings),
-		title=title,
-		run_date=run_date,
-		description=payload.get("description") or source.description,
-		status="draft",
-		created_by_user_id=user_id,
+	new_run = _flush_new_payroll_run(
+		db,
+		business_id,
+		settings,
+		lambda code: PayrollRun(
+			business_id=business_id,
+			period_id=int(target_period_id) if target_period_id is not None else None,
+			code=code,
+			title=title,
+			run_date=run_date,
+			description=payload.get("description") or source.description,
+			status="draft",
+			created_by_user_id=user_id,
+		),
 	)
-	db.add(new_run)
-	db.flush()
 	_persist_run_lines(db, business_id, new_run, lines_payload, settings)
 	new_run.updated_at = datetime.utcnow()
 	_audit(db, business_id, "payroll_run", new_run.id, "copy", user_id, None, _run_to_dict(new_run))
