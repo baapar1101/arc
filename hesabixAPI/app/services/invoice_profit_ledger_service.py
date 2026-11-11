@@ -59,6 +59,49 @@ def document_has_any_posted_warehouse(db: Session, *, document_id: int) -> bool:
     return q is not None
 
 
+def single_sales_issue_cost_scope(db: Session, document_id: int) -> tuple[bool, set[int]]:
+    """Identify a single sales issue and its explicitly linked lines if cancelled."""
+    from adapters.db.models.document import Document
+    from adapters.db.models.warehouse_document import WarehouseDocument
+    from app.services.warehouse_service import _payload_invoice_item_line_id
+
+    issues = db.query(WarehouseDocument).join(
+        Document, Document.id == WarehouseDocument.source_document_id,
+    ).filter(
+        Document.id == document_id,
+        Document.document_type == "invoice_sales",
+        WarehouseDocument.business_id == Document.business_id,
+        WarehouseDocument.source_type == "invoice",
+        WarehouseDocument.doc_type == "issue",
+        WarehouseDocument.status.in_(("posted", "cancelled")),
+    ).limit(2).all()
+    if len(issues) != 1:
+        return False, set()
+    if issues[0].status != "cancelled":
+        return True, set()
+    return True, {
+        line_id for line in issues[0].lines if line.movement == "out"
+        if (line_id := _payload_invoice_item_line_id({"extra_info": line.extra_info})) is not None
+    }
+
+
+def apply_cancelled_issue_cost(profit_data: dict[str, Any], cancelled_ids: set[int]) -> None:
+    for line in profit_data.get("line_profits") or ():
+        if line.get("line_id") in cancelled_ids:
+            line.update(cost_per_unit=0, total_cost=0, gross_profit=line["sales_amount"])
+            profit_data.pop("total_cost", None)
+
+
+def _write_profit_snapshot(row: Any, line: dict[str, Any]) -> bool:
+    unit_cost, total_cost, gross_profit = (line.get(key) for key in ("cost_per_unit", "total_cost", "gross_profit"))
+    if unit_cost is None or total_cost is None:
+        return False
+    row.ledger_unit_cogs = Decimal(str(unit_cost))
+    row.ledger_line_cogs = Decimal(str(total_cost))
+    row.ledger_line_gross_profit = Decimal(str(gross_profit)) if gross_profit is not None else None
+    return True
+
+
 def apply_recognized_profit_to_invoice_lines(
     db: Session,
     business_id: int,
@@ -121,11 +164,13 @@ def apply_recognized_profit_to_invoice_lines(
         fifo_shortage_mode=getattr(biz, "invoice_profit_fifo_shortage_mode", None),
     )
 
+    _, cancelled_ids = single_sales_issue_cost_scope(db, document_id)
+    apply_cancelled_issue_cost(profit_data, cancelled_ids)
     line_profits: List[Dict[str, Any]] = profit_data.get("line_profits") or []
     if not line_profits:
         return False
 
-    recognized_at = datetime.utcnow()
+    recognized_at = None
 
     for lp in line_profits:
         lid = lp.get("line_id")
@@ -135,16 +180,14 @@ def apply_recognized_profit_to_invoice_lines(
             InvoiceItemLine.id == int(lid),
             InvoiceItemLine.document_id == int(document_id),
         ).first()
-        if not row:
+        if not row or not _write_profit_snapshot(row, lp):
             continue
-        row.ledger_unit_cogs = Decimal(str(lp.get("cost_per_unit", 0) or 0))
-        row.ledger_line_cogs = Decimal(str(lp.get("total_cost", 0) or 0))
-        row.ledger_line_gross_profit = Decimal(str(lp.get("gross_profit", 0) or 0))
+        recognized_at = recognized_at or datetime.utcnow()
         row.ledger_recognized_at = recognized_at
         row.ledger_recognition_event = recognition_event
 
     db.flush()
-    return True
+    return recognized_at is not None
 
 
 def sync_ledger_profit_from_analytical_for_document(
@@ -188,11 +231,13 @@ def sync_ledger_profit_from_analytical_for_document(
         fifo_shortage_mode=getattr(biz, "invoice_profit_fifo_shortage_mode", None),
     )
 
+    _, cancelled_ids = single_sales_issue_cost_scope(db, document_id)
+    apply_cancelled_issue_cost(profit_data, cancelled_ids)
     line_profits: List[Dict[str, Any]] = profit_data.get("line_profits") or []
     if not line_profits:
         return False
 
-    recognized_at = datetime.utcnow()
+    recognized_at = None
 
     for lp in line_profits:
         lid = lp.get("line_id")
@@ -202,16 +247,14 @@ def sync_ledger_profit_from_analytical_for_document(
             InvoiceItemLine.id == int(lid),
             InvoiceItemLine.document_id == int(document_id),
         ).first()
-        if not row:
+        if not row or not _write_profit_snapshot(row, lp):
             continue
-        row.ledger_unit_cogs = Decimal(str(lp.get("cost_per_unit", 0) or 0))
-        row.ledger_line_cogs = Decimal(str(lp.get("total_cost", 0) or 0))
-        row.ledger_line_gross_profit = Decimal(str(lp.get("gross_profit", 0) or 0))
+        recognized_at = recognized_at or datetime.utcnow()
         row.ledger_recognized_at = recognized_at
         row.ledger_recognition_event = LEDGER_EVENT_INVENTORY_CHAIN_REFRESH
 
     db.flush()
-    return True
+    return recognized_at is not None
 
 
 def refresh_sales_ledgers_after_inventory_invoice_change(
