@@ -36,6 +36,7 @@ from app.core.responses import ApiError, success_response
 from app.core.transaction_lock import acquire_transaction_lock
 from app.services.document_monetization_service import ensure_document_policy_allows_creation
 from app.services.credit_service import get_business_credit_settings
+from app.services.invoice_line_total_guard import validate_invoice_line_totals
 from app.services.invoice_unit_conversion_service import (
     INVENTORY_QUANTITY_UNIT_MAIN,
     extra_info_dict,
@@ -6901,6 +6902,7 @@ def create_invoice(
     lines_input: List[Dict[str, Any]] = list(data.get("lines") or [])
     if not isinstance(lines_input, list) or len(lines_input) == 0:
         raise ApiError("LINES_REQUIRED", "At least one line is required", http_status=400)
+    validate_invoice_line_totals(data, lines_input, currency)
     _apply_expired_sale_confirm_permission(
         invoice_type,
         lines_input,
@@ -8639,7 +8641,6 @@ def update_invoice(
         from app.services.tax_reference_service import validate_invoice_type_change_for_tax
 
         validate_invoice_type_change_for_tax(document, _old_document_type, inv_type)
-        document.document_type = inv_type
     data["invoice_type"] = inv_type
 
     if _invoice_payload_preserves_invoice_body(
@@ -8668,6 +8669,9 @@ def update_invoice(
     if not currency:
         raise ApiError("CURRENCY_NOT_FOUND", "Currency not found", http_status=404)
 
+    validate_invoice_line_totals(data, data.get("lines") or [], currency, document=document)
+    if inv_type != _old_document_type:
+        document.document_type = inv_type
     document.document_date = document_date
     document.currency_id = int(currency_id)
     # به‌روزرسانی وضعیت پیش‌فاکتور
