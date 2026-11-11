@@ -121,6 +121,27 @@ def _visitor_message_workflow_payload(
 	return payload
 
 
+def _chat_conversation_workflow_payload(
+	db: Session,
+	c: CrmChatConversation,
+	*,
+	old_status: Optional[str] = None,
+	new_status: Optional[str] = None,
+) -> Dict[str, Any]:
+	"""دادهٔ تریگر تغییر وضعیت مکالمه، شامل نام بازدیدکننده."""
+	payload: Dict[str, Any] = {
+		"conversation_id": c.id,
+		"widget_id": c.widget_id,
+		"conversation_status": c.status,
+	}
+	if old_status is not None:
+		payload["old_status"] = old_status
+	if new_status is not None:
+		payload["new_status"] = new_status
+	payload.update(build_crm_chat_visitor_message_trigger_enrichment(db, c.business_id, c.id))
+	return payload
+
+
 def widget_to_dict(w: CrmChatWidget) -> Dict[str, Any]:
 	return {
 		"id": w.id,
@@ -1305,7 +1326,7 @@ async def patch_conversation_agent(
 				db,
 				business_id,
 				"crm.chat.conversation.resolved",
-				{"conversation_id": c.id, "widget_id": c.widget_id},
+				_chat_conversation_workflow_payload(db, c),
 				acting_user_id,
 			)
 		elif old_status == "resolved" and c.status != "resolved":
@@ -1313,12 +1334,9 @@ async def patch_conversation_agent(
 				db,
 				business_id,
 				"crm.chat.conversation.reopened",
-				{
-					"conversation_id": c.id,
-					"widget_id": c.widget_id,
-					"old_status": old_status,
-					"new_status": c.status,
-				},
+				_chat_conversation_workflow_payload(
+					db, c, old_status=old_status, new_status=c.status
+				),
 				acting_user_id,
 			)
 

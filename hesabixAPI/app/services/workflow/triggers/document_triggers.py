@@ -259,13 +259,13 @@ class InvoiceCreatedTrigger(BaseTrigger):
                 "invoice_type": {
                     "type": "string",
                     "description": "نوع فاکتور",
-                    "enum": ["invoice_sales", "invoice_purchase", "invoice_return_sales", "invoice_return_purchase"],
+                    "enum": ["invoice_sales", "invoice_purchase", "invoice_sales_return", "invoice_purchase_return"],
                     "ui_config": {
                         "labels": {
                             "invoice_sales": "فاکتور فروش",
                             "invoice_purchase": "فاکتور خرید",
-                            "invoice_return_sales": "برگشت از فروش",
-                            "invoice_return_purchase": "برگشت از خرید"
+                            "invoice_sales_return": "برگشت از فروش",
+                            "invoice_purchase_return": "برگشت از خرید"
                         }
                     },
                     "required": False
