@@ -1731,20 +1731,10 @@ def delete_receipt_payment(db: Session, document_id: int, *, commit: bool = True
     except Exception:
         pass
     
-    # 4) جلوگیری از حذف اگر سند به تراکنش‌های کیف پول مرتبط باشد
-    try:
-        from app.services.wallet_service import check_document_has_wallet_transactions
-        wallet_check = check_document_has_wallet_transactions(db, document_id)
-        if wallet_check["has_wallet_transactions"] and wallet_check.get("has_protected_transactions", False):
-            raise ApiError(
-                "DOCUMENT_HAS_WALLET_TRANSACTIONS",
-                wallet_check["message"],
-                http_status=409,
-            )
-    except ApiError:
-        raise
-    except Exception:
-        pass
+    # 4) جلوگیری از حذف اگر سند به تراکنش‌های کیف پول مرتبط باشد.
+    # خطا را قورت نمی‌دهیم: در غیر این صورت حذف سند، document_id تراکنش موفق را NULL می‌کند.
+    from app.services.wallet_service import raise_if_protected_wallet_document
+    raise_if_protected_wallet_document(db, document_id)
     
     # حذف لینک این سند از فاکتورهای مرتبط (قبل از حذف سند)
     try:

@@ -1693,6 +1693,21 @@ def check_document_has_wallet_transactions(db: Session, document_id: int) -> Dic
 	}
 
 
+def raise_if_protected_wallet_document(db: Session, document_id: int) -> None:
+	"""حذف سندی که تراکنش سیستمی کیف‌پول به آن وصل است را متوقف می‌کند.
+
+	ستون document_id در wallet_transactions با ON DELETE SET NULL تعریف شده است.
+	اگر سند دریافتِ پرداخت آنلاین حذف شود، وضعیت تراکنش «موفق» می‌ماند و فقط پیوند سند پاک می‌شود.
+	"""
+	wallet_check = check_document_has_wallet_transactions(db, int(document_id))
+	if wallet_check["has_wallet_transactions"] and wallet_check.get("has_protected_transactions"):
+		raise ApiError(
+			"DOCUMENT_HAS_WALLET_TRANSACTIONS",
+			wallet_check["message"] or "این سند به تراکنش کیف پول سیستمی مرتبط است و قابل حذف نمی‌باشد",
+			http_status=409,
+		)
+
+
 def check_wallet_transaction_has_dependencies(db: Session, transaction_id: int) -> Dict[str, Any]:
 	"""
 	بررسی می‌کند که آیا یک تراکنش کیف پول به موجودیت‌های دیگر لینک شده است یا نه

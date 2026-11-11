@@ -9957,22 +9957,9 @@ def delete_invoice(db: Session, document_id: int, *, commit: bool = True) -> boo
             logger.warning(f"[DELETE_INVOICE] Invoice {document_id}: Error checking tax workspace: {ex}")
             pass
         
-        # 3.5) جلوگیری از حذف اگر سند به تراکنش‌های کیف پول مرتبط باشد
-        try:
-            from app.services.wallet_service import check_document_has_wallet_transactions
-            wallet_check = check_document_has_wallet_transactions(db, document_id)
-            if wallet_check["has_wallet_transactions"] and wallet_check.get("has_protected_transactions", False):
-                logger.error(f"[DELETE_INVOICE] Invoice {document_id}: Cannot delete - has wallet transactions")
-                raise ApiError(
-                    "DOCUMENT_HAS_WALLET_TRANSACTIONS",
-                    wallet_check["message"],
-                    http_status=409,
-                )
-        except ApiError:
-            raise
-        except Exception as ex:
-            logger.warning(f"[DELETE_INVOICE] Invoice {document_id}: Error checking wallet transactions: {ex}")
-            pass
+        # 3.5) جلوگیری از حذف اگر خود فاکتور به تراکنش سیستمی کیف‌پول وصل باشد
+        from app.services.wallet_service import raise_if_protected_wallet_document
+        raise_if_protected_wallet_document(db, document_id)
         
         # 4) بررسی و حذف حواله‌های انبار مرتبط و اسناد دریافت/پرداخت
         # همه عملیات در یک transaction انجام می‌شوند و در صورت خطا rollback می‌شود
@@ -10090,6 +10077,10 @@ def delete_invoice(db: Session, document_id: int, *, commit: bool = True) -> boo
                 except Exception as ex:
                     logger.warning(f"[DELETE_INVOICE] Invoice {document_id}: Error checking receipt/payment {rp_doc.id} constraints: {ex}")
                     raise  # هر خطای دیگری را هم propagate کن
+
+                # سند دریافت پرداخت آنلاین به تراکنش کیف‌پول وصل است؛ حذف مستقیم آن
+                # به‌خاطر ON DELETE SET NULL تراکنش را «موفق» و بدون سند باقی می‌گذارد.
+                raise_if_protected_wallet_document(db, int(rp_doc.id))
                 
                 # حذف خطوط سند دریافت/پرداخت
                 rp_lines_deleted = db.query(DocumentLine).filter(
