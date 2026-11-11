@@ -146,6 +146,8 @@ class CapitalLineSplit:
 class PurchaseDebitSplit:
 	inventory_gross: Decimal = Decimal("0.00")
 	inventory_discount: Decimal = Decimal("0.00")
+	service_gross: Decimal = Decimal("0.00")
+	service_discount: Decimal = Decimal("0.00")
 	capital_gross: Decimal = Decimal("0.00")
 	capital_discount: Decimal = Decimal("0.00")
 	capital_net: Decimal = Decimal("0.00")
@@ -155,10 +157,12 @@ class PurchaseDebitSplit:
 
 	@property
 	def purchase_discount_credit(self) -> Decimal:
-		return self.inventory_discount
+		return q2(self.inventory_discount + self.service_discount)
 
 
 def split_purchase_debit_amounts(lines: Iterable[Mapping[str, Any]]) -> PurchaseDebitSplit:
+	from app.services.invoice_inventory_policy import invoice_line_posts_to_inventory
+
 	out = PurchaseDebitSplit()
 	for idx, line in enumerate(lines):
 		info = line.get("extra_info") or {}
@@ -181,8 +185,12 @@ def split_purchase_debit_amounts(lines: Iterable[Mapping[str, Any]]) -> Purchase
 				)
 			)
 			continue
-		out.inventory_gross = q2(out.inventory_gross + gross)
-		out.inventory_discount = q2(out.inventory_discount + discount)
+		if invoice_line_posts_to_inventory(info):
+			out.inventory_gross = q2(out.inventory_gross + gross)
+			out.inventory_discount = q2(out.inventory_discount + discount)
+		else:
+			out.service_gross = q2(out.service_gross + gross)
+			out.service_discount = q2(out.service_discount + discount)
 	return out
 
 
@@ -192,7 +200,7 @@ def purchase_gl_balances(
 	tax: Decimal,
 	payable: Decimal,
 ) -> Tuple[Decimal, Decimal]:
-	"""بدهکار/بستانکار سمت خرید پس از تفکیک سرمایه‌ای. برای تست توازن."""
-	debits = q2(split.inventory_gross + split.capital_net + tax)
+	"""بدهکار/بستانکار سمت خرید پس از تفکیک سرمایه‌ای و خدمت. برای تست توازن."""
+	debits = q2(split.inventory_gross + split.service_gross + split.capital_net + tax)
 	credits = q2(split.purchase_discount_credit + payable)
 	return debits, credits

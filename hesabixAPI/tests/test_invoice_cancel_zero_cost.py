@@ -43,7 +43,7 @@ def sale(monkeypatch):
                      owner_id=1, default_currency_id=1, invoice_profit_ledger_recognition_basis="sales_invoice_document"),
             models.Currency(id=1, name="Base", title="Base", symbol="B", code="B"),
             models.FiscalYear(id=1, business_id=1, title="2026", is_last=True, start_date=day, end_date=day),
-            models.Product(id=1, business_id=1, code="P", name="P"),
+            models.Product(id=1, business_id=1, code="P", name="P", track_inventory=True),
             models.Document(id=1, code="SALE", business_id=1, fiscal_year_id=1, currency_id=1, created_by_user_id=1,
                      document_date=day, document_type="invoice_sales", extra_info={"links": {"warehouse_document_ids": [1]}}),
             models.WarehouseDocument(id=1, business_id=1, fiscal_year_id=1, code="ISSUE", document_date=day,

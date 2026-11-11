@@ -83,6 +83,53 @@ def test_mixed_gl_stays_balanced_when_fa_discount_is_netted_into_107():
 	assert split.purchase_discount_credit == Decimal("0.00")
 
 
+def test_service_line_goes_to_purchase_service_not_inventory():
+	split = split_purchase_debit_amounts(
+		[
+			_line(qty=1, price=2_000_000, discount=0),
+			{
+				"quantity": 1,
+				"extra_info": {
+					"unit_price": 7_000_000,
+					"line_discount": 200_000,
+					"tax_amount": 0,
+					"inventory_tracked": False,
+					"item_type": "خدمت",
+				},
+			},
+		]
+	)
+	assert split.inventory_gross == Decimal("2000000.00")
+	assert split.service_gross == Decimal("7000000.00")
+	assert split.service_discount == Decimal("200000.00")
+	assert split.purchase_discount_credit == Decimal("200000.00")
+	tax = Decimal("0.00")
+	payable = Decimal("8800000.00")  # 2m + 7m - 0.2m
+	debits, credits = purchase_gl_balances(split, tax=tax, payable=payable)
+	assert debits == credits
+
+
+def test_service_only_purchase_has_no_inventory_debit():
+	split = split_purchase_debit_amounts(
+		[
+			{
+				"quantity": 2,
+				"extra_info": {
+					"unit_price": 1_500_000,
+					"line_discount": 0,
+					"inventory_tracked": False,
+				},
+			}
+		]
+	)
+	assert split.inventory_gross == Decimal("0.00")
+	assert split.service_gross == Decimal("3000000.00")
+	debits, credits = purchase_gl_balances(
+		split, tax=Decimal("0"), payable=Decimal("3000000.00")
+	)
+	assert debits == credits == Decimal("3000000.00")
+
+
 def test_capital_does_not_share_discount_account_with_inventory():
 	split = split_purchase_debit_amounts(
 		[

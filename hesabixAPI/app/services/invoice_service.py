@@ -2421,7 +2421,7 @@ def _apply_purchase_invoice_accounting(
     invoice_type: str,
     header_extra: Dict[str, Any],
 ) -> None:
-    """ثبت خرید: موجودی/GRNI فقط برای سطر غیرسرمایه‌ای؛ سطر سرمایه‌ای بدهکار ۱۰۷."""
+    """ثبت خرید: موجودی/GRNI برای کالای دارای موجودی؛ خدمت به ۷۰۴۰۱؛ سطر سرمایه‌ای بدهکار ۱۰۷."""
     from app.services.fixed_asset_capital_purchase import split_purchase_debit_amounts
     from app.services.fixed_asset_service import add_capital_cost_document_lines
     from app.services.invoice_adjustments_service import add_adjustment_document_lines
@@ -2434,6 +2434,7 @@ def _apply_purchase_invoice_accounting(
         mode=purchase_mode,
         accounts=accounts,
         gross=split.inventory_gross,
+        service_gross=split.service_gross,
     )
     add_capital_cost_document_lines(
         db,
@@ -2480,6 +2481,29 @@ def _apply_purchase_invoice_accounting(
         invoice_type=invoice_type,
         accounts=accounts,
         header_extra=header_extra,
+    )
+
+
+def _apply_purchase_return_inventory_credits(
+    db: Session,
+    *,
+    document_id: int,
+    purchase_mode: str,
+    accounts: Dict[str, Account],
+    lines_input: List[Dict[str, Any]],
+) -> None:
+    """برگشت خرید: موجودی/GRNI فقط برای کالای دارای موجودی؛ خدمت به ۷۰۴۰۱."""
+    from app.services.fixed_asset_capital_purchase import split_purchase_debit_amounts
+    from app.services.purchase_accounting_service import add_purchase_return_credit_lines
+
+    split = split_purchase_debit_amounts(lines_input)
+    add_purchase_return_credit_lines(
+        db,
+        document_id=int(document_id),
+        mode=purchase_mode,
+        accounts=accounts,
+        gross=split.inventory_gross,
+        service_gross=split.service_gross,
     )
 
 
@@ -2684,14 +2708,19 @@ def _extract_cogs_total_for_invoice(lines: List[Dict[str, Any]]) -> Decimal:
     """
     محاسبه COGS برای فاکتورها (بدون بررسی inventory_posted).
     برای مصرف مستقیم، ضایعات و تولید استفاده می‌شود.
+    خدمت و کالای بدون موجودی موجودی کالا را بستانکار نمی‌کنند.
     """
+    from app.services.invoice_inventory_policy import invoice_line_posts_to_inventory
+
     total = Decimal(0)
     for line in lines:
         info = line.get("extra_info") or {}
         qty = Decimal(str(line.get("quantity", 0) or 0))
         if qty <= 0:
             continue
-        
+        if not invoice_line_posts_to_inventory(info):
+            continue
+
         # اولویت: cogs_amount > cost_price > unit_price
         if info.get("cogs_amount") is not None:
             total += Decimal(str(info.get("cogs_amount")))
@@ -2739,6 +2768,7 @@ def _resolve_accounts_for_invoice(db: Session, data: Dict[str, Any]) -> Dict[str
         # تخفیفات فروش و خرید (به‌صورت مجزا)
         "sales_discount": _get_fixed_account_by_code(db, code("sales_discount", "50003")),
         "purchase_discount": _get_fixed_account_by_code(db, code("purchase_discount", "40003")),
+        "purchase_service": _get_fixed_account_by_code(db, code("purchase_service", "70401")),
         # موجودی، GRNI و ساخته‌شده (در نبود حساب مجزا)
         "inventory": _get_fixed_account_by_code(db, code("inventory", "10102")),
         "inventory_finished": _get_fixed_account_by_code(db, code("inventory_finished", "10102")),
@@ -6575,6 +6605,8 @@ def _calculate_invoice_profit(
 
         profit_rows: List[Dict[str, Any]] = []
 
+        from app.services.invoice_inventory_policy import invoice_line_posts_to_inventory
+
         for item_line in item_lines:
             extra_info = item_line.extra_info or {}
             qty = Decimal(str(item_line.quantity or 0))
@@ -6619,13 +6651,19 @@ def _calculate_invoice_profit(
             line_gross_profit = Decimal(0)
 
             if product:
+                posts_inventory = invoice_line_posts_to_inventory(extra_info, product)
                 inbound_return_goods = (
                     bool(is_sales_return)
                     and (effective_move == "in")
+                    and posts_inventory
                     and (inv_tracked_ok is not False or normalized_basis == "purchase_price")
                 )
 
-                if inbound_return_goods:
+                if not posts_inventory:
+                    cost_per_unit = Decimal(0)
+                    total_line_cost = Decimal(0)
+                    line_gross_profit = sales_amount
+                elif inbound_return_goods:
                     cp_raw = extra_info.get("cost_price")
                     if cp_raw is not None and normalized_basis != "purchase_price":
                         cost_per_unit = Decimal(str(cp_raw))
@@ -7027,12 +7065,16 @@ def create_invoice(
     # Resolve inventory tracking per product and annotate lines
     all_product_ids = [int(ln.get("product_id")) for ln in lines_input if ln.get("product_id")]
     track_map: Dict[int, bool] = {}
+    item_type_map: Dict[int, Any] = {}
     if all_product_ids:
-        for pid, tracked in db.query(Product.id, Product.track_inventory).filter(
+        for pid, tracked, item_type in db.query(
+            Product.id, Product.track_inventory, Product.item_type
+        ).filter(
             Product.business_id == business_id,
             Product.id.in_(all_product_ids),
         ).all():
             track_map[int(pid)] = bool(tracked)
+            item_type_map[int(pid)] = item_type
 
     product_tax_map = _build_product_tax_snapshot_map(db, business_id, all_product_ids)
 
@@ -7042,6 +7084,9 @@ def create_invoice(
             continue
         info = dict(ln.get("extra_info") or {})
         info["inventory_tracked"] = bool(track_map.get(int(pid), False))
+        item_type = item_type_map.get(int(pid))
+        if item_type is not None:
+            info["item_type"] = getattr(item_type, "value", item_type)
         tax_meta = product_tax_map.get(int(pid))
         if tax_meta:
             snapshot = {k: v for k, v in tax_meta.items() if v is not None}
@@ -7475,14 +7520,12 @@ def create_invoice(
 
         # Purchase Return
         elif invoice_type == INVOICE_PURCHASE_RETURN:
-            from app.services.purchase_accounting_service import add_purchase_return_credit_lines
-
-            add_purchase_return_credit_lines(
+            _apply_purchase_return_inventory_credits(
                 db,
                 document_id=int(document.id),
-                mode=_purchase_mode,
+                purchase_mode=_purchase_mode,
                 accounts=accounts,
-                gross=gross,
+                lines_input=lines_input,
             )
             # برگشت تخفیفات خرید
             if discount > 0:
@@ -8869,12 +8912,16 @@ def update_invoice(
     # Resolve and annotate inventory tracking for all lines
     all_product_ids = [int(ln.get("product_id")) for ln in lines_input if ln.get("product_id")]
     track_map: Dict[int, bool] = {}
+    item_type_map: Dict[int, Any] = {}
     if all_product_ids:
-        for pid, tracked in db.query(Product.id, Product.track_inventory).filter(
+        for pid, tracked, item_type in db.query(
+            Product.id, Product.track_inventory, Product.item_type
+        ).filter(
             Product.business_id == document.business_id,
             Product.id.in_(all_product_ids),
         ).all():
             track_map[int(pid)] = bool(tracked)
+            item_type_map[int(pid)] = item_type
     product_tax_map = _build_product_tax_snapshot_map(db, document.business_id, all_product_ids)
 
     for ln in lines_input:
@@ -8883,6 +8930,9 @@ def update_invoice(
             continue
         info = dict(ln.get("extra_info") or {})
         info["inventory_tracked"] = bool(track_map.get(int(pid), False))
+        item_type = item_type_map.get(int(pid))
+        if item_type is not None:
+            info["item_type"] = getattr(item_type, "value", item_type)
         tax_meta = product_tax_map.get(int(pid))
         if tax_meta:
             snapshot = {k: v for k, v in tax_meta.items() if v is not None}
@@ -9239,15 +9289,13 @@ def update_invoice(
                 header_extra=_adj_extra_hdr,
             )
         elif inv_type == INVOICE_PURCHASE_RETURN:
-            from app.services.purchase_accounting_service import add_purchase_return_credit_lines
-
             _purchase_mode_upd = (header_extra.get("purchase_accounting_mode") or "").strip()
-            add_purchase_return_credit_lines(
+            _apply_purchase_return_inventory_credits(
                 db,
                 document_id=int(document.id),
-                mode=_purchase_mode_upd,
+                purchase_mode=_purchase_mode_upd,
                 accounts=accounts,
-                gross=gross,
+                lines_input=lines_input,
             )
             # برگشت تخفیفات خرید
             if discount > 0:

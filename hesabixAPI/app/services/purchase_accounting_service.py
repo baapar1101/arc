@@ -40,6 +40,7 @@ PURCHASE_ACCOUNTING_MODES = frozenset(
 GRNI_ACCOUNT_CODE_LEGACY = "30101"
 GRNI_ACCOUNT_CODE_STANDARD = "10107"
 INVENTORY_ACCOUNT_CODE = "10102"
+SERVICE_PURCHASE_ACCOUNT_CODE = "70401"
 
 GRNI_CLEARANCE_DESC = "تسویه GRNI — رسید انبار"
 GRNI_CLEARANCE_REVERSAL_DESC = "برگشت تسویه GRNI — لغو رسید انبار"
@@ -117,30 +118,40 @@ def add_purchase_invoice_debit_lines(
 	mode: str,
 	accounts: Dict[str, Account],
 	gross: Decimal,
+	service_gross: Decimal = Decimal(0),
 ) -> None:
-	if gross <= 0:
-		return
-	m = normalize_purchase_accounting_mode(mode)
-	if m == PURCHASE_ACCOUNTING_DIRECT:
+	if gross > 0:
+		m = normalize_purchase_accounting_mode(mode)
+		if m == PURCHASE_ACCOUNTING_DIRECT:
+			db.add(
+				DocumentLine(
+					document_id=document_id,
+					account_id=accounts["inventory"].id,
+					debit=gross,
+					credit=Decimal(0),
+					description="ثبت موجودی کالا (فاکتور خرید)",
+				)
+			)
+		else:
+			db.add(
+				DocumentLine(
+					document_id=document_id,
+					account_id=accounts["grni"].id,
+					debit=gross,
+					credit=Decimal(0),
+					description="ثبت GRNI خرید (مبلغ ناخالص)",
+				)
+			)
+	if service_gross > 0:
 		db.add(
 			DocumentLine(
 				document_id=document_id,
-				account_id=accounts["inventory"].id,
-				debit=gross,
+				account_id=accounts["purchase_service"].id,
+				debit=service_gross,
 				credit=Decimal(0),
-				description="ثبت موجودی کالا (فاکتور خرید)",
+				description="خرید خدمات",
 			)
 		)
-		return
-	db.add(
-		DocumentLine(
-			document_id=document_id,
-			account_id=accounts["grni"].id,
-			debit=gross,
-			credit=Decimal(0),
-			description="ثبت GRNI خرید (مبلغ ناخالص)",
-		)
-	)
 
 
 def add_purchase_return_credit_lines(
@@ -150,30 +161,40 @@ def add_purchase_return_credit_lines(
 	mode: str,
 	accounts: Dict[str, Account],
 	gross: Decimal,
+	service_gross: Decimal = Decimal(0),
 ) -> None:
-	if gross <= 0:
-		return
-	m = normalize_purchase_accounting_mode(mode)
-	if m == PURCHASE_ACCOUNTING_DIRECT:
+	if gross > 0:
+		m = normalize_purchase_accounting_mode(mode)
+		if m == PURCHASE_ACCOUNTING_DIRECT:
+			db.add(
+				DocumentLine(
+					document_id=document_id,
+					account_id=accounts["inventory"].id,
+					debit=Decimal(0),
+					credit=gross,
+					description="برگشت موجودی کالا (برگشت از خرید)",
+				)
+			)
+		else:
+			db.add(
+				DocumentLine(
+					document_id=document_id,
+					account_id=accounts["grni"].id,
+					debit=Decimal(0),
+					credit=gross,
+					description="برگشت GRNI بابت برگشت خرید (مبلغ ناخالص)",
+				)
+			)
+	if service_gross > 0:
 		db.add(
 			DocumentLine(
 				document_id=document_id,
-				account_id=accounts["inventory"].id,
+				account_id=accounts["purchase_service"].id,
 				debit=Decimal(0),
-				credit=gross,
-				description="برگشت موجودی کالا (برگشت از خرید)",
+				credit=service_gross,
+				description="برگشت خرید خدمات",
 			)
 		)
-		return
-	db.add(
-		DocumentLine(
-			document_id=document_id,
-			account_id=accounts["grni"].id,
-			debit=Decimal(0),
-			credit=gross,
-			description="برگشت GRNI بابت برگشت خرید (مبلغ ناخالص)",
-		)
-	)
 
 
 def _line_unit_cost_for_purchase(extra: Dict[str, Any]) -> Decimal:
