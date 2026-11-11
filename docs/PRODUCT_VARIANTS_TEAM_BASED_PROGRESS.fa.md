@@ -15,8 +15,10 @@
 
 | کد | عنوان | branch | commit | تاریخ | وضعیت |
 |---|---|---|---|---|---|
-| H15 | root-only drain Woo hook | codex/team-base-01-woocommerce-root-commit | 15fd8509 | ۲۰۲۶-۱۱-۰۶ | ✅ در `master` merge شد (#42) |
-| P01 | تفکیک cost_price | codex/team-base-02-cost-currency-basis | 1a003e17 | ۲۰۲۶-۱۱-۰۶ | ✅ در `master` merge شد (#43) |
+| H15 | root-only drain Woo hook | codex/team-base-01-woocommerce-root-commit | 15fd8509 | ۲۰۲۶-۱۱-۰۶ | ✅ merge شده (#42) |
+| P01 | تفکیک cost_price | codex/team-base-02-cost-currency-basis | 1a003e17 | ۲۰۲۶-۱۱-۰۶ | ✅ merge شده (#43) |
+| C04 | حفظ صفر معلوم پس از لغو تنها حوالهٔ خروج | codex/team-base-03-zero-cost-cancel | 4867aaa3586c62794746c723c1cc4df61c19c9ad | ۲۰۲۶-۱۱-۱۱ | 🟢 PR ارسال شد |
+| H35 | تخصیص هزینهٔ هر حواله برای لغو جزئیِ مبالغ متفاوت | — | — | — | ⏳ در انتظار (وابسته به فاز ۲ Native) |
 
 ## مرحلهٔ ۰۱ — H15: زمان ارسال موجودی ووکامرس
 
@@ -64,6 +66,14 @@ python -m pytest -q -p no:cacheprovider tests/test_woocommerce_stock_push_transa
 python -m pytest -q -p no:cacheprovider tests/test_invoice_cost_currency_basis.py
 ```
 
+## مرحلهٔ ۰۳ — C04
+
+- شاخه از `origin/master` در `3aee9afa388bbd942a639265b48d4ef143f3aba0` ساخته شد. P01 و H15 در تاریخچهٔ پایه هستند.
+- در فاکتور فروش با تنها یک حوالهٔ خروج، لغو حواله سهم خطوط پیوندخورده از بهای شناسایی‌شده و دفتر کل را صفر می‌کند. صفر معلوم حفظ می‌شود و `None` اجازهٔ fallback به snapshot قبلی را می‌دهد.
+- ۶۳ آزمون مرتبط موفق شدند، شامل لغو واقعی در SQLite، fallback برای `None`، صفر واقعی، حفظ رفتار چندخروجی و رگرسیون P01. برای تزریق `None` فقط خروجی محاسبهٔ تحلیلی جایگزین شد.
+- اجرای کامل ۲۲۳۲ آزمون جمع‌آوری کرد و پس از ۳۰۰ ثانیه در `test_ai_channel_stream.py` متوقف شد. اجرای پایه نیز در همان آزمون به سقف رسید.
+- شاخه به فورک ارسال شد. [صفحهٔ ایجاد PR در مخزن تیم](https://source.hesabix.ir/hesabix/arc/compare/master...Seyyed:codex/team-base-03-zero-cost-cancel).
+
 ## موارد منتقل‌نشده و ترتیب بازبینی
 
 | دسته | وضعیت انتقال به مبنای تیم | اقدام لازم |
@@ -87,3 +97,4 @@ python -m pytest -q -p no:cacheprovider tests/test_invoice_cost_currency_basis.p
 
 - ۲۰۲۶-۱۱-۰۶: مبنا به کد رسمی تیم تغییر کرد؛ master محلی تا `2b5c6a24` fast-forward شد. H15 به‌عنوان اولین اصلاح مستقل با بازتولید قبل و ۱۵ آزمون موفق پس از اصلاح منتقل شد. شاخهٔ Unified قدیمی و تست‌های آن تغییر نکردند.
 - ۲۰۲۶-۱۱-۰۷: H15 در `master` merge شد (#42). P01 (`cost_currency_basis` برای `cost_price`) پس از حل تداخل همین سند پیشرفت در `master` merge شد (#43).
+- ۲۰۲۶-۱۱-۱۱: C04 برای تک‌خروج اصلاح شد. H35 در C04 کشف شد؛ با معرفی `VariantCostConsumption` در فاز ۲ Native حل می‌شود. تا آن زمان، GL برای چند-خروجی همان رفتار قبلی را دارد؛ تغییر نمی‌کند.
