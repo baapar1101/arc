@@ -425,10 +425,16 @@ class _KeyboardShortcutListenerState extends State<KeyboardShortcutListener> {
   }
 
   void _openMemorialDialog() {
-    _openShortcutDialog(
-      dialog: const HesabixDevelopersMemorialDialog(),
-      barrierDismissible: true,
-    );
+    if (!mounted) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      try {
+        final ctx = navigatorKey.currentContext ?? _dialogContext ?? context;
+        if (!ctx.mounted) return;
+        HesabixDevelopersMemorialDialog.show(ctx);
+      } catch (_) {}
+    });
   }
 
   void _openShortcutDialog({
