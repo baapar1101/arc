@@ -253,8 +253,8 @@ class TestTotalCostFromProfitData:
         data = {"total_cost": -800000.0, "line_profits": []}
         assert _total_cost_from_profit_data(data) == Decimal("800000")
 
-    def test_empty_profit_data_returns_zero(self):
-        assert _total_cost_from_profit_data({}) == Decimal(0)
+    def test_empty_profit_data_has_unknown_cost(self):
+        assert _total_cost_from_profit_data({}) is None
 
 
 class TestRecognizedLedgerCogsTotal:
