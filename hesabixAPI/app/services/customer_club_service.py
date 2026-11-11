@@ -328,8 +328,37 @@ def _person_is_customer(person: Person) -> bool:
 	return PersonType.CUSTOMER.value in types_list
 
 
+def _apply_club_discount_to_totals(totals: Dict[str, Any], extra_discount: Decimal) -> Decimal:
+	"""تخفیف باشگاه را روی totals اعمال می‌کند و net را شامل مالیات خط می‌نویسد.
+
+	قرارداد با جمع خطوط و تخفیف کلی یکی است: net = (gross − discount) + tax.
+	مالیات به نسبت مبنای مشمول تخفیف کم می‌شود. مقدار برگشتی همان مبنای مشمول جدید است.
+	"""
+	gross = Decimal(str(totals.get("gross", 0) or 0))
+	old_disc = Decimal(str(totals.get("discount", 0) or 0))
+	old_tax = Decimal(str(totals.get("tax", 0) or 0))
+	old_taxable = gross - old_disc
+	new_disc = old_disc + extra_discount
+	new_taxable = gross - new_disc
+	if new_taxable < 0:
+		raise ApiError(
+			"LOYALTY_DISCOUNT_TOO_HIGH",
+			"Loyalty discount exceeds the invoice net amount.",
+			http_status=400,
+		)
+	new_tax = old_tax
+	if old_taxable > 0:
+		new_tax = (old_tax * (new_taxable / old_taxable)).quantize(Decimal("0.01"))
+	totals["discount"] = float(new_disc)
+	totals["tax"] = float(new_tax)
+	totals["net"] = float(new_taxable + new_tax)
+	return new_taxable
+
+
 def _basis_net_and_total_from_document(db: Session, doc: Document) -> Tuple[Decimal, Decimal]:
 	"""خواندن خالص و جمع با مالیات از totals؛ در صورت غیبت، تقریب از خطوط اقلام."""
+	from app.services.invoice_adjustments_service import total_with_tax_from_totals_dict
+
 	extra = doc.extra_info or {}
 	totals = extra.get("totals") if isinstance(extra, dict) else None
 	line_sum_netish = Decimal("0")
@@ -355,12 +384,10 @@ def _basis_net_and_total_from_document(db: Session, doc: Document) -> Tuple[Deci
 		except (InvalidOperation, ValueError):
 			net_dec = Decimal("0")
 		try:
-			tax_dec = Decimal(str(totals.get("tax") if totals.get("tax") is not None else "0"))
-		except (InvalidOperation, ValueError):
-			tax_dec = Decimal("0")
-		net_abs = abs(net_dec)
-		total_abs = abs(net_dec + tax_dec)
-		return net_abs, total_abs
+			total_abs = abs(total_with_tax_from_totals_dict(totals))
+		except (InvalidOperation, ValueError, TypeError):
+			total_abs = abs(net_dec)
+		return abs(net_dec), total_abs
 
 	return line_sum_netish, line_sum_netish
 
@@ -706,11 +733,7 @@ def maybe_apply_loyalty_redemption_to_invoice_payload(
 			voucher_discount = min(max(value, Decimal("0")), available)
 		else:
 			voucher_discount = min(max(value, Decimal("0")), available)
-		new_discount = old_discount + voucher_discount
-		old_tax = Decimal(str(totals.get("tax", 0)))
-		new_net = gross - new_discount
-		new_tax = (old_tax * new_net / (gross - old_discount)).quantize(Decimal("0.01")) if gross > old_discount else old_tax
-		totals.update({"discount": float(new_discount), "net": float(new_net), "tax": float(new_tax)})
+		_apply_club_discount_to_totals(totals, voucher_discount)
 		header_extra["totals"] = totals
 		cc["voucher_code"] = voucher.code
 		cc["voucher_id"] = voucher.id
@@ -810,25 +833,7 @@ def maybe_apply_loyalty_redemption_to_invoice_payload(
 		)
 
 	discount_add = (redeem_pts * cv).quantize(Decimal("0.01"))
-	gross = Decimal(str(totals.get("gross", 0)))
-	old_disc = Decimal(str(totals.get("discount", 0)))
-	old_tax = Decimal(str(totals.get("tax", 0)))
-	old_net = gross - old_disc
-	new_disc = old_disc + discount_add
-	new_net = gross - new_disc
-	if new_net < 0:
-		raise ApiError(
-			"LOYALTY_DISCOUNT_TOO_HIGH",
-			"Loyalty discount exceeds the invoice net amount.",
-			http_status=400,
-		)
-	new_tax = old_tax
-	if old_net > 0 and new_net >= 0:
-		new_tax = (old_tax * (new_net / old_net)).quantize(Decimal("0.01"))
-
-	totals["discount"] = float(new_disc)
-	totals["net"] = float(new_net)
-	totals["tax"] = float(new_tax)
+	_apply_club_discount_to_totals(totals, discount_add)
 	header_extra["totals"] = totals
 	cc["redeem_points_requested"] = float(redeem_pts)
 	cc["redeem_discount_amount"] = float(discount_add)

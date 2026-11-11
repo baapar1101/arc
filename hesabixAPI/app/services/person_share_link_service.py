@@ -143,13 +143,19 @@ def _public_invoice_financials_from_extra_info(extra_info: Any) -> Dict[str, flo
         extra_info = {}
     totals = extra_info.get("totals")
     if isinstance(totals, dict):
+        from app.services.invoice_adjustments_service import total_with_tax_from_totals_dict
+
         gross = _safe_float(totals.get("gross"))
         discount = _safe_float(totals.get("discount"))
         tax = _safe_float(totals.get("tax"))
-        net = _safe_float(totals.get("net"))
-        if not net and (gross or discount):
-            net = gross - discount
-        total_final = net + tax
+        # جمع نمایشی از مؤلفه‌هاست، نه net+tax؛ وگرنه وقتی net مالیات خط را دارد مالیات دوبار حساب می‌شود.
+        try:
+            total_final = float(total_with_tax_from_totals_dict(totals))
+        except (TypeError, ValueError):
+            net = _safe_float(totals.get("net"))
+            if not net and (gross or discount):
+                net = gross - discount
+            total_final = net + tax
         return {
             "subtotal": gross,
             "discount_amount": discount,
