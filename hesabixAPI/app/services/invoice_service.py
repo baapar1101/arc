@@ -6902,7 +6902,13 @@ def create_invoice(
     lines_input: List[Dict[str, Any]] = list(data.get("lines") or [])
     if not isinstance(lines_input, list) or len(lines_input) == 0:
         raise ApiError("LINES_REQUIRED", "At least one line is required", http_status=400)
-    validate_invoice_line_totals(data, lines_input, currency)
+    validate_invoice_line_totals(
+        data, lines_input, currency, db=db, business_id=business_id, invoice_type=invoice_type,
+        prepare_discount_lines=(
+            _canonicalize_quick_sale_line_amounts
+            if extra_info_dict(data.get("extra_info")).get("quick_sale") is True else None
+        ),
+    )
     _apply_expired_sale_confirm_permission(
         invoice_type,
         lines_input,
@@ -8669,7 +8675,18 @@ def update_invoice(
     if not currency:
         raise ApiError("CURRENCY_NOT_FOUND", "Currency not found", http_status=404)
 
-    validate_invoice_line_totals(data, data.get("lines") or [], currency, document=document)
+    discount_input = data
+    if not isinstance(data.get("extra_info"), dict):
+        discount_input = {
+            **data,
+            "extra_info": _sanitize_extra_info_for_invoice_type_change(
+                document.extra_info or {}, inv_type, _old_document_type,
+            ),
+        }
+    validate_invoice_line_totals(
+        discount_input, data.get("lines") or [], currency,
+        db=db, business_id=int(document.business_id), invoice_type=inv_type,
+    )
     if inv_type != _old_document_type:
         document.document_type = inv_type
     document.document_date = document_date

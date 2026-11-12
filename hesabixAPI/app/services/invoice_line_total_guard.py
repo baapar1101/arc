@@ -2,35 +2,34 @@ from decimal import Decimal, DecimalException
 
 from app.core.responses import ApiError
 from app.services.currency_quant import decimal_places_to_quant
+from app.services.invoice_global_discount_service import apply_global_discount_to_invoice_payload
 from app.services.invoice_unit_conversion_service import extra_info_dict
 
 
-def _positive(value):
-    try:
-        number = Decimal(str(value or 0))
-        return number.is_finite() and number > 0
-    except DecimalException:
-        return False
+def _allocated_line_totals(db, business_id, invoice_type, data, lines, prepare_discount_lines):
+    # The allocator replaces extra_info on its inputs. Preview on copies so the
+    # validation happens before document/GL changes and saving still applies it once.
+    if (
+        not any(key in data for key in ("global_discount_amount", "global_discount_percent"))
+        and not isinstance(extra_info_dict(data.get("extra_info")).get("global_discount"), dict)
+    ):
+        return []
+    preview = dict(data)
+    preview_lines = [dict(line) for line in lines]
+    if prepare_discount_lines is not None:
+        prepare_discount_lines(preview_lines)
+    if not apply_global_discount_to_invoice_payload(db, business_id, invoice_type, preview_lines, preview):
+        return []
+    return [Decimal(str(line["extra_info"]["line_total"])) for line in preview_lines]
 
 
-def _has_global_discount(payload):
-    keys = ("header_discount", "global_discount_amount", "global_discount_percent")
-    if any(_positive(payload.get(key)) for key in keys):
-        return True
-    discount = extra_info_dict(payload.get("extra_info")).get("global_discount")
-    if not isinstance(discount, dict):
-        return _positive(discount)
-    return _positive(discount.get("amount")) or _positive(discount.get("value"))
-
-
-def validate_invoice_line_totals(data, lines, currency, *, document=None):
-    """Validate client amounts before an invoice is written; H37 owns global discount."""
-    stored = {"extra_info": getattr(document, "extra_info", None),
-              "global_discount_amount": getattr(document, "global_discount_amount", None)}
-    if any(_has_global_discount(entry) for entry in (data, stored, *lines)):
-        return
+def validate_invoice_line_totals(
+    data, lines, currency, *, db, business_id, invoice_type, prepare_discount_lines=None,
+):
+    """Accept the line before header discount or as calculated by the allocator."""
     places = currency.decimal_places
     quant = decimal_places_to_quant(places if places is not None else 2)
+    allocated = None
     for index, line in enumerate(lines, 1):
         info = extra_info_dict(line.get("extra_info"))
         sent = info.get("line_total", line.get("line_total"))
@@ -44,9 +43,16 @@ def validate_invoice_line_totals(data, lines, currency, *, document=None):
             )
             supplied = Decimal(str(sent))
             expected = quantity * price - discount + tax
-            if (all(value.is_finite() for value in (supplied, expected, quantity))
-                    and abs(supplied - expected) <= max(abs(quantity) * quant, quant)):
-                continue
+            if all(value.is_finite() for value in (supplied, expected, quantity)):
+                tolerance = max(abs(quantity) * quant, quant)
+                if abs(supplied - expected) <= tolerance:
+                    continue
+                if allocated is None:
+                    allocated = _allocated_line_totals(
+                        db, business_id, invoice_type, data, lines, prepare_discount_lines,
+                    )
+                if allocated and abs(supplied - allocated[index - 1]) <= tolerance:
+                    continue
         except DecimalException:
             pass
         raise ApiError(
