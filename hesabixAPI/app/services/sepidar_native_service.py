@@ -104,6 +104,12 @@ def account_report_prefix(path: list[dict]) -> str:
             return '30105'  # current-year profit
     if len(codes) > 1 and (group == '62' or group == '41' and codes[1] == '12'):
         normal_side = path[-1].get('BalanceType')
+        # Sepidar's AccountManagement lookups defines 3 as "Don't Care".
+        # Such a child inherits its nearest declared GL/SL report section,
+        # never its current debit/credit balance or the mixed group root.
+        if normal_side == 3:
+            normal_side = next((row['BalanceType'] for row in reversed(path[:-1])
+                if row.get('Type') in (2, 3) and row.get('BalanceType') in (1, 2)), None)
         if normal_side not in (1, 2):
             raise NativeConversionError("Mixed source income/expense account needs a declared normal balance")
         return ('708' if normal_side == 1 else '602') if group == '62' else ('701' if normal_side == 1 else '601')

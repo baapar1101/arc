@@ -135,3 +135,61 @@ def test_later_source_posting_attaches_original_voucher_to_existing_invoice(nati
     assert db.scalar(select(func.count()).select_from(DocumentLine).where(DocumentLine.document_id==did))==2
     summary=project_native(db,1)
     assert all(s['created']==s['updated']==0 for s in summary['entities'].values())
+
+@pytest.mark.parametrize('kind',['receipt','payment'])
+def test_reviewed_bank_voucher_replacement_keeps_cash_identity_and_allocations(native_db,kind):
+    from tests.test_sepidar_operations import operations,add
+    db=native_db;operations(db)
+    table='RPA.ReceiptHeader' if kind=='receipt' else 'RPA.PaymentHeader'
+    if kind=='payment':
+        original=db.scalars(select(SepidarImportRow).where(SepidarImportRow.source_table=='ReceiptHeader')).one()
+        header=deepcopy(original.payload);original.is_deleted=True
+        header['PaymentHeaderId']=header.pop('ReceiptHeaderId')
+        add(db,table,[header])
+        remove(db,'RPA.PartyAccountSettlement');remove(db,'RPA.PartyAccountSettlementItem')
+        for row in db.scalars(select(SepidarImportRow).where(SepidarImportRow.source_table=='VoucherItem')):
+            if row.payload.get('VoucherRef')==51:
+                row.payload={**row.payload,'Debit':row.payload['Credit'],'Credit':row.payload['Debit']}
+                row.content_hash=fingerprint(row.payload)
+    db.commit();project_native(db,1)
+    mapping=db.scalars(select(SepidarNativeMap).where(SepidarNativeMap.source_table==table)).one()
+    did=mapping.target_id;before_count=count(db,Document)
+    before_allocations=deepcopy(db.get(Document,did).extra_info['sepidar']['settlement_allocations'])
+    old_lines=[]
+    for row in db.scalars(select(SepidarImportRow).where(SepidarImportRow.source_schema=='ACC')):
+        if row.source_table=='Voucher' and row.payload.get('VoucherId')==51:row.is_deleted=True
+        if row.source_table=='VoucherItem' and row.payload.get('VoucherRef')==51:
+            row.is_deleted=True;old_lines.append(deepcopy(row.payload))
+    add(db,'ACC.Voucher',[{'VoucherId':61,'Number':31,'FiscalYearRef':4,'Date':'2026-10-22','State':1}])
+    for i,line in enumerate(old_lines):
+        add_raw(db,'ACC.VoucherItem',{**line,'VoucherItemId':20+i,'VoucherRef':61,
+            'Debit':'120' if Decimal(str(line['Debit'])) else 0,'Credit':'120' if Decimal(str(line['Credit'])) else 0},f'bank-replacement-{i}')
+    header=db.scalars(select(SepidarImportRow).where(SepidarImportRow.source_table==table.split('.')[1],SepidarImportRow.is_deleted.is_(False))).one()
+    header.payload={**header.payload,'VoucherRef':61,'TotalAmount':'120'};header.content_hash=fingerprint(header.payload)
+    db.commit()
+    plan,_=build_plan(db,1)
+    assert not plan['retire_document_ids'] and len(plan['replacements'])==1
+    assert plan['replacements'][0]['operational_table']==table and plan['replacements'][0]['document_id']==did
+    with db.begin_nested():apply_reviewed_plan(db,1,1,plan['plan_hash'],'owner reviewed source bank voucher replacement')
+    db.commit()
+    assert count(db,Document)==before_count
+    assert db.get(Document,did).document_type==kind
+    assert db.get(Document,did).extra_info['sepidar']['settlement_allocations']==before_allocations
+    assert db.get(Document,did).extra_info['sepidar']['ledger_document_id']==did
+    assert db.scalar(select(func.sum(DocumentLine.debit)).where(DocumentLine.document_id==did))==120
+    assert db.scalars(select(SepidarNativeMap).where(SepidarNativeMap.source_table=='ACC.Voucher',SepidarNativeMap.source_id=='61')).one().target_id==did
+    repeated=project_native(db,1)
+    assert all(s['created']==s['updated']==0 for s in repeated['entities'].values())
+
+@pytest.mark.parametrize('parent_side,prefix',[(1,'708'),(2,'602')])
+def test_neutral_nonoperating_child_inherits_declared_parent_not_mixed_group(parent_side,prefix):
+    from app.services.sepidar_native_service import account_report_prefix
+    path=[{'Code':'0','Type':0,'BalanceType':3},{'Code':'62','Type':1,'BalanceType':2},
+          {'Code':'11','Type':2,'BalanceType':parent_side},{'Code':'10','Type':3,'BalanceType':3}]
+    assert account_report_prefix(path)==prefix
+
+def test_neutral_mixed_accounts_without_declared_gl_parent_still_require_review():
+    from app.services.sepidar_native_service import account_report_prefix
+    path=[{'Code':'0','Type':0,'BalanceType':3},{'Code':'62','Type':1,'BalanceType':2},
+          {'Code':'11','Type':2,'BalanceType':3},{'Code':'10','Type':3,'BalanceType':3}]
+    with pytest.raises(NativeConversionError,match='declared normal balance'):account_report_prefix(path)

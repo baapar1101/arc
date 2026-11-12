@@ -18,7 +18,7 @@ from adapters.db.models.warehouse_document import WarehouseDocument
 from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
 from adapters.db.models.customer_club import CustomerClubInvoiceSnapshot, CustomerClubBalance, CustomerClubLedger
 from adapters.db.models.sepidar_live_import import SepidarImportSetting, SepidarImportRow, SepidarImportRun, SepidarNativeMap, SepidarReconciliationAudit
-from app.services.sepidar_native_service import SOURCE_IDS, OPERATION_IDS, INVOICES, NativeConversionError, fingerprint, Projector
+from app.services.sepidar_native_service import SOURCE_IDS, OPERATION_IDS, INVOICES, NativeConversionError, fingerprint, source_date, Projector
 
 
 def serialized(obj):
@@ -53,21 +53,28 @@ def build_plan(db, business_id):
     warehouse_ids={m.target_id for m in missing if m.target_table=='warehouse_documents'}
     replacements=[];preserved=set()
     vouchers={r['VoucherId']:r for r in data['ACC.Voucher']}
-    for table,key,child,parent,doctype,prefix,net,voucher_key in INVOICES:
-        if not voucher_key:continue
+    references=[(s[0],s[1],s[7]) for s in INVOICES if s[7]]
+    if setting.operations_enabled:
+        references += [('RPA.ReceiptHeader','ReceiptHeaderId','VoucherRef'),('RPA.PaymentHeader','PaymentHeaderId','VoucherRef')]
+    for table,key,voucher_key in references:
         for row in data[table]:
             old=maps.get((table,str(row[key])))
             if not old or old.target_id not in document_ids:continue
             vid=row.get(voucher_key)
             if not vid or vid not in vouchers:
-                raise NativeConversionError('Surviving invoice needs an available replacement voucher')
+                raise NativeConversionError('Surviving source document needs an available replacement voucher')
+            if table.startswith('RPA.') and (source_date(row['Date'])!=source_date(vouchers[vid]['Date'])
+                or row['FiscalYearRef']!=vouchers[vid]['FiscalYearRef'] or int(row.get('CurrencyRef') or 1)!=1):
+                raise NativeConversionError('Replacement bank voucher needs matching source date, fiscal year and base currency')
             vm=maps.get(('ACC.Voucher',str(vid)))
             if vm and vm.target_id!=old.target_id:
                 raise NativeConversionError('Replacement voucher already belongs to another native document')
             if old.target_id in preserved:
-                raise NativeConversionError('Ambiguous replacement invoice aliases')
+                raise NativeConversionError('Ambiguous replacement source aliases')
             preserved.add(old.target_id)
-            replacements.append({'document_id':old.target_id,'invoice_table':table,'invoice_id':str(row[key]),'voucher_id':str(vid)})
+            reference_fields=({'operational_table':table,'operational_id':str(row[key])} if table.startswith('RPA.')
+                              else {'invoice_table':table,'invoice_id':str(row[key])})
+            replacements.append({'document_id':old.target_id,**reference_fields,'voucher_id':str(vid)})
     retired=document_ids-preserved
     missing_ids={m.id for m in missing}
     if any(m.target_table=='documents' and m.target_id in retired and m.id not in missing_ids for m in mappings):
