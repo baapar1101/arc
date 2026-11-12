@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import and_, func, or_
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from adapters.db.models.account import Account
 from adapters.db.models.business import Business
@@ -238,6 +238,7 @@ def _load_document(
 	document_id: int,
 	*,
 	with_lines: bool = True,
+	for_update: bool = False,
 ) -> GoodsExpenseIncomeDocument:
 	q = db.query(GoodsExpenseIncomeDocument).filter(
 		and_(
@@ -245,11 +246,16 @@ def _load_document(
 			GoodsExpenseIncomeDocument.business_id == int(business_id),
 		)
 	)
+	if for_update:
+		# Refresh cached state under a row lock before checking the posting status.
+		q = q.with_for_update().populate_existing()
 	if with_lines:
+		# Load relations separately on the locking path to avoid locking nullable joins.
+		load_relation = selectinload if for_update else joinedload
 		q = q.options(
-			joinedload(GoodsExpenseIncomeDocument.lines),
-			joinedload(GoodsExpenseIncomeDocument.effect_account),
-			joinedload(GoodsExpenseIncomeDocument.person),
+			load_relation(GoodsExpenseIncomeDocument.lines),
+			load_relation(GoodsExpenseIncomeDocument.effect_account),
+			load_relation(GoodsExpenseIncomeDocument.person),
 		)
 	doc = q.first()
 	if not doc:
@@ -1290,7 +1296,7 @@ def post_document(
 	*,
 	commit: bool = True,
 ) -> Dict[str, Any]:
-	doc = _load_document(db, business_id, document_id)
+	doc = _load_document(db, business_id, document_id, for_update=True)
 	if doc.status not in (
 		STATUS_DRAFT_OPS,
 		STATUS_PENDING_ACCOUNTING,
