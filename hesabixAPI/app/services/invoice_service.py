@@ -13157,6 +13157,37 @@ def _sum_receipt_doc_payments_for_invoice(doc: Document, invoice_id: int, *, via
     return _sum_receipt_doc_account_payments(doc)
 
 
+def _receipt_amount_for_invoice_balance(
+    receipt: Document, invoice: Document, *, via_person_line: bool,
+) -> Decimal:
+    """Prefer explicit receivable allocations in the invoice's currency."""
+    extra = receipt.extra_info or {}
+    if (
+        invoice.document_type == INVOICE_SALES
+        and receipt.document_type == "receipt"
+        and invoice.currency_id is not None
+        and receipt.currency_id == invoice.currency_id
+        and not any(extra.get(key) for key in ("cross_currency", "fx_settlement", "settles_currency_id", "settlements"))
+    ):
+        person_id = _person_id_from_header({"extra_info": invoice.extra_info})
+        invoice_id = str(invoice.id)
+        allocations = [
+            line for line in receipt.lines
+            if person_id is not None
+            and line.person_id == person_id
+            and str((line.extra_info or {}).get("invoice_id", "")).strip() == invoice_id
+            and line.account is not None
+            and line.account.code == "10401"
+            and line.debit == 0
+            and line.credit > 0
+        ]
+        # Ordinary receipts store debit/credit in Document.currency_id.
+        # A converted receipt can instead store base amounts on person lines.
+        if allocations and not any((line.extra_info or {}).get("fx_settlement") for line in allocations):
+            return sum((line.credit for line in allocations), Decimal(0))
+    return _sum_receipt_doc_payments_for_invoice(receipt, invoice.id, via_person_line=via_person_line)
+
+
 def _get_receipt_payment_ids_linked_to_invoice(
     db: Session,
     business_id: int,
@@ -13501,7 +13532,7 @@ def batch_calculate_invoices_remaining(
     if all_rp_doc_ids:
         rp_docs = (
             db.query(Document)
-            .options(selectinload(Document.lines))
+            .options(selectinload(Document.lines).joinedload(DocumentLine.account))
             .filter(
                 Document.id.in_(list(all_rp_doc_ids)),
                 Document.business_id == business_id,
@@ -13525,11 +13556,13 @@ def batch_calculate_invoices_remaining(
                 doc_id_int = int(doc_id)
             except (ValueError, TypeError):
                 continue
+            if doc_id_int in processed_doc_ids:
+                continue
             rp_doc = rp_docs_by_id.get(doc_id_int)
             if not rp_doc:
                 continue
             processed_doc_ids.add(doc_id_int)
-            total_paid += _sum_receipt_doc_payments_for_invoice(rp_doc, inv_id, via_person_line=False)
+            total_paid += _receipt_amount_for_invoice_balance(rp_doc, doc, via_person_line=False)
 
         for doc_id_int in invoice_to_person_rp.get(inv_id, set()):
             if doc_id_int in processed_doc_ids:
@@ -13541,8 +13574,8 @@ def batch_calculate_invoices_remaining(
             if (rp_doc.extra_info or {}).get("source") == "quick_sale_change":
                 total_paid -= _quick_sale_change_document_amount(rp_doc)
             else:
-                total_paid += _sum_receipt_doc_payments_for_invoice(
-                    rp_doc, inv_id, via_person_line=True
+                total_paid += _receipt_amount_for_invoice_balance(
+                    rp_doc, doc, via_person_line=True
                 )
 
         change_doc_id = links.get(INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID)
@@ -13635,8 +13668,10 @@ def calculate_invoice_remaining(
         for doc_id in receipt_payment_ids:
             try:
                 doc_id_int = int(doc_id)
+                if doc_id_int in processed_doc_ids:
+                    continue
                 doc = db.query(Document).options(
-                    selectinload(Document.lines)
+                    selectinload(Document.lines).joinedload(DocumentLine.account)
                 ).filter(
                     Document.id == doc_id_int,
                     Document.business_id == business_id,
@@ -13647,7 +13682,7 @@ def calculate_invoice_remaining(
                     continue
                 
                 processed_doc_ids.add(doc_id_int)
-                total_paid += _sum_receipt_doc_payments_for_invoice(doc, invoice_id, via_person_line=False)
+                total_paid += _receipt_amount_for_invoice_balance(doc, invoice, via_person_line=False)
             except (ValueError, TypeError) as e:
                 logger.warning("receipt_payment_id parse error %s: %s", doc_id, e)
                 continue
@@ -13673,7 +13708,7 @@ def calculate_invoice_remaining(
         if person_doc_ids:
             receipt_payment_docs = (
                 db.query(Document)
-                .options(selectinload(Document.lines))
+                .options(selectinload(Document.lines).joinedload(DocumentLine.account))
                 .filter(
                     Document.id.in_(person_doc_ids),
                     Document.business_id == business_id,
@@ -13687,8 +13722,8 @@ def calculate_invoice_remaining(
                 if (doc.extra_info or {}).get("source") == "quick_sale_change":
                     total_paid -= _quick_sale_change_document_amount(doc)
                 else:
-                    total_paid += _sum_receipt_doc_payments_for_invoice(
-                        doc, invoice_id, via_person_line=True
+                    total_paid += _receipt_amount_for_invoice_balance(
+                        doc, invoice, via_person_line=True
                     )
 
         change_doc_id = links.get(INVOICE_LINK_QUICK_SALE_CHANGE_PAYMENT_ID)
