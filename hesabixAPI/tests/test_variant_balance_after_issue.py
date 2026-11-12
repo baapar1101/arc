@@ -22,7 +22,7 @@ from sqlalchemy.schema import CreateTable
 DAY = date(2026, 11, 11)
 
 
-def test_post_issue_refreshes_variant_balance_before_commit(monkeypatch):
+def test_post_receipt_then_issue_refreshes_variant_balance(monkeypatch):
     monkeypatch.setattr(cache, "get_redis_client", lambda *args, **kwargs: None)
     monkeypatch.setattr(cache, "_cache_service", None)
     monkeypatch.setattr(business_calendar, "business_today", lambda *args: DAY)
@@ -87,7 +87,7 @@ def test_post_issue_refreshes_variant_balance_before_commit(monkeypatch):
                         business_id=1,
                         code="IN",
                         document_date=DAY,
-                        status="posted",
+                        status="draft",
                         doc_type="receipt",
                         warehouse_id_to=1,
                         source_type="manual",
@@ -108,15 +108,6 @@ def test_post_issue_refreshes_variant_balance_before_commit(monkeypatch):
                 db.add(
                     ProductVariant(
                         id=variant_id, business_id=1, product_id=1, combination_key=str(variant_id)
-                    )
-                )
-                db.add(
-                    InventoryVariantBalance(
-                        business_id=1,
-                        warehouse_id=1,
-                        product_id=1,
-                        variant_id=variant_id,
-                        quantity=10,
                     )
                 )
                 for document_id, movement, quantity in ((1, "in", 10), (2, "out", outgoing)):
@@ -143,22 +134,22 @@ def test_post_issue_refreshes_variant_balance_before_commit(monkeypatch):
                     )
             db.commit()
 
-            assert post_warehouse_document(db, 2)["status"] == "posted"
-            db.commit()
+        for document_id, expected in ((1, {1: 10, 2: 10}), (2, {1: 8, 2: 7})):
+            with Session(engine, autoflush=False) as db:
+                assert post_warehouse_document(db, document_id)["status"] == "posted"
+                db.commit()
 
-        with Session(engine, autoflush=False) as db:
-            assert db.get(WarehouseDocument, 2).status == "posted"
-            assert {
-                r.variant_id: r.quantity for r in db.scalars(select(InventoryVariantBalance))
-            } == {
-                1: 8,
-                2: 7,
-            }
-            assert {
-                r["variant_id"]: Decimal(r["quantity"]) for r in list_variant_balances(db, 1, 1, 1)
-            } == {
-                1: 8,
-                2: 7,
-            }
+            with Session(engine, autoflush=False) as db:
+                assert db.get(WarehouseDocument, document_id).status == "posted"
+                stored = {
+                    row.variant_id: row.quantity
+                    for row in db.scalars(select(InventoryVariantBalance))
+                }
+                assert stored == expected
+                listed = {
+                    row["variant_id"]: Decimal(row["quantity"])
+                    for row in list_variant_balances(db, 1, 1, 1)
+                }
+                assert listed == expected
     finally:
         engine.dispose()
