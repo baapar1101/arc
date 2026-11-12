@@ -3680,6 +3680,9 @@ def post_warehouse_document(
 	wh.status = "posted"
 	from app.services.variant_inventory_service import rebuild_balances_for_warehouse_document
 
+	if doc_type == "issue" and not (wh.extra_info or {}).get("cancels_warehouse_document_id"):
+		# The balance query filters on the persisted posted status.
+		db.flush([wh])
 	rebuild_balances_for_warehouse_document(db, wh)
 	wh.touch()
 	db.flush()
