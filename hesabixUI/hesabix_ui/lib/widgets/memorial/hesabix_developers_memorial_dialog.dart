@@ -6,8 +6,6 @@ import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens/theme_catalog.dart';
 
-part 'memorial_snow_walk.dart';
-
 /// صفحهٔ گرامیداشت (میانبر مخفی Q سپس jam).
 ///
 /// پرترهٔ secret.png عمداً بدون نام و بدون عنوان است؛
@@ -153,12 +151,7 @@ class _HesabixDevelopersMemorialDialogState
     final onSurface = scheme.onSurface;
     final muted = scheme.onSurfaceVariant;
     final width = MediaQuery.sizeOf(context).width;
-    final viewHeight = MediaQuery.sizeOf(context).height;
     final gutter = width < 420 ? 18.0 : 28.0;
-    final snowBand = (viewHeight * 0.30).clamp(168.0, 250.0);
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
-    const topPad = 72.0;
-    final bottomPad = 18.0 + snowBand * 0.48;
     // قاب پرتره به‌علاوهٔ هاله نباید از عرض صفحه بزند بیرون.
     final side = (width - gutter * 2 - 96).clamp(150.0, 280.0);
 
@@ -216,31 +209,14 @@ class _HesabixDevelopersMemorialDialogState
                   ),
                 ),
                 const IgnorePointer(child: _Vignette()),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  height: snowBand + bottomInset,
-                  child: IgnorePointer(
-                    child: ExcludeSemantics(
-                      child: _NightSnowWalk(
-                        appear: _enter,
-                        groundLift: bottomInset,
-                      ),
-                    ),
-                  ),
-                ),
                 SafeArea(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       return SingleChildScrollView(
-                        padding: EdgeInsets.fromLTRB(gutter, topPad, gutter, bottomPad),
+                        padding: EdgeInsets.fromLTRB(gutter, 72, gutter, 36),
                         child: ConstrainedBox(
                           constraints: BoxConstraints(
-                            minHeight: math.max(
-                              0,
-                              constraints.maxHeight - topPad - bottomPad,
-                            ),
+                            minHeight: math.max(0, constraints.maxHeight - 108),
                           ),
                           child: Center(
                             child: ConstrainedBox(
