@@ -7,8 +7,8 @@ import logging
 
 from collections import defaultdict
 
-from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import Integer, and_, cast, func, or_
+from sqlalchemy.orm import Session, aliased, joinedload
+from sqlalchemy import Integer, String, and_, cast, exists, func, or_
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import IntegrityError
 
@@ -215,6 +215,17 @@ def should_seal_warehouse_cancel_reversal(db: Session, business_id: int, wh: War
 	برای حواله‌های فاکتور، جریان فعلی draft→post برای بایگانی حفظ می‌شود.
 	"""
 	return not _warehouse_document_source_is_invoice(db, business_id, wh)
+
+
+def counts_toward_physical_stock():
+	"""یک معکوس ثبت‌شده پس از لغو اصل، حرکت فیزیکی دیگری ایجاد نمی‌کند."""
+	original = aliased(WarehouseDocument)
+	return ~exists().where(
+		original.id == WarehouseDocument.source_document_id,
+		original.business_id == WarehouseDocument.business_id,
+		original.status == "cancelled",
+		WarehouseDocument.extra_info["cancels_warehouse_document_id"].as_string() == cast(original.id, String),
+	)
 
 
 def assert_cancel_reversal_postable(db: Session, wh: WarehouseDocument) -> None:
@@ -5361,6 +5372,7 @@ def get_physical_stock_bulk(
 				WarehouseDocument.status == "posted",
 				WarehouseDocument.document_date <= as_of_date,
 				WarehouseDocumentLine.product_id.in_(product_ids),
+				counts_toward_physical_stock(),
 			)
 		)
 	)
