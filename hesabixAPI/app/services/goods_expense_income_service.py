@@ -1004,6 +1004,17 @@ def _create_warehouse_and_post(
 				"extra_info": extra,
 				"lot_allocations": line_extra.get("lot_allocations") or extra.get("lot_allocations"),
 			}
+			if (
+				(doc.extra_info or {}).get("source") == "stock_count"
+				and line_extra.get("variant_id") is not None
+				and not payload["lot_allocations"]
+			):
+				from app.services.variant_allocation_service import attach_warehouse_line_from_payload
+
+				attach_warehouse_line_from_payload(
+					db, business_id, wline, product, payload,
+					document=wh, source_line_unit=line_extra.get("unit"),
+				)
 			attach_warehouse_line_lots_from_payload(
 				db,
 				business_id,

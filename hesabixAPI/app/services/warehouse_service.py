@@ -5041,6 +5041,51 @@ def start_stock_count(
 	}
 
 
+def _get_stock_count_variant_quantity(
+	db: Session,
+	business_id: int,
+	product_id: int,
+	warehouse_id: Optional[int],
+	variant_id: Any,
+	as_of_date: date,
+) -> Decimal:
+	from adapters.db.models.product_variant_allocation import WarehouseLineVariantAllocation
+	from app.services.invoice_service import _warehouse_doc_is_cancel_reversal_of_cancelled
+	from app.services.variant_allocation_service import validate_payload_for_product
+
+	product = db.query(Product).filter_by(id=product_id, business_id=business_id).first()
+	if product is None:
+		raise ApiError("PRODUCT_NOT_FOUND", "کالا یافت نشد", http_status=404)
+	[(resolved_variant_id, _, _)] = validate_payload_for_product(
+		db, business_id, product, {"variant_id": variant_id, "quantity": 1}, Decimal(1)
+	)
+	rows = (
+		db.query(WarehouseLineVariantAllocation.quantity, WarehouseDocumentLine.movement, WarehouseDocument)
+		.join(WarehouseDocumentLine, WarehouseDocumentLine.id == WarehouseLineVariantAllocation.warehouse_document_line_id)
+		.join(WarehouseDocument, WarehouseDocument.id == WarehouseDocumentLine.warehouse_document_id)
+		.filter(
+			WarehouseLineVariantAllocation.business_id == business_id,
+			WarehouseLineVariantAllocation.product_id == product_id,
+			WarehouseLineVariantAllocation.variant_id == resolved_variant_id,
+			WarehouseDocumentLine.product_id == product_id,
+			WarehouseDocument.business_id == business_id,
+			WarehouseDocument.status == "posted",
+			WarehouseDocument.document_date <= as_of_date,
+			WarehouseDocumentLine.movement.in_(("in", "out")),
+		)
+	)
+	if warehouse_id is not None:
+		rows = rows.filter(WarehouseDocumentLine.warehouse_id == warehouse_id)
+	return sum(
+		(
+			quantity if movement == "in" else -quantity
+			for quantity, movement, document in rows
+			if not _warehouse_doc_is_cancel_reversal_of_cancelled(db, business_id, document)
+		),
+		Decimal(0),
+	)
+
+
 def calculate_stock_count_differences(
 	db: Session,
 	business_id: int,
@@ -5069,13 +5114,7 @@ def calculate_stock_count_differences(
 
 		lot_id = item.get("lot_id")
 		instance_id = item.get("instance_id")
-		system_quantity = get_physical_stock(
-			db,
-			business_id,
-			int(product_id),
-			wh_id,
-			as_of_date,
-		)
+		variant_id = item.get("variant_id")
 		if instance_id is not None:
 			from adapters.db.models.product_instance import ProductInstance
 
@@ -5109,7 +5148,13 @@ def calculate_stock_count_differences(
 					db, business_id, int(product_id), wh_id, int(lot_id), as_of_date
 				)
 			except (TypeError, ValueError):
-				pass
+				system_quantity = get_physical_stock(db, business_id, int(product_id), wh_id, as_of_date)
+		elif variant_id is not None:
+			system_quantity = _get_stock_count_variant_quantity(
+				db, business_id, int(product_id), wh_id, variant_id, as_of_date,
+			)
+		else:
+			system_quantity = get_physical_stock(db, business_id, int(product_id), wh_id, as_of_date)
 		try:
 			physical_quantity = Decimal(str(item.get("physical_quantity", 0)))
 		except Exception:
@@ -5270,10 +5315,11 @@ def create_stock_count_adjustment(
 					instance.status = "sold"
 					instance.warehouse_id = None
 					instance.last_movement_date = stock_count_date
-		if item.get("lot_id") or item.get("lot_allocations") or item.get("lot_code"):
+		has_lot = item.get("lot_id") or item.get("lot_allocations") or item.get("lot_code")
+		if item.get("variant_id") is not None and (has_lot or item.get("instance_id") is None):
+			stamped_extra["variant_id"] = item["variant_id"]
+		if has_lot:
 			stamped_extra = dict(stamped_extra or {})
-			if item.get("variant_id") is not None:
-				stamped_extra["variant_id"] = item.get("variant_id")
 			if item.get("lot_allocations"):
 				stamped_extra["lot_allocations"] = item.get("lot_allocations")
 			elif item.get("lot_id") or item.get("lot_code"):
