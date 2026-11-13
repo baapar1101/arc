@@ -6,7 +6,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Session, aliased
 
 from adapters.db.models.document import Document
@@ -226,7 +226,7 @@ def rebuild_variant_balances(
             db.query(
                 func.coalesce(
                     func.sum(
-                        func.case(
+                        case(
                             (WarehouseDocumentLine.movement == "in", WarehouseLineVariantAllocation.quantity),
                             else_=-WarehouseLineVariantAllocation.quantity,
                         )
