@@ -8666,6 +8666,10 @@ def update_invoice(
             old_change_payment_id=_old_change_payment_id,
         )
 
+    # Later steps may fill extra_info from the existing document.
+    input_extra = data.get("extra_info")
+    has_input_totals = isinstance(input_extra, dict) and bool(input_extra.get("totals"))
+
     # Update header
     document_date = _parse_iso_date(data.get("document_date", document.document_date))
     currency_id = data.get("currency_id", document.currency_id)
@@ -8990,7 +8994,7 @@ def update_invoice(
     try:
         from app.services.invoice_global_discount_service import apply_global_discount_to_invoice_payload
 
-        apply_global_discount_to_invoice_payload(
+        global_discount_applied = apply_global_discount_to_invoice_payload(
             db, int(document.business_id), inv_type, lines_input, data
         )
     except ApiError:
@@ -9102,7 +9106,9 @@ def update_invoice(
             **(data or {}),
         }
         accounts = _resolve_accounts_for_invoice(db, header_for_accounts)
-        totals = dict(header_extra.get("totals") or {})
+        totals = {}
+        if global_discount_applied or has_input_totals:
+            totals = dict(header_extra.get("totals") or {})
         if not totals:
             totals = _extract_totals_from_lines(lines_input)
         header_extra["totals"] = totals
@@ -9148,7 +9154,11 @@ def update_invoice(
                 ex_merge["global_discount"] = header_extra["global_discount"]
             else:
                 ex_merge.pop("global_discount", None)
-        ex_merge["totals"] = totals
+        # Match CREATE's JSON number format while retaining Decimal for accounting.
+        ex_merge["totals"] = {
+            key: float(value) if isinstance(value, Decimal) else value
+            for key, value in totals.items()
+        }
         if "invoice_adjustments" in header_extra:
             ex_merge["invoice_adjustments"] = header_extra["invoice_adjustments"]
         else:
