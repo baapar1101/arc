@@ -4519,6 +4519,58 @@ def bulk_delete_warehouse_documents(db: Session, business_id: int, doc_ids: List
 	}
 
 
+def _validate_manual_receipt_variant_cancellation(
+	db: Session,
+	receipt: WarehouseDocument,
+	lines: List[WarehouseDocumentLine],
+) -> None:
+	from adapters.db.models.product_variant_allocation import WarehouseLineVariantAllocation
+	from app.core.business_calendar import business_today
+	from app.services.variant_inventory_service import (
+		acquire_variant_stock_locks,
+		compute_available_variant_stock,
+	)
+
+	business_id = int(receipt.business_id)
+	incoming = {line.id: line for line in lines if line.movement == "in" and line.warehouse_id is not None}
+	if not incoming:
+		return
+	quantities = defaultdict(Decimal)
+	for allocation in db.query(WarehouseLineVariantAllocation).filter(
+		WarehouseLineVariantAllocation.business_id == business_id,
+		WarehouseLineVariantAllocation.warehouse_document_line_id.in_(incoming),
+	):
+		line = incoming[allocation.warehouse_document_line_id]
+		key = (int(line.warehouse_id), int(line.product_id), int(allocation.variant_id))
+		quantities[key] += allocation.quantity
+	if not quantities:
+		return
+
+	acquire_variant_stock_locks(db, business_id, list(quantities))
+	db.refresh(receipt, attribute_names=["status"])
+	if receipt.status != "posted":
+		raise ApiError("NOT_CANCELLABLE", "فقط حواله‌های posted قابل لغو هستند", http_status=400)
+	as_of = max(business_today(business_id), receipt.document_date)
+	for (warehouse_id, product_id, variant_id), quantity in sorted(quantities.items()):
+		remaining = compute_available_variant_stock(
+			db, business_id, product_id, warehouse_id, variant_id, as_of,
+			exclude_warehouse_document_ids=[int(receipt.id)],
+		)
+		if remaining < 0:
+			raise ApiError(
+				"VARIANT_RECEIPT_CANCEL_INSUFFICIENT_STOCK",
+				"لغو رسید، موجودی قابل‌تأمین این ترکیب در انبار را منفی می‌کند",
+				http_status=409,
+				details={
+					"warehouse_id": warehouse_id,
+					"product_id": product_id,
+					"variant_id": variant_id,
+					"receipt_quantity": str(quantity),
+					"remaining_available_quantity": str(remaining),
+				},
+			)
+
+
 def cancel_warehouse_document(
 	db: Session,
 	business_id: int,
@@ -4555,6 +4607,14 @@ def cancel_warehouse_document(
 			raise ApiError("INVALID_PRODUCTION_ORDER_LINK", "شناسهٔ سفارش تولید در حواله نامعتبر است", http_status=409)
 	if len(linked_order_ids) > 1:
 		raise ApiError("MULTIPLE_PRODUCTION_ORDER_LINKS", "حواله به چند سفارش تولید متصل است و قابل ابطال نیست", http_status=409)
+	if (
+		wh.doc_type == "receipt"
+		and wh.source_type == "manual"
+		and wh.source_document_id is None
+		and not (wh.extra_info or {}).get("cancels_warehouse_document_id")
+		and not linked_order_ids
+	):
+		_validate_manual_receipt_variant_cancellation(db, wh, lines)
 	if linked_order_ids:
 		_reverse_production_order_cancelled_document(db, wh, lines, next(iter(linked_order_ids)))
 
