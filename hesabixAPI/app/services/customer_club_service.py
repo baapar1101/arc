@@ -694,8 +694,8 @@ def maybe_apply_loyalty_redemption_to_invoice_payload(
 	user_id: int,
 	invoice_lines: Optional[List[Dict[str, Any]]] = None,
 	document_id: int | None = None,
-) -> None:
-	"""قبل از ذخیره فاکتور: افزایش تخفیف و کاهش مالیات به نسبت مبنای جدید. extra_info.customer_club پر می‌شود."""
+) -> bool:
+	"""قبل از ذخیره فاکتور: افزایش تخفیف و کاهش مالیات به نسبت مبنای جدید. خروجی نشان می‌دهد کوپن یا امتیاز اعمال شد."""
 	cc = dict(header_extra.get("customer_club") or {})
 	voucher_code = str(data.get("customer_club_voucher_code") or cc.get("voucher_code") or "").strip().upper()
 	if voucher_code:
@@ -741,7 +741,7 @@ def maybe_apply_loyalty_redemption_to_invoice_payload(
 		header_extra["customer_club"] = cc
 	raw_pts = data.get("loyalty_redemption_points")
 	if raw_pts is None:
-		return
+		return bool(voucher_code)
 	try:
 		redeem_pts = Decimal(str(raw_pts))
 	except Exception:
@@ -760,7 +760,7 @@ def maybe_apply_loyalty_redemption_to_invoice_payload(
 				header_extra["customer_club"] = cc
 			else:
 				header_extra.pop("customer_club", None)
-		return
+		return bool(voucher_code)
 	if invoice_type != INVOICE_SALES or is_proforma:
 		raise ApiError(
 			"LOYALTY_REDEEM_NOT_ALLOWED",
@@ -838,6 +838,7 @@ def maybe_apply_loyalty_redemption_to_invoice_payload(
 	cc["redeem_points_requested"] = float(redeem_pts)
 	cc["redeem_discount_amount"] = float(discount_add)
 	header_extra["customer_club"] = cc
+	return True
 
 
 def commit_loyalty_redemption_for_sales_invoice(db: Session, document: Document, user_id: int) -> None:

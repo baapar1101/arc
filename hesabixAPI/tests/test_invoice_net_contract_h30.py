@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateTable
 
@@ -10,7 +10,10 @@ from adapters.db import models
 from adapters.db.models.business import BusinessField, BusinessType
 from adapters.db.models.customer_club import CustomerClubBalance, CustomerClubSettings, CustomerClubVoucher
 from adapters.db.models.document_monetization import DocumentUsagePolicy
+from adapters.db.models.invoice_item_line import InvoiceItemLine
 from adapters.db.models.person import Person, PersonType
+from adapters.db.models.product_variant import ProductVariant
+from adapters.db.models.product_variant_allocation import InvoiceItemLineVariantAllocation
 from app.core import cache
 from app.services.customer_club_service import (
     _apply_club_discount_to_totals,
@@ -18,10 +21,15 @@ from app.services.customer_club_service import (
     maybe_apply_loyalty_redemption_to_invoice_payload,
 )
 from app.services.invoice_adjustments_service import (
+    SALES_RECEIVABLE_TOTAL_KEY,
     payable_total_from_totals_dict,
     total_with_tax_from_totals_dict,
 )
-from app.services.invoice_service import create_invoice
+from app.services.invoice_service import (
+    batch_calculate_invoices_remaining,
+    calculate_invoice_remaining,
+    create_invoice,
+)
 from app.services.person_share_link_service import _public_invoice_financials_from_extra_info
 
 ACCOUNT_CODES = (
@@ -54,13 +62,17 @@ def db(monkeypatch):
         lambda *args, **kwargs: None,
     )
     engine = create_engine("sqlite://")
+    # SQLite autogenerates a primary key only when declared INTEGER.
+    monkeypatch.setattr(engine.dialect.type_compiler_instance, "visit_BIGINT",
+                        lambda *args, **kwargs: "INTEGER")
     names = (
         "businesses", "currencies", "fiscal_years", "products", "documents", "document_lines",
         "invoice_item_lines", "document_usage_policies", "invoice_item_line_variant_allocations",
         "invoice_item_line_lot_allocations", "users", "accounts", "persons", "fa_assets",
         "customer_club_settings", "customer_club_balances", "customer_club_rewards",
         "customer_club_campaigns", "customer_club_vouchers", "customer_club_ledger",
-        "customer_club_point_lots",
+        "customer_club_point_lots", "product_variants", "product_variant_values",
+        "product_attributes", "product_attribute_options", "warehouse_documents",
     )
     day = date(2026, 11, 11)
     with Session(engine, autoflush=False) as session:
@@ -168,3 +180,69 @@ def test_loyalty_earn_total_with_tax_does_not_add_tax_twice(db):
     net_b, total_b = _basis_net_and_total_from_document(db, document)
     assert net_b == Decimal("550")
     assert total_b == Decimal("550.00")
+
+@pytest.mark.parametrize("variant", [False, True], ids=["simple", "variant"])
+def test_high_precision_sale_uses_posted_receivable(db, variant):
+    currency = db.get(models.Currency, 1)
+    currency.decimal_places = 8
+    product = db.get(models.Product, 1)
+    if variant:
+        product.variant_mode = "inventory"
+        product.inventory_mode = "bulk"
+        product.track_inventory = True
+        db.add(ProductVariant(id=1, business_id=1, product_id=1, combination_key="1:1"))
+    db.commit()
+
+    line = {
+        "product_id": 1,
+        "quantity": 1,
+        "extra_info": {
+            "unit_price": "100000000.00499999",
+            "tax_rate": 10,
+            "tax_amount": "10000000",
+            "line_total": "110000000.00499999",
+        },
+    }
+    if variant:
+        line["allocations"] = [{"variant_id": 1, "quantity": 1}]
+    payload = {
+        "invoice_type": "invoice_sales",
+        "document_date": "2026-11-11",
+        "currency_id": 1,
+        "code": "H30-PRECISION",
+        "customer_club_voucher_code": "C50",
+        "loyalty_redemption_points": 10,
+        "extra_info": {
+            "person_id": 1,
+            "post_inventory": False,
+            "totals": {SALES_RECEIVABLE_TOTAL_KEY: "1.00"},
+        },
+        "lines": [line],
+    }
+    document_id = create_invoice(db, 1, 1, payload, commit=False)["data"]["id"]
+    db.commit()
+    db.expire_all()
+    document = db.get(models.Document, document_id)
+    item = db.scalars(select(InvoiceItemLine).filter_by(document_id=document_id)).one()
+    allocations = db.scalars(
+        select(InvoiceItemLineVariantAllocation).filter_by(invoice_item_line_id=item.id)
+    ).all()
+    assert [(row.variant_id, row.quantity) for row in allocations] == ([(1, 1)] if variant else [])
+
+    ar = next(row.debit for row in document.lines if row.account.code == "10401" and row.person_id == 1)
+    assert ar == Decimal("109999934.00")
+    totals = document.extra_info["totals"]
+    assert totals["net"] == 109999934.005
+    assert totals[SALES_RECEIVABLE_TOTAL_KEY] == "109999934.00"
+    assert payable_total_from_totals_dict(totals) == ar
+    single = calculate_invoice_remaining(db, 1, document_id)
+    assert Decimal(str(single["remaining"])) == ar
+    assert batch_calculate_invoices_remaining(db, 1, [document])[document_id] == single
+
+
+def test_zero_snapshot_and_historical_totals_are_distinct():
+    historical = {"gross": 500, "discount": 60, "tax": 44, "net": 440}
+    assert payable_total_from_totals_dict(historical) == Decimal("440.00")
+    assert payable_total_from_totals_dict(
+        {**historical, SALES_RECEIVABLE_TOTAL_KEY: "0.00"}
+    ) == Decimal("0.00")
