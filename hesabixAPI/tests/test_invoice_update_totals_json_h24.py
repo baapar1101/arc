@@ -22,6 +22,7 @@ from adapters.db.models.document_numbering import (
 )
 from app.core import cache
 from app.services import customer_club_service, invoice_service
+from app.services.invoice_adjustments_service import SALES_RECEIVABLE_TOTAL_KEY
 
 DAY = date(2026, 11, 11)
 
@@ -195,7 +196,11 @@ def read_invoice(db, document_id):
     db.expire_all()
     doc = db.get(models.Document, document_id)
     totals = doc.extra_info["totals"]
-    assert all(type(value) in (int, float) for value in totals.values())
+    assert all(
+        type(value) in (int, float)
+        for key, value in totals.items()
+        if key != SALES_RECEIVABLE_TOTAL_KEY
+    )
     return totals, gl_lines(db, document_id)
 
 
@@ -212,6 +217,7 @@ def test_invoice_rewrite_preserves_create_totals_and_gl(db, club):
         "net": net,
         "adjustments_net": 0,
         "adjustments_tax": 0,
+        **({SALES_RECEIVABLE_TOTAL_KEY: "594.00"} if club else {}),
     }
     assert expected[1] == [
         ("10401", net, 0, 1),
