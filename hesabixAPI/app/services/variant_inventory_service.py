@@ -217,6 +217,8 @@ def rebuild_variant_balances(
     business_id: int,
     keys: Iterable[Tuple[int, int, int]],
 ) -> None:
+    from app.services.warehouse_service import counts_toward_physical_stock
+
     unique_keys = sorted({(int(wh), int(pid), int(vid)) for wh, pid, vid in keys})
     if not unique_keys:
         return
@@ -246,6 +248,7 @@ def rebuild_variant_balances(
                 WarehouseLineVariantAllocation.variant_id == int(variant_id),
                 WarehouseDocumentLine.warehouse_id == int(warehouse_id),
                 WarehouseDocument.status == "posted",
+                counts_toward_physical_stock(),
             )
             .scalar()
         )
