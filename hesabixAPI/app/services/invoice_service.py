@@ -36,6 +36,11 @@ from app.core.responses import ApiError, success_response
 from app.core.transaction_lock import acquire_transaction_lock
 from app.services.document_monetization_service import ensure_document_policy_allows_creation
 from app.services.credit_service import get_business_credit_settings
+from app.services.invoice_adjustments_service import (
+    SALES_RECEIVABLE_TOTAL_KEY,
+    sales_receivable_total_from_totals,
+    total_with_tax_from_totals_dict,
+)
 from app.services.invoice_line_total_guard import validate_invoice_line_totals
 from app.services.invoice_unit_conversion_service import (
     INVENTORY_QUANTITY_UNIT_MAIN,
@@ -3957,7 +3962,9 @@ def _quick_sale_payment_target(document: Document) -> Decimal:
             return max(Decimal(0), Decimal(str(meta["payment_target"])))
         except Exception:
             pass
-    return Decimal(str(((document.extra_info or {}).get("totals") or {}).get("net", 0) or 0))
+    totals = (document.extra_info or {}).get("totals") or {}
+    receivable = sales_receivable_total_from_totals(totals)
+    return receivable if receivable is not None else Decimal(str(totals.get("net", 0) or 0))
 
 
 def _adjust_quick_sale_invoice_paid(document: Document, total_paid: Decimal) -> Decimal:
@@ -3968,9 +3975,10 @@ def _adjust_quick_sale_invoice_paid(document: Document, total_paid: Decimal) -> 
     try:
         prior_debt = max(Decimal(0), Decimal(str(meta.get("prior_debt_amount", 0) or 0)))
         credit_applied = max(Decimal(0), Decimal(str(meta.get("credit_applied_amount", 0) or 0)))
-        invoice_total = Decimal(
-            str(((document.extra_info or {}).get("totals") or {}).get("net", 0) or 0)
-        )
+        totals = (document.extra_info or {}).get("totals") or {}
+        invoice_total = sales_receivable_total_from_totals(totals)
+        if invoice_total is None:
+            invoice_total = Decimal(str(totals.get("net", 0) or 0))
     except Exception:
         return total_paid
     old_debt_settled = min(max(total_paid, Decimal(0)), prior_debt)
@@ -7007,7 +7015,7 @@ def create_invoice(
     try:
         from app.services.customer_club_service import maybe_apply_loyalty_redemption_to_invoice_payload
 
-        maybe_apply_loyalty_redemption_to_invoice_payload(
+        club_discount_applied = maybe_apply_loyalty_redemption_to_invoice_payload(
             db,
             business_id,
             invoice_type,
@@ -7032,6 +7040,7 @@ def create_invoice(
 
     header_extra = dict(data.get("extra_info") or {})
     totals = dict(header_extra.get("totals") or {})
+    total_with_tax = total_with_tax_from_totals_dict(totals)
 
     if (
         invoice_type == INVOICE_SALES
@@ -7046,7 +7055,7 @@ def create_invoice(
             currency_id=int(currency_id),
             document_date=document_date,
             fiscal_year_id=int(fiscal_year.id),
-            invoice_total=Decimal(str(totals.get("net", 0) or 0)),
+            invoice_total=total_with_tax if club_discount_applied else Decimal(str(totals.get("net", 0) or 0)),
             header_extra=header_extra,
         )
         data["extra_info"] = header_extra
@@ -7122,10 +7131,6 @@ def create_invoice(
     discount = Decimal(str(totals["discount"]))
     net = gross - discount
     tax = Decimal(str(totals["tax"]))
-    from app.services.invoice_adjustments_service import total_with_tax_from_totals_dict
-
-    total_with_tax = total_with_tax_from_totals_dict(totals)
-
     ensure_document_policy_allows_creation(
         db,
         business_id,
@@ -7144,6 +7149,9 @@ def create_invoice(
         "adjustments_net": float(Decimal(str(totals.get("adjustments_net", 0)))),
         "adjustments_tax": float(Decimal(str(totals.get("adjustments_tax", 0)))),
     }
+
+    if club_discount_applied:
+        new_extra_info["totals"][SALES_RECEIVABLE_TOTAL_KEY] = str(total_with_tax)
 
     from app.services.invoice_fx_revaluation import apply_fx_revaluation_to_invoice_extra
 
@@ -8732,7 +8740,14 @@ def update_invoice(
             except Exception:
                 pass
         # merge کردن: new_extra فیلدهای old_extra را override می‌کند؛ نرمال‌سازی برای ذخیره یکسان
-        merged_extra = _normalize_document_extra_info_for_storage({**old_extra, **new_extra})
+        header_for_storage = {**old_extra, **new_extra}
+        incoming_totals = header_for_storage.get("totals")
+        if isinstance(incoming_totals, dict) and SALES_RECEIVABLE_TOTAL_KEY in incoming_totals:
+            header_for_storage["totals"] = {
+                key: value for key, value in incoming_totals.items()
+                if key != SALES_RECEIVABLE_TOTAL_KEY
+            }
+        merged_extra = _normalize_document_extra_info_for_storage(header_for_storage)
         if inv_type != _old_document_type:
             merged_extra = _sanitize_extra_info_for_invoice_type_change(
                 merged_extra, inv_type, _old_document_type
@@ -9124,7 +9139,7 @@ def update_invoice(
             from app.services.customer_club_service import maybe_apply_loyalty_redemption_to_invoice_payload
 
             pid_for_club = _person_id_from_header({"extra_info": header_extra})
-            maybe_apply_loyalty_redemption_to_invoice_payload(
+            club_discount_applied = maybe_apply_loyalty_redemption_to_invoice_payload(
                 db,
                 int(document.business_id),
                 inv_type,
@@ -9142,11 +9157,12 @@ def update_invoice(
         from app.services.invoice_adjustments_service import (
             merge_invoice_adjustments_into_header_extra,
             add_adjustment_document_lines,
-            total_with_tax_from_totals_dict,
         )
 
         merge_invoice_adjustments_into_header_extra(db, int(document.business_id), inv_type, header_extra)
         totals = dict(header_extra.get("totals") or {})
+        totals.pop(SALES_RECEIVABLE_TOTAL_KEY, None)
+        total_with_tax = total_with_tax_from_totals_dict(totals)
         _adj_extra_hdr = dict(header_extra)
         ex_merge = dict(document.extra_info or {})
         if isinstance(header_extra, dict):
@@ -9159,6 +9175,8 @@ def update_invoice(
             key: float(value) if isinstance(value, Decimal) else value
             for key, value in totals.items()
         }
+        if club_discount_applied:
+            ex_merge["totals"][SALES_RECEIVABLE_TOTAL_KEY] = str(total_with_tax)
         if "invoice_adjustments" in header_extra:
             ex_merge["invoice_adjustments"] = header_extra["invoice_adjustments"]
         else:
@@ -9182,7 +9200,6 @@ def update_invoice(
         discount = Decimal(str(totals.get("discount", 0)))
         net = gross - discount
         tax = Decimal(str(totals.get("tax", 0)))
-        total_with_tax = total_with_tax_from_totals_dict(totals)
         person_id = _person_id_from_header({"extra_info": header_extra})
         person_id = _resolve_and_validate_person_id(db, document.business_id, person_id)
 
