@@ -225,6 +225,10 @@ def create_invoice_endpoint(
     # پس از کنترل ویژگی فروش سریع، تنظیمات کسب‌وکار و مجوز کاربر در سرور ساخته می‌شود.
     extra = dict(payload.get("extra_info") or {})
     extra.pop("_stock_override", None)
+    if "woo_create_key" in payload and extra.get("quick_sale"):
+        raise ApiError(
+            "INVALID_WOO_CREATE_KEY", "کلید صدور ووکامرس برای فروش سریع معتبر نیست.", http_status=422
+        )
     if extra.get("quick_sale") is True:
         if payload.get("invoice_type") != "invoice_sales":
             raise ApiError(

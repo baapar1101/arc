@@ -123,7 +123,12 @@ class Hesabix_V2_Queue_Service
 								'skipped_pause' => true,
 							);
 						} else {
-							$res = $sync->sync_order((int) $row['entity_id']);
+							$retry_create = !empty($payload['retry_create']);
+							$res = $sync->sync_order(
+								(int) $row['entity_id'],
+								!empty($payload['keyed_create']) && !$retry_create,
+								$retry_create
+							);
 						}
 						break;
 					case 'order_return':
@@ -225,6 +230,11 @@ class Hesabix_V2_Queue_Service
 			'attempts' => 0,
 		);
 		$formats = array('%s', '%d', '%s', '%d', '%s', '%d');
+
+		if ($entity_type === 'order' && $action === 'sync_order') {
+			$payload = (array) $payload;
+			$payload['keyed_create'] = true;
+		}
 
 		if ($payload !== null && array() !== $payload) {
 			$data['payload'] = wp_json_encode($payload);

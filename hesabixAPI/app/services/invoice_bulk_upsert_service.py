@@ -162,6 +162,8 @@ def bulk_upsert_invoices_integration(
                         }
                     )
                 except ApiError as ae:
+                    if "woo_create_key" in payload:
+                        db.rollback()
                     p = _api_error_parts(ae)
                     results.append(
                         {
@@ -173,6 +175,8 @@ def bulk_upsert_invoices_integration(
                         }
                     )
                 except IntegrityError as e:
+                    if "woo_create_key" in payload:
+                        db.rollback()
                     results.append(
                         {
                             **base,
