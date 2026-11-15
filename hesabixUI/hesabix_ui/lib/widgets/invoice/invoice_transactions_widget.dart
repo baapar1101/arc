@@ -33,6 +33,7 @@ import '../../utils/error_extractor.dart';
 import '../../utils/invoice_transaction_preferences.dart';
 import '../../widgets/money/amount_field_words_tooltip.dart';
 import '../../utils/currency_display_utils.dart';
+import '../../utils/account_detail_type.dart';
 
 int _moneyDecimalPlacesForCurrency(
   Map<int, Map<String, dynamic>> currencies,
@@ -2500,6 +2501,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
       children: [
         AccountTreeComboboxWidget(
           businessId: widget.businessId,
+          allowPersonControlParents: true,
           selectedAccount: _selectedAccount?.toAccount(),
           onChanged: (account) {
             setState(() {
@@ -2556,26 +2558,11 @@ class _TransactionDialogState extends State<TransactionDialog> {
 
   String? _accountDetailType(Account? account) {
     if (account == null) return null;
-    if (account.accountType == 'product') return 'product';
-    final name = account.name.toLowerCase();
-    if (name.contains('دریافتنی') ||
-        name.contains('پرداختنی') ||
-        name.contains('مشتری') ||
-        name.contains('تامین'))
-      return 'person';
-    if (name.contains('موجودی') ||
-        name.contains('کالا') ||
-        name.contains('انبار'))
-      return 'product';
-    if (account.accountType == 'bank' || name.contains('بانک'))
-      return 'bank_account';
-    if (account.accountType == 'cash_register' || name.contains('صندوق'))
-      return 'cash_register';
-    if (account.accountType == 'petty_cash' || name.contains('تنخواه'))
-      return 'petty_cash';
-    if (account.accountType == 'check' || name.contains('چک')) return 'check';
-    if (account.accountType == 'person') return 'person';
-    return null;
+    return accountDetailTypeFor(
+      name: account.name,
+      accountType: account.accountType,
+      code: account.code,
+    );
   }
 
   Future<void> _saveTransaction() async {

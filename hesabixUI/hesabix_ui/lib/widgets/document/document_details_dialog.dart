@@ -60,6 +60,7 @@ import 'package:hesabix_ui/models/invoice_transaction.dart'
     show TransactionType;
 import 'package:share_plus/share_plus.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
+import 'package:hesabix_ui/utils/account_detail_type.dart';
 
 int? _parseInstallmentSeq(dynamic v) {
   if (v == null) return null;
@@ -6516,6 +6517,7 @@ class _ReceiptPaymentTransactionDialogState
       children: [
         AccountTreeComboboxWidget(
           businessId: widget.document.businessId,
+          allowPersonControlParents: true,
           selectedAccount: _selectedAccount?.toAccount(),
           onChanged: (account) {
             setState(() {
@@ -6572,31 +6574,11 @@ class _ReceiptPaymentTransactionDialogState
 
   String? _accountDetailType(Account? account) {
     if (account == null) return null;
-    if (account.accountType == 'product') return 'product';
-    final name = account.name.toLowerCase();
-    if (name.contains('دریافتنی') ||
-        name.contains('پرداختنی') ||
-        name.contains('مشتری') ||
-        name.contains('تامین')) {
-      return 'person';
-    }
-    if (name.contains('موجودی') ||
-        name.contains('کالا') ||
-        name.contains('انبار')) {
-      return 'product';
-    }
-    if (account.accountType == 'bank' || name.contains('بانک')) {
-      return 'bank_account';
-    }
-    if (account.accountType == 'cash_register' || name.contains('صندوق')) {
-      return 'cash_register';
-    }
-    if (account.accountType == 'petty_cash' || name.contains('تنخواه')) {
-      return 'petty_cash';
-    }
-    if (account.accountType == 'check' || name.contains('چک')) return 'check';
-    if (account.accountType == 'person') return 'person';
-    return null;
+    return accountDetailTypeFor(
+      name: account.name,
+      accountType: account.accountType,
+      code: account.code,
+    );
   }
 
   Map<String, dynamic>? _detailMapFromExtra(Map<String, dynamic>? extra) {

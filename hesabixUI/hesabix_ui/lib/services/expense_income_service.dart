@@ -95,6 +95,11 @@ class ExpenseIncomeService {
               data['account_id'] = line.accountId;
               data['account_name'] = line.accountName;
             }
+            if (line.personId != null) {
+              data['person_id'] = line.personId;
+              data['person_name'] = line.personName;
+              data['detail_type'] = 'person';
+            }
             break;
         }
 
@@ -194,6 +199,11 @@ class ExpenseIncomeService {
             if (line.accountId != null) {
               data['account_id'] = line.accountId;
               data['account_name'] = line.accountName;
+            }
+            if (line.personId != null) {
+              data['person_id'] = line.personId;
+              data['person_name'] = line.personName;
+              data['detail_type'] = 'person';
             }
             break;
         }
@@ -329,6 +339,8 @@ class ExpenseIncomeService {
             personName: line['person_name'] as String? ?? (extra['person_name'] as String?),
             accountId: line['account_id'] as int?,
             accountName: line['account_name'] as String?,
+            accountCode: line['account_code'] as String?,
+            accountType: line['account_type'] as String?,
           );
         })
         .toList();

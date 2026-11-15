@@ -115,6 +115,97 @@ def _get_fixed_account_by_code(db: Session, account_code: str) -> Account:
     return account
 
 
+def _optional_int(value: Any) -> Optional[int]:
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def is_person_control_account(account: Account) -> bool:
+    """حساب کنترلی شخص‌محور (جاری شرکا، دریافتنی، پرداختنی، …) نیاز به تفصیل شخص دارد."""
+    account_type = str(getattr(account, "account_type", "") or "").strip().lower()
+    if account_type == "person":
+        return True
+    name = str(getattr(account, "name", "") or "").lower()
+    code = str(getattr(account, "code", "") or "").strip()
+    markers = (
+        "دریافتنی",
+        "پرداختنی",
+        "مشتری",
+        "تامین",
+        "جاری شرکا",
+        "جاری شرکاء",
+        "سهامدار",
+    )
+    if any(marker in name for marker in markers):
+        return True
+    return code == "20503"
+
+
+def _resolve_selected_counterparty_account(
+    db: Session,
+    business_id: int,
+    line: Dict[str, Any],
+) -> Account:
+    account_id = _optional_int(line.get("account_id"))
+    if account_id is None:
+        raise ApiError(
+            "ACCOUNT_REQUIRED",
+            "account_id is required when counterparty type is account",
+            http_status=400,
+        )
+    account = db.query(Account).filter(
+        and_(
+            Account.id == account_id,
+            or_(Account.business_id == business_id, Account.business_id == None),  # noqa: E711
+        )
+    ).first()
+    if not account:
+        raise ApiError("ACCOUNT_NOT_FOUND", "Account not found for counterparty line", http_status=404)
+    return account
+
+
+def _person_id_for_counterparty_line(
+    db: Session,
+    business_id: int,
+    transaction_type: Optional[str],
+    person_id_val: Any,
+    account: Optional[Account],
+) -> Optional[int]:
+    person_id = _optional_int(person_id_val)
+    if transaction_type == "account" and account is not None and is_person_control_account(account) and person_id is None:
+        raise ApiError(
+            "PERSON_REQUIRED",
+            "پس از انتخاب این حساب، تفصیل شخص (سهامدار/شریک) را انتخاب کنید",
+            http_status=400,
+        )
+    if person_id is None or transaction_type not in ("person", "account"):
+        return None
+    from adapters.db.models.person import Person
+    person = db.query(Person).filter(
+        and_(Person.id == person_id, Person.business_id == business_id)
+    ).first()
+    if not person:
+        raise ApiError("PERSON_NOT_FOUND", "Person not found", http_status=404)
+    return person_id
+
+
+def _apply_account_type_extra_info(extra_info: Dict[str, Any], line: Dict[str, Any], person_id: Optional[int]) -> None:
+    if line.get("account_name"):
+        extra_info["account_name"] = line.get("account_name")
+    if person_id is not None:
+        extra_info["person_id"] = person_id
+        extra_info["detail_type"] = line.get("detail_type") or "person"
+    if line.get("person_name"):
+        extra_info["person_name"] = line.get("person_name")
+    elif line.get("detail_name") and person_id is not None:
+        extra_info["person_name"] = line.get("detail_name")
+        extra_info["detail_name"] = line.get("detail_name")
+
+
 def _get_business_fiscal_year(db: Session, business_id: int) -> FiscalYear:
     fy = (
         db.query(FiscalYear)
@@ -378,15 +469,15 @@ def create_expense_income(
                     account = _get_fixed_account_by_code(db, "20201" if not is_income else "10401")
             else:
                 account = _get_fixed_account_by_code(db, "20201" if not is_income else "10401")
-        elif line.get("account_id"):
-            account = db.query(Account).filter(
-                and_(
-                    Account.id == int(line.get("account_id")),
-                    or_(Account.business_id == business_id, Account.business_id == None),  # noqa: E711
-                )
-            ).first()
+        elif transaction_type == "account" or line.get("account_id"):
+            # نوع «حساب»: همان حساب انتخاب‌شده بستانکار/بدهکار می‌شود؛ با پرداختنی جایگزین نمی‌شود.
+            account = _resolve_selected_counterparty_account(db, business_id, line)
         if not account:
             raise ApiError("ACCOUNT_NOT_FOUND", "Account not found for counterparty line", http_status=404)
+
+        person_id_for_line = _person_id_for_counterparty_line(
+            db, business_id, transaction_type, person_id_val, account
+        )
 
         extra_info: Dict[str, Any] = {}
         if transaction_type:
@@ -425,6 +516,8 @@ def create_expense_income(
                 extra_info["person_id"] = line.get("person_id")
             if line.get("person_name"):
                 extra_info["person_name"] = line.get("person_name")
+        elif transaction_type == "account":
+            _apply_account_type_extra_info(extra_info, line, person_id_for_line)
 
         # برای چک: منطق حسابداری متفاوت است
         # در اسناد هزینه با چک دریافتی: چک از 10403 خارج می‌شود → باید بستانکار شود
@@ -477,7 +570,7 @@ def create_expense_income(
         db.add(DocumentLine(
             document_id=document.id,
             account_id=account.id,
-            person_id=(int(person_id_val) if transaction_type == "person" and person_id_val else None),
+            person_id=person_id_for_line,
             bank_account_id=(int(resolved_bank_account_id) if transaction_type == "bank" and resolved_bank_account_id else None),
             cash_register_id=cash_register_id_val,
             petty_cash_id=petty_cash_id_val,
@@ -605,6 +698,8 @@ def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
             "account_id": ln.account_id,
             "account_code": getattr(account, "code", None),
             "account_name": account.name if account else None,
+            "account_type": getattr(account, "account_type", None),
+            "person_name": (ln.extra_info or {}).get("person_name") if ln.extra_info else None,
             "debit": float(ln.debit or 0),
             "credit": float(ln.credit or 0),
             "description": ln.description,
@@ -1034,15 +1129,14 @@ def update_expense_income(
                     account = _get_fixed_account_by_code(db, "20201" if not is_income else "10401")
             else:
                 account = _get_fixed_account_by_code(db, "20201" if not is_income else "10401")
-        elif line.get("account_id"):
-            account = db.query(Account).filter(
-                and_(
-                    Account.id == int(line.get("account_id")),
-                    or_(Account.business_id == document.business_id, Account.business_id == None),  # noqa: E711
-                )
-            ).first()
+        elif transaction_type == "account" or line.get("account_id"):
+            account = _resolve_selected_counterparty_account(db, document.business_id, line)
         if not account:
             raise ApiError("ACCOUNT_NOT_FOUND", "Account not found for counterparty line", http_status=404)
+
+        person_id_for_line = _person_id_for_counterparty_line(
+            db, document.business_id, transaction_type, person_id_val, account
+        )
         
         extra_info: Dict[str, Any] = {}
         if transaction_type:
@@ -1081,6 +1175,8 @@ def update_expense_income(
                 extra_info["person_id"] = line.get("person_id")
             if line.get("person_name"):
                 extra_info["person_name"] = line.get("person_name")
+        elif transaction_type == "account":
+            _apply_account_type_extra_info(extra_info, line, person_id_for_line)
 
         # برای چک: منطق حسابداری متفاوت است
         # در اسناد هزینه با چک دریافتی: چک از 10403 خارج می‌شود → باید بستانکار شود
@@ -1131,7 +1227,7 @@ def update_expense_income(
         db.add(DocumentLine(
             document_id=document.id,
             account_id=account.id,
-            person_id=(int(person_id_val) if transaction_type == "person" and person_id_val else None),
+            person_id=person_id_for_line,
             bank_account_id=(int(resolved_bank_account_id) if transaction_type == "bank" and resolved_bank_account_id else None),
             cash_register_id=cash_register_id_val,
             petty_cash_id=petty_cash_id_val,

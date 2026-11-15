@@ -10,6 +10,7 @@ import 'package:hesabix_ui/widgets/inputs/frequent_description_text_field.dart';
 import 'package:hesabix_ui/widgets/invoice/account_tree_combobox_widget.dart';
 import '../../utils/snackbar_helper.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
+import 'package:hesabix_ui/utils/account_detail_type.dart';
 
 int _documentLineUidSeq = 0;
 String _newDocumentLineUid() => '${DateTime.now().microsecondsSinceEpoch}_${_documentLineUidSeq++}';
@@ -333,6 +334,7 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
             AccountTreeComboboxWidget(
               key: ValueKey('acc_${line.uid}'),
               businessId: widget.businessId,
+              allowPersonControlParents: true,
               selectedAccount: line.account,
               onChanged: (account) {
                 setState(() {
@@ -494,6 +496,7 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
             child: AccountTreeComboboxWidget(
               key: ValueKey('acc_${line.uid}'),
               businessId: widget.businessId,
+              allowPersonControlParents: true,
               selectedAccount: line.account,
               onChanged: (account) {
                 setState(() {
@@ -805,49 +808,11 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
   /// تشخیص نوع تفضیل بر اساس حساب
   String? _getAccountDetailType(Account? account) {
     if (account == null) return null;
-
-    // اول چک کردن accountType که دقیق‌تر است
-    if (account.accountType == 'product') {
-      return 'product';
-    }
-
-    // سپس چک کردن نام حساب به عنوان fallback
-    final accountName = account.name.toLowerCase();
-
-    if (accountName.contains('دریافتنی') ||
-        accountName.contains('پرداختنی') ||
-        accountName.contains('مشتری') ||
-        accountName.contains('تامین')) {
-      return 'person';
-    }
-
-    if (accountName.contains('موجودی') ||
-        accountName.contains('کالا') ||
-        accountName.contains('انبار')) {
-      return 'product';
-    }
-
-    if (account.accountType == 'bank' || accountName.contains('بانک')) {
-      return 'bank_account';
-    }
-
-    if (account.accountType == 'cash_register' || accountName.contains('صندوق')) {
-      return 'cash_register';
-    }
-
-    if (account.accountType == 'petty_cash' || accountName.contains('تنخواه')) {
-      return 'petty_cash';
-    }
-
-    if (account.accountType == 'check' || accountName.contains('چک')) {
-      return 'check';
-    }
-
-    if (account.accountType == 'person') {
-      return 'person';
-    }
-
-    return null; // حساب نیاز به تفضیل ندارد
+    return accountDetailTypeFor(
+      name: account.name,
+      accountType: account.accountType,
+      code: account.code,
+    );
   }
 
   /// آیا حساب انتخاب شده از نوع کالا است و تفضیل کالا انتخاب شده؟
