@@ -40,6 +40,44 @@ class Hesabix_V2_DB_Service
 	}
 
 	/**
+	 * Freeze the first CREATE payload so all retry paths send the same operation.
+	 * WordPress options has a unique option_name per site, including on HPOS.
+	 */
+	public function get_or_start_invoice_create($order_id, ?array $payload = null)
+	{
+		global $wpdb;
+		$name = 'hesabix_v2_invoice_create_' . (int) $this->business_id . '_' . (int) $order_id;
+
+		if ($payload !== null) {
+			$payload['woo_create_key'] = wp_generate_uuid4();
+			$value = wp_json_encode($payload);
+			if (!is_string($value) || $wpdb->query($wpdb->prepare(
+				"INSERT INTO {$wpdb->options} (option_name, option_value, autoload)
+				 VALUES (%s, %s, 'no') ON DUPLICATE KEY UPDATE option_name = option_name",
+				$name,
+				$value
+			)) === false) {
+				throw new RuntimeException(__('ذخیرهٔ کلید صدور فاکتور ووکامرس ناموفق بود.', 'hesabix-v2'));
+			}
+		}
+
+		// Read the winning database value, independently of the WordPress option cache.
+		$value = $wpdb->get_var($wpdb->prepare(
+			"SELECT option_value FROM {$wpdb->options} WHERE option_name = %s",
+			$name
+		));
+		$saved = is_string($value) ? json_decode($value, true) : null;
+		if (!is_array($saved) || empty($saved['woo_create_key'])) {
+			if ($value === null && $payload === null && !$wpdb->last_error) {
+				return null;
+			}
+			throw new RuntimeException(__('خواندن کلید صدور فاکتور ووکامرس ناموفق بود.', 'hesabix-v2'));
+		}
+		return $saved;
+	}
+
+
+	/**
 	 * Save mapping
 	 *
 	 * @since    2.0.0

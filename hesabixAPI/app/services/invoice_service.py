@@ -4,6 +4,8 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from datetime import datetime, date, timedelta, timezone
 from app.core.datetime_utils import utc_now, utc_now_aware, utc_naive_to_iso_z
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+import hashlib
+import json
 import logging
 import re
 from collections import defaultdict, deque
@@ -6877,6 +6879,53 @@ def _calculate_invoice_profit(
     return result
 
 
+def _woo_invoice_create_operation(
+    db: Session, business_id: int, data: Dict[str, Any]
+) -> tuple[dict[str, str] | None, dict[str, Any] | None]:
+    if "woo_create_key" not in data:
+        return None, None
+    key = data["woo_create_key"]
+    extra = data.get("extra_info") or {}
+    if not isinstance(extra, dict):
+        extra = {}
+    order_id = extra.get("wc_order_id")
+    if (
+        not isinstance(key, str)
+        or not re.fullmatch(r"[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}", key)
+        or data.get("invoice_type") != "invoice_sales"
+        or extra.get("source") != "woocommerce"
+        or type(order_id) is not int
+        or order_id < 1
+        or extra.get("quick_sale")
+    ):
+        raise ApiError(
+            "INVALID_WOO_CREATE_KEY", "کلید عملیات صدور ووکامرس یا اطلاعات سفارش نامعتبر است.", http_status=422
+        )
+    fingerprint = hashlib.sha256(
+        json.dumps(data, sort_keys=True, separators=(",", ":"), default=str).encode()
+    ).hexdigest()
+    operation = {"key": key, "fingerprint": fingerprint}
+    acquire_transaction_lock(db, f"woo_invoice_create:{business_id}:{key}")
+    matches = db.query(Document).filter(
+        Document.business_id == business_id,
+        Document.developer_settings["woo_invoice_create"]["key"].as_string() == key,
+    ).limit(2).all()
+    if not matches:
+        return operation, None
+    if len(matches) != 1 or matches[0].developer_settings["woo_invoice_create"] != operation:
+        raise ApiError(
+            "WOO_CREATE_KEY_REUSED", "این کلید قبلاً برای درخواست صدور دیگری استفاده شده است.", http_status=409
+        )
+    invoice = matches[0]
+    return operation, {
+        "id": invoice.id,
+        "code": invoice.code,
+        "document_type": invoice.document_type,
+        "woo_create_replayed": True,
+    }
+
+
+
 def create_invoice(
     db: Session,
     business_id: int,
@@ -6895,6 +6944,12 @@ def create_invoice(
     invoice_type = str(data.get("invoice_type", "")).strip()
     if invoice_type not in SUPPORTED_INVOICE_TYPES:
         raise ApiError("INVALID_INVOICE_TYPE", "Unsupported invoice_type", http_status=400)
+
+    woo_operation, replay = _woo_invoice_create_operation(db, business_id, data)
+    if replay is not None:
+        if commit:
+            db.rollback()  # Release the transaction lock before the next bulk item.
+        return replay
 
     document_date = _parse_iso_date(data.get("document_date", datetime.now()))
     currency_id = data.get("currency_id")
@@ -7317,6 +7372,9 @@ def create_invoice(
                 "تولید شماره سند پس از چند تلاش ناموفق بود. لطفاً دوباره تلاش کنید.",
                 http_status=409,
             )
+
+    if woo_operation is not None:
+        document.developer_settings = {"woo_invoice_create": woo_operation}
 
     from app.services.invoice_line_unit_price_guard import validate_invoice_lines_unit_price_policy
 
