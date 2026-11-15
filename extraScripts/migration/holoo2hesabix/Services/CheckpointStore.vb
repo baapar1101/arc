@@ -5,7 +5,14 @@ Friend Class ModuleCheckpoint
     Public Property Completed As Boolean
     Public Property Done As New Dictionary(Of String, Integer)
     Public Property Failed As New Dictionary(Of String, String)
+    Public Property Fingerprints As New Dictionary(Of String, String)
     Public Property LastKey As String
+
+    Public Sub EnsureCollections()
+        If Done Is Nothing Then Done = New Dictionary(Of String, Integer)
+        If Failed Is Nothing Then Failed = New Dictionary(Of String, String)
+        If Fingerprints Is Nothing Then Fingerprints = New Dictionary(Of String, String)
+    End Sub
 End Class
 
 Friend Class TransferCheckpoint
@@ -20,6 +27,7 @@ Friend Class TransferCheckpoint
     Public Function EnsureModule(key As String) As ModuleCheckpoint
         Dim existing As ModuleCheckpoint = Nothing
         If Modules.TryGetValue(key, existing) AndAlso existing IsNot Nothing Then
+            existing.EnsureCollections()
             Return existing
         End If
         Dim created As New ModuleCheckpoint()
@@ -51,6 +59,9 @@ Friend Class CheckpointStore
                 Dim cp = JsonConvert.DeserializeObject(Of TransferCheckpoint)(json)
                 If cp IsNot Nothing Then
                     If cp.Modules Is Nothing Then cp.Modules = New Dictionary(Of String, ModuleCheckpoint)
+                    For Each m In cp.Modules.Values
+                        If m IsNot Nothing Then m.EnsureCollections()
+                    Next
                     Return cp
                 End If
             Catch
