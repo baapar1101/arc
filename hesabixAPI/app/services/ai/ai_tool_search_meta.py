@@ -612,6 +612,19 @@ TOOL_SEARCH_META: Dict[str, SearchMeta] = {
         "keywords": ("مانده",),
         "examples": ("مانده حساب علی چقدر است",),
     },
+    "search_support_tickets": {
+        "aliases": ("تیکت", "تیکت پشتیبانی", "میز پشتیبانی"),
+        "keywords": ("ticket", "support", "inbox"),
+        "examples": ("تیکت‌های باز را نشان بده", "تیکت‌های تأخیری کدام‌اند"),
+    },
+    "get_support_ticket": {
+        "aliases": ("جزئیات تیکت", "متن تیکت"),
+        "examples": ("تیکت ۱۲۳ را کامل نشان بده",),
+    },
+    "reply_support_ticket": {
+        "aliases": ("پاسخ تیکت", "جواب تیکت"),
+        "examples": ("به این تیکت پاسخ بده",),
+    },
 }
 
 

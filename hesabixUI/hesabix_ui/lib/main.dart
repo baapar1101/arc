@@ -38,6 +38,7 @@ import 'pages/profile/verification_page.dart';
 import 'pages/profile/operator/operator_tickets_page.dart';
 import 'widgets/support/operator_inbox_list.dart';
 import 'pages/profile/operator/operator_dashboard_page.dart';
+import 'pages/profile/operator/support_mcp_connections_page.dart';
 import 'pages/profile/announcements_page.dart';
 import 'pages/system_settings_page.dart';
 import 'pages/admin/storage_management_page.dart';
@@ -1623,6 +1624,19 @@ class _MyAppState extends State<MyApp> {
                   return PermissionGuard.buildAccessDeniedPage();
                 }
                 return OperatorDashboardPage(
+                  calendarController: _calendarController,
+                );
+              },
+            ),
+            GoRoute(
+              path: '/user/profile/operator/mcp-connections',
+              name: 'profile_operator_mcp_connections',
+              builder: (context, state) {
+                if (_authStore == null ||
+                    !_authStore!.canAccessSupportOperator) {
+                  return PermissionGuard.buildAccessDeniedPage();
+                }
+                return SupportMcpConnectionsPage(
                   calendarController: _calendarController,
                 );
               },

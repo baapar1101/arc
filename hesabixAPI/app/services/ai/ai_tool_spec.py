@@ -70,6 +70,7 @@ TOOL_DOMAINS: frozenset[str] = frozenset({
     "fixed_assets",
     "telephony",
     "barcode",
+    "support",
 })
 
 DOMAIN_TO_CAPABILITY: dict[str, str] = {
@@ -105,6 +106,7 @@ DOMAIN_TO_CAPABILITY: dict[str, str] = {
     "fixed_assets": "financial.fixed_assets",
     "telephony": "integration.telephony",
     "barcode": "inventory.barcode",
+    "support": "platform.support",
     "query": ToolCapability.QUERY.value,
     "projects": "financial.project",
     "misc": ToolCapability.MISC.value,
@@ -147,6 +149,7 @@ REGISTRY_CATEGORY_TO_DOMAINS: dict[str, Tuple[str, ...]] = {
     "distribution": ("misc",),
     "warranty": ("misc",),
     "memory": ("memory",),
+    "support": ("support",),
 }
 
 

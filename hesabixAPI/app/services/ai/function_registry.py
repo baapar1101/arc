@@ -1902,8 +1902,9 @@ class AIFunctionRegistry:
 
     def _register_operator_functions(self):
         """ثبت function های مخصوص اپراتورهای پشتیبانی"""
-        # این function ها بعداً اضافه می‌شوند
-        pass
+        from app.services.ai.ai_function_extensions_mcp_support import register_mcp_support_functions
+
+        register_mcp_support_functions(self)
     
     def _register_admin_functions(self):
         """ثبت function های مخصوص مدیر سیستم"""

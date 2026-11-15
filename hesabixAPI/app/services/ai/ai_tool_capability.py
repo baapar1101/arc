@@ -54,6 +54,7 @@ TOOL_CAPABILITIES: frozenset[str] = frozenset({
     "platform.marketplace",
     "platform.notifications",
     "platform.settings",
+    "platform.support",
     "query.entity",
     "query.meta",
     "reports.cashflow",

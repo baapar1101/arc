@@ -62,6 +62,61 @@ def mcp_visible_definitions(
     return registry, definitions
 
 
+def mcp_support_visible_definitions(
+    db: Session,
+    ctx: AuthContext,
+) -> Tuple[Any, List[Dict[str, Any]]]:
+    """Operator/admin support-desk tools only. Never include tenant business tools."""
+    from app.services.ai.function_registry import AIRole, registry
+
+    context = {
+        "db": db,
+        "user_context": ctx,
+        "business_id": None,
+        "session_business_id": None,
+    }
+    definitions = registry.get_function_definitions(context)
+    operator_roles = {AIRole.OPERATOR, AIRole.ADMIN}
+    business_roles = {AIRole.USER, AIRole.BUSINESS_OWNER}
+    definitions = [
+        item
+        for item in definitions
+        if (function := registry.get_function(str((item.get("function") or {}).get("name", ""))))
+        and getattr(function, "enabled", True)
+        and not getattr(function, "deprecated", False)
+        and not function.business_context_required
+        and function.category == "support"
+        and bool(function.allowed_roles & operator_roles)
+        and not bool(function.allowed_roles & business_roles)
+    ]
+    return registry, definitions
+
+
+def support_tool_catalog(db: Session, ctx: AuthContext) -> List[Dict[str, Any]]:
+    registry, definitions = mcp_support_visible_definitions(db, ctx)
+    catalog: List[Dict[str, Any]] = []
+    for definition in definitions:
+        fn_def = definition.get("function") or {}
+        name = str(fn_def.get("name", ""))
+        function = registry.get_function(name)
+        if not function:
+            continue
+        catalog.append(
+            {
+                "name": name,
+                "description": fn_def.get("description") or function.description or "",
+                "input_schema": fn_def.get("parameters") or {"type": "object", "properties": {}},
+                "category": function.category or "support",
+                "capability": getattr(function, "capability", "platform.support"),
+                "read_only": mcp_readonly(name, registry),
+                "required_permissions": list(function.required_permissions or []),
+                "aliases": list(getattr(function, "aliases", ()) or ()),
+                "keywords": list(getattr(function, "keywords", ()) or ()),
+            }
+        )
+    return sorted(catalog, key=lambda item: item["name"])
+
+
 def _channel_uses_mcp_filter(ctx: AuthContext) -> bool:
     return getattr(ctx, "mcp_scopes", None) is not None
 
