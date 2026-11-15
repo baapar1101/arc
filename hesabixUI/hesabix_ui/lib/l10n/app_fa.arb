@@ -9310,6 +9310,7 @@
   "telephonyCreateLead": "ایجاد سرنخ",
   "telephonyCreateContact": "ایجاد مخاطب",
   "telephonyCustomerFile": "پرونده مشتری",
+  "telephonyLeadFile": "پرونده سرنخ",
   "telephonySaveNote": "ذخیره یادداشت",
   "telephonyHangupCall": "قطع تماس",
   "telephonyRecordingUnavailable": "فایل ضبط در دسترس نیست",

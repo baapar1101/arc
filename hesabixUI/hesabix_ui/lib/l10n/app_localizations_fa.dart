@@ -24735,6 +24735,9 @@ class AppLocalizationsFa extends AppLocalizations {
   String get telephonyCustomerFile => 'پرونده مشتری';
 
   @override
+  String get telephonyLeadFile => 'پرونده سرنخ';
+
+  @override
   String get telephonySaveNote => 'ذخیره یادداشت';
 
   @override

@@ -9268,6 +9268,7 @@
   "telephonyCreateLead": "Create lead",
   "telephonyCreateContact": "Create contact",
   "telephonyCustomerFile": "Customer file",
+  "telephonyLeadFile": "Lead file",
   "telephonySaveNote": "Save note",
   "telephonyHangupCall": "Hang up call",
   "telephonyRecordingUnavailable": "Recording file is not available",

@@ -45254,6 +45254,12 @@ abstract class AppLocalizations {
   /// **'Customer file'**
   String get telephonyCustomerFile;
 
+  /// No description provided for @telephonyLeadFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Lead file'**
+  String get telephonyLeadFile;
+
   /// No description provided for @telephonySaveNote.
   ///
   /// In en, this message translates to:

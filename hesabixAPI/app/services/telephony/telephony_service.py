@@ -885,6 +885,31 @@ def _person_brief(p: Optional[Person]) -> Optional[Dict[str, Any]]:
 	}
 
 
+def _peer_canonical_phone(call: TelephonyCall) -> Optional[str]:
+	raw = call.from_number_normalized if call.direction == "inbound" else call.to_number_normalized
+	raw = raw or (call.from_number_raw if call.direction == "inbound" else call.to_number_raw)
+	canon = normalize_iran_phone(raw)["canonical"]
+	if canon:
+		return str(canon)[:20]
+	digits = extract_digits(raw or "")
+	if len(digits) >= 10 and digits[-10:].startswith("9"):
+		return ("0" + digits[-10:])[:20]
+	text = str(raw).strip() if raw else ""
+	return text[:20] if text else None
+
+
+def _remember_call_match(call: TelephonyCall, *, person: Optional[Person] = None, lead: Optional[Lead] = None) -> None:
+	extra = dict(call.extra_info or {})
+	match = dict(extra.get("match") or {}) if isinstance(extra.get("match"), dict) else {}
+	if person is not None:
+		match["person"] = _person_brief(person)
+	if lead is not None:
+		match["lead"] = _lead_brief(lead)
+	match["is_anonymous"] = not (match.get("person") or match.get("lead"))
+	extra["match"] = match
+	call.extra_info = extra
+
+
 def _lead_brief(l: Optional[Lead]) -> Optional[Dict[str, Any]]:
 	if not l:
 		return None
@@ -1864,11 +1889,21 @@ def screen_pop_context(db: Session, business_id: int, call_id: int, *, auth_ctx=
 		db, business_id, call.from_number_raw if call.direction == "inbound" else call.to_number_raw
 	)
 	person_id = call.person_id or (match.get("person") or {}).get("id")
+	lead_id = call.lead_id or (match.get("lead") or {}).get("id")
 	balance = None
 	recent_docs: List[Dict[str, Any]] = []
 	overdue_checks: List[Dict[str, Any]] = []
 	open_deals: List[Dict[str, Any]] = []
 	person = None
+	lead_row = None
+	if lead_id:
+		lead_row = db.get(Lead, lead_id)
+		if lead_row and lead_row.business_id != business_id:
+			lead_row = None
+		elif lead_row and auth_ctx is not None:
+			hidden_leads = _hidden_crm_ids(db, business_id, auth_ctx, "lead", [int(lead_row.id)])
+			if int(lead_row.id) in hidden_leads:
+				lead_row = None
 	if person_id:
 		person = db.get(Person, person_id)
 		if person and person.business_id == business_id:
@@ -1947,7 +1982,7 @@ def screen_pop_context(db: Session, business_id: int, call_id: int, *, auth_ctx=
 	return {
 		"call": safe_call,
 		"person": _person_brief(person) if person else safe_match.get("person"),
-		"lead": safe_match.get("lead"),
+		"lead": _lead_brief(lead_row) if lead_row else safe_match.get("lead"),
 		"match": safe_match,
 		"balance": balance,
 		"recent_documents": recent_docs,
@@ -2153,6 +2188,7 @@ def create_person_from_call(
 	call.is_anonymous = False
 	call.match_method = "created_person"
 	call.updated_at = _now()
+	_remember_call_match(call, person=person)
 	db.commit()
 	db.refresh(call)
 	return {"call": call_to_dict(call), "person": _person_brief(person)}
@@ -2195,15 +2231,22 @@ def create_lead_from_call(
 	if not stage:
 		raise ApiError("NO_LEAD_STAGE", "NO_LEAD_STAGE", http_status=400)
 
-	number = call.from_number_normalized if call.direction == "inbound" else call.to_number_normalized
-	number = number or call.from_number_raw or call.to_number_raw
-	code = f"TEL-L-{call.id}-{secrets.token_hex(2)}"
+	if call.lead_id:
+		existing = db.get(Lead, call.lead_id)
+		if existing and existing.business_id == business_id:
+			return {"call": call_to_dict(call), "lead": _lead_brief(existing)}
+
+	from datetime import date
+	from app.services.document_numbering_service import generate_document_code
+
+	number = _peer_canonical_phone(call)
+	name = (payload.get("name") or number or "سرنخ تلفنی").strip()
 	lead = Lead(
 		business_id=business_id,
 		process_definition_id=process.id,
 		stage_id=stage.id,
-		code=code,
-		name=(payload.get("name") or number or "سرنخ تلفنی").strip(),
+		code=generate_document_code(db, business_id, "crm_lead", date.today()),
+		name=name,
 		company_name=payload.get("company_name"),
 		mobile=number,
 		source_code=payload.get("source_code") or "telephony",
@@ -2219,8 +2262,23 @@ def create_lead_from_call(
 	call.is_anonymous = False
 	call.match_method = "created_lead"
 	call.updated_at = _now()
+	_remember_call_match(call, lead=lead)
 	db.commit()
 	db.refresh(call)
+	try:
+		from app.services.workflow.workflow_trigger_service import trigger_lead_created
+
+		trigger_lead_created(
+			db,
+			business_id,
+			lead_id=lead.id,
+			process_definition_id=lead.process_definition_id,
+			stage_id=lead.stage_id,
+			name=lead.name,
+			user_id=user_id,
+		)
+	except Exception:
+		pass
 	return {"call": call_to_dict(call), "lead": _lead_brief(lead)}
 
 

@@ -3,11 +3,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/auth_store.dart';
 import '../../core/business_nav.dart';
+import '../../models/person_model.dart';
 import '../../services/telephony/telephony_api.dart';
 import '../../services/telephony/telephony_session_controller.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/telephony/telephony_l10n.dart';
 import '../../utils/error_extractor.dart';
+import '../person/person_form_dialog.dart';
 
 class TelephonyScreenPopOverlay extends StatefulWidget {
   final int businessId;
@@ -46,16 +48,67 @@ class _TelephonyScreenPopOverlayState extends State<TelephonyScreenPopOverlay> {
   Map<String, dynamic>? get _balance =>
       _ctx['balance'] is Map ? Map<String, dynamic>.from(_ctx['balance'] as Map) : null;
 
+  void _openCrm(String relativePath) {
+    context.go(context.businessPanelUrl(widget.businessId, relativePath));
+  }
+
+  void _openPersonFile(dynamic personId) {
+    if (personId == null) return;
+    _openCrm('crm/customer-360?personId=$personId');
+  }
+
+  void _openLeadFile(dynamic leadId) {
+    if (leadId == null) return;
+    _openCrm('crm/leads/$leadId');
+  }
+
+  String _digitsOnly(String value) => value.replaceAll(RegExp(r'\D'), '');
+
+  /// شماره طرف مقابل تماس، نه داخلی کسب‌وکار.
+  String _callerNumber() {
+    final call = _call ?? const <String, dynamic>{};
+    final extension = '${call['extension'] ?? ''}'.trim();
+    final extensionDigits = _digitsOnly(extension);
+    final direction = '${call['direction'] ?? ''}';
+    final ordered = <String>[
+      '${call['peer_number'] ?? ''}',
+      if (direction == 'outbound') ...[
+        '${call['to_number_normalized'] ?? ''}',
+        '${call['to_number_raw'] ?? ''}',
+      ] else ...[
+        '${call['from_number_normalized'] ?? ''}',
+        '${call['from_number_raw'] ?? ''}',
+      ],
+      '${call['from_number_normalized'] ?? ''}',
+      '${call['from_number_raw'] ?? ''}',
+      '${call['to_number_normalized'] ?? ''}',
+      '${call['to_number_raw'] ?? ''}',
+    ];
+    String? fallback;
+    for (final raw in ordered) {
+      final value = raw.trim();
+      if (value.isEmpty) continue;
+      final digits = _digitsOnly(value);
+      if (digits.isEmpty) continue;
+      if (extensionDigits.isNotEmpty && digits == extensionDigits) continue;
+      if (digits.length >= 8) return value;
+      fallback ??= value;
+    }
+    return fallback ?? '';
+  }
+
   Future<void> _createLead() async {
     final callId = _call?['id'];
     if (callId == null) return;
     setState(() => _busy = true);
     try {
-      await _api.createLeadFromCall(widget.businessId, int.parse('$callId'));
+      final created = await _api.createLeadFromCall(widget.businessId, int.parse('$callId'));
       await widget.session.unawaitedOpenPop(int.parse('$callId'));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).telephonyLeadCreated)));
-      }
+      final lead = created['lead'] is Map ? Map<String, dynamic>.from(created['lead'] as Map) : null;
+      final leadId = lead?['id'] ?? created['id'];
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).telephonyLeadCreated)));
+      _openLeadFile(leadId);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -68,15 +121,25 @@ class _TelephonyScreenPopOverlayState extends State<TelephonyScreenPopOverlay> {
   }
 
   Future<void> _createPerson() async {
-    final callId = _call?['id'];
+    final callId = int.tryParse('${_call?['id'] ?? ''}');
     if (callId == null) return;
+    final created = await showDialog<Person?>(
+      context: context,
+      useRootNavigator: true,
+      builder: (ctx) => PersonFormDialog(
+        businessId: widget.businessId,
+        initialMobile: _callerNumber(),
+        initialPersonTypes: const [PersonType.customer],
+      ),
+    );
+    if (created?.id == null || !mounted) return;
     setState(() => _busy = true);
     try {
-      await _api.createPersonFromCall(widget.businessId, int.parse('$callId'));
-      await widget.session.unawaitedOpenPop(int.parse('$callId'));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).telephonyContactCreated)));
-      }
+      await _api.patchCall(widget.businessId, callId, {
+        'person_id': created!.id,
+        'match_method': 'created_person',
+      });
+      await widget.session.unawaitedOpenPop(callId);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -137,8 +200,7 @@ class _TelephonyScreenPopOverlayState extends State<TelephonyScreenPopOverlay> {
     final width = MediaQuery.sizeOf(context).width;
     final isWide = width >= 900;
     final status = '${_call?['status'] ?? ''}';
-    final number =
-        '${_call?['from_number_normalized'] ?? _call?['from_number_raw'] ?? _call?['to_number_normalized'] ?? ''}';
+    final number = _callerNumber();
     final title = _person?['name']?.toString() ?? _lead?['name']?.toString() ?? t.telephonyUnknownNumber;
     final anonymous = _person == null && _lead == null;
     final inProgress = status == 'ringing' || status == 'answered';
@@ -309,15 +371,18 @@ class _TelephonyScreenPopOverlayState extends State<TelephonyScreenPopOverlay> {
                       onPressed: _busy ? null : _createPerson,
                       child: Text(t.telephonyCreateContact),
                     ),
-                  ] else if (_person != null)
-                    FilledButton.tonal(
-                      onPressed: () {
-                        context.go(
-                          context.businessPanelUrl(widget.businessId, 'crm/customer-360/${_person!['id']}'),
-                        );
-                      },
-                      child: Text(t.telephonyCustomerFile),
-                    ),
+                  ] else ...[
+                    if (_person != null)
+                      FilledButton.tonal(
+                        onPressed: () => _openPersonFile(_person!['id']),
+                        child: Text(t.telephonyCustomerFile),
+                      ),
+                    if (_lead != null)
+                      FilledButton.tonal(
+                        onPressed: () => _openLeadFile(_lead!['id']),
+                        child: Text(t.telephonyLeadFile),
+                      ),
+                  ],
                   FilledButton(
                     onPressed: _busy ? null : _saveNote,
                     child: Text(t.telephonySaveNote),

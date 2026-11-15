@@ -24874,6 +24874,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get telephonyCustomerFile => 'Customer file';
 
   @override
+  String get telephonyLeadFile => 'Lead file';
+
+  @override
   String get telephonySaveNote => 'Save note';
 
   @override
