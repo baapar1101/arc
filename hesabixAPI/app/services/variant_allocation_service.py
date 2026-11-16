@@ -252,6 +252,8 @@ def copy_invoice_allocations_to_warehouse_line(
     warehouse_line: WarehouseDocumentLine,
     product: Product,
     invoice_line: InvoiceItemLine,
+    *,
+    return_quantity_main: Decimal | None = None,
 ) -> List[WarehouseLineVariantAllocation]:
     src_rows = (
         db.query(InvoiceItemLineVariantAllocation)
@@ -262,8 +264,10 @@ def copy_invoice_allocations_to_warehouse_line(
     unit = extra.get("unit")
     converted: List[Tuple[int, Decimal, Optional[Decimal]]] = []
     source_map: Dict[int, int] = {}
+    if return_quantity_main is not None and len(src_rows) != 1:
+        raise ApiError("WOO_RETURN_SOURCE_AMBIGUOUS", "تخصیص ردیف برگشت ووکامرس قابل تطبیق نیست.", http_status=409)
     for row in src_rows:
-        qty_main = quantity_line_to_main(row.quantity, product, unit, strict=True)
+        qty_main = return_quantity_main or quantity_line_to_main(row.quantity, product, unit, strict=True)
         converted.append((int(row.variant_id), qty_main, row.unit_price))
         source_map[int(row.variant_id)] = int(row.id)
     if is_variant_inventory_product(product) and not converted:

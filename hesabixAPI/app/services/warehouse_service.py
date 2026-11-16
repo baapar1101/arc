@@ -47,6 +47,7 @@ def _attach_variant_allocations_for_warehouse_line(
 	wline: WarehouseDocumentLine,
 	product: Product,
 	payload: Dict[str, Any],
+	*, return_quantity_main: Decimal | None = None,
 ) -> None:
 	from adapters.db.models.invoice_item_line import InvoiceItemLine
 	from app.services.variant_allocation_service import (
@@ -63,7 +64,7 @@ def _attach_variant_allocations_for_warehouse_line(
 			invoice_line = None
 		if invoice_line is not None:
 			copy_invoice_allocations_to_warehouse_line(
-				db, int(business_id), wline, product, invoice_line
+				db, int(business_id), wline, product, invoice_line, return_quantity_main=return_quantity_main
 			)
 			from app.services.inventory_lot_allocation_service import copy_invoice_lot_allocations_to_warehouse_line
 
@@ -1455,6 +1456,9 @@ def create_from_invoice(
 	if wh is None:
 		raise ApiError("WAREHOUSE_CODE_CONFLICT", "Failed to generate unique warehouse document code", http_status=500)
 
+	from app.services.woo_return_source_service import return_quantity_main
+	from app.services.invoice_unit_conversion_service import stamp_inventory_quantity_as_main
+
 	validate_invoice_warehouse_lines_quantities(db, business_id, invoice, lines)
 
 	lines_added = 0
@@ -1663,12 +1667,25 @@ def create_from_invoice(
 				if instance_count > int(qty):
 					raise ApiError("INSTANCE_COUNT_EXCEEDS_QUANTITY", f"خط با product_id {pid}: تعداد کالاهای یونیک ({instance_count}) نمی‌تواند از تعداد وارد شده ({int(qty)}) بیشتر باشد", http_status=400)
 
-		qty, extra = _normalize_warehouse_line_quantity(
-			product,
-			qty,
-			extra,
-			payload_line_unit(ln, extra),
-		)
+		line_id = ln.get("invoice_item_line_id") or extra.get("invoice_item_line_id")
+		frozen_return = return_quantity_main(invoice, line_id) if wh_doc_type == "receipt" else None
+		if frozen_return is not None:
+			from adapters.db.models.invoice_item_line import InvoiceItemLine
+
+			invoice_line = db.get(InvoiceItemLine, int(line_id))
+			if invoice_line is None or invoice_line.document_id != invoice.id or qty != invoice_line.quantity:
+				raise ApiError("WOO_RETURN_SOURCE_AMBIGUOUS", "مقدار ردیف برگشت باید با مقدار ثبت‌شده منطبق باشد.", http_status=409)
+			extra = stamp_inventory_quantity_as_main(
+				extra, product, source_line_unit=payload_line_unit(ln, extra), source_line_quantity=qty,
+			)
+			qty = frozen_return
+		else:
+			qty, extra = _normalize_warehouse_line_quantity(
+				product,
+				qty,
+				extra,
+				payload_line_unit(ln, extra),
+			)
 
 		line_wh_loc = _warehouse_location_id_from_payload(
 			{"warehouse_location_id": ln.get("warehouse_location_id"), "extra_info": extra}
@@ -1685,7 +1702,7 @@ def create_from_invoice(
 		)
 		db.add(wline)
 		db.flush()
-		_attach_variant_allocations_for_warehouse_line(db, business_id, wh, wline, product, ln)
+		_attach_variant_allocations_for_warehouse_line(db, business_id, wh, wline, product, ln, return_quantity_main=frozen_return)
 		lines_added += 1
 
 	if lines_added == 0:
@@ -3484,6 +3501,22 @@ def post_warehouse_document(
 	lines = db.query(WarehouseDocumentLine).filter(WarehouseDocumentLine.warehouse_document_id == wh.id).all()
 	if not lines:
 		raise ApiError("NO_LINES", "حواله باید حداقل یک خط داشته باشد", http_status=400)
+	if wh.source_type == "invoice" and wh.doc_type == "receipt" and wh.source_document_id:
+		from app.services.woo_return_source_service import STOCK_KEY, validate_woo_return_receipt
+
+		invoice = db.get(Document, wh.source_document_id)
+		if invoice and invoice.business_id == wh.business_id and (invoice.developer_settings or {}).get(STOCK_KEY):
+			db.query(Document.id).filter_by(id=invoice.id).with_for_update().one()
+			db.refresh(wh)
+			if wh.status == "posted":
+				return {"id": wh.id, "status": wh.status}
+			if wh.status != "draft":
+				raise ApiError("NOT_POSTABLE", "حوالهٔ برگشت در وضعیت قابل قطعی‌سازی نیست.", http_status=409)
+			lines = db.query(WarehouseDocumentLine).filter_by(warehouse_document_id=wh.id).populate_existing().all()
+			if not lines:
+				raise ApiError("NO_LINES", "حواله باید حداقل یک خط داشته باشد", http_status=400)
+			validate_woo_return_receipt(db, invoice, wh, lines)
+
 	production_order_ids: set[int] = set()
 	for line in lines:
 		try:
