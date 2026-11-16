@@ -8674,8 +8674,10 @@ def update_invoice(
 
     from app.services.woo_return_source_service import STOCK_KEY
 
-    if (document.developer_settings or {}).get(STOCK_KEY) and any(
-        key not in {"payments", "tag_ids"} for key in data
+    if (
+        document.document_type == INVOICE_SALES_RETURN
+        and (document.developer_settings or {}).get(STOCK_KEY)
+        and any(key not in {"payments", "tag_ids"} for key in data)
     ):
         raise ApiError(
             "WOO_RETURN_STOCK_REWRITE_REQUIRED",
