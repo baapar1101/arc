@@ -8433,6 +8433,217 @@ def _invoice_payload_preserves_invoice_body(
     return True
 
 
+def _woo_posted_issue_update(
+    db: Session, document: Document, data: Dict[str, Any], invoice_type: str,
+) -> Optional[bool]:
+    """True preserves a proven posted issue. False runs the normal stock rewrite."""
+    extra = extra_info_dict(document.extra_info)
+    if (
+        document.document_type != INVOICE_SALES
+        or invoice_type != INVOICE_SALES
+        or document.is_proforma
+        or extra.get("source") != "woocommerce"
+        or "lines" not in data
+    ):
+        return None
+
+    from adapters.db.models.product_variant_allocation import (
+        InvoiceItemLineVariantAllocation, WarehouseLineVariantAllocation,
+    )
+    from adapters.db.models.warehouse_document import WarehouseDocument
+    from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
+    from app.services.variant_allocation_service import _normalized_items, parse_payload_allocations
+
+    old_lines = db.query(InvoiceItemLine).filter_by(document_id=document.id).all()
+    fiscal_allocations = {
+        row.id: row
+        for row in db.query(InvoiceItemLineVariantAllocation)
+        .filter(InvoiceItemLineVariantAllocation.invoice_item_line_id.in_([line.id for line in old_lines]))
+        .all()
+    }
+    issues = (
+        db.query(WarehouseDocumentLine, WarehouseLineVariantAllocation)
+        .join(WarehouseDocument, WarehouseDocument.id == WarehouseDocumentLine.warehouse_document_id)
+        .outerjoin(
+            WarehouseLineVariantAllocation,
+            WarehouseLineVariantAllocation.warehouse_document_line_id == WarehouseDocumentLine.id,
+        )
+        .filter(
+            WarehouseDocument.business_id == document.business_id,
+            WarehouseDocument.source_type == "invoice",
+            WarehouseDocument.source_document_id == document.id,
+            WarehouseDocument.status == "posted",
+            WarehouseDocument.doc_type == "issue",
+            WarehouseDocumentLine.movement == "out",
+        )
+        .all()
+    )
+    if not issues or not (fiscal_allocations or any(allocation for _, allocation in issues)):
+        return None
+
+    def ambiguous() -> ApiError:
+        return ApiError(
+            "WOO_POSTED_ISSUE_SOURCE_AMBIGUOUS",
+            "تخصیص قطعی حوالهٔ فروش ووکامرس قابل تطبیق نیست. سند و حواله را بررسی کنید.",
+            http_status=409,
+        )
+
+    def index_by_item(lines):
+        indexed = {}
+        for line in lines:
+            if line is None or (not isinstance(line, dict) and not isinstance(line, InvoiceItemLine)):
+                raise ambiguous()
+            info = extra_info_dict(line.get("extra_info") if isinstance(line, dict) else line.extra_info)
+            item_id = _canonical_optional_int(info.get("wc_item_id"))
+            if item_id is None and info.get("wc_line_kind") in {"shipping", "fee"}:
+                identity = (info["wc_line_kind"], info.get("wc_fee_label"))
+            elif item_id is not None and item_id > 0:
+                identity = ("item", item_id)
+            else:
+                raise ambiguous()
+            if identity in indexed:
+                raise ambiguous()
+            indexed[identity] = line
+        return indexed
+
+    old_by_item = index_by_item(old_lines)
+    new_by_item = index_by_item(list(data.get("lines") or []))
+    incoming_header = extra_info_dict(data.get("extra_info"))
+    same_woo_order = (
+        extra.get("wc_order_id") is not None
+        and incoming_header.get("source") == "woocommerce"
+        and incoming_header.get("wc_order_id") == extra.get("wc_order_id")
+    )
+    allocation_by_line: Dict[int, list[Any]] = defaultdict(list)
+    for row in fiscal_allocations.values():
+        allocation_by_line[row.invoice_item_line_id].append(row)
+
+    old_by_id = {line.id: line for line in old_lines}
+    covered = set()
+    quantities_by_issue: Dict[int, Decimal] = defaultdict(Decimal)
+    issue_quantities = {}
+    for issue, allocation in issues:
+        line_id = _canonical_optional_int(extra_info_dict(issue.extra_info).get("invoice_item_line_id"))
+        if allocation is None:
+            if line_id in allocation_by_line or line_id is None:
+                raise ambiguous()
+            continue
+        original = fiscal_allocations.get(allocation.source_document_allocation_id)
+        if (
+            original is None
+            or original.invoice_item_line_id != line_id
+            or original.business_id != document.business_id
+            or allocation.business_id != document.business_id
+            or old_by_id[line_id].product_id != issue.product_id
+            or (extra_info_dict(old_by_id[line_id].extra_info).get("warehouse_id") is not None
+                and _canonical_optional_int(old_by_id[line_id].extra_info.get("warehouse_id")) != issue.warehouse_id)
+            or original.product_id != issue.product_id
+            or allocation.product_id != issue.product_id
+            or allocation.variant_id != original.variant_id
+            or allocation.quantity <= 0
+        ):
+            raise ambiguous()
+        covered.add(original.id)
+        quantities_by_issue[issue.id] += allocation.quantity
+        issue_quantities[issue.id] = issue.quantity
+    if covered != fiscal_allocations.keys() or quantities_by_issue != issue_quantities:
+        raise ambiguous()
+
+    if old_by_item.keys() != new_by_item.keys():
+        return False
+
+    ordered_old = []
+    ordered_new = []
+    money_changed = False
+    for key, previous in old_by_item.items():
+        incoming = new_by_item[key]
+        old_info = extra_info_dict(previous.extra_info)
+        new_info = extra_info_dict(incoming.get("extra_info"))
+        raw_qty = incoming.get("quantity")
+        try:
+            qty = Decimal(str(raw_qty))
+        except (InvalidOperation, ValueError, TypeError) as exc:
+            raise ambiguous() from exc
+        if not qty.is_finite() or qty <= 0:
+            raise ambiguous()
+        if (
+            _canonical_optional_int(incoming.get("product_id")) != previous.product_id
+            or qty != previous.quantity
+            or _canonical_optional_int(new_info.get("warehouse_id")) != _canonical_optional_int(old_info.get("warehouse_id"))
+            or _canonical_optional_int(incoming.get("warehouse_location_id", new_info.get("warehouse_location_id")))
+                != _canonical_optional_int(old_info.get("warehouse_location_id"))
+            or new_info.get("movement", "out") != old_info.get("movement", "out")
+            or sorted(
+                (vid, amount, _canonical_amount(price))
+                for vid, amount, price in _normalized_items(parse_payload_allocations(incoming))
+            ) != sorted(
+                (row.variant_id, row.quantity, _canonical_amount(row.unit_price))
+                for row in allocation_by_line[previous.id]
+            )
+        ):
+            return False
+        if allocation_by_line[previous.id]:
+            if any(
+                not old_info.get(field) or new_info.get(field) != old_info[field]
+                for field in ("wc_product_id", "wc_variation_id")
+            ):
+                raise ambiguous()
+            # The Woo mapper historically sent 'عدد' even for a sale saved in 'main'.
+            if not old_info.get("unit"):
+                raise ambiguous()
+            if new_info.get("unit") != old_info["unit"] and not (
+                same_woo_order and new_info.get("unit") == "عدد"
+            ):
+                raise ambiguous()
+            incoming = {**incoming, "extra_info": {**new_info, "unit": old_info["unit"]}}
+        try:
+            money_changed |= any(
+                Decimal(str(new_info.get(field) or 0)) != Decimal(str(old_info.get(field) or 0))
+                for field in ("unit_price", "line_discount", "tax_amount")
+            )
+        except InvalidOperation as exc:
+            raise ApiError("INVALID_LINE", "مبلغ ردیف فاکتور نامعتبر است.", http_status=422) from exc
+        ordered_old.append(previous)
+        ordered_new.append(incoming)
+
+    # Only a header description, tags and payments may change without recomputing the invoice.
+    header = dict(data)
+    header.pop("description", None)
+    header.pop("lines")
+    if isinstance(header.get("extra_info"), dict):
+        supplied = dict(header["extra_info"])
+        if any(
+            _canonical_jsonish(value) != _canonical_jsonish(extra.get(key))
+            for key, value in supplied.items()
+            if key not in {"totals", "ignore_credit_check", *_INVOICE_BODY_EXTRA_KEYS}
+        ):
+            raise ambiguous()
+        header["extra_info"] = {**extra, **supplied}
+    if (
+        header.keys() - {
+            "invoice_type", "document_date", "currency_id", "is_proforma", "code", "project_id",
+            "fx_rate_id", "extra_info", "payments", "tag_ids",
+        }
+        or not _invoice_payload_preserves_invoice_body(
+            db, document, header, inv_type=invoice_type, old_document_type=document.document_type,
+        )
+        or money_changed
+        or not _invoice_lines_economically_equal(ordered_old, ordered_new)
+    ):
+        raise ApiError(
+            "WOO_POSTED_ISSUE_REWRITE_REQUIRED",
+            "این تغییر نیازمند بازسازی حواله و بهای قطعی فروش ووکامرس است. فاکتور تغییر نکرد.",
+            http_status=409,
+        )
+
+    validate_invoice_line_totals(
+        data, ordered_new, db.get(Currency, document.currency_id),
+        db=db, business_id=document.business_id, invoice_type=invoice_type,
+    )
+    return True
+
+
+
 def _sync_invoice_linked_payments(
     db: Session,
     *,
@@ -8672,6 +8883,11 @@ def update_invoice(
     if not document or document.document_type not in SUPPORTED_INVOICE_TYPES:
         raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
 
+    if document.document_type == INVOICE_SALES and (document.extra_info or {}).get("source") == "woocommerce":
+        document = db.query(Document).filter_by(id=document_id).with_for_update().populate_existing().first()
+        if document is None or document.document_type not in SUPPORTED_INVOICE_TYPES:
+            raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
+
     from app.services.woo_return_source_service import STOCK_KEY
 
     if (
@@ -8741,13 +8957,19 @@ def update_invoice(
         validate_invoice_type_change_for_tax(document, _old_document_type, inv_type)
     data["invoice_type"] = inv_type
 
-    if _invoice_payload_preserves_invoice_body(
-        db,
-        document,
-        data,
-        inv_type=inv_type,
-        old_document_type=_old_document_type,
-    ):
+    preserve_issue = _woo_posted_issue_update(db, document, data, inv_type)
+    if preserve_issue and isinstance(data.get("description"), str):
+        document.description = data["description"]
+    preserve_body = preserve_issue
+    if preserve_body is None:
+        preserve_body = _invoice_payload_preserves_invoice_body(
+            db,
+            document,
+            data,
+            inv_type=inv_type,
+            old_document_type=_old_document_type,
+        )
+    if preserve_body:
         return _apply_invoice_payments_only_update(
             db,
             document=document,
