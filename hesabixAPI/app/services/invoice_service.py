@@ -5186,6 +5186,8 @@ def _iter_profit_movements_from_invoice_lines(
     movement_product = db.get(Product, int(product_id))
     business = db.get(Business, int(business_id))
     rate_cache: Dict[int, Decimal] = {}
+    from app.services.woo_return_source_service import return_quantity_main
+
     for line, doc in rows:
         info = extra_info_dict(line.extra_info)
         if invoice_line_skips_inventory_kardex(info):
@@ -5197,7 +5199,7 @@ def _iter_profit_movements_from_invoice_lines(
             movement, _ = _movement_from_type(doc.document_type)
         if movement not in ("in", "out"):
             continue
-        qty = inventory_quantity_to_main(
+        qty = return_quantity_main(doc, line.id) or inventory_quantity_to_main(
             line.quantity, movement_product, info, strict=False
         )
         if qty <= 0:
@@ -6682,7 +6684,10 @@ def _calculate_invoice_profit(
                         mvl = _mv_list_pid_wh(product.id, wh_iter)
                         idx_ln = _find_profit_movement_index_for_line(mvl, int(item_line.id))
                         if idx_ln is not None:
-                            restoration_qty_for_match = quantity_line_to_main(
+                            from app.services.woo_return_source_service import return_quantity_main
+
+                            posted_return_qty = return_quantity_main(document, item_line.id)
+                            restoration_qty_for_match = posted_return_qty or quantity_line_to_main(
                                 qty,
                                 product,
                                 extra_info.get("unit"),
@@ -6703,12 +6708,12 @@ def _calculate_invoice_profit(
                                 fallback_line=item_line,
                                 missing_purchase_price_policy=missing_purchase_price_policy,
                             )
-                            cost_per_unit = price_main_to_line(
-                                cost_per_unit,
-                                product,
-                                extra_info.get("unit"),
-                                strict=False,
-                            )
+                            if posted_return_qty is not None:
+                                cost_per_unit = cost_per_unit * posted_return_qty / qty
+                            else:
+                                cost_per_unit = price_main_to_line(
+                                    cost_per_unit, product, extra_info.get("unit"), strict=False,
+                                )
                         else:
                             if normalized_basis == "purchase_price":
                                 from app.services.invoice_purchase_price_snapshot_service import (
@@ -6965,6 +6970,9 @@ def create_invoice(
     lines_input: List[Dict[str, Any]] = list(data.get("lines") or [])
     if not isinstance(lines_input, list) or len(lines_input) == 0:
         raise ApiError("LINES_REQUIRED", "At least one line is required", http_status=400)
+    from app.services.woo_return_source_service import STOCK_KEY, prepare_woo_return_stock
+
+    woo_return_stock = prepare_woo_return_stock(db, business_id, data, lines_input, invoice_type)
     validate_invoice_line_totals(
         data, lines_input, currency, db=db, business_id=business_id, invoice_type=invoice_type,
         prepare_discount_lines=(
@@ -7443,6 +7451,11 @@ def create_invoice(
         created_invoice_lines.append((item_line, line))
     db.flush()
     _persist_invoice_variant_allocations(db, business_id, created_invoice_lines)
+    if woo_return_stock:
+        document.developer_settings = {
+            **(document.developer_settings or {}),
+            STOCK_KEY: {str(created_invoice_lines[index][0].id): stock for index, stock in woo_return_stock.items()},
+        }
 
     # Accounting lines for finalized invoices (COGS/Inventory در invoice_cogs_gl_service ثبت می‌شود)
     if not document.is_proforma:
@@ -8658,6 +8671,17 @@ def update_invoice(
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document or document.document_type not in SUPPORTED_INVOICE_TYPES:
         raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
+
+    from app.services.woo_return_source_service import STOCK_KEY
+
+    if (document.developer_settings or {}).get(STOCK_KEY) and any(
+        key not in {"payments", "tag_ids"} for key in data
+    ):
+        raise ApiError(
+            "WOO_RETURN_STOCK_REWRITE_REQUIRED",
+            "بازنویسی برگشت ووکامرس با حوالهٔ مبدأ ثبت‌شده مجاز نیست.",
+            http_status=409,
+        )
 
     _pre_links_wh = (document.extra_info or {}).get("links") or {}
     _old_warehouse_document_ids = list(_pre_links_wh.get("warehouse_document_ids") or [])
