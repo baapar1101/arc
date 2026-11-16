@@ -1076,7 +1076,8 @@ class Hesabix_V2_Sync_Service
 
 		try {
 			$existing_mapping = $this->db->get_mapping('order', $order_id);
-			$saved = $existing_mapping ? null : $this->db->get_or_start_invoice_create($order_id);
+			$hid = absint($existing_mapping['hesabix_id'] ?? 0);
+			$saved = $hid > 0 ? null : $this->db->get_or_start_invoice_create($order_id);
 			if ($saved !== null) {
 				return array(
 					'success' => true,
@@ -1171,18 +1172,13 @@ class Hesabix_V2_Sync_Service
 					$person_id,
 					$gate['factor'],
 					$gate['currency_id'],
-					$fiscal_dates ? $fiscal_dates : null
+					$fiscal_dates ? $fiscal_dates : null,
+					$hid === 0
 				),
 				$order
 			);
 
 			self::assert_invoice_lines_have_warehouse_when_required($order, $invoice_data);
-
-			$existing_mapping = $this->db->get_mapping('order', $order_id);
-			$hid = null;
-			if ($existing_mapping && !empty($existing_mapping['hesabix_id'])) {
-				$hid = absint($existing_mapping['hesabix_id']);
-			}
 
 			return array(
 				'success' => true,
@@ -1190,8 +1186,8 @@ class Hesabix_V2_Sync_Service
 				'order' => $order,
 				'person_id' => $person_id,
 				'invoice_data' => $invoice_data,
-				'is_new_invoice' => !$existing_mapping,
-				'hesabix_invoice_id' => $hid && $hid > 0 ? $hid : null,
+				'is_new_invoice' => $hid === 0,
+				'hesabix_invoice_id' => $hid > 0 ? $hid : null,
 				'fiscal_note' => isset($fiscal['note']) ? (string) $fiscal['note'] : '',
 			);
 		} catch (Exception $e) {
@@ -1593,7 +1589,8 @@ class Hesabix_V2_Sync_Service
 						$person_id,
 						$gate['factor'],
 						$gate['currency_id'],
-						$fiscal_dates ? $fiscal_dates : null
+						$fiscal_dates ? $fiscal_dates : null,
+						!$existing_mapping
 					),
 					$order
 				);
