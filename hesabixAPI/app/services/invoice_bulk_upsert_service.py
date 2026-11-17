@@ -246,6 +246,8 @@ def bulk_upsert_invoices_integration(
                     )
                 except ApiError as ae:
                     p = _api_error_parts(ae)
+                    if p["code"] in {"WOO_POSTED_ISSUE_SOURCE_AMBIGUOUS", "WOO_POSTED_ISSUE_REWRITE_REQUIRED"}:
+                        db.rollback()
                     results.append(
                         {
                             **base,
