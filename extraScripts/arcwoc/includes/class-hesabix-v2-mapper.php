@@ -545,9 +545,10 @@ class Hesabix_V2_Mapper
 	 * @param    float|null  $amount_factor   ضریب مبلغ (مثلاً ۱۰ برای تومان→ریال).
 	 * @param    int|null    $invoice_currency_id شناسهٔ ارز در حسابیکس؛ اگر تهی باشد از تنظیمات/پیش‌فرض حل می‌شود.
 	 * @param    array|null  $date_overrides      اختیاری: `document_date` (Y-m-d)، `payment_date_ymd` (Y-m-d برای بخش تاریخ transaction_date پرداخت).
+	 * @param    bool        $new_sale           Map stock-tracked native variants in main units for the first CREATE.
 	 * @return   array
 	 */
-	public static function wc_order_to_invoice($order, $person_id, $amount_factor = 1.0, $invoice_currency_id = null, $date_overrides = null)
+	public static function wc_order_to_invoice($order, $person_id, $amount_factor = 1.0, $invoice_currency_id = null, $date_overrides = null, $new_sale = false)
 	{
 		$f = (float) $amount_factor;
 		if ($f <= 0 || is_nan($f)) {
@@ -663,7 +664,7 @@ class Hesabix_V2_Mapper
 				'line_discount' => 0,
 				'tax_amount' => $tax_amount,
 				'line_total' => $line_total,
-				'unit' => 'عدد',
+				'unit' => $new_sale && $native_variant_id > 0 && !$product->is_virtual() ? 'main' : 'عدد',
 				'unit_price_source' => 'base',
 				'discount_type' => 'amount',
 				'discount_value' => 0,
