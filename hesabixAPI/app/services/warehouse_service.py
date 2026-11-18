@@ -3497,6 +3497,13 @@ def post_warehouse_document(
 		)
 
 	assert_cancel_reversal_postable(db, wh)
+	transfer_currency = None
+	if wh.doc_type == "transfer":
+		from app.services.business_currency_rate_service import _get_business_default_currency_id
+
+		transfer_currency = db.get(Currency, _get_business_default_currency_id(db, int(wh.business_id)))
+		if transfer_currency is None:
+			raise ApiError("CURRENCY_NOT_FOUND", "ارز پایه کسب‌وکار یافت نشد", http_status=404)
 
 	lines = db.query(WarehouseDocumentLine).filter(WarehouseDocumentLine.warehouse_document_id == wh.id).all()
 	if not lines:
@@ -3769,14 +3776,6 @@ def post_warehouse_document(
 	
 	# اگر doc_type='transfer' باشد، یک سند حسابداری ایجاد کن
 	if wh.doc_type == "transfer":
-		# دریافت currency_id (از business یا default)
-		currency = db.query(Currency).filter(Currency.business_id == wh.business_id).first()
-		if not currency:
-			# استفاده از currency پیش‌فرض
-			currency = db.query(Currency).filter(Currency.code == "IRR").first()
-		if not currency:
-			raise ApiError("CURRENCY_NOT_FOUND", "Currency not found", http_status=404)
-		
 		fiscal_year = _get_current_fiscal_year(db, wh.business_id)
 		
 		# ساخت کد سند (مشابه inventory_transfer_service)
@@ -3814,7 +3813,7 @@ def post_warehouse_document(
 			code=doc_code,
 			document_type="inventory_transfer",
 			document_date=wh.document_date,
-			currency_id=currency.id,
+			currency_id=transfer_currency.id,
 			created_by_user_id=wh.created_by_user_id,
 			registered_at=datetime.utcnow(),
 			is_proforma=False,
