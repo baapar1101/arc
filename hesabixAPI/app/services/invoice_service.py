@@ -8957,6 +8957,9 @@ def update_invoice(
         validate_invoice_type_change_for_tax(document, _old_document_type, inv_type)
     data["invoice_type"] = inv_type
 
+    from app.services.woo_proforma_service import prepare_woo_proforma_finalization
+
+    data = prepare_woo_proforma_finalization(db, document, data, inv_type)
     preserve_issue = _woo_posted_issue_update(db, document, data, inv_type)
     if preserve_issue and isinstance(data.get("description"), str):
         document.description = data["description"]
