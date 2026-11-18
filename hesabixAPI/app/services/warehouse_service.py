@@ -4557,6 +4557,14 @@ def _validate_manual_receipt_variant_cancellation(
 	receipt: WarehouseDocument,
 	lines: List[WarehouseDocumentLine],
 ) -> None:
+	_validate_manual_variant_cancellation(db, receipt, lines)
+
+
+def _validate_manual_variant_cancellation(
+	db: Session,
+	document: WarehouseDocument,
+	lines: List[WarehouseDocumentLine],
+) -> None:
 	from adapters.db.models.product_variant_allocation import WarehouseLineVariantAllocation
 	from app.core.business_calendar import business_today
 	from app.services.variant_inventory_service import (
@@ -4564,41 +4572,46 @@ def _validate_manual_receipt_variant_cancellation(
 		compute_available_variant_stock,
 	)
 
-	business_id = int(receipt.business_id)
-	incoming = {line.id: line for line in lines if line.movement == "in" and line.warehouse_id is not None}
-	if not incoming:
+	business_id = int(document.business_id)
+	movements = {
+		line.id: line for line in lines
+		if line.movement in {"in", "out"} and line.warehouse_id is not None
+	}
+	if not movements:
 		return
 	quantities = defaultdict(Decimal)
 	for allocation in db.query(WarehouseLineVariantAllocation).filter(
 		WarehouseLineVariantAllocation.business_id == business_id,
-		WarehouseLineVariantAllocation.warehouse_document_line_id.in_(incoming),
+		WarehouseLineVariantAllocation.warehouse_document_line_id.in_(movements),
 	):
-		line = incoming[allocation.warehouse_document_line_id]
+		line = movements[allocation.warehouse_document_line_id]
 		key = (int(line.warehouse_id), int(line.product_id), int(allocation.variant_id))
-		quantities[key] += allocation.quantity
+		quantities[key] += allocation.quantity if line.movement == "in" else -allocation.quantity
 	if not quantities:
 		return
 
 	acquire_variant_stock_locks(db, business_id, list(quantities))
-	db.refresh(receipt, attribute_names=["status"])
-	if receipt.status != "posted":
+	db.refresh(document, attribute_names=["status"])
+	if document.status != "posted":
 		raise ApiError("NOT_CANCELLABLE", "فقط حواله‌های posted قابل لغو هستند", http_status=400)
-	as_of = max(business_today(business_id), receipt.document_date)
+	as_of = max(business_today(business_id), document.document_date)
 	for (warehouse_id, product_id, variant_id), quantity in sorted(quantities.items()):
 		remaining = compute_available_variant_stock(
 			db, business_id, product_id, warehouse_id, variant_id, as_of,
-			exclude_warehouse_document_ids=[int(receipt.id)],
+			exclude_warehouse_document_ids=[int(document.id)],
 		)
 		if remaining < 0:
+			is_receipt = document.doc_type == "receipt"
 			raise ApiError(
-				"VARIANT_RECEIPT_CANCEL_INSUFFICIENT_STOCK",
-				"لغو رسید، موجودی قابل‌تأمین این ترکیب در انبار را منفی می‌کند",
+				"VARIANT_RECEIPT_CANCEL_INSUFFICIENT_STOCK" if is_receipt else "VARIANT_ADJUSTMENT_CANCEL_INSUFFICIENT_STOCK",
+				"لغو رسید، موجودی قابل‌تأمین این ترکیب در انبار را منفی می‌کند" if is_receipt
+				else "لغو تعدیل، موجودی قابل‌تأمین این ترکیب در انبار را منفی می‌کند",
 				http_status=409,
 				details={
 					"warehouse_id": warehouse_id,
 					"product_id": product_id,
 					"variant_id": variant_id,
-					"receipt_quantity": str(quantity),
+					"receipt_quantity" if is_receipt else "document_net_quantity": str(quantity),
 					"remaining_available_quantity": str(remaining),
 				},
 			)
@@ -4621,6 +4634,8 @@ def cancel_warehouse_document(
 	wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == wh_id).first()
 	if not wh or wh.business_id != business_id:
 		raise ApiError("NOT_FOUND", "Warehouse document not found", http_status=404)
+	if wh.doc_type == "adjustment":
+		db.refresh(wh)
 	
 	if wh.status != "posted":
 		raise ApiError("NOT_CANCELLABLE", "فقط حواله‌های posted قابل لغو هستند", http_status=400)
@@ -4648,6 +4663,14 @@ def cancel_warehouse_document(
 		and not linked_order_ids
 	):
 		_validate_manual_receipt_variant_cancellation(db, wh, lines)
+	elif (
+		wh.doc_type == "adjustment"
+		and wh.source_type == "manual"
+		and wh.source_document_id is None
+		and not (wh.extra_info or {}).get("cancels_warehouse_document_id")
+		and not linked_order_ids
+	):
+		_validate_manual_variant_cancellation(db, wh, lines)
 	if linked_order_ids:
 		_reverse_production_order_cancelled_document(db, wh, lines, next(iter(linked_order_ids)))
 
