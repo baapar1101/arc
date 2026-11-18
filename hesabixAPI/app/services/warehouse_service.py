@@ -4625,10 +4625,14 @@ def _validate_manual_variant_cancellation(
 		)
 		if remaining < 0:
 			is_receipt = document.doc_type == "receipt"
+			error_kind, label = {
+				"receipt": ("RECEIPT", "رسید"),
+				"adjustment": ("ADJUSTMENT", "تعدیل"),
+				"transfer": ("TRANSFER", "انتقال"),
+			}[document.doc_type]
 			raise ApiError(
-				"VARIANT_RECEIPT_CANCEL_INSUFFICIENT_STOCK" if is_receipt else "VARIANT_ADJUSTMENT_CANCEL_INSUFFICIENT_STOCK",
-				"لغو رسید، موجودی قابل‌تأمین این ترکیب در انبار را منفی می‌کند" if is_receipt
-				else "لغو تعدیل، موجودی قابل‌تأمین این ترکیب در انبار را منفی می‌کند",
+				f"VARIANT_{error_kind}_CANCEL_INSUFFICIENT_STOCK",
+				f"لغو {label}، موجودی قابل‌تأمین این ترکیب در انبار را منفی می‌کند",
 				http_status=409,
 				details={
 					"warehouse_id": warehouse_id,
@@ -4657,7 +4661,7 @@ def cancel_warehouse_document(
 	wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == wh_id).first()
 	if not wh or wh.business_id != business_id:
 		raise ApiError("NOT_FOUND", "Warehouse document not found", http_status=404)
-	if wh.doc_type == "adjustment":
+	if wh.doc_type in ("adjustment", "transfer"):
 		db.refresh(wh)
 	
 	if wh.status != "posted":
@@ -4687,7 +4691,7 @@ def cancel_warehouse_document(
 	):
 		_validate_manual_receipt_variant_cancellation(db, wh, lines)
 	elif (
-		wh.doc_type == "adjustment"
+		wh.doc_type in ("adjustment", "transfer")
 		and wh.source_type == "manual"
 		and wh.source_document_id is None
 		and not (wh.extra_info or {}).get("cancels_warehouse_document_id")
