@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
+from adapters.db.models.document import Document
+from adapters.db.models.product import Product
 from adapters.db.repositories.document_repository import DocumentRepository
 from adapters.db.repositories.fiscal_year_repo import FiscalYearRepository
-from adapters.db.models.document import Document
 from app.core.responses import ApiError
 
 
@@ -264,6 +265,14 @@ def upsert_opening_balance(
             }
         )
 
+    from app.services.variant_allocation_service import opening_allocations_in_main_units
+
+    inventory_products = {
+        row.id: row for row in db.query(Product).filter(
+            Product.business_id == business_id,
+            Product.id.in_({int(line.get("product_id") or 0) for line in inventory_lines}),
+        )
+    } if inventory_lines else {}
     # 2) Inventory lines (movement=in) + total valuation
     inventory_total_value = Decimal(0)
     for inv in inventory_lines:
@@ -286,6 +295,10 @@ def upsert_opening_balance(
         allocations = inv.get("allocations")
         if isinstance(allocations, list) and allocations:
             info["allocations"] = allocations
+        product = inventory_products.get(int(inv.get("product_id") or 0))
+        if product is None:
+            raise ApiError("PRODUCT_NOT_FOUND", "کالای افتتاحیه یافت نشد یا متعلق به کسب‌وکار نیست", http_status=404)
+        opening_allocations_in_main_units(db, business_id, product, qty, info, require_active=True)
         lines.append(
             {
                 "product_id": int(inv.get("product_id")),

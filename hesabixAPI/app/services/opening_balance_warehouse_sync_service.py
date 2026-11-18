@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from decimal import Decimal
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional
 from uuid import uuid4
 
 from sqlalchemy import func
@@ -12,12 +12,27 @@ from sqlalchemy.orm import Session
 from adapters.db.models.document import Document
 from adapters.db.models.document_line import DocumentLine
 from adapters.db.models.product import Product
+from adapters.db.models.product_variant_allocation import WarehouseLineVariantAllocation
 from adapters.db.models.warehouse_document import WarehouseDocument
 from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
 from app.core.responses import ApiError
-from app.services.invoice_unit_conversion_service import inventory_quantity_to_main
+from app.services.invoice_unit_conversion_service import (
+    inventory_price_to_main,
+    inventory_quantity_to_main,
+)
+from app.services.product_variant_service import is_variant_inventory_product
+from app.services.variant_allocation_service import (
+    opening_allocations_in_main_units,
+    validate_payload_for_product,
+)
 
-InventoryKey = Tuple[int, int]
+InventoryKey = tuple[int, int] | tuple[int, int, int]
+
+
+def _record_cost(costs: dict, key: InventoryKey, cost: Decimal) -> None:
+    if len(key) == 3 and key in costs and costs[key] != cost:
+        raise ApiError("OPENING_VARIANT_COST_AMBIGUOUS", "بهای ثبت‌شدهٔ این ترکیب یکتا نیست؛ همگام‌سازی خودکار مجاز نیست", http_status=409)
+    costs[key] = cost
 
 
 def _decimal(value: Any) -> Decimal:
@@ -42,6 +57,7 @@ def build_opening_balance_warehouse_deltas(
 
 def _desired_opening_inventory(
     db: Session,
+    business_id: int,
     document_id: int,
     product_ids: List[int],
 ) -> tuple[Dict[InventoryKey, Decimal], Dict[InventoryKey, Decimal], Dict[InventoryKey, Dict[str, Any]]]:
@@ -56,7 +72,7 @@ def _desired_opening_inventory(
     if product_ids:
         products_by_id = {
             int(product.id): product
-            for product in db.query(Product).filter(Product.id.in_(product_ids)).all()
+            for product in db.query(Product).filter(Product.id.in_(product_ids), Product.business_id == business_id).all()
         }
     for row in rows:
         info = dict(row.extra_info or {})
@@ -71,9 +87,19 @@ def _desired_opening_inventory(
         )
         if warehouse_id is None or quantity <= 0:
             continue
-        key = (int(row.product_id), int(warehouse_id))
-        desired[key] += quantity
-        costs[key] = _decimal(info.get("cost_price"))
+        product = products_by_id[int(row.product_id)]
+        native = is_variant_inventory_product(product)
+        if native:
+            quantities = [((int(row.product_id), int(warehouse_id), vid), qty)
+                          for vid, qty, _price in opening_allocations_in_main_units(
+                              db, business_id, product, row.quantity, info, require_active=True)]
+            cost = inventory_price_to_main(info.get("cost_price"), product, info, strict=True)
+        else:
+            quantities = [((int(row.product_id), int(warehouse_id)), quantity)]
+            cost = _decimal(info.get("cost_price"))
+        for key, qty in quantities:
+            desired[key] += qty
+            _record_cost(costs, key, cost)
         lot_payload: Dict[str, Any] = {}
         if info.get("lot_allocations"):
             lot_payload["lot_allocations"] = info.get("lot_allocations")
@@ -92,7 +118,8 @@ def _desired_opening_inventory(
                 ],
             }
         if lot_payload:
-            lots[key] = lot_payload
+            for key, _qty in quantities:
+                lots[key] = lot_payload
     return dict(desired), costs, lots
 
 
@@ -101,8 +128,9 @@ def _linked_opening_inventory(
     business_id: int,
     document_id: int,
     product_ids: List[int],
-) -> Dict[InventoryKey, Decimal]:
+) -> tuple[dict[InventoryKey, Decimal], dict[InventoryKey, Decimal]]:
     linked: Dict[InventoryKey, Decimal] = defaultdict(Decimal)
+    costs: Dict[InventoryKey, Decimal] = {}
     rows = (
         db.query(WarehouseDocumentLine)
         .join(
@@ -122,23 +150,45 @@ def _linked_opening_inventory(
     if product_ids:
         products_by_id = {
             int(product.id): product
-            for product in db.query(Product).filter(Product.id.in_(product_ids)).all()
+            for product in db.query(Product).filter(Product.id.in_(product_ids), Product.business_id == business_id).all()
         }
+    allocations_by_line = defaultdict(list)
+    if rows:
+        for allocation in db.query(WarehouseLineVariantAllocation).filter(
+            WarehouseLineVariantAllocation.warehouse_document_line_id.in_([row.id for row in rows])
+        ):
+            allocations_by_line[allocation.warehouse_document_line_id].append(allocation)
     for row in rows:
         if row.warehouse_id is None:
             continue
-        key = (int(row.product_id), int(row.warehouse_id))
         quantity = inventory_quantity_to_main(
             row.quantity,
             products_by_id.get(int(row.product_id)),
             getattr(row, "extra_info", None),
             strict=False,
         )
-        if str(row.movement or "").lower() == "in":
-            linked[key] += quantity
-        elif str(row.movement or "").lower() == "out":
-            linked[key] -= quantity
-    return dict(linked)
+        product = products_by_id[int(row.product_id)]
+        if is_variant_inventory_product(product):
+            allocations = allocations_by_line[row.id]
+            if any(a.business_id != business_id or a.product_id != row.product_id for a in allocations):
+                raise ApiError("OPENING_VARIANT_LINK_INVALID", "انتساب تخصیص حوالهٔ افتتاحیه نامعتبر است", http_status=409)
+            items = validate_payload_for_product(db, business_id, product, {"allocations": [
+                {"variant_id": a.variant_id, "quantity": a.quantity} for a in allocations
+            ]}, quantity, require_active=False)
+            quantities = [((int(row.product_id), int(row.warehouse_id), vid), qty) for vid, qty, _price in items]
+            if "cost_price" not in (row.extra_info or {}):
+                raise ApiError("OPENING_VARIANT_COST_AMBIGUOUS", "بهای حوالهٔ افتتاحیه مشخص نیست", http_status=409)
+            cost = inventory_price_to_main(row.extra_info["cost_price"], product, row.extra_info, strict=True)
+            for key, _qty in quantities:
+                _record_cost(costs, key, cost)
+        else:
+            quantities = [((int(row.product_id), int(row.warehouse_id)), quantity)]
+        for key, qty in quantities:
+            if str(row.movement or "").lower() == "in":
+                linked[key] += qty
+            elif str(row.movement or "").lower() == "out":
+                linked[key] -= qty
+    return dict(linked), costs
 
 
 def _assert_products_can_sync(
@@ -225,15 +275,16 @@ def _group_delta_lines(
     receipts: Dict[int, List[Dict[str, Any]]] = defaultdict(list)
     issues: Dict[int, List[Dict[str, Any]]] = defaultdict(list)
     lot_map = lots or {}
-    for (product_id, warehouse_id), delta in sorted(deltas.items()):
+    for key, delta in sorted(deltas.items()):
+        product_id, warehouse_id = key[:2]
         if not delta:
             continue
         extra: Dict[str, Any] = {
             "opening_balance_sync": True,
-            "cost_price": float(costs.get((product_id, warehouse_id), Decimal(0))),
+            "cost_price": float(costs.get(key, Decimal(0))),
         }
         if delta > 0:
-            lot_extra = dict(lot_map.get((product_id, warehouse_id)) or {})
+            lot_extra = dict(lot_map.get(key) or {})
             allocs = [
                 dict(item)
                 for item in (lot_extra.get("lot_allocations") or [])
@@ -250,6 +301,9 @@ def _group_delta_lines(
             "extra_info": extra,
             "lot_allocations": extra.get("lot_allocations"),
         }
+        if len(key) == 3:
+            extra["unit"] = "main"
+            extra["allocations"] = [{"variant_id": key[2], "quantity": str(abs(delta))}]
         (receipts if delta > 0 else issues)[int(warehouse_id)].append(line)
     return dict(receipts), dict(issues)
 
@@ -278,15 +332,17 @@ def sync_opening_balance_warehouse_documents(
         Document.id == int(opening_balance_document_id),
         Document.business_id == int(business_id),
         Document.document_type == "opening_balance",
-    ).first()
+    ).with_for_update().first()
     if opening_document is None:
         raise ApiError("OPENING_BALANCE_NOT_FOUND", "سند تراز افتتاحیه یافت نشد", http_status=404)
 
     _assert_products_can_sync(db, business_id, product_ids)
     _assert_no_unrelated_posted_history(db, business_id, product_ids)
 
-    desired, costs, lots = _desired_opening_inventory(db, int(opening_document.id), product_ids)
-    linked = _linked_opening_inventory(db, business_id, int(opening_document.id), product_ids)
+    desired, costs, lots = _desired_opening_inventory(db, business_id, int(opening_document.id), product_ids)
+    linked, linked_costs = _linked_opening_inventory(db, business_id, int(opening_document.id), product_ids)
+    for key, cost in linked_costs.items():
+        _record_cost(costs, key, cost)
     deltas = build_opening_balance_warehouse_deltas(desired, linked)
     receipts, issues = _group_delta_lines(deltas, costs, lots)
 

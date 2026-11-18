@@ -10,6 +10,7 @@ from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Session, aliased
 
 from adapters.db.models.document import Document
+from adapters.db.models.document_line import DocumentLine
 from adapters.db.models.inventory_variant_balance import InventoryVariantBalance
 from adapters.db.models.invoice_item_line import InvoiceItemLine
 from adapters.db.models.product import Product
@@ -150,6 +151,36 @@ def compute_available_variant_stock(
             bal += qty
         else:
             bal -= qty
+
+    # Opening stock is financial stock, like the product-level reader; its warehouse mirror is excluded below.
+    if product is not None and is_variant_inventory_product(product) and product.track_inventory:
+        from app.services.variant_allocation_service import opening_allocations_in_main_units
+
+        opening_q = db.query(Document.id).filter(
+            Document.business_id == int(business_id), Document.document_type == "opening_balance",
+            Document.is_proforma == False, Document.document_date <= up_to_date,  # noqa: E712
+        )
+        if exclude_document_id is not None:
+            opening_q = opening_q.filter(Document.id != int(exclude_document_id))
+        opening_ids = [row.id for row in opening_q]
+        opening_lines = db.query(DocumentLine).filter(
+            DocumentLine.document_id.in_(opening_ids), DocumentLine.product_id == int(product_id),
+        ).all() if opening_ids else []
+        for line in opening_lines:
+            info = extra_info_dict(line.extra_info)
+            if (info.get("movement") or "in") != "in" or info.get("inventory_posted") is False or info.get("inventory_tracked") is False:
+                continue
+            if warehouse_id is not None:
+                try:
+                    if int(info.get("warehouse_id")) != int(warehouse_id):
+                        continue
+                except (TypeError, ValueError):
+                    continue
+            if _d(line.quantity) <= 0:
+                continue
+            for vid, qty, _price in opening_allocations_in_main_units(db, business_id, product, line.quantity, info):
+                if vid == int(variant_id):
+                    bal += qty
 
     wh_q = (
         db.query(WarehouseLineVariantAllocation, WarehouseDocumentLine, WarehouseDocument)

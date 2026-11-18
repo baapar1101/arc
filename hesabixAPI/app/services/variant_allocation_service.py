@@ -19,6 +19,7 @@ from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
 from app.core.responses import ApiError
 from app.services.invoice_unit_conversion_service import (
     extra_info_dict,
+    inventory_quantity_is_already_main,
     quantity_line_to_main,
 )
 from app.services.product_variant_service import (
@@ -182,6 +183,19 @@ def convert_allocations_to_main(
             raise ApiError("VARIANT_ALLOCATION_MISMATCH", "مقدار تخصیص پس از تبدیل واحد نامعتبر است", http_status=422)
         converted.append((variant_id, qty_main, price))
     return converted
+
+
+def opening_allocations_in_main_units(
+    db: Session, business_id: int, product: Product, quantity: Any, extra_info: Any,
+    *, require_active: bool = False,
+) -> list[tuple[int, Decimal, Decimal | None]]:
+    info = extra_info_dict(extra_info)
+    items = validate_payload_for_product(
+        db, business_id, product, {"extra_info": info, "quantity": quantity}, _d(quantity),
+        require_active=require_active,
+    )
+    unit = "main" if inventory_quantity_is_already_main(info) else info.get("unit")
+    return convert_allocations_to_main(product, items, unit)
 
 
 def persist_warehouse_allocations(
