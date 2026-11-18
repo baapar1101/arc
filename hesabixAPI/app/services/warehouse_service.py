@@ -2014,6 +2014,7 @@ def create_manual_warehouse_document(
 	if wh is None:
 		raise ApiError("WAREHOUSE_CODE_CONFLICT", "Failed to generate unique warehouse document code", http_status=500)
 	
+	transfer_pairs = []
 	# ایجاد خطوط
 	for i, ln in enumerate(lines_data, start=1):
 		pid = ln.get("product_id")
@@ -2281,6 +2282,14 @@ def create_manual_warehouse_document(
 				instance_ids=final_instance_ids if final_instance_ids else None,
 			)
 			db.add(wline_in)
+			db.flush()
+			_attach_variant_allocations_for_warehouse_line(db, business_id, wh, wline_out, product, ln)
+			from app.services.variant_allocation_service import (
+				copy_warehouse_allocations_to_reverse_line,
+			)
+
+			copy_warehouse_allocations_to_reverse_line(db, business_id, wline_out, wline_in)
+			transfer_pairs.append((wline_out, wline_in))
 		else:
 			# برای سایر انواع: movement بر اساس doc_type
 			# منطق fallback برای انبار:
@@ -2359,15 +2368,7 @@ def create_manual_warehouse_document(
 			copy_warehouse_lot_allocations_to_reverse_line,
 		)
 
-		posted_lines = (
-			db.query(WarehouseDocumentLine)
-			.filter(WarehouseDocumentLine.warehouse_document_id == int(wh.id))
-			.all()
-		)
-		outs = [ln for ln in posted_lines if ln.movement == "out"]
-		ins = [ln for ln in posted_lines if ln.movement == "in"]
-		for out_line in outs:
-			in_line = next((x for x in ins if int(x.product_id) == int(out_line.product_id)), None)
+		for out_line, in_line in transfer_pairs:
 			if in_line is not None:
 				assert_transfer_allocations_match(db, out_line, in_line)
 				from adapters.db.models.inventory_lot import WarehouseLineLotAllocation
@@ -3332,6 +3333,15 @@ def update_warehouse_document(
 
 				db.flush()
 	
+	if wh.doc_type == "transfer" and not is_posted and "lines" in data:
+		from app.services.variant_allocation_service import (
+			assert_transfer_document_allocations_match,
+		)
+
+		assert_transfer_document_allocations_match(
+			db, db.query(WarehouseDocumentLine).filter_by(warehouse_document_id=wh.id).all()
+		)
+
 	# دریافت اطلاعات قبل از به‌روزرسانی برای invalidation
 	old_fiscal_year_id = wh.fiscal_year_id
 	old_doc_type = wh.doc_type
@@ -3457,6 +3467,14 @@ def update_warehouse_document_line(
 				validate_warehouse_location_for_line(db, business_id, int(wline.warehouse_id), lid)
 			wline.warehouse_location_id = lid
 	
+	if wh.doc_type == "transfer" and any(key in data for key in ("quantity", "allocations", "variant_id")):
+		product = db.query(Product).filter_by(id=wline.product_id, business_id=business_id).first()
+		if product is None:
+			raise ApiError("PRODUCT_NOT_FOUND", "محصول یافت نشد", http_status=404)
+		payload = dict(data)
+		payload.setdefault("quantity", wline.quantity)
+		_attach_variant_allocations_for_warehouse_line(db, business_id, wh, wline, product, payload)
+
 	wh.touch()
 	db.flush()
 	return wline
@@ -3508,6 +3526,12 @@ def post_warehouse_document(
 	lines = db.query(WarehouseDocumentLine).filter(WarehouseDocumentLine.warehouse_document_id == wh.id).all()
 	if not lines:
 		raise ApiError("NO_LINES", "حواله باید حداقل یک خط داشته باشد", http_status=400)
+	if wh.doc_type == "transfer":
+		from app.services.variant_allocation_service import (
+			assert_transfer_document_allocations_match,
+		)
+
+		assert_transfer_document_allocations_match(db, lines)
 	if wh.source_type == "invoice" and wh.doc_type == "receipt" and wh.source_document_id:
 		from app.services.woo_return_source_service import STOCK_KEY, validate_woo_return_receipt
 
@@ -3731,7 +3755,7 @@ def post_warehouse_document(
 	wh.status = "posted"
 	from app.services.variant_inventory_service import rebuild_balances_for_warehouse_document
 
-	if doc_type in ("issue", "receipt", "adjustment") and not (wh.extra_info or {}).get("cancels_warehouse_document_id"):
+	if doc_type in ("issue", "receipt", "adjustment", "transfer") and not (wh.extra_info or {}).get("cancels_warehouse_document_id"):
 		# The balance query filters on the persisted posted status.
 		db.flush([wh])
 	rebuild_balances_for_warehouse_document(db, wh)

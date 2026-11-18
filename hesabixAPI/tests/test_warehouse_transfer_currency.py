@@ -1,7 +1,7 @@
 from datetime import date
 
 import pytest
-from sqlalchemy import create_engine, select
+from sqlalchemy import BigInteger, Integer, MetaData, create_engine, select
 from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateTable
 
@@ -35,7 +35,11 @@ def transfer_db(monkeypatch):
     ]
     with engine.begin() as connection:
         for name in names:
-            connection.execute(CreateTable(models.Base.metadata.tables[name], include_foreign_key_constraints=[]))
+            table = models.Base.metadata.tables[name].to_metadata(MetaData())
+            for column in table.primary_key:
+                if isinstance(column.type, BigInteger):
+                    column.type = Integer()  # SQLite autoincrement requires the literal INTEGER type.
+            connection.execute(CreateTable(table, include_foreign_key_constraints=[]))
     with Session(engine, autoflush=False, expire_on_commit=False) as db:
         db.add_all([models.Currency(id=idx, name=code, title=code, symbol=code, code=code)
                     for idx, code in ((1, "IRR"), (2, "USD"), (3, "EUR"))])
