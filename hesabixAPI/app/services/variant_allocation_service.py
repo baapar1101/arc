@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from decimal import Decimal
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -338,6 +339,24 @@ def assert_transfer_allocations_match(
         raise ApiError(
             "TRANSFER_VARIANT_MISMATCH",
             "تخصیص ویژگی دو سمت حواله انتقال یکسان نیست",
+            http_status=422,
+        )
+
+
+def assert_transfer_document_allocations_match(db: Session, lines: Sequence[WarehouseDocumentLine]) -> None:
+    """Match the multiset of line quantities and Variant allocations, not product alone."""
+    sides = {"in": Counter(), "out": Counter()}
+    for line in lines:
+        rows = list_warehouse_line_allocations(db, int(line.id))
+        signature = (
+            int(line.product_id), _d(line.quantity),
+            tuple(sorted((int(row.variant_id), _d(row.quantity)) for row in rows)),
+        )
+        sides[str(line.movement)][signature] += 1
+    if sides["in"] != sides["out"]:
+        raise ApiError(
+            "TRANSFER_VARIANT_MISMATCH",
+            "مقدار و تخصیص ویژگی دو سمت حواله انتقال یکسان نیست",
             http_status=422,
         )
 
