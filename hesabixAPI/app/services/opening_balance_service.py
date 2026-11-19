@@ -553,6 +553,7 @@ def post_opening_balance(
     user_id: int,
     fiscal_year_id: Optional[int],
 ) -> Dict[str, Any]:
+    """نهایی‌سازی در تراکنش فراخواننده؛ commit بر عهدهٔ caller است."""
     fy_id, _, _ = _ensure_fiscal_year(db, business_id, fiscal_year_id)
     existing = _find_existing_ob_document(db, business_id, fy_id)
     if not existing:
@@ -565,7 +566,7 @@ def post_opening_balance(
         "extra_info": {**(existing.extra_info or {}), "posted": True, "posted_by": int(user_id)},
     }
     repo = DocumentRepository(db)
-    updated = repo.update_document(existing.id, payload)
+    updated = repo.update_document(existing.id, payload, auto_commit=False)
     if not updated:
         raise ApiError("POST_FAILED", "نهایی‌سازی تراز افتتاحیه ناموفق بود", http_status=500)
     return repo.get_document_details(updated.id) or {}
@@ -578,7 +579,7 @@ def unpost_opening_balance(
     fiscal_year_id: Optional[int],
     request: Any = None,
 ) -> Dict[str, Any]:
-    """لغو نهایی‌سازی؛ فقط وقتی مجاز است که جز سند افتتاحیه، سند حسابداری دیگری در همان سال مالی نباشد."""
+    """لغو نهایی‌سازی بدون commit؛ فقط وقتی در همان سال سند دیگری جز افتتاحیه نباشد."""
     fy_id, _, _ = _ensure_fiscal_year(db, business_id, fiscal_year_id)
     existing = _find_existing_ob_document(db, business_id, fy_id)
     if not existing:
@@ -612,7 +613,7 @@ def unpost_opening_balance(
     extra.pop("posted_by", None)
 
     repo = DocumentRepository(db)
-    updated = repo.update_document(existing.id, {"extra_info": extra})
+    updated = repo.update_document(existing.id, {"extra_info": extra}, auto_commit=False)
     if not updated:
         raise ApiError("UNPOST_FAILED", "لغو نهایی‌سازی تراز افتتاحیه ناموفق بود", http_status=500)
 
@@ -632,7 +633,6 @@ def unpost_opening_balance(
             after_data={"posted": False},
             request=request,
         )
-        db.commit()
     except Exception:
         pass
 
