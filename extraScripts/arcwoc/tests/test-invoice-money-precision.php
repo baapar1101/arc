@@ -57,13 +57,22 @@ class MoneyOrder
 	public function get_total_tax() { return $GLOBALS['money_case'][2]; }
 	public function get_discount_total() { return '0'; }
 	public function get_shipping_total() { return '0'; }
-	public function get_currency() { return 'USD'; }
+	public function get_currency() { return $GLOBALS['money_currency'] ?? 'USD'; }
 	public function get_id() { return 100; }
 	public function get_order_number() { return '100'; }
 	public function get_date_created() { return null; }
 	public function get_date_paid() { return null; }
 	public function is_paid() { return true; }
 }
+$money_case = array(3, '30.01', '3.01', '33.02');
+$money_currency = 'IRT';
+$currency_response = array('success' => true, 'data' => array(array('id' => 1, 'code' => 'IRR', 'decimal_places' => 2, 'round_monetary_amounts' => true)));
+$gate = Hesabix_V2_Currency_Service::evaluate_currency_sync(null, 'IRT');
+$payload = Hesabix_V2_Mapper::wc_order_to_invoice(new MoneyOrder(), 1, $gate['factor'], $gate['currency_id']);
+check($payload['lines'][0]['extra_info']['unit_price'], (30.01 * 10 / 3), 'legacy converted price encoding');
+check($payload['lines'][0]['extra_info']['tax_amount'], (3.01 * 10), 'legacy converted tax encoding');
+check($payload['payments'][0]['amount'], '330.2', 'converted payment is still exact');
+unset($money_currency);
 foreach (array(
 	array(array(1, '0.005', '0'), array(1, '0.005', '0'), '0.01'),
 	array(array(1, '1', '0.005'), array(1, '1', '0.005'), '2.01'),
@@ -74,12 +83,12 @@ foreach (array(
 	$currency_response = array('success' => true, 'data' => array(array('id' => 1, 'code' => 'USD', 'decimal_places' => 2, 'round_monetary_amounts' => true)));
 	$payload = Hesabix_V2_Mapper::wc_order_to_invoice(new MoneyOrder(), 1, 1, 1);
 	check($payload['payments'][0]['amount'], $items[2], 'multi-line payment');
-	check($payload['lines'][0]['extra_info']['tax_amount'], $items[0][2], 'unrounded tax share');
+	check(Hesabix_V2_Decimal::subtract($payload['lines'][0]['extra_info']['tax_amount'], $items[0][2]), '0', 'unrounded tax share');
 }
 unset($money_items);
 $money_case = array(1, '0.01', '0.005', '0.02');
 $payload = Hesabix_V2_Mapper::wc_order_to_invoice(new MoneyOrder(), 1, 1, 1);
-check($payload['lines'][0]['extra_info']['unit_price'], '0.01', 'half-cent must not increase revenue');
+check(Hesabix_V2_Decimal::subtract($payload['lines'][0]['extra_info']['unit_price'], '0.01'), '0', 'half-cent must not increase revenue');
 check($payload['lines'][0]['extra_info']['line_total'], '0.015', 'server rounds the aggregate');
 check($payload['payments'][0]['amount'], '0.02', 'half-cent payment');
 
@@ -93,6 +102,7 @@ check(Hesabix_V2_Decimal::round('0.00001', 2), '0', 'leading zeros');
 check(Hesabix_V2_Decimal::divide('999999999.99', '7'), '142857142.855714285714285714285714', 'exact quotient');
 check(Hesabix_V2_Decimal::divide('1', '0.125'), '8', 'fractional quantity');
 check(Hesabix_V2_Decimal::divide('0', '7'), '0', 'zero');
+check(Hesabix_V2_Decimal::round(Hesabix_V2_Decimal::multiply(Hesabix_V2_Decimal::unit_price('0.005', 7), 7), 2), '0.01', 'quotient preserves a half-cent');
 
 foreach (array(
 	array(7, '999999999.99', '0', '999999999.99', 8, true, '999999999.99'),
@@ -112,11 +122,16 @@ foreach (array(
 	check($wire['payments'][0]['amount'], $money_case[6], 'payment amount');
 	check($wire['extra_info']['totals']['net'], $money_case[6], 'order amount');
 	check($wire['lines'][0]['extra_info']['line_total'], $money_case[6], 'line amount');
-	check(is_string($wire['lines'][0]['extra_info']['unit_price']), true, 'price remains a decimal string');
+	if ($money_case[1] === '999999999.99' && $money_case[3] === $money_case[1]) {
+		check(is_string($wire['lines'][0]['extra_info']['unit_price']), true, 'insufficient JSON number uses exact price');
+	}
+	if ($money_case[1] === '100.01' && $money_case[4] === 2) {
+		check($wire['lines'][0]['extra_info']['unit_price'], (100.01 / 7), 'safe legacy price encoding remains stable');
+	}
 }
 try {
 	Hesabix_V2_Decimal::money('999999999.99000001', array('decimal_places' => 8, 'round_monetary_amounts' => true));
 	throw new LogicException('Unsupported GL precision was accepted');
 } catch (RuntimeException $e) {
 }
-echo "PASS: decimal arithmetic, currency policy and ten Mapper/payment/JSON cases\n";
+echo "PASS: decimal arithmetic, currency policy and eleven Mapper/payment/JSON cases\n";

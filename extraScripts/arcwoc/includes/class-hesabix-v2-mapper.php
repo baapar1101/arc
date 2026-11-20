@@ -569,6 +569,7 @@ class Hesabix_V2_Mapper
 			: null;
 
 		$lines = array();
+		$legacy_line_values = array();
 		$invoice_adjustments = array();
 		$shipping_adjustment_net = 0.0;
 		$shipping_adjustment_tax = 0.0;
@@ -660,7 +661,7 @@ class Hesabix_V2_Mapper
 
 			$quantity = $item->get_quantity();
 			$total = Hesabix_V2_Decimal::multiply($item->get_total(), $f);
-			$unit_price = $quantity > 0 ? Hesabix_V2_Decimal::divide($total, $quantity) : '0';
+			$unit_price = $quantity > 0 ? Hesabix_V2_Decimal::unit_price($total, $quantity) : '0';
 			// Keep Woo tax shares exact; fractions can sum to whole ledger cents.
 			$tax_amount = Hesabix_V2_Decimal::multiply($item->get_total_tax(), $f);
 			$line_total = Hesabix_V2_Decimal::add($total, $tax_amount);
@@ -700,6 +701,13 @@ class Hesabix_V2_Mapper
 				$line_row['allocations'] = $alloc;
 				$line_row['extra_info']['allocations'] = $alloc;
 			}
+			// A safe legacy number keeps already-posted invoices editable under #61.
+			// It is only an encoding candidate, never the source of money arithmetic.
+			$legacy_line_values[count($lines)] = array(
+				'unit_price' => $quantity > 0 ? ((float) $item->get_total() * $f) / $quantity : 0.0,
+				'tax_amount' => (float) $item->get_total_tax() * $f,
+				'line_discount' => 0,
+			);
 			$lines[] = $line_row;
 		}
 
@@ -743,6 +751,11 @@ class Hesabix_V2_Mapper
 				$shipping_product_id = null;
 			}
 			if ($shipping_product_id) {
+				$legacy_line_values[count($lines)] = array(
+					'unit_price' => (float) $order->get_shipping_total() * $f,
+					'tax_amount' => (float) $order->get_shipping_tax() * $f,
+					'line_discount' => 0,
+				);
 				$line_extra = array(
 					'unit_price' => $ship_total,
 					'line_discount' => 0,
@@ -788,7 +801,13 @@ class Hesabix_V2_Mapper
 		$adjustments_net = Hesabix_V2_Decimal::add($shipping_adjustment_net, $fee_adjustment_net);
 		$adjustments_tax = Hesabix_V2_Decimal::add($shipping_adjustment_tax, $fee_adjustment_tax);
 		$lines_target_net_rounded = Hesabix_V2_Decimal::subtract($order_total, Hesabix_V2_Decimal::add($adjustments_net, $adjustments_tax));
-		self::adjust_invoice_lines_rounding_to_order_net($lines, $lines_target_net_rounded, $order->get_id());
+		foreach ($lines as $index => $line) {
+			if (!isset($legacy_line_values[$index])) {
+				$legacy_line_values[$index] = array_intersect_key($line['extra_info'], array_flip(array('unit_price', 'tax_amount', 'line_discount')));
+			}
+		}
+		self::adjust_invoice_lines_rounding_to_order_net($lines, $lines_target_net_rounded, $order->get_id(), $legacy_line_values);
+		self::preserve_safe_numeric_line_encoding($lines, $legacy_line_values, $money_policy['decimal_places']);
 
 		$gross = Hesabix_V2_Decimal::subtract(Hesabix_V2_Decimal::add($order_total, $order_discount), Hesabix_V2_Decimal::add($order_tax, $adjustments_net));
 		$header_tax_total = Hesabix_V2_Decimal::subtract($order_tax, $adjustments_tax);
@@ -897,7 +916,7 @@ class Hesabix_V2_Mapper
 	 * @param int                               $order_id
 	 * @return void
 	 */
-	private static function adjust_invoice_lines_rounding_to_order_net(array &$lines, $target_net_rounded, $order_id)
+	private static function adjust_invoice_lines_rounding_to_order_net(array &$lines, $target_net_rounded, $order_id, array &$legacy_line_values)
 	{
 		if (empty($lines)) {
 			return;
@@ -974,9 +993,11 @@ class Hesabix_V2_Mapper
 
 		if (!empty($ei['wc_fee_negative'])) {
 			$ei['line_discount'] = Hesabix_V2_Decimal::subtract($ei['line_discount'], $delta);
+			$legacy_line_values[$idx]['line_discount'] = (float) $legacy_line_values[$idx]['line_discount'] - (float) $delta;
 		} else {
 			$net = Hesabix_V2_Decimal::add(Hesabix_V2_Decimal::subtract($ei['line_total'], $ei['tax_amount'] ?? 0), $ei['line_discount'] ?? 0);
-			$ei['unit_price'] = Hesabix_V2_Decimal::divide($net, $qty);
+			$ei['unit_price'] = Hesabix_V2_Decimal::unit_price($net, $qty);
+			$legacy_line_values[$idx]['unit_price'] = (float) $legacy_line_values[$idx]['unit_price'] + ((float) $delta / (float) $qty);
 		}
 
 		$ei['wc_rounding_adjust'] = $delta;
@@ -990,6 +1011,72 @@ class Hesabix_V2_Mapper
 					'delta' => $delta,
 				)
 			);
+		}
+	}
+
+	private static function wire_decimal($value)
+	{
+		if (is_float($value)) {
+			$encoded = json_encode($value);
+			if ($encoded === false) {
+				throw new InvalidArgumentException('Non-finite invoice amount');
+			}
+			return $encoded;
+		}
+		return (string) $value;
+	}
+
+	private static function wire_line_totals($quantity, array $info)
+	{
+		$gross = Hesabix_V2_Decimal::multiply($quantity, self::wire_decimal($info['unit_price'] ?? 0));
+		$discount = self::wire_decimal($info['line_discount'] ?? 0);
+		$tax = self::wire_decimal($info['tax_amount'] ?? 0);
+		return array($gross, $discount, $tax, Hesabix_V2_Decimal::add(Hesabix_V2_Decimal::subtract($gross, $discount), $tax));
+	}
+
+	/** Keep legacy JSON numbers only when line validation and monetary results agree. */
+	private static function preserve_safe_numeric_line_encoding(array &$lines, array $legacy, $places)
+	{
+		$exact = $lines;
+		$quant = $places > 0 ? '0.' . str_repeat('0', $places - 1) . '1' : '1';
+		foreach ($lines as $index => &$line) {
+			$info = $line['extra_info'];
+			$candidate = array_replace($info, $legacy[$index]);
+			try {
+				$wanted = self::wire_line_totals($line['quantity'], $info);
+				$encoded = self::wire_line_totals($line['quantity'], $candidate);
+				$delta = ltrim(Hesabix_V2_Decimal::subtract($encoded[3], self::wire_decimal($info['line_total'])), '-');
+				$tolerance = Hesabix_V2_Decimal::multiply(ltrim(self::wire_decimal($line['quantity']), '-'), $quant);
+				if (Hesabix_V2_Decimal::compare($tolerance, $quant) < 0) {
+					$tolerance = $quant;
+				}
+				$safe = Hesabix_V2_Decimal::compare($delta, $tolerance) <= 0;
+				foreach ($wanted as $key => $amount) {
+					$safe = $safe && Hesabix_V2_Decimal::round($amount, 2) === Hesabix_V2_Decimal::round($encoded[$key], 2);
+				}
+				if ($safe) {
+					$line['extra_info'] = $candidate;
+				}
+			} catch (InvalidArgumentException $e) {
+				// The exact decimal values remain authoritative.
+			}
+		}
+		unset($line);
+		$wanted = array('0', '0', '0', '0');
+		$encoded = $wanted;
+		foreach ($lines as $index => $line) {
+			$a = self::wire_line_totals($line['quantity'], $exact[$index]['extra_info']);
+			$b = self::wire_line_totals($line['quantity'], $line['extra_info']);
+			foreach ($a as $key => $amount) {
+				$wanted[$key] = Hesabix_V2_Decimal::add($wanted[$key], $amount);
+				$encoded[$key] = Hesabix_V2_Decimal::add($encoded[$key], $b[$key]);
+			}
+		}
+		foreach ($wanted as $key => $amount) {
+			if (Hesabix_V2_Decimal::round($amount, 2) !== Hesabix_V2_Decimal::round($encoded[$key], 2)) {
+				$lines = $exact;
+				break;
+			}
 		}
 	}
 

@@ -137,6 +137,23 @@ class Hesabix_V2_Decimal
 		return self::render($sign, $head, $places);
 	}
 
+	/** A positive unit quotient must not put an exact half-cent below its boundary. */
+	public static function unit_price($amount, $quantity)
+	{
+		$price = self::divide($amount, $quantity);
+		if (self::subtract(self::multiply($price, $quantity), $amount) !== '0') {
+			$negative = (strpos((string) $amount, '-') === 0) !== (strpos((string) $quantity, '-') === 0);
+			$price = self::add($price, ($negative ? '-' : '') . '0.000000000000000000000001');
+		}
+		return $price;
+	}
+
+	public static function compare($a, $b)
+	{
+		$delta = self::subtract($a, $b);
+		return $delta === '0' ? 0 : (strpos($delta, '-') === 0 ? -1 : 1);
+	}
+
 	public static function money($value, array $policy)
 	{
 		$value = !empty($policy['round_monetary_amounts']) ? self::round($value, $policy['decimal_places']) : self::add($value, '0');
