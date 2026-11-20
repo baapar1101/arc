@@ -29,6 +29,9 @@ from adapters.db.models.fiscal_year import FiscalYear
 from app.core.responses import ApiError
 from app.services.document_monetization_service import ensure_document_policy_allows_creation
 from app.services.document_numbering_service import generate_document_code
+from app.services.receipt_invoice_allocation_service import (
+    ALLOCATION_KEY, CONTRACT_KEY, preserve_readback_allocations,
+)
 import jdatetime
 
 # تنظیم لاگر
@@ -431,6 +434,7 @@ def create_receipt_payment(
     
     is_receipt = (document_type == DOCUMENT_TYPE_RECEIPT)
     logger.info(f"آیا دریافت است: {is_receipt}")
+    invoice_allocations = {}
 
     # V2-P4: بازنویسی بین‌ارزی مستقل به ارز پایه (اگر لازم)
     try:
@@ -439,12 +443,14 @@ def create_receipt_payment(
         )
 
         data = prepare_standalone_receipt_payment_cross_currency(
-            db, business_id, data, is_receipt=is_receipt
+            db, business_id, data, is_receipt=is_receipt,
+            invoice_allocations=invoice_allocations,
         )
     except ApiError:
         raise
     except Exception:
         logger.exception("prepare standalone cross-currency failed")
+        invoice_allocations.clear()
 
     # امکان override نوع حساب طرف‌شخص (دریافتنی/پرداختنی) برای سناریوهایی مثل برگشت فاکتور
     extra_info_all = data.get("extra_info") or {}
@@ -557,6 +563,7 @@ def create_receipt_payment(
             is_proforma=False,
             description=data.get("description"),
             extra_info=data.get("extra_info"),
+            developer_settings={CONTRACT_KEY: 1} if invoice_allocations else None,
             project_id=project_id,
         )
         try:
@@ -701,7 +708,8 @@ def create_receipt_payment(
         
         amount = Decimal(str(person_line.get("amount", 0)))
         logger.info(f"مبلغ: {amount}")
-        if amount <= 0:
+        # A positive native share can round to zero in base; retain its metadata.
+        if amount <= 0 and i not in invoice_allocations:
             logger.warning(f"خط شخص {i+1}: مبلغ صفر یا منفی، رد می‌شود")
             continue
         
@@ -762,7 +770,8 @@ def create_receipt_payment(
             debit=debit_amount,
             credit=credit_amount,
             description=description,
-            extra_info=line_extra_info
+            extra_info=line_extra_info,
+            developer_data={ALLOCATION_KEY: invoice_allocations[i]} if i in invoice_allocations else None,
         )
         logger.info(f"خط سند شخص ایجاد شد: {line}")
         db.add(line)
@@ -1869,18 +1878,24 @@ def update_receipt_payment(
     # 2) اعتبارسنجی ورودی‌ها (مشابه create)
     parsed_doc_date = _parse_iso_date(data.get("document_date", document.document_date))
     is_receipt = (document.document_type == DOCUMENT_TYPE_RECEIPT)
+    invoice_allocations = {}
     try:
         from app.services.cross_currency_settlement_service import (
             prepare_standalone_receipt_payment_cross_currency,
         )
 
         data = prepare_standalone_receipt_payment_cross_currency(
-            db, int(document.business_id), data, is_receipt=is_receipt
+            db, int(document.business_id), data, is_receipt=is_receipt,
+            invoice_allocations=invoice_allocations,
         )
     except ApiError:
         raise
     except Exception:
         logger.exception("prepare standalone cross-currency on update failed")
+        invoice_allocations.clear()
+
+    if not invoice_allocations:
+        invoice_allocations = preserve_readback_allocations(db, document, data)
 
     currency_id = data.get("currency_id", document.currency_id)
     if not currency_id:
@@ -1927,6 +1942,8 @@ def update_receipt_payment(
     # 3) اعمال تغییرات در سند (بدون تغییر code و document_type)
     document.document_date = document_date
     document.currency_id = int(currency_id)
+    if invoice_allocations:
+        document.developer_settings = {**(document.developer_settings or {}), CONTRACT_KEY: 1}
     if "extra_info" in data and (
         isinstance(data.get("extra_info"), dict) or data.get("extra_info") is None
     ):
@@ -1969,12 +1986,13 @@ def update_receipt_payment(
     db.query(DocumentLine).filter(DocumentLine.document_id == document.id).delete(synchronize_session=False)
 
     # خطوط شخص
-    for person_line in person_lines:
+    for i, person_line in enumerate(person_lines):
         person_id = person_line.get("person_id")
         if not person_id:
             continue
         amount = Decimal(str(person_line.get("amount", 0)))
-        if amount <= 0:
+        # Keep an exact native share even when its base GL amount rounds to zero.
+        if amount <= 0 and i not in invoice_allocations:
             continue
         description = (person_line.get("description") or "").strip() or None
         person_account = _get_person_account(db, document.business_id, int(person_id), is_receivable=is_person_receivable)
@@ -2010,6 +2028,7 @@ def update_receipt_payment(
             credit=credit_amount,
             description=description,
             extra_info=line_extra_info,
+            developer_data={ALLOCATION_KEY: invoice_allocations[i]} if i in invoice_allocations else None,
         )
         db.add(line)
 
@@ -2699,6 +2718,9 @@ def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
             "description": line.description,
             "extra_info": line.extra_info,
         }
+        allocation = (line.developer_data or {}).get(ALLOCATION_KEY)
+        if (document.developer_settings or {}).get(CONTRACT_KEY) == 1 and allocation:
+            line_dict["extra_info"] = {**(line.extra_info or {}), ALLOCATION_KEY: dict(allocation)}
         
         # اضافه کردن اطلاعات اضافی از extra_info
         if line.extra_info:
