@@ -10,12 +10,14 @@ on:
       - 'hesabixUI/hesabix_ui/lib/pages/business/telephony/telephony_hub_page.dart'
       - 'hesabixUI/hesabix_ui/lib/pages/business/users_permissions_page.dart'
       - 'hesabixUI/hesabix_ui/lib/widgets/document/document_details_dialog.dart'
+      - 'hesabixUI/hesabix_ui/lib/widgets/marketplace/plugin_marketplace_utils.dart'
       - 'hesabixUI/hesabix_ui/lib/widgets/telephony/telephony_party.dart'
       - 'hesabixUI/hesabix_ui/lib/models/quick_sales_parked_sale.dart'
       - 'hesabixUI/hesabix_ui/lib/models/invoice_transaction.dart'
       - 'hesabixUI/hesabix_ui/lib/widgets/invoice/person_combobox_widget.dart'
       - 'hesabixUI/hesabix_ui/test/quick_sales_parked_sale_test.dart'
       - 'hesabixUI/hesabix_ui/test/telephony_party_test.dart'
+      - 'hesabixUI/hesabix_ui/test/plugin_marketplace_utils_test.dart'
       - '.github/workflows/validate-hesabix-conflict-integration.yml'
   workflow_dispatch:
 
@@ -53,6 +55,7 @@ jobs:
             lib/pages/business/telephony/telephony_hub_page.dart \
             lib/pages/business/users_permissions_page.dart \
             lib/widgets/document/document_details_dialog.dart \
+            lib/widgets/marketplace/plugin_marketplace_utils.dart \
             lib/widgets/telephony/telephony_party.dart \
             lib/models/quick_sales_parked_sale.dart \
             lib/models/invoice_transaction.dart \
@@ -62,3 +65,4 @@ jobs:
         run: |
           flutter test --no-pub test/quick_sales_parked_sale_test.dart
           flutter test --no-pub test/telephony_party_test.dart
+          flutter test --no-pub test/plugin_marketplace_utils_test.dart
