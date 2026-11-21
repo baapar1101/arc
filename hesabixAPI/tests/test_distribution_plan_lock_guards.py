@@ -273,3 +273,32 @@ def test_start_visit_rejects_mismatched_day_plan_route_before_writing(
             _FakeDb(), 10, 20,
             {"person_id": 707, "route_id": 99, "route_stop_id": 12},
         )
+
+
+def test_supervisor_assignment_requires_manager_access():
+    from app.services.distribution_service import validate_visit_supervisor_assignment
+
+    class FakeContext:
+        db = None
+
+        def __init__(self, permissions=(), superadmin=False):
+            self.permissions = set(permissions)
+            self.superadmin = superadmin
+
+        def is_superadmin(self):
+            return self.superadmin
+
+        def has_business_permission(self, section, action):
+            return (section, action) in self.permissions
+
+    visitor = FakeContext({("distribution", "operate"), ("distribution", "reports_team")})
+    manager = FakeContext({("distribution", "manage")})
+    admin = FakeContext(superadmin=True)
+
+    assert validate_visit_supervisor_assignment(None, visitor, 10) is None
+    with pytest.raises(ApiError):
+        validate_visit_supervisor_assignment(99, visitor, 10)
+    with pytest.raises(ApiError):
+        validate_visit_supervisor_assignment(99, None, 10)
+    assert validate_visit_supervisor_assignment(99, manager, 10) == 99
+    assert validate_visit_supervisor_assignment(99, admin, 10) == 99
