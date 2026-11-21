@@ -423,7 +423,9 @@ def enrich_daily_plan(
 	plan_date: date,
 	items: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
-	settings = dist_svc.get_or_create_distribution_settings(db, business_id)
+	# Daily-plan reads must not commit: publication holds a transaction-level
+	# PostgreSQL advisory lock until the plan and its snapshot are persisted.
+	settings = dist_svc.get_distribution_settings_row(db, business_id)
 	carry = bool(getattr(settings, "carry_over_missed_visits", True))
 	lookback = max(1, int(getattr(settings, "carry_over_days", 7) or 7))
 
