@@ -347,7 +347,8 @@ class DailyPlanPublishPayload(BaseModel):
 	plan_date: Optional[str] = Field(None, description="YYYY-MM-DD")
 	target_user_id: Optional[int] = Field(None, gt=0)
 	all_assigned: bool = False
-	locked: bool = True
+	# Route edit blocking is not yet ported: default to an unlocked publication.
+	locked: bool = False
 	notes: Optional[str] = Field(None, max_length=2000)
 
 
