@@ -308,10 +308,17 @@ def test_start_visit_accepts_matching_locked_plan_attribution(monkeypatch):
     from types import SimpleNamespace
 
     class FakeQuery:
+        def __init__(self, model):
+            self.model = model
+
         def filter(self, *_args):
             return self
 
         def first(self):
+            if self.model.__name__ == "DistributionRoute":
+                return SimpleNamespace(id=99, business_id=10)
+            if self.model.__name__ == "DistributionRouteStop":
+                return SimpleNamespace(id=10, route_id=99, person_id=707)
             return SimpleNamespace(id=707, business_id=10, alias_name="Client")
 
     class FakeDb:
@@ -320,7 +327,7 @@ def test_start_visit_accepts_matching_locked_plan_attribution(monkeypatch):
             self.commits = 0
 
         def query(self, _model):
-            return FakeQuery()
+            return FakeQuery(_model)
 
         def add(self, instance):
             self.added.append(instance)
@@ -441,3 +448,35 @@ def test_offline_sync_cannot_bypass_day_plan_stop_validation(monkeypatch):
     assert db.commits == 1  # Sync result recorded; no visit is created.
     assert len(db.added) == 1
     assert db.added[0].__class__.__name__ == "DistributionOfflineSyncBatch"
+
+
+def test_free_form_visit_route_attribution_is_business_scoped(db):
+    # Without a required day plan, route and stop FK attribution must still be
+    # coherent; free visits with neither field stay supported.
+    from app.services.distribution_service import validate_visit_route_attribution
+
+    setup_route(db, business_id=10, route_id=99, user_id=20, locked=False)
+    setup_route(db, business_id=11, route_id=100, user_id=30, locked=False)
+    db.add_all([
+        DistributionRouteStop(route_id=99, person_id=707, sort_order=1),
+        DistributionRouteStop(route_id=100, person_id=808, sort_order=1),
+    ])
+    db.commit()
+    stop_local = db.query(DistributionRouteStop).filter_by(route_id=99).one()
+    stop_other = db.query(DistributionRouteStop).filter_by(route_id=100).one()
+
+    assert validate_visit_route_attribution(db, 10, 707, None, None) == (None, None)
+    assert validate_visit_route_attribution(db, 10, 707, 99, None) == (99, None)
+    assert validate_visit_route_attribution(db, 10, 707, None, stop_local.id) == (99, stop_local.id)
+    assert validate_visit_route_attribution(db, 10, 707, 99, stop_local.id) == (99, stop_local.id)
+
+    with pytest.raises(ApiError):  # foreign business
+        validate_visit_route_attribution(db, 10, 808, 100, stop_other.id)
+    with pytest.raises(ApiError):  # foreign business even without a stop
+        validate_visit_route_attribution(db, 10, 707, 100, None)
+    with pytest.raises(ApiError):  # correct stop, wrong customer
+        validate_visit_route_attribution(db, 10, 808, 99, stop_local.id)
+    with pytest.raises(ApiError):  # stop and route IDs disagree
+        validate_visit_route_attribution(db, 10, 707, 100, stop_local.id)
+    with pytest.raises(ApiError):  # unknown stop
+        validate_visit_route_attribution(db, 10, 707, 99, 999999)
