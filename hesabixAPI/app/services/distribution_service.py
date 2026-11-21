@@ -772,22 +772,59 @@ _PLAN_PUBLICATION_ADVISORY_LOCK_NAMESPACE = 174021
 
 
 def _serialize_distribution_plan_mutation(db: Session, business_id: int) -> None:
-	"""Serialize plan publication and route edits within one PostgreSQL business.
+	"""Serialize publication and related edits per business until commit/rollback.
 
-	PostgreSQL advisory transaction locks are released by commit/rollback.
-	SQLite tests skip this database-specific coordination; no production SQL
-	Server implementation is assumed.
+	PostgreSQL uses an advisory transaction lock; SQL Server uses an exclusive
+	transaction-owned application lock in the current database. Both protect the
+	read/check/write sequence from concurrent writes using this helper. SQLite
+	is used only for isolated unit tests and has no cross-session lock here.
 	"""
-	bind = db.get_bind()
-	if bind.dialect.name != "postgresql":
+	dialect = db.get_bind().dialect.name
+	if dialect == "sqlite":
 		return
-	db.execute(
-		text("SELECT pg_advisory_xact_lock(:namespace, :business_id)"),
-		{
-			"namespace": _PLAN_PUBLICATION_ADVISORY_LOCK_NAMESPACE,
-			"business_id": int(business_id),
-		},
-	).scalar()
+	if dialect == "postgresql":
+		db.execute(
+			text("SELECT pg_advisory_xact_lock(:namespace, :business_id)"),
+			{
+				"namespace": _PLAN_PUBLICATION_ADVISORY_LOCK_NAMESPACE,
+				"business_id": int(business_id),
+			},
+		).scalar()
+		return
+	if dialect == "mssql":
+		# SET NOCOUNT keeps the stored-procedure batch to one result set,
+		# compatible with the pymssql/pyodbc SQLAlchemy mssql dialects.
+		result = db.execute(
+			text("""
+				SET NOCOUNT ON;
+				DECLARE @distribution_lock_result int;
+				EXEC @distribution_lock_result = sys.sp_getapplock
+					@Resource = :resource,
+					@LockMode = 'Exclusive',
+					@LockOwner = 'Transaction',
+					@LockTimeout = 10000;
+				SELECT @distribution_lock_result;
+			"""),
+			{
+				"resource": (
+					f"hesabix:distribution:plan-mutation:"
+					f"{_PLAN_PUBLICATION_ADVISORY_LOCK_NAMESPACE}:{int(business_id)}"
+				),
+			},
+		).scalar_one()
+		if result is None or int(result) < 0:
+			raise ApiError(
+				"CONFLICT",
+				"Unable to obtain the distribution plan transaction lock; retry safely",
+				http_status=409,
+			)
+		return
+	# Never silently bypass coordination on an untested production dialect.
+	raise ApiError(
+		"SERVICE_UNAVAILABLE",
+		"Distribution plan transaction lock is unavailable for this database",
+		http_status=503,
+	)
 
 
 def assert_route_has_no_locked_plans(
