@@ -16,6 +16,7 @@ on:
       - 'hesabixAPI/app/services/distribution_service.py'
       - 'hesabixAPI/migrations/versions/20261121_000001_distribution_daily_plan_locks.py'
       - 'hesabixAPI/tests/test_distribution_daily_plan_publication.py'
+      - 'hesabixAPI/tests/test_distribution_plan_migration_postgres.py'
       - 'hesabixUI/hesabix_ui/lib/pages/business/quick_sales_page.dart'
       - 'hesabixUI/hesabix_ui/lib/pages/business/telephony/telephony_hub_page.dart'
       - 'hesabixUI/hesabix_ui/lib/pages/business/users_permissions_page.dart'
@@ -124,3 +125,49 @@ jobs:
 
       - name: Run distribution publication regression
         run: pytest -q tests/test_distribution_daily_plan_publication.py
+
+  distribution-publication-postgres:
+    name: Distribution migration on PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: distribution_integration
+          POSTGRES_USER: integration
+          POSTGRES_PASSWORD: integration
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U integration -d distribution_integration"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DISTRIBUTION_PG_TEST_DSN: postgresql+psycopg2://integration:integration@localhost:5432/distribution_integration
+
+    defaults:
+      run:
+        working-directory: hesabixAPI
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: hesabixAPI/pyproject.toml
+
+      - name: Install API test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Run live PostgreSQL publication migration checks
+        run: pytest -q tests/test_distribution_plan_migration_postgres.py
