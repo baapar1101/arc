@@ -9,7 +9,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from adapters.api.v1.schema_models.distribution import DailyPlanPublishPayload
-from adapters.db.models.distribution import DistributionDailyPlanLock, DistributionRouteAssignment
+from adapters.db.models.distribution import DistributionDailyPlanLock, DistributionFieldVisit, DistributionRouteAssignment
 from app.core.responses import ApiError
 from app.services import distribution_service as svc
 
@@ -22,6 +22,7 @@ def db(monkeypatch):
     engine = create_engine("sqlite+pysqlite:///:memory:")
     DistributionRouteAssignment.__table__.create(engine)
     DistributionDailyPlanLock.__table__.create(engine)
+    DistributionFieldVisit.__table__.create(engine)
     with Session(engine) as session:
         yield session
     engine.dispose()
