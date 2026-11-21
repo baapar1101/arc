@@ -1074,11 +1074,14 @@ def _summarize_visit_progress(rows: List[Any], items: List[Dict[str, Any]]) -> D
 	Rows must be newest-first. Visits never mutate immutable published rows;
 	instead, their current execution state is returned in a separate field.
 	"""
-	allowed = {
-		int(item["person_id"])
-		for item in items
-		if isinstance(item, dict) and item.get("person_id") is not None
-	}
+	allowed: set[int] = set()
+	for item in items:
+		if not isinstance(item, dict):
+			continue
+		try:
+			allowed.add(int(item["person_id"]))
+		except (KeyError, TypeError, ValueError, OverflowError):
+			continue
 	progress: Dict[str, Dict[str, Any]] = {}
 	for row in rows:
 		person_id = int(row.person_id)
