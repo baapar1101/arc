@@ -23,7 +23,7 @@ from adapters.db.models.document import Document
 from adapters.db.models.person import Person
 from adapters.db.models.product import Product
 from app.core.auth_dependency import AuthContext
-from app.core.business_calendar import business_today
+from app.core.business_calendar import business_day_utc_bounds, business_today
 from app.core.distribution_plugin_dependency import check_distribution_plugin_active
 from app.core.responses import ApiError
 from app.services.distribution_geo import person_coords
@@ -1068,6 +1068,60 @@ def _weekday_matches(plan_date: date, weekday: Optional[int]) -> bool:
 	return int(weekday) == int(plan_date.weekday())
 
 
+def _summarize_visit_progress(rows: List[Any], items: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+	"""Return live statuses for only the customers present in a day plan.
+
+	Rows must be newest-first. Visits never mutate immutable published rows;
+	instead, their current execution state is returned in a separate field.
+	"""
+	allowed = {
+		int(item["person_id"])
+		for item in items
+		if isinstance(item, dict) and item.get("person_id") is not None
+	}
+	progress: Dict[str, Dict[str, Any]] = {}
+	for row in rows:
+		person_id = int(row.person_id)
+		if person_id not in allowed:
+			continue
+		status = str(row.status or "").lower()
+		if status not in ("completed", "in_progress"):
+			continue
+		key = str(person_id)
+		if key in progress:
+			continue
+		progress[key] = {
+			"kind": "done" if status == "completed" else "current",
+			"visit_id": int(row.id),
+		}
+	return progress
+
+
+def _get_plan_visit_progress(
+	db: Session,
+	business_id: int,
+	target_user_id: int,
+	plan_date: date,
+	items: List[Dict[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+	if not items:
+		return {}
+	start_utc, end_utc = business_day_utc_bounds(business_id, plan_date)
+	visits = (
+		db.query(DistributionFieldVisit)
+		.filter(
+			DistributionFieldVisit.business_id == business_id,
+			DistributionFieldVisit.user_id == target_user_id,
+			DistributionFieldVisit.started_at >= start_utc,
+			DistributionFieldVisit.started_at <= end_utc,
+			DistributionFieldVisit.status.in_(("completed", "in_progress")),
+		)
+		.order_by(DistributionFieldVisit.started_at.desc(), DistributionFieldVisit.id.desc())
+		.all()
+	)
+	return _summarize_visit_progress(visits, items)
+
+
 def get_daily_plan(db: Session, business_id: int, target_user_id: int, plan_date: date) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
 	publication = get_plan_lock(db, business_id, target_user_id, plan_date)
@@ -1089,6 +1143,7 @@ def get_daily_plan(db: Session, business_id: int, target_user_id: int, plan_date
 			raise ApiError("CONFLICT", "Locked daily plan snapshot does not match the requested visitor/date", http_status=409)
 		result = deepcopy(snapshot)
 		result.update(plan_lock_to_dict(publication))
+		result["visit_progress"] = _get_plan_visit_progress(db, business_id, target_user_id, plan_date, result["items"])
 		return result
 	assignments = (
 		db.query(DistributionRouteAssignment)
@@ -1155,6 +1210,7 @@ def get_daily_plan(db: Session, business_id: int, target_user_id: int, plan_date
 
 	result = enrich_daily_plan(db, business_id, target_user_id, plan_date, items)
 	result.update(plan_lock_to_dict(publication))
+	result["visit_progress"] = _get_plan_visit_progress(db, business_id, target_user_id, plan_date, result["items"])
 	return result
 
 
