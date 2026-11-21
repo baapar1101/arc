@@ -834,11 +834,13 @@ def publish_daily_plan(
 	target_user_id: int,
 	plan_date: date,
 	*,
-	locked: bool = True,
+	locked: bool = False,
 	notes: Optional[str] = None,
 ) -> Dict[str, Any]:
 	"""Publish a plan only for an actively assigned visitor in this business."""
 	_ensure_plugin(db, business_id)
+	if locked:
+		raise ApiError("VALIDATION_ERROR", "Publishing with locked=true is unavailable until route edit guards are integrated", http_status=400)
 	if target_user_id not in assigned_user_ids_for_date(db, business_id, plan_date):
 		raise ApiError("VALIDATION_ERROR", "Visitor has no active route assignment for this business/date", http_status=400)
 	row = _stage_plan_publication(
@@ -855,11 +857,13 @@ def publish_daily_plans_for_date(
 	actor_user_id: int,
 	plan_date: date,
 	*,
-	locked: bool = True,
+	locked: bool = False,
 	notes: Optional[str] = None,
 ) -> Dict[str, Any]:
 	"""Publish the assigned visitors atomically, never other businesses' users."""
 	_ensure_plugin(db, business_id)
+	if locked:
+		raise ApiError("VALIDATION_ERROR", "Publishing with locked=true is unavailable until route edit guards are integrated", http_status=400)
 	rows = [
 		_stage_plan_publication(
 			db, business_id, actor_user_id, user_id, plan_date, locked=locked, notes=notes,
