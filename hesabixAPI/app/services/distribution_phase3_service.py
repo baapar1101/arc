@@ -452,6 +452,7 @@ def apply_route_optimize(
 	).first()
 	if not route:
 		raise ApiError("NOT_FOUND", "Route not found", http_status=404)
+	dist_svc.assert_route_has_no_locked_plans(db, business_id, route_id, plan_date=plan_date)
 	overrides = dict(route.plan_sort_overrides or {})
 	day_key = plan_date.isoformat()
 	day_map: Dict[str, int] = {}
