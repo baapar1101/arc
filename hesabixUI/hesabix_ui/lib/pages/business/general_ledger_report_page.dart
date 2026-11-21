@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -17,7 +16,9 @@ import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/account_tree_combobox_widget.dart';
 import 'package:hesabix_ui/models/account_model.dart';
+import 'package:hesabix_ui/models/account_tree_node.dart';
 import 'package:hesabix_ui/models/person_model.dart';
+import 'package:hesabix_ui/services/account_service.dart';
 import 'package:hesabix_ui/widgets/project/project_selector_widget.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
@@ -57,22 +58,27 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
   DateTime? _toDate;
   int? _selectedFiscalYearId;
   int? _selectedCurrencyId;
+  int? _rialCurrencyId;
   int? _selectedProjectId;  // 🆕 فیلتر پروژه
   List<Account> _selectedAccounts = [];
   Account? _accountToAdd;
   Person? _selectedPerson;
   bool _includeProforma = false;
+  bool _allMoeinsSelected = false;
   
   // Data
   List<Map<String, dynamic>> _fiscalYears = [];
   List<Map<String, dynamic>> _currencies = [];
+  List<AccountTreeNode> _accountTree = [];
+  bool _isLoadingAccounts = false;
+  Future<void>? _accountTreeLoad;
   
   // Summary from API response
   Map<String, dynamic>? _summary;
   bool _isExportingElectronic = false;
 
-  /// فیلترها به‌صورت پیش‌فرض بسته تا فضای کمتری اشغال شود
-  bool _filtersExpanded = false;
+  /// اگر از تراز با حساب مشخص نیامده باشیم، فیلترها باز می‌مانند تا انتخاب معین دیده شود
+  bool _filtersExpanded = true;
 
   @override
   void initState() {
@@ -95,8 +101,12 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
     if (widget.initialProjectId != null) {
       _selectedProjectId = widget.initialProjectId;
     }
+    if (widget.initialAccount != null) {
+      _filtersExpanded = false;
+    }
     _loadFiscalYears();
     _loadCurrencies();
+    _loadAccountTree();
   }
 
   Future<void> _loadFiscalYears() async {
@@ -123,6 +133,7 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
       if (!mounted) return;
       setState(() {
         _currencies = items;
+        _rialCurrencyId = _findRialCurrencyId(items);
         if (items.length <= 1) {
           // تک‌ارزی: بدون فیلتر ارز
           _selectedCurrencyId = null;
@@ -135,6 +146,35 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
       });
     } catch (_) {
       // ignore errors
+    }
+  }
+
+  Future<void> _loadAccountTree() {
+    return _accountTreeLoad ??= _fetchAccountTree();
+  }
+
+  Future<void> _fetchAccountTree() async {
+    setState(() => _isLoadingAccounts = true);
+    try {
+      final response = await AccountService().getAccountsTree(businessId: widget.businessId);
+      final items = (response['items'] as List<dynamic>?)
+              ?.map((item) => AccountTreeNode.fromJson(item as Map<String, dynamic>))
+              .toList() ??
+          [];
+      if (!mounted) return;
+      setState(() {
+        _accountTree = items;
+      });
+    } catch (_) {
+      _accountTreeLoad = null;
+      if (!mounted) return;
+      setState(() {
+        _accountTree = [];
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingAccounts = false);
+      }
     }
   }
 
@@ -181,6 +221,7 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
     setState(() {
       _selectedAccounts.add(account);
       _accountToAdd = null;
+      _allMoeinsSelected = false;
     });
     _refreshData();
   }
@@ -188,6 +229,51 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
   void _removeAccount(Account account) {
     setState(() {
       _selectedAccounts.removeWhere((a) => a.id == account.id);
+      _allMoeinsSelected = false;
+    });
+    _refreshData();
+  }
+
+  void _clearSelectedAccounts() {
+    setState(() {
+      _selectedAccounts = [];
+      _accountToAdd = null;
+      _allMoeinsSelected = false;
+      _summary = null;
+    });
+    _refreshData();
+  }
+
+  List<Account> _selectableMoeinAccounts() {
+    final accounts = <Account>[];
+    final seen = <int>{};
+    for (final root in _accountTree) {
+      for (final node in root.getSelectableAccounts()) {
+        final id = node.id;
+        if (!seen.add(id)) continue;
+        accounts.add(node.toAccount());
+      }
+    }
+    return accounts;
+  }
+
+  Future<void> _selectAllMoeinAccounts() async {
+    if (_accountTree.isEmpty) {
+      await _loadAccountTree();
+    }
+    if (!mounted) return;
+    final accounts = _selectableMoeinAccounts();
+    if (accounts.isEmpty) {
+      SnackBarHelper.showError(
+        context,
+        message: 'حساب معینی برای انتخاب یافت نشد.',
+      );
+      return;
+    }
+    setState(() {
+      _selectedAccounts = accounts;
+      _accountToAdd = null;
+      _allMoeinsSelected = true;
     });
     _refreshData();
   }
@@ -205,27 +291,27 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
     };
   }
 
-  bool _isSelectedCurrencyRial() {
-    if (_selectedCurrencyId == null) return false;
-    for (final currency in _currencies) {
-      if (currency['id'] == _selectedCurrencyId) {
-        final code = (currency['code'] ?? currency['name'] ?? '').toString().toUpperCase();
-        return code == 'IRR' || code == 'RIAL';
+  int? _findRialCurrencyId(List<Map<String, dynamic>> currencies) {
+    for (final currency in currencies) {
+      final code = (currency['code'] ?? currency['name'] ?? '').toString().toUpperCase();
+      if (code == 'IRR' || code == 'RIAL') {
+        final id = currency['id'];
+        if (id is int) return id;
+        if (id is num) return id.toInt();
       }
     }
-    return false;
+    return null;
   }
 
   Future<void> _exportElectronicBooks() async {
     if (_isExportingElectronic) return;
 
-    if (!_isSelectedCurrencyRial()) {
-      SnackBarHelper.showError(
-        context,
-        message: 'برای خروجی دفتر الکترونیکی باید ارز ریال (IRR) انتخاب شود.',
-      );
-      return;
+    if (_rialCurrencyId == null && _currencies.isEmpty) {
+      await _loadCurrencies();
+      if (!mounted) return;
     }
+    if (_isExportingElectronic) return;
+    final rialCurrencyId = _rialCurrencyId ?? _findRialCurrencyId(_currencies);
 
     setState(() => _isExportingElectronic = true);
     final t = AppLocalizations.of(context);
@@ -236,7 +322,7 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
         if (_fromDate != null) 'date_from': _fromDate!.toIso8601String().split('T').first,
         if (_toDate != null) 'date_to': _toDate!.toIso8601String().split('T').first,
         if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
-        if (_selectedCurrencyId != null) 'currency_id': _selectedCurrencyId,
+        if (rialCurrencyId != null) 'currency_id': rialCurrencyId,
         'include_proforma': _includeProforma,
         'format': 'auto',
       };
@@ -414,20 +500,7 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
       additionalParams: _additionalParams(),
       showExportButtons: true,
       customHeaderActions: [
-        Tooltip(
-          message: 'خروجی دفتر کل الکترونیکی مطابق قالب سازمان امور مالیاتی (تمام حساب‌ها)',
-          child: FilledButton.tonalIcon(
-            onPressed: _isExportingElectronic ? null : _exportElectronicBooks,
-            icon: _isExportingElectronic
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.upload_file_outlined),
-            label: const Text('دفتر کل الکترونیکی'),
-          ),
-        ),
+        _buildElectronicExportButton(),
       ],
       excelEndpoint: '/api/v1/businesses/${widget.businessId}/reports/general-ledger/export/excel',
       pdfEndpoint: '/api/v1/businesses/${widget.businessId}/reports/general-ledger/export/pdf',
@@ -440,6 +513,80 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
       defaultSortDesc: false,
       expandBodyHeightToFitRows: true,
     );
+  }
+
+  Widget _buildElectronicExportButton({bool compact = false}) {
+    final icon = _isExportingElectronic
+        ? const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : const Icon(Icons.upload_file_outlined);
+    if (compact) {
+      return IconButton(
+        tooltip: 'خروجی دفتر کل الکترونیکی مطابق قالب سازمان امور مالیاتی (تمام حساب‌ها)',
+        onPressed: _isExportingElectronic ? null : _exportElectronicBooks,
+        icon: icon,
+      );
+    }
+    return Tooltip(
+      message: 'خروجی دفتر کل الکترونیکی مطابق قالب سازمان امور مالیاتی (تمام حساب‌ها)',
+      child: FilledButton.tonalIcon(
+        onPressed: _isExportingElectronic ? null : _exportElectronicBooks,
+        icon: icon,
+        label: const Text('دفتر کل الکترونیکی'),
+      ),
+    );
+  }
+
+  Widget _buildSelectAllMoeinButton() {
+    return TextButton.icon(
+      onPressed: (_isLoadingAccounts || _allMoeinsSelected) ? null : _selectAllMoeinAccounts,
+      icon: _isLoadingAccounts
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.select_all, size: 18),
+      label: const Text('انتخاب همه معین‌ها'),
+    );
+  }
+
+  List<Widget> _selectedAccountChips() {
+    if (_selectedAccounts.isEmpty) {
+      return const [];
+    }
+    if (_allMoeinsSelected || _selectedAccounts.length > 12) {
+      return [
+        Chip(
+          avatar: const Icon(Icons.account_tree_outlined, size: 16),
+          label: Text(
+            _allMoeinsSelected
+                ? 'همه معین‌ها (${_selectedAccounts.length} حساب)'
+                : '${_selectedAccounts.length} حساب انتخاب‌شده',
+            style: const TextStyle(fontSize: 12),
+          ),
+          onDeleted: _clearSelectedAccounts,
+          deleteIcon: const Icon(Icons.close, size: 16),
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+      ];
+    }
+    return _selectedAccounts.map((account) {
+      return Chip(
+        label: Text(
+          '${account.code} - ${account.name}',
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1,
+          style: const TextStyle(fontSize: 12),
+        ),
+        onDeleted: () => _removeAccount(account),
+        deleteIcon: const Icon(Icons.close, size: 16),
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      );
+    }).toList();
   }
 
   /// چیدمان فشرده و رسپانسیو فیلترها (داخل پنل جمع‌شونده)
@@ -593,6 +740,20 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
           ],
         ),
         // افزودن حساب و چیپ‌ها
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            _buildSelectAllMoeinButton(),
+            if (_selectedAccounts.isNotEmpty)
+              TextButton.icon(
+                onPressed: _clearSelectedAccounts,
+                icon: const Icon(Icons.clear_all, size: 18),
+                label: const Text('پاک کردن انتخاب'),
+              ),
+          ],
+        ),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -619,19 +780,7 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
                             style: TextStyle(color: cs.error, fontSize: 12),
                           ),
                         ]
-                      : _selectedAccounts.map((account) {
-                          return Chip(
-                            label: Text(
-                              '${account.code} - ${account.name}',
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                            onDeleted: () => _removeAccount(account),
-                            deleteIcon: const Icon(Icons.close, size: 16),
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          );
-                        }).toList(),
+                      : _selectedAccountChips(),
                 ),
               ),
           ],
@@ -641,19 +790,7 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
           Wrap(
             spacing: 6,
             runSpacing: 6,
-            children: _selectedAccounts.map((account) {
-              return Chip(
-                label: Text(
-                  '${account.code} - ${account.name}',
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                  style: const TextStyle(fontSize: 12),
-                ),
-                onDeleted: () => _removeAccount(account),
-                deleteIcon: const Icon(Icons.close, size: 16),
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              );
-            }).toList(),
+            children: _selectedAccountChips(),
           ),
         ],
       ],
@@ -725,6 +862,7 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
         leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: Text(t.reportsGeneralLedgerTitle),
         actions: [
+          _buildElectronicExportButton(compact: isMobile),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: t.refresh,
@@ -802,13 +940,35 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
                                 ),
                                 textAlign: TextAlign.center,
                               ),
+                              const SizedBox(height: 16),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                alignment: WrapAlignment.center,
+                                children: [
+                                  FilledButton.tonalIcon(
+                                    onPressed: (_isLoadingAccounts || _allMoeinsSelected)
+                                        ? null
+                                        : _selectAllMoeinAccounts,
+                                    icon: _isLoadingAccounts
+                                        ? const SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(strokeWidth: 2),
+                                          )
+                                        : const Icon(Icons.select_all),
+                                    label: const Text('انتخاب همه معین‌ها'),
+                                  ),
+                                  _buildElectronicExportButton(),
+                                ],
+                              ),
                             ],
                           ),
                         ),
                       )
                     : DataTableWidget<Map<String, dynamic>>(
                         key: ValueKey(
-                          'general_ledger_${_selectedAccounts.map((a) => a.id).join('_')}_${_selectedFiscalYearId}_${_selectedCurrencyId}_${_selectedPerson?.id}_${_includeProforma}_${_fromDate?.toIso8601String()}_${_toDate?.toIso8601String()}',
+                          'general_ledger_${_allMoeinsSelected ? 'all_${_selectedAccounts.length}' : _selectedAccounts.map((a) => a.id).join('_')}_${_selectedFiscalYearId}_${_selectedCurrencyId}_${_selectedPerson?.id}_${_includeProforma}_${_fromDate?.toIso8601String()}_${_toDate?.toIso8601String()}',
                         ),
                         config: _buildTableConfig(t),
                         fromJson: (json) => Map<String, dynamic>.from(json),

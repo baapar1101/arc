@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from fastapi.responses import Response
 from openpyxl import Workbook
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from adapters.db.models.business import Business
@@ -148,13 +149,23 @@ def _resolve_export_format(
     return fmt  # type: ignore[return-value]
 
 
-def _ensure_rial_currency(db: Session, currency_id: Optional[int]) -> None:
+def _ensure_rial_currency(db: Session, currency_id: Optional[int]) -> int:
+    """شناسه ارز ریال را برمی‌گرداند. اگر فیلتر ارز خالی باشد، IRR از فهرست ارزها پیدا می‌شود."""
     if currency_id is None:
-        raise ApiError(
-            "CURRENCY_REQUIRED",
-            "برای خروجی دفتر الکترونیکی باید ارز ریال (IRR) انتخاب شود",
-            http_status=400,
+        currency = (
+            db.query(Currency)
+            .filter(func.upper(Currency.code).in_(tuple(RIAL_CURRENCY_CODES)))
+            .order_by(Currency.id.asc())
+            .first()
         )
+        if currency is None:
+            raise ApiError(
+                "CURRENCY_REQUIRED",
+                "شناسه ارز ریال (IRR) برای خروجی دفتر الکترونیکی دریافت نشد.",
+                http_status=400,
+            )
+        return int(currency.id)
+
     currency = db.query(Currency).filter(Currency.id == int(currency_id)).first()
     if currency is None:
         raise ApiError("CURRENCY_NOT_FOUND", "ارز انتخاب‌شده یافت نشد", http_status=404)
@@ -165,6 +176,7 @@ def _ensure_rial_currency(db: Session, currency_id: Optional[int]) -> None:
             "دفتر الکترونیکی باید بر اساس مبالغ ریالی باشد. لطفاً ارز ریال (IRR) را انتخاب کنید.",
             http_status=400,
         )
+    return int(currency.id)
 
 
 def build_electronic_journal_excel_bytes(rows: List[List[Any]]) -> bytes:
@@ -220,7 +232,7 @@ def export_electronic_journal_books(
     include_proforma: bool,
     export_format: str = "auto",
 ) -> Response:
-    _ensure_rial_currency(db, currency_id)
+    currency_id = _ensure_rial_currency(db, currency_id)
 
     result = get_journal_ledger_report(
         db=db,

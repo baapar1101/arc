@@ -5,6 +5,9 @@ from decimal import Decimal
 
 import pytest
 
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+
 from app.services.journal_ledger_electronic_export_service import (
     ELECTRONIC_JOURNAL_HEADERS,
     build_electronic_journal_csv_bytes,
@@ -13,6 +16,7 @@ from app.services.journal_ledger_electronic_export_service import (
     format_jalali_date_for_electronic_books,
     item_to_electronic_row,
     round_rial_amount,
+    _ensure_rial_currency,
     _resolve_export_format,
 )
 from app.core.responses import ApiError
@@ -121,6 +125,37 @@ def test_resolve_export_format_auto_threshold():
 def test_resolve_export_format_invalid_raises():
     with pytest.raises(ApiError):
         _resolve_export_format("pdf", 10)
+
+
+def test_ensure_rial_currency_resolves_when_id_missing():
+    irr = SimpleNamespace(id=3, code="IRR")
+    db = MagicMock()
+    db.query.return_value.filter.return_value.order_by.return_value.first.return_value = irr
+    assert _ensure_rial_currency(db, None) == 3
+
+
+def test_ensure_rial_currency_accepts_explicit_irr():
+    irr = SimpleNamespace(id=3, code="irr")
+    db = MagicMock()
+    db.query.return_value.filter.return_value.first.return_value = irr
+    assert _ensure_rial_currency(db, 3) == 3
+
+
+def test_ensure_rial_currency_rejects_non_rial():
+    usd = SimpleNamespace(id=9, code="USD")
+    db = MagicMock()
+    db.query.return_value.filter.return_value.first.return_value = usd
+    with pytest.raises(ApiError) as exc:
+        _ensure_rial_currency(db, 9)
+    assert exc.value.code == "NON_RIAL_CURRENCY"
+
+
+def test_ensure_rial_currency_missing_catalog_raises():
+    db = MagicMock()
+    db.query.return_value.filter.return_value.order_by.return_value.first.return_value = None
+    with pytest.raises(ApiError) as exc:
+        _ensure_rial_currency(db, None)
+    assert exc.value.code == "CURRENCY_REQUIRED"
 
 
 def test_build_excel_contains_headers_and_data():
