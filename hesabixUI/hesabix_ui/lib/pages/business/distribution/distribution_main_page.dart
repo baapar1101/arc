@@ -391,9 +391,11 @@ class _DistributionMainPageState extends State<DistributionMainPage>
       if (mounted) {
         final items = (d['items'] as List?) ?? [];
         Map<String, dynamic>? active;
+        final selectedUserId = _teamTargetUserId ?? widget.authStore.currentUserId;
         for (final raw in items) {
           final v = Map<String, dynamic>.from(raw as Map);
-          if (v['status'] == 'in_progress') {
+          if (v['status'] == 'in_progress' &&
+              int.tryParse('${v['user_id']}') == selectedUserId) {
             active = v;
             break;
           }
@@ -558,6 +560,18 @@ class _DistributionMainPageState extends State<DistributionMainPage>
   /// وضعیت توقف نسبت به ویزیت‌های امروز: done | current | pending
   String _planStopKind(int? personId) {
     if (personId == null) return 'pending';
+    // Live progress is scoped by the API to this plan's visitor and
+    // business-local day. Keep published plan snapshots immutable.
+    final progress = _dailyPlan?['visit_progress'];
+    if (progress is Map) {
+      final entry = progress['$personId'];
+      if (entry is Map) {
+        final kind = entry['kind']?.toString();
+        if (kind == 'done' || kind == 'current') return kind!;
+      }
+      return 'pending';
+    }
+    // Compatibility with older servers that do not return visit_progress.
     final activePid = int.tryParse('${_activeVisit?['person_id']}');
     if (activePid != null && activePid == personId) return 'current';
     final today = DateTime(_planDay.year, _planDay.month, _planDay.day);
