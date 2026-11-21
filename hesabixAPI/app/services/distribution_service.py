@@ -441,6 +441,17 @@ def delete_territory(db: Session, business_id: int, territory_id: int) -> None:
 	)
 	if not row:
 		raise ApiError("NOT_FOUND", "Territory not found", http_status=404)
+	# Territory deletion changes every linked route and its published plan context.
+	linked_route_ids = (
+		db.query(DistributionRoute.id)
+		.filter(
+			DistributionRoute.business_id == business_id,
+			DistributionRoute.territory_id == territory_id,
+		)
+		.all()
+	)
+	for (linked_route_id,) in linked_route_ids:
+		assert_route_has_no_locked_plans(db, business_id, linked_route_id)
 	db.query(DistributionRoute).filter(DistributionRoute.territory_id == territory_id).update({"territory_id": None})
 	db.delete(row)
 	db.commit()
