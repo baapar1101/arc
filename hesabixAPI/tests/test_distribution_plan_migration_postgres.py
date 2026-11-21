@@ -35,6 +35,13 @@ def test_postgres_daily_plan_publication_migration(monkeypatch):
     assert spec is not None and spec.loader is not None
     migration = module_from_spec(spec)
     spec.loader.exec_module(migration)
+    snapshot_path = migration_path.with_name(
+        "20261121_000002_distribution_daily_plan_snapshot.py"
+    )
+    snapshot_spec = spec_from_file_location("dist_plan_snapshot_postgres", snapshot_path)
+    assert snapshot_spec is not None and snapshot_spec.loader is not None
+    snapshot_migration = module_from_spec(snapshot_spec)
+    snapshot_spec.loader.exec_module(snapshot_migration)
 
     engine = sa.create_engine(dsn)
     try:
@@ -52,6 +59,12 @@ def test_postgres_daily_plan_publication_migration(monkeypatch):
                 Operations(MigrationContext.configure(conn)),
             )
             migration.upgrade()
+            monkeypatch.setattr(
+                snapshot_migration,
+                "op",
+                Operations(MigrationContext.configure(conn)),
+            )
+            snapshot_migration.upgrade()
 
             inspector = sa.inspect(conn)
             table = "distribution_daily_plan_locks"
@@ -59,6 +72,8 @@ def test_postgres_daily_plan_publication_migration(monkeypatch):
             cols = {c["name"]: c for c in inspector.get_columns(table)}
             assert {"business_id", "user_id", "plan_date", "is_locked", "published_at"}.issubset(cols)
             assert cols["is_locked"]["nullable"] is False
+            assert "plan_snapshot" in cols
+            assert cols["plan_snapshot"]["nullable"] is True
             assert str(cols["is_locked"]["default"]).lower() == "false"
             unique_sets = {
                 tuple(sorted(c["column_names"]))
@@ -87,6 +102,21 @@ def test_postgres_daily_plan_publication_migration(monkeypatch):
             ).scalar_one()
             assert unlocked is False
 
+            snapshot_value = '{"plan_date":"2026-11-21","items":[{"stop_id":7}]}'
+            conn.execute(
+                sa.text(
+                    "UPDATE distribution_daily_plan_locks "
+                    "SET plan_snapshot = CAST(:snapshot AS JSON) WHERE business_id = 10"
+                ),
+                {"snapshot": snapshot_value},
+            )
+            assert conn.execute(
+                sa.text(
+                    "SELECT plan_snapshot -> 'items' -> 0 ->> 'stop_id' "
+                    "FROM distribution_daily_plan_locks WHERE business_id = 10"
+                )
+            ).scalar_one() == "7"
+
             # The same visitor/date can exist in another business, but not twice
             # in one business. A savepoint keeps the outer migration transaction live.
             with pytest.raises(IntegrityError):
@@ -110,6 +140,10 @@ def test_postgres_daily_plan_publication_migration(monkeypatch):
                 sa.text("SELECT business_id FROM distribution_daily_plan_locks")
             ).scalars().all() == [11]
 
+            snapshot_migration.downgrade()
+            assert "plan_snapshot" not in {
+                c["name"] for c in sa.inspect(conn).get_columns(table)
+            }
             migration.downgrade()
             assert not sa.inspect(conn).has_table(table)
     finally:
