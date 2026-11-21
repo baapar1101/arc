@@ -42,7 +42,7 @@ def _assign(db: Session, business_id: int, user_id: int, start: date, end: date 
 
 def test_schema_keeps_explicit_single_and_bulk_options():
     assert DailyPlanPublishPayload().all_assigned is False
-    assert DailyPlanPublishPayload(all_assigned=True).locked is True
+    assert DailyPlanPublishPayload(all_assigned=True).locked is False
     with pytest.raises(ValueError):
         DailyPlanPublishPayload(target_user_id=-1)
 
@@ -55,10 +55,21 @@ def test_publish_is_idempotent_per_business_user_day(db):
     second = svc.publish_daily_plan(db, 10, 1, 20, day, locked=False)
 
     assert first["published"] is True
-    assert first["locked"] is True
+    assert first["locked"] is False
     assert second["locked"] is False
     assert second["notes"] == "approved"
     assert db.query(DistributionDailyPlanLock).count() == 1
+
+
+def test_rejects_locked_publication_until_edit_guards_exist(db):
+    day = date(2026, 11, 21)
+    _assign(db, 10, 20, date(2026, 11, 1))
+
+    with pytest.raises(ApiError):
+        svc.publish_daily_plan(db, 10, 1, 20, day, locked=True)
+    with pytest.raises(ApiError):
+        svc.publish_daily_plans_for_date(db, 10, 1, day, locked=True)
+    assert db.query(DistributionDailyPlanLock).count() == 0
 
 
 def test_rejects_target_without_active_assignment(db):
