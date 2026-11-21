@@ -25,7 +25,7 @@ def upgrade() -> None:
         sa.Column("business_id", sa.Integer(), sa.ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False),
         sa.Column("user_id", sa.Integer(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
         sa.Column("plan_date", sa.Date(), nullable=False),
-        sa.Column("is_locked", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+        sa.Column("is_locked", sa.Boolean(), nullable=False, server_default=sa.text("false")),
         sa.Column("published_by_user_id", sa.Integer(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
         sa.Column("published_at", sa.DateTime(), nullable=False),
         sa.Column("notes", sa.Text(), nullable=True),
