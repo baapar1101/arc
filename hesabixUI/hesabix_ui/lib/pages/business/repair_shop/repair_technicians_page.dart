@@ -237,7 +237,9 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
               ? colorScheme.primary
               : Colors.grey,
           child: Text(
-            technician.personName[0].toUpperCase(),
+            technician.personName.trim().isNotEmpty
+                ? technician.personName.trim()[0].toUpperCase()
+                : '?',
             style: TextStyle(color: Colors.white),
           ),
         ),
@@ -404,7 +406,9 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
       final data = {
         'code': _codeController.text,
         'commission_type': _commissionType,
-        'commission_value': double.parse(_commissionValueController.text),
+        'commission_value': _commissionType == 'case_by_case'
+            ? 0
+            : double.parse(_commissionValueController.text),
         'is_active': _isActive,
       };
 
