@@ -193,6 +193,34 @@ def test_locked_plan_without_snapshot_fails_closed(db):
     assert getattr(exc.value, "http_status", 409) == 409
 
 
+@pytest.mark.parametrize(
+    "snapshot",
+    [
+        {"user_id": 21, "plan_date": "2026-11-21", "items": []},
+        {"user_id": 20, "plan_date": "2026-11-20", "items": []},
+        {"user_id": "invalid", "plan_date": "2026-11-21", "items": []},
+        {"user_id": 20, "plan_date": "2026-11-21", "items": [None]},
+    ],
+)
+def test_locked_snapshot_rejects_wrong_visitor_date_and_invalid_items(db, snapshot):
+    from datetime import datetime
+    from adapters.db.models.distribution import DistributionDailyPlanLock
+
+    db.add(DistributionDailyPlanLock(
+        business_id=10,
+        user_id=20,
+        plan_date=date(2026, 11, 21),
+        is_locked=True,
+        published_at=datetime.utcnow(),
+        plan_snapshot=snapshot,
+    ))
+    db.flush()
+
+    with pytest.raises(ApiError) as exc:
+        svc.get_daily_plan(db, 10, 20, date(2026, 11, 21))
+    assert getattr(exc.value, "http_status", 409) == 409
+
+
 def test_schema_keeps_explicit_single_and_bulk_options():
     assert DailyPlanPublishPayload().all_assigned is False
     assert DailyPlanPublishPayload(all_assigned=True).locked is False
