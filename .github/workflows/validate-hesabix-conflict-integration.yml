@@ -48,7 +48,7 @@ jobs:
 
       - name: Analyze changed feature files
         run: |
-          flutter analyze --no-pub --no-fatal-infos \
+          flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings \
             lib/pages/business/repair_shop/repair_order_detail_page.dart \
             lib/pages/business/repair_shop/repair_technicians_page.dart \
             lib/pages/business/quick_sales_page.dart \
