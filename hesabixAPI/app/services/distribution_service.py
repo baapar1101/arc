@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, func, or_, text
 from sqlalchemy.orm import Session, joinedload
 
 from adapters.db.models.distribution import (
@@ -767,6 +767,28 @@ def delete_assignment(db: Session, business_id: int, assignment_id: int) -> None
 	db.commit()
 
 
+_PLAN_PUBLICATION_ADVISORY_LOCK_NAMESPACE = 174021
+
+
+def _serialize_distribution_plan_mutation(db: Session, business_id: int) -> None:
+	"""Serialize plan publication and route edits within one PostgreSQL business.
+
+	PostgreSQL advisory transaction locks are released by commit/rollback.
+	SQLite tests skip this database-specific coordination; no production SQL
+	Server implementation is assumed.
+	"""
+	bind = db.get_bind()
+	if bind.dialect.name != "postgresql":
+		return
+	db.execute(
+		text("SELECT pg_advisory_xact_lock(:namespace, :business_id)"),
+		{
+			"namespace": _PLAN_PUBLICATION_ADVISORY_LOCK_NAMESPACE,
+			"business_id": int(business_id),
+		},
+	).scalar()
+
+
 def assert_route_has_no_locked_plans(
 	db: Session,
 	business_id: int,
@@ -781,6 +803,7 @@ def assert_route_has_no_locked_plans(
 	underlying route, except a day-specific ordering override which only
 	checks its own date.
 	"""
+	_serialize_distribution_plan_mutation(db, business_id)
 	q = (
 		db.query(DistributionDailyPlanLock.id)
 		.join(
@@ -821,6 +844,7 @@ def assert_assignment_has_no_locked_plans(
 	"""Protect an already-published visitor plan from assignment changes."""
 	if valid_to is not None and valid_to < valid_from:
 		raise ApiError("VALIDATION_ERROR", "valid_to must not precede valid_from", http_status=400)
+	_serialize_distribution_plan_mutation(db, business_id)
 	q = db.query(DistributionDailyPlanLock.id).filter(
 		DistributionDailyPlanLock.business_id == business_id,
 		DistributionDailyPlanLock.user_id == user_id,
@@ -926,6 +950,7 @@ def publish_daily_plan(
 ) -> Dict[str, Any]:
 	"""Publish a plan only for an actively assigned visitor in this business."""
 	_ensure_plugin(db, business_id)
+	_serialize_distribution_plan_mutation(db, business_id)
 	if locked:
 		raise ApiError("VALIDATION_ERROR", "Publishing with locked=true is unavailable until route edit guards are integrated", http_status=400)
 	if target_user_id not in assigned_user_ids_for_date(db, business_id, plan_date):
@@ -949,6 +974,7 @@ def publish_daily_plans_for_date(
 ) -> Dict[str, Any]:
 	"""Publish the assigned visitors atomically, never other businesses' users."""
 	_ensure_plugin(db, business_id)
+	_serialize_distribution_plan_mutation(db, business_id)
 	if locked:
 		raise ApiError("VALIDATION_ERROR", "Publishing with locked=true is unavailable until route edit guards are integrated", http_status=400)
 	rows = [
@@ -973,6 +999,7 @@ def unpublish_daily_plan(
 ) -> None:
 	"""Deleting a publication is idempotent but always scoped to its business."""
 	_ensure_plugin(db, business_id)
+	_serialize_distribution_plan_mutation(db, business_id)
 	row = get_plan_lock(db, business_id, target_user_id, plan_date)
 	if row is None:
 		return
