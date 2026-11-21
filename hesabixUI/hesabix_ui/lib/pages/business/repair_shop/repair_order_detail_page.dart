@@ -309,6 +309,36 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
     }
   }
 
+  Future<void> _setLaborCost() async {
+    final order = _order;
+    if (order == null || {'delivered', 'cancelled'}.contains(order.status)) {
+      return;
+    }
+    final amount = await showGlassDialog<double>(
+      context: context,
+      builder: (context) => _LaborCostDialog(initial: order.laborCost),
+    );
+    if (!mounted || amount == null) return;
+
+    try {
+      await _service.calculateCosts(
+        businessId: widget.businessId,
+        orderId: widget.orderId,
+        laborCost: amount,
+      );
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: 'اجرت تعمیر ثبت شد');
+      await _loadOrder();
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.show(
+          context,
+          message: 'خطا در ثبت اجرت: ${ErrorExtractor.forContext(e, context)}',
+        );
+      }
+    }
+  }
+
   Future<void> _createInvoice() async {
     final order = _order;
     if (order == null) return;
@@ -559,6 +589,15 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
                 'دستمزد',
                 order.formattedLaborCost,
               ),
+              if (!{'delivered', 'cancelled'}.contains(order.status))
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TextButton.icon(
+                    onPressed: _setLaborCost,
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('ویرایش اجرت'),
+                  ),
+                ),
               _buildInfoRow(
                 'قطعات',
                 order.formattedPartsCost,
@@ -743,6 +782,69 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
     }
 
     return null;
+  }
+}
+
+/// دیالوگ ویرایش اجرت تعمیر
+class _LaborCostDialog extends StatefulWidget {
+  final double initial;
+
+  const _LaborCostDialog({required this.initial});
+
+  @override
+  State<_LaborCostDialog> createState() => _LaborCostDialogState();
+}
+
+class _LaborCostDialogState extends State<_LaborCostDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+      text: widget.initial > 0 ? widget.initial.toStringAsFixed(0) : '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('اجرت تعمیر'),
+      content: TextField(
+        controller: _controller,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: const InputDecoration(
+          labelText: 'مبلغ اجرت',
+          border: OutlineInputBorder(),
+        ),
+        autofocus: true,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('انصراف'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            final value = double.tryParse(
+              _controller.text.replaceAll(',', '').trim(),
+            );
+            if (value == null || !value.isFinite || value < 0) {
+              SnackBarHelper.show(context, message: 'مبلغ معتبر وارد کنید');
+              return;
+            }
+            Navigator.pop(context, value);
+          },
+          child: const Text('ثبت'),
+        ),
+      ],
+    );
   }
 }
 
