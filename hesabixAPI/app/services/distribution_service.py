@@ -408,6 +408,23 @@ def create_territory(db: Session, business_id: int, payload: Dict[str, Any]) -> 
 	return territory_to_dict(row)
 
 
+def _assert_territory_has_no_locked_plans(db: Session, business_id: int, territory_id: int) -> None:
+	"""Protect a territory's metadata when any linked route is in a locked plan."""
+	# Acquire the business transaction lock BEFORE reading linked routes so a
+	# concurrent route reassignment cannot slip between the lookup and guard.
+	_serialize_distribution_plan_mutation(db, business_id)
+	linked_route_ids = (
+		db.query(DistributionRoute.id)
+		.filter(
+			DistributionRoute.business_id == business_id,
+			DistributionRoute.territory_id == territory_id,
+		)
+		.all()
+	)
+	for (linked_route_id,) in linked_route_ids:
+		assert_route_has_no_locked_plans(db, business_id, linked_route_id)
+
+
 def update_territory(db: Session, business_id: int, territory_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
 	from app.services.sepidar_plugin_service import assert_plugin_entity_editable
 	assert_plugin_entity_editable(db,business_id,'distribution_territories',territory_id)
@@ -419,6 +436,7 @@ def update_territory(db: Session, business_id: int, territory_id: int, payload: 
 	)
 	if not row:
 		raise ApiError("NOT_FOUND", "Territory not found", http_status=404)
+	_assert_territory_has_no_locked_plans(db, business_id, territory_id)
 	if "name" in payload:
 		row.name = str(payload["name"])[:255]
 	if "description" in payload:
@@ -442,17 +460,7 @@ def delete_territory(db: Session, business_id: int, territory_id: int) -> None:
 	)
 	if not row:
 		raise ApiError("NOT_FOUND", "Territory not found", http_status=404)
-	# Territory deletion changes every linked route and its published plan context.
-	linked_route_ids = (
-		db.query(DistributionRoute.id)
-		.filter(
-			DistributionRoute.business_id == business_id,
-			DistributionRoute.territory_id == territory_id,
-		)
-		.all()
-	)
-	for (linked_route_id,) in linked_route_ids:
-		assert_route_has_no_locked_plans(db, business_id, linked_route_id)
+	_assert_territory_has_no_locked_plans(db, business_id, territory_id)
 	db.query(DistributionRoute).filter(DistributionRoute.territory_id == territory_id).update({"territory_id": None})
 	db.delete(row)
 	db.commit()
