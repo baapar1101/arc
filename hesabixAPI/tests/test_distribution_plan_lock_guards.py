@@ -369,3 +369,75 @@ def test_start_visit_accepts_matching_locked_plan_attribution(monkeypatch):
     assert result == {"person_id": 707, "route_id": 99, "route_stop_id": 10}
     assert db.commits == 1
     assert len(db.added) == 1
+
+
+def test_offline_sync_cannot_bypass_day_plan_stop_validation(monkeypatch):
+    from types import SimpleNamespace
+    from app.services.distribution_phase3_service import process_offline_sync
+
+    class FakeQuery:
+        def __init__(self, model):
+            self.model = model
+
+        def filter(self, *_args):
+            return self
+
+        def first(self):
+            if self.model.__name__ == "Person":
+                return SimpleNamespace(id=707, business_id=10)
+            return None
+
+    class FakeDb:
+        def __init__(self):
+            self.added = []
+            self.commits = 0
+
+        def query(self, model):
+            return FakeQuery(model)
+
+        def add(self, row):
+            self.added.append(row)
+
+        def commit(self):
+            self.commits += 1
+
+    class FakeContext:
+        def has_business_permission(self, section, action):
+            return section == "distribution" and action == "operate"
+
+    monkeypatch.setattr(svc, "_ensure_plugin", lambda *_args: None)
+    monkeypatch.setattr(svc, "_active_visit", lambda *_args: None)
+    monkeypatch.setattr(svc, "business_today", lambda *_args: DAY)
+    monkeypatch.setattr(
+        svc,
+        "get_or_create_distribution_settings",
+        lambda *_args: SimpleNamespace(require_visit_in_daily_plan=True),
+    )
+    monkeypatch.setattr(svc, "get_plan_lock", lambda *_args: None)
+    monkeypatch.setattr(
+        svc,
+        "get_daily_plan",
+        lambda *_args: {
+            "items": [{"person_id": 707, "route_id": 99, "stop_id": 10}],
+        },
+    )
+
+    db = FakeDb()
+    outcome = process_offline_sync(
+        db,
+        business_id=10,
+        user_id=20,
+        client_batch_id="invalid-visit-attribution",
+        actions=[{
+            "op": "start_visit",
+            "client_ref": "visit-1",
+            "payload": {"person_id": 707, "route_id": 99, "route_stop_id": 12},
+        }],
+        ctx=FakeContext(),
+    )
+
+    assert outcome["results"][0]["ok"] is False
+    assert "visit_id" not in outcome["results"][0]
+    assert db.commits == 1  # Sync result recorded; no visit is created.
+    assert len(db.added) == 1
+    assert db.added[0].__class__.__name__ == "DistributionOfflineSyncBatch"
