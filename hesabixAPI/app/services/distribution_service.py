@@ -1289,6 +1289,43 @@ def validate_visit_supervisor_assignment(
 	return int(candidate_id)
 
 
+def validate_visit_route_attribution(
+	db: Session,
+	business_id: int,
+	person_id: int,
+	route_id: Optional[int],
+	route_stop_id: Optional[int],
+) -> Tuple[Optional[int], Optional[int]]:
+	"""Resolve submitted route/stop IDs inside one business and one customer.
+
+	Free-form visits remain possible when neither ID is provided. A stop
+	without an explicit route resolves to its owning route; forged references
+	to another business or customer never reach the visit record.
+	"""
+	resolved_route = int(route_id) if route_id is not None else None
+	resolved_stop = int(route_stop_id) if route_stop_id is not None else None
+	if resolved_route is not None and resolved_route <= 0:
+		raise ApiError("VALIDATION_ERROR", "route_id must be positive", http_status=400)
+	if resolved_stop is not None and resolved_stop <= 0:
+		raise ApiError("VALIDATION_ERROR", "route_stop_id must be positive", http_status=400)
+	if resolved_stop is not None:
+		stop = db.query(DistributionRouteStop).filter(DistributionRouteStop.id == resolved_stop).first()
+		if stop is None or int(stop.person_id) != int(person_id):
+			raise ApiError("VALIDATION_ERROR", "Stop does not belong to the supplied customer", http_status=400)
+		if resolved_route is not None and int(stop.route_id) != resolved_route:
+			raise ApiError("VALIDATION_ERROR", "Route stop does not belong to the supplied route", http_status=400)
+		resolved_route = int(stop.route_id)
+	if resolved_route is not None:
+		route = (
+			db.query(DistributionRoute)
+			.filter(DistributionRoute.id == resolved_route, DistributionRoute.business_id == business_id)
+			.first()
+		)
+		if route is None:
+			raise ApiError("VALIDATION_ERROR", "Route does not belong to this business", http_status=400)
+	return resolved_route, resolved_stop
+
+
 def start_visit(
 	db: Session,
 	business_id: int,
@@ -1322,6 +1359,9 @@ def start_visit(
 			route_id=int(route_id) if route_id else None,
 			route_stop_id=int(route_stop_id) if route_stop_id else None,
 		)
+	route_id, route_stop_id = validate_visit_route_attribution(
+		db, business_id, person_id, route_id, route_stop_id,
+	)
 	if ctx is not None and route_id:
 		_ensure_route_allowed_for_strict(db, business_id, ctx, int(route_id))
 	if ctx is not None and _use_strict_catalog_for_field_user(db, business_id, ctx):
