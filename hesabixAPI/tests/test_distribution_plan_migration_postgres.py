@@ -114,3 +114,37 @@ def test_postgres_daily_plan_publication_migration(monkeypatch):
             assert not sa.inspect(conn).has_table(table)
     finally:
         engine.dispose()
+
+
+@pytest.mark.skipif(
+    not os.environ.get("DISTRIBUTION_PG_TEST_DSN"),
+    reason="Requires ephemeral PostgreSQL GitHub Actions service",
+)
+def test_postgres_distribution_mutation_lock_serialization():
+    """One business is serialized; other businesses remain independent."""
+    from sqlalchemy.orm import Session
+    from app.services.distribution_service import _serialize_distribution_plan_mutation
+
+    engine = sa.create_engine(os.environ["DISTRIBUTION_PG_TEST_DSN"])
+    try:
+        with Session(engine) as owner:
+            _serialize_distribution_plan_mutation(owner, 10)
+            with engine.connect() as concurrent:
+                same_business = concurrent.execute(
+                    sa.text("SELECT pg_try_advisory_xact_lock(174021, 10)")
+                ).scalar_one()
+                other_business = concurrent.execute(
+                    sa.text("SELECT pg_try_advisory_xact_lock(174021, 11)")
+                ).scalar_one()
+                assert same_business is False
+                assert other_business is True
+                concurrent.rollback()
+
+            owner.commit()  # transaction-scoped lock is now released
+            with engine.connect() as next_transaction:
+                assert next_transaction.execute(
+                    sa.text("SELECT pg_try_advisory_xact_lock(174021, 10)")
+                ).scalar_one() is True
+                next_transaction.rollback()
+    finally:
+        engine.dispose()
