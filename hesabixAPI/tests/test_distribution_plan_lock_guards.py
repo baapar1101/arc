@@ -302,3 +302,70 @@ def test_supervisor_assignment_requires_manager_access():
         validate_visit_supervisor_assignment(99, None, 10)
     assert validate_visit_supervisor_assignment(99, manager, 10) == 99
     assert validate_visit_supervisor_assignment(99, admin, 10) == 99
+
+
+def test_start_visit_accepts_matching_locked_plan_attribution(monkeypatch):
+    from types import SimpleNamespace
+
+    class FakeQuery:
+        def filter(self, *_args):
+            return self
+
+        def first(self):
+            return SimpleNamespace(id=707, business_id=10, alias_name="Client")
+
+    class FakeDb:
+        def __init__(self):
+            self.added = []
+            self.commits = 0
+
+        def query(self, _model):
+            return FakeQuery()
+
+        def add(self, instance):
+            self.added.append(instance)
+
+        def commit(self):
+            self.commits += 1
+
+        def refresh(self, _instance):
+            pass
+
+    monkeypatch.setattr(svc, "_ensure_plugin", lambda *_args: None)
+    monkeypatch.setattr(svc, "_active_visit", lambda *_args: None)
+    monkeypatch.setattr(svc, "business_today", lambda *_args: DAY)
+    monkeypatch.setattr(
+        svc, "get_or_create_distribution_settings",
+        lambda *_args: SimpleNamespace(require_visit_in_daily_plan=False),
+    )
+    monkeypatch.setattr(
+        svc, "get_plan_lock",
+        lambda *_args: SimpleNamespace(is_locked=True),
+    )
+    monkeypatch.setattr(
+        svc, "get_daily_plan",
+        lambda *_args: {
+            "items": [{"person_id": 707, "route_id": 99, "stop_id": 10}],
+        },
+    )
+    monkeypatch.setattr(
+        phase3, "validate_geofence_on_start",
+        lambda *_args, **_kwargs: {"geofence_warning": None, "distance_meters": None},
+    )
+    monkeypatch.setattr(
+        svc, "visit_to_dict",
+        lambda v, _name: {
+            "person_id": v.person_id,
+            "route_id": v.route_id,
+            "route_stop_id": v.route_stop_id,
+        },
+    )
+
+    db = FakeDb()
+    result = svc.start_visit(
+        db, 10, 20,
+        {"person_id": 707, "route_id": 99, "route_stop_id": 10},
+    )
+    assert result == {"person_id": 707, "route_id": 99, "route_stop_id": 10}
+    assert db.commits == 1
+    assert len(db.added) == 1
