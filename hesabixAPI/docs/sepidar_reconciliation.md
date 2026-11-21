@@ -29,3 +29,17 @@ invoice or receipt, provided the source voucher reference is unique, date/year/
 currency agree and there is no prior active financial alias or ledger. A new
 unreviewed source deletion still blocks; a retired identity that reappears also
 requires review. Repeating the same approved plan is a no-op.
+
+Reviewed replacements also cover `RPA.ReceiptHeader` and `RPA.PaymentHeader`:
+retain the original cash document identity and rebuild its ledger from the new
+source voucher. Existing settlement allocations are retained and refreshed by
+the normal source projection. Source header and voucher date/year and base
+currency must agree; ambiguous aliases or allocations to deleted invoices still
+require separate review. A replacement must never archive a surviving receipt
+or payment merely because its former voucher disappeared.
+
+In mixed income/expense sections, Sepidar `BalanceType=3` means "Don't Care"
+(`Sepidar/SqlScripts/StaticData/AccountManagement_Lookups.sql`). A neutral child
+inherits the nearest GL/SL ancestor's explicitly declared normal side for report
+classification. The mixed group root and live balances never decide it; missing
+or ambiguous GL/SL classification still stops conversion for review.
