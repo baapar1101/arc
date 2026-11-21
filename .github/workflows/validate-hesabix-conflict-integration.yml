@@ -106,6 +106,18 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev]"
 
+      - name: Verify Alembic migration graph
+        run: |
+          python - <<'PY'
+          from alembic.config import Config
+          from alembic.script import ScriptDirectory
+          script = ScriptDirectory.from_config(Config("alembic.ini"))
+          migration = script.get_revision("20261121_000001_dist_plan_locks")
+          assert migration is not None
+          assert migration.down_revision == "20261101_000001_sepidar_reconciliation"
+          print("Daily plan lock migration registered in Alembic graph")
+          PY
+
       - name: Check backend Python syntax
         run: |
           python -m compileall -q adapters/api/v1/distribution.py adapters/api/v1/schema_models/distribution.py adapters/db/models/distribution.py app/services/distribution_service.py migrations/versions/20261121_000001_distribution_daily_plan_locks.py
