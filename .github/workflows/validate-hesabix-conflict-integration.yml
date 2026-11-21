@@ -8,6 +8,7 @@ on:
       - 'hesabixUI/hesabix_ui/lib/pages/business/repair_shop/**'
       - 'hesabixUI/hesabix_ui/lib/pages/business/quick_sales_page.dart'
       - 'hesabixUI/hesabix_ui/lib/pages/business/telephony/telephony_hub_page.dart'
+      - 'hesabixUI/hesabix_ui/lib/pages/business/users_permissions_page.dart'
       - 'hesabixUI/hesabix_ui/lib/widgets/telephony/telephony_party.dart'
       - 'hesabixUI/hesabix_ui/lib/models/quick_sales_parked_sale.dart'
       - 'hesabixUI/hesabix_ui/lib/models/invoice_transaction.dart'
@@ -49,6 +50,7 @@ jobs:
             lib/pages/business/repair_shop/repair_technicians_page.dart \
             lib/pages/business/quick_sales_page.dart \
             lib/pages/business/telephony/telephony_hub_page.dart \
+            lib/pages/business/users_permissions_page.dart \
             lib/widgets/telephony/telephony_party.dart \
             lib/models/quick_sales_parked_sale.dart \
             lib/models/invoice_transaction.dart \
