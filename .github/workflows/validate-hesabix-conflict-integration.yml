@@ -7,6 +7,7 @@ on:
     paths:
       - 'hesabixUI/hesabix_ui/lib/pages/business/repair_shop/**'
       - 'hesabixUI/hesabix_ui/lib/pages/business/distribution/distribution_main_page.dart'
+      - 'hesabixUI/hesabix_ui/lib/services/distribution_service.dart'
       - 'hesabixUI/hesabix_ui/lib/pages/business/distribution/distribution_tab_permissions.dart'
       - 'hesabixAPI/adapters/db/models/distribution.py'
       - 'hesabixAPI/adapters/db/models/__init__.py'
@@ -62,6 +63,7 @@ jobs:
             lib/pages/business/repair_shop/repair_order_detail_page.dart \
             lib/pages/business/repair_shop/repair_technicians_page.dart \
             lib/pages/business/distribution/distribution_main_page.dart \
+            lib/services/distribution_service.dart \
             lib/pages/business/distribution/distribution_tab_permissions.dart \
             lib/pages/business/quick_sales_page.dart \
             lib/pages/business/telephony/telephony_hub_page.dart \
