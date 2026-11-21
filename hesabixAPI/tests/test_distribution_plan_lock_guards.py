@@ -190,3 +190,86 @@ def test_unlocked_plan_allows_customer_schedule_changes(db):
     db.add(DistributionRouteStop(route_id=99, person_id=707, sort_order=1))
     db.commit()
     svc.assert_customer_schedule_unlocked(db, 10, 707)
+
+
+def test_visit_attribution_matches_one_daily_plan_entry():
+    from app.services.distribution_service import assert_visit_matches_daily_plan
+
+    plan = {
+        "items": [
+            {"person_id": 707, "route_id": 99, "stop_id": 10},
+            {"person_id": 707, "route_id": 100, "stop_id": 11},
+            {"person_id": 808, "route_id": 99, "stop_id": 12},
+        ]
+    }
+    assert_visit_matches_daily_plan(plan, 707)
+    assert_visit_matches_daily_plan(plan, 707, route_id=99)
+    assert_visit_matches_daily_plan(plan, 707, route_stop_id=11)
+    assert_visit_matches_daily_plan(plan, 707, route_id=99, route_stop_id=10)
+
+    with pytest.raises(ApiError):
+        assert_visit_matches_daily_plan(plan, 999)
+    with pytest.raises(ApiError):
+        assert_visit_matches_daily_plan(plan, 707, route_id=101)
+    with pytest.raises(ApiError):
+        assert_visit_matches_daily_plan(plan, 707, route_stop_id=12)
+    with pytest.raises(ApiError):
+        assert_visit_matches_daily_plan(plan, 707, route_id=99, route_stop_id=11)
+
+
+def test_visit_attribution_handles_invalid_or_corrupt_day_plan():
+    from app.services.distribution_service import assert_visit_matches_daily_plan
+
+    with pytest.raises(ApiError):
+        assert_visit_matches_daily_plan({"items": None}, 707)
+    with pytest.raises(ApiError):
+        assert_visit_matches_daily_plan({}, 707)
+    with pytest.raises(ApiError):
+        assert_visit_matches_daily_plan(
+            {"items": [{"person_id": "invalid"}, None, "bad"]}, 707
+        )
+
+
+@pytest.mark.parametrize(
+    ("required", "locked"),
+    [(True, False), (False, True)],
+)
+def test_start_visit_rejects_mismatched_day_plan_route_before_writing(
+    monkeypatch, required, locked,
+):
+    from types import SimpleNamespace
+
+    class _FakeQuery:
+        def filter(self, *_args):
+            return self
+
+        def first(self):
+            return SimpleNamespace(id=707, business_id=10)
+
+    class _FakeDb:
+        def query(self, _model):
+            return _FakeQuery()
+
+    monkeypatch.setattr(svc, "_ensure_plugin", lambda *_args: None)
+    monkeypatch.setattr(svc, "_active_visit", lambda *_args: None)
+    monkeypatch.setattr(svc, "business_today", lambda *_args: DAY)
+    monkeypatch.setattr(
+        svc, "get_or_create_distribution_settings",
+        lambda *_args: SimpleNamespace(require_visit_in_daily_plan=required),
+    )
+    monkeypatch.setattr(
+        svc, "get_plan_lock",
+        lambda *_args: SimpleNamespace(is_locked=True) if locked else None,
+    )
+    monkeypatch.setattr(
+        svc, "get_daily_plan",
+        lambda *_args: {
+            "items": [{"person_id": 707, "route_id": 99, "stop_id": 10}],
+        },
+    )
+
+    with pytest.raises(ApiError):
+        svc.start_visit(
+            _FakeDb(), 10, 20,
+            {"person_id": 707, "route_id": 99, "route_stop_id": 12},
+        )
