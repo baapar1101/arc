@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import func, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from adapters.db.models.distribution import (
@@ -512,6 +512,7 @@ def delete_route(db: Session, business_id: int, route_id: int) -> None:
 	row = db.query(DistributionRoute).filter(DistributionRoute.id == route_id, DistributionRoute.business_id == business_id).first()
 	if not row:
 		raise ApiError("NOT_FOUND", "Route not found", http_status=404)
+	assert_route_has_no_locked_plans(db, business_id, route_id)
 	in_progress = (
 		db.query(DistributionFieldVisit.id)
 		.filter(
@@ -534,6 +535,7 @@ def update_route(db: Session, business_id: int, route_id: int, payload: Dict[str
 	row = db.query(DistributionRoute).filter(DistributionRoute.id == route_id, DistributionRoute.business_id == business_id).first()
 	if not row:
 		raise ApiError("NOT_FOUND", "Route not found", http_status=404)
+	assert_route_has_no_locked_plans(db, business_id, route_id)
 	if "name" in payload:
 		row.name = str(payload["name"])[:255]
 	if "description" in payload:
@@ -599,6 +601,7 @@ def upsert_route_stop(db: Session, business_id: int, route_id: int, payload: Dic
 	rt = db.query(DistributionRoute).filter(DistributionRoute.id == route_id, DistributionRoute.business_id == business_id).first()
 	if not rt:
 		raise ApiError("NOT_FOUND", "Route not found", http_status=404)
+	assert_route_has_no_locked_plans(db, business_id, route_id)
 	person_id = int(payload.get("person_id") or 0)
 	if person_id <= 0:
 		raise ApiError("VALIDATION_ERROR", "person_id required", http_status=400)
@@ -666,6 +669,7 @@ def delete_route_stop(db: Session, business_id: int, route_id: int, stop_id: int
 	rt = db.query(DistributionRoute).filter(DistributionRoute.id == route_id, DistributionRoute.business_id == business_id).first()
 	if not rt:
 		raise ApiError("NOT_FOUND", "Route not found", http_status=404)
+	assert_route_has_no_locked_plans(db, business_id, route_id)
 	row = db.query(DistributionRouteStop).filter(DistributionRouteStop.id == stop_id, DistributionRouteStop.route_id == route_id).first()
 	if not row:
 		raise ApiError("NOT_FOUND", "Stop not found", http_status=404)
@@ -718,6 +722,7 @@ def create_assignment(db: Session, business_id: int, payload: Dict[str, Any]) ->
 	valid_to = None
 	if payload.get("valid_to"):
 		valid_to = date.fromisoformat(str(payload["valid_to"])[:10])
+	assert_assignment_has_no_locked_plans(db, business_id, user_id, valid_from, valid_to)
 	row = DistributionRouteAssignment(
 		business_id=business_id,
 		route_id=route_id,
@@ -746,8 +751,79 @@ def delete_assignment(db: Session, business_id: int, assignment_id: int) -> None
 	)
 	if not row:
 		raise ApiError("NOT_FOUND", "Assignment not found", http_status=404)
+	assert_assignment_has_no_locked_plans(db, business_id, row.user_id, row.valid_from, row.valid_to)
 	db.delete(row)
 	db.commit()
+
+
+def assert_route_has_no_locked_plans(
+	db: Session,
+	business_id: int,
+	route_id: int,
+	*,
+	plan_date: Optional[date] = None,
+) -> None:
+	"""Block edits affecting any locked visitor plan assigned to this route.
+
+	The catalog is currently shared across dates. Until immutable plan
+	snapshots are available, a lock on *any* assigned date protects the
+	underlying route, except a day-specific ordering override which only
+	checks its own date.
+	"""
+	q = (
+		db.query(DistributionDailyPlanLock.id)
+		.join(
+			DistributionRouteAssignment,
+			and_(
+				DistributionRouteAssignment.business_id == DistributionDailyPlanLock.business_id,
+				DistributionRouteAssignment.user_id == DistributionDailyPlanLock.user_id,
+				DistributionRouteAssignment.valid_from <= DistributionDailyPlanLock.plan_date,
+				or_(
+					DistributionRouteAssignment.valid_to.is_(None),
+					DistributionRouteAssignment.valid_to >= DistributionDailyPlanLock.plan_date,
+				),
+			),
+		)
+		.filter(
+			DistributionDailyPlanLock.business_id == business_id,
+			DistributionRouteAssignment.route_id == route_id,
+			DistributionDailyPlanLock.is_locked.is_(True),
+		)
+	)
+	if plan_date is not None:
+		q = q.filter(DistributionDailyPlanLock.plan_date == plan_date)
+	if q.first() is not None:
+		raise ApiError(
+			"CONFLICT",
+			"Route is used by a locked daily plan; unpublish before editing",
+			http_status=409,
+		)
+
+
+def assert_assignment_has_no_locked_plans(
+	db: Session,
+	business_id: int,
+	user_id: int,
+	valid_from: date,
+	valid_to: Optional[date],
+) -> None:
+	"""Protect an already-published visitor plan from assignment changes."""
+	if valid_to is not None and valid_to < valid_from:
+		raise ApiError("VALIDATION_ERROR", "valid_to must not precede valid_from", http_status=400)
+	q = db.query(DistributionDailyPlanLock.id).filter(
+		DistributionDailyPlanLock.business_id == business_id,
+		DistributionDailyPlanLock.user_id == user_id,
+		DistributionDailyPlanLock.is_locked.is_(True),
+		DistributionDailyPlanLock.plan_date >= valid_from,
+	)
+	if valid_to is not None:
+		q = q.filter(DistributionDailyPlanLock.plan_date <= valid_to)
+	if q.first() is not None:
+		raise ApiError(
+			"CONFLICT",
+			"Visitor has a locked daily plan in this assignment period; unpublish first",
+			http_status=409,
+		)
 
 
 def assigned_user_ids_for_date(db: Session, business_id: int, plan_date: date) -> List[int]:
