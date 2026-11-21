@@ -1341,6 +1341,12 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       'telephony': {
         'view': t.localeName.startsWith('fa') ? 'مشاهده مرکز تماس' : 'View telephony center',
         'manage': t.localeName.startsWith('fa') ? 'مدیریت اتصال و داخلی‌ها' : 'Manage PBX & extensions',
+        'view_all_calls': t.localeName.startsWith('fa')
+            ? 'مشاهدهٔ همهٔ تماس‌ها'
+            : 'View all calls',
+        'supervise': t.localeName.startsWith('fa')
+            ? 'نظارت بر تماس‌های تیم'
+            : 'Supervise team calls',
         'click_to_call': t.localeName.startsWith('fa') ? 'Click-to-Call' : 'Click to call',
         'softphone': t.localeName.startsWith('fa') ? 'Softphone داخل‌برنامه' : 'In-app softphone',
         'softphone_manage': t.localeName.startsWith('fa') ? 'مدیریت Softphone و حالت رسانه' : 'Manage softphone media modes',
