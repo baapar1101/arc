@@ -161,3 +161,32 @@ def test_unlocked_publication_does_not_block_route_mutations(db):
     setup_route(db, locked=False)
     svc.assert_route_has_no_locked_plans(db, 10, 99)
     svc.assert_assignment_has_no_locked_plans(db, 10, 20, DAY, None)
+
+
+def test_customer_schedule_edit_guard_follows_locked_route_stops(db):
+    setup_route(db)
+    db.add(DistributionRouteStop(
+        route_id=99,
+        person_id=707,
+        sort_order=1,
+        weekday=5,
+        frequency="weekly",
+    ))
+    db.commit()
+
+    with pytest.raises(ApiError):
+        svc.assert_customer_schedule_unlocked(db, 10, 707)
+
+    # A different person or business is not affected by this lock.
+    svc.assert_customer_schedule_unlocked(db, 10, 708)
+    svc.assert_customer_schedule_unlocked(db, 11, 707)
+
+    svc.unpublish_daily_plan(db, 10, 20, DAY)
+    svc.assert_customer_schedule_unlocked(db, 10, 707)
+
+
+def test_unlocked_plan_allows_customer_schedule_changes(db):
+    setup_route(db, locked=False)
+    db.add(DistributionRouteStop(route_id=99, person_id=707, sort_order=1))
+    db.commit()
+    svc.assert_customer_schedule_unlocked(db, 10, 707)
