@@ -84,18 +84,31 @@ def test_alembic_plan_lock_migration_upgrade_and_downgrade(monkeypatch):
     assert spec is not None and spec.loader is not None
     migration = module_from_spec(spec)
     spec.loader.exec_module(migration)
+    snapshot_path = path.with_name("20261121_000002_distribution_daily_plan_snapshot.py")
+    snapshot_spec = spec_from_file_location("distribution_daily_plan_snapshot_migration", snapshot_path)
+    assert snapshot_spec is not None and snapshot_spec.loader is not None
+    snapshot_migration = module_from_spec(snapshot_spec)
+    snapshot_spec.loader.exec_module(snapshot_migration)
+
     engine = create_engine("sqlite+pysqlite:///:memory:")
     with engine.begin() as connection:
         monkeypatch.setattr(migration, "op", Operations(MigrationContext.configure(connection)))
         migration.upgrade()
+        monkeypatch.setattr(
+            snapshot_migration, "op", Operations(MigrationContext.configure(connection))
+        )
+        snapshot_migration.upgrade()
         columns = {
             col["name"]
             for col in inspect(connection).get_columns("distribution_daily_plan_locks")
         }
+        assert "plan_snapshot" in columns
         assert {
             "business_id", "user_id", "plan_date", "is_locked",
             "published_by_user_id", "published_at",
         }.issubset(columns)
+        snapshot_migration.downgrade()
+        assert "plan_snapshot" not in {c["name"] for c in inspect(connection).get_columns("distribution_daily_plan_locks")}
         migration.downgrade()
         assert not inspect(connection).has_table("distribution_daily_plan_locks")
     engine.dispose()
@@ -122,6 +135,62 @@ def test_read_only_daily_plan_enrichment_does_not_create_settings_or_commit(db, 
     assert result["items"] == []
     assert result["scheduled_count"] == 0
     assert result["carried_over_count"] == 0
+
+
+def test_locked_snapshot_preserves_published_contents_even_when_source_changes(db, monkeypatch):
+    from datetime import datetime
+    from adapters.db.models.distribution import DistributionDailyPlanLock
+
+    original_getter = svc.get_daily_plan
+    source = {
+        "plan_date": "2026-11-21",
+        "user_id": 20,
+        "items": [{"stop_id": 7, "person_name": "Original visitor"}],
+        "scheduled_count": 1,
+        "carried_over_count": 0,
+        "published": False,
+    }
+    monkeypatch.setattr(svc, "get_daily_plan", lambda *_args: source)
+    row = svc._stage_plan_publication(
+        db, business_id=10, actor_user_id=1,
+        target_user_id=20, plan_date=date(2026, 11, 21),
+        locked=True, notes=None,
+    )
+    db.add(row)
+    db.flush()
+    monkeypatch.setattr(svc, "get_daily_plan", original_getter)
+
+    source["items"][0]["person_name"] = "Changed live catalog"
+    frozen = svc.get_daily_plan(db, 10, 20, date(2026, 11, 21))
+    assert frozen["published"] is True
+    assert frozen["locked"] is True
+    assert frozen["items"] == [{"stop_id": 7, "person_name": "Original visitor"}]
+    assert frozen["scheduled_count"] == 1
+    assert frozen["plan_date"] == "2026-11-21"
+    assert "published" not in row.plan_snapshot
+
+    frozen["items"][0]["person_name"] = "Edited response copy"
+    again = svc.get_daily_plan(db, 10, 20, date(2026, 11, 21))
+    assert again["items"][0]["person_name"] == "Original visitor"
+
+
+def test_locked_plan_without_snapshot_fails_closed(db):
+    from datetime import datetime
+    from adapters.db.models.distribution import DistributionDailyPlanLock
+
+    db.add(DistributionDailyPlanLock(
+        business_id=10,
+        user_id=20,
+        plan_date=date(2026, 11, 21),
+        is_locked=True,
+        published_at=datetime.utcnow(),
+        plan_snapshot=None,
+    ))
+    db.flush()
+
+    with pytest.raises(ApiError) as exc:
+        svc.get_daily_plan(db, 10, 20, date(2026, 11, 21))
+    assert getattr(exc.value, "http_status", 409) == 409
 
 
 def test_schema_keeps_explicit_single_and_bulk_options():
