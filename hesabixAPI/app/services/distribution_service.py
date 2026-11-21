@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -903,6 +904,21 @@ def plan_lock_to_dict(row: Optional[DistributionDailyPlanLock]) -> Dict[str, Any
 	}
 
 
+def _capture_plan_snapshot(
+	db: Session,
+	business_id: int,
+	target_user_id: int,
+	plan_date: date,
+) -> Dict[str, Any]:
+	"""Copy the scheduled route data, excluding mutable publication metadata."""
+	current = get_daily_plan(db, business_id, target_user_id, plan_date)
+	return deepcopy({
+		key: current[key]
+		for key in ("plan_date", "user_id", "items", "scheduled_count", "carried_over_count")
+		if key in current
+	})
+
+
 def _stage_plan_publication(
 	db: Session,
 	business_id: int,
@@ -913,6 +929,7 @@ def _stage_plan_publication(
 	locked: bool,
 	notes: Optional[str],
 ) -> DistributionDailyPlanLock:
+	plan_snapshot = _capture_plan_snapshot(db, business_id, target_user_id, plan_date) if locked else None
 	now = datetime.utcnow()
 	row = get_plan_lock(db, business_id, target_user_id, plan_date)
 	if row is None:
@@ -924,12 +941,14 @@ def _stage_plan_publication(
 			published_by_user_id=actor_user_id,
 			published_at=now,
 			notes=notes,
+			plan_snapshot=plan_snapshot,
 			created_at=now,
 			updated_at=now,
 		)
 		db.add(row)
 	else:
 		row.is_locked = locked
+		row.plan_snapshot = plan_snapshot
 		row.published_by_user_id = actor_user_id
 		row.published_at = now
 		if notes is not None:
@@ -1015,6 +1034,14 @@ def _weekday_matches(plan_date: date, weekday: Optional[int]) -> bool:
 
 def get_daily_plan(db: Session, business_id: int, target_user_id: int, plan_date: date) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
+	publication = get_plan_lock(db, business_id, target_user_id, plan_date)
+	if publication is not None and publication.is_locked:
+		# Do not silently recalculate a locked plan from mutable catalog state.
+		if not isinstance(publication.plan_snapshot, dict) or not isinstance(publication.plan_snapshot.get("items"), list):
+			raise ApiError("CONFLICT", "Locked daily plan has no valid immutable snapshot", http_status=409)
+		result = deepcopy(publication.plan_snapshot)
+		result.update(plan_lock_to_dict(publication))
+		return result
 	assignments = (
 		db.query(DistributionRouteAssignment)
 		.options(joinedload(DistributionRouteAssignment.route))
@@ -1079,7 +1106,7 @@ def get_daily_plan(db: Session, business_id: int, target_user_id: int, plan_date
 	from app.services.distribution_field_ops_service import enrich_daily_plan
 
 	result = enrich_daily_plan(db, business_id, target_user_id, plan_date, items)
-	result.update(plan_lock_to_dict(get_plan_lock(db, business_id, target_user_id, plan_date)))
+	result.update(plan_lock_to_dict(publication))
 	return result
 
 
