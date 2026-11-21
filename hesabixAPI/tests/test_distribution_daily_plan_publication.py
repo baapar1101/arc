@@ -101,6 +101,29 @@ def test_alembic_plan_lock_migration_upgrade_and_downgrade(monkeypatch):
     engine.dispose()
 
 
+def test_read_only_daily_plan_enrichment_does_not_create_settings_or_commit(db, monkeypatch):
+    from types import SimpleNamespace
+    from app.services.distribution_field_ops_service import enrich_daily_plan
+
+    monkeypatch.setattr(
+        svc,
+        "get_or_create_distribution_settings",
+        lambda *_args: pytest.fail("Daily plan read must not create and commit settings"),
+    )
+    monkeypatch.setattr(
+        svc,
+        "get_distribution_settings_row",
+        lambda *_args: SimpleNamespace(
+            carry_over_missed_visits=False,
+            carry_over_days=7,
+        ),
+    )
+    result = enrich_daily_plan(db, 10, 20, date(2026, 11, 21), [])
+    assert result["items"] == []
+    assert result["scheduled_count"] == 0
+    assert result["carried_over_count"] == 0
+
+
 def test_schema_keeps_explicit_single_and_bulk_options():
     assert DailyPlanPublishPayload().all_assigned is False
     assert DailyPlanPublishPayload(all_assigned=True).locked is False
