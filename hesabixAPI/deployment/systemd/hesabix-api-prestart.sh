@@ -3,6 +3,7 @@
 # ۱) نصب postgresql-client نسخه‌دار اگر pg_dump فقط wrapper باشد (نصب‌های قبلی)
 # ۲) systemctl daemon-reload — بعد از تغییر یونیت‌ها یا اسکریپت‌هایی مثل build_web
 # ۳) در صورت نبودن/خرابی وابستگی‌های Python، نصب از آینه‌ها مطابق deploy.sh
+# ۴) اگر Alembic چند head داشته باشد، قبل از upgrade آن‌ها را merge می‌کند
 
 set -euo pipefail
 # systemd ممکن است PATH کوتاه بدهد؛ runuser در /usr/sbin است
@@ -69,23 +70,6 @@ run_as_www() {
   fi
 }
 
-# همان مسیر import واقعی workerها
-set +e
-import_err="$(run_as_www env PYTHONPATH="${API_DIR}" "$VENV_PY" -c "import app.main" 2>&1)"
-import_rc=$?
-set -e
-if [[ "${import_rc}" -eq 0 ]]; then
-  exit 0
-fi
-if grep -q "Production security validation failed" <<<"${import_err}"; then
-  log "app.main import failed due to production settings, not missing packages:"
-  log "${import_err}"
-  exit 1
-fi
-
-log "import app.main failed; attempting pip install -e . from Hesabix PyPI mirror..."
-log "${import_err}"
-
 set_pip_env_for_url() {
   local index_url="$1"
   export PIP_INDEX_URL="${index_url}"
@@ -98,41 +82,71 @@ set_pip_env_for_url() {
   fi
 }
 
-# Sequential indexes only (no extra-index). A dead extra-index stalls every pip lookup.
-MIRRORS=()
-if [[ -n "${PIP_INDEX_URL:-}" ]]; then
-  MIRRORS+=("${PIP_INDEX_URL}")
+# همان مسیر import واقعی workerها
+set +e
+import_err="$(run_as_www env PYTHONPATH="${API_DIR}" "$VENV_PY" -c "import app.main" 2>&1)"
+import_rc=$?
+set -e
+if [[ "${import_rc}" -ne 0 ]]; then
+  if grep -q "Production security validation failed" <<<"${import_err}"; then
+    log "app.main import failed due to production settings, not missing packages:"
+    log "${import_err}"
+    exit 1
+  fi
+
+  log "import app.main failed; attempting pip install -e . from Hesabix PyPI mirror..."
+  log "${import_err}"
+
+  # Sequential indexes only (no extra-index). A dead extra-index stalls every pip lookup.
+  MIRRORS=()
+  if [[ -n "${PIP_INDEX_URL:-}" ]]; then
+    MIRRORS+=("${PIP_INDEX_URL}")
+  fi
+  MIRRORS+=(
+    "https://pypi.org/simple"
+    "https://pypi.tuna.tsinghua.edu.cn/simple"
+    "https://mirrors.cloud.tencent.com/pypi/simple"
+    "https://p.mirror.hesabix.ir/simple"
+    "https://mirrors.aliyun.com/pypi/simple"
+  )
+
+  seen_mirrors=" "
+  for url in "${MIRRORS[@]}"; do
+    [[ -z "$url" ]] && continue
+    case "${seen_mirrors}" in *" ${url} "*) continue ;; esac
+    seen_mirrors+="${url} "
+    log "trying PyPI: $url"
+    set_pip_env_for_url "$url"
+    pip_env=(env -u PIP_EXTRA_INDEX_URL PIP_INDEX_URL="${PIP_INDEX_URL}" PIP_DEFAULT_TIMEOUT=15)
+    pip_args=("$PIP" --isolated --disable-pip-version-check --timeout 15 --retries 2 install --index-url "$url")
+    if [[ -n "${PIP_TRUSTED_HOST:-}" ]]; then
+      pip_env+=(PIP_TRUSTED_HOST="${PIP_TRUSTED_HOST}")
+      pip_args+=(--trusted-host "${PIP_TRUSTED_HOST}")
+    fi
+    if ! run_as_www "${pip_env[@]}" "${pip_args[@]}" --upgrade pip setuptools wheel \
+        || ! run_as_www "${pip_env[@]}" "${pip_args[@]}" -e "${API_DIR}"; then
+      continue
+    fi
+    if run_as_www env PYTHONPATH="${API_DIR}" "$VENV_PY" -c "import app.main"; then
+      log "OK after install from $url"
+      import_rc=0
+      break
+    fi
+  done
+
+  if [[ "${import_rc}" -ne 0 ]]; then
+    log "could not fix Python dependencies or app.main still does not import"
+    exit 1
+  fi
 fi
-MIRRORS+=(
-  "https://pypi.org/simple"
-  "https://pypi.tuna.tsinghua.edu.cn/simple"
-  "https://mirrors.cloud.tencent.com/pypi/simple"
-  "https://p.mirror.hesabix.ir/simple"
-  "https://mirrors.aliyun.com/pypi/simple"
-)
 
-seen_mirrors=" "
-for url in "${MIRRORS[@]}"; do
-  [[ -z "$url" ]] && continue
-  case "${seen_mirrors}" in *" ${url} "*) continue ;; esac
-  seen_mirrors+="${url} "
-  log "trying PyPI: $url"
-  set_pip_env_for_url "$url"
-  pip_env=(env -u PIP_EXTRA_INDEX_URL PIP_INDEX_URL="${PIP_INDEX_URL}" PIP_DEFAULT_TIMEOUT=15)
-  pip_args=("$PIP" --isolated --disable-pip-version-check --timeout 15 --retries 2 install --index-url "$url")
-  if [[ -n "${PIP_TRUSTED_HOST:-}" ]]; then
-    pip_env+=(PIP_TRUSTED_HOST="${PIP_TRUSTED_HOST}")
-    pip_args+=(--trusted-host "${PIP_TRUSTED_HOST}")
-  fi
-  if ! run_as_www "${pip_env[@]}" "${pip_args[@]}" --upgrade pip setuptools wheel \
-      || ! run_as_www "${pip_env[@]}" "${pip_args[@]}" -e "${API_DIR}"; then
-    continue
-  fi
-  if run_as_www env PYTHONPATH="${API_DIR}" "$VENV_PY" -c "import app.main"; then
-    log "OK after install from $url"
-    exit 0
-  fi
-done
-
-log "could not fix Python dependencies or app.main still does not import"
-exit 1
+# Root can write merge revisions; the next ExecStartPre (`upgrade head`) runs as www-data.
+log "ensuring a single Alembic head"
+if ! env PYTHONPATH="${API_DIR}" "$VENV_PY" "${API_DIR}/scripts/check_migration_branches.py"; then
+  log "failed to auto-merge Alembic heads"
+  exit 1
+fi
+if id -u www-data >/dev/null 2>&1; then
+  chown -R www-data:www-data "${API_DIR}/migrations/versions" 2>/dev/null || true
+fi
+exit 0

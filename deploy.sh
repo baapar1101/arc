@@ -2476,7 +2476,7 @@ print('Connection successful')
   hesabix_fixup_seed_object_privileges
   hesabix_ensure_alembic_version_schema
   log_step "Running Alembic migrations..."
-  if ! alembic upgrade head; then
+  if ! python scripts/check_migration_branches.py --upgrade; then
     echo "$CROSS_MARK Error running migrations"
     exit 1
   fi
@@ -2512,7 +2512,7 @@ Environment=PYTHONUNBUFFERED=1
 Environment=TZ=UTC
 # ! = run as root: postgresql-client + daemon-reload + pip from deploy mirrors if needed
 ExecStartPre=!${api_dir}/deployment/systemd/hesabix-api-prestart.sh
-# Before start/restart: run migrations; service does not start if migrations fail
+# Before start/restart: run migrations; prestart auto-merges multiple Alembic heads first
 ExecStartPre=${api_dir}/.venv/bin/python -m alembic -c ${api_dir}/alembic.ini upgrade head
 ExecStart=${api_dir}/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS}
 Restart=always

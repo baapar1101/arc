@@ -12,7 +12,7 @@ echo "To stop: docker compose down"
 docker compose up -d
 
 echo "To run migrations inside container:"
-echo "  docker exec -it hesabix-api alembic upgrade head"
+echo "  docker exec -it hesabix-api python scripts/check_migration_branches.py --upgrade"
 echo "To view logs:"
 echo "  docker compose logs -f"
 
