@@ -8,6 +8,13 @@ on:
       - 'hesabixUI/hesabix_ui/lib/pages/business/repair_shop/**'
       - 'hesabixUI/hesabix_ui/lib/pages/business/distribution/distribution_main_page.dart'
       - 'hesabixUI/hesabix_ui/lib/pages/business/distribution/distribution_tab_permissions.dart'
+      - 'hesabixAPI/adapters/db/models/distribution.py'
+      - 'hesabixAPI/adapters/db/models/__init__.py'
+      - 'hesabixAPI/adapters/api/v1/distribution.py'
+      - 'hesabixAPI/adapters/api/v1/schema_models/distribution.py'
+      - 'hesabixAPI/app/services/distribution_service.py'
+      - 'hesabixAPI/migrations/versions/20261121_000001_distribution_daily_plan_locks.py'
+      - 'hesabixAPI/tests/test_distribution_daily_plan_publication.py'
       - 'hesabixUI/hesabix_ui/lib/pages/business/quick_sales_page.dart'
       - 'hesabixUI/hesabix_ui/lib/pages/business/telephony/telephony_hub_page.dart'
       - 'hesabixUI/hesabix_ui/lib/pages/business/users_permissions_page.dart'
@@ -72,3 +79,34 @@ jobs:
           flutter test --no-pub test/telephony_party_test.dart
           flutter test --no-pub test/plugin_marketplace_utils_test.dart
           flutter test --no-pub test/distribution_tab_permissions_test.dart
+
+  distribution-publication-backend:
+    name: Distribution publication backend regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: hesabixAPI
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: hesabixAPI/pyproject.toml
+
+      - name: Install API test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Check backend Python syntax
+        run: |
+          python -m compileall -q adapters/api/v1/distribution.py adapters/api/v1/schema_models/distribution.py adapters/db/models/distribution.py app/services/distribution_service.py migrations/versions/20261121_000001_distribution_daily_plan_locks.py
+
+      - name: Run distribution publication regression
+        run: pytest -q tests/test_distribution_daily_plan_publication.py
