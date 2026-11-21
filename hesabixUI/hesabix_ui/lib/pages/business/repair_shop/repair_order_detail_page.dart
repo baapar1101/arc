@@ -278,7 +278,47 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
     }
   }
 
+  /// تحویل سفارش آماده‌شده به مشتری، با امکان ثبت توضیح.
+  Future<void> _deliverRepair() async {
+    if (_order?.status != 'ready_for_pickup') return;
+    final notes = await showGlassDialog<String>(
+      context: context,
+      builder: (dialogContext) => _NotesDialog(
+        title: 'تحویل به مشتری',
+        hint: 'توضیحات تحویل (اختیاری)',
+      ),
+    );
+    if (!mounted || notes == null) return;
+
+    try {
+      await _service.deliverRepair(
+        businessId: widget.businessId,
+        orderId: widget.orderId,
+        notes: notes.trim().isNotEmpty ? notes.trim() : null,
+      );
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: 'سفارش به مشتری تحویل داده شد');
+      await _loadOrder();
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.show(
+          context,
+          message: 'خطا در تحویل سفارش: ${ErrorExtractor.forContext(e, context)}',
+        );
+      }
+    }
+  }
+
   Future<void> _createInvoice() async {
+    final order = _order;
+    if (order == null) return;
+    if (order.laborCost <= 0 && order.parts.isEmpty) {
+      SnackBarHelper.show(
+        context,
+        message: 'برای صدور فاکتور ابتدا اجرت تعمیر یا قطعات مصرفی را ثبت کنید',
+      );
+      return;
+    }
     final confirm = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -693,6 +733,12 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
         onPressed: _createInvoice,
         icon: const Icon(Icons.receipt),
         label: const Text('صدور فاکتور'),
+      );
+    } else if (status == 'ready_for_pickup') {
+      return FloatingActionButton.extended(
+        onPressed: _deliverRepair,
+        icon: const Icon(Icons.inventory_2_outlined),
+        label: const Text('تحویل به مشتری'),
       );
     }
 
