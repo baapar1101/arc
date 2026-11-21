@@ -2181,7 +2181,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       case 'allocate':
         return 'تخصیص حساب';
       case 'post':
-        return 'قطعی‌سازی';
+        return sectionKey == 'payroll' ? t.payrollPermissionPost : 'قطعی‌سازی';
       case 'cancel':
         return 'ابطال';
       case 'change_unit_cost':
@@ -2202,7 +2202,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       case 'history':
         return t.history;
       case 'print':
-        return t.print;
+        return sectionKey == 'barcode_labels' ? t.barcodeLabelPermissionPrint : t.print;
       case 'users':
         return t.users;
       case 'business':
@@ -2236,8 +2236,6 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.manage;
       case 'design':
         return sectionKey == 'barcode_labels' ? t.barcodeLabelPermissionDesign : action;
-      case 'print':
-        return sectionKey == 'barcode_labels' ? t.barcodeLabelPermissionPrint : (t.printDocuments);
       case 'adjust':
         return t.customerClubActionAdjust;
       case 'redeem':
@@ -2255,8 +2253,6 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
           return t.payrollPermissionOperate;
         }
         return t.distributionPermissionOperate;
-      case 'post':
-        return t.payrollPermissionPost;
       case 'approve':
         return t.payrollPermissionApprove;
       case 'sync':
