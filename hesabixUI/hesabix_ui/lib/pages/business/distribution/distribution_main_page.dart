@@ -846,6 +846,62 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     return '$wd';
   }
 
+  /// Publish all assigned visitors' plans for the selected day.
+  ///
+  /// This first integration stage publishes without enforcing route locks.
+  Future<void> _publishAllAssignedPlans() async {
+    if (!_canManage) return;
+    final t = AppLocalizations.of(context);
+    final fa = t.localeName.startsWith('fa');
+    final confirm = await showGlassDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(fa ? 'انتشار برنامه‌های روزانه' : 'Publish daily plans'),
+        content: Text(
+          fa
+              ? 'برنامه‌های ویزیتورهای دارای مسیر فعال در تاریخ انتخاب‌شده منتشر شوند؟ در این مرحله برنامه‌ها قفل نمی‌شوند.'
+              : 'Publish plans for assigned visitors on the selected date? Plans will not be locked in this stage.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(t.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(fa ? 'انتشار' : 'Publish'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirm != true) return;
+
+    try {
+      final result = await _svc.publishDailyPlan(
+        businessId: widget.businessId,
+        planDate: _iso(_planDay),
+        allAssigned: true,
+        locked: false,
+      );
+      await _refreshPlan();
+      if (!mounted) return;
+      final count = int.tryParse('${result['published_count']}') ?? 0;
+      SnackBarHelper.showSuccess(
+        context,
+        message: count > 0
+            ? (fa ? 'برنامهٔ $count ویزیتور منتشر شد' : 'Published plans for $count visitors')
+            : (fa ? 'برنامهٔ قابل انتشاری یافت نشد' : 'No assigned plans to publish'),
+      );
+    } catch (error) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(error, context),
+        );
+      }
+    }
+  }
+
   void _openReports() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -926,6 +982,14 @@ class _DistributionMainPageState extends State<DistributionMainPage>
         title: Text(t.distributionMenu),
         leading: businessSubpageBackLeading(context, widget.businessId),
         actions: [
+          if (_canManage)
+            IconButton(
+              tooltip: t.localeName.startsWith('fa')
+                  ? 'انتشار برنامه‌های روزانه (بدون قفل)'
+                  : 'Publish daily plans (unlocked)',
+              onPressed: _publishAllAssignedPlans,
+              icon: const Icon(Icons.publish_outlined),
+            ),
           if (_canTeam)
             IconButton(
               tooltip: t.distributionTabTeamMap,
