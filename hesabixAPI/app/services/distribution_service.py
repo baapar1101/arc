@@ -1197,6 +1197,27 @@ def assert_visit_matches_daily_plan(
 		)
 
 
+def validate_visit_supervisor_assignment(
+	candidate_id: Optional[int],
+	ctx: Optional[AuthContext],
+	business_id: int,
+) -> Optional[int]:
+	"""Prevent field agents from attributing visits to arbitrary supervisors."""
+	if candidate_id is None:
+		return None
+	if ctx is None or not (
+		ctx.is_superadmin()
+		or (ctx.db and ctx.is_business_owner(business_id))
+		or ctx.has_business_permission("distribution", "manage")
+	):
+		raise ApiError(
+			"FORBIDDEN",
+			"Setting supervisor_user_id requires distribution.manage",
+			http_status=403,
+		)
+	return int(candidate_id)
+
+
 def start_visit(
 	db: Session,
 	business_id: int,
@@ -1213,6 +1234,9 @@ def start_visit(
 	person = db.query(Person).filter(Person.id == person_id, Person.business_id == business_id).first()
 	if not person:
 		raise ApiError("NOT_FOUND", "Person not found", http_status=404)
+	validated_supervisor_id = validate_visit_supervisor_assignment(
+		payload.get("supervisor_user_id"), ctx, business_id,
+	)
 	today = business_today(business_id)
 	settings_sv = get_or_create_distribution_settings(db, business_id)
 	route_id = payload.get("route_id")
@@ -1303,7 +1327,7 @@ def start_visit(
 		start_latitude=_slat,
 		start_longitude=_slng,
 		extra_info=_extra or None,
-		supervisor_user_id=int(payload["supervisor_user_id"]) if payload.get("supervisor_user_id") else None,
+		supervisor_user_id=validated_supervisor_id,
 		is_carried_over=bool(payload.get("is_carried_over")),
 	)
 	db.add(v)
