@@ -16,6 +16,7 @@ from adapters.db.models.distribution import (
 	DistributionRouteAssignment,
 	DistributionRouteStop,
 	DistributionTerritory,
+	DistributionDailyPlanLock,
 )
 from adapters.db.models.document import Document
 from adapters.db.models.person import Person
@@ -749,6 +750,145 @@ def delete_assignment(db: Session, business_id: int, assignment_id: int) -> None
 	db.commit()
 
 
+def assigned_user_ids_for_date(db: Session, business_id: int, plan_date: date) -> List[int]:
+	"""Resolve only visitors with a business-owned route assignment active on this day."""
+	rows = (
+		db.query(DistributionRouteAssignment.user_id)
+		.filter(
+			DistributionRouteAssignment.business_id == business_id,
+			DistributionRouteAssignment.valid_from <= plan_date,
+			or_(
+				DistributionRouteAssignment.valid_to.is_(None),
+				DistributionRouteAssignment.valid_to >= plan_date,
+			),
+		)
+		.distinct()
+		.all()
+	)
+	return sorted({int(row[0]) for row in rows if row[0] is not None})
+
+
+def get_plan_lock(db: Session, business_id: int, target_user_id: int, plan_date: date) -> Optional[DistributionDailyPlanLock]:
+	return (
+		db.query(DistributionDailyPlanLock)
+		.filter(
+			DistributionDailyPlanLock.business_id == business_id,
+			DistributionDailyPlanLock.user_id == target_user_id,
+			DistributionDailyPlanLock.plan_date == plan_date,
+		)
+		.first()
+	)
+
+
+def plan_lock_to_dict(row: Optional[DistributionDailyPlanLock]) -> Dict[str, Any]:
+	if row is None:
+		return {"published": False, "locked": False, "published_at": None, "published_by_user_id": None}
+	return {
+		"published": True,
+		"locked": bool(row.is_locked),
+		"published_at": row.published_at.isoformat() + "Z" if row.published_at else None,
+		"published_by_user_id": row.published_by_user_id,
+		"notes": row.notes,
+	}
+
+
+def _stage_plan_publication(
+	db: Session,
+	business_id: int,
+	actor_user_id: int,
+	target_user_id: int,
+	plan_date: date,
+	*,
+	locked: bool,
+	notes: Optional[str],
+) -> DistributionDailyPlanLock:
+	now = datetime.utcnow()
+	row = get_plan_lock(db, business_id, target_user_id, plan_date)
+	if row is None:
+		row = DistributionDailyPlanLock(
+			business_id=business_id,
+			user_id=target_user_id,
+			plan_date=plan_date,
+			is_locked=locked,
+			published_by_user_id=actor_user_id,
+			published_at=now,
+			notes=notes,
+			created_at=now,
+			updated_at=now,
+		)
+		db.add(row)
+	else:
+		row.is_locked = locked
+		row.published_by_user_id = actor_user_id
+		row.published_at = now
+		if notes is not None:
+			row.notes = notes
+		row.updated_at = now
+	return row
+
+
+def publish_daily_plan(
+	db: Session,
+	business_id: int,
+	actor_user_id: int,
+	target_user_id: int,
+	plan_date: date,
+	*,
+	locked: bool = True,
+	notes: Optional[str] = None,
+) -> Dict[str, Any]:
+	"""Publish a plan only for an actively assigned visitor in this business."""
+	_ensure_plugin(db, business_id)
+	if target_user_id not in assigned_user_ids_for_date(db, business_id, plan_date):
+		raise ApiError("VALIDATION_ERROR", "Visitor has no active route assignment for this business/date", http_status=400)
+	row = _stage_plan_publication(
+		db, business_id, actor_user_id, target_user_id, plan_date, locked=locked, notes=notes,
+	)
+	db.commit()
+	db.refresh(row)
+	return plan_lock_to_dict(row)
+
+
+def publish_daily_plans_for_date(
+	db: Session,
+	business_id: int,
+	actor_user_id: int,
+	plan_date: date,
+	*,
+	locked: bool = True,
+	notes: Optional[str] = None,
+) -> Dict[str, Any]:
+	"""Publish the assigned visitors atomically, never other businesses' users."""
+	_ensure_plugin(db, business_id)
+	rows = [
+		_stage_plan_publication(
+			db, business_id, actor_user_id, user_id, plan_date, locked=locked, notes=notes,
+		)
+		for user_id in assigned_user_ids_for_date(db, business_id, plan_date)
+	]
+	db.commit()
+	items = []
+	for row in rows:
+		db.refresh(row)
+		items.append({"user_id": row.user_id, **plan_lock_to_dict(row)})
+	return {"plan_date": plan_date.isoformat(), "published_count": len(items), "items": items}
+
+
+def unpublish_daily_plan(
+	db: Session,
+	business_id: int,
+	target_user_id: int,
+	plan_date: date,
+) -> None:
+	"""Deleting a publication is idempotent but always scoped to its business."""
+	_ensure_plugin(db, business_id)
+	row = get_plan_lock(db, business_id, target_user_id, plan_date)
+	if row is None:
+		return
+	db.delete(row)
+	db.commit()
+
+
 def _weekday_matches(plan_date: date, weekday: Optional[int]) -> bool:
 	if weekday is None:
 		return True
@@ -820,7 +960,9 @@ def get_daily_plan(db: Session, business_id: int, target_user_id: int, plan_date
 	items.sort(key=lambda x: (x["route_code"], x["sort_order"], x["person_id"]))
 	from app.services.distribution_field_ops_service import enrich_daily_plan
 
-	return enrich_daily_plan(db, business_id, target_user_id, plan_date, items)
+	result = enrich_daily_plan(db, business_id, target_user_id, plan_date, items)
+	result.update(plan_lock_to_dict(get_plan_lock(db, business_id, target_user_id, plan_date)))
+	return result
 
 
 def _active_visit(db: Session, business_id: int, user_id: int) -> Optional[DistributionFieldVisit]:
