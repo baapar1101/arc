@@ -40,6 +40,32 @@ def _assign(db: Session, business_id: int, user_id: int, start: date, end: date 
     db.commit()
 
 
+@pytest.mark.parametrize("method", ["POST", "DELETE"])
+def test_publication_endpoints_require_distribution_manage(method):
+    from adapters.api.v1.distribution import router
+
+    matches = [
+        route for route in router.routes
+        if route.path == "/distribution/business/{business_id}/daily-plan/publish"
+        and method in route.methods
+    ]
+    assert len(matches) == 1
+
+    captured = []
+    for dependency in matches[0].dependant.dependencies:
+        callback = dependency.call
+        closure = getattr(callback, "__closure__", None)
+        if closure:
+            captured.append({
+                key: cell.cell_contents
+                for key, cell in zip(callback.__code__.co_freevars, closure)
+            })
+    assert any(
+        values.get("section") == "distribution" and values.get("action") == "manage"
+        for values in captured
+    )
+
+
 def test_schema_keeps_explicit_single_and_bulk_options():
     assert DailyPlanPublishPayload().all_assigned is False
     assert DailyPlanPublishPayload(all_assigned=True).locked is False
