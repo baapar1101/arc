@@ -13,6 +13,10 @@ import 'quick_sales_change_resolution.dart';
 ///
 /// سبد فعال در state صفحه است؛ این مدل برای سبدهای دیگر و برای ماندگاری محلی است.
 class QuickSalesParkedSale {
+  static final RegExp _requestIdPattern = RegExp(
+    r'^[A-Za-z0-9._:-]{16,160}$',
+  );
+
   final String id;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -66,6 +70,18 @@ class QuickSalesParkedSale {
   });
 
   static String newId() => const Uuid().v4();
+
+  /// Keeps locally persisted sale IDs compatible with the quick-sales API.
+  static bool isValidRequestId(Object? value) {
+    final requestId = value?.toString().trim() ?? '';
+    return _requestIdPattern.hasMatch(requestId);
+  }
+
+  /// Migrates a missing or legacy local ID without dropping the saved basket.
+  static String normalizeRequestId(Object? value) {
+    final requestId = value?.toString().trim() ?? '';
+    return isValidRequestId(requestId) ? requestId : newId();
+  }
 
   bool isBlank({int? anonymousCustomerId}) {
     final isAnon =
@@ -210,7 +226,7 @@ class QuickSalesParkedSale {
     }
 
     return QuickSalesParkedSale(
-      id: json['id']?.toString() ?? newId(),
+      id: normalizeRequestId(json['id']),
       createdAt:
           DateTime.tryParse(json['created_at']?.toString() ?? '') ??
           DateTime.now(),
@@ -370,16 +386,22 @@ class QuickSalesParkedSalesBundle {
     if (_asInt(json['version']) != version) return null;
     final rawSales = json['sales'];
     if (rawSales is! List || rawSales.isEmpty) return null;
+    final storedActiveId = json['active_id']?.toString();
     final sales = <QuickSalesParkedSale>[];
+    String? migratedActiveId;
     for (final raw in rawSales) {
       if (raw is Map) {
-        sales.add(
-          QuickSalesParkedSale.fromJson(Map<String, dynamic>.from(raw)),
-        );
+        final rawSale = Map<String, dynamic>.from(raw);
+        final storedSaleId = rawSale['id']?.toString();
+        final sale = QuickSalesParkedSale.fromJson(rawSale);
+        sales.add(sale);
+        if (migratedActiveId == null && storedSaleId == storedActiveId) {
+          migratedActiveId = sale.id;
+        }
       }
     }
     if (sales.isEmpty) return null;
-    var activeId = json['active_id']?.toString() ?? sales.first.id;
+    var activeId = migratedActiveId ?? storedActiveId ?? sales.first.id;
     if (!sales.any((s) => s.id == activeId)) {
       activeId = sales.first.id;
     }
