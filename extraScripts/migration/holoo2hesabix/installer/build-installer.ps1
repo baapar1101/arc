@@ -45,12 +45,14 @@ function Invoke-AiEdit {
 
 if (-not $SkipAppBuild) {
     $MsBuild = @(
-        "${env:ProgramFiles(x86)}\MSBuild\14.0\Bin\MSBuild.exe",
-        "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2019\BuildTools\MSBuild\Current\Bin\MSBuild.exe",
-        "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\MSBuild.exe",
         "${env:ProgramFiles}\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe",
         "${env:ProgramFiles}\Microsoft Visual Studio\2022\Professional\MSBuild\Current\Bin\MSBuild.exe",
-        "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe"
+        "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe",
+        "${env:ProgramFiles}\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\MSBuild.exe",
+        "D:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe",
+        "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2019\BuildTools\MSBuild\Current\Bin\MSBuild.exe",
+        "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\MSBuild.exe",
+        "${env:ProgramFiles(x86)}\MSBuild\14.0\Bin\MSBuild.exe"
     ) | Where-Object { Test-Path $_ } | Select-Object -First 1
 
     if (-not $MsBuild) {
@@ -83,7 +85,7 @@ if (-not $SkipProjectCreate -or -not (Test-Path $AipPath)) {
     Write-Host "Configuring product..."
     Invoke-AiEdit /SetProperty, "ProductName=Holoo2Hesabix"
     Invoke-AiEdit /SetProperty, "Manufacturer=Hesabix"
-    Invoke-AiEdit /SetVersion, "1.1.0"
+    Invoke-AiEdit /SetVersion, "1.2.0"
     Invoke-AiEdit /SetIcon, "-icon", $IconPath
     Invoke-AiEdit /SetAppdir, "-buildname", "DefaultBuild", "-path", "[ProgramFilesFolder][Manufacturer]\[ProductName]"
     Invoke-AiEdit /SetShortcutdir, "-buildname", "DefaultBuild", "-path", "[ProgramMenuFolder][ProductName]"
@@ -107,7 +109,7 @@ if (-not $SkipProjectCreate -or -not (Test-Path $AipPath)) {
 }
 else {
     Write-Host "Refreshing file sources from Release build..."
-    Invoke-AiEdit /SetVersion, "1.1.0"
+    Invoke-AiEdit /SetVersion, "1.2.0"
     Invoke-AiEdit /UpdateFile, "APPDIR\Holoo2Hesabix.exe", (Join-Path $ReleaseDir "Holoo2Hesabix.exe")
     Invoke-AiEdit /UpdateFile, "APPDIR\Holoo2Hesabix.exe.config", (Join-Path $ReleaseDir "Holoo2Hesabix.exe.config")
     Invoke-AiEdit /UpdateFile, "APPDIR\Newtonsoft.Json.dll", (Join-Path $ReleaseDir "Newtonsoft.Json.dll")
