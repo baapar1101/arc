@@ -619,7 +619,7 @@ class DistributionDailyPlanLock(Base):
 	business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), index=True)
 	user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True)
 	plan_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
-	is_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+	is_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 	published_by_user_id: Mapped[int | None] = mapped_column(
 		Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
 	)
