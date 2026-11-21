@@ -1072,10 +1072,22 @@ def get_daily_plan(db: Session, business_id: int, target_user_id: int, plan_date
 	_ensure_plugin(db, business_id)
 	publication = get_plan_lock(db, business_id, target_user_id, plan_date)
 	if publication is not None and publication.is_locked:
-		# Do not silently recalculate a locked plan from mutable catalog state.
-		if not isinstance(publication.plan_snapshot, dict) or not isinstance(publication.plan_snapshot.get("items"), list):
+		# Never recalculate from live catalog state or mix snapshots between
+		# visitors/dates; corrupt or incorrectly scoped records fail closed.
+		snapshot = publication.plan_snapshot
+		if not isinstance(snapshot, dict) or not isinstance(snapshot.get("items"), list):
 			raise ApiError("CONFLICT", "Locked daily plan has no valid immutable snapshot", http_status=409)
-		result = deepcopy(publication.plan_snapshot)
+		try:
+			snapshot_user_id = int(snapshot.get("user_id"))
+		except (TypeError, ValueError, OverflowError):
+			snapshot_user_id = None
+		if (
+			snapshot_user_id != int(target_user_id)
+			or snapshot.get("plan_date") != plan_date.isoformat()
+			or any(not isinstance(item, dict) for item in snapshot["items"])
+		):
+			raise ApiError("CONFLICT", "Locked daily plan snapshot does not match the requested visitor/date", http_status=409)
+		result = deepcopy(snapshot)
 		result.update(plan_lock_to_dict(publication))
 		return result
 	assignments = (
