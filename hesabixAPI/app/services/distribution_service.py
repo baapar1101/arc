@@ -862,6 +862,42 @@ def assert_assignment_has_no_locked_plans(
 		)
 
 
+def assert_customer_schedule_unlocked(db: Session, business_id: int, person_id: int) -> None:
+	"""Block schedule/profile edits for customers on a locked visitor plan.
+
+	A visitor's due dates can be derived from the customer profile even
+	without editing a route stop, so this guard follows active assignments.
+	"""
+	_serialize_distribution_plan_mutation(db, business_id)
+	q = (
+		db.query(DistributionDailyPlanLock.id)
+		.join(
+			DistributionRouteAssignment,
+			and_(
+				DistributionRouteAssignment.business_id == DistributionDailyPlanLock.business_id,
+				DistributionRouteAssignment.user_id == DistributionDailyPlanLock.user_id,
+				DistributionRouteAssignment.valid_from <= DistributionDailyPlanLock.plan_date,
+				or_(
+					DistributionRouteAssignment.valid_to.is_(None),
+					DistributionRouteAssignment.valid_to >= DistributionDailyPlanLock.plan_date,
+				),
+			),
+		)
+		.join(DistributionRouteStop, DistributionRouteStop.route_id == DistributionRouteAssignment.route_id)
+		.filter(
+			DistributionDailyPlanLock.business_id == business_id,
+			DistributionDailyPlanLock.is_locked.is_(True),
+			DistributionRouteStop.person_id == person_id,
+		)
+	)
+	if q.first() is not None:
+		raise ApiError(
+			"CONFLICT",
+			"Customer is scheduled on a locked daily plan; unpublish before changing visit frequency",
+			http_status=409,
+		)
+
+
 def assigned_user_ids_for_date(db: Session, business_id: int, plan_date: date) -> List[int]:
 	"""Resolve only visitors with a business-owned route assignment active on this day."""
 	rows = (
