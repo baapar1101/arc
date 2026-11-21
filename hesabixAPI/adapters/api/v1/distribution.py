@@ -40,6 +40,7 @@ from adapters.api.v1.schema_models.distribution import (
 	AssortmentPayload,
 	SetupWizardPayload,
 	NewOutletPayload,
+	DailyPlanPublishPayload,
 )
 from app.core.business_calendar import business_today
 from app.services import distribution_service as dist_svc
@@ -376,6 +377,59 @@ def daily_plan(
 	d = _parse_iso_date(plan_date, "plan_date") if plan_date else business_today(business_id)
 	data = dist_svc.get_daily_plan(db, business_id, uid, d)
 	return success_response(data, request)
+
+
+@router.post("/business/{business_id}/daily-plan/publish")
+def publish_daily_plan(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	body: DailyPlanPublishPayload = Body(...),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("distribution", "manage")),
+) -> Dict[str, Any]:
+	"""Publish daily plans; only distribution managers may create publications."""
+	_ensure_plugin(db, business_id)
+	actor = ctx.get_user_id()
+	if actor is None:
+		raise ApiError("UNAUTHORIZED", "No user id", http_status=401)
+	if body.all_assigned and body.target_user_id is not None:
+		raise ApiError("VALIDATION_ERROR", "Use either target_user_id or all_assigned, not both", http_status=400)
+	plan_date = _parse_iso_date(body.plan_date, "plan_date") if body.plan_date else business_today(business_id)
+	if body.all_assigned:
+		result = dist_svc.publish_daily_plans_for_date(
+			db, business_id, int(actor), plan_date, locked=body.locked, notes=body.notes,
+		)
+	else:
+		target_user_id = body.target_user_id or int(actor)
+		result = dist_svc.publish_daily_plan(
+			db, business_id, int(actor), int(target_user_id), plan_date, locked=body.locked, notes=body.notes,
+		)
+	return success_response(result, request)
+
+
+@router.delete("/business/{business_id}/daily-plan/publish")
+def unpublish_daily_plan(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	plan_date: Optional[str] = Query(None),
+	target_user_id: Optional[int] = Query(None, gt=0),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("distribution", "manage")),
+) -> Dict[str, Any]:
+	"""Unpublish a daily plan within the current business."""
+	_ensure_plugin(db, business_id)
+	actor = ctx.get_user_id()
+	if actor is None:
+		raise ApiError("UNAUTHORIZED", "No user id", http_status=401)
+	day = _parse_iso_date(plan_date, "plan_date") if plan_date else business_today(business_id)
+	dist_svc.unpublish_daily_plan(db, business_id, int(target_user_id or actor), day)
+	return success_response({"ok": True}, request)
 
 
 @router.post("/business/{business_id}/visits/start")
