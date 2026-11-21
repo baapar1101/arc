@@ -1159,6 +1159,44 @@ def _active_visit(db: Session, business_id: int, user_id: int) -> Optional[Distr
 	)
 
 
+def assert_visit_matches_daily_plan(
+	plan: Dict[str, Any],
+	person_id: int,
+	*,
+	route_id: Optional[int] = None,
+	route_stop_id: Optional[int] = None,
+) -> None:
+	"""Validate the supplied visit attribution against the visitor's day plan.
+
+	For published/required plans, a client must not attach a visit to a route
+	or stop belonging to another customer, route or business.
+	"""
+	items = plan.get("items")
+	if not isinstance(items, list):
+		raise ApiError("VALIDATION_ERROR", "Daily plan items are invalid", http_status=400)
+	def _item_id(item: Dict[str, Any], key: str) -> Optional[int]:
+		try:
+			value = item.get(key)
+			return int(value) if value is not None else None
+		except (TypeError, ValueError, OverflowError):
+			return None
+
+	matching = [
+		item for item in items
+		if isinstance(item, dict) and _item_id(item, "person_id") == person_id
+	]
+	if route_id is not None:
+		matching = [item for item in matching if _item_id(item, "route_id") == route_id]
+	if route_stop_id is not None:
+		matching = [item for item in matching if _item_id(item, "stop_id") == route_stop_id]
+	if not matching:
+		raise ApiError(
+			"VALIDATION_ERROR",
+			"Visit person, route and stop must match a single entry in today's plan",
+			http_status=400,
+		)
+
+
 def start_visit(
 	db: Session,
 	business_id: int,
@@ -1177,17 +1215,18 @@ def start_visit(
 		raise ApiError("NOT_FOUND", "Person not found", http_status=404)
 	today = business_today(business_id)
 	settings_sv = get_or_create_distribution_settings(db, business_id)
-	if settings_sv.require_visit_in_daily_plan:
-		_plan = get_daily_plan(db, business_id, user_id, today)
-		_allowed_pids = {int(it["person_id"]) for it in _plan["items"]}
-		if person_id not in _allowed_pids:
-			raise ApiError(
-				"VALIDATION_ERROR",
-				"این شخص در برنامهٔ روز ویزیت شما نیست.",
-				http_status=400,
-			)
 	route_id = payload.get("route_id")
 	route_stop_id = payload.get("route_stop_id")
+	publication = get_plan_lock(db, business_id, user_id, today)
+	validated_plan = None
+	if settings_sv.require_visit_in_daily_plan or (publication is not None and publication.is_locked):
+		validated_plan = get_daily_plan(db, business_id, user_id, today)
+		assert_visit_matches_daily_plan(
+			validated_plan,
+			person_id,
+			route_id=int(route_id) if route_id else None,
+			route_stop_id=int(route_stop_id) if route_stop_id else None,
+		)
 	if ctx is not None and route_id:
 		_ensure_route_allowed_for_strict(db, business_id, ctx, int(route_id))
 	if ctx is not None and _use_strict_catalog_for_field_user(db, business_id, ctx):
@@ -1197,8 +1236,9 @@ def start_visit(
 		if route_id and int(route_id) not in allowed_routes:
 			raise ApiError("FORBIDDEN", "مسیر به شما تخصیص داده نشده است.", http_status=403)
 		if not route_id:
-			_plan = get_daily_plan(db, business_id, user_id, today)
-			plan_person_routes = {int(it["person_id"]): int(it["route_id"]) for it in _plan["items"]}
+			if validated_plan is None:
+				validated_plan = get_daily_plan(db, business_id, user_id, today)
+			plan_person_routes = {int(it["person_id"]): int(it["route_id"]) for it in validated_plan["items"]}
 			if person_id not in plan_person_routes:
 				raise ApiError(
 					"FORBIDDEN",
