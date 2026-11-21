@@ -13,6 +13,7 @@ import '../../../services/distribution_offline_queue.dart';
 import '../../../services/distribution_offline_catalog.dart';
 import '../../../utils/distribution_location_helper.dart';
 import 'distribution_team_map_page.dart';
+import 'distribution_tab_permissions.dart';
 import '../distribution_reports_dashboard_page.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart' show SnackBarHelper;
@@ -117,16 +118,12 @@ class _DistributionMainPageState extends State<DistributionMainPage>
 
   int get _tabCount => _tabKeys.length;
 
-  List<String> get _tabKeys {
-    final keys = <String>['field', 'visits', 'returns'];
-    if (_canOperate) {
-      keys.add('settlement');
-      if (_enableVanSales) keys.add('van');
-      if (_enablePresell || _canManage) keys.add('commercial');
-    }
-    if (_canManage) keys.add('manage');
-    return keys;
-  }
+  List<String> get _tabKeys => distributionVisibleTabKeys(
+    canOperate: _canOperate,
+    canManage: _canManage,
+    enableVanSales: _enableVanSales,
+    enablePresell: _enablePresell,
+  );
 
   void _syncTabController() {
     final n = _tabKeys.length;
@@ -149,6 +146,8 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     });
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _refreshOfflineCount();
+      await _refreshSummary();
+      if (!mounted) return;
       await _loadTab(0);
       _startLiveHeartbeat();
     });
@@ -884,7 +883,8 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     }
 
     final tabs = <Tab>[
-      Tab(text: t.distributionTabField, icon: const Icon(Icons.today_outlined)),
+      if (_canOperate)
+        Tab(text: t.distributionTabField, icon: const Icon(Icons.today_outlined)),
       Tab(text: t.distributionTabVisits, icon: const Icon(Icons.place_outlined)),
       Tab(text: t.distributionTabReturns, icon: const Icon(Icons.assignment_return_outlined)),
       if (_canOperate) Tab(text: t.distributionTabSettlement, icon: const Icon(Icons.account_balance_wallet_outlined)),
@@ -895,7 +895,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     ];
 
     final tabChildren = <Widget>[
-      _fieldTab(t),
+      if (_canOperate) _fieldTab(t),
       _visitsTab(t),
       _returnsTab(t),
       if (_canOperate)
