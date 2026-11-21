@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from adapters.db.models.distribution import (
     DistributionDailyPlanLock,
+    DistributionTerritory,
     DistributionRoute,
     DistributionRouteAssignment,
     DistributionRouteStop,
@@ -27,6 +28,7 @@ def db(monkeypatch):
     monkeypatch.setattr(svc, "_ensure_plugin", lambda *_args: None)
     engine = create_engine("sqlite+pysqlite:///:memory:")
     for table in (
+        DistributionTerritory.__table__,
         DistributionRoute.__table__,
         DistributionRouteStop.__table__,
         DistributionRouteAssignment.__table__,
@@ -480,3 +482,30 @@ def test_free_form_visit_route_attribution_is_business_scoped(db):
         validate_visit_route_attribution(db, 10, 707, 100, stop_local.id)
     with pytest.raises(ApiError):  # unknown stop
         validate_visit_route_attribution(db, 10, 707, 99, 999999)
+
+
+def test_locked_plan_blocks_territory_edit_and_delete_until_unpublished(db, monkeypatch):
+    """A territory edit must not bypass protection on its linked route."""
+    from app.services import sepidar_plugin_service
+
+    monkeypatch.setattr(sepidar_plugin_service, "assert_plugin_entity_editable", lambda *_: None)
+    route = setup_route(db)
+    db.add(DistributionTerritory(id=17, business_id=10, code="T-17", name="Original"))
+    db.add(DistributionTerritory(id=18, business_id=11, code="T-18", name="Other business"))
+    db.commit()
+    route.territory_id = 17
+    db.commit()
+
+    with pytest.raises(ApiError):
+        svc.update_territory(db, 10, 17, {"name": "Must not change"})
+    with pytest.raises(ApiError):
+        svc.delete_territory(db, 10, 17)
+    assert db.get(DistributionTerritory, 17).name == "Original"
+    assert db.get(DistributionRoute, 99).territory_id == 17
+
+    # Neither another business nor an unlocked publication is blocked.
+    other = svc.update_territory(db, 11, 18, {"name": "Allowed elsewhere"})
+    assert other["name"] == "Allowed elsewhere"
+    svc.unpublish_daily_plan(db, 10, 20, DAY)
+    renamed = svc.update_territory(db, 10, 17, {"name": "Allowed after unpublish"})
+    assert renamed["name"] == "Allowed after unpublish"
