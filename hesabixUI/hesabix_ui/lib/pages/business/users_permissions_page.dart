@@ -1341,6 +1341,12 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       'telephony': {
         'view': t.localeName.startsWith('fa') ? 'مشاهده مرکز تماس' : 'View telephony center',
         'manage': t.localeName.startsWith('fa') ? 'مدیریت اتصال و داخلی‌ها' : 'Manage PBX & extensions',
+        'view_all_calls': t.localeName.startsWith('fa')
+            ? 'مشاهدهٔ همهٔ تماس‌ها'
+            : 'View all calls',
+        'supervise': t.localeName.startsWith('fa')
+            ? 'نظارت بر تماس‌های تیم'
+            : 'Supervise team calls',
         'click_to_call': t.localeName.startsWith('fa') ? 'Click-to-Call' : 'Click to call',
         'softphone': t.localeName.startsWith('fa') ? 'Softphone داخل‌برنامه' : 'In-app softphone',
         'softphone_manage': t.localeName.startsWith('fa') ? 'مدیریت Softphone و حالت رسانه' : 'Manage softphone media modes',
@@ -2175,7 +2181,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       case 'allocate':
         return 'تخصیص حساب';
       case 'post':
-        return 'قطعی‌سازی';
+        return sectionKey == 'payroll' ? t.payrollPermissionPost : 'قطعی‌سازی';
       case 'cancel':
         return 'ابطال';
       case 'change_unit_cost':
@@ -2196,7 +2202,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       case 'history':
         return t.history;
       case 'print':
-        return t.print;
+        return sectionKey == 'barcode_labels' ? t.barcodeLabelPermissionPrint : t.print;
       case 'users':
         return t.users;
       case 'business':
@@ -2230,8 +2236,6 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.manage;
       case 'design':
         return sectionKey == 'barcode_labels' ? t.barcodeLabelPermissionDesign : action;
-      case 'print':
-        return sectionKey == 'barcode_labels' ? t.barcodeLabelPermissionPrint : (t.printDocuments);
       case 'adjust':
         return t.customerClubActionAdjust;
       case 'redeem':
@@ -2249,8 +2253,6 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
           return t.payrollPermissionOperate;
         }
         return t.distributionPermissionOperate;
-      case 'post':
-        return t.payrollPermissionPost;
       case 'approve':
         return t.payrollPermissionApprove;
       case 'sync':

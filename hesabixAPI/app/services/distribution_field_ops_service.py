@@ -171,6 +171,8 @@ def upsert_customer_profile(
 	person = db.query(Person).filter(Person.id == person_id, Person.business_id == business_id).first()
 	if not person:
 		raise ApiError("NOT_FOUND", "Person not found", http_status=404)
+	if {"customer_class", "visit_frequency", "cycle_offset"}.intersection(payload):
+		dist_svc.assert_customer_schedule_unlocked(db, business_id, person_id)
 	row = get_profile(db, business_id, person_id)
 	if not row:
 		row = DistributionCustomerProfile(business_id=business_id, person_id=person_id)
@@ -423,7 +425,9 @@ def enrich_daily_plan(
 	plan_date: date,
 	items: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
-	settings = dist_svc.get_or_create_distribution_settings(db, business_id)
+	# Daily-plan reads must not commit: publication holds a transaction-level
+	# PostgreSQL advisory lock until the plan and its snapshot are persisted.
+	settings = dist_svc.get_distribution_settings_row(db, business_id)
 	carry = bool(getattr(settings, "carry_over_missed_visits", True))
 	lookback = max(1, int(getattr(settings, "carry_over_days", 7) or 7))
 

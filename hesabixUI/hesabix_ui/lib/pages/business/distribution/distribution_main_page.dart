@@ -13,6 +13,7 @@ import '../../../services/distribution_offline_queue.dart';
 import '../../../services/distribution_offline_catalog.dart';
 import '../../../utils/distribution_location_helper.dart';
 import 'distribution_team_map_page.dart';
+import 'distribution_tab_permissions.dart';
 import '../distribution_reports_dashboard_page.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart' show SnackBarHelper;
@@ -117,16 +118,12 @@ class _DistributionMainPageState extends State<DistributionMainPage>
 
   int get _tabCount => _tabKeys.length;
 
-  List<String> get _tabKeys {
-    final keys = <String>['field', 'visits', 'returns'];
-    if (_canOperate) {
-      keys.add('settlement');
-      if (_enableVanSales) keys.add('van');
-      if (_enablePresell || _canManage) keys.add('commercial');
-    }
-    if (_canManage) keys.add('manage');
-    return keys;
-  }
+  List<String> get _tabKeys => distributionVisibleTabKeys(
+    canOperate: _canOperate,
+    canManage: _canManage,
+    enableVanSales: _enableVanSales,
+    enablePresell: _enablePresell,
+  );
 
   void _syncTabController() {
     final n = _tabKeys.length;
@@ -149,6 +146,8 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     });
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _refreshOfflineCount();
+      await _refreshSummary();
+      if (!mounted) return;
       await _loadTab(0);
       _startLiveHeartbeat();
     });
@@ -847,6 +846,111 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     return '$wd';
   }
 
+  /// Publish all assigned visitors' plans for the selected day.
+  ///
+  /// This first integration stage publishes without enforcing route locks.
+  Future<void> _publishAllAssignedPlans() async {
+    if (!_canManage) return;
+    final t = AppLocalizations.of(context);
+    final fa = t.localeName.startsWith('fa');
+    final confirm = await showGlassDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(fa ? 'انتشار برنامه‌های روزانه' : 'Publish daily plans'),
+        content: Text(
+          fa
+              ? 'برنامه‌های ویزیتورهای دارای مسیر فعال در تاریخ انتخاب‌شده منتشر شوند؟ در این مرحله برنامه‌ها قفل نمی‌شوند.'
+              : 'Publish plans for assigned visitors on the selected date? Plans will not be locked in this stage.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(t.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(fa ? 'انتشار' : 'Publish'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirm != true) return;
+
+    try {
+      final result = await _svc.publishDailyPlan(
+        businessId: widget.businessId,
+        planDate: _iso(_planDay),
+        allAssigned: true,
+        locked: false,
+      );
+      await _refreshPlan();
+      if (!mounted) return;
+      final count = int.tryParse('${result['published_count']}') ?? 0;
+      SnackBarHelper.showSuccess(
+        context,
+        message: count > 0
+            ? (fa ? 'برنامهٔ $count ویزیتور منتشر شد' : 'Published plans for $count visitors')
+            : (fa ? 'برنامهٔ قابل انتشاری یافت نشد' : 'No assigned plans to publish'),
+      );
+    } catch (error) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(error, context),
+        );
+      }
+    }
+  }
+
+  Future<void> _unpublishSelectedPlan() async {
+    if (!_canManage || _dailyPlan?['published'] != true) return;
+    final t = AppLocalizations.of(context);
+    final fa = t.localeName.startsWith('fa');
+    final confirmed = await showGlassDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(fa ? 'لغو انتشار برنامه' : 'Unpublish daily plan'),
+        content: Text(
+          fa
+              ? 'انتشار برنامهٔ نمایش‌داده‌شده برای تاریخ انتخاب‌شده لغو شود؟'
+              : 'Unpublish the currently displayed plan for the selected date?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(t.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(fa ? 'لغو انتشار' : 'Unpublish'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    try {
+      await _svc.unpublishDailyPlan(
+        businessId: widget.businessId,
+        planDate: _iso(_planDay),
+        targetUserId: _teamTargetUserId,
+      );
+      await _refreshPlan();
+      if (mounted) {
+        SnackBarHelper.showSuccess(
+          context,
+          message: fa ? 'انتشار برنامه لغو شد' : 'Daily plan unpublished',
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(error, context),
+        );
+      }
+    }
+  }
+
   void _openReports() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -884,7 +988,8 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     }
 
     final tabs = <Tab>[
-      Tab(text: t.distributionTabField, icon: const Icon(Icons.today_outlined)),
+      if (_canOperate)
+        Tab(text: t.distributionTabField, icon: const Icon(Icons.today_outlined)),
       Tab(text: t.distributionTabVisits, icon: const Icon(Icons.place_outlined)),
       Tab(text: t.distributionTabReturns, icon: const Icon(Icons.assignment_return_outlined)),
       if (_canOperate) Tab(text: t.distributionTabSettlement, icon: const Icon(Icons.account_balance_wallet_outlined)),
@@ -895,7 +1000,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     ];
 
     final tabChildren = <Widget>[
-      _fieldTab(t),
+      if (_canOperate) _fieldTab(t),
       _visitsTab(t),
       _returnsTab(t),
       if (_canOperate)
@@ -926,6 +1031,22 @@ class _DistributionMainPageState extends State<DistributionMainPage>
         title: Text(t.distributionMenu),
         leading: businessSubpageBackLeading(context, widget.businessId),
         actions: [
+          if (_canManage)
+            IconButton(
+              tooltip: t.localeName.startsWith('fa')
+                  ? 'انتشار برنامه‌های روزانه (بدون قفل)'
+                  : 'Publish daily plans (unlocked)',
+              onPressed: _publishAllAssignedPlans,
+              icon: const Icon(Icons.publish_outlined),
+            ),
+          if (_canManage && _dailyPlan?['published'] == true)
+            IconButton(
+              tooltip: t.localeName.startsWith('fa')
+                  ? 'لغو انتشار برنامهٔ انتخاب‌شده'
+                  : 'Unpublish the selected plan',
+              onPressed: _unpublishSelectedPlan,
+              icon: const Icon(Icons.undo_outlined),
+            ),
           if (_canTeam)
             IconButton(
               tooltip: t.distributionTabTeamMap,

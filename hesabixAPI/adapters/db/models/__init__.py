@@ -261,6 +261,7 @@ from .distribution import (  # noqa: F401
 	DistributionAssortment,
 	DistributionCustomerProfile,
 	DistributionVanLot,
+	DistributionDailyPlanLock,
 )
 from .telephony import (  # noqa: F401
 	TelephonySettings,

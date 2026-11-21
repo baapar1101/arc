@@ -21,7 +21,7 @@ void main() {
 
   test('parked sale round-trips cart, customer and totals', () {
     final sale = QuickSalesParkedSale(
-      id: 'sale-1',
+      id: 'sale-1234567890123456',
       createdAt: DateTime.utc(2026, 8, 15, 8),
       updatedAt: DateTime.utc(2026, 8, 15, 9),
       customer: const Customer(id: 42, name: 'علی رضایی', phone: '09120000000'),
@@ -50,7 +50,7 @@ void main() {
     );
 
     final parsed = QuickSalesParkedSale.fromJson(sale.toJson());
-    expect(parsed.id, 'sale-1');
+    expect(parsed.id, 'sale-1234567890123456');
     expect(parsed.customer?.id, 42);
     expect(parsed.customer?.phone, '09120000000');
     expect(parsed.cartItems, hasLength(1));
@@ -82,14 +82,14 @@ void main() {
       isNull,
     );
     final sale = QuickSalesParkedSale(
-      id: 'a',
+      id: 'sale-1234567890123456',
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
       documentDate: DateTime.now(),
     );
-    final bundle = QuickSalesParkedSalesBundle(activeId: 'a', sales: [sale]);
+    final bundle = QuickSalesParkedSalesBundle(activeId: 'sale-1234567890123456', sales: [sale]);
     final parsed = QuickSalesParkedSalesBundle.tryParse(bundle.toJson());
-    expect(parsed?.activeId, 'a');
+    expect(parsed?.activeId, 'sale-1234567890123456');
     expect(parsed?.sales, hasLength(1));
   });
 
@@ -147,6 +147,40 @@ void main() {
       );
     },
   );
+
+  test('legacy parked sale ID migrates without losing the active basket', () {
+    final sale = QuickSalesParkedSale(
+      id: 'old-id',
+      createdAt: DateTime.utc(2026, 10, 14),
+      updatedAt: DateTime.utc(2026, 10, 14),
+      documentDate: DateTime.utc(2026, 10, 14),
+      documentDescription: 'Existing parked basket',
+      cartItems: [
+        InvoiceLineItem(
+          lineKey: 'legacy-line',
+          productId: 7,
+          productName: 'Test product',
+          quantity: 2,
+          unitPrice: 100,
+        ),
+      ],
+    );
+
+    final parsed = QuickSalesParkedSalesBundle.tryParse(
+      QuickSalesParkedSalesBundle(
+        activeId: 'old-id',
+        sales: [sale],
+      ).toJson(),
+    );
+
+    expect(parsed, isNotNull);
+    expect(parsed!.sales, hasLength(1));
+    expect(QuickSalesParkedSale.isValidRequestId(parsed.activeId), isTrue);
+    expect(parsed.activeId, parsed.sales.single.id);
+    expect(parsed.sales.single.cartItems.single.productId, 7);
+    expect(parsed.sales.single.cartItems.single.quantity, 2);
+    expect(parsed.sales.single.documentDescription, 'Existing parked basket');
+  });
 
   test('parked sale preserves split change resolution', () {
     final sale = QuickSalesParkedSale(

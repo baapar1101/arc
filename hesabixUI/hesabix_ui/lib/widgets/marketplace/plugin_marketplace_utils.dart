@@ -12,6 +12,7 @@ const Map<String, String> pluginSetupRouteByCode = {
   'product_warranty': 'business_warranty',
   'distribution': 'business_distribution',
   'woocommerce_hesabix': 'business_woocommerce',
+  'digipay_credit': 'business_digipay',
   'customer_club': 'business_customer_club',
   'payroll': 'business_payroll',
   'fixed_assets': 'business_fixed_assets',
@@ -20,6 +21,43 @@ const Map<String, String> pluginSetupRouteByCode = {
   'conditional_pricing': 'business_conditional_pricing',
   'inventory_trace_cost': 'business_inventory_trace_cost',
   'hscript_custom_reports': 'business_hscript_reports',
+  'advanced_accounting': 'business_reports',
+};
+
+const String kAdvancedAccountingPluginCode = 'advanced_accounting';
+const String kAiMcpServerPluginCode = 'ai_mcp_server';
+
+/// آیتم‌های منوی شل که فقط با لایسنس بسته حسابداری پیشرفته دیده می‌شوند.
+const Set<String> kAdvancedAccountingMenuKeys = {
+  'year-end-closing',
+  'currency-revaluation',
+  'loan-facilities',
+  'report-templates',
+};
+
+/// مسیرهای تنظیمات کسب‌وکار که فقط با لایسنس این افزونه دیده می‌شوند.
+const Set<String> kAdvancedAccountingSettingsKeys = {
+  'backup',
+  'ftp_backup',
+  'restore',
+  'report_templates',
+};
+
+/// کلید کارت گزارش در hub که با همین افزونه گیت می‌شود.
+const Set<String> kAdvancedAccountingReportKeys = {
+  'trial_balance',
+  'balance_sheet',
+  'financial_package',
+  'general_ledger',
+  'journal_ledger',
+  'accounts_review',
+  'cash_flow',
+  'fx_revaluation',
+  'pnl_period',
+  'pnl_cumulative',
+  'ar_aging',
+  'ap_aging',
+  'person_balances_by_currency',
 };
 
 /// دسته‌های شناخته‌شده در seed/API.
@@ -30,6 +68,7 @@ const Set<String> kPluginMarketplaceCategories = {
   'sales',
   'crm_marketing',
   'reporting',
+  'accounting',
 };
 
 String pluginCategoryLabel(AppLocalizations t, String? category) {
@@ -44,6 +83,8 @@ String pluginCategoryLabel(AppLocalizations t, String? category) {
       return t.pluginMarketplaceCategorySales;
     case 'crm_marketing':
       return t.pluginMarketplaceCategoryCrmMarketing;
+    case 'accounting':
+      return t.localeName.startsWith('fa') ? 'حسابداری' : 'Accounting';
     case 'hr_payroll':
       return t.localeName.startsWith('fa') ? 'منابع انسانی و حقوق' : 'HR & Payroll';
     case 'reporting':
@@ -78,6 +119,8 @@ IconData pluginCategoryIcon(String? category) {
       return Icons.local_shipping_outlined;
     case 'crm_marketing':
       return Icons.loyalty_outlined;
+    case 'accounting':
+      return Icons.calculate_outlined;
     default:
       return Icons.extension_outlined;
   }
@@ -132,6 +175,60 @@ Map<String, dynamic>? businessPluginForId(
     }
   }
   return null;
+}
+
+bool marketplaceJsonBool(dynamic value) {
+  if (value == true) return true;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final v = value.trim().toLowerCase();
+    return v == 'true' || v == '1';
+  }
+  return false;
+}
+
+const String kPluginSourceSystemDefault = 'system_default';
+
+/// لایسنس کسب‌وکار برای افزونه فعال است (خرید فعال یا آزمایشی منقضی‌نشده).
+bool marketplacePluginLicenseActive(Map<dynamic, dynamic>? row) {
+  if (row == null || row.isEmpty) return false;
+  if (marketplaceJsonBool(row['is_active'])) return true;
+  return marketplaceJsonBool(row['is_trial']) && !marketplaceJsonBool(row['is_expired']);
+}
+
+bool pluginLicenseIsSystemDefault(Map<dynamic, dynamic>? row) {
+  if (row == null || row.isEmpty) return false;
+  return row['source']?.toString() == kPluginSourceSystemDefault;
+}
+
+/// افزونه در بازار قابل خرید/trial است (سراسری‌ها فروخته نمی‌شوند).
+bool pluginIsPurchasable(Map<dynamic, dynamic>? plugin) {
+  if (plugin == null || plugin.isEmpty) return false;
+  if (plugin.containsKey('purchasable') &&
+      !marketplaceJsonBool(plugin['purchasable'])) {
+    return false;
+  }
+  if (marketplaceJsonBool(plugin['enabled_for_all_businesses'])) return false;
+  return true;
+}
+
+bool pluginIsGloballyEnabled(
+  Map<dynamic, dynamic>? plugin, [
+  Map<dynamic, dynamic>? status,
+]) {
+  return marketplaceJsonBool(plugin?['enabled_for_all_businesses']) ||
+      marketplaceJsonBool(status?['globally_enabled']);
+}
+
+Set<String> activeMarketplacePluginCodes(Iterable<dynamic> plugins) {
+  final codes = <String>{};
+  for (final raw in plugins) {
+    if (raw is! Map) continue;
+    if (!marketplacePluginLicenseActive(raw)) continue;
+    final code = raw['plugin_code']?.toString();
+    if (code != null && code.isNotEmpty) codes.add(code);
+  }
+  return codes;
 }
 
 bool hasUsedTrial(Map<String, dynamic>? pluginStatus) {

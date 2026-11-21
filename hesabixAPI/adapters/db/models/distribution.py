@@ -606,3 +606,25 @@ class DistributionVanLot(Base):
 	unit_volume_m3: Mapped[float | None] = mapped_column(Numeric(12, 4), nullable=True)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+class DistributionDailyPlanLock(Base):
+	"""Published daily distribution plan status per assigned visitor."""
+
+	__tablename__ = "distribution_daily_plan_locks"
+	__table_args__ = (
+		UniqueConstraint("business_id", "user_id", "plan_date", name="uq_dist_daily_plan_lock"),
+	)
+
+	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+	business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), index=True)
+	user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+	plan_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+	is_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+	published_by_user_id: Mapped[int | None] = mapped_column(
+		Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
+	)
+	published_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+	notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+	plan_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

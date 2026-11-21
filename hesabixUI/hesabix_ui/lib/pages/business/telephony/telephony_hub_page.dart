@@ -8,6 +8,7 @@ import '../../../core/auth_store.dart';
 import '../../../core/business_nav.dart';
 import '../../../services/telephony/telephony_api.dart';
 import '../../../widgets/telephony/telephony_dialer_sheet.dart';
+import '../../../widgets/telephony/telephony_party.dart';
 import '../../../widgets/telephony/telephony_recording_player.dart';
 import '../../../services/telephony/telephony_session_controller.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
@@ -29,6 +30,22 @@ class TelephonyHubPage extends StatefulWidget {
 class _TelephonyHubPageState extends State<TelephonyHubPage> {
   final _api = TelephonyApi();
   Map<String, dynamic>? _dashboard;
+
+  bool get _canManage =>
+      widget.authStore.hasBusinessPermission('telephony', 'manage') ||
+      (_dashboard?['access'] is Map &&
+          (_dashboard?['access'] as Map)['can_manage'] == true);
+
+  bool get _canLive =>
+      widget.authStore.hasBusinessPermission('telephony', 'live_monitor') ||
+      widget.authStore.hasBusinessPermission('telephony', 'supervise') ||
+      widget.authStore.hasBusinessPermission('telephony', 'manage');
+
+  bool get _canReports =>
+      widget.authStore.hasBusinessPermission('telephony', 'reports') ||
+      widget.authStore.hasBusinessPermission('telephony', 'supervise') ||
+      widget.authStore.hasBusinessPermission('telephony', 'manage');
+
   bool _loading = true;
   String? _error;
 
@@ -134,22 +151,25 @@ class _TelephonyHubPageState extends State<TelephonyHubPage> {
                           icon: const Icon(Icons.history_rounded),
                           label: const Text('تاریخچه'),
                         ),
-                        OutlinedButton.icon(
-                          onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony/live')),
-                          icon: const Icon(Icons.monitor_heart_outlined),
-                          label: const Text('زنده'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony/reports')),
-                          icon: const Icon(Icons.insights_outlined),
-                          label: const Text('گزارش'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () =>
-                              context.go(context.businessPanelUrl(widget.businessId, 'settings/telephony')),
-                          icon: const Icon(Icons.settings_outlined),
-                          label: const Text('تنظیمات'),
-                        ),
+                        if (_canLive)
+                          OutlinedButton.icon(
+                            onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony/live')),
+                            icon: const Icon(Icons.monitor_heart_outlined),
+                            label: const Text('زنده'),
+                          ),
+                        if (_canReports)
+                          OutlinedButton.icon(
+                            onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony/reports')),
+                            icon: const Icon(Icons.insights_outlined),
+                            label: const Text('گزارش'),
+                          ),
+                        if (_canManage)
+                          OutlinedButton.icon(
+                            onPressed: () =>
+                                context.go(context.businessPanelUrl(widget.businessId, 'settings/telephony')),
+                            icon: const Icon(Icons.settings_outlined),
+                            label: const Text('تنظیمات'),
+                          ),
                         TextButton.icon(
                           onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony/softphone')),
                           icon: const Icon(Icons.headset_mic_outlined),
@@ -212,7 +232,8 @@ class _TelephonyHubPageState extends State<TelephonyHubPage> {
                         children: [
                           const Text('هنوز مرکز تلفنی متصل نشده است.'),
                           const SizedBox(height: 12),
-                          FilledButton(
+                          if (_canManage)
+                            FilledButton(
                             onPressed: () =>
                                 context.go(context.businessPanelUrl(widget.businessId, 'settings/telephony')),
                             child: const Text('اتصال Issabel'),
@@ -433,9 +454,12 @@ class _TelephonyCallsPageState extends State<TelephonyCallsPage> {
                         final c = _items[i];
                         final status = '${c['status'] ?? ''}';
                         final dir = '${c['direction'] ?? ''}';
-                        final peer = dir == 'inbound'
-                            ? (c['from_number_normalized'] ?? c['from_number_raw'])
-                            : (c['to_number_normalized'] ?? c['to_number_raw']);
+                        final peer = telephonyPartyTitle(
+                          c,
+                          unknownLabel: 'شماره ناشناس',
+                          ambiguousLabel: 'تماس‌گیرنده نامشخص',
+                        );
+                        final peerSub = telephonyPartySubtitle(c);
                         return ListTile(
                           leading: CircleAvatar(
                             backgroundColor: _statusColor(status, scheme).withValues(alpha: 0.15),
@@ -444,10 +468,12 @@ class _TelephonyCallsPageState extends State<TelephonyCallsPage> {
                               color: _statusColor(status, scheme),
                             ),
                           ),
-                          title: Text('$peer'),
+                          title: Text(peer),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              if (peerSub != null && peerSub.isNotEmpty)
+                                Text(peerSub, style: Theme.of(context).textTheme.bodySmall),
                               Text(
                                 '${_statusFa(status)} · داخلی ${c['extension'] ?? '—'} · ${c['duration_sec'] ?? 0} ثانیه',
                               ),
@@ -542,6 +568,10 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
+    if (!widget.authStore.hasBusinessPermission('telephony', 'manage')) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
     try {
       final settings = await _api.getSettings(widget.businessId);
       final pbx = await _api.listPbx(widget.businessId);
@@ -827,6 +857,20 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.authStore.hasBusinessPermission('telephony', 'manage')) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('تنظیمات مرکز تماس'),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+        ),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text('برای تنظیم مرکز تماس، دسترسی مدیریت تلفن لازم است.'),
+          ),
+        ),
+      );
+    }
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
