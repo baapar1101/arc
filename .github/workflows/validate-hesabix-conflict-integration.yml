@@ -120,9 +120,10 @@ jobs:
           migration = script.get_revision("20261121_000001_dist_plan_locks")
           assert migration is not None
           assert migration.down_revision == "20261101_000001_sepidar_reconciliation"
-          snapshot = script.get_revision("20261121_000002_dist_plan_snapshot")
+          snapshot = script.get_revision("20261121_000002_plan_snapshot")
           assert snapshot is not None
           assert snapshot.down_revision == "20261121_000001_dist_plan_locks"
+          assert len(snapshot.revision) <= 32  # Alembic version_num column limit
           print("Daily plan lock and snapshot migrations registered in Alembic graph")
           PY
 
