@@ -1569,6 +1569,16 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         default:
           break;
       }
+      if (p.description != null && p.description!.isNotEmpty) {
+        map['description'] = p.description;
+      }
+      if (p.extraInfo != null && p.extraInfo!.isNotEmpty) {
+        map['extra_info'] = p.extraInfo;
+        final providerId = p.extraInfo!['digipay_provider_id'];
+        if (providerId != null) {
+          map['digipay_provider_id'] = providerId;
+        }
+      }
       out.add(map);
     }
     return out;
@@ -2443,7 +2453,9 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       for (final item in items) {
         final pid = (item['product_id'] as num?)?.toInt();
         if (pid != null) {
-          stocksMap[pid] = (item['quantity'] as num?) ?? 0;
+          stocksMap[pid] = (item['sellable_quantity'] as num?) ??
+              (item['quantity'] as num?) ??
+              0;
         }
       }
       if (!mounted) return;
@@ -2506,7 +2518,9 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       for (final item in items) {
         final pid = (item['product_id'] as num?)?.toInt();
         if (pid != null) {
-          stocksMap[pid] = (item['quantity'] as num?) ?? 0;
+          stocksMap[pid] = (item['sellable_quantity'] as num?) ??
+              (item['quantity'] as num?) ??
+              0;
         }
       }
 
