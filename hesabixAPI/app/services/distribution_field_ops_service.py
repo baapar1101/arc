@@ -171,6 +171,8 @@ def upsert_customer_profile(
 	person = db.query(Person).filter(Person.id == person_id, Person.business_id == business_id).first()
 	if not person:
 		raise ApiError("NOT_FOUND", "Person not found", http_status=404)
+	if {"customer_class", "visit_frequency", "cycle_offset"}.intersection(payload):
+		dist_svc.assert_customer_schedule_unlocked(db, business_id, person_id)
 	row = get_profile(db, business_id, person_id)
 	if not row:
 		row = DistributionCustomerProfile(business_id=business_id, person_id=person_id)
