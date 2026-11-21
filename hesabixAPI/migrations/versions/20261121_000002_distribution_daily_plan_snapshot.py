@@ -11,7 +11,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "20261121_000002_dist_plan_snapshot"
+revision = "20261121_000002_plan_snapshot"
 down_revision = "20261121_000001_dist_plan_locks"
 branch_labels = None
 depends_on = None
