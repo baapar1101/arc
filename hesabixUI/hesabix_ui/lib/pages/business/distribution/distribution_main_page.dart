@@ -902,6 +902,55 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     }
   }
 
+  Future<void> _unpublishSelectedPlan() async {
+    if (!_canManage || _dailyPlan?['published'] != true) return;
+    final t = AppLocalizations.of(context);
+    final fa = t.localeName.startsWith('fa');
+    final confirmed = await showGlassDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(fa ? 'لغو انتشار برنامه' : 'Unpublish daily plan'),
+        content: Text(
+          fa
+              ? 'انتشار برنامهٔ نمایش‌داده‌شده برای تاریخ انتخاب‌شده لغو شود؟'
+              : 'Unpublish the currently displayed plan for the selected date?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(t.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(fa ? 'لغو انتشار' : 'Unpublish'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    try {
+      await _svc.unpublishDailyPlan(
+        businessId: widget.businessId,
+        planDate: _iso(_planDay),
+        targetUserId: _teamTargetUserId,
+      );
+      await _refreshPlan();
+      if (mounted) {
+        SnackBarHelper.showSuccess(
+          context,
+          message: fa ? 'انتشار برنامه لغو شد' : 'Daily plan unpublished',
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(error, context),
+        );
+      }
+    }
+  }
+
   void _openReports() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -989,6 +1038,14 @@ class _DistributionMainPageState extends State<DistributionMainPage>
                   : 'Publish daily plans (unlocked)',
               onPressed: _publishAllAssignedPlans,
               icon: const Icon(Icons.publish_outlined),
+            ),
+          if (_canManage && _dailyPlan?['published'] == true)
+            IconButton(
+              tooltip: t.localeName.startsWith('fa')
+                  ? 'لغو انتشار برنامهٔ انتخاب‌شده'
+                  : 'Unpublish the selected plan',
+              onPressed: _unpublishSelectedPlan,
+              icon: const Icon(Icons.undo_outlined),
             ),
           if (_canTeam)
             IconButton(
