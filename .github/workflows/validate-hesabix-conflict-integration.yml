@@ -1,0 +1,53 @@
+name: Validate Hesabix conflict integration
+
+on:
+  push:
+    branches:
+      - integration/resolve-hesabix-conflicts-20261102
+    paths:
+      - 'hesabixUI/hesabix_ui/lib/pages/business/repair_shop/**'
+      - 'hesabixUI/hesabix_ui/lib/pages/business/quick_sales_page.dart'
+      - 'hesabixUI/hesabix_ui/lib/models/quick_sales_parked_sale.dart'
+      - 'hesabixUI/hesabix_ui/lib/models/invoice_transaction.dart'
+      - 'hesabixUI/hesabix_ui/lib/widgets/invoice/person_combobox_widget.dart'
+      - 'hesabixUI/hesabix_ui/test/quick_sales_parked_sale_test.dart'
+      - '.github/workflows/validate-hesabix-conflict-integration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  focused-flutter-validation:
+    name: Focused Flutter analysis and regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: hesabixUI/hesabix_ui
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Resolve Flutter dependencies
+        run: flutter pub get
+
+      - name: Analyze changed feature files
+        run: |
+          flutter analyze --no-pub --no-fatal-infos \
+            lib/pages/business/repair_shop/repair_order_detail_page.dart \
+            lib/pages/business/repair_shop/repair_technicians_page.dart \
+            lib/pages/business/quick_sales_page.dart \
+            lib/models/quick_sales_parked_sale.dart \
+            lib/models/invoice_transaction.dart \
+            lib/widgets/invoice/person_combobox_widget.dart
+
+      - name: Run parked-sale migration regression tests
+        run: flutter test --no-pub test/quick_sales_parked_sale_test.dart
