@@ -66,6 +66,41 @@ def test_publication_endpoints_require_distribution_manage(method):
     )
 
 
+def test_alembic_plan_lock_migration_upgrade_and_downgrade(monkeypatch):
+    from importlib.util import module_from_spec, spec_from_file_location
+    from pathlib import Path
+
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+    from sqlalchemy import inspect
+
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "migrations"
+        / "versions"
+        / "20261121_000001_distribution_daily_plan_locks.py"
+    )
+    spec = spec_from_file_location("distribution_daily_plan_migration", path)
+    assert spec is not None and spec.loader is not None
+    migration = module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    with engine.begin() as connection:
+        monkeypatch.setattr(migration, "op", Operations(MigrationContext.configure(connection)))
+        migration.upgrade()
+        columns = {
+            col["name"]
+            for col in inspect(connection).get_columns("distribution_daily_plan_locks")
+        }
+        assert {
+            "business_id", "user_id", "plan_date", "is_locked",
+            "published_by_user_id", "published_at",
+        }.issubset(columns)
+        migration.downgrade()
+        assert not inspect(connection).has_table("distribution_daily_plan_locks")
+    engine.dispose()
+
+
 def test_schema_keeps_explicit_single_and_bulk_options():
     assert DailyPlanPublishPayload().all_assigned is False
     assert DailyPlanPublishPayload(all_assigned=True).locked is False
