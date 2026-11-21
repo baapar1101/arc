@@ -7,10 +7,13 @@ on:
     paths:
       - 'hesabixUI/hesabix_ui/lib/pages/business/repair_shop/**'
       - 'hesabixUI/hesabix_ui/lib/pages/business/quick_sales_page.dart'
+      - 'hesabixUI/hesabix_ui/lib/pages/business/telephony/telephony_hub_page.dart'
+      - 'hesabixUI/hesabix_ui/lib/widgets/telephony/telephony_party.dart'
       - 'hesabixUI/hesabix_ui/lib/models/quick_sales_parked_sale.dart'
       - 'hesabixUI/hesabix_ui/lib/models/invoice_transaction.dart'
       - 'hesabixUI/hesabix_ui/lib/widgets/invoice/person_combobox_widget.dart'
       - 'hesabixUI/hesabix_ui/test/quick_sales_parked_sale_test.dart'
+      - 'hesabixUI/hesabix_ui/test/telephony_party_test.dart'
       - '.github/workflows/validate-hesabix-conflict-integration.yml'
   workflow_dispatch:
 
@@ -45,9 +48,13 @@ jobs:
             lib/pages/business/repair_shop/repair_order_detail_page.dart \
             lib/pages/business/repair_shop/repair_technicians_page.dart \
             lib/pages/business/quick_sales_page.dart \
+            lib/pages/business/telephony/telephony_hub_page.dart \
+            lib/widgets/telephony/telephony_party.dart \
             lib/models/quick_sales_parked_sale.dart \
             lib/models/invoice_transaction.dart \
             lib/widgets/invoice/person_combobox_widget.dart
 
       - name: Run parked-sale migration regression tests
-        run: flutter test --no-pub test/quick_sales_parked_sale_test.dart
+        run: |
+          flutter test --no-pub test/quick_sales_parked_sale_test.dart
+          flutter test --no-pub test/telephony_party_test.dart
