@@ -544,6 +544,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
       final res = await _offlineQueue.sync(widget.businessId);
       await _refreshOfflineCount();
       await _refreshSummary();
+      await _refreshPlan();
       await _refreshVisits();
       if (!mounted) return;
       final remaining = res['remaining'] as int? ?? 0;
@@ -748,6 +749,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
         message: '${t.distributionStartVisit}: #${res['id']} — $msg\n${t.distributionVisitStayHint}',
       );
       await _refreshVisits(detectActiveOnly: true);
+            await _refreshPlan();
     } catch (e) {
       final err = ErrorExtractor.forContext(e, context);
       if (err.contains('GEOFENCE') || err.contains('فاصله')) {
@@ -798,6 +800,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
             if (!mounted) return;
             SnackBarHelper.showSuccess(context, message: t.distributionVisitStayHint);
             await _refreshVisits(detectActiveOnly: true);
+            await _refreshPlan();
           } catch (e2) {
             await _enqueueOffline('start_visit', payload, clientRef: 'start_${item['person_id']}');
             if (mounted) {
@@ -835,6 +838,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
         reason: t.distributionCancelVisit,
       );
       await _refreshVisits();
+      await _refreshPlan();
       await _refreshSummary();
       if (mounted) SnackBarHelper.showSuccess(context, message: t.distributionCancelVisit);
     } catch (e) {
