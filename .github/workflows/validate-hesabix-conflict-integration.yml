@@ -6,6 +6,8 @@ on:
       - integration/resolve-hesabix-conflicts-20261102
     paths:
       - 'hesabixUI/hesabix_ui/lib/pages/business/repair_shop/**'
+      - 'hesabixUI/hesabix_ui/lib/pages/business/distribution/distribution_main_page.dart'
+      - 'hesabixUI/hesabix_ui/lib/pages/business/distribution/distribution_tab_permissions.dart'
       - 'hesabixUI/hesabix_ui/lib/pages/business/quick_sales_page.dart'
       - 'hesabixUI/hesabix_ui/lib/pages/business/telephony/telephony_hub_page.dart'
       - 'hesabixUI/hesabix_ui/lib/pages/business/users_permissions_page.dart'
@@ -18,6 +20,7 @@ on:
       - 'hesabixUI/hesabix_ui/test/quick_sales_parked_sale_test.dart'
       - 'hesabixUI/hesabix_ui/test/telephony_party_test.dart'
       - 'hesabixUI/hesabix_ui/test/plugin_marketplace_utils_test.dart'
+      - 'hesabixUI/hesabix_ui/test/distribution_tab_permissions_test.dart'
       - '.github/workflows/validate-hesabix-conflict-integration.yml'
   workflow_dispatch:
 
@@ -51,6 +54,8 @@ jobs:
           flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings \
             lib/pages/business/repair_shop/repair_order_detail_page.dart \
             lib/pages/business/repair_shop/repair_technicians_page.dart \
+            lib/pages/business/distribution/distribution_main_page.dart \
+            lib/pages/business/distribution/distribution_tab_permissions.dart \
             lib/pages/business/quick_sales_page.dart \
             lib/pages/business/telephony/telephony_hub_page.dart \
             lib/pages/business/users_permissions_page.dart \
@@ -66,3 +71,4 @@ jobs:
           flutter test --no-pub test/quick_sales_parked_sale_test.dart
           flutter test --no-pub test/telephony_party_test.dart
           flutter test --no-pub test/plugin_marketplace_utils_test.dart
+          flutter test --no-pub test/distribution_tab_permissions_test.dart
