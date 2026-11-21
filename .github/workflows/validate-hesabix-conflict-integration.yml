@@ -15,7 +15,9 @@ on:
       - 'hesabixAPI/adapters/api/v1/schema_models/distribution.py'
       - 'hesabixAPI/app/services/distribution_service.py'
       - 'hesabixAPI/app/services/distribution_phase3_service.py'
+      - 'hesabixAPI/app/services/distribution_field_ops_service.py'
       - 'hesabixAPI/migrations/versions/20261121_000001_distribution_daily_plan_locks.py'
+      - 'hesabixAPI/migrations/versions/20261121_000002_distribution_daily_plan_snapshot.py'
       - 'hesabixAPI/tests/test_distribution_daily_plan_publication.py'
       - 'hesabixAPI/tests/test_distribution_plan_lock_guards.py'
       - 'hesabixAPI/tests/test_distribution_plan_migration_postgres.py'
@@ -118,12 +120,15 @@ jobs:
           migration = script.get_revision("20261121_000001_dist_plan_locks")
           assert migration is not None
           assert migration.down_revision == "20261101_000001_sepidar_reconciliation"
-          print("Daily plan lock migration registered in Alembic graph")
+          snapshot = script.get_revision("20261121_000002_dist_plan_snapshot")
+          assert snapshot is not None
+          assert snapshot.down_revision == "20261121_000001_dist_plan_locks"
+          print("Daily plan lock and snapshot migrations registered in Alembic graph")
           PY
 
       - name: Check backend Python syntax
         run: |
-          python -m compileall -q adapters/api/v1/distribution.py adapters/api/v1/schema_models/distribution.py adapters/db/models/distribution.py app/services/distribution_service.py app/services/distribution_phase3_service.py migrations/versions/20261121_000001_distribution_daily_plan_locks.py
+          python -m compileall -q adapters/api/v1/distribution.py adapters/api/v1/schema_models/distribution.py adapters/db/models/distribution.py app/services/distribution_service.py app/services/distribution_phase3_service.py app/services/distribution_field_ops_service.py migrations/versions/20261121_000001_distribution_daily_plan_locks.py migrations/versions/20261121_000002_distribution_daily_plan_snapshot.py
 
       - name: Run distribution publication regression
         run: pytest -q tests/test_distribution_daily_plan_publication.py tests/test_distribution_plan_lock_guards.py
