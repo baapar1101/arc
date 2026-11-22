@@ -157,3 +157,56 @@ def test_live_mssql_posting_lock_blocks_until_owner_commits():
         with engine.begin() as conn:
             conn.execute(DropTable(table))
         engine.dispose()
+
+
+@pytest.mark.skipif(
+    not os.getenv("DISTRIBUTION_PG_TEST_DSN"),
+    reason="Requires dedicated ephemeral PostgreSQL GitHub Actions service",
+)
+def test_live_postgres_posting_lock_blocks_until_owner_commits():
+    """PostgreSQL SELECT FOR UPDATE must serialize a second document poster."""
+    url = make_url(os.environ["DISTRIBUTION_PG_TEST_DSN"])
+    assert url.get_backend_name() == "postgresql"
+    assert url.host in ("localhost", "127.0.0.1")
+    assert url.database == "distribution_integration"
+    assert url.port == 5432
+
+    engine = sa.create_engine(url, pool_pre_ping=True, pool_size=5)
+    table = GoodsExpenseIncomeDocument.__table__
+    with engine.begin() as conn:
+        assert conn.execute(sa.text("SELECT current_database()")).scalar_one() == "distribution_integration"
+        assert not sa.inspect(conn).has_table(table.name)
+        conn.execute(CreateTable(table, include_foreign_key_constraints=[]))
+
+    try:
+        with Session(engine) as seed:
+            document_id = _seed(seed)
+        started = Event()
+
+        def second_session():
+            with Session(engine) as concurrent:
+                started.set()
+                document = goods._load_document(
+                    concurrent, 10, document_id, with_lines=False, for_update=True
+                )
+                observed = document.status
+                concurrent.rollback()
+                return observed
+
+        with Session(engine) as owner:
+            document = goods._load_document(
+                owner, 10, document_id, with_lines=False, for_update=True
+            )
+            assert document.status == "draft_ops"
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(second_session)
+                assert started.wait(timeout=5)
+                time.sleep(0.25)
+                assert not future.done(), "Second PostgreSQL session bypassed FOR UPDATE"
+                document.status = "posted"
+                owner.commit()
+                assert future.result(timeout=8) == "posted"
+    finally:
+        with engine.begin() as conn:
+            conn.execute(DropTable(table))
+        engine.dispose()
