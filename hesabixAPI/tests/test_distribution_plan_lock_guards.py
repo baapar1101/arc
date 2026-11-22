@@ -573,3 +573,34 @@ def test_new_outlet_preflight_rejects_locked_or_foreign_route_before_creating_cu
     with pytest.raises(ApiError, match="Route not found"):
         fieldops.onboard_new_outlet(db, 10, 1, {"name": "New customer", "route_id": 100})
     assert create_calls == []
+
+
+@pytest.mark.parametrize("payload", [
+    {"route_id": 99, "person_ids": [707]},
+    {"route_name": "Existing", "route_code": "R-99", "person_ids": [707]},
+    {"route_id": 99, "visitor_user_id": 20, "valid_from": "2026-11-01"},
+])
+def test_setup_wizard_preflights_locked_route_before_any_settings_commit(db, monkeypatch, payload):
+    """Known locked-plan conflicts must fail before the wizard's first write."""
+    from app.services import distribution_field_ops_service as fieldops
+
+    setup_route(db)
+    def no_settings_commit(*_args, **_kwargs):
+        raise AssertionError("Wizard must not update settings before lock preflight")
+
+    monkeypatch.setattr(svc, "update_distribution_settings", no_settings_commit)
+    with pytest.raises(ApiError, match="locked"):
+        fieldops.run_setup_wizard(db, 10, 1, payload)
+    assert db.query(DistributionRoute).filter_by(business_id=10).count() == 1
+
+
+def test_setup_wizard_rejects_foreign_route_before_settings_change(db, monkeypatch):
+    from app.services import distribution_field_ops_service as fieldops
+
+    setup_route(db, business_id=11, route_id=99, user_id=30, locked=False)
+    def no_settings_commit(*_args, **_kwargs):
+        raise AssertionError("Wizard must not update settings for a foreign route")
+
+    monkeypatch.setattr(svc, "update_distribution_settings", no_settings_commit)
+    with pytest.raises(ApiError, match="Route not found"):
+        fieldops.run_setup_wizard(db, 10, 1, {"route_id": 99, "person_ids": [707]})
