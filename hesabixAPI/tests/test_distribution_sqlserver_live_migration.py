@@ -47,8 +47,13 @@ def test_mssql_daily_plan_schema_snapshot_and_fk_behavior(monkeypatch):
         with engine.begin() as conn:
             assert conn.execute(sa.text("SELECT DB_NAME()")).scalar_one() == "tempdb"
             assert not sa.inspect(conn).has_table("distribution_daily_plan_locks")
-            conn.exec_driver_sql("CREATE TABLE businesses (id int NOT NULL PRIMARY KEY)")
+            # Mirror the production users -> businesses ownership cascade,
+            # which creates a third path to the plan-lock table in SQL Server.
             conn.exec_driver_sql("CREATE TABLE users (id int NOT NULL PRIMARY KEY)")
+            conn.exec_driver_sql(
+                "CREATE TABLE businesses (id int NOT NULL PRIMARY KEY, "
+                "owner_id int NOT NULL REFERENCES users(id) ON DELETE CASCADE)"
+            )
             try:
                 operation = Operations(MigrationContext.configure(conn))
                 monkeypatch.setattr(initial, "op", operation)
@@ -62,8 +67,10 @@ def test_mssql_daily_plan_schema_snapshot_and_fk_behavior(monkeypatch):
                 names = {column["name"] for column in inspector.get_columns(table)}
                 assert {"business_id", "user_id", "plan_date", "is_locked", "plan_snapshot"}.issubset(names)
 
-                conn.execute(sa.text("INSERT INTO businesses (id) VALUES (10), (11)"))
-                conn.execute(sa.text("INSERT INTO users (id) VALUES (20), (21), (99)"))
+                conn.execute(sa.text("INSERT INTO users (id) VALUES (20), (21), (88), (99)"))
+                conn.execute(sa.text(
+                    "INSERT INTO businesses (id, owner_id) VALUES (10, 88), (11, 88)"
+                ))
                 conn.execute(sa.text(
                     "INSERT INTO distribution_daily_plan_locks "
                     "(business_id, user_id, plan_date, published_by_user_id, published_at, created_at, updated_at) "
@@ -82,6 +89,21 @@ def test_mssql_daily_plan_schema_snapshot_and_fk_behavior(monkeypatch):
                     "FROM distribution_daily_plan_locks WHERE business_id = 10"
                 )).scalar_one() == "7"
 
+                # SQL Server intentionally uses NO ACTION on visitor and
+                # publisher references. Clear optional publisher references
+                # explicitly before deleting their User; PostgreSQL uses
+                # ON DELETE SET NULL instead.
+                fks = {
+                    tuple(fk["constrained_columns"]): fk
+                    for fk in sa.inspect(conn).get_foreign_keys(table)
+                }
+                assert fks[("business_id",)]["options"].get("ondelete") == "CASCADE"
+                assert fks[("user_id",)]["options"].get("ondelete") is None
+                assert fks[("published_by_user_id",)]["options"].get("ondelete") is None
+                conn.execute(sa.text(
+                    "UPDATE distribution_daily_plan_locks SET published_by_user_id = NULL "
+                    "WHERE published_by_user_id = 99"
+                ))
                 conn.execute(sa.text("DELETE FROM users WHERE id = 99"))
                 assert conn.execute(sa.text(
                     "SELECT COUNT(*) FROM distribution_daily_plan_locks WHERE published_by_user_id IS NULL"
