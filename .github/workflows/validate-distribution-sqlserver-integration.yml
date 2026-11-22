@@ -6,8 +6,10 @@ on:
       - integration/resolve-hesabix-conflicts-20261102
     paths:
       - 'hesabixAPI/app/services/distribution_service.py'
+      - 'hesabixAPI/app/services/goods_expense_income_service.py'
       - 'hesabixAPI/tests/test_distribution_sqlserver_live_lock.py'
       - 'hesabixAPI/tests/test_distribution_sqlserver_live_migration.py'
+      - 'hesabixAPI/tests/test_goods_post_row_lock.py'
       - 'hesabixAPI/migrations/versions/20261121_000001_distribution_daily_plan_locks.py'
       - 'hesabixAPI/migrations/versions/20261121_000002_distribution_daily_plan_snapshot.py'
       - '.github/workflows/validate-distribution-sqlserver-integration.yml'
@@ -84,4 +86,4 @@ jobs:
           PY
 
       - name: Run SQL Server transaction concurrency regression
-        run: pytest -q tests/test_distribution_sqlserver_live_lock.py tests/test_distribution_sqlserver_live_migration.py
+        run: pytest -q tests/test_distribution_sqlserver_live_lock.py tests/test_distribution_sqlserver_live_migration.py tests/test_goods_post_row_lock.py
