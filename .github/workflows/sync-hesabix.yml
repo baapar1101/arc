@@ -37,16 +37,39 @@ jobs:
           set -euo pipefail
           git config core.hooksPath /dev/null
           git remote add hesabix https://source.hesabix.ir/hesabix/arc.git
+          # Preserve a useful failure artifact. Older fetch failures did
+          # not create the audit directory, leaving no actionable report.
+          report_dir="${RUNNER_TEMP}/hesabix-upstream-audit"
+          mkdir -p "$report_dir"
+          {
+            echo '# Upstream fetch diagnostics'
+            echo '- Source: https://source.hesabix.ir/hesabix/arc.git'
+            echo '- Mirroring is fail-closed; no master merge is attempted.'
+          } > "$report_dir/fetch-status.md"
           fetched=false
           for attempt in 1 2 3; do
-            if timeout 180 git fetch --no-tags hesabix refs/heads/master:refs/remotes/hesabix/master; then
+            status=0
+            if timeout --signal=TERM --kill-after=15s 180 git fetch --no-tags hesabix refs/heads/master:refs/remotes/hesabix/master; then
               fetched=true
+              echo "- Attempt $attempt: success" >> "$report_dir/fetch-status.md"
               break
+            else
+              status=$?
             fi
-            sleep 10
+            if [ "$status" -eq 124 ]; then
+              reason=timeout
+            elif [ "$status" -eq 128 ]; then
+              reason=git-transport-failure
+            else
+              reason=unexpected-fetch-failure
+            fi
+            echo "- Attempt $attempt: failed (exit $status, $reason)" >> "$report_dir/fetch-status.md"
+            echo "::warning::Hesabix fetch attempt $attempt failed: $reason (exit $status)"
+            if [ "$attempt" -lt 3 ]; then sleep 10; fi
           done
           if [ "$fetched" != true ]; then
-            echo '::error::Cannot fetch current Hesabix master; neither mirror nor master was updated.'
+            echo '- Result: blocked; mirror and master unchanged.' >> "$report_dir/fetch-status.md"
+            echo '::error::Cannot fetch current Hesabix master; mirror/master were not updated. See fetch-status.md artifact.'
             exit 1
           fi
           git fetch --no-tags origin refs/heads/master:refs/remotes/origin/master refs/heads/hesabix-upstream:refs/remotes/origin/hesabix-upstream
