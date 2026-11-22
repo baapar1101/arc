@@ -644,6 +644,32 @@ def get_persons_by_business(
     }
 
 
+_DISTRIBUTION_SNAPSHOT_PERSON_FIELDS = frozenset({
+    "alias_name", "mobile", "mobile_2", "mobile_3", "phone",
+    "latitude", "longitude",
+})
+
+
+def _assert_distribution_snapshot_person_editable(
+    db: Session, person: Person, updated_fields: Dict[str, Any],
+) -> None:
+    """Prevent general person edits from bypassing locked distribution plans.
+
+    The day-plan snapshot includes the person's display name, selected phone
+    number and coordinates. Other contact/accounting fields do not change
+    those immutable snapshot values and remain independently editable.
+    """
+    if not any(
+        field in updated_fields and updated_fields[field] != getattr(person, field, None)
+        for field in _DISTRIBUTION_SNAPSHOT_PERSON_FIELDS
+    ):
+        return
+    # Import only when necessary to avoid a service-import cycle.
+    from app.services.distribution_service import assert_customer_schedule_unlocked
+
+    assert_customer_schedule_unlocked(db, int(person.business_id), int(person.id))
+
+
 def update_person(
     db: Session,
     person_id: int,
@@ -675,6 +701,10 @@ def update_person(
         sync_banks = update_data.pop("bank_accounts")
     # مانده افتتاحیه روی persons ذخیره نمی‌شود؛ در person_opening_balance_service مدیریت می‌شود
     update_data.pop("opening_balance", None)
+
+    # The common Person endpoint, imports and opening-balance wrapper all use
+    # this service. Guard snapshot-dependent fields before any ORM mutation.
+    _assert_distribution_snapshot_person_editable(db, person, update_data)
 
     # مدیریت کد یکتا (شامل پاک کردن صریح با null)
     if 'code' in update_data:
@@ -881,7 +911,12 @@ def delete_person(db: Session, person_id: int, business_id: int) -> tuple[bool, 
     
     if not person:
         return False, "شخص یافت نشد"
-    
+
+    # Deletion cascades to distribution route stops. Protect any locked
+    # assigned plan before document checks or destructive writes.
+    from app.services.distribution_service import assert_customer_schedule_unlocked
+    assert_customer_schedule_unlocked(db, business_id, person_id)
+
     # بررسی وجود اسناد حسابداری مرتبط
     has_documents, document_types = check_person_has_accounting_documents(db, person_id)
     
