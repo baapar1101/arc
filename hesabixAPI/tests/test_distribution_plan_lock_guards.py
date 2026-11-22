@@ -509,3 +509,47 @@ def test_locked_plan_blocks_territory_edit_and_delete_until_unpublished(db, monk
     svc.unpublish_daily_plan(db, 10, 20, DAY)
     renamed = svc.update_territory(db, 10, 17, {"name": "Allowed after unpublish"})
     assert renamed["name"] == "Allowed after unpublish"
+
+
+def test_locked_plan_blocks_customer_location_edit_without_mutation(db):
+    """Coordinates are part of the saved route-plan snapshot."""
+    from types import SimpleNamespace
+    from adapters.db.models.person import Person
+
+    setup_route(db)
+    db.add(DistributionRouteStop(route_id=99, person_id=707, sort_order=1))
+    db.commit()
+    person = SimpleNamespace(
+        id=707, business_id=10, latitude=35.0, longitude=51.0, updated_at=None,
+    )
+
+    class PersonQuery:
+        def filter(self, *_args):
+            return self
+
+        def first(self):
+            return person
+
+    class PersonSession:
+        def query(self, model):
+            return PersonQuery() if model is Person else db.query(model)
+
+        def get_bind(self):
+            return db.get_bind()
+
+        def commit(self):
+            db.commit()
+
+    session = PersonSession()
+    with pytest.raises(ApiError):
+        phase3.update_person_location(session, 10, 707, 36.0, 52.0)
+    assert (person.latitude, person.longitude) == (35.0, 51.0)
+
+    # A different customer is unaffected by this guard.
+    svc.assert_customer_schedule_unlocked(db, 10, 708)
+    svc.assert_customer_schedule_unlocked(db, 11, 707)
+
+    svc.unpublish_daily_plan(db, 10, 20, DAY)
+    result = phase3.update_person_location(session, 10, 707, 36.0, 52.0)
+    assert result == {"person_id": 707, "latitude": 36.0, "longitude": 52.0}
+    assert (person.latitude, person.longitude) == (36.0, 52.0)
