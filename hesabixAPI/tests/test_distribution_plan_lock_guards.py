@@ -579,6 +579,7 @@ def test_new_outlet_preflight_rejects_locked_or_foreign_route_before_creating_cu
     {"route_id": 99, "person_ids": [707]},
     {"route_name": "Existing", "route_code": "R-99", "person_ids": [707]},
     {"route_id": 99, "visitor_user_id": 20, "valid_from": "2026-11-01"},
+    {"route_name": "New route", "route_code": "R-NEW", "visitor_user_id": 20, "valid_from": "2026-11-01"},
 ])
 def test_setup_wizard_preflights_locked_route_before_any_settings_commit(db, monkeypatch, payload):
     """Known locked-plan conflicts must fail before the wizard's first write."""
