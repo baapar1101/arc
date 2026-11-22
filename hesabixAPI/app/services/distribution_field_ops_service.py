@@ -1025,6 +1025,19 @@ def onboard_new_outlet(
 	name = str(payload.get("name") or payload.get("alias_name") or "").strip()
 	if not name:
 		raise ApiError("VALIDATION_ERROR", "name required", http_status=400)
+	# Preflight the requested route before create_person commits a new
+	# customer. The stop service checks again when inserting the stop, so
+	# concurrent publication cannot bypass its authoritative lock check.
+	route_id = int(payload.get("route_id") or 0)
+	if route_id:
+		route = (
+			db.query(DistributionRoute.id)
+			.filter(DistributionRoute.id == route_id, DistributionRoute.business_id == business_id)
+			.first()
+		)
+		if route is None:
+			raise ApiError("NOT_FOUND", "Route not found in this business", http_status=404)
+		dist_svc.assert_route_has_no_locked_plans(db, business_id, route_id)
 	from adapters.api.v1.schema_models.person import PersonCreateRequest, PersonType
 	from app.services.person_service import create_person
 
@@ -1066,7 +1079,6 @@ def onboard_new_outlet(
 		prof_row.onboarded_at = datetime.utcnow()
 		db.commit()
 	stop = None
-	route_id = int(payload.get("route_id") or 0)
 	if route_id:
 		stop = dist_svc.upsert_route_stop(db, business_id, route_id, {
 			"person_id": person_id,
