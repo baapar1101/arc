@@ -946,10 +946,12 @@ def run_setup_wizard(db: Session, business_id: int, actor_user_id: int, payload:
 			raise ApiError("NOT_FOUND", "Route not found in this business", http_status=404)
 		if _int_ids(payload.get("person_ids")):
 			dist_svc.assert_route_has_no_locked_plans(db, business_id, existing_route_id)
-		visitor_id = int(payload.get("visitor_user_id") or 0)
-		if visitor_id:
-			valid_from = date.fromisoformat(str(payload.get("valid_from") or business_today(business_id).isoformat())[:10])
-			dist_svc.assert_assignment_has_no_locked_plans(db, business_id, visitor_id, valid_from, None)
+	# Even a brand-new route would change a visitor's previously locked plan
+	# when assigned. Check the visitor period independently of route existence.
+	visitor_id = int(payload.get("visitor_user_id") or 0)
+	if visitor_id:
+		valid_from = date.fromisoformat(str(payload.get("valid_from") or business_today(business_id).isoformat())[:10])
+		dist_svc.assert_assignment_has_no_locked_plans(db, business_id, visitor_id, valid_from, None)
 	enable_van = bool(payload.get("enable_van_sales"))
 	enable_presell = bool(payload.get("enable_presell", True if not enable_van else payload.get("enable_presell")))
 	settings_patch = {
