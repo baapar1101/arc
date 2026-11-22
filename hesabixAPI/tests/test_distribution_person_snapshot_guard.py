@@ -65,7 +65,10 @@ class _PersonSession:
 
 
 @pytest.fixture
-def db():
+def db(monkeypatch):
+    # This suite exercises guards on isolated route/assignment tables without
+    # loading marketplace entitlement tables.
+    monkeypatch.setattr(distribution_service, "_ensure_plugin", lambda *_args: None)
     engine = create_engine("sqlite+pysqlite:///:memory:")
     for table in (
         DistributionRoute.__table__,
