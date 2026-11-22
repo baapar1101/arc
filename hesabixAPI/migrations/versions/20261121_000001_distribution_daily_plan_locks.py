@@ -19,14 +19,20 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # SQL Server rejects multiple cascading routes to this table (error 1785):
+    # users -> businesses -> locks, users -> locks, and publisher -> locks.
+    # Keep business deletion cascading; require the application to clear
+    # visitor/publication references before deleting users on SQL Server.
+    # PostgreSQL retains its original CASCADE / SET NULL semantics.
+    is_mssql = op.get_bind().dialect.name == "mssql"
     op.create_table(
         "distribution_daily_plan_locks",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
         sa.Column("business_id", sa.Integer(), sa.ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("user_id", sa.Integer(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("user_id", sa.Integer(), sa.ForeignKey("users.id", ondelete=None if is_mssql else "CASCADE"), nullable=False),
         sa.Column("plan_date", sa.Date(), nullable=False),
         sa.Column("is_locked", sa.Boolean(), nullable=False, server_default=sa.false()),
-        sa.Column("published_by_user_id", sa.Integer(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column("published_by_user_id", sa.Integer(), sa.ForeignKey("users.id", ondelete=None if is_mssql else "SET NULL"), nullable=True),
         sa.Column("published_at", sa.DateTime(), nullable=False),
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=False),
