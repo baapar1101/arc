@@ -553,3 +553,23 @@ def test_locked_plan_blocks_customer_location_edit_without_mutation(db):
     result = phase3.update_person_location(session, 10, 707, 36.0, 52.0)
     assert result == {"person_id": 707, "latitude": 36.0, "longitude": 52.0}
     assert (person.latitude, person.longitude) == (36.0, 52.0)
+
+
+def test_new_outlet_preflight_rejects_locked_or_foreign_route_before_creating_customer(db, monkeypatch):
+    """New-outlet flow must fail before its independently committed person create."""
+    from app.services import distribution_field_ops_service as fieldops
+    from app.services import person_service
+
+    setup_route(db, business_id=10, route_id=99, user_id=20, locked=True)
+    setup_route(db, business_id=11, route_id=100, user_id=30, locked=True)
+    create_calls = []
+    monkeypatch.setattr(
+        person_service, "create_person",
+        lambda *_args, **_kwargs: create_calls.append(True),
+    )
+
+    with pytest.raises(ApiError, match="locked"):
+        fieldops.onboard_new_outlet(db, 10, 1, {"name": "New customer", "route_id": 99})
+    with pytest.raises(ApiError, match="Route not found"):
+        fieldops.onboard_new_outlet(db, 10, 1, {"name": "New customer", "route_id": 100})
+    assert create_calls == []
