@@ -100,6 +100,34 @@ def test_mssql_daily_plan_schema_snapshot_and_fk_behavior(monkeypatch):
                 assert fks[("business_id",)]["options"].get("ondelete") == "CASCADE"
                 assert fks[("user_id",)]["options"].get("ondelete") is None
                 assert fks[("published_by_user_id",)]["options"].get("ondelete") is None
+
+                # Exercise actual SQL Server FK enforcement, not just the
+                # reflected schema. Catch only FK error 547 *inside* T-SQL so
+                # the surrounding test transaction stays usable for the next
+                # assertion; a different error is rethrown and fails the test.
+                def delete_user_rejected(user_id: int) -> bool:
+                    return bool(conn.execute(sa.text("""
+                        SET NOCOUNT ON;
+                        DECLARE @blocked bit = 0;
+                        BEGIN TRY
+                            DELETE FROM users WHERE id = :user_id;
+                        END TRY
+                        BEGIN CATCH
+                            IF ERROR_NUMBER() <> 547 THROW;
+                            SET @blocked = 1;
+                        END CATCH;
+                        SELECT @blocked;
+                    """), {"user_id": user_id}).scalar_one())
+
+                assert delete_user_rejected(20), "Referenced visitor must not be deleted"
+                assert delete_user_rejected(99), "Referenced publisher must not be deleted"
+                assert conn.execute(sa.text(
+                    "SELECT COUNT(*) FROM distribution_daily_plan_locks"
+                )).scalar_one() == 2
+                assert conn.execute(sa.text(
+                    "SELECT COUNT(*) FROM users WHERE id IN (20, 99)"
+                )).scalar_one() == 2
+
                 conn.execute(sa.text(
                     "UPDATE distribution_daily_plan_locks SET published_by_user_id = NULL "
                     "WHERE published_by_user_id = 99"
@@ -112,6 +140,14 @@ def test_mssql_daily_plan_schema_snapshot_and_fk_behavior(monkeypatch):
                 assert conn.execute(sa.text(
                     "SELECT business_id FROM distribution_daily_plan_locks"
                 )).scalars().all() == [11]
+                # Once the referencing plan is gone, its visitor may be
+                # deleted without affecting the other business's plan.
+                conn.execute(sa.text("DELETE FROM users WHERE id = 20"))
+                assert conn.execute(sa.text(
+                    "SELECT COUNT(*) FROM distribution_daily_plan_locks "
+                    "WHERE business_id = 11 AND user_id = 21"
+                )).scalar_one() == 1
+                assert delete_user_rejected(21)
 
                 snapshot.downgrade()
                 assert "plan_snapshot" not in {
