@@ -1,4 +1,8 @@
-"""Financial finalization owns no commit; these tests do not claim a Variant warehouse lifecycle."""
+"""Opening-balance finalization belongs to the caller transaction.
+
+Adapted from upstream to the current fork's accounting schema. Product-variant
+inventory is intentionally not a prerequisite for finalization safety.
+"""
 
 from datetime import date
 
@@ -10,7 +14,6 @@ from sqlalchemy.schema import CreateTable
 from adapters.db import models
 from adapters.db.models.activity_log import ActivityLog
 from adapters.db.models.business import BusinessField, BusinessType
-from adapters.db.models.product_variant import ProductVariant
 from app.core.responses import ApiError
 from app.services.opening_balance_service import post_opening_balance, unpost_opening_balance
 
@@ -21,7 +24,7 @@ DAY = date(2026, 11, 11)
 def opening_db():
     engine = create_engine("sqlite://")
     tables = (models.Business, models.Currency, models.FiscalYear, models.User, models.Account,
-              models.Product, ProductVariant, models.Document, models.DocumentLine, ActivityLog)
+              models.Document, models.DocumentLine, ActivityLog)
     with engine.begin() as connection:
         for model in tables:
             connection.execute(CreateTable(model.__table__, include_foreign_key_constraints=[]))
@@ -34,13 +37,9 @@ def opening_db():
             models.User(id=1, first_name="Test", last_name="Owner", password_hash="fixture", referral_code="OBTX"),
             models.Account(id=1, business_id=1, code="INV", name="Inventory", account_type="asset"),
             models.Account(id=2, business_id=1, code="EQUITY", name="Equity", account_type="equity"),
-            models.Product(id=1, business_id=1, code="P", name="P", variant_mode="inventory", main_unit="each"),
-            ProductVariant(id=1, business_id=1, product_id=1, combination_key="1"),
             models.Document(id=1, business_id=1, fiscal_year_id=1, currency_id=1, created_by_user_id=1,
                             code="OPENING", document_type="opening_balance", document_date=DAY,
                             is_proforma=False, extra_info={"posted": False}),
-            models.DocumentLine(document_id=1, product_id=1, quantity=10, debit=0, credit=0,
-                                extra_info={"warehouse_id": 1, "movement": "in", "allocations": [{"variant_id": 1, "quantity": 10}]}),
             models.DocumentLine(document_id=1, account_id=1, debit=1000, credit=0),
             models.DocumentLine(document_id=1, account_id=2, debit=0, credit=1000),
         ])
