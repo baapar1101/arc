@@ -126,10 +126,10 @@ def test_mssql_daily_plan_schema_snapshot_and_fk_behavior(monkeypatch):
                     "DROP TABLE distribution_daily_plan_locks"
                 )
                 conn.exec_driver_sql(
-                    "IF OBJECT_ID('users', 'U') IS NOT NULL DROP TABLE users"
+                    "IF OBJECT_ID('businesses', 'U') IS NOT NULL DROP TABLE businesses"
                 )
                 conn.exec_driver_sql(
-                    "IF OBJECT_ID('businesses', 'U') IS NOT NULL DROP TABLE businesses"
+                    "IF OBJECT_ID('users', 'U') IS NOT NULL DROP TABLE users"
                 )
     finally:
         engine.dispose()
