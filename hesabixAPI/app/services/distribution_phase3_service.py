@@ -123,6 +123,10 @@ def update_person_location(db: Session, business_id: int, person_id: int, lat: f
 	person = db.query(Person).filter(Person.id == person_id, Person.business_id == business_id).first()
 	if not person:
 		raise ApiError("NOT_FOUND", "Person not found", http_status=404)
+	# The customer's coordinates are embedded in the immutable day-plan
+	# snapshot. A location edit on a locked assigned route must not bypass
+	# the same business-scoped, transaction-serialized schedule guard.
+	dist_svc.assert_customer_schedule_unlocked(db, business_id, person_id)
 	person.latitude = lat
 	person.longitude = lng
 	person.updated_at = datetime.utcnow()
