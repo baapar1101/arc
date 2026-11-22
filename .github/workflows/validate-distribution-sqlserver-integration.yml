@@ -1,0 +1,84 @@
+name: Validate distribution SQL Server transaction locks
+
+on:
+  push:
+    branches:
+      - integration/resolve-hesabix-conflicts-20261102
+    paths:
+      - 'hesabixAPI/app/services/distribution_service.py'
+      - 'hesabixAPI/tests/test_distribution_sqlserver_live_lock.py'
+      - '.github/workflows/validate-distribution-sqlserver-integration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-mssql-locks:
+    name: Live SQL Server 2022 business-scoped locking
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    # Ephemeral CI-only container. No credentials or databases from production.
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: 'Y'
+          MSSQL_PID: Developer
+          MSSQL_SA_PASSWORD: 'Ephemeral-Db2026-Only'
+        ports:
+          - 1433:1433
+
+    env:
+      DISTRIBUTION_MSSQL_TEST_ENABLE: '1'
+      DISTRIBUTION_MSSQL_TEST_DSN: 'mssql+pymssql://sa:Ephemeral-Db2026-Only@localhost:1433/tempdb'
+
+    defaults:
+      run:
+        working-directory: hesabixAPI
+
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: hesabixAPI/pyproject.toml
+
+      - name: Install API test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Wait for isolated SQL Server to become ready
+        run: |
+          python - <<'PY'
+          import os
+          import time
+          import sqlalchemy as sa
+
+          engine = sa.create_engine(
+              os.environ["DISTRIBUTION_MSSQL_TEST_DSN"],
+              pool_pre_ping=True,
+          )
+          try:
+              for attempt in range(45):
+                  try:
+                      with engine.connect() as conn:
+                          assert conn.execute(sa.text("SELECT DB_NAME()")).scalar_one() == "tempdb"
+                      print("Local ephemeral SQL Server is ready")
+                      break
+                  except Exception:
+                      if attempt == 44:
+                          raise
+                      time.sleep(3)
+          finally:
+              engine.dispose()
+          PY
+
+      - name: Run SQL Server transaction concurrency regression
+        run: pytest -q tests/test_distribution_sqlserver_live_lock.py
