@@ -2016,7 +2016,7 @@ hesabix_resolve_pg_restore_for_dump() {
     if [[ -n "${server_major}" ]] && [[ "${server_major}" -ge "${min_major}" ]]; then
       bin="/usr/lib/postgresql/${server_major}/bin/pg_restore"
       if [[ -x "${bin}" ]]; then
-        log_info "pg_restore: PostgreSQL ${server_major} client (matches server; dump format ${fmt})."
+        log_info "pg_restore: PostgreSQL ${server_major} client (matches server; dump format ${fmt})." >&2
         printf '%s' "${bin}"
         return 0
       fi
@@ -2024,7 +2024,7 @@ hesabix_resolve_pg_restore_for_dump() {
     if [[ -n "${server_major}" ]]; then
       for m in "${installed[@]}"; do
         if [[ "${m}" -ge "${min_major}" ]] && [[ "${m}" -le "${server_major}" ]]; then
-          log_info "pg_restore: PostgreSQL ${m} client (dump format ${fmt}; server ${server_major})."
+          log_info "pg_restore: PostgreSQL ${m} client (dump format ${fmt}; server ${server_major})." >&2
           printf '%s' "/usr/lib/postgresql/${m}/bin/pg_restore"
           return 0
         fi
@@ -2033,7 +2033,7 @@ hesabix_resolve_pg_restore_for_dump() {
     for m in "${installed[@]}"; do
       if [[ "${m}" -ge "${min_major}" ]]; then
         if [[ -n "${server_major}" ]] && [[ "${m}" -gt "${server_major}" ]]; then
-          log_warning "pg_restore ${m} for dump format ${fmt} on PostgreSQL ${server_major} server — may cause transaction_timeout errors; prefer matching client or upgrade PostgreSQL."
+          log_warning "pg_restore ${m} for dump format ${fmt} on PostgreSQL ${server_major} server — may cause transaction_timeout errors; prefer matching client or upgrade PostgreSQL." >&2
         fi
         printf '%s' "/usr/lib/postgresql/${m}/bin/pg_restore"
         return 0
@@ -2043,7 +2043,7 @@ hesabix_resolve_pg_restore_for_dump() {
     if [[ -n "${server_major}" ]] && [[ "${server_major}" -ge "${min_major}" ]]; then
       install_m="${server_major}"
     fi
-    hesabix_ensure_postgresql_client_major "${install_m}" || true
+    hesabix_ensure_postgresql_client_major "${install_m}" >&2 || true
     bin="/usr/lib/postgresql/${install_m}/bin/pg_restore"
     if [[ -x "${bin}" ]]; then
       printf '%s' "${bin}"
@@ -2051,11 +2051,11 @@ hesabix_resolve_pg_restore_for_dump() {
     fi
     for m in 18 17 16 15 14 13; do
       [[ "${m}" -ge "${min_major}" ]] || continue
-      hesabix_ensure_postgresql_client_major "${m}" || continue
+      hesabix_ensure_postgresql_client_major "${m}" >&2 || continue
       bin="/usr/lib/postgresql/${m}/bin/pg_restore"
       if [[ -x "${bin}" ]]; then
         if [[ -n "${server_major}" ]] && [[ "${m}" -gt "${server_major}" ]]; then
-          log_warning "Installed pg_restore ${m} for format ${fmt}; target server is PostgreSQL ${server_major}."
+          log_warning "Installed pg_restore ${m} for format ${fmt}; target server is PostgreSQL ${server_major}." >&2
         fi
         printf '%s' "${bin}"
         return 0
@@ -2072,6 +2072,26 @@ hesabix_resolve_pg_restore_for_dump() {
     [[ -x "${bin}" ]] && { printf '%s' "${bin}"; return 0; }
   done
   command -v pg_restore 2>/dev/null || true
+}
+
+
+# The resolver is captured via command substitution: stdout must be a single
+# executable path. Recover safely if older helpers print informational lines.
+hesabix_pg_restore_bin_for_dump() {
+  local dump="$1" raw line picked=""
+  raw=$(hesabix_resolve_pg_restore_for_dump "${dump}")
+  if [[ -n "${raw}" && -x "${raw}" ]]; then
+    printf '%s' "${raw}"
+    return 0
+  fi
+  while IFS= read -r line; do
+    [[ -x "${line}" ]] && picked="${line}"
+  done <<< "${raw}"
+  if [[ -n "${picked}" ]]; then
+    printf '%s' "${picked}"
+    return 0
+  fi
+  return 1
 }
 
 # Revision bundled with seed dump (sidecar file, env, or embedded alembic_version data).
@@ -2091,7 +2111,7 @@ hesabix_read_seed_alembic_revision() {
     fi
   done
   if [[ -f "${dump}" ]]; then
-    pg_restore_bin=$(hesabix_resolve_pg_restore_for_dump "${dump}")
+    pg_restore_bin=$(hesabix_pg_restore_bin_for_dump "${dump}" || true)
     if [[ -n "${pg_restore_bin}" && -x "${pg_restore_bin}" ]]; then
       rev=$(
         "${pg_restore_bin}" -a -t alembic_version "${dump}" 2>/dev/null | awk '
@@ -2139,7 +2159,7 @@ SQL
 hesabix_run_pg_restore_seed() {
   local seed_dump="$1" restore_log="$2"
   local pg_restore_bin
-  pg_restore_bin=$(hesabix_resolve_pg_restore_for_dump "${seed_dump}")
+  pg_restore_bin=$(hesabix_pg_restore_bin_for_dump "${seed_dump}" || true)
   if [[ -z "${pg_restore_bin}" || ! -x "${pg_restore_bin}" ]]; then
     log_error "pg_restore not found."
     return 1
