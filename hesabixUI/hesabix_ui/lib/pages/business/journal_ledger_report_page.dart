@@ -173,13 +173,23 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
   Future<void> _exportElectronicBooks() async {
     if (_isExportingElectronic) return;
 
+    // An empty currency list must not prevent a valid legal export:
+    // the API will resolve IRR or reject if no Rial currency exists.
+    if (_currencies.isEmpty) {
+      await _loadCurrencies();
+      if (!mounted) return;
+    }
+    if (_isExportingElectronic) return;
     final rialCurrencyId = _rialCurrencyId;
-    if (rialCurrencyId == null) {
-      SnackBarHelper.showError(
-        context,
-        message: 'شناسه ارز ریال (IRR) برای خروجی دفتر الکترونیکی دریافت نشد.',
-      );
-      return;
+    final exportParams = <String, dynamic>{
+      ..._additionalParams(),
+      'format': 'auto',
+    };
+    // Never allow the ordinary report's selected (possibly non-Rial)
+    // currency to leak into the legal electronic journal request.
+    exportParams.remove('currency_id');
+    if (rialCurrencyId != null) {
+      exportParams['currency_id'] = rialCurrencyId;
     }
 
     setState(() => _isExportingElectronic = true);
@@ -189,11 +199,7 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
       final api = ApiClient();
       final response = await api.post<List<int>>(
         '/api/v1/businesses/${widget.businessId}/reports/journal-ledger/export/electronic-books',
-        data: {
-          ..._additionalParams(),
-          'currency_id': rialCurrencyId,
-          'format': 'auto',
-        },
+        data: exportParams,
         options: Options(
           responseType: ResponseType.bytes,
           headers: {
