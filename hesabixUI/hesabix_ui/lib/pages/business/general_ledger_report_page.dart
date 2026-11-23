@@ -205,27 +205,31 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
     };
   }
 
-  bool _isSelectedCurrencyRial() {
-    if (_selectedCurrencyId == null) return false;
+  int? _findRialCurrencyId() {
     for (final currency in _currencies) {
-      if (currency['id'] == _selectedCurrencyId) {
-        final code = (currency['code'] ?? currency['name'] ?? '').toString().toUpperCase();
-        return code == 'IRR' || code == 'RIAL';
+      final code = (currency['code'] ?? currency['name'] ?? '').toString().trim().toUpperCase();
+      if (code == 'IRR' || code == 'RIAL') {
+        final value = currency['id'];
+        if (value is int) return value;
+        if (value is num) return value.toInt();
+        return int.tryParse(value?.toString() ?? '');
       }
     }
-    return false;
+    return null;
   }
 
   Future<void> _exportElectronicBooks() async {
     if (_isExportingElectronic) return;
 
-    if (!_isSelectedCurrencyRial()) {
-      SnackBarHelper.showError(
-        context,
-        message: 'برای خروجی دفتر الکترونیکی باید ارز ریال (IRR) انتخاب شود.',
-      );
-      return;
+    // Electronic books are always Rial, independently of the report filter.
+    // When business currency metadata is unavailable, the API resolves IRR
+    // from its currency catalogue or returns a clear validation error.
+    if (_currencies.isEmpty) {
+      await _loadCurrencies();
+      if (!mounted) return;
     }
+    if (_isExportingElectronic) return;
+    final rialCurrencyId = _findRialCurrencyId();
 
     setState(() => _isExportingElectronic = true);
     final t = AppLocalizations.of(context);
@@ -236,7 +240,7 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
         if (_fromDate != null) 'date_from': _fromDate!.toIso8601String().split('T').first,
         if (_toDate != null) 'date_to': _toDate!.toIso8601String().split('T').first,
         if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
-        if (_selectedCurrencyId != null) 'currency_id': _selectedCurrencyId,
+        if (rialCurrencyId != null) 'currency_id': rialCurrencyId,
         'include_proforma': _includeProforma,
         'format': 'auto',
       };
