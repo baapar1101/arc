@@ -2039,9 +2039,53 @@ def resolve_return_request(
 	}
 
 
+_DAILY_PLAN_INPUT_SETTINGS = frozenset({
+	"carry_over_missed_visits",
+	"carry_over_days",
+})
+
+
+def assert_daily_plan_inputs_unlocked(db: Session, business_id: int) -> None:
+	"""Protect business-wide scheduling inputs for existing locked daily plans.
+
+	The carry-over policy and lookback interval control the scheduled/missed
+	stops copied into immutable snapshots. Serialize the check with the same
+	business-scoped transaction lock used by publishing and route edits.
+	"""
+	_serialize_distribution_plan_mutation(db, business_id)
+	if (
+		db.query(DistributionDailyPlanLock.id)
+		.filter(
+			DistributionDailyPlanLock.business_id == business_id,
+			DistributionDailyPlanLock.is_locked.is_(True),
+		)
+		.first()
+		is not None
+	):
+		raise ApiError(
+			"CONFLICT",
+			"Locked daily plans exist; unpublish before changing carry-over settings",
+			http_status=409,
+		)
+
+
 def update_distribution_settings(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
-	row = get_or_create_distribution_settings(db, business_id)
+	if _DAILY_PLAN_INPUT_SETTINGS.intersection(payload):
+		assert_daily_plan_inputs_unlocked(db, business_id)
+	# Do not use get_or_create_distribution_settings here: it commits when
+	# inserting and would release the publication lock before these settings
+	# are saved. Persist a newly initialized row with the final update commit.
+	row = get_distribution_settings_row(db, business_id)
+	if row is None:
+		row = DistributionBusinessSettings(
+			business_id=business_id,
+			shared_routing_catalog=False,
+			require_visit_in_daily_plan=False,
+			created_at=datetime.utcnow(),
+			updated_at=datetime.utcnow(),
+		)
+		db.add(row)
 	if "shared_routing_catalog" in payload:
 		row.shared_routing_catalog = bool(payload["shared_routing_catalog"])
 	if "require_visit_in_daily_plan" in payload:
