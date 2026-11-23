@@ -1219,8 +1219,12 @@ def get_daily_plan(db: Session, business_id: int, target_user_id: int, plan_date
 			if not _weekday_matches(plan_date, s.weekday):
 				continue
 			person = db.query(Person).filter(Person.id == s.person_id, Person.business_id == business_id).first()
-			pname = (person.alias_name or "").strip() if person else None
-			plats = person_coords(person) if person else (None, None)
+			# Corrupt legacy cross-business route stops must not become
+			# actionable daily-plan entries, even with masked personal data.
+			if person is None:
+				continue
+			pname = (person.alias_name or "").strip()
+			plats = person_coords(person)
 			# ترتیب روزمحور از override مسیر (در صورت وجود)
 			day_sort = s.sort_order
 			overrides = getattr(route, "plan_sort_overrides", None) or {}
