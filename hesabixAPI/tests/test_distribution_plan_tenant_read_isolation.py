@@ -7,7 +7,7 @@ production connections, database migrations or locked publication enabled.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from types import SimpleNamespace
 
 import pytest
@@ -18,6 +18,7 @@ from sqlalchemy.schema import CreateTable
 from adapters.db.models.person import Person
 from adapters.db.models.distribution import (
     DistributionCustomerProfile,
+    DistributionDailyPlanLock,
     DistributionRoute,
     DistributionRouteAssignment,
     DistributionRouteStop,
@@ -38,6 +39,7 @@ def db(monkeypatch):
             DistributionRouteAssignment.__table__,
             DistributionRouteStop.__table__,
             DistributionCustomerProfile.__table__,
+            DistributionDailyPlanLock.__table__,
         ):
             connection.execute(CreateTable(table, include_foreign_key_constraints=[]))
     monkeypatch.setattr(distribution, "_ensure_plugin", lambda *_args, **_kwargs: None)
@@ -178,3 +180,119 @@ def test_offline_pack_rejects_missing_items_in_old_snapshot(db, monkeypatch):
     with pytest.raises(ApiError) as error:
         field_ops.build_offline_pack(db, 10, SimpleNamespace(get_user_id=lambda: 20))
     assert (error.value.code, error.value.status_code) == ("CONFLICT", 409)
+
+
+def _add_locked_snapshot(db, monkeypatch, items):
+    """Exercise the real locked get_daily_plan branch, not a fake getter."""
+    lock = DistributionDailyPlanLock(
+        business_id=10,
+        user_id=20,
+        plan_date=DAY,
+        is_locked=True,
+        published_by_user_id=1,
+        published_at=datetime.utcnow(),
+        plan_snapshot={
+            "user_id": 20,
+            "plan_date": DAY.isoformat(),
+            "items": items,
+            "scheduled_count": len(items),
+            "carried_over_count": 0,
+        },
+    )
+    db.add(lock)
+    db.commit()
+    monkeypatch.setattr(
+        distribution,
+        "get_plan_lock",
+        lambda session, business_id, user_id, plan_date: session.query(
+            DistributionDailyPlanLock
+        ).filter(
+            DistributionDailyPlanLock.business_id == business_id,
+            DistributionDailyPlanLock.user_id == user_id,
+            DistributionDailyPlanLock.plan_date == plan_date,
+        ).first(),
+    )
+    return lock
+
+
+def _published_stop(*, person_id=707, route_id=99, stop_id=1, **additional):
+    return {
+        "person_id": person_id,
+        "route_id": route_id,
+        "stop_id": stop_id,
+        "person_name": "Original frozen customer name",
+        "person_mobile": "09111111111",
+        **additional,
+    }
+
+
+def test_valid_locked_snapshot_preserves_original_person_fields(db, monkeypatch):
+    original = _published_stop()
+    lock = _add_locked_snapshot(db, monkeypatch, [original])
+    first = distribution.get_daily_plan(db, 10, 20, DAY)
+    assert first["locked"] is True
+    assert first["items"] == [original]
+
+    # A legitimate CRM edit does not rewrite an immutable publication;
+    # ownership IDs are checked but display data remains the saved copy.
+    db.get(Person, 707).alias_name = "Edited after publication"
+    db.commit()
+    second = distribution.get_daily_plan(db, 10, 20, DAY)
+    assert second["items"] == [original]
+    second["items"][0]["person_name"] = "Caller-mutated copy"
+    assert lock.plan_snapshot["items"][0]["person_name"] == "Original frozen customer name"
+
+
+@pytest.mark.parametrize("item", [
+    _published_stop(person_id=808, stop_id=2),       # foreign person linked to own route
+    _published_stop(person_id=808, route_id=100, stop_id=3),  # foreign route
+    _published_stop(person_id=707, stop_id=2),       # forged customer for an existing stop
+    _published_stop(person_id=707, route_id=100),    # forged route for a real stop
+    _published_stop(person_id=707, stop_id=3),       # foreign route stop
+    _published_stop(person_id=707, stop_id=99999),   # deleted/unknown stop
+    _published_stop(person_id=707, stop_id="1"),     # malformed JSON identifier
+    _published_stop(person_id=707, stop_id=True),    # booleans are not integer IDs
+    _published_stop(person_id="707"),                # ID coercion is not permitted
+    _published_stop(route_id=None),                  # incomplete snapshot
+    {"person_name": "Unscoped legacy value"},       # old forged data
+])
+def test_locked_snapshot_rejects_foreign_missing_or_forged_links(db, monkeypatch, item):
+    _add_locked_snapshot(db, monkeypatch, [_published_stop(), item])
+    from app.core.responses import ApiError
+
+    with pytest.raises(ApiError) as error:
+        distribution.get_daily_plan(db, 10, 20, DAY)
+    assert (error.value.code, error.value.status_code) == ("CONFLICT", 409)
+
+
+def test_locked_snapshot_rejects_duplicate_stops(db, monkeypatch):
+    _add_locked_snapshot(db, monkeypatch, [_published_stop(), _published_stop()])
+    from app.core.responses import ApiError
+
+    with pytest.raises(ApiError) as error:
+        distribution.get_daily_plan(db, 10, 20, DAY)
+    assert (error.value.code, error.value.status_code) == ("CONFLICT", 409)
+
+
+def test_locked_snapshot_rejects_route_not_assigned_to_visitor(db, monkeypatch):
+    # An in-business route can still be forbidden if this visitor was never
+    # assigned to it on the published day.
+    db.add(DistributionRoute(id=101, business_id=10, code="R-101", name="Other local route", is_active=True))
+    db.flush()
+    db.add(DistributionRouteStop(id=4, route_id=101, person_id=707, weekday=0))
+    db.commit()
+    _add_locked_snapshot(db, monkeypatch, [_published_stop(route_id=101, stop_id=4)])
+    from app.core.responses import ApiError
+
+    with pytest.raises(ApiError) as error:
+        distribution.get_daily_plan(db, 10, 20, DAY)
+    assert (error.value.code, error.value.status_code) == ("CONFLICT", 409)
+
+
+def test_empty_locked_snapshot_does_not_require_route_assignments(db, monkeypatch):
+    _add_locked_snapshot(db, monkeypatch, [])
+    db.query(DistributionRouteAssignment).delete()
+    db.commit()
+    plan = distribution.get_daily_plan(db, 10, 20, DAY)
+    assert plan["items"] == []
+    assert plan["locked"] is True
