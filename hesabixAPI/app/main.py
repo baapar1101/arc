@@ -909,6 +909,9 @@ def create_app() -> FastAPI:
         if raw_body:
             try:
                 normalized_body = smart_normalize_json(raw_body)
+                if path.startswith(f"{settings.api_v1_prefix}/products/business/"):
+                    # Product measurements may need the exact JSON number tokens.
+                    request.state.original_product_json = raw_body
             except Exception as e:
                 import logging
                 logger = logging.getLogger(__name__)

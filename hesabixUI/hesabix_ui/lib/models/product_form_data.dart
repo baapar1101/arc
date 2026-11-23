@@ -1,4 +1,5 @@
 import 'catalog_specification_item.dart';
+import 'product_measurement.dart';
 import 'product_supplier_item.dart';
 
 const Object _kProductFormCodeUnset = Object();
@@ -20,6 +21,7 @@ class ProductFormData {
   /// بارکدهای عمومی؛ با ویرگول از هم جدا می‌شوند (هم‌عرض با APIی `general_barcodes`).
   String? generalBarcodes;
   int? categoryId;
+  final Map<ProductMeasurement, String?> physicalMeasurements;
   
   // Inventory
   bool trackInventory;
@@ -102,6 +104,7 @@ class ProductFormData {
     this.description,
     this.generalBarcodes,
     this.categoryId,
+    this.physicalMeasurements = const {},
     this.trackInventory = false,
     this.reorderPoint,
     this.minOrderQty,
@@ -164,6 +167,7 @@ class ProductFormData {
     Object? description = _kProductFormFieldUnset,
     Object? generalBarcodes = _kProductFormFieldUnset,
     Object? categoryId = _kProductFormFieldUnset,
+    Map<ProductMeasurement, String?>? physicalMeasurements,
     bool? trackInventory,
     Object? reorderPoint = _kProductFormFieldUnset,
     Object? minOrderQty = _kProductFormFieldUnset,
@@ -221,6 +225,7 @@ class ProductFormData {
       description: _nullableCopyField<String>(description, this.description),
       generalBarcodes: _nullableCopyField<String>(generalBarcodes, this.generalBarcodes),
       categoryId: _nullableCopyField<int>(categoryId, this.categoryId),
+      physicalMeasurements: physicalMeasurements ?? this.physicalMeasurements,
       trackInventory: trackInventory ?? this.trackInventory,
       reorderPoint: _nullableCopyField<int>(reorderPoint, this.reorderPoint),
       minOrderQty: _nullableCopyField<int>(minOrderQty, this.minOrderQty),
@@ -386,6 +391,10 @@ class ProductFormData {
 
   factory ProductFormData.fromProduct(Map<String, dynamic> product) {
     return ProductFormData(
+      physicalMeasurements: {
+        for (final field in ProductMeasurement.values)
+          field: product[field.apiKey] as String?,
+      },
       itemType: (product['item_type'] as String?) ?? 'کالا',
       code: product['code']?.toString(),
       autoGenerateCode: false,

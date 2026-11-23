@@ -37,6 +37,9 @@ class Business(Base):
     business_field: Mapped[BusinessField] = mapped_column(SQLEnum(BusinessField), nullable=False)
     owner_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     default_currency_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("currencies.id", ondelete="RESTRICT"), nullable=True, index=True)
+
+    product_dimension_unit: Mapped[str] = mapped_column(String(2), default="mm", server_default="mm")
+    product_weight_unit: Mapped[str] = mapped_column(String(2), default="g", server_default="g")
     
     # فیلدهای جدید
     address: Mapped[str | None] = mapped_column(Text, nullable=True)

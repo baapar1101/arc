@@ -4,6 +4,8 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Dict, List, Optional
 
+from app.core.product_measurements import MEASUREMENT_FIELDS
+
 _LINE_ROOT_TO_EXTRA = (
     "unit_price",
     "line_discount",
@@ -2642,6 +2644,10 @@ _PRODUCT_OPENING_BALANCE_SCHEMA: Dict[str, Any] = {
 }
 
 _PRODUCT_WRITE_FIELDS_SCHEMA: Dict[str, Any] = {
+    **{
+        key: {"type": ["string", "null"], "description": f"{label} (رشتهٔ اعشاری دقیق)"}
+        for key, label in MEASUREMENT_FIELDS.items()
+    },
     "item_type": {
         "type": "string",
         "enum": ["کالا", "خدمت"],
@@ -2980,6 +2986,7 @@ def _normalize_product_opening_balance(raw: Any) -> Optional[Dict[str, Any]]:
 
 
 def _apply_product_write_fields(args: Dict[str, Any], payload: Dict[str, Any]) -> None:
+    payload.update((key, args[key]) for key in MEASUREMENT_FIELDS if key in args)
     if "item_type" in args:
         payload["item_type"] = normalize_product_item_type(args.get("item_type"))
     if "code" in args:

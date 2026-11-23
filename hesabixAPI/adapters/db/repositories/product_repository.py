@@ -417,6 +417,10 @@ class ProductRepository(BaseRepository[Product]):
             return None
         # اجازه بده فیلدهای خاص حتی اگر None باشند هم ست شوند
         nullable_overrides = {
+            "length_mm",
+            "width_mm",
+            "height_mm",
+            "weight_g",
             "main_unit_id",
             "secondary_unit_id",
             "unit_conversion_factor",

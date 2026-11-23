@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 from typing import Optional, Callable
 from functools import wraps
 
@@ -28,6 +29,7 @@ EXCLUDED_PATHS = {
     "/api/v1/jobs",
     "/api/v1/admin",
 }
+PRODUCT_DETAIL_PATH = re.compile(r"/api/v1/products/business/[0-9]+/[0-9]+/?")
 
 # Endpoints که باید cache شوند (با TTL مشخص)
 CACHE_CONFIG = {
@@ -126,6 +128,10 @@ class ResponseCacheMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable):
         # فقط GET requests را cache می‌کنیم
         if request.method != "GET":
+            return await call_next(request)
+
+        # The product editor needs current values immediately after saving.
+        if PRODUCT_DETAIL_PATH.fullmatch(request.url.path):
             return await call_next(request)
         
         # بررسی exclude paths

@@ -6,6 +6,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../category/category_picker_field.dart';
 import '../../../models/product_form_data.dart';
+import '../../../models/product_measurement.dart';
 import '../../../utils/number_normalizer.dart';
 import '../../../utils/product_form_validator.dart';
 import '../../../controllers/product_form_controller.dart';
@@ -291,6 +292,12 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
           SizedBox(height: spacing),
           _buildUnitsSection(context),
         ],
+        if (widget.formData.itemType == 'کالا' && widget.controller != null) ...[
+          SizedBox(height: spacing * 2),
+          Text('مشخصات فیزیکی', style: Theme.of(context).textTheme.titleSmall),
+          SizedBox(height: spacing),
+          _buildMeasurements(widget.controller!, spacing),
+        ],
         if (widget.productId != null) ...[
           SizedBox(height: spacing),
           QuickSalesPersonalPinToggle(
@@ -346,6 +353,51 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
 
   void _updateFormData(ProductFormData newData) {
     widget.onChanged(newData);
+  }
+
+  Widget _buildMeasurements(ProductFormController controller, double spacing) {
+    if (controller.measurementUnit(ProductMeasurement.length) == null) {
+      return const Text('واحدهای کالا دریافت نشد. برای ورود اندازه‌ها فرم را دوباره باز کنید.');
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 520 ? 2 : 1;
+        final width = (constraints.maxWidth - (columns - 1) * spacing) / columns;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final field in ProductMeasurement.values)
+              SizedBox(
+                width: width,
+                child: _measurementField(controller, field),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _measurementField(
+    ProductFormController controller,
+    ProductMeasurement field,
+  ) {
+    final unit = controller.measurementUnit(field)!;
+    return TextFormField(
+      key: ValueKey(field.apiKey),
+      initialValue: controller.measurementInput(field),
+      decoration: InputDecoration(
+        labelText: '${field.label} (${unit.label})',
+        helperText: controller.isMeasurementApproximate(field)
+            ? 'نمایش تقریبی'
+            : null,
+      ),
+      textDirection: TextDirection.ltr,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: const [EnglishDigitsFormatter()],
+      onChanged: (value) => controller.updateMeasurement(field, value),
+      validator: (value) => controller.measurementError(field, value ?? ''),
+    );
   }
 
   Widget _buildProductCodeBlock(BuildContext context, double spacing) {

@@ -21,6 +21,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from adapters.db.session import Base
+from app.core.product_measurements import MEASUREMENT_PRECISION, MEASUREMENT_SCALE
 
 
 class ProductItemType(str, Enum):
@@ -54,6 +55,11 @@ class Product(Base):
     code: Mapped[str] = mapped_column(String(64), nullable=False, comment="کد یکتا در هر کسب‌وکار")
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    length_mm: Mapped[Decimal | None] = mapped_column(Numeric(MEASUREMENT_PRECISION, MEASUREMENT_SCALE))
+    width_mm: Mapped[Decimal | None] = mapped_column(Numeric(MEASUREMENT_PRECISION, MEASUREMENT_SCALE))
+    height_mm: Mapped[Decimal | None] = mapped_column(Numeric(MEASUREMENT_PRECISION, MEASUREMENT_SCALE))
+    weight_g: Mapped[Decimal | None] = mapped_column(Numeric(MEASUREMENT_PRECISION, MEASUREMENT_SCALE))
 
     # بارکدهای عمومی (چند مقدار با ویرگول؛ برای اسکن و چاپ برچسب)
     general_barcodes: Mapped[str | None] = mapped_column(

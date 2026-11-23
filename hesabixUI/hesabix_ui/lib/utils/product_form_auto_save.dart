@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/product_form_data.dart';
+import '../models/product_measurement.dart';
 
 /// سرویس برای ذخیره و بارگذاری خودکار فرم کالا
 class ProductFormAutoSave {
@@ -44,6 +45,8 @@ class ProductFormAutoSave {
         'description': formData.description,
         'generalBarcodes': formData.generalBarcodes,
         'categoryId': formData.categoryId,
+        for (final entry in formData.physicalMeasurements.entries)
+          entry.key.apiKey: entry.value,
         'trackInventory': formData.trackInventory,
         'reorderPoint': formData.reorderPoint,
         'minOrderQty': formData.minOrderQty,
@@ -113,6 +116,10 @@ class ProductFormAutoSave {
         description: data['description'] as String?,
         generalBarcodes: data['generalBarcodes'] as String?,
         categoryId: data['categoryId'] as int?,
+        physicalMeasurements: {
+          for (final field in ProductMeasurement.values)
+            field: data[field.apiKey] as String?,
+        },
         trackInventory: data['trackInventory'] as bool? ?? false,
         reorderPoint: data['reorderPoint'] as int?,
         minOrderQty: data['minOrderQty'] as int?,

@@ -390,6 +390,8 @@ class BusinessResponse {
   final bool invoiceDefaultWarehouseFillDocumentHeader;
   /// خروج با کسری برای کالای فله‌ای هنگام قطعی حواله
   final bool allowNegativeInventoryForBulk;
+  final String productDimensionUnit;
+  final String productWeightUnit;
   /// خروج با کسری برای کالای یونیک هنگام قطعی حواله
   final bool allowNegativeInventoryForUnique;
   /// حواله انتقال همیشه کنترل کسری کامل
@@ -468,6 +470,8 @@ class BusinessResponse {
     this.invoiceDefaultWarehouseId,
     this.invoiceDefaultWarehouseFillDocumentHeader = true,
     this.allowNegativeInventoryForBulk = false,
+    this.productDimensionUnit = 'mm',
+    this.productWeightUnit = 'g',
     this.allowNegativeInventoryForUnique = false,
     this.warehouseTransferRequirePositiveStock = true,
     this.goodsExpenseIncomeWorkflowMode = 'simple',
@@ -576,6 +580,8 @@ class BusinessResponse {
       invoiceDefaultWarehouseFillDocumentHeader:
           (json['invoice_default_warehouse_fill_document_header'] as bool?) ?? true,
       allowNegativeInventoryForBulk: (json['allow_negative_inventory_for_bulk'] as bool?) ?? false,
+      productDimensionUnit: (json['product_dimension_unit'] as String?) ?? 'mm',
+      productWeightUnit: (json['product_weight_unit'] as String?) ?? 'g',
       allowNegativeInventoryForUnique: (json['allow_negative_inventory_for_unique'] as bool?) ?? false,
       warehouseTransferRequirePositiveStock:
           (json['warehouse_transfer_require_positive_stock'] as bool?) ?? true,
