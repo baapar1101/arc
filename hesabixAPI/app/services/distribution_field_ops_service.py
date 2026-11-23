@@ -450,7 +450,17 @@ def enrich_daily_plan(
 		if not route or route.business_id != business_id or not route.is_active:
 			continue
 		stops = db.query(DistributionRouteStop).filter(DistributionRouteStop.route_id == route.id).all()
+		valid_person_ids = {
+			int(row[0]) for row in db.query(Person.id).filter(
+				Person.business_id == business_id,
+				Person.id.in_([s.person_id for s in stops]),
+			).all()
+		}
 		for s in stops:
+			# Do not schedule a foreign-business customer via an invalid
+			# legacy stop reference; keep any valid local stops intact.
+			if int(s.person_id) not in valid_person_ids:
+				continue
 			stop_meta[int(s.id)] = s
 			profile = get_profile(db, business_id, int(s.person_id))
 			freq = getattr(s, "frequency", None) or (profile.visit_frequency if profile else "weekly")
@@ -472,8 +482,16 @@ def enrich_daily_plan(
 			if not route or route.business_id != business_id or not route.is_active:
 				continue
 			stops = db.query(DistributionRouteStop).filter(DistributionRouteStop.route_id == route.id).all()
+			valid_person_ids = {
+				int(row[0]) for row in db.query(Person.id).filter(
+					Person.business_id == business_id,
+					Person.id.in_([s.person_id for s in stops]),
+				).all()
+			}
 			for s in stops:
 				pid = int(s.person_id)
+				if pid not in valid_person_ids:
+					continue
 				if pid in seen_persons:
 					continue
 				profile = get_profile(db, business_id, pid)
@@ -854,10 +872,24 @@ def build_offline_pack(db: Session, business_id: int, ctx: AuthContext) -> Dict[
 	today = business_today(business_id)
 	plan = dist_svc.get_daily_plan(db, business_id, uid, today)
 	settings = dist_svc.settings_to_dict(dist_svc.get_or_create_distribution_settings(db, business_id))
-	person_ids = [int(it["person_id"]) for it in plan.get("items") or [] if it.get("person_id")]
+	person_ids = list(dict.fromkeys(
+		int(it["person_id"]) for it in plan.get("items") or [] if it.get("person_id")
+	))
 	persons = []
 	if person_ids:
-		for p in db.query(Person).filter(Person.id.in_(person_ids)).all():
+		# Old locked snapshots may contain invalid cross-business references.
+		# Validate the complete list before returning any offline pack.
+		local_people = db.query(Person).filter(
+			Person.business_id == business_id,
+			Person.id.in_(person_ids),
+		).all()
+		if {int(p.id) for p in local_people} != set(person_ids):
+			raise ApiError(
+				"CONFLICT",
+				"Daily plan refers to a customer outside this business",
+				http_status=409,
+			)
+		for p in local_people:
 			persons.append({
 				"id": p.id,
 				"name": (p.alias_name or "").strip(),
