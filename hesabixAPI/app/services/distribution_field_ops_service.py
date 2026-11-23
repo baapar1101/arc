@@ -872,9 +872,15 @@ def build_offline_pack(db: Session, business_id: int, ctx: AuthContext) -> Dict[
 	today = business_today(business_id)
 	plan = dist_svc.get_daily_plan(db, business_id, uid, today)
 	settings = dist_svc.settings_to_dict(dist_svc.get_or_create_distribution_settings(db, business_id))
-	person_ids = list(dict.fromkeys(
-		int(it["person_id"]) for it in plan.get("items") or [] if it.get("person_id")
-	))
+	plan_items = plan.get("items")
+	if not isinstance(plan_items, list):
+		raise ApiError("CONFLICT", "Offline daily plan must contain a valid item list", http_status=409)
+	try:
+		person_ids = list(dict.fromkeys(int(item["person_id"]) for item in plan_items))
+	except (KeyError, TypeError, ValueError, OverflowError):
+		raise ApiError("CONFLICT", "Offline daily plan contains an invalid customer", http_status=409)
+	if any(person_id <= 0 for person_id in person_ids):
+		raise ApiError("CONFLICT", "Offline daily plan contains an invalid customer", http_status=409)
 	persons = []
 	if person_ids:
 		# Old locked snapshots may contain invalid cross-business references.
