@@ -122,7 +122,7 @@ def export_electronic_general_ledger_books(
     خروجی دفتر کل الکترونیکی برای تمام حساب‌های کسب‌وکار در بازه انتخاب‌شده.
     فیلتر حساب (account_ids) در این خروجی نادیده گرفته می‌شود؛ مطابق اصل دفتر کل قانونی.
     """
-    _ensure_rial_currency(db, currency_id)
+    currency_id = _ensure_rial_currency(db, currency_id)
 
     result = get_journal_ledger_report(
         db=db,
