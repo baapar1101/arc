@@ -9,6 +9,7 @@ on:
       - 'hesabixAPI/app/services/general_ledger_electronic_export_service.py'
       - 'hesabixAPI/tests/test_electronic_ledger_rial_fallback.py'
       - 'hesabixUI/hesabix_ui/lib/pages/business/general_ledger_report_page.dart'
+      - 'hesabixUI/hesabix_ui/lib/pages/business/journal_ledger_report_page.dart'
       - '.github/workflows/validate-electronic-ledger-rial.yml'
   workflow_dispatch:
 
@@ -59,4 +60,4 @@ jobs:
       - name: Resolve Flutter dependencies
         run: flutter pub get
       - name: Analyze general ledger report page
-        run: flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings lib/pages/business/general_ledger_report_page.dart
+        run: flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings lib/pages/business/general_ledger_report_page.dart lib/pages/business/journal_ledger_report_page.dart
