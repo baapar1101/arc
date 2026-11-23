@@ -159,7 +159,7 @@ def test_offline_pack_rejects_corrupt_customer_snapshot_before_disclosure(
     monkeypatch.setattr(
         distribution,
         "get_or_create_distribution_settings",
-        lambda *_args: SimpleNamespace(),
+        lambda *_args: None,
     )
     ctx = SimpleNamespace(get_user_id=lambda: 20)
     from app.core.responses import ApiError
@@ -172,7 +172,7 @@ def test_offline_pack_rejects_corrupt_customer_snapshot_before_disclosure(
 def test_offline_pack_rejects_missing_items_in_old_snapshot(db, monkeypatch):
     monkeypatch.setattr(field_ops, "business_today", lambda *_args: DAY)
     monkeypatch.setattr(distribution, "get_daily_plan", lambda *_args: {"items": None})
-    monkeypatch.setattr(distribution, "get_or_create_distribution_settings", lambda *_args: SimpleNamespace())
+    monkeypatch.setattr(distribution, "get_or_create_distribution_settings", lambda *_args: None)
     from app.core.responses import ApiError
 
     with pytest.raises(ApiError) as error:
