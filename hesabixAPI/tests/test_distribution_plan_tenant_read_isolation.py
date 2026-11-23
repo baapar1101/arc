@@ -103,22 +103,78 @@ def test_individual_plan_item_masks_foreign_contact_and_location(db):
     assert foreign_item["longitude"] is None
 
 
-def test_daily_plan_excludes_foreign_route_and_masks_corrupt_customer(db):
+def test_daily_plan_excludes_foreign_route_and_corrupt_customer_stop(db):
     plan = distribution.get_daily_plan(db, 10, 20, DAY)
     assert plan["plan_date"] == DAY.isoformat()
-    assert plan["scheduled_count"] == 2  # includes local-route corrupted stop, but no PII
+    assert plan["scheduled_count"] == 1
     assert {row["route_id"] for row in plan["items"]} == {99}
-    local = next(row for row in plan["items"] if row["person_id"] == 707)
-    foreign = next(row for row in plan["items"] if row["person_id"] == 808)
+    assert {row["person_id"] for row in plan["items"]} == {707}
+    local = plan["items"][0]
     assert local["person_name"] == "Tenant ten"
-    assert foreign["person_name"] == "808"
-    assert foreign["person_mobile"] is None
-    assert foreign["latitude"] is None
+    assert local["person_mobile"] == "09111111111"
     assert "Tenant eleven SECRET" not in repr(plan)
     assert "09222222222" not in repr(plan)
+    assert "808" not in repr(plan["items"])
 
 
 def test_enrichment_ignores_other_business_route_even_when_assignment_is_corrupt(db):
     plan = field_ops.enrich_daily_plan(db, 10, 20, DAY, [])
     assert {row["route_id"] for row in plan["items"]} == {99}
+    assert {row["person_id"] for row in plan["items"]} == {707}
     assert all(row["route_name"] == "My route" for row in plan["items"])
+
+
+def test_carried_over_plan_does_not_include_foreign_customer(db, monkeypatch):
+    # An invalid Tuesday stop would otherwise be carried into Monday's plan.
+    db.get(DistributionRouteStop, 2).weekday = 1
+    db.commit()
+    monkeypatch.setattr(
+        distribution,
+        "get_distribution_settings_row",
+        lambda *_a: SimpleNamespace(carry_over_missed_visits=True, carry_over_days=7),
+    )
+    monkeypatch.setattr(field_ops, "_completed_person_days", lambda *_args: set())
+    result = field_ops.enrich_daily_plan(db, 10, 20, DAY, [])
+    assert {row["person_id"] for row in result["items"]} == {707}
+    assert result["scheduled_count"] == 1
+    assert result["carried_over_count"] == 0
+
+
+@pytest.mark.parametrize("invalid_items", [
+    [{"person_id": 707}, {"person_id": 808}],
+    [{"person_id": 808}],
+    [{"person_id": "not-an-integer"}],
+    [{"person_name": "Unscoped customer"}],
+    [None],
+])
+def test_offline_pack_rejects_corrupt_customer_snapshot_before_disclosure(
+    db, monkeypatch, invalid_items,
+):
+    monkeypatch.setattr(field_ops, "business_today", lambda *_args: DAY)
+    monkeypatch.setattr(
+        distribution,
+        "get_daily_plan",
+        lambda *_args: {"items": invalid_items, "plan_date": DAY.isoformat()},
+    )
+    monkeypatch.setattr(
+        distribution,
+        "get_or_create_distribution_settings",
+        lambda *_args: SimpleNamespace(),
+    )
+    ctx = SimpleNamespace(get_user_id=lambda: 20)
+    from app.core.responses import ApiError
+
+    with pytest.raises(ApiError) as error:
+        field_ops.build_offline_pack(db, 10, ctx)
+    assert (error.value.code, error.value.status_code) == ("CONFLICT", 409)
+
+
+def test_offline_pack_rejects_missing_items_in_old_snapshot(db, monkeypatch):
+    monkeypatch.setattr(field_ops, "business_today", lambda *_args: DAY)
+    monkeypatch.setattr(distribution, "get_daily_plan", lambda *_args: {"items": None})
+    monkeypatch.setattr(distribution, "get_or_create_distribution_settings", lambda *_args: SimpleNamespace())
+    from app.core.responses import ApiError
+
+    with pytest.raises(ApiError) as error:
+        field_ops.build_offline_pack(db, 10, SimpleNamespace(get_user_id=lambda: 20))
+    assert (error.value.code, error.value.status_code) == ("CONFLICT", 409)
