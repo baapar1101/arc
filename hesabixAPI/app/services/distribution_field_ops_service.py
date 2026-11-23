@@ -447,7 +447,7 @@ def enrich_daily_plan(
 
 	for asn in assignments:
 		route = db.query(DistributionRoute).filter(DistributionRoute.id == asn.route_id).first()
-		if not route or not route.is_active:
+		if not route or route.business_id != business_id or not route.is_active:
 			continue
 		stops = db.query(DistributionRouteStop).filter(DistributionRouteStop.route_id == route.id).all()
 		for s in stops:
@@ -469,7 +469,7 @@ def enrich_daily_plan(
 		done = _completed_person_days(db, business_id, target_user_id, plan_date - timedelta(days=lookback), plan_date)
 		for asn in assignments:
 			route = db.query(DistributionRoute).filter(DistributionRoute.id == asn.route_id).first()
-			if not route or not route.is_active:
+			if not route or route.business_id != business_id or not route.is_active:
 				continue
 			stops = db.query(DistributionRouteStop).filter(DistributionRouteStop.route_id == route.id).all()
 			for s in stops:
@@ -525,7 +525,8 @@ def _stop_plan_item(
 	customer_class: Optional[str],
 	frequency: Optional[str],
 ) -> Dict[str, Any]:
-	person = db.query(Person).filter(Person.id == s.person_id).first()
+	# Never expose a person from another tenant through a corrupt route stop.
+	person = db.query(Person).filter(Person.id == s.person_id, Person.business_id == route.business_id).first()
 	pname = (person.alias_name or "").strip() if person else None
 	plats = person_coords(person) if person else (None, None)
 	day_sort = s.sort_order
