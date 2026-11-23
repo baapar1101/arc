@@ -257,7 +257,9 @@ def test_valid_locked_snapshot_preserves_original_person_fields(db, monkeypatch)
     {"person_name": "Unscoped legacy value"},       # old forged data
 ])
 def test_locked_snapshot_rejects_foreign_missing_or_forged_links(db, monkeypatch, item):
-    _add_locked_snapshot(db, monkeypatch, [_published_stop(), item])
+    # Each corrupt item must fail independently, not only because a good
+    # item in the same fixture happens to duplicate its stop ID.
+    _add_locked_snapshot(db, monkeypatch, [item])
     from app.core.responses import ApiError
 
     with pytest.raises(ApiError) as error:
@@ -296,3 +298,17 @@ def test_empty_locked_snapshot_does_not_require_route_assignments(db, monkeypatc
     plan = distribution.get_daily_plan(db, 10, 20, DAY)
     assert plan["items"] == []
     assert plan["locked"] is True
+
+
+def test_mixed_locked_snapshot_fails_entire_response_without_disclosing_foreign_pii(
+    db, monkeypatch,
+):
+    _add_locked_snapshot(
+        db, monkeypatch,
+        [_published_stop(), _published_stop(person_id=808, stop_id=2, person_mobile="FOREIGN-SECRET")],
+    )
+    from app.core.responses import ApiError
+    with pytest.raises(ApiError) as error:
+        distribution.get_daily_plan(db, 10, 20, DAY)
+    assert (error.value.code, error.value.status_code) == ("CONFLICT", 409)
+    assert "FOREIGN-SECRET" not in str(error.value)
