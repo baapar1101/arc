@@ -1,0 +1,37 @@
+name: Validate PostgreSQL restore resolver
+
+on:
+  push:
+    branches:
+      - integration/resolve-hesabix-conflicts-20261102
+    paths:
+      - 'deploy.sh'
+      - 'hesabixAPI/tests/test_pg_restore_bin_capture.py'
+      - '.github/workflows/validate-pg-restore-resolver.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  restore-path-validation:
+    name: Safe pg_restore binary-path capture
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+
+      - name: Validate deploy script syntax
+        run: bash -n deploy.sh
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install only unit-test runner
+        run: python -m pip install pytest
+
+      - name: Check executable path resolution without running any restore
+        run: pytest -q hesabixAPI/tests/test_pg_restore_bin_capture.py
