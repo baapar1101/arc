@@ -162,6 +162,10 @@ def test_locked_snapshot_preserves_published_contents_even_when_source_changes(d
     monkeypatch.setattr(svc, "get_daily_plan", original_getter)
 
     source["items"][0]["person_name"] = "Changed live catalog"
+    # This test isolates deepcopy / immutability mechanics using a synthetic
+    # snapshot without real route/customer FKs. Ownership validation is
+    # separately tested with actual models in test_distribution_plan_tenant_read_isolation.
+    monkeypatch.setattr(svc, "_validate_locked_plan_snapshot_tenant_scope", lambda *_args: None)
     frozen = svc.get_daily_plan(db, 10, 20, date(2026, 11, 21))
     assert frozen["published"] is True
     assert frozen["locked"] is True
