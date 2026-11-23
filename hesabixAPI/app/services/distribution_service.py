@@ -1170,6 +1170,94 @@ def _get_plan_visit_progress(
 	return _summarize_visit_progress(visits, items)
 
 
+def _validate_locked_plan_snapshot_tenant_scope(
+	db: Session,
+	business_id: int,
+	target_user_id: int,
+	plan_date: date,
+	items: List[Dict[str, Any]],
+) -> None:
+	"""Fail closed if a persisted day plan references an unscoped customer/stop.
+
+	Only validate stable ownership and assignment IDs. Do not recalculate
+	route ordering, customer names, coordinates or carry-over status: a valid
+	immutable publication must remain the originally published snapshot.
+	"""
+	if not items:
+		return
+
+	def _positive_id(item: Dict[str, Any], field: str) -> int:
+		value = item.get(field)
+		# JSON snapshot IDs are integers; disallow bool/str/float coercion.
+		if type(value) is not int or value <= 0:
+			raise ApiError(
+				"CONFLICT",
+				"Locked daily plan contains an invalid customer, route or stop identifier",
+				http_status=409,
+			)
+		return value
+
+	by_stop: Dict[int, Tuple[int, int]] = {}
+	route_ids = set()
+	for item in items:
+		person_id = _positive_id(item, "person_id")
+		route_id = _positive_id(item, "route_id")
+		stop_id = _positive_id(item, "stop_id")
+		# Duplicate stop entries are not valid itinerary items.
+		if stop_id in by_stop:
+			raise ApiError("CONFLICT", "Locked daily plan contains duplicate stops", http_status=409)
+		by_stop[stop_id] = (route_id, person_id)
+		route_ids.add(route_id)
+
+	assigned_routes = {
+		int(row[0])
+		for row in db.query(DistributionRouteAssignment.route_id).filter(
+			DistributionRouteAssignment.business_id == business_id,
+			DistributionRouteAssignment.user_id == target_user_id,
+			DistributionRouteAssignment.valid_from <= plan_date,
+			or_(
+				DistributionRouteAssignment.valid_to.is_(None),
+				DistributionRouteAssignment.valid_to >= plan_date,
+			),
+		).all()
+	}
+	if not route_ids.issubset(assigned_routes):
+		raise ApiError(
+			"CONFLICT", "Locked daily plan contains a route not assigned to this visitor",
+			http_status=409,
+		)
+
+	# Include business-scoped joins for the route *and* customer. Chunk
+	# stop IDs to stay below SQL Server's 2100 query-parameter limit.
+	verified: Dict[int, Tuple[int, int]] = {}
+	stop_ids = list(by_stop)
+	for pos in range(0, len(stop_ids), 750):
+		rows = (
+			db.query(
+				DistributionRouteStop.id,
+				DistributionRouteStop.route_id,
+				DistributionRouteStop.person_id,
+			)
+			.join(DistributionRoute, DistributionRoute.id == DistributionRouteStop.route_id)
+			.join(Person, Person.id == DistributionRouteStop.person_id)
+			.filter(
+				DistributionRouteStop.id.in_(stop_ids[pos:pos + 750]),
+				DistributionRoute.business_id == business_id,
+				Person.business_id == business_id,
+			)
+			.all()
+		)
+		verified.update({
+			int(stop_id): (int(route_id), int(person_id))
+			for stop_id, route_id, person_id in rows
+		})
+	if verified != by_stop:
+		raise ApiError(
+			"CONFLICT", "Locked daily plan has a missing or foreign-business customer, route or stop",
+			http_status=409,
+	)
+
+
 def get_daily_plan(db: Session, business_id: int, target_user_id: int, plan_date: date) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
 	publication = get_plan_lock(db, business_id, target_user_id, plan_date)
@@ -1189,6 +1277,9 @@ def get_daily_plan(db: Session, business_id: int, target_user_id: int, plan_date
 			or any(not isinstance(item, dict) for item in snapshot["items"])
 		):
 			raise ApiError("CONFLICT", "Locked daily plan snapshot does not match the requested visitor/date", http_status=409)
+		_validate_locked_plan_snapshot_tenant_scope(
+			db, business_id, target_user_id, plan_date, snapshot["items"],
+		)
 		result = deepcopy(snapshot)
 		result.update(plan_lock_to_dict(publication))
 		result["visit_progress"] = _get_plan_visit_progress(db, business_id, target_user_id, plan_date, result["items"])
