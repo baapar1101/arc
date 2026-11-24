@@ -4690,6 +4690,49 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chooseFile => 'Choose file';
 
   @override
+  String get productPhoto => 'Product photo';
+
+  @override
+  String get productPhotoTake => 'Take photo';
+
+  @override
+  String get productPhotoRetake => 'Retake photo';
+
+  @override
+  String get productPhotoUse => 'Use photo';
+
+  @override
+  String get productPhotoRemove => 'Remove photo';
+
+  @override
+  String get productPhotoCameraSecureContext =>
+      'Open Hesabix over HTTPS to use the camera, or choose a file.';
+
+  @override
+  String get productPhotoCameraPermission =>
+      'Camera access was denied. Check camera permissions in your browser or device settings.';
+
+  @override
+  String get productPhotoNoCamera =>
+      'No camera was found. Connect a camera or choose a file.';
+
+  @override
+  String get productPhotoCameraUnavailable =>
+      'The camera is unavailable. Check that it is connected and close any other app using it, or choose a file.';
+
+  @override
+  String get productPhotoCaptureFailed =>
+      'Could not take a photo. Try again or choose a file.';
+
+  @override
+  String get productPhotoEmpty =>
+      'The image is empty. Choose another file or take a photo.';
+
+  @override
+  String get productPhotoInvalidFormat =>
+      'Choose a JPG, PNG, GIF, WebP or BMP image.';
+
+  @override
   String get matchBy => 'Match by';
 
   @override
@@ -14623,6 +14666,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get oaAcknowledge => 'Acknowledge';
+
+  @override
+  String get oaVersion => 'Version';
 
   @override
   String get oaVersions => 'Body versions';
