@@ -316,3 +316,66 @@ def test_mixed_locked_snapshot_fails_entire_response_without_disclosing_foreign_
         distribution.get_daily_plan(db, 10, 20, DAY)
     assert (error.value.code, error.value.status_code) == ("CONFLICT", 409)
     assert "FOREIGN-SECRET" not in str(error.value)
+
+
+def _assert_no_implicit_settings_creation(db, monkeypatch):
+    """Exercise the real read-only selector and forbid premature commits."""
+    monkeypatch.setattr(
+        distribution,
+        "get_distribution_settings_row",
+        lambda session, business_id: session.query(DistributionBusinessSettings).filter(
+            DistributionBusinessSettings.business_id == business_id,
+        ).first(),
+    )
+    monkeypatch.setattr(
+        distribution,
+        "get_or_create_distribution_settings",
+        lambda *_args: pytest.fail("Read-only operation must never initialize settings"),
+    )
+    monkeypatch.setattr(
+        db,
+        "commit",
+        lambda: pytest.fail("Rejected operation must not commit partial settings"),
+    )
+
+
+def test_rejected_visit_does_not_create_or_commit_missing_settings(db, monkeypatch):
+    from app.core.responses import ApiError
+
+    _assert_no_implicit_settings_creation(db, monkeypatch)
+    monkeypatch.setattr(distribution, "business_today", lambda *_args: DAY)
+    assert db.get(DistributionBusinessSettings, 10) is None
+    with pytest.raises(ApiError) as error:
+        distribution.start_visit(
+            db, 10, 20,
+            {"person_id": 707, "route_id": 100},  # route belongs to business 11
+        )
+    assert (error.value.code, error.value.status_code) == ("VALIDATION_ERROR", 400)
+    assert db.get(DistributionBusinessSettings, 10) is None
+    assert db.query(DistributionFieldVisit).count() == 0
+
+
+def test_rejected_offline_pack_does_not_create_or_commit_settings(db, monkeypatch):
+    from app.core.responses import ApiError
+
+    _assert_no_implicit_settings_creation(db, monkeypatch)
+    monkeypatch.setattr(field_ops, "business_today", lambda *_args: DAY)
+    monkeypatch.setattr(
+        distribution, "get_daily_plan",
+        lambda *_args: {"plan_date": DAY.isoformat(), "items": [{"person_id": 808}]},
+    )
+    assert db.get(DistributionBusinessSettings, 10) is None
+    with pytest.raises(ApiError) as error:
+        field_ops.build_offline_pack(
+            db, 10, SimpleNamespace(get_user_id=lambda: 20),
+        )
+    assert (error.value.code, error.value.status_code) == ("CONFLICT", 409)
+    assert db.get(DistributionBusinessSettings, 10) is None
+
+
+def test_read_only_default_settings_do_not_create_row(db, monkeypatch):
+    _assert_no_implicit_settings_creation(db, monkeypatch)
+    result = distribution.settings_for_read(db, 10)
+    assert result["require_visit_in_daily_plan"] is False
+    assert result["carry_over_days"] == 7
+    assert db.get(DistributionBusinessSettings, 10) is None
