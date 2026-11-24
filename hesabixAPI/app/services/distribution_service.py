@@ -108,8 +108,10 @@ def settings_to_dict(s: DistributionBusinessSettings) -> Dict[str, Any]:
 def _use_strict_catalog_for_field_user(db: Session, business_id: int, ctx: AuthContext) -> bool:
 	if _can_see_full_distribution_catalog(ctx, business_id):
 		return False
-	s = get_or_create_distribution_settings(db, business_id)
-	return not bool(s.shared_routing_catalog)
+	# Authorization checks must not create settings or commit the caller's
+	# transaction. Missing settings default to a private route catalogue.
+	s = get_distribution_settings_row(db, business_id)
+	return not bool(getattr(s, "shared_routing_catalog", False))
 
 
 def _assigned_route_ids_for_user(
