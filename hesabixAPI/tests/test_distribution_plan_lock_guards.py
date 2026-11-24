@@ -256,7 +256,7 @@ def test_start_visit_rejects_mismatched_day_plan_route_before_writing(
     monkeypatch.setattr(svc, "_active_visit", lambda *_args: None)
     monkeypatch.setattr(svc, "business_today", lambda *_args: DAY)
     monkeypatch.setattr(
-        svc, "get_or_create_distribution_settings",
+        svc, "get_distribution_settings_row",
         lambda *_args: SimpleNamespace(require_visit_in_daily_plan=required),
     )
     monkeypatch.setattr(
@@ -344,7 +344,7 @@ def test_start_visit_accepts_matching_locked_plan_attribution(monkeypatch):
     monkeypatch.setattr(svc, "_active_visit", lambda *_args: None)
     monkeypatch.setattr(svc, "business_today", lambda *_args: DAY)
     monkeypatch.setattr(
-        svc, "get_or_create_distribution_settings",
+        svc, "get_distribution_settings_row",
         lambda *_args: SimpleNamespace(require_visit_in_daily_plan=False),
     )
     monkeypatch.setattr(
@@ -419,7 +419,7 @@ def test_offline_sync_cannot_bypass_day_plan_stop_validation(monkeypatch):
     monkeypatch.setattr(svc, "business_today", lambda *_args: DAY)
     monkeypatch.setattr(
         svc,
-        "get_or_create_distribution_settings",
+        "get_distribution_settings_row",
         lambda *_args: SimpleNamespace(require_visit_in_daily_plan=True),
     )
     monkeypatch.setattr(svc, "get_plan_lock", lambda *_args: None)
