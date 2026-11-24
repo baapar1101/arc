@@ -1486,12 +1486,14 @@ def start_visit(
 		payload.get("supervisor_user_id"), ctx, business_id,
 	)
 	today = business_today(business_id)
-	settings_sv = get_or_create_distribution_settings(db, business_id)
+	# A rejected visit must not create and commit a settings row. Preserve the
+	# request's transaction until its route/plan checks and visit are complete.
+	settings_sv = get_distribution_settings_row(db, business_id)
 	route_id = payload.get("route_id")
 	route_stop_id = payload.get("route_stop_id")
 	publication = get_plan_lock(db, business_id, user_id, today)
 	validated_plan = None
-	if settings_sv.require_visit_in_daily_plan or (publication is not None and publication.is_locked):
+	if bool(getattr(settings_sv, "require_visit_in_daily_plan", False)) or (publication is not None and publication.is_locked):
 		validated_plan = get_daily_plan(db, business_id, user_id, today)
 		assert_visit_matches_daily_plan(
 			validated_plan,
