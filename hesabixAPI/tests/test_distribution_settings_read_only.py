@@ -102,3 +102,47 @@ def test_disabled_promotion_does_not_query_catalogue(
         lambda *_args: SimpleNamespace(auto_apply_promotions=False, enable_promotions=True),
     )
     assert field_ops.apply_auto_promotions_if_needed(ReadOnlySession([]), 10, None) is None
+
+
+class FieldContext:
+    db = None
+
+    def is_superadmin(self):
+        return False
+
+    def has_business_permission(self, _section, _action):
+        return False
+
+
+def test_missing_settings_keep_visitor_routes_private_without_commit(
+    forbid_settings_creation,
+):
+    assert distribution._use_strict_catalog_for_field_user(
+        ReadOnlySession([]), 10, FieldContext(),
+    ) is True
+
+
+def test_explicit_shared_route_catalogue_still_supported_without_commit(
+    forbid_settings_creation, monkeypatch,
+):
+    monkeypatch.setattr(
+        distribution, "get_distribution_settings_row",
+        lambda *_args: SimpleNamespace(shared_routing_catalog=True),
+    )
+    assert distribution._use_strict_catalog_for_field_user(
+        ReadOnlySession([]), 10, FieldContext(),
+    ) is False
+
+
+def test_manager_bypasses_catalogue_settings_lookup(forbid_settings_creation, monkeypatch):
+    class ManagerContext(FieldContext):
+        def has_business_permission(self, section, action):
+            return section == "distribution" and action == "manage"
+
+    monkeypatch.setattr(
+        distribution, "get_distribution_settings_row",
+        lambda *_args: pytest.fail("Manager should not query route privacy settings"),
+    )
+    assert distribution._use_strict_catalog_for_field_user(
+        ReadOnlySession([]), 10, ManagerContext(),
+    ) is False
