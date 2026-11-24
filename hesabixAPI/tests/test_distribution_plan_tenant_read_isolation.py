@@ -17,8 +17,10 @@ from sqlalchemy.schema import CreateTable
 
 from adapters.db.models.person import Person
 from adapters.db.models.distribution import (
+    DistributionBusinessSettings,
     DistributionCustomerProfile,
     DistributionDailyPlanLock,
+    DistributionFieldVisit,
     DistributionRoute,
     DistributionRouteAssignment,
     DistributionRouteStop,
@@ -40,6 +42,8 @@ def db(monkeypatch):
             DistributionRouteStop.__table__,
             DistributionCustomerProfile.__table__,
             DistributionDailyPlanLock.__table__,
+            DistributionFieldVisit.__table__,
+            DistributionBusinessSettings.__table__,
         ):
             connection.execute(CreateTable(table, include_foreign_key_constraints=[]))
     monkeypatch.setattr(distribution, "_ensure_plugin", lambda *_args, **_kwargs: None)
@@ -160,7 +164,7 @@ def test_offline_pack_rejects_corrupt_customer_snapshot_before_disclosure(
     )
     monkeypatch.setattr(
         distribution,
-        "get_or_create_distribution_settings",
+        "get_distribution_settings_row",
         lambda *_args: None,
     )
     ctx = SimpleNamespace(get_user_id=lambda: 20)
@@ -174,7 +178,7 @@ def test_offline_pack_rejects_corrupt_customer_snapshot_before_disclosure(
 def test_offline_pack_rejects_missing_items_in_old_snapshot(db, monkeypatch):
     monkeypatch.setattr(field_ops, "business_today", lambda *_args: DAY)
     monkeypatch.setattr(distribution, "get_daily_plan", lambda *_args: {"items": None})
-    monkeypatch.setattr(distribution, "get_or_create_distribution_settings", lambda *_args: None)
+    monkeypatch.setattr(distribution, "get_distribution_settings_row", lambda *_args: None)
     from app.core.responses import ApiError
 
     with pytest.raises(ApiError) as error:
