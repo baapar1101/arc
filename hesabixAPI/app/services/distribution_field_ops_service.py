@@ -809,7 +809,9 @@ def van_capacity_snapshot(db: Session, business_id: int, van: DistributionVan) -
 	weight = 0.0
 	volume = 0.0
 	near = 0
-	settings = dist_svc.get_or_create_distribution_settings(db, business_id)
+	# Capacity snapshots are also used in offline read packs. Do not create
+	# settings (and implicitly commit) just to resolve the expiry horizon.
+	settings = dist_svc.get_distribution_settings_row(db, business_id)
 	horizon = int(getattr(settings, "near_expiry_days", 14) or 14)
 	today = business_today(business_id)
 	cutoff = today + timedelta(days=horizon)
@@ -1273,7 +1275,9 @@ def apply_auto_promotions_if_needed(
 	business_id: int,
 	promotion_ids: Optional[List[int]],
 ) -> Optional[List[int]]:
-	settings = dist_svc.get_or_create_distribution_settings(db, business_id)
+	# Auto-promotion selection may run during a larger sales transaction.
+	# Resolving default settings must never commit that transaction early.
+	settings = dist_svc.get_distribution_settings_row(db, business_id)
 	if promotion_ids:
 		return promotion_ids
 	if not getattr(settings, "auto_apply_promotions", True):
