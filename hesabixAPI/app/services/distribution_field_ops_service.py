@@ -871,7 +871,9 @@ def build_offline_pack(db: Session, business_id: int, ctx: AuthContext) -> Dict[
 		raise ApiError("FORBIDDEN", "user required", http_status=403)
 	today = business_today(business_id)
 	plan = dist_svc.get_daily_plan(db, business_id, uid, today)
-	settings = dist_svc.settings_to_dict(dist_svc.get_or_create_distribution_settings(db, business_id))
+	# Offline preparation is read-only. Never commit an implicit settings
+	# initialization before verifying a persisted plan snapshot.
+	settings = dist_svc.settings_for_read(db, business_id)
 	plan_items = plan.get("items")
 	if not isinstance(plan_items, list):
 		raise ApiError("CONFLICT", "Offline daily plan must contain a valid item list", http_status=409)
