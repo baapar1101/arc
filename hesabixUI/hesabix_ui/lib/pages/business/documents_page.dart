@@ -90,17 +90,31 @@ class _DocumentsPageState extends State<DocumentsPage> {
     setState(() {});
   }
 
-  // انواع اسناد
-  final Map<String, String> _documentTypes = {
-    'all': 'همه',
-    'manual': 'سند دستی',
-    'expense': 'هزینه',
-    'income': 'درآمد',
-    'receipt': 'دریافت',
-    'payment': 'پرداخت',
-    'transfer': 'انتقال',
-    'invoice': 'فاکتور',
-  };
+  // Keep document filters bilingual without requiring regenerated l10n files.
+  Map<String, String> get _documentTypes {
+    final isFa = AppLocalizations.of(context).localeName.startsWith('fa');
+    return isFa
+        ? {
+            'all': 'همه',
+            'manual': 'سند دستی',
+            'expense': 'هزینه',
+            'income': 'درآمد',
+            'receipt': 'دریافت',
+            'payment': 'پرداخت',
+            'transfer': 'انتقال',
+            'invoice': 'فاکتور',
+          }
+        : {
+            'all': 'All',
+            'manual': 'Manual document',
+            'expense': 'Expense',
+            'income': 'Income',
+            'receipt': 'Receipt',
+            'payment': 'Payment',
+            'transfer': 'Transfer',
+            'invoice': 'Invoice',
+          };
+  }
 
   @override
   void initState() {
@@ -323,7 +337,9 @@ class _DocumentsPageState extends State<DocumentsPage> {
                 icon:
                     Icon(_showDesktopFilters ? Icons.expand_less : Icons.tune),
                 label:
-                    Text(_showDesktopFilters ? 'بستن فیلترها' : 'فیلترها'),
+                    Text(AppLocalizations.of(context).localeName.startsWith('fa')
+                        ? (_showDesktopFilters ? 'بستن فیلترها' : 'فیلترها')
+                        : (_showDesktopFilters ? 'Hide filters' : 'Filters')),
               ),
               if (_hasExternalFiltersActive()) ...[
                 const SizedBox(width: 8),

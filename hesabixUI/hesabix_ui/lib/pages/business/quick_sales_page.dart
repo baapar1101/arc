@@ -821,6 +821,31 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     );
   }
 
+  String _ensureValidActiveSaleRequestId() {
+    final normalizedId = QuickSalesParkedSale.normalizeRequestId(
+      _activeSaleId,
+    );
+    if (normalizedId == _activeSaleId) return normalizedId;
+
+    final oldId = _activeSaleId;
+    _captureActiveSaleIntoList();
+    final index = _sales.indexWhere((sale) => sale.id == oldId);
+    setState(() {
+      _activeSaleId = normalizedId;
+      if (index >= 0) {
+        _sales[index] = QuickSalesParkedSale.fromJson({
+          ..._sales[index].toJson(),
+          'id': normalizedId,
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+      } else {
+        _sales.add(_snapshotActiveSale());
+      }
+    });
+    unawaited(_persistParkedSalesNow());
+    return normalizedId;
+  }
+
   QuickSalesParkedSale _snapshotActiveSale({DateTime? createdAt}) {
     final now = DateTime.now();
     return QuickSalesParkedSale(
@@ -1568,6 +1593,16 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           break;
         default:
           break;
+      }
+      if (p.description != null && p.description!.isNotEmpty) {
+        map['description'] = p.description;
+      }
+      if (p.extraInfo != null && p.extraInfo!.isNotEmpty) {
+        map['extra_info'] = p.extraInfo;
+        final providerId = p.extraInfo!['digipay_provider_id'];
+        if (providerId != null) {
+          map['digipay_provider_id'] = providerId;
+        }
       }
       out.add(map);
     }
@@ -2443,7 +2478,9 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       for (final item in items) {
         final pid = (item['product_id'] as num?)?.toInt();
         if (pid != null) {
-          stocksMap[pid] = (item['quantity'] as num?) ?? 0;
+          stocksMap[pid] = (item['sellable_quantity'] as num?) ??
+              (item['quantity'] as num?) ??
+              0;
         }
       }
       if (!mounted) return;
@@ -2506,7 +2543,9 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       for (final item in items) {
         final pid = (item['product_id'] as num?)?.toInt();
         if (pid != null) {
-          stocksMap[pid] = (item['quantity'] as num?) ?? 0;
+          stocksMap[pid] = (item['sellable_quantity'] as num?) ??
+              (item['quantity'] as num?) ??
+              0;
         }
       }
 
@@ -3029,6 +3068,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     final savedShareAmount = _remainingAmount > 0
         ? _remainingAmount
         : _paymentTargetAmount;
+    final quickSaleRequestId = _ensureValidActiveSaleRequestId();
     Map<String, dynamic>? retryOverride;
     String? retryCorrectionToken;
     var parkAfterFailure = false;
@@ -3101,7 +3141,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       // ساخت extra_info با person_id و تنظیمات حواله انبار
       final extraInfo = <String, dynamic>{
         'quick_sale': true,
-        'quick_sale_request_id': _activeSaleId,
+        'quick_sale_request_id': quickSaleRequestId,
         'person_id': personId, // همیشه person_id را اضافه می‌کنیم
         'post_inventory': _enableWarehouseDocument, // آیا حواله ایجاد شود؟
         'auto_post_warehouse':

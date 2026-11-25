@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, true
 from sqlalchemy.orm import Session
 
 from adapters.db.models.distribution import (
@@ -166,11 +166,14 @@ def get_profile(db: Session, business_id: int, person_id: int) -> Optional[Distr
 
 def upsert_customer_profile(
 	db: Session, business_id: int, person_id: int, payload: Dict[str, Any],
+	*, commit: bool = True,
 ) -> Dict[str, Any]:
 	dist_svc._ensure_plugin(db, business_id)
 	person = db.query(Person).filter(Person.id == person_id, Person.business_id == business_id).first()
 	if not person:
 		raise ApiError("NOT_FOUND", "Person not found", http_status=404)
+	if {"customer_class", "visit_frequency", "cycle_offset"}.intersection(payload):
+		dist_svc.assert_customer_schedule_unlocked(db, business_id, person_id)
 	row = get_profile(db, business_id, person_id)
 	if not row:
 		row = DistributionCustomerProfile(business_id=business_id, person_id=person_id)
@@ -207,7 +210,10 @@ def upsert_customer_profile(
 	if "notes" in payload:
 		row.notes = (str(payload.get("notes") or "").strip() or None)
 	row.updated_at = datetime.utcnow()
-	db.commit()
+	if commit:
+		db.commit()
+	else:
+		db.flush()
 	db.refresh(row)
 	d = profile_to_dict(row)
 	d["person_name"] = person_label(db, person_id)
@@ -312,7 +318,7 @@ def must_sell_product_ids_for_person(db: Session, business_id: int, person_id: i
 		.filter(
 			DistributionAssortment.id == profile.assortment_id,
 			DistributionAssortment.business_id == business_id,
-			DistributionAssortment.is_active.is_(True),
+			DistributionAssortment.is_active == true(),
 		)
 		.first()
 	)
@@ -423,7 +429,9 @@ def enrich_daily_plan(
 	plan_date: date,
 	items: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
-	settings = dist_svc.get_or_create_distribution_settings(db, business_id)
+	# Daily-plan reads must not commit: publication holds a transaction-level
+	# PostgreSQL advisory lock until the plan and its snapshot are persisted.
+	settings = dist_svc.get_distribution_settings_row(db, business_id)
 	carry = bool(getattr(settings, "carry_over_missed_visits", True))
 	lookback = max(1, int(getattr(settings, "carry_over_days", 7) or 7))
 
@@ -443,10 +451,20 @@ def enrich_daily_plan(
 
 	for asn in assignments:
 		route = db.query(DistributionRoute).filter(DistributionRoute.id == asn.route_id).first()
-		if not route or not route.is_active:
+		if not route or route.business_id != business_id or not route.is_active:
 			continue
 		stops = db.query(DistributionRouteStop).filter(DistributionRouteStop.route_id == route.id).all()
+		valid_person_ids = {
+			int(row[0]) for row in db.query(Person.id).filter(
+				Person.business_id == business_id,
+				Person.id.in_([s.person_id for s in stops]),
+			).all()
+		}
 		for s in stops:
+			# Do not schedule a foreign-business customer via an invalid
+			# legacy stop reference; keep any valid local stops intact.
+			if int(s.person_id) not in valid_person_ids:
+				continue
 			stop_meta[int(s.id)] = s
 			profile = get_profile(db, business_id, int(s.person_id))
 			freq = getattr(s, "frequency", None) or (profile.visit_frequency if profile else "weekly")
@@ -465,11 +483,19 @@ def enrich_daily_plan(
 		done = _completed_person_days(db, business_id, target_user_id, plan_date - timedelta(days=lookback), plan_date)
 		for asn in assignments:
 			route = db.query(DistributionRoute).filter(DistributionRoute.id == asn.route_id).first()
-			if not route or not route.is_active:
+			if not route or route.business_id != business_id or not route.is_active:
 				continue
 			stops = db.query(DistributionRouteStop).filter(DistributionRouteStop.route_id == route.id).all()
+			valid_person_ids = {
+				int(row[0]) for row in db.query(Person.id).filter(
+					Person.business_id == business_id,
+					Person.id.in_([s.person_id for s in stops]),
+				).all()
+			}
 			for s in stops:
 				pid = int(s.person_id)
+				if pid not in valid_person_ids:
+					continue
 				if pid in seen_persons:
 					continue
 				profile = get_profile(db, business_id, pid)
@@ -521,7 +547,8 @@ def _stop_plan_item(
 	customer_class: Optional[str],
 	frequency: Optional[str],
 ) -> Dict[str, Any]:
-	person = db.query(Person).filter(Person.id == s.person_id).first()
+	# Never expose a person from another tenant through a corrupt route stop.
+	person = db.query(Person).filter(Person.id == s.person_id, Person.business_id == route.business_id).first()
 	pname = (person.alias_name or "").strip() if person else None
 	plats = person_coords(person) if person else (None, None)
 	day_sort = s.sort_order
@@ -786,7 +813,9 @@ def van_capacity_snapshot(db: Session, business_id: int, van: DistributionVan) -
 	weight = 0.0
 	volume = 0.0
 	near = 0
-	settings = dist_svc.get_or_create_distribution_settings(db, business_id)
+	# Capacity snapshots are also used in offline read packs. Do not create
+	# settings (and implicitly commit) just to resolve the expiry horizon.
+	settings = dist_svc.get_distribution_settings_row(db, business_id)
 	horizon = int(getattr(settings, "near_expiry_days", 14) or 14)
 	today = business_today(business_id)
 	cutoff = today + timedelta(days=horizon)
@@ -848,11 +877,33 @@ def build_offline_pack(db: Session, business_id: int, ctx: AuthContext) -> Dict[
 		raise ApiError("FORBIDDEN", "user required", http_status=403)
 	today = business_today(business_id)
 	plan = dist_svc.get_daily_plan(db, business_id, uid, today)
-	settings = dist_svc.settings_to_dict(dist_svc.get_or_create_distribution_settings(db, business_id))
-	person_ids = [int(it["person_id"]) for it in plan.get("items") or [] if it.get("person_id")]
+	# Offline preparation is read-only. Never commit an implicit settings
+	# initialization before verifying a persisted plan snapshot.
+	settings = dist_svc.settings_for_read(db, business_id)
+	plan_items = plan.get("items")
+	if not isinstance(plan_items, list):
+		raise ApiError("CONFLICT", "Offline daily plan must contain a valid item list", http_status=409)
+	try:
+		person_ids = list(dict.fromkeys(int(item["person_id"]) for item in plan_items))
+	except (KeyError, TypeError, ValueError, OverflowError):
+		raise ApiError("CONFLICT", "Offline daily plan contains an invalid customer", http_status=409)
+	if any(person_id <= 0 for person_id in person_ids):
+		raise ApiError("CONFLICT", "Offline daily plan contains an invalid customer", http_status=409)
 	persons = []
 	if person_ids:
-		for p in db.query(Person).filter(Person.id.in_(person_ids)).all():
+		# Old locked snapshots may contain invalid cross-business references.
+		# Validate the complete list before returning any offline pack.
+		local_people = db.query(Person).filter(
+			Person.business_id == business_id,
+			Person.id.in_(person_ids),
+		).all()
+		if {int(p.id) for p in local_people} != set(person_ids):
+			raise ApiError(
+				"CONFLICT",
+				"Daily plan refers to a customer outside this business",
+				http_status=409,
+			)
+		for p in local_people:
 			persons.append({
 				"id": p.id,
 				"name": (p.alias_name or "").strip(),
@@ -916,8 +967,56 @@ def build_offline_pack(db: Session, business_id: int, ctx: AuthContext) -> Dict[
 	}
 
 
+
+
 def run_setup_wizard(db: Session, business_id: int, actor_user_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
-	dist_svc._ensure_plugin(db, business_id)
+	"""Apply the complete distribution setup using one atomic transaction.
+
+	An existing request-scoped session is reused (no nested independent
+	transaction). All child mutations flush without committing, preserving
+	the business-level publication lock until the single final commit.
+	"""
+	try:
+		dist_svc._ensure_plugin(db, business_id)
+		dist_svc._serialize_distribution_plan_mutation(db, business_id)
+		result = _stage_setup_wizard(db, business_id, actor_user_id, payload)
+		db.commit()
+		return result
+	except Exception:
+		db.rollback()
+		raise
+
+def _stage_setup_wizard(db: Session, business_id: int, actor_user_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+	# All called write services must use commit=False. The caller holds one
+	# business-wide publication lock and commits once after every stage
+	# validates and flushes successfully. Failures roll back the whole wizard.
+	existing_route_id = int(payload.get("route_id") or 0) if not payload.get("route_name") else 0
+	if payload.get("route_name"):
+		route_code = str(payload.get("route_code") or "R-01")[:50]
+		existing_route = (
+			db.query(DistributionRoute.id)
+			.filter(
+				DistributionRoute.business_id == business_id,
+				DistributionRoute.code == route_code,
+			)
+			.first()
+		)
+		if existing_route:
+			existing_route_id = int(existing_route[0])
+	if existing_route_id:
+		if not db.query(DistributionRoute.id).filter(
+			DistributionRoute.id == existing_route_id,
+			DistributionRoute.business_id == business_id,
+		).first():
+			raise ApiError("NOT_FOUND", "Route not found in this business", http_status=404)
+		if _int_ids(payload.get("person_ids")):
+			dist_svc.assert_route_has_no_locked_plans(db, business_id, existing_route_id)
+	# Even a brand-new route would change a visitor's previously locked plan
+	# when assigned. Check the visitor period independently of route existence.
+	visitor_id = int(payload.get("visitor_user_id") or 0)
+	if visitor_id:
+		valid_from = date.fromisoformat(str(payload.get("valid_from") or business_today(business_id).isoformat())[:10])
+		dist_svc.assert_assignment_has_no_locked_plans(db, business_id, visitor_id, valid_from, None)
 	enable_van = bool(payload.get("enable_van_sales"))
 	enable_presell = bool(payload.get("enable_presell", True if not enable_van else payload.get("enable_presell")))
 	settings_patch = {
@@ -933,44 +1032,40 @@ def run_setup_wizard(db: Session, business_id: int, actor_user_id: int, payload:
 		settings_patch["default_source_warehouse_id"] = int(payload["default_source_warehouse_id"])
 	if payload.get("nav_provider") in NAV_PROVIDERS:
 		settings_patch["nav_provider"] = payload["nav_provider"]
-	dist_svc.update_distribution_settings(db, business_id, settings_patch)
+	dist_svc.update_distribution_settings(db, business_id, settings_patch, commit=False)
 
 	territory = None
 	if payload.get("territory_name"):
 		tcode = str(payload.get("territory_code") or "T-01")[:50]
-		try:
+		row = (
+			db.query(DistributionTerritory)
+			.filter(DistributionTerritory.business_id == business_id, DistributionTerritory.code == tcode)
+			.first()
+		)
+		if row:
+			territory = dist_svc.territory_to_dict(row)
+		else:
 			territory = dist_svc.create_territory(db, business_id, {
 				"code": tcode,
 				"name": str(payload["territory_name"]).strip()[:255],
-			})
-		except ApiError as e:
-			if int(getattr(e, "status_code", 400) or 400) not in (400, 409):
-				raise
-			row = (
-				db.query(DistributionTerritory)
-				.filter(DistributionTerritory.business_id == business_id, DistributionTerritory.code == tcode)
-				.first()
-			)
-			territory = dist_svc.territory_to_dict(row) if row else None
+			}, commit=False)
 
 	route = None
 	if payload.get("route_name"):
 		rcode = str(payload.get("route_code") or "R-01")[:50]
-		try:
+		row = (
+			db.query(DistributionRoute)
+			.filter(DistributionRoute.business_id == business_id, DistributionRoute.code == rcode)
+			.first()
+		)
+		if row:
+			route = dist_svc.route_to_dict(row)
+		else:
 			route = dist_svc.create_route(db, business_id, {
 				"code": rcode,
 				"name": str(payload["route_name"]).strip()[:255],
 				"territory_id": (territory or {}).get("id") if isinstance(territory, dict) else payload.get("territory_id"),
-			})
-		except ApiError as e:
-			if int(getattr(e, "status_code", 400) or 400) not in (400, 409):
-				raise
-			row = (
-				db.query(DistributionRoute)
-				.filter(DistributionRoute.business_id == business_id, DistributionRoute.code == rcode)
-				.first()
-			)
-			route = dist_svc.route_to_dict(row) if row else None
+			}, commit=False)
 
 	stops_created = 0
 	route_id = (route or {}).get("id") if isinstance(route, dict) else payload.get("route_id")
@@ -979,30 +1074,70 @@ def run_setup_wizard(db: Session, business_id: int, actor_user_id: int, payload:
 	freq = normalize_frequency(payload.get("frequency"), payload.get("customer_class"))
 	if route_id and person_ids:
 		for i, pid in enumerate(person_ids):
-			dist_svc.upsert_route_stop(db, business_id, int(route_id), {
+			# Retrying the wizard reuses an existing stop for the same
+			# route/customer/weekday rather than inserting a duplicate.
+			existing_stop = (
+				db.query(DistributionRouteStop.id)
+				.filter(
+					DistributionRouteStop.route_id == int(route_id),
+					DistributionRouteStop.person_id == pid,
+					DistributionRouteStop.weekday == weekday,
+				)
+				.first()
+			)
+			stop_payload = {
 				"person_id": pid,
 				"sort_order": i + 1,
 				"weekday": weekday,
 				"frequency": freq,
 				"cycle_offset": int(payload.get("cycle_offset") or 0),
 				"customer_class": payload.get("customer_class"),
-			})
+			}
+			if existing_stop:
+				stop_payload["id"] = int(existing_stop[0])
+			dist_svc.upsert_route_stop(
+				db, business_id, int(route_id), stop_payload, commit=False,
+			)
 			cls = str(payload.get("customer_class") or "").upper() or None
 			if cls:
 				upsert_customer_profile(db, business_id, pid, {
 					"customer_class": cls,
 					"visit_frequency": freq,
-				})
-			stops_created += 1
+				}, commit=False)
+			if not existing_stop:
+				stops_created += 1
 
 	assignment = None
 	visitor_id = int(payload.get("visitor_user_id") or 0)
 	if route_id and visitor_id:
-		assignment = dist_svc.create_assignment(db, business_id, {
-			"route_id": int(route_id),
-			"user_id": visitor_id,
-			"valid_from": (payload.get("valid_from") or business_today(business_id).isoformat()),
-		})
+		valid_from = date.fromisoformat(
+			str(payload.get("valid_from") or business_today(business_id).isoformat())[:10]
+		)
+		existing_assignment = (
+			db.query(DistributionRouteAssignment)
+			.filter(
+				DistributionRouteAssignment.business_id == business_id,
+				DistributionRouteAssignment.route_id == int(route_id),
+				DistributionRouteAssignment.user_id == visitor_id,
+				DistributionRouteAssignment.valid_from == valid_from,
+				DistributionRouteAssignment.valid_to.is_(None),
+			)
+			.first()
+		)
+		if existing_assignment:
+			assignment = {
+				"id": existing_assignment.id,
+				"route_id": existing_assignment.route_id,
+				"user_id": existing_assignment.user_id,
+				"valid_from": existing_assignment.valid_from.isoformat(),
+				"valid_to": None,
+			}
+		else:
+			assignment = dist_svc.create_assignment(db, business_id, {
+				"route_id": int(route_id),
+				"user_id": visitor_id,
+				"valid_from": valid_from.isoformat(),
+			}, commit=False)
 
 	return {
 		"ok": True,
@@ -1017,10 +1152,56 @@ def run_setup_wizard(db: Session, business_id: int, actor_user_id: int, payload:
 def onboard_new_outlet(
 	db: Session, business_id: int, actor_user_id: int, payload: Dict[str, Any],
 ) -> Dict[str, Any]:
-	dist_svc._ensure_plugin(db, business_id)
+	"""Register a new outlet and route stop in one business-scoped transaction.
+
+	Workflow notifications and person cache invalidation run only *after* the
+	transaction commits successfully. Any failure leaves neither a customer
+	nor an incomplete profile/route stop behind.
+	"""
+	try:
+		dist_svc._ensure_plugin(db, business_id)
+		dist_svc._serialize_distribution_plan_mutation(db, business_id)
+		result = _stage_new_outlet(db, business_id, actor_user_id, payload)
+		db.commit()
+	except Exception:
+		db.rollback()
+		raise
+	# Never send a person.created workflow event for a rolled-back person.
+	from app.services.person_service import notify_person_created
+	try:
+		notify_person_created(
+			db, business_id, result["person_id"],
+			(result["person"].get("data") or {}).get("person_types") or [],
+		)
+	except Exception:
+		# Post-commit side effects cannot roll back the successfully created
+		# customer. Treat notification failures as nonfatal, as before.
+		import logging
+		logging.getLogger(__name__).exception(
+			"Post-commit person notification failed for %s", result["person_id"],
+		)
+	return result
+
+
+def _stage_new_outlet(
+	db: Session, business_id: int, actor_user_id: int, payload: Dict[str, Any],
+) -> Dict[str, Any]:
 	name = str(payload.get("name") or payload.get("alias_name") or "").strip()
 	if not name:
 		raise ApiError("VALIDATION_ERROR", "name required", http_status=400)
+	# The caller holds the business mutation lock across the full transaction.
+	# Validate the route before staging a person; downstream guards recheck
+	# locked-plan and customer ownership without releasing that lock.
+	route_id = int(payload.get("route_id") or 0)
+	if route_id:
+		route = (
+			db.query(DistributionRoute.id)
+			.filter(DistributionRoute.id == route_id, DistributionRoute.business_id == business_id)
+			.first()
+		)
+		if route is None:
+			raise ApiError("NOT_FOUND", "Route not found in this business", http_status=404)
+		dist_svc.assert_route_has_no_locked_plans(db, business_id, route_id)
 	from adapters.api.v1.schema_models.person import PersonCreateRequest, PersonType
 	from app.services.person_service import create_person
 
@@ -1032,8 +1213,14 @@ def onboard_new_outlet(
 		address=payload.get("address"),
 		city=payload.get("city"),
 	)
-	created = create_person(db, business_id, req)
-	person_id = int(created.get("id") or created.get("person_id") or 0)
+	created = create_person(
+		db, business_id, req,
+		defer_cache_invalidation=True, commit=False,
+	)
+	# Person service wraps its data as {"success": True, "data": {...}}.
+	# Reading the top-level "id" incorrectly failed *after* an early commit.
+	person_data = created.get("data") if isinstance(created, dict) else None
+	person_id = int((person_data or {}).get("id") or 0)
 	if person_id <= 0:
 		raise ApiError("VALIDATION_ERROR", "person create failed", http_status=400)
 	lat = payload.get("latitude")
@@ -1041,7 +1228,9 @@ def onboard_new_outlet(
 	if lat is not None and lng is not None:
 		from app.services.distribution_phase3_service import update_person_location
 
-		update_person_location(db, business_id, person_id, float(lat), float(lng))
+		update_person_location(
+			db, business_id, person_id, float(lat), float(lng), commit=False,
+		)
 	profile = upsert_customer_profile(db, business_id, person_id, {
 		"customer_class": payload.get("customer_class"),
 		"visit_frequency": payload.get("frequency") or payload.get("visit_frequency"),
@@ -1050,19 +1239,17 @@ def onboard_new_outlet(
 		"assortment_id": payload.get("assortment_id"),
 		"storefront_photo_file_id": payload.get("storefront_photo_file_id"),
 		"notes": payload.get("notes"),
-	})
-	person = db.query(Person).filter(Person.id == person_id).first()
+	}, commit=False)
+	person = db.query(Person).filter(
+		Person.id == person_id, Person.business_id == business_id,
+	).first()
 	if person:
 		person.updated_at = datetime.utcnow()
-		if not getattr(person, "onboarded_at", None):
-			pass
-	get_profile(db, business_id, person_id)
 	prof_row = get_profile(db, business_id, person_id)
 	if prof_row:
 		prof_row.onboarded_at = datetime.utcnow()
-		db.commit()
+	db.flush()
 	stop = None
-	route_id = int(payload.get("route_id") or 0)
 	if route_id:
 		stop = dist_svc.upsert_route_stop(db, business_id, route_id, {
 			"person_id": person_id,
@@ -1070,11 +1257,11 @@ def onboard_new_outlet(
 			"weekday": payload.get("weekday"),
 			"frequency": payload.get("frequency") or profile.get("visit_frequency"),
 			"customer_class": payload.get("customer_class"),
-		})
+		}, commit=False)
 	return {
 		"person": created,
 		"person_id": person_id,
-		"profile": profile_to_dict(get_profile(db, business_id, person_id)) if get_profile(db, business_id, person_id) else profile,
+		"profile": profile_to_dict(prof_row) if prof_row else profile,
 		"stop": stop,
 	}
 
@@ -1186,7 +1373,9 @@ def apply_auto_promotions_if_needed(
 	business_id: int,
 	promotion_ids: Optional[List[int]],
 ) -> Optional[List[int]]:
-	settings = dist_svc.get_or_create_distribution_settings(db, business_id)
+	# Auto-promotion selection may run during a larger sales transaction.
+	# Resolving default settings must never commit that transaction early.
+	settings = dist_svc.get_distribution_settings_row(db, business_id)
 	if promotion_ids:
 		return promotion_ids
 	if not getattr(settings, "auto_apply_promotions", True):

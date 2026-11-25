@@ -1,0 +1,44 @@
+name: Validate goods voucher posting idempotency
+
+on:
+  push:
+    branches:
+      - integration/resolve-hesabix-conflicts-20261102
+    paths:
+      - 'hesabixAPI/app/services/goods_expense_income_service.py'
+      - 'hesabixAPI/tests/test_goods_post_row_lock.py'
+      - '.github/workflows/validate-goods-post-idempotency.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  goods-posting:
+    name: Goods voucher posting consistency
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: hesabixAPI
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: hesabixAPI/pyproject.toml
+
+      - name: Install API test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Check Python syntax
+        run: python -m compileall -q app/services/goods_expense_income_service.py tests/test_goods_post_row_lock.py
+
+      - name: Test stale-session duplicate-post prevention
+        run: pytest -q tests/test_goods_post_row_lock.py

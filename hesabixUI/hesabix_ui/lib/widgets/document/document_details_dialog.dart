@@ -5,6 +5,7 @@ import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/models/document_model.dart';
 import 'package:hesabix_ui/services/document_service.dart';
+import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/widgets/invoice/invoice_fx_dual_totals_banner.dart';
@@ -5066,6 +5067,13 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
   final _amountController = TextEditingController();
   final _commissionController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final CurrencyService _currencyService = CurrencyService(ApiClient());
+  int _currencyDecimalPlaces = 8;
+  bool _amountManuallyEdited = false;
+  bool _commissionManuallyEdited = false;
+
+  String get _currencyLabel =>
+      widget.document.currencySymbol ?? widget.document.currencyCode ?? 'ریال';
   
   DateTime _transactionDate = DateTime.now();
   String? _selectedTransactionMethod; // 'bank', 'cash_register', 'petty_cash', 'check', 'person', 'account'
@@ -5090,7 +5098,7 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
     if (widget.existingDocument != null) {
       final doc = widget.existingDocument!;
       _transactionDate = doc.documentDate;
-      _amountController.text = formatWithThousands(doc.totalAmount, decimalPlaces: 0);
+      _amountController.text = doc.totalAmount.toString();
       _descriptionController.text = doc.description ?? '';
       
       // تعیین روش پرداخت از خطوط حساب (بدون خطوط کارمزد داخلی)
@@ -5099,10 +5107,7 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
         final firstLine = paymentLines.first;
         _selectedTransactionMethod = firstLine.transactionType;
         if (firstLine.commission != null && firstLine.commission! > 0) {
-          _commissionController.text = formatWithThousands(
-            firstLine.commission!,
-            decimalPlaces: 0,
-          );
+          _commissionController.text = firstLine.commission!.toString();
         }
         if (_selectedTransactionMethod == 'bank') {
           _selectedBankId = firstLine.extraInfo?['bank_id']?.toString();
@@ -5146,12 +5151,73 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
       final alloc = widget.initialInstallmentAllocationAmount;
       if (seq != null && alloc != null && alloc > 0) {
         _installmentAllocations[seq] = alloc;
-        _amountController.text = formatWithThousands(alloc, decimalPlaces: (alloc % 1 == 0) ? 0 : 2);
+        _amountController.text = formatWithThousands(
+          alloc,
+          decimalPlaces: _currencyDecimalPlaces,
+        );
       }
       final presetDesc = widget.initialDescription;
       if (presetDesc != null && presetDesc.trim().isNotEmpty) {
         _descriptionController.text = presetDesc.trim();
       }
+    }
+    _loadCurrencyPrecision();
+  }
+
+  Future<void> _loadCurrencyPrecision() async {
+    try {
+      final currencies = await _currencyService.listBusinessCurrencies(
+        businessId: widget.document.businessId,
+      );
+      Map<String, dynamic>? selected;
+      for (final currency in currencies) {
+        if ((currency['id'] as num?)?.toInt() == widget.document.currencyId) {
+          selected = currency;
+          break;
+        }
+      }
+      if (!mounted || selected == null) return;
+      final configuredPlaces =
+          ((selected['decimal_places'] as num?)?.toInt() ?? 2)
+              .clamp(0, 8)
+              .toInt();
+      final places = selected['round_monetary_amounts'] == false
+          ? 8
+          : configuredPlaces;
+      setState(() => _currencyDecimalPlaces = places);
+
+      final existing = widget.existingDocument;
+      if (existing != null) {
+        if (!_amountManuallyEdited) {
+          _amountController.text = formatWithThousands(
+            existing.totalAmount,
+            decimalPlaces: places,
+          );
+        }
+        double? commission;
+        for (final line in existing.accountLines.where(
+          (line) => !line.isCommissionLine,
+        )) {
+          if (line.commission != null) {
+            commission = line.commission;
+            break;
+          }
+        }
+        if (commission != null && !_commissionManuallyEdited) {
+          _commissionController.text = formatWithThousands(
+            commission,
+            decimalPlaces: places,
+          );
+        }
+      } else if (widget.initialInstallmentAllocationAmount != null &&
+          !_amountManuallyEdited) {
+        _amountController.text = formatWithThousands(
+          widget.initialInstallmentAllocationAmount!,
+          decimalPlaces: places,
+        );
+      }
+    } catch (_) {
+      // Preserve the unrounded amount if the business currency is unavailable.
     }
   }
 
@@ -5305,20 +5371,26 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
                       // مبلغ
                       AmountFieldWordsTooltip(
                         controller: _amountController,
-                        currencyUnit: 'ریال',
+                        currencyUnit: _currencyLabel,
                         child: TextFormField(
                           controller: _amountController,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: 'مبلغ *',
-                            border: OutlineInputBorder(),
-                            suffixText: 'ریال',
+                            border: const OutlineInputBorder(),
+                            suffixText: _currencyLabel,
                           ),
-                          keyboardType: TextInputType.number,
+                          keyboardType: TextInputType.numberWithOptions(
+                            decimal: _currencyDecimalPlaces > 0,
+                          ),
                           inputFormatters: [
                             EnglishDigitsFormatter(),
                             FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                            ThousandsSeparatorInputFormatter(allowDecimal: false),
+                            ThousandsSeparatorInputFormatter(
+                              allowDecimal: true,
+                              maxDecimalPlaces: _currencyDecimalPlaces,
+                            ),
                           ],
+                          onChanged: (_) => _amountManuallyEdited = true,
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'مبلغ الزامی است';
@@ -5460,20 +5532,26 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
                       // کارمزد
                       AmountFieldWordsTooltip(
                         controller: _commissionController,
-                        currencyUnit: 'ریال',
+                        currencyUnit: _currencyLabel,
                         child: TextFormField(
                           controller: _commissionController,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: 'کارمزد',
-                            border: OutlineInputBorder(),
-                            suffixText: 'ریال',
+                            border: const OutlineInputBorder(),
+                            suffixText: _currencyLabel,
                           ),
-                          keyboardType: TextInputType.number,
+                          keyboardType: TextInputType.numberWithOptions(
+                            decimal: _currencyDecimalPlaces > 0,
+                          ),
                           inputFormatters: [
                             EnglishDigitsFormatter(),
                             FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                            ThousandsSeparatorInputFormatter(allowDecimal: false),
+                            ThousandsSeparatorInputFormatter(
+                              allowDecimal: true,
+                              maxDecimalPlaces: _currencyDecimalPlaces,
+                            ),
                           ],
+                          onChanged: (_) => _commissionManuallyEdited = true,
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -5605,21 +5683,32 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
                       child: Text('قسط $seq'),
                     ),
                     Expanded(
-                      child: Text('مانده: ${formatWithThousands(remaining.toInt())}'),
+                      child: Text('مانده: ${formatWithThousands(remaining, decimalPlaces: _currencyDecimalPlaces)}'),
                     ),
                     Expanded(
                       child: TextFormField(
-                        initialValue: allocated > 0 ? formatWithThousands(allocated.toInt()) : '',
+                        key: ValueKey('installment-allocation-$seq-$_currencyDecimalPlaces'),
+                        initialValue: allocated > 0
+                            ? formatWithThousands(
+                                allocated,
+                                decimalPlaces: _currencyDecimalPlaces,
+                              )
+                            : '',
                         decoration: InputDecoration(
                           labelText: 'مبلغ تخصیص',
                           border: const OutlineInputBorder(),
                           isDense: true,
                         ),
-                        keyboardType: TextInputType.number,
+                        keyboardType: TextInputType.numberWithOptions(
+                          decimal: _currencyDecimalPlaces > 0,
+                        ),
                         inputFormatters: [
                           EnglishDigitsFormatter(),
                           FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                          ThousandsSeparatorInputFormatter(allowDecimal: false),
+                          ThousandsSeparatorInputFormatter(
+                            allowDecimal: true,
+                            maxDecimalPlaces: _currencyDecimalPlaces,
+                          ),
                         ],
                         onChanged: (value) {
                           final cleanValue = value.replaceAll(',', '');

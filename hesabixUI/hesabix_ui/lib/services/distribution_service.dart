@@ -66,6 +66,40 @@ class DistributionService {
     return _dataMap(res.data);
   }
 
+  /// Publish a date's route assignments (manager-only API).
+  Future<Map<String, dynamic>> publishDailyPlan({
+    required int businessId,
+    required String planDate,
+    int? targetUserId,
+    bool allAssigned = false,
+    bool locked = false,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/distribution/business/$businessId/daily-plan/publish',
+      data: <String, dynamic>{
+        'plan_date': planDate,
+        if (targetUserId != null) 'target_user_id': targetUserId,
+        'all_assigned': allAssigned,
+        'locked': locked,
+      },
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<void> unpublishDailyPlan({
+    required int businessId,
+    required String planDate,
+    int? targetUserId,
+  }) async {
+    await _api.delete<Map<String, dynamic>>(
+      '/api/v1/distribution/business/$businessId/daily-plan/publish',
+      query: <String, dynamic>{
+        'plan_date': planDate,
+        if (targetUserId != null) 'target_user_id': '$targetUserId',
+      },
+    );
+  }
+
   Future<Map<String, dynamic>> startVisit({
     required int businessId,
     required Map<String, dynamic> payload,

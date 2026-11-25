@@ -341,6 +341,17 @@ class CustomerProfilePayload(BaseModel):
 	notes: Optional[str] = None
 
 
+class DailyPlanPublishPayload(BaseModel):
+	"""Publication request for one visitor or all assigned visitors on a date."""
+
+	plan_date: Optional[str] = Field(None, description="YYYY-MM-DD")
+	target_user_id: Optional[int] = Field(None, gt=0)
+	all_assigned: bool = False
+	# Route edit blocking is not yet ported: default to an unlocked publication.
+	locked: bool = False
+	notes: Optional[str] = Field(None, max_length=2000)
+
+
 class AssortmentPayload(BaseModel):
 	code: Optional[str] = Field(None, min_length=1, max_length=50)
 	name: Optional[str] = Field(None, min_length=1, max_length=255)

@@ -15,9 +15,9 @@ from datetime import date, datetime
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, func, or_, text
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from adapters.db.models.account import Account
 from adapters.db.models.business import Business
@@ -236,18 +236,43 @@ def _load_document(
 	document_id: int,
 	*,
 	with_lines: bool = True,
+	for_update: bool = False,
 ) -> GoodsExpenseIncomeDocument:
+	"""Reload posting status under an exclusive row lock on supported databases.
+
+	PostgreSQL accepts SELECT FOR UPDATE. SQL Server needs an UPDLOCK hint;
+	SQLAlchemy's MSSQL dialect does not implement SELECT FOR UPDATE.
+	The lock remains owned by the caller transaction until commit/rollback.
+	"""
 	q = db.query(GoodsExpenseIncomeDocument).filter(
 		and_(
 			GoodsExpenseIncomeDocument.id == int(document_id),
 			GoodsExpenseIncomeDocument.business_id == int(business_id),
 		)
 	)
+	if for_update:
+		dialect = db.get_bind().dialect.name
+		if dialect == "mssql":
+			db.execute(text(
+				"SELECT id FROM goods_expense_income_documents WITH (UPDLOCK, HOLDLOCK) "
+				"WHERE id = :document_id AND business_id = :business_id"
+			), {"document_id": int(document_id), "business_id": int(business_id)}).scalar_one_or_none()
+		elif dialect == "postgresql":
+			q = q.with_for_update()
+		elif dialect != "sqlite":
+			raise ApiError(
+				"SERVICE_UNAVAILABLE",
+				"Goods posting row lock is unavailable for this database",
+				http_status=503,
+			)
+		# A stale Session identity-map entry must never bypass the lock.
+		q = q.populate_existing()
 	if with_lines:
+		load_relation = selectinload if for_update else joinedload
 		q = q.options(
-			joinedload(GoodsExpenseIncomeDocument.lines),
-			joinedload(GoodsExpenseIncomeDocument.effect_account),
-			joinedload(GoodsExpenseIncomeDocument.person),
+			load_relation(GoodsExpenseIncomeDocument.lines),
+			load_relation(GoodsExpenseIncomeDocument.effect_account),
+			load_relation(GoodsExpenseIncomeDocument.person),
 		)
 	doc = q.first()
 	if not doc:
@@ -1159,7 +1184,7 @@ def post_document(
 	*,
 	commit: bool = True,
 ) -> Dict[str, Any]:
-	doc = _load_document(db, business_id, document_id)
+	doc = _load_document(db, business_id, document_id, for_update=True)
 	if doc.status not in (
 		STATUS_DRAFT_OPS,
 		STATUS_PENDING_ACCOUNTING,

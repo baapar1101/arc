@@ -24,7 +24,7 @@ class Hesabix_V2_Currency_Service
 	 */
 	private static function list_transient_key()
 	{
-		return 'hesabix_v2_bc_' . (int) get_option('hesabix_v2_business_id');
+		return 'hesabix_v2_bc_money_policy_v2_' . (int) get_option('hesabix_v2_business_id');
 	}
 
 	/**
@@ -81,10 +81,24 @@ class Hesabix_V2_Currency_Service
 				'title' => isset($row['title']) ? (string) $row['title'] : '',
 				'name' => isset($row['name']) ? (string) $row['name'] : '',
 				'is_default' => !empty($row['is_default']),
+				'decimal_places' => isset($row['decimal_places']) ? (int) $row['decimal_places'] : null,
+				'round_monetary_amounts' => isset($row['round_monetary_amounts']) ? (bool) $row['round_monetary_amounts'] : null,
 			);
 		}
 
 		return $out;
+	}
+
+	/** Currency policy comes from the API, never from the Woo currency label. */
+	public static function invoice_money_policy($currency_id)
+	{
+		foreach (self::get_business_currency_rows() as $row) {
+			if ((int) $row['id'] === (int) $currency_id && isset($row['decimal_places'], $row['round_monetary_amounts'])) {
+				return array('decimal_places' => max(0, min(8, (int) $row['decimal_places'])),
+					'round_monetary_amounts' => (bool) $row['round_monetary_amounts']);
+			}
+		}
+		throw new RuntimeException('دقت و سیاست گردکردن ارز فاکتور از حسابیکس دریافت نشد.');
 	}
 
 	/**

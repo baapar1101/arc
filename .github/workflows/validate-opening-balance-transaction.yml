@@ -1,0 +1,45 @@
+name: Validate opening-balance finalization transaction
+
+on:
+  push:
+    branches:
+      - integration/resolve-hesabix-conflicts-20261102
+    paths:
+      - 'hesabixAPI/app/services/opening_balance_service.py'
+      - 'hesabixAPI/adapters/db/repositories/document_repository.py'
+      - 'hesabixAPI/tests/test_opening_balance_transaction_boundary.py'
+      - '.github/workflows/validate-opening-balance-transaction.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  opening-balance-transaction:
+    name: Opening-balance transaction and financial safety
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: hesabixAPI
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: hesabixAPI/pyproject.toml
+
+      - name: Install API test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Check source syntax
+        run: python -m compileall -q app/services/opening_balance_service.py tests/test_opening_balance_transaction_boundary.py
+
+      - name: Test opening-balance post/unpost transaction boundary
+        run: pytest -q tests/test_opening_balance_transaction_boundary.py

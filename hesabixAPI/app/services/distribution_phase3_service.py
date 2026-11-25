@@ -8,7 +8,7 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import or_, true
 
 from adapters.db.models.distribution import (
 	DistributionFieldVisit,
@@ -119,14 +119,21 @@ def validate_geofence_on_start(
 	raise ApiError("GEOFENCE_VIOLATION", msg, http_status=400, details={"distance_meters": dist})
 
 
-def update_person_location(db: Session, business_id: int, person_id: int, lat: float, lng: float) -> Dict[str, Any]:
+def update_person_location(db: Session, business_id: int, person_id: int, lat: float, lng: float, *, commit: bool = True) -> Dict[str, Any]:
 	person = db.query(Person).filter(Person.id == person_id, Person.business_id == business_id).first()
 	if not person:
 		raise ApiError("NOT_FOUND", "Person not found", http_status=404)
+	# The customer's coordinates are embedded in the immutable day-plan
+	# snapshot. A location edit on a locked assigned route must not bypass
+	# the same business-scoped, transaction-serialized schedule guard.
+	dist_svc.assert_customer_schedule_unlocked(db, business_id, person_id)
 	person.latitude = lat
 	person.longitude = lng
 	person.updated_at = datetime.utcnow()
-	db.commit()
+	if commit:
+		db.commit()
+	else:
+		db.flush()
 	return {"person_id": person_id, "latitude": lat, "longitude": lng}
 
 
@@ -237,7 +244,7 @@ def get_van_for_user(db: Session, business_id: int, user_id: int) -> Optional[Di
 		.filter(
 			DistributionVan.business_id == business_id,
 			DistributionVan.user_id == user_id,
-			DistributionVan.is_active == True,  # noqa: E712
+			DistributionVan.is_active == true(),
 		)
 		.first()
 	)
@@ -441,7 +448,13 @@ def apply_route_optimize(
 	start_lat: Optional[float] = None,
 	start_lng: Optional[float] = None,
 ) -> Dict[str, Any]:
-	"""بهینه‌سازی و ذخیرهٔ ترتیب فقط برای همان روز (بدون بازنویسی sort_order کاتالوگ)."""
+	"""Persist a day-specific route order without racing plan publication.
+
+	Acquire the business mutation lock and check the day's publication
+	*before* reading route stops. Keep the lock until the final commit so a
+	concurrent route edit/publication cannot invalidate computed stop IDs.
+	"""
+	dist_svc.assert_route_has_no_locked_plans(db, business_id, route_id, plan_date=plan_date)
 	result = optimize_route_plan(db, business_id, route_id, plan_date, start_lat, start_lng)
 	items = result.get("items") or []
 	if not result.get("optimized"):
@@ -539,13 +552,20 @@ def optimize_route_plan(
 	for s in stops:
 		if not dist_svc._weekday_matches(plan_date, s.weekday):
 			continue
-		person = db.query(Person).filter(Person.id == s.person_id).first()
-		lat, lng = person_coords(person) if person else (None, None)
+		# Legacy routes may contain corrupted foreign-business person IDs.
+		# Such stops are neither visible nor actionable in an optimized plan.
+		person = db.query(Person).filter(
+			Person.id == s.person_id,
+			Person.business_id == business_id,
+		).first()
+		if person is None:
+			continue
+		lat, lng = person_coords(person)
 		items.append(
 			{
 				"stop_id": s.id,
 				"person_id": s.person_id,
-				"person_name": (person.alias_name or "").strip() if person else str(s.person_id),
+				"person_name": (person.alias_name or "").strip(),
 				"sort_order": s.sort_order,
 				"latitude": lat,
 				"longitude": lng,
@@ -622,7 +642,9 @@ def get_team_map(
 
 	d = plan_date or business_today(business_id)
 	start_utc, end_utc = business_day_utc_bounds(business_id, d)
-	settings = dist_svc.get_or_create_distribution_settings(db, business_id)
+	# Team map is read-only; its settings lookup must never create a
+	# settings row or commit an unrelated caller transaction.
+	settings = dist_svc.get_distribution_settings_row(db, business_id)
 	share_live = bool(getattr(settings, "share_live_location", True))
 
 	user_ids: set[int] = set()
@@ -642,7 +664,7 @@ def get_team_map(
 	user_ids.update(int(r[0]) for r in assigns if r[0])
 	van_users = (
 		db.query(DistributionVan.user_id)
-		.filter(DistributionVan.business_id == business_id, DistributionVan.is_active.is_(True))
+		.filter(DistributionVan.business_id == business_id, DistributionVan.is_active == true())
 		.all()
 	)
 	user_ids.update(int(r[0]) for r in van_users if r[0])
@@ -682,15 +704,23 @@ def get_team_map(
 	for uid in sorted(user_ids):
 		visit = in_progress.get(uid) or latest_visit.get(uid)
 		person = None
+		safe_person_id = None
 		plats: Tuple[Optional[float], Optional[float]] = (None, None)
 		if visit:
-			person = db.query(Person).filter(Person.id == visit.person_id).first()
-			plats = person_coords(person) if person else (None, None)
-			if plats[0] is not None and plats[1] is not None and visit.person_id not in seen_customers:
-				seen_customers.add(int(visit.person_id))
+			# Old visits may reference a person in another business.
+			# Do not disclose their customer name, coordinates or ID.
+			person = db.query(Person).filter(
+				Person.id == visit.person_id,
+				Person.business_id == business_id,
+			).first()
+			if person is not None:
+				safe_person_id = int(person.id)
+				plats = person_coords(person)
+			if safe_person_id is not None and plats[0] is not None and plats[1] is not None and safe_person_id not in seen_customers:
+				seen_customers.add(safe_person_id)
 				customers.append(
 					{
-						"person_id": visit.person_id,
+						"person_id": safe_person_id,
 						"person_name": (person.alias_name or "").strip() if person else None,
 						"latitude": plats[0],
 						"longitude": plats[1],
@@ -739,7 +769,7 @@ def get_team_map(
 				"live_updated_at": updated_at.isoformat() + "Z" if updated_at else None,
 				"visit_id": current.id if current else (visit.id if visit else None),
 				"status": current.status if current else (visit.status if visit else None),
-				"person_id": (current.person_id if current else (visit.person_id if visit else None)),
+				"person_id": safe_person_id,
 				"person_name": (person.alias_name or "").strip() if person else None,
 				"customer_latitude": plats[0],
 				"customer_longitude": plats[1],

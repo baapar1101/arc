@@ -1,7 +1,7 @@
 import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import '../../../services/repair_shop_service.dart';
-import '../../../services/person_service.dart';
+import '../../../widgets/invoice/person_combobox_widget.dart';
 import '../../../models/repair_technician_model.dart';
 import '../../../models/person_model.dart';
 import '../../../core/api_client.dart';
@@ -237,7 +237,9 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
               ? colorScheme.primary
               : Colors.grey,
           child: Text(
-            technician.personName[0].toUpperCase(),
+            technician.personName.trim().isNotEmpty
+                ? technician.personName.trim()[0].toUpperCase()
+                : '?',
             style: TextStyle(color: Colors.white),
           ),
         ),
@@ -323,7 +325,6 @@ class _TechnicianFormDialog extends StatefulWidget {
 class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
   final _formKey = GlobalKey<FormState>();
   late final RepairShopService _service;
-  late final PersonService _personService;
 
   Person? _selectedPerson;
   final TextEditingController _codeController = TextEditingController();
@@ -338,7 +339,6 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
     super.initState();
     final apiClient = ApiClient();
     _service = RepairShopService(apiClient);
-    _personService = PersonService(apiClient: apiClient);
     if (widget.technician != null) {
       _loadTechnician();
     }
@@ -362,34 +362,6 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
     super.dispose();
   }
 
-  Future<void> _selectPerson() async {
-    final response = await _personService.getPersons(
-      businessId: widget.businessId,
-    );
-
-    final items = response['items'] as List<dynamic>;
-    final persons = items.map((e) => Person.fromJson(e as Map<String, dynamic>)).toList();
-
-    if (!mounted) return;
-
-    final selected = await showGlassDialog<Person>(
-      context: context,
-      builder: (context) => SimpleDialog(
-        title: const Text('انتخاب فرد'),
-        children: persons.map((person) {
-          return SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, person),
-            child: Text(person.aliasName),
-          );
-        }).toList(),
-      ),
-    );
-
-    if (selected != null) {
-      setState(() => _selectedPerson = selected);
-    }
-  }
-
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -404,7 +376,9 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
       final data = {
         'code': _codeController.text,
         'commission_type': _commissionType,
-        'commission_value': double.parse(_commissionValueController.text),
+        'commission_value': _commissionType == 'case_by_case'
+            ? 0
+            : double.parse(_commissionValueController.text),
         'is_active': _isActive,
       };
 
@@ -471,13 +445,15 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
             children: [
               // انتخاب فرد (فقط برای ایجاد جدید)
               if (widget.technician == null)
-                Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.person),
-                    title: Text(_selectedPerson?.aliasName ?? 'انتخاب فرد'),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                    onTap: _selectPerson,
-                  ),
+                PersonComboboxWidget(
+                  businessId: widget.businessId,
+                  selectedPerson: _selectedPerson,
+                  label: 'شخص',
+                  hintText: 'جست‌وجو و انتخاب فرد',
+                  isRequired: true,
+                  onChanged: (person) {
+                    setState(() => _selectedPerson = person);
+                  },
                 )
               else
                 Card(

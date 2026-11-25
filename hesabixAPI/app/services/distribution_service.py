@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import func, or_
+from sqlalchemy import and_, func, or_, text, true
 from sqlalchemy.orm import Session, joinedload
 
 from adapters.db.models.distribution import (
@@ -16,12 +17,13 @@ from adapters.db.models.distribution import (
 	DistributionRouteAssignment,
 	DistributionRouteStop,
 	DistributionTerritory,
+	DistributionDailyPlanLock,
 )
 from adapters.db.models.document import Document
 from adapters.db.models.person import Person
 from adapters.db.models.product import Product
 from app.core.auth_dependency import AuthContext
-from app.core.business_calendar import business_today
+from app.core.business_calendar import business_day_utc_bounds, business_today
 from app.core.distribution_plugin_dependency import check_distribution_plugin_active
 from app.core.responses import ApiError
 from app.services.distribution_geo import person_coords
@@ -106,8 +108,10 @@ def settings_to_dict(s: DistributionBusinessSettings) -> Dict[str, Any]:
 def _use_strict_catalog_for_field_user(db: Session, business_id: int, ctx: AuthContext) -> bool:
 	if _can_see_full_distribution_catalog(ctx, business_id):
 		return False
-	s = get_or_create_distribution_settings(db, business_id)
-	return not bool(s.shared_routing_catalog)
+	# Authorization checks must not create settings or commit the caller's
+	# transaction. Missing settings default to a private route catalogue.
+	s = get_distribution_settings_row(db, business_id)
+	return not bool(getattr(s, "shared_routing_catalog", False))
 
 
 def _assigned_route_ids_for_user(
@@ -380,7 +384,7 @@ def list_territories(db: Session, business_id: int, ctx: AuthContext) -> List[Di
 	return [territory_to_dict(t) for t in q.order_by(DistributionTerritory.code.asc()).all()]
 
 
-def create_territory(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+def create_territory(db: Session, business_id: int, payload: Dict[str, Any], *, commit: bool = True) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
 	code = str(payload.get("code") or "").strip()
 	name = str(payload.get("name") or "").strip()
@@ -401,9 +405,29 @@ def create_territory(db: Session, business_id: int, payload: Dict[str, Any]) -> 
 		is_active=bool(payload.get("is_active", True)),
 	)
 	db.add(row)
-	db.commit()
+	if commit:
+		db.commit()
+	else:
+		db.flush()
 	db.refresh(row)
 	return territory_to_dict(row)
+
+
+def _assert_territory_has_no_locked_plans(db: Session, business_id: int, territory_id: int) -> None:
+	"""Protect a territory's metadata when any linked route is in a locked plan."""
+	# Acquire the business transaction lock BEFORE reading linked routes so a
+	# concurrent route reassignment cannot slip between the lookup and guard.
+	_serialize_distribution_plan_mutation(db, business_id)
+	linked_route_ids = (
+		db.query(DistributionRoute.id)
+		.filter(
+			DistributionRoute.business_id == business_id,
+			DistributionRoute.territory_id == territory_id,
+		)
+		.all()
+	)
+	for (linked_route_id,) in linked_route_ids:
+		assert_route_has_no_locked_plans(db, business_id, linked_route_id)
 
 
 def update_territory(db: Session, business_id: int, territory_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -417,6 +441,7 @@ def update_territory(db: Session, business_id: int, territory_id: int, payload: 
 	)
 	if not row:
 		raise ApiError("NOT_FOUND", "Territory not found", http_status=404)
+	_assert_territory_has_no_locked_plans(db, business_id, territory_id)
 	if "name" in payload:
 		row.name = str(payload["name"])[:255]
 	if "description" in payload:
@@ -440,18 +465,33 @@ def delete_territory(db: Session, business_id: int, territory_id: int) -> None:
 	)
 	if not row:
 		raise ApiError("NOT_FOUND", "Territory not found", http_status=404)
-	db.query(DistributionRoute).filter(DistributionRoute.territory_id == territory_id).update({"territory_id": None})
+	# On deletion, SQLAlchemy relationship synchronization may null out
+	# route.territory_id regardless of our business-scoped bulk UPDATE.
+	# Reject malformed cross-business FK links instead of modifying them.
+	foreign_route = db.query(DistributionRoute.id).filter(
+		DistributionRoute.territory_id == territory_id,
+		DistributionRoute.business_id != business_id,
+	).first()
+	if foreign_route is not None:
+		raise ApiError(
+			"CONFLICT",
+			"Territory is referenced by a route in another business; repair the invalid link first",
+			http_status=409,
+		)
+	_assert_territory_has_no_locked_plans(db, business_id, territory_id)
+	# The FK is a global ID and legacy data may incorrectly link routes
+	# from other businesses to this territory. Never rewrite those routes.
+	db.query(DistributionRoute).filter(
+		DistributionRoute.business_id == business_id,
+		DistributionRoute.territory_id == territory_id,
+	).update({"territory_id": None})
 	db.delete(row)
 	db.commit()
 
 
 def list_routes(db: Session, business_id: int, ctx: AuthContext) -> List[Dict[str, Any]]:
 	_ensure_plugin(db, business_id)
-	q = (
-		db.query(DistributionRoute)
-		.options(joinedload(DistributionRoute.territory))
-		.filter(DistributionRoute.business_id == business_id)
-	)
+	q = db.query(DistributionRoute).filter(DistributionRoute.business_id == business_id)
 	if _use_strict_catalog_for_field_user(db, business_id, ctx):
 		uid = ctx.get_user_id()
 		if uid is None:
@@ -461,14 +501,28 @@ def list_routes(db: Session, business_id: int, ctx: AuthContext) -> List[Dict[st
 			return []
 		q = q.filter(DistributionRoute.id.in_(route_ids))
 	rows = q.order_by(DistributionRoute.code.asc()).all()
+	# Territory references are single-column foreign keys, and historical
+	# rows may point to a territory in another business. Never serialize a
+	# foreign territory's name or ID into a local route list.
+	territory_ids = {r.territory_id for r in rows if r.territory_id is not None}
+	territory_names = dict(
+		db.query(DistributionTerritory.id, DistributionTerritory.name)
+		.filter(
+			DistributionTerritory.business_id == business_id,
+			DistributionTerritory.id.in_(territory_ids),
+		).all()
+	) if territory_ids else {}
 	out = []
 	for r in rows:
-		tname = r.territory.name if r.territory else None
-		out.append(route_to_dict(r, tname))
+		territory_name = territory_names.get(r.territory_id)
+		result = route_to_dict(r, territory_name)
+		if r.territory_id is not None and r.territory_id not in territory_names:
+			result["territory_id"] = None
+		out.append(result)
 	return out
 
 
-def create_route(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+def create_route(db: Session, business_id: int, payload: Dict[str, Any], *, commit: bool = True) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
 	code = str(payload.get("code") or "").strip()
 	name = str(payload.get("name") or "").strip()
@@ -495,7 +549,10 @@ def create_route(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict
 		is_active=bool(payload.get("is_active", True)),
 	)
 	db.add(row)
-	db.commit()
+	if commit:
+		db.commit()
+	else:
+		db.flush()
 	db.refresh(row)
 	tname = None
 	if row.territory_id:
@@ -511,6 +568,7 @@ def delete_route(db: Session, business_id: int, route_id: int) -> None:
 	row = db.query(DistributionRoute).filter(DistributionRoute.id == route_id, DistributionRoute.business_id == business_id).first()
 	if not row:
 		raise ApiError("NOT_FOUND", "Route not found", http_status=404)
+	assert_route_has_no_locked_plans(db, business_id, route_id)
 	in_progress = (
 		db.query(DistributionFieldVisit.id)
 		.filter(
@@ -533,6 +591,7 @@ def update_route(db: Session, business_id: int, route_id: int, payload: Dict[str
 	row = db.query(DistributionRoute).filter(DistributionRoute.id == route_id, DistributionRoute.business_id == business_id).first()
 	if not row:
 		raise ApiError("NOT_FOUND", "Route not found", http_status=404)
+	assert_route_has_no_locked_plans(db, business_id, route_id)
 	if "name" in payload:
 		row.name = str(payload["name"])[:255]
 	if "description" in payload:
@@ -551,11 +610,18 @@ def update_route(db: Session, business_id: int, route_id: int, payload: Dict[str
 	row.updated_at = datetime.utcnow()
 	db.commit()
 	db.refresh(row)
-	tname = None
+	territory = None
 	if row.territory_id:
-		t = db.query(DistributionTerritory).filter(DistributionTerritory.id == row.territory_id).first()
-		tname = t.name if t else None
-	return route_to_dict(row, tname)
+		territory = db.query(DistributionTerritory).filter(
+			DistributionTerritory.id == row.territory_id,
+			DistributionTerritory.business_id == business_id,
+		).first()
+	result = route_to_dict(row, territory.name if territory else None)
+	if row.territory_id is not None and territory is None:
+		# A legacy cross-tenant FK must not appear in the API response.
+		# Explicit territory_id=null remains available to repair that FK.
+		result["territory_id"] = None
+	return result
 
 
 def list_route_stops(db: Session, business_id: int, route_id: int, ctx: AuthContext) -> List[Dict[str, Any]]:
@@ -573,7 +639,7 @@ def list_route_stops(db: Session, business_id: int, route_id: int, ctx: AuthCont
 	person_ids = [s.person_id for s in stops]
 	persons = {}
 	if person_ids:
-		for p in db.query(Person).filter(Person.id.in_(person_ids)).all():
+		for p in db.query(Person).filter(Person.id.in_(person_ids), Person.business_id == business_id).all():
 			persons[p.id] = (p.alias_name or "").strip() or str(p.id)
 	out = []
 	for s in stops:
@@ -593,11 +659,12 @@ def list_route_stops(db: Session, business_id: int, route_id: int, ctx: AuthCont
 	return out
 
 
-def upsert_route_stop(db: Session, business_id: int, route_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+def upsert_route_stop(db: Session, business_id: int, route_id: int, payload: Dict[str, Any], *, commit: bool = True) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
 	rt = db.query(DistributionRoute).filter(DistributionRoute.id == route_id, DistributionRoute.business_id == business_id).first()
 	if not rt:
 		raise ApiError("NOT_FOUND", "Route not found", http_status=404)
+	assert_route_has_no_locked_plans(db, business_id, route_id)
 	person_id = int(payload.get("person_id") or 0)
 	if person_id <= 0:
 		raise ApiError("VALIDATION_ERROR", "person_id required", http_status=400)
@@ -644,7 +711,10 @@ def upsert_route_stop(db: Session, business_id: int, route_id: int, payload: Dic
 			customer_class=customer_class,
 		)
 		db.add(row)
-	db.commit()
+	if commit:
+		db.commit()
+	else:
+		db.flush()
 	db.refresh(row)
 	pname = (person.alias_name or "").strip() or str(person.id)
 	return {
@@ -665,6 +735,7 @@ def delete_route_stop(db: Session, business_id: int, route_id: int, stop_id: int
 	rt = db.query(DistributionRoute).filter(DistributionRoute.id == route_id, DistributionRoute.business_id == business_id).first()
 	if not rt:
 		raise ApiError("NOT_FOUND", "Route not found", http_status=404)
+	assert_route_has_no_locked_plans(db, business_id, route_id)
 	row = db.query(DistributionRouteStop).filter(DistributionRouteStop.id == stop_id, DistributionRouteStop.route_id == route_id).first()
 	if not row:
 		raise ApiError("NOT_FOUND", "Stop not found", http_status=404)
@@ -701,7 +772,7 @@ def list_assignments(db: Session, business_id: int, route_id: Optional[int], ctx
 	return out
 
 
-def create_assignment(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+def create_assignment(db: Session, business_id: int, payload: Dict[str, Any], *, commit: bool = True) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
 	route_id = int(payload.get("route_id") or 0)
 	user_id = int(payload.get("user_id") or 0)
@@ -717,6 +788,7 @@ def create_assignment(db: Session, business_id: int, payload: Dict[str, Any]) ->
 	valid_to = None
 	if payload.get("valid_to"):
 		valid_to = date.fromisoformat(str(payload["valid_to"])[:10])
+	assert_assignment_has_no_locked_plans(db, business_id, user_id, valid_from, valid_to)
 	row = DistributionRouteAssignment(
 		business_id=business_id,
 		route_id=route_id,
@@ -725,7 +797,10 @@ def create_assignment(db: Session, business_id: int, payload: Dict[str, Any]) ->
 		valid_to=valid_to,
 	)
 	db.add(row)
-	db.commit()
+	if commit:
+		db.commit()
+	else:
+		db.flush()
 	db.refresh(row)
 	return {
 		"id": row.id,
@@ -745,6 +820,348 @@ def delete_assignment(db: Session, business_id: int, assignment_id: int) -> None
 	)
 	if not row:
 		raise ApiError("NOT_FOUND", "Assignment not found", http_status=404)
+	assert_assignment_has_no_locked_plans(db, business_id, row.user_id, row.valid_from, row.valid_to)
+	db.delete(row)
+	db.commit()
+
+
+_PLAN_PUBLICATION_ADVISORY_LOCK_NAMESPACE = 174021
+
+
+def _serialize_distribution_plan_mutation(db: Session, business_id: int) -> None:
+	"""Serialize publication and related edits per business until commit/rollback.
+
+	PostgreSQL uses an advisory transaction lock; SQL Server uses an exclusive
+	transaction-owned application lock in the current database. Both protect the
+	read/check/write sequence from concurrent writes using this helper. SQLite
+	is used only for isolated unit tests and has no cross-session lock here.
+	"""
+	dialect = db.get_bind().dialect.name
+	if dialect == "sqlite":
+		return
+	if dialect == "postgresql":
+		db.execute(
+			text("SELECT pg_advisory_xact_lock(:namespace, :business_id)"),
+			{
+				"namespace": _PLAN_PUBLICATION_ADVISORY_LOCK_NAMESPACE,
+				"business_id": int(business_id),
+			},
+		).scalar()
+		return
+	if dialect == "mssql":
+		# SET NOCOUNT keeps the stored-procedure batch to one result set,
+		# compatible with the pymssql/pyodbc SQLAlchemy mssql dialects.
+		result = db.execute(
+			text("""
+				SET NOCOUNT ON;
+				DECLARE @distribution_lock_result int;
+				BEGIN TRY
+					EXEC @distribution_lock_result = sys.sp_getapplock
+						@Resource = :resource,
+						@LockMode = 'Exclusive',
+						@LockOwner = 'Transaction',
+						@LockTimeout = 10000;
+				END TRY
+				BEGIN CATCH
+					SET NOCOUNT OFF;
+					THROW;
+				END CATCH;
+				-- NOCOUNT is connection-scoped. Leaving it ON makes pymssql
+				-- report rowcount=-1 for subsequent ORM UPDATE statements,
+				-- causing SQLAlchemy to raise StaleDataError on valid writes.
+				SET NOCOUNT OFF;
+				SELECT @distribution_lock_result;
+			"""),
+			{
+				"resource": (
+					f"hesabix:distribution:plan-mutation:"
+					f"{_PLAN_PUBLICATION_ADVISORY_LOCK_NAMESPACE}:{int(business_id)}"
+				),
+			},
+		).scalar_one()
+		if result is None or int(result) < 0:
+			raise ApiError(
+				"CONFLICT",
+				"Unable to obtain the distribution plan transaction lock; retry safely",
+				http_status=409,
+			)
+		return
+	# Never silently bypass coordination on an untested production dialect.
+	raise ApiError(
+		"SERVICE_UNAVAILABLE",
+		"Distribution plan transaction lock is unavailable for this database",
+		http_status=503,
+	)
+
+
+def assert_route_has_no_locked_plans(
+	db: Session,
+	business_id: int,
+	route_id: int,
+	*,
+	plan_date: Optional[date] = None,
+) -> None:
+	"""Block edits affecting any locked visitor plan assigned to this route.
+
+	The catalog is currently shared across dates. Until immutable plan
+	snapshots are available, a lock on *any* assigned date protects the
+	underlying route, except a day-specific ordering override which only
+	checks its own date.
+	"""
+	_serialize_distribution_plan_mutation(db, business_id)
+	q = (
+		db.query(DistributionDailyPlanLock.id)
+		.join(
+			DistributionRouteAssignment,
+			and_(
+				DistributionRouteAssignment.business_id == DistributionDailyPlanLock.business_id,
+				DistributionRouteAssignment.user_id == DistributionDailyPlanLock.user_id,
+				DistributionRouteAssignment.valid_from <= DistributionDailyPlanLock.plan_date,
+				or_(
+					DistributionRouteAssignment.valid_to.is_(None),
+					DistributionRouteAssignment.valid_to >= DistributionDailyPlanLock.plan_date,
+				),
+			),
+		)
+		.filter(
+			DistributionDailyPlanLock.business_id == business_id,
+			DistributionRouteAssignment.route_id == route_id,
+			DistributionDailyPlanLock.is_locked == true(),
+		)
+	)
+	if plan_date is not None:
+		q = q.filter(DistributionDailyPlanLock.plan_date == plan_date)
+	if q.first() is not None:
+		raise ApiError(
+			"CONFLICT",
+			"Route is used by a locked daily plan; unpublish before editing",
+			http_status=409,
+		)
+
+
+def assert_assignment_has_no_locked_plans(
+	db: Session,
+	business_id: int,
+	user_id: int,
+	valid_from: date,
+	valid_to: Optional[date],
+) -> None:
+	"""Protect an already-published visitor plan from assignment changes."""
+	if valid_to is not None and valid_to < valid_from:
+		raise ApiError("VALIDATION_ERROR", "valid_to must not precede valid_from", http_status=400)
+	_serialize_distribution_plan_mutation(db, business_id)
+	q = db.query(DistributionDailyPlanLock.id).filter(
+		DistributionDailyPlanLock.business_id == business_id,
+		DistributionDailyPlanLock.user_id == user_id,
+		DistributionDailyPlanLock.is_locked == true(),
+		DistributionDailyPlanLock.plan_date >= valid_from,
+	)
+	if valid_to is not None:
+		q = q.filter(DistributionDailyPlanLock.plan_date <= valid_to)
+	if q.first() is not None:
+		raise ApiError(
+			"CONFLICT",
+			"Visitor has a locked daily plan in this assignment period; unpublish first",
+			http_status=409,
+		)
+
+
+def assert_customer_schedule_unlocked(db: Session, business_id: int, person_id: int) -> None:
+	"""Block schedule/profile edits for customers on a locked visitor plan.
+
+	A visitor's due dates can be derived from the customer profile even
+	without editing a route stop, so this guard follows active assignments.
+	"""
+	_serialize_distribution_plan_mutation(db, business_id)
+	q = (
+		db.query(DistributionDailyPlanLock.id)
+		.join(
+			DistributionRouteAssignment,
+			and_(
+				DistributionRouteAssignment.business_id == DistributionDailyPlanLock.business_id,
+				DistributionRouteAssignment.user_id == DistributionDailyPlanLock.user_id,
+				DistributionRouteAssignment.valid_from <= DistributionDailyPlanLock.plan_date,
+				or_(
+					DistributionRouteAssignment.valid_to.is_(None),
+					DistributionRouteAssignment.valid_to >= DistributionDailyPlanLock.plan_date,
+				),
+			),
+		)
+		.join(DistributionRouteStop, DistributionRouteStop.route_id == DistributionRouteAssignment.route_id)
+		.filter(
+			DistributionDailyPlanLock.business_id == business_id,
+			DistributionDailyPlanLock.is_locked == true(),
+			DistributionRouteStop.person_id == person_id,
+		)
+	)
+	if q.first() is not None:
+		raise ApiError(
+			"CONFLICT",
+			"Customer is scheduled on a locked daily plan; unpublish before changing visit frequency",
+			http_status=409,
+		)
+
+
+def assigned_user_ids_for_date(db: Session, business_id: int, plan_date: date) -> List[int]:
+	"""Resolve only visitors with a business-owned route assignment active on this day."""
+	rows = (
+		db.query(DistributionRouteAssignment.user_id)
+		.filter(
+			DistributionRouteAssignment.business_id == business_id,
+			DistributionRouteAssignment.valid_from <= plan_date,
+			or_(
+				DistributionRouteAssignment.valid_to.is_(None),
+				DistributionRouteAssignment.valid_to >= plan_date,
+			),
+		)
+		.distinct()
+		.all()
+	)
+	return sorted({int(row[0]) for row in rows if row[0] is not None})
+
+
+def get_plan_lock(db: Session, business_id: int, target_user_id: int, plan_date: date) -> Optional[DistributionDailyPlanLock]:
+	return (
+		db.query(DistributionDailyPlanLock)
+		.filter(
+			DistributionDailyPlanLock.business_id == business_id,
+			DistributionDailyPlanLock.user_id == target_user_id,
+			DistributionDailyPlanLock.plan_date == plan_date,
+		)
+		.first()
+	)
+
+
+def plan_lock_to_dict(row: Optional[DistributionDailyPlanLock]) -> Dict[str, Any]:
+	if row is None:
+		return {"published": False, "locked": False, "published_at": None, "published_by_user_id": None}
+	return {
+		"published": True,
+		"locked": bool(row.is_locked),
+		"published_at": row.published_at.isoformat() + "Z" if row.published_at else None,
+		"published_by_user_id": row.published_by_user_id,
+		"notes": row.notes,
+	}
+
+
+def _capture_plan_snapshot(
+	db: Session,
+	business_id: int,
+	target_user_id: int,
+	plan_date: date,
+) -> Dict[str, Any]:
+	"""Copy the scheduled route data, excluding mutable publication metadata."""
+	current = get_daily_plan(db, business_id, target_user_id, plan_date)
+	return deepcopy({
+		key: current[key]
+		for key in ("plan_date", "user_id", "items", "scheduled_count", "carried_over_count")
+		if key in current
+	})
+
+
+def _stage_plan_publication(
+	db: Session,
+	business_id: int,
+	actor_user_id: int,
+	target_user_id: int,
+	plan_date: date,
+	*,
+	locked: bool,
+	notes: Optional[str],
+) -> DistributionDailyPlanLock:
+	plan_snapshot = _capture_plan_snapshot(db, business_id, target_user_id, plan_date) if locked else None
+	now = datetime.utcnow()
+	row = get_plan_lock(db, business_id, target_user_id, plan_date)
+	if row is None:
+		row = DistributionDailyPlanLock(
+			business_id=business_id,
+			user_id=target_user_id,
+			plan_date=plan_date,
+			is_locked=locked,
+			published_by_user_id=actor_user_id,
+			published_at=now,
+			notes=notes,
+			plan_snapshot=plan_snapshot,
+			created_at=now,
+			updated_at=now,
+		)
+		db.add(row)
+	else:
+		row.is_locked = locked
+		row.plan_snapshot = plan_snapshot
+		row.published_by_user_id = actor_user_id
+		row.published_at = now
+		if notes is not None:
+			row.notes = notes
+		row.updated_at = now
+	return row
+
+
+def publish_daily_plan(
+	db: Session,
+	business_id: int,
+	actor_user_id: int,
+	target_user_id: int,
+	plan_date: date,
+	*,
+	locked: bool = False,
+	notes: Optional[str] = None,
+) -> Dict[str, Any]:
+	"""Publish a plan only for an actively assigned visitor in this business."""
+	_ensure_plugin(db, business_id)
+	_serialize_distribution_plan_mutation(db, business_id)
+	if locked:
+		raise ApiError("VALIDATION_ERROR", "Publishing with locked=true is unavailable until route edit guards are integrated", http_status=400)
+	if target_user_id not in assigned_user_ids_for_date(db, business_id, plan_date):
+		raise ApiError("VALIDATION_ERROR", "Visitor has no active route assignment for this business/date", http_status=400)
+	row = _stage_plan_publication(
+		db, business_id, actor_user_id, target_user_id, plan_date, locked=locked, notes=notes,
+	)
+	db.commit()
+	db.refresh(row)
+	return plan_lock_to_dict(row)
+
+
+def publish_daily_plans_for_date(
+	db: Session,
+	business_id: int,
+	actor_user_id: int,
+	plan_date: date,
+	*,
+	locked: bool = False,
+	notes: Optional[str] = None,
+) -> Dict[str, Any]:
+	"""Publish the assigned visitors atomically, never other businesses' users."""
+	_ensure_plugin(db, business_id)
+	_serialize_distribution_plan_mutation(db, business_id)
+	if locked:
+		raise ApiError("VALIDATION_ERROR", "Publishing with locked=true is unavailable until route edit guards are integrated", http_status=400)
+	rows = [
+		_stage_plan_publication(
+			db, business_id, actor_user_id, user_id, plan_date, locked=locked, notes=notes,
+		)
+		for user_id in assigned_user_ids_for_date(db, business_id, plan_date)
+	]
+	db.commit()
+	items = []
+	for row in rows:
+		db.refresh(row)
+		items.append({"user_id": row.user_id, **plan_lock_to_dict(row)})
+	return {"plan_date": plan_date.isoformat(), "published_count": len(items), "items": items}
+
+
+def unpublish_daily_plan(
+	db: Session,
+	business_id: int,
+	target_user_id: int,
+	plan_date: date,
+) -> None:
+	"""Deleting a publication is idempotent but always scoped to its business."""
+	_ensure_plugin(db, business_id)
+	_serialize_distribution_plan_mutation(db, business_id)
+	row = get_plan_lock(db, business_id, target_user_id, plan_date)
+	if row is None:
+		return
 	db.delete(row)
 	db.commit()
 
@@ -755,8 +1172,177 @@ def _weekday_matches(plan_date: date, weekday: Optional[int]) -> bool:
 	return int(weekday) == int(plan_date.weekday())
 
 
+def _summarize_visit_progress(rows: List[Any], items: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+	"""Return live statuses for only the customers present in a day plan.
+
+	Rows must be newest-first. Visits never mutate immutable published rows;
+	instead, their current execution state is returned in a separate field.
+	"""
+	allowed: set[int] = set()
+	for item in items:
+		if not isinstance(item, dict):
+			continue
+		try:
+			allowed.add(int(item["person_id"]))
+		except (KeyError, TypeError, ValueError, OverflowError):
+			continue
+	progress: Dict[str, Dict[str, Any]] = {}
+	for row in rows:
+		person_id = int(row.person_id)
+		if person_id not in allowed:
+			continue
+		status = str(row.status or "").lower()
+		if status not in ("completed", "in_progress"):
+			continue
+		key = str(person_id)
+		if key in progress:
+			continue
+		progress[key] = {
+			"kind": "done" if status == "completed" else "current",
+			"visit_id": int(row.id),
+		}
+	return progress
+
+
+def _get_plan_visit_progress(
+	db: Session,
+	business_id: int,
+	target_user_id: int,
+	plan_date: date,
+	items: List[Dict[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+	if not items:
+		return {}
+	start_utc, end_utc = business_day_utc_bounds(business_id, plan_date)
+	visits = (
+		db.query(DistributionFieldVisit)
+		.filter(
+			DistributionFieldVisit.business_id == business_id,
+			DistributionFieldVisit.user_id == target_user_id,
+			DistributionFieldVisit.started_at >= start_utc,
+			DistributionFieldVisit.started_at <= end_utc,
+			DistributionFieldVisit.status.in_(("completed", "in_progress")),
+		)
+		.order_by(DistributionFieldVisit.started_at.desc(), DistributionFieldVisit.id.desc())
+		.all()
+	)
+	return _summarize_visit_progress(visits, items)
+
+
+def _validate_locked_plan_snapshot_tenant_scope(
+	db: Session,
+	business_id: int,
+	target_user_id: int,
+	plan_date: date,
+	items: List[Dict[str, Any]],
+) -> None:
+	"""Fail closed if a persisted day plan references an unscoped customer/stop.
+
+	Only validate stable ownership and assignment IDs. Do not recalculate
+	route ordering, customer names, coordinates or carry-over status: a valid
+	immutable publication must remain the originally published snapshot.
+	"""
+	if not items:
+		return
+
+	def _positive_id(item: Dict[str, Any], field: str) -> int:
+		value = item.get(field)
+		# JSON snapshot IDs are integers; disallow bool/str/float coercion.
+		if type(value) is not int or value <= 0:
+			raise ApiError(
+				"CONFLICT",
+				"Locked daily plan contains an invalid customer, route or stop identifier",
+				http_status=409,
+			)
+		return value
+
+	by_stop: Dict[int, Tuple[int, int]] = {}
+	route_ids = set()
+	for item in items:
+		person_id = _positive_id(item, "person_id")
+		route_id = _positive_id(item, "route_id")
+		stop_id = _positive_id(item, "stop_id")
+		# Duplicate stop entries are not valid itinerary items.
+		if stop_id in by_stop:
+			raise ApiError("CONFLICT", "Locked daily plan contains duplicate stops", http_status=409)
+		by_stop[stop_id] = (route_id, person_id)
+		route_ids.add(route_id)
+
+	assigned_routes = {
+		int(row[0])
+		for row in db.query(DistributionRouteAssignment.route_id).filter(
+			DistributionRouteAssignment.business_id == business_id,
+			DistributionRouteAssignment.user_id == target_user_id,
+			DistributionRouteAssignment.valid_from <= plan_date,
+			or_(
+				DistributionRouteAssignment.valid_to.is_(None),
+				DistributionRouteAssignment.valid_to >= plan_date,
+			),
+		).all()
+	}
+	if not route_ids.issubset(assigned_routes):
+		raise ApiError(
+			"CONFLICT", "Locked daily plan contains a route not assigned to this visitor",
+			http_status=409,
+		)
+
+	# Include business-scoped joins for the route *and* customer. Chunk
+	# stop IDs to stay below SQL Server's 2100 query-parameter limit.
+	verified: Dict[int, Tuple[int, int]] = {}
+	stop_ids = list(by_stop)
+	for pos in range(0, len(stop_ids), 750):
+		rows = (
+			db.query(
+				DistributionRouteStop.id,
+				DistributionRouteStop.route_id,
+				DistributionRouteStop.person_id,
+			)
+			.join(DistributionRoute, DistributionRoute.id == DistributionRouteStop.route_id)
+			.join(Person, Person.id == DistributionRouteStop.person_id)
+			.filter(
+				DistributionRouteStop.id.in_(stop_ids[pos:pos + 750]),
+				DistributionRoute.business_id == business_id,
+				Person.business_id == business_id,
+			)
+			.all()
+		)
+		verified.update({
+			int(stop_id): (int(route_id), int(person_id))
+			for stop_id, route_id, person_id in rows
+		})
+	if verified != by_stop:
+		raise ApiError(
+			"CONFLICT", "Locked daily plan has a missing or foreign-business customer, route or stop",
+			http_status=409,
+	)
+
+
 def get_daily_plan(db: Session, business_id: int, target_user_id: int, plan_date: date) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
+	publication = get_plan_lock(db, business_id, target_user_id, plan_date)
+	if publication is not None and publication.is_locked:
+		# Never recalculate from live catalog state or mix snapshots between
+		# visitors/dates; corrupt or incorrectly scoped records fail closed.
+		snapshot = publication.plan_snapshot
+		if not isinstance(snapshot, dict) or not isinstance(snapshot.get("items"), list):
+			raise ApiError("CONFLICT", "Locked daily plan has no valid immutable snapshot", http_status=409)
+		try:
+			snapshot_user_id = int(snapshot.get("user_id"))
+		except (TypeError, ValueError, OverflowError):
+			snapshot_user_id = None
+		if (
+			snapshot_user_id != int(target_user_id)
+			or snapshot.get("plan_date") != plan_date.isoformat()
+			or any(not isinstance(item, dict) for item in snapshot["items"])
+		):
+			raise ApiError("CONFLICT", "Locked daily plan snapshot does not match the requested visitor/date", http_status=409)
+		_validate_locked_plan_snapshot_tenant_scope(
+			db, business_id, target_user_id, plan_date, snapshot["items"],
+		)
+		result = deepcopy(snapshot)
+		result.update(plan_lock_to_dict(publication))
+		result["visit_progress"] = _get_plan_visit_progress(db, business_id, target_user_id, plan_date, result["items"])
+		return result
 	assignments = (
 		db.query(DistributionRouteAssignment)
 		.options(joinedload(DistributionRouteAssignment.route))
@@ -771,7 +1357,7 @@ def get_daily_plan(db: Session, business_id: int, target_user_id: int, plan_date
 	items: List[Dict[str, Any]] = []
 	for asn in assignments:
 		route = asn.route
-		if not route or not route.is_active:
+		if not route or route.business_id != business_id or not route.is_active:
 			continue
 		stops = (
 			db.query(DistributionRouteStop)
@@ -782,9 +1368,13 @@ def get_daily_plan(db: Session, business_id: int, target_user_id: int, plan_date
 		for s in stops:
 			if not _weekday_matches(plan_date, s.weekday):
 				continue
-			person = db.query(Person).filter(Person.id == s.person_id).first()
-			pname = (person.alias_name or "").strip() if person else None
-			plats = person_coords(person) if person else (None, None)
+			person = db.query(Person).filter(Person.id == s.person_id, Person.business_id == business_id).first()
+			# Corrupt legacy cross-business route stops must not become
+			# actionable daily-plan entries, even with masked personal data.
+			if person is None:
+				continue
+			pname = (person.alias_name or "").strip()
+			plats = person_coords(person)
 			# ترتیب روزمحور از override مسیر (در صورت وجود)
 			day_sort = s.sort_order
 			overrides = getattr(route, "plan_sort_overrides", None) or {}
@@ -820,7 +1410,10 @@ def get_daily_plan(db: Session, business_id: int, target_user_id: int, plan_date
 	items.sort(key=lambda x: (x["route_code"], x["sort_order"], x["person_id"]))
 	from app.services.distribution_field_ops_service import enrich_daily_plan
 
-	return enrich_daily_plan(db, business_id, target_user_id, plan_date, items)
+	result = enrich_daily_plan(db, business_id, target_user_id, plan_date, items)
+	result.update(plan_lock_to_dict(publication))
+	result["visit_progress"] = _get_plan_visit_progress(db, business_id, target_user_id, plan_date, result["items"])
+	return result
 
 
 def _active_visit(db: Session, business_id: int, user_id: int) -> Optional[DistributionFieldVisit]:
@@ -834,6 +1427,102 @@ def _active_visit(db: Session, business_id: int, user_id: int) -> Optional[Distr
 		.order_by(DistributionFieldVisit.started_at.desc())
 		.first()
 	)
+
+
+def assert_visit_matches_daily_plan(
+	plan: Dict[str, Any],
+	person_id: int,
+	*,
+	route_id: Optional[int] = None,
+	route_stop_id: Optional[int] = None,
+) -> None:
+	"""Validate the supplied visit attribution against the visitor's day plan.
+
+	For published/required plans, a client must not attach a visit to a route
+	or stop belonging to another customer, route or business.
+	"""
+	items = plan.get("items")
+	if not isinstance(items, list):
+		raise ApiError("VALIDATION_ERROR", "Daily plan items are invalid", http_status=400)
+	def _item_id(item: Dict[str, Any], key: str) -> Optional[int]:
+		try:
+			value = item.get(key)
+			return int(value) if value is not None else None
+		except (TypeError, ValueError, OverflowError):
+			return None
+
+	matching = [
+		item for item in items
+		if isinstance(item, dict) and _item_id(item, "person_id") == person_id
+	]
+	if route_id is not None:
+		matching = [item for item in matching if _item_id(item, "route_id") == route_id]
+	if route_stop_id is not None:
+		matching = [item for item in matching if _item_id(item, "stop_id") == route_stop_id]
+	if not matching:
+		raise ApiError(
+			"VALIDATION_ERROR",
+			"Visit person, route and stop must match a single entry in today's plan",
+			http_status=400,
+		)
+
+
+def validate_visit_supervisor_assignment(
+	candidate_id: Optional[int],
+	ctx: Optional[AuthContext],
+	business_id: int,
+) -> Optional[int]:
+	"""Prevent field agents from attributing visits to arbitrary supervisors."""
+	if candidate_id is None:
+		return None
+	if ctx is None or not (
+		ctx.is_superadmin()
+		or (ctx.db and ctx.is_business_owner(business_id))
+		or ctx.has_business_permission("distribution", "manage")
+	):
+		raise ApiError(
+			"FORBIDDEN",
+			"Setting supervisor_user_id requires distribution.manage",
+			http_status=403,
+		)
+	return int(candidate_id)
+
+
+def validate_visit_route_attribution(
+	db: Session,
+	business_id: int,
+	person_id: int,
+	route_id: Optional[int],
+	route_stop_id: Optional[int],
+) -> Tuple[Optional[int], Optional[int]]:
+	"""Resolve submitted route/stop IDs inside one business and one customer.
+
+	Free-form visits remain possible when neither ID is provided. A stop
+	without an explicit route resolves to its owning route; forged references
+	to another business or customer never reach the visit record.
+	"""
+	resolved_route = int(route_id) if route_id is not None else None
+	resolved_stop = int(route_stop_id) if route_stop_id is not None else None
+	if resolved_route is not None and resolved_route <= 0:
+		raise ApiError("VALIDATION_ERROR", "route_id must be positive", http_status=400)
+	if resolved_stop is not None and resolved_stop <= 0:
+		raise ApiError("VALIDATION_ERROR", "route_stop_id must be positive", http_status=400)
+	if resolved_stop is not None:
+		stop = db.query(DistributionRouteStop).filter(DistributionRouteStop.id == resolved_stop).first()
+		if stop is None or int(stop.person_id) != int(person_id):
+			raise ApiError("VALIDATION_ERROR", "Stop does not belong to the supplied customer", http_status=400)
+		if resolved_route is not None and int(stop.route_id) != resolved_route:
+			raise ApiError("VALIDATION_ERROR", "Route stop does not belong to the supplied route", http_status=400)
+		resolved_route = int(stop.route_id)
+	if resolved_route is not None:
+		route = (
+			db.query(DistributionRoute)
+			.filter(DistributionRoute.id == resolved_route, DistributionRoute.business_id == business_id)
+			.first()
+		)
+		if route is None:
+			raise ApiError("VALIDATION_ERROR", "Route does not belong to this business", http_status=400)
+	return resolved_route, resolved_stop
 
 
 def start_visit(
@@ -852,19 +1541,28 @@ def start_visit(
 	person = db.query(Person).filter(Person.id == person_id, Person.business_id == business_id).first()
 	if not person:
 		raise ApiError("NOT_FOUND", "Person not found", http_status=404)
+	validated_supervisor_id = validate_visit_supervisor_assignment(
+		payload.get("supervisor_user_id"), ctx, business_id,
+	)
 	today = business_today(business_id)
-	settings_sv = get_or_create_distribution_settings(db, business_id)
-	if settings_sv.require_visit_in_daily_plan:
-		_plan = get_daily_plan(db, business_id, user_id, today)
-		_allowed_pids = {int(it["person_id"]) for it in _plan["items"]}
-		if person_id not in _allowed_pids:
-			raise ApiError(
-				"VALIDATION_ERROR",
-				"این شخص در برنامهٔ روز ویزیت شما نیست.",
-				http_status=400,
-			)
+	# A rejected visit must not create and commit a settings row. Preserve the
+	# request's transaction until its route/plan checks and visit are complete.
+	settings_sv = get_distribution_settings_row(db, business_id)
 	route_id = payload.get("route_id")
 	route_stop_id = payload.get("route_stop_id")
+	publication = get_plan_lock(db, business_id, user_id, today)
+	validated_plan = None
+	if bool(getattr(settings_sv, "require_visit_in_daily_plan", False)) or (publication is not None and publication.is_locked):
+		validated_plan = get_daily_plan(db, business_id, user_id, today)
+		assert_visit_matches_daily_plan(
+			validated_plan,
+			person_id,
+			route_id=int(route_id) if route_id else None,
+			route_stop_id=int(route_stop_id) if route_stop_id else None,
+		)
+	route_id, route_stop_id = validate_visit_route_attribution(
+		db, business_id, person_id, route_id, route_stop_id,
+	)
 	if ctx is not None and route_id:
 		_ensure_route_allowed_for_strict(db, business_id, ctx, int(route_id))
 	if ctx is not None and _use_strict_catalog_for_field_user(db, business_id, ctx):
@@ -874,8 +1572,9 @@ def start_visit(
 		if route_id and int(route_id) not in allowed_routes:
 			raise ApiError("FORBIDDEN", "مسیر به شما تخصیص داده نشده است.", http_status=403)
 		if not route_id:
-			_plan = get_daily_plan(db, business_id, user_id, today)
-			plan_person_routes = {int(it["person_id"]): int(it["route_id"]) for it in _plan["items"]}
+			if validated_plan is None:
+				validated_plan = get_daily_plan(db, business_id, user_id, today)
+			plan_person_routes = {int(it["person_id"]): int(it["route_id"]) for it in validated_plan["items"]}
 			if person_id not in plan_person_routes:
 				raise ApiError(
 					"FORBIDDEN",
@@ -940,7 +1639,7 @@ def start_visit(
 		start_latitude=_slat,
 		start_longitude=_slng,
 		extra_info=_extra or None,
-		supervisor_user_id=int(payload["supervisor_user_id"]) if payload.get("supervisor_user_id") else None,
+		supervisor_user_id=validated_supervisor_id,
 		is_carried_over=bool(payload.get("is_carried_over")),
 	)
 	db.add(v)
@@ -1277,9 +1976,14 @@ def cancel_visit(
 	v.updated_at = datetime.utcnow()
 	db.commit()
 	db.refresh(v)
-	person = db.query(Person).filter(Person.id == v.person_id).first()
+	person = db.query(Person).filter(
+		Person.id == v.person_id, Person.business_id == business_id,
+	).first()
 	pname = (person.alias_name or "").strip() if person else None
-	return visit_to_dict(v, pname)
+	result = visit_to_dict(v, pname)
+	if person is None:
+		result["person_id"] = None
+	return result
 
 
 def list_visits(
@@ -1305,9 +2009,17 @@ def list_visits(
 	pids = [r.person_id for r in rows]
 	pmap = {}
 	if pids:
-		for p in db.query(Person).filter(Person.id.in_(pids)).all():
+		for p in db.query(Person).filter(
+			Person.id.in_(pids), Person.business_id == business_id,
+		).all():
 			pmap[p.id] = (p.alias_name or "").strip()
-	return [visit_to_dict(r, pmap.get(r.person_id)) for r in rows], total
+	out = []
+	for r in rows:
+		item = visit_to_dict(r, pmap.get(r.person_id))
+		if r.person_id not in pmap:
+			item["person_id"] = None
+		out.append(item)
+	return out, total
 
 
 def create_return_request(db: Session, business_id: int, user_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -1323,6 +2035,23 @@ def create_return_request(db: Session, business_id: int, user_id: int, payload: 
 		raise ApiError("VALIDATION_ERROR", "lines must be a non-empty list", http_status=400)
 	lines = _validate_return_lines(db, business_id, raw_lines)
 	vid = payload.get("visit_id")
+	visit_id = None
+	if vid is not None and vid != "":
+		try:
+			visit_id = int(vid)
+		except (TypeError, ValueError, OverflowError):
+			raise ApiError("VALIDATION_ERROR", "Invalid visit_id", http_status=400)
+		if visit_id <= 0:
+			raise ApiError("VALIDATION_ERROR", "Invalid visit_id", http_status=400)
+		# Never attach a return request to another business's visit or to a
+		# different customer of the same business.
+		valid_visit = db.query(DistributionFieldVisit.id).filter(
+			DistributionFieldVisit.id == visit_id,
+			DistributionFieldVisit.business_id == business_id,
+			DistributionFieldVisit.person_id == person_id,
+		).first()
+		if valid_visit is None:
+			raise ApiError("NOT_FOUND", "Visit not found for this customer", http_status=404)
 	source_document_id = payload.get("source_document_id")
 	if source_document_id:
 		_validate_document_for_business(db, business_id, int(source_document_id), person_id)
@@ -1335,7 +2064,7 @@ def create_return_request(db: Session, business_id: int, user_id: int, payload: 
 	row = DistributionReturnRequest(
 		business_id=business_id,
 		person_id=person_id,
-		visit_id=int(vid) if vid else None,
+		visit_id=visit_id,
 		status="pending",
 		lines=meta_lines,
 		notes=payload.get("notes"),
@@ -1365,15 +2094,23 @@ def list_return_requests(db: Session, business_id: int, ctx: AuthContext, status
 	if status:
 		q = q.filter(DistributionReturnRequest.status == status)
 	rows = q.order_by(DistributionReturnRequest.created_at.desc()).limit(500).all()
-	from app.services.distribution_documents import person_label, user_label
+	from app.services.distribution_documents import user_label
 
+	person_ids = {r.person_id for r in rows}
+	persons = {
+		p.id: (p.alias_name or "").strip()
+		for p in db.query(Person).filter(
+			Person.business_id == business_id,
+			Person.id.in_(person_ids),
+		).all()
+	} if person_ids else {}
 	out = []
 	for r in rows:
 		out.append(
 			{
 				"id": r.id,
-				"person_id": r.person_id,
-				"person_name": person_label(db, r.person_id),
+				"person_id": r.person_id if r.person_id in persons else None,
+				"person_name": persons.get(r.person_id),
 				"visit_id": r.visit_id,
 				"status": r.status,
 				"lines": r.lines,
@@ -1496,9 +2233,53 @@ def resolve_return_request(
 	}
 
 
-def update_distribution_settings(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+_DAILY_PLAN_INPUT_SETTINGS = frozenset({
+	"carry_over_missed_visits",
+	"carry_over_days",
+})
+
+
+def assert_daily_plan_inputs_unlocked(db: Session, business_id: int) -> None:
+	"""Protect business-wide scheduling inputs for existing locked daily plans.
+
+	The carry-over policy and lookback interval control the scheduled/missed
+	stops copied into immutable snapshots. Serialize the check with the same
+	business-scoped transaction lock used by publishing and route edits.
+	"""
+	_serialize_distribution_plan_mutation(db, business_id)
+	if (
+		db.query(DistributionDailyPlanLock.id)
+		.filter(
+			DistributionDailyPlanLock.business_id == business_id,
+			DistributionDailyPlanLock.is_locked == true(),
+		)
+		.first()
+		is not None
+	):
+		raise ApiError(
+			"CONFLICT",
+			"Locked daily plans exist; unpublish before changing carry-over settings",
+			http_status=409,
+		)
+
+
+def update_distribution_settings(db: Session, business_id: int, payload: Dict[str, Any], *, commit: bool = True) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
-	row = get_or_create_distribution_settings(db, business_id)
+	if _DAILY_PLAN_INPUT_SETTINGS.intersection(payload):
+		assert_daily_plan_inputs_unlocked(db, business_id)
+	# Do not use get_or_create_distribution_settings here: it commits when
+	# inserting and would release the publication lock before these settings
+	# are saved. Persist a newly initialized row with the final update commit.
+	row = get_distribution_settings_row(db, business_id)
+	if row is None:
+		row = DistributionBusinessSettings(
+			business_id=business_id,
+			shared_routing_catalog=False,
+			require_visit_in_daily_plan=False,
+			created_at=datetime.utcnow(),
+			updated_at=datetime.utcnow(),
+		)
+		db.add(row)
 	if "shared_routing_catalog" in payload:
 		row.shared_routing_catalog = bool(payload["shared_routing_catalog"])
 	if "require_visit_in_daily_plan" in payload:
@@ -1553,7 +2334,10 @@ def update_distribution_settings(db: Session, business_id: int, payload: Dict[st
 	if "near_expiry_days" in payload:
 		row.near_expiry_days = max(1, min(90, int(payload.get("near_expiry_days") or 14)))
 	row.updated_at = datetime.utcnow()
-	db.commit()
+	if commit:
+		db.commit()
+	else:
+		db.flush()
 	db.refresh(row)
 	return settings_to_dict(row)
 
