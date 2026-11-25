@@ -448,7 +448,13 @@ def apply_route_optimize(
 	start_lat: Optional[float] = None,
 	start_lng: Optional[float] = None,
 ) -> Dict[str, Any]:
-	"""بهینه‌سازی و ذخیرهٔ ترتیب فقط برای همان روز (بدون بازنویسی sort_order کاتالوگ)."""
+	"""Persist a day-specific route order without racing plan publication.
+
+	Acquire the business mutation lock and check the day's publication
+	*before* reading route stops. Keep the lock until the final commit so a
+	concurrent route edit/publication cannot invalidate computed stop IDs.
+	"""
+	dist_svc.assert_route_has_no_locked_plans(db, business_id, route_id, plan_date=plan_date)
 	result = optimize_route_plan(db, business_id, route_id, plan_date, start_lat, start_lng)
 	items = result.get("items") or []
 	if not result.get("optimized"):
@@ -459,7 +465,6 @@ def apply_route_optimize(
 	).first()
 	if not route:
 		raise ApiError("NOT_FOUND", "Route not found", http_status=404)
-	dist_svc.assert_route_has_no_locked_plans(db, business_id, route_id, plan_date=plan_date)
 	overrides = dict(route.plan_sort_overrides or {})
 	day_key = plan_date.isoformat()
 	day_map: Dict[str, int] = {}
@@ -547,13 +552,20 @@ def optimize_route_plan(
 	for s in stops:
 		if not dist_svc._weekday_matches(plan_date, s.weekday):
 			continue
-		person = db.query(Person).filter(Person.id == s.person_id).first()
-		lat, lng = person_coords(person) if person else (None, None)
+		# Legacy routes may contain corrupted foreign-business person IDs.
+		# Such stops are neither visible nor actionable in an optimized plan.
+		person = db.query(Person).filter(
+			Person.id == s.person_id,
+			Person.business_id == business_id,
+		).first()
+		if person is None:
+			continue
+		lat, lng = person_coords(person)
 		items.append(
 			{
 				"stop_id": s.id,
 				"person_id": s.person_id,
-				"person_name": (person.alias_name or "").strip() if person else str(s.person_id),
+				"person_name": (person.alias_name or "").strip(),
 				"sort_order": s.sort_order,
 				"latitude": lat,
 				"longitude": lng,
