@@ -1,0 +1,31 @@
+name: WooCommerce money precision
+on:
+  pull_request:
+    paths:
+      - 'extraScripts/arcwoc/**'
+      - '.github/workflows/woocommerce-money-precision.yml'
+  push:
+    branches:
+      - integration/reconcile-master-20261125
+    paths:
+      - 'extraScripts/arcwoc/**'
+      - '.github/workflows/woocommerce-money-precision.yml'
+permissions:
+  contents: read
+jobs:
+  php-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: PHP runtime
+        run: php --version
+      - name: Lint decimal invoice files
+        run: |
+          php -l extraScripts/arcwoc/includes/class-hesabix-v2-decimal.php
+          php -l extraScripts/arcwoc/includes/class-hesabix-v2-currency-service.php
+          php -l extraScripts/arcwoc/includes/class-hesabix-v2-mapper.php
+          php -l extraScripts/arcwoc/includes/class-hesabix-v2-gateway-fee.php
+          php -l extraScripts/arcwoc/tests/test-invoice-money-precision.php
+      - name: Decimal and variation regression
+        run: php -d error_reporting=E_ALL extraScripts/arcwoc/tests/test-invoice-money-precision.php
