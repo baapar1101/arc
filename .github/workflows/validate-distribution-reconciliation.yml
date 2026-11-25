@@ -1,0 +1,38 @@
+name: Distribution reconciliation
+on:
+  pull_request:
+    paths:
+      - 'hesabixAPI/app/services/distribution*.py'
+      - 'hesabixAPI/adapters/db/models/distribution.py'
+      - 'hesabixAPI/tests/test_distribution*.py'
+      - '.github/workflows/validate-distribution-reconciliation.yml'
+  push:
+    branches:
+      - integration/reconcile-master-20261125
+    paths:
+      - 'hesabixAPI/app/services/distribution*.py'
+      - 'hesabixAPI/adapters/db/models/distribution.py'
+      - 'hesabixAPI/tests/test_distribution*.py'
+      - '.github/workflows/validate-distribution-reconciliation.yml'
+permissions:
+  contents: read
+jobs:
+  tenant-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: hesabixAPI
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: hesabixAPI/pyproject.toml
+      - name: Install API dependencies
+        run: python -m pip install -e ".[dev]"
+      - name: Compile changed services
+        run: python -m compileall -q app/services/distribution_service.py app/services/distribution_field_ops_service.py tests/test_distribution_plan_tenant_read_isolation.py
+      - name: Tenant isolation regressions
+        run: python -m pytest -q tests/test_distribution_plan_tenant_read_isolation.py
