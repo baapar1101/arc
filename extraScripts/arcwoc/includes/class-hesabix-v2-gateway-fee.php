@@ -10,6 +10,8 @@ if (!defined('WPINC')) {
 	die;
 }
 
+require_once __DIR__ . '/class-hesabix-v2-decimal.php';
+
 class Hesabix_V2_Gateway_Fee_Service
 {
 	const FEE_LINE_SERVICE = 'service';
@@ -428,6 +430,71 @@ class Hesabix_V2_Gateway_Fee_Service
 			'description' => sanitize_text_field(mb_substr($fee_label, 0, 500)),
 			'extra_info' => $line_extra,
 		);
+	}
+
+	/**
+	 * Exact invoice-currency commission; retain the legacy public method and
+	 * float filter contract for third-party WooCommerce extensions.
+	 */
+	public static function resolve_invoice_commission($order, $payment_amount, $amount_factor, array $policy)
+	{
+		$sync = self::get_sync();
+		$mode = $sync['gateway_settlement_mode'];
+		$base = Hesabix_V2_Decimal::add($payment_amount, '0');
+		if (Hesabix_V2_Decimal::compare($base, '0') <= 0) {
+			return '0';
+		}
+		$f = (float) $amount_factor;
+		if (!is_finite($f) || $f <= 0) {
+			$f = 1.0;
+		}
+		$commission = '0';
+		if ($mode === self::SETTLEMENT_PERCENT) {
+			$commission = Hesabix_V2_Decimal::multiply(Hesabix_V2_Decimal::multiply($base, $sync['gateway_settlement_percent']), '0.01');
+		} elseif ($mode === self::SETTLEMENT_FIXED) {
+			$commission = Hesabix_V2_Decimal::multiply($sync['gateway_settlement_fixed'], $f);
+		} elseif ($mode === self::SETTLEMENT_RULES) {
+			$method = method_exists($order, 'get_payment_method') ? sanitize_key((string) $order->get_payment_method()) : '';
+			foreach ($sync['gateway_settlement_rules'] as $rule) {
+				if ($rule['payment_method'] === '' || ($method !== '' && $rule['payment_method'] !== $method)) {
+					continue;
+				}
+				$commission = Hesabix_V2_Decimal::add(
+					Hesabix_V2_Decimal::multiply(Hesabix_V2_Decimal::multiply($base, $rule['percent']), '0.01'),
+					Hesabix_V2_Decimal::multiply($rule['fixed'], $f)
+				);
+				break;
+			}
+		} elseif ($mode === self::SETTLEMENT_ORDER_META) {
+			$keys = array($sync['gateway_settlement_meta_key'], '_gateway_settlement_fee', '_transaction_fee', 'gateway_fee', '_wc_gateway_fee', '_payment_fee');
+			foreach (array_unique($keys) as $key) {
+				if ($key === '') {
+					continue;
+				}
+				$raw = $order->get_meta($key, true);
+				if (is_numeric($raw) && Hesabix_V2_Decimal::compare($raw, '0') > 0) {
+					$commission = Hesabix_V2_Decimal::multiply($raw, $f);
+					break;
+				}
+			}
+		}
+		// Bound both built-in results and the final extension result.
+		$commission = self::bound_invoice_commission($commission, $base);
+		if (has_filter('hesabix_v2_order_gateway_commission') !== false) {
+			$commission = apply_filters('hesabix_v2_order_gateway_commission', (float) $commission, $order, (float) $base, $f, $sync);
+		}
+		$commission = self::bound_invoice_commission($commission, $base);
+		$commission = Hesabix_V2_Decimal::money($commission, $policy);
+		return self::bound_invoice_commission($commission, $base);
+	}
+
+	private static function bound_invoice_commission($amount, $base)
+	{
+		$amount = Hesabix_V2_Decimal::add($amount, '0');
+		if (Hesabix_V2_Decimal::compare($amount, '0') < 0) {
+			return '0';
+		}
+		return Hesabix_V2_Decimal::compare($amount, $base) > 0 ? $base : $amount;
 	}
 
 	/**
