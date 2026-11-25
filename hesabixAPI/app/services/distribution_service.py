@@ -1262,7 +1262,7 @@ def list_route_stops(db: Session, business_id: int, route_id: int, ctx: AuthCont
 	person_ids = [s.person_id for s in stops]
 	persons = {}
 	if person_ids:
-		for p in db.query(Person).filter(Person.id.in_(person_ids)).all():
+		for p in db.query(Person).filter(Person.id.in_(person_ids), Person.business_id == business_id).all():
 			persons[p.id] = (p.alias_name or "").strip() or str(p.id)
 	out = []
 	for s in stops:
@@ -1627,7 +1627,7 @@ def get_daily_plan(db: Session, business_id: int, target_user_id: int, plan_date
 	items: List[Dict[str, Any]] = []
 	for asn in assignments:
 		route = asn.route
-		if not route or not route.is_active:
+		if not route or route.business_id != business_id or not route.is_active:
 			continue
 		stops = (
 			db.query(DistributionRouteStop)
@@ -1638,9 +1638,12 @@ def get_daily_plan(db: Session, business_id: int, target_user_id: int, plan_date
 		for s in stops:
 			if not _weekday_matches(plan_date, s.weekday):
 				continue
-			person = db.query(Person).filter(Person.id == s.person_id).first()
-			pname = (person.alias_name or "").strip() if person else None
-			plats = person_coords(person) if person else (None, None)
+			person = db.query(Person).filter(Person.id == s.person_id, Person.business_id == business_id).first()
+			# Corrupt cross-business stops cannot become actionable plan entries.
+			if person is None:
+				continue
+			pname = (person.alias_name or "").strip()
+			plats = person_coords(person)
 			# ترتیب روزمحور از override مسیر (در صورت وجود)
 			day_sort = s.sort_order
 			overrides = getattr(route, "plan_sort_overrides", None) or {}
