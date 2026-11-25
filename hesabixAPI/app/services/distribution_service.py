@@ -610,11 +610,18 @@ def update_route(db: Session, business_id: int, route_id: int, payload: Dict[str
 	row.updated_at = datetime.utcnow()
 	db.commit()
 	db.refresh(row)
-	tname = None
+	territory = None
 	if row.territory_id:
-		t = db.query(DistributionTerritory).filter(DistributionTerritory.id == row.territory_id).first()
-		tname = t.name if t else None
-	return route_to_dict(row, tname)
+		territory = db.query(DistributionTerritory).filter(
+			DistributionTerritory.id == row.territory_id,
+			DistributionTerritory.business_id == business_id,
+		).first()
+	result = route_to_dict(row, territory.name if territory else None)
+	if row.territory_id is not None and territory is None:
+		# A legacy cross-tenant FK must not appear in the API response.
+		# Explicit territory_id=null remains available to repair that FK.
+		result["territory_id"] = None
+	return result
 
 
 def list_route_stops(db: Session, business_id: int, route_id: int, ctx: AuthContext) -> List[Dict[str, Any]]:
