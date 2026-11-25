@@ -8,7 +8,7 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import or_, true
 
 from adapters.db.models.distribution import (
 	DistributionFieldVisit,
@@ -241,7 +241,7 @@ def get_van_for_user(db: Session, business_id: int, user_id: int) -> Optional[Di
 		.filter(
 			DistributionVan.business_id == business_id,
 			DistributionVan.user_id == user_id,
-			DistributionVan.is_active == True,  # noqa: E712
+			DistributionVan.is_active == true(),
 		)
 		.first()
 	)
@@ -647,7 +647,7 @@ def get_team_map(
 	user_ids.update(int(r[0]) for r in assigns if r[0])
 	van_users = (
 		db.query(DistributionVan.user_id)
-		.filter(DistributionVan.business_id == business_id, DistributionVan.is_active == True)
+		.filter(DistributionVan.business_id == business_id, DistributionVan.is_active == true())
 		.all()
 	)
 	user_ids.update(int(r[0]) for r in van_users if r[0])
