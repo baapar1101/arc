@@ -1976,9 +1976,14 @@ def cancel_visit(
 	v.updated_at = datetime.utcnow()
 	db.commit()
 	db.refresh(v)
-	person = db.query(Person).filter(Person.id == v.person_id).first()
+	person = db.query(Person).filter(
+		Person.id == v.person_id, Person.business_id == business_id,
+	).first()
 	pname = (person.alias_name or "").strip() if person else None
-	return visit_to_dict(v, pname)
+	result = visit_to_dict(v, pname)
+	if person is None:
+		result["person_id"] = None
+	return result
 
 
 def list_visits(
@@ -2004,9 +2009,17 @@ def list_visits(
 	pids = [r.person_id for r in rows]
 	pmap = {}
 	if pids:
-		for p in db.query(Person).filter(Person.id.in_(pids)).all():
+		for p in db.query(Person).filter(
+			Person.id.in_(pids), Person.business_id == business_id,
+		).all():
 			pmap[p.id] = (p.alias_name or "").strip()
-	return [visit_to_dict(r, pmap.get(r.person_id)) for r in rows], total
+	out = []
+	for r in rows:
+		item = visit_to_dict(r, pmap.get(r.person_id))
+		if r.person_id not in pmap:
+			item["person_id"] = None
+		out.append(item)
+	return out, total
 
 
 def create_return_request(db: Session, business_id: int, user_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -2022,6 +2035,23 @@ def create_return_request(db: Session, business_id: int, user_id: int, payload: 
 		raise ApiError("VALIDATION_ERROR", "lines must be a non-empty list", http_status=400)
 	lines = _validate_return_lines(db, business_id, raw_lines)
 	vid = payload.get("visit_id")
+	visit_id = None
+	if vid is not None and vid != "":
+		try:
+			visit_id = int(vid)
+		except (TypeError, ValueError, OverflowError):
+			raise ApiError("VALIDATION_ERROR", "Invalid visit_id", http_status=400)
+		if visit_id <= 0:
+			raise ApiError("VALIDATION_ERROR", "Invalid visit_id", http_status=400)
+		# Never attach a return request to another business's visit or to a
+		# different customer of the same business.
+		valid_visit = db.query(DistributionFieldVisit.id).filter(
+			DistributionFieldVisit.id == visit_id,
+			DistributionFieldVisit.business_id == business_id,
+			DistributionFieldVisit.person_id == person_id,
+		).first()
+		if valid_visit is None:
+			raise ApiError("NOT_FOUND", "Visit not found for this customer", http_status=404)
 	source_document_id = payload.get("source_document_id")
 	if source_document_id:
 		_validate_document_for_business(db, business_id, int(source_document_id), person_id)
@@ -2034,7 +2064,7 @@ def create_return_request(db: Session, business_id: int, user_id: int, payload: 
 	row = DistributionReturnRequest(
 		business_id=business_id,
 		person_id=person_id,
-		visit_id=int(vid) if vid else None,
+		visit_id=visit_id,
 		status="pending",
 		lines=meta_lines,
 		notes=payload.get("notes"),
@@ -2064,15 +2094,23 @@ def list_return_requests(db: Session, business_id: int, ctx: AuthContext, status
 	if status:
 		q = q.filter(DistributionReturnRequest.status == status)
 	rows = q.order_by(DistributionReturnRequest.created_at.desc()).limit(500).all()
-	from app.services.distribution_documents import person_label, user_label
+	from app.services.distribution_documents import user_label
 
+	person_ids = {r.person_id for r in rows}
+	persons = {
+		p.id: (p.alias_name or "").strip()
+		for p in db.query(Person).filter(
+			Person.business_id == business_id,
+			Person.id.in_(person_ids),
+		).all()
+	} if person_ids else {}
 	out = []
 	for r in rows:
 		out.append(
 			{
 				"id": r.id,
-				"person_id": r.person_id,
-				"person_name": person_label(db, r.person_id),
+				"person_id": r.person_id if r.person_id in persons else None,
+				"person_name": persons.get(r.person_id),
 				"visit_id": r.visit_id,
 				"status": r.status,
 				"lines": r.lines,
