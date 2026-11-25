@@ -14,6 +14,8 @@ function check($actual, $expected, $name)
 	}
 }
 function absint($v) { return abs((int) $v); }
+function sanitize_text_field($v) { return $v; }
+if (!function_exists('mb_substr')) { function mb_substr($v, $start, $length) { return substr($v, $start, $length); } }
 function __($v, $domain = '') { return $v; }
 function sanitize_key($key) { return preg_replace('/[^a-z0-9_\-]/', '', strtolower($key)); }
 function has_filter($hook) { return $hook === 'hesabix_v2_order_gateway_commission' && isset($GLOBALS['commission_filter']) ? 10 : false; }
@@ -23,6 +25,7 @@ function set_transient(...$args) {}
 function get_option($key, $default = false)
 {
 	if ($key === 'hesabix_v2_sync_settings') { return $GLOBALS['commission_settings'] ?? array(); }
+	if ($key === 'hesabix_v2_fee_product_id') { return 123; }
 	return array('hesabix_v2_enabled' => true, 'hesabix_v2_business_id' => 1, 'hesabix_v2_currency_id' => 1,
 		'hesabix_v2_invoice_payment_destination' => 'cash_register', 'hesabix_v2_default_cash_register_id' => '1')[$key] ?? $default;
 }
@@ -51,11 +54,20 @@ class MoneyItem
 	public function get_total_tax() { return ($this->item ?? $GLOBALS['money_case'])[2]; }
 	public function get_id() { return 77; }
 }
+class MoneyFee
+{
+	private $net;
+	private $tax;
+	public function __construct($net, $tax) { $this->net = $net; $this->tax = $tax; }
+	public function get_total() { return $this->net; }
+	public function get_total_tax() { return $this->tax; }
+	public function get_name() { return 'Test fee'; }
+}
 class MoneyOrder
 {
 	public function get_items($type = 'line_item')
 	{
-		if ($type === 'fee') { return array(); }
+		if ($type === 'fee') { return $GLOBALS['money_fees'] ?? array(); }
 		return isset($GLOBALS['money_items']) ? array_map(fn($item) => new MoneyItem($item), $GLOBALS['money_items']) : array(new MoneyItem());
 	}
 	public function get_total() { return $GLOBALS['money_case'][3]; }
@@ -187,4 +199,41 @@ $payload = Hesabix_V2_Mapper::wc_order_to_invoice(new MoneyOrder(), 1, 10, 1);
 check($payload['payments'][0]['commission'], '2.5', 'fixed commission converted by factor');
 unset($commission_settings, $commission_meta);
 echo "PASS: exact settlement commissions and filter compatibility\n";
+// Match backend invoice adjustment sign and per-row tax rounding.
+foreach (array(
+	array('1.25', '0.125', 'addition', '1.25', '0.13'),
+	array('-1.25', '-0.125', 'deduction', '-1.25', '-0.13'),
+	array('0.03', '0.005', 'addition', '0.03', '0.01'),
+) as $fee_case) {
+	$commission_settings = array('fee_line_mode' => 'account_adjustment', 'fee_negative_mode' => 'deduction_adjustment',
+		'fee_adjustment_account_id' => 9, 'fee_deduction_account_id' => 10);
+	$lines = array(); $adjustments = array(); $net = '0'; $tax = '0';
+	Hesabix_V2_Gateway_Fee_Service::apply_wc_fee_item_to_invoice(new MoneyOrder(), new MoneyFee($fee_case[0], $fee_case[1]), 1, $lines, $adjustments, $net, $tax);
+	check($adjustments[0]['kind'], $fee_case[2], 'adjustment kind');
+	check($net, $fee_case[3], 'signed adjustment net');
+	check($tax, $fee_case[4], 'signed posted adjustment tax');
+	check($lines, array(), 'account adjustment does not add a service line');
+}
+foreach (array(array('1.25','-0.1'), array('-1.25','0.1'), array('0.001','0'), array('1','2')) as $bad_fee) {
+	$lines = array(); $adjustments = array(); $net = '0'; $tax = '0'; $rejected = false;
+	try {
+		Hesabix_V2_Gateway_Fee_Service::apply_wc_fee_item_to_invoice(new MoneyOrder(), new MoneyFee($bad_fee[0], $bad_fee[1]), 1, $lines, $adjustments, $net, $tax);
+	} catch (RuntimeException $e) { $rejected = true; }
+	check($rejected, true, 'unsupported adjustment rejected');
+	check($adjustments, array(), 'no partial adjustment');
+}
+unset($commission_settings);
+foreach (array(array('0.005','0.005','0.01'), array('-0.125','-0.025','-0.15')) as $fee_case) {
+	$lines = array(); $adjustments = array(); $net = '0'; $tax = '0';
+	Hesabix_V2_Gateway_Fee_Service::apply_wc_fee_item_to_invoice(new MoneyOrder(), new MoneyFee($fee_case[0], $fee_case[1]), 1, $lines, $adjustments, $net, $tax);
+	check($lines[0]['extra_info']['line_total'], $fee_case[2], 'exact service line net');
+	check($lines[0]['extra_info']['tax_amount'], $fee_case[1], 'exact signed service line tax');
+}
+$money_case = array(1, '1', '0.005', '1.01');
+$money_fees = array(new MoneyFee('0.005','0.005'));
+$payload = Hesabix_V2_Mapper::wc_order_to_invoice(new MoneyOrder(), 1, 1, 1);
+check($payload['payments'][0]['amount'], '1.01', 'service fee payment stays exact');
+check($payload['lines'][1]['extra_info']['line_total'], '0.01', 'service fee retains fractional source amount');
+unset($money_fees);
+echo "PASS: fee service line and signed account adjustment precision\n";
 echo "PASS: decimal arithmetic, currency policy and eleven Mapper/payment/JSON cases\n";
